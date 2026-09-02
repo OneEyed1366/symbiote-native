@@ -17,6 +17,7 @@ export {
   censusRetainedTree,
   getExplicitStyle,
   setNodeHidden,
+  setNodeComponent,
   setNodePressed,
   setText,
   isSymbioteNode,
@@ -86,6 +87,10 @@ export type { ICommitProfile } from './commit';
 // across adapters has to hang off this, not off a per-framework lifecycle hook, or it measures a
 // different quantity in each one under the same name.
 export { registerPostCommit, unregisterPostCommit } from './post-commit';
+// The aria/role -> accessibility* fold. Lives here rather than in a component wrapper because a
+// LOWERED element has no wrapper: `fabricProps` runs it on the way to the payload, so every path
+// gets it. `core/components`' typed `resolveAccessibilityProps` delegates to this one.
+export { foldAriaProps } from './accessibility-props';
 // The public instance every host node already is (React's getPublicInstance, the Vue renderer's
 // createElement): the imperative measure/setNativeProps/focus API, on the shared node prototype.
 // toPublicInstance is the identity that names the seam — see ./host-instance.
@@ -416,6 +421,7 @@ export type {
 export {
   registerHostBehavior,
   hasHostBehaviors,
+  hostBehaviorFor,
   clearHostBehaviors,
   appListenerFor,
 } from './host-behavior';

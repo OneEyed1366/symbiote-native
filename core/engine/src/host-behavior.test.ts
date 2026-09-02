@@ -14,6 +14,7 @@ import {
   insertBefore,
   registerHostBehavior,
   removeChild,
+  setProp,
   type ISymbioteNode,
 } from './index';
 
@@ -185,5 +186,184 @@ describe('teardown', () => {
     expect(log.detached, 'exactly once, not once per commit').toEqual([
       pressable,
     ]);
+  });
+});
+
+// The half `attach` cannot do. A behavior whose setup needs a committed Fabric tag — a view command
+// for `autoFocus`, a native Animated binding, an event attach — cannot run at `attach`, because
+// that fires inside `createElement` with the node holding its component and nothing else. React
+// would hide this: it commits synchronously, so such code works there by accident and no-ops
+// silently on Vue, Solid and Angular, which commit a tick later.
+describe('attachAfterCommit', () => {
+  interface IDeferredLog extends ILog {
+    afterCommit: ISymbioteNode[];
+  }
+
+  function trackDeferred(component: string): IDeferredLog {
+    const log: IDeferredLog = { attached: [], detached: [], afterCommit: [] };
+    registerHostBehavior(component, {
+      attach: node => log.attached.push(node),
+      attachAfterCommit: node => log.afterCommit.push(node),
+      detach: node => log.detached.push(node),
+    });
+    return log;
+  }
+
+  it('does not run at attach, and runs on the commit that lands the node', () => {
+    const log = trackDeferred(PRESSABLE);
+    const { surface, root } = mount();
+    const pressable = createElement(PRESSABLE);
+
+    // The control, and it is the whole test: `attach` has ALREADY fired here. Without asserting
+    // that, an `afterCommit` still empty two lines down could equally mean the behavior never
+    // attached at all, and the case would pass against a registry that does nothing.
+    expect(log.attached, 'attach fires at createElement').toEqual([pressable]);
+    expect(log.afterCommit, 'nothing committed yet').toEqual([]);
+
+    appendChild(root, pressable);
+    surface.commit();
+
+    expect(log.afterCommit).toEqual([pressable]);
+  });
+
+  // The later commits must be REAL ones. Written first with three bare `surface.commit()` calls,
+  // this passed against a drain that never removed anything from its pending set — because commits
+  // two and three changed nothing, and `commitContainer` returns on `!result.changed` ABOVE the
+  // drain, so no second drain ever happened (`engine-mutations-must-mark-dirty.md`, "a no-op commit
+  // fires NO post-commit hook"). A test of "runs once" that never runs the drain twice is vacuous.
+  it('runs once, not once per later commit', () => {
+    const log = trackDeferred(PRESSABLE);
+    const { surface, root } = mount();
+    const pressable = createElement(PRESSABLE);
+    appendChild(root, pressable);
+    surface.commit();
+
+    for (const nativeID of ['second', 'third']) {
+      setProp(pressable, 'nativeID', nativeID);
+      surface.commit();
+    }
+
+    expect(log.afterCommit).toEqual([pressable]);
+  });
+
+  // The leak this exists to prevent: a node built and thrown away inside one tick never reaches
+  // Fabric, so a drain must not hand its behavior a node that is already dead.
+  it('never runs for a node torn down before its first commit', () => {
+    const log = trackDeferred(PRESSABLE);
+    const { surface, root } = mount();
+    const pressable = createElement(PRESSABLE);
+    appendChild(root, pressable);
+    removeChild(root, pressable);
+    surface.commit();
+
+    expect(log.detached).toEqual([pressable]);
+    expect(log.afterCommit).toEqual([]);
+  });
+
+  // `attach` and `attachAfterCommit` are a PAIR. A behavior that splits its setup across the two
+  // comes back half-initialised if a restart re-arms only one — and Svelte parks live nodes across
+  // commits routinely, so a restart is an ordinary event, not an edge case.
+  it('re-arms with attach when a parked node comes back', () => {
+    const log = trackDeferred(PRESSABLE);
+    const { surface, root } = mount();
+    const row = createElement('RCTView');
+    const parked = createElement(PRESSABLE);
+    appendChild(row, parked);
+    appendChild(root, row);
+    surface.commit();
+    expect(log.afterCommit).toEqual([parked]);
+
+    removeChild(root, row);
+    surface.commit();
+    expect(log.detached).toEqual([parked]);
+
+    appendChild(root, row);
+    surface.commit();
+
+    expect(log.attached.filter(node => node === parked)).toHaveLength(2);
+    expect(
+      log.afterCommit.filter(node => node === parked),
+      'the deferred half restarts with the eager one',
+    ).toHaveLength(2);
+  });
+});
+
+// The RECURRING beat, for a behavior whose contract is driven by a PROP rather than by an event.
+// A controlled TextInput is the case: RN commands the text back down when the app's `value`
+// diverges from what native last reported, and in a component the render is what re-runs that
+// comparison. A lowered element has no render, so the commit is the only equivalent.
+describe('afterCommit', () => {
+  interface IRecurringLog extends ILog {
+    order: string[];
+    beats: ISymbioteNode[];
+  }
+
+  function trackRecurring(component: string): IRecurringLog {
+    const log: IRecurringLog = {
+      attached: [],
+      detached: [],
+      order: [],
+      beats: [],
+    };
+    registerHostBehavior(component, {
+      attach: node => log.attached.push(node),
+      attachAfterCommit: () => log.order.push('attachAfterCommit'),
+      afterCommit: node => {
+        log.order.push('afterCommit');
+        log.beats.push(node);
+      },
+      detach: node => log.detached.push(node),
+    });
+    return log;
+  }
+
+  it('runs on every commit, not once', () => {
+    const log = trackRecurring(PRESSABLE);
+    const { surface, root } = mount();
+    const node = createElement(PRESSABLE);
+    appendChild(root, node);
+    surface.commit();
+
+    // Real commits, not bare ones: `commitContainer` returns on `!result.changed` above the drain,
+    // so three no-op commits would exercise a single beat and the test would pass on a hook that
+    // only ever fired once.
+    for (const nativeID of ['second', 'third']) {
+      setProp(node, 'nativeID', nativeID);
+      surface.commit();
+    }
+
+    expect(log.beats).toEqual([node, node, node]);
+  });
+
+  // The ordering is load-bearing on the FIRST commit, where a node carrying both hooks is drained
+  // by both: `attachAfterCommit` seeds the mirrors that `afterCommit` compares against. Reversed,
+  // the first beat compares against nothing and commands a redundant write down to native.
+  it('runs AFTER attachAfterCommit on the first commit', () => {
+    const log = trackRecurring(PRESSABLE);
+    const { surface, root } = mount();
+    appendChild(root, createElement(PRESSABLE));
+    surface.commit();
+
+    expect(log.order).toEqual(['attachAfterCommit', 'afterCommit']);
+  });
+
+  // Unlike a missed deferral, forgetting this one has a visible consequence: the behavior would be
+  // asked to reconcile props against a subtree that has left the tree, on every commit, forever.
+  it('stops beating once the node is torn down', () => {
+    const log = trackRecurring(PRESSABLE);
+    const { surface, root } = mount();
+    const node = createElement(PRESSABLE);
+    appendChild(root, node);
+    surface.commit();
+    expect(log.beats).toHaveLength(1);
+
+    removeChild(root, node);
+    surface.commit();
+    expect(log.detached).toEqual([node]);
+
+    setProp(root, 'nativeID', 'after-teardown');
+    surface.commit();
+
+    expect(log.beats, 'no beat after the teardown commit').toHaveLength(1);
   });
 });

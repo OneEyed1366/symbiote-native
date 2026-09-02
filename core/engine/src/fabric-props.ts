@@ -5,6 +5,7 @@
 // ./platform-color (the stable leaf every color-touching module imports from); this file only
 // decides WHICH props are color props and wires the structured CSS-style processors.
 
+import { foldAriaProps } from './accessibility-props';
 import type { IFabricProps } from './fabric';
 import { RAW_TEXT_COMPONENT, type ISymbioteNode } from './node';
 import { registeredProcessor } from './registry';
@@ -262,6 +263,50 @@ function addStyle(
 // Translate the retained node's logical props into the flat payload Fabric's C++
 // props expect: `style` keys are hoisted to the top level, event handlers and
 // undefined values are dropped.
+// RN HAS NO `value` FABRIC PROP. A TextInput's controlled value rides as the private `text` prop,
+// and the fold that produces it — `value ?? defaultValue` — lives in the component wrapper
+// (`core/components/src/view/render-text-input.ts`, whose own comment says "There is no `value`
+// Fabric prop; this is the whole controlled surface"). A LOWERED element has no wrapper, so a
+// transform printing the author's `value={x}` yields a key no ViewConfig declares: silently dropped,
+// `text` never set, and the field renders EMPTY. Nothing red anywhere — found 2026-08-31 by an agent
+// reading what the render function actually emits rather than trusting a header comment.
+//
+// So the fold moves to the layer every path goes through, exactly like the aria fold above it. This
+// is the third instance of one rule: a lowered element inherits NOTHING its wrapper did, and the
+// repair belongs below the fork, never in the transform.
+//
+// GATED ON THE COMPONENT, NOT ON THE PROP. `value` is also a prop of `Switch` and `Slider`; a fold
+// keyed on the prop name would write a bogus `text` onto both. Two string comparisons rather than a
+// Set lookup — this runs per node per commit, and the set has exactly two members.
+//
+// The engine may hold this because both views are in `BUILTIN_COMPONENTS`, whose hand-tuned tables
+// (`view-config.ts`'s TEXT_INPUT_EVENTS, commit's COLOR_PROPS) already live here for the same
+// reason. Routing it through `registerComponent` was tried first and is WRONG: `resolve()`
+// short-circuits every builtin to EMPTY, so the registration would have been accepted and never
+// applied.
+const SINGLELINE_TEXT_INPUT = 'RCTSinglelineTextInputView';
+const MULTILINE_TEXT_INPUT = 'RCTMultilineTextInputView';
+
+function foldTextInputValue(
+  props: Record<string, unknown>,
+): Record<string, unknown> {
+  const hasValue = props.value !== undefined;
+  const hasDefault = props.defaultValue !== undefined;
+  if (!hasValue && !hasDefault) return props;
+
+  const folded: Record<string, unknown> = { ...props };
+  // `value` WINS over `defaultValue` — `foldText`'s rule, kept identical rather than re-derived.
+  // An explicit `text` is left alone: that is the component path, where the wrapper already folded,
+  // and re-folding there would let a stale `value` overwrite what the wrapper computed.
+  if (folded.text === undefined) {
+    folded.text = hasValue ? props.value : props.defaultValue;
+  }
+  // Blanked, not deleted: `fabricProps` skips undefined, and neither name is a real Fabric prop.
+  folded.value = undefined;
+  folded.defaultValue = undefined;
+  return folded;
+}
+
 export function fabricProps(node: ISymbioteNode): IFabricProps {
   if (node.component === RAW_TEXT_COMPONENT) {
     return { text: node.props.text };
@@ -280,7 +325,30 @@ export function fabricProps(node: ISymbioteNode): IFabricProps {
   // cache. The general rule this bought: an allocation-count win measured on V8 is not a Hermes
   // win, and only the on-device number decides (`perf-claims-need-numbers`).
   const out: Record<string, unknown> = {};
-  const props = node.props;
+  // THE ONE POINT WHERE THE WHOLE BAG IS KNOWN ON EVERY PATH, which is what the aria fold needs:
+  // `aria-checked` has to be folded against a sibling `accessibilityState`, and `routeProp` sees
+  // one key at a time. Both commit paths — create and update — reach here, so a lowered element
+  // gets the fold it has no wrapper to run.
+  //
+  // NOT memoised on `node.props` identity. That object is stable and mutated IN PLACE, so an
+  // identity-keyed cache (the `processedStyle` pattern below) would be stale forever. The gate is
+  // the node's sticky flag instead: one boolean read for a node with no alias, which is nearly all
+  // of them, and the fold's own fast path returns by identity for the rest.
+  const aliasFolded = node.hasAriaAlias
+    ? foldAriaProps(node.props)
+    : node.props;
+  // The behavior's own fold, for a LOWERED element only — the two folds above are keyed on the
+  // component name, which a wrapper and its lowered twin share, so neither could carry a
+  // per-primitive fold without running it twice on the wrapper. See IPayloadFold.
+  const behaviorFolded =
+    node.payloadFold !== undefined
+      ? node.payloadFold(aliasFolded)
+      : aliasFolded;
+  const props =
+    node.component === SINGLELINE_TEXT_INPUT ||
+    node.component === MULTILINE_TEXT_INPUT
+      ? foldTextInputValue(behaviorFolded)
+      : behaviorFolded;
   for (const key of Object.keys(props)) {
     if (key === 'style') continue;
     const value = props[key];

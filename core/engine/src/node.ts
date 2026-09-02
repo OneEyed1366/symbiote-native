@@ -13,6 +13,7 @@ import type {
   IMeasureInWindowOnSuccess,
   IMeasureLayoutOnSuccess,
 } from './fabric';
+import { isAriaAliasKey } from './accessibility-props';
 import { isEventFor } from './view-config';
 import {
   canonicalClassName,
@@ -29,6 +30,7 @@ import {
   ownsListener,
   reattachHostBehaviors,
   stashAppListener,
+  type IPayloadFold,
 } from './host-behavior';
 // A cycle, deliberately: commit.ts imports this module for the node shape, and the imperative
 // methods below call back into it. Neither side touches the other at module-evaluation time -
@@ -82,7 +84,13 @@ export function isSymbioteEvent(value: unknown): value is ISymbioteEvent {
 export interface ISymbioteNode {
   readonly [BRAND]: true;
   // Fabric view name passed to createNode (RCTView, RCTImageView, RCTText, ...).
-  readonly component: string;
+  //
+  // NOT readonly, and only `setNodeComponent` may write it. A primitive whose native view depends
+  // on a prop (`TextInput`'s `multiline`) has to be able to change view without changing IDENTITY —
+  // an app's ref, the host behavior and the children all stay attached to this object while the
+  // native side is rebuilt underneath. That is the browser's own semantics for `<input type>`:
+  // the element survives, its internal representation does not.
+  component: string;
   // A text container: its descendants render as virtual text spans.
   readonly isText: boolean;
   props: Record<string, unknown>;
@@ -109,6 +117,30 @@ export interface ISymbioteNode {
   // silent-stale-UI failure mode. So every write path errs toward marking - see markPropsDirty -
   // and skipped nodes are deliberately NOT cleared in renderableChildren the way `dirty` is.
   propsDirty: boolean;
+  // "A `role` or `aria-*` key has been written here at least once." The gate for the aria fold
+  // (`accessibility-props.ts`), which `fabricProps` runs on the way to the payload so a LOWERED
+  // element gets it too - it has no component wrapper to run it in.
+  //
+  // A FIELD rather than the fold's own 15-property probe, because the probe is per COMPONENT
+  // INSTANCE where this is per NODE PER BUILD: ~9 000 nodes on a create, 135 000 property reads to
+  // discover that almost none of them carry an alias. One boolean read instead, written at most
+  // once per prop write.
+  //
+  // STICKY on purpose - never cleared. Deleting the last alias leaves it true, the fold runs and
+  // returns its input by identity. Monotone, so no invalidation bug is expressible; the cost of a
+  // stale `true` is one identity-returning call on a node that once had an alias.
+  hasAriaAlias: boolean;
+  // The payload fold this node's host behavior supplied, or undefined for the ~all of them that
+  // have none. Set once at `createElement`, never per write, and read by `fabricProps` at the one
+  // point where the whole bag is known.
+  //
+  // WHY IT HANGS OFF THE BEHAVIOR AND NOT OFF `node.component`, which is how the aria and
+  // value->text folds next to it are keyed. A wrapper and its lowered twin commit the SAME Fabric
+  // view name — `RCTSinglelineTextInputView` for both `symbiote-text-input` and
+  // `symbiote-text-input-managed` — so a fold keyed on the component name runs on both, and the
+  // wrapper has already folded in its own body. Double-folding is the hazard. A behavior attaches
+  // to the LOWERED tag alone, so it is the discriminator that already exists.
+  payloadFold: IPayloadFold | undefined;
   // "THIS node's own CHILD LIST changed since its last commit" - the third question the single
   // `dirty` flag used to blur together with the other two. `dirty` says whether to descend,
   // `propsDirty` whether this node's own payload can differ, `structureDirty` whether its committed
@@ -189,7 +221,7 @@ const BLUR_COMMAND = 'blur';
 // define-per-field.
 class SymbioteNode implements ISymbioteNode {
   declare readonly [BRAND]: true;
-  declare readonly component: string;
+  declare component: string;
   declare readonly isText: boolean;
   declare props: Record<string, unknown>;
   declare listeners: Map<string, IListener> | undefined;
@@ -197,9 +229,11 @@ class SymbioteNode implements ISymbioteNode {
   declare parent: ISymbioteNode | undefined;
   declare dirty: boolean;
   declare propsDirty: boolean;
+  declare hasAriaAlias: boolean;
   declare structureDirty: boolean;
   declare committed: IMirror | undefined;
   declare styleParts: IClassStyleParts | undefined;
+  declare payloadFold: IPayloadFold | undefined;
 
   constructor(
     component: string,
@@ -218,9 +252,22 @@ class SymbioteNode implements ISymbioteNode {
     // are assigned here rather than through setText.
     this.dirty = true;
     this.propsDirty = true;
+    // Assigned here, not lazily on first use: every slot present from the constructor keeps one
+    // hidden class for every node. Adding it on demand buys a shape transition per aria-bearing
+    // node, which is the opposite of what this field is for.
+    //
+    // Starts false, and that is COMPLETE rather than optimistic: the only two constructions are
+    // `createElement`'s `{}` and `createRawText`'s `{ text }`, so no aria key can arrive here. It
+    // was first written as `hasAriaAliases(props)` — a probe that reads as a safeguard and can
+    // never fire, which the break-test caught by staying green with it removed. If a construction
+    // path is ever added that passes real props, this line owes that probe back.
+    this.hasAriaAlias = false;
     this.structureDirty = true;
     this.committed = undefined;
     this.styleParts = undefined;
+    // Assigned here for the same hidden-class reason as `hasAriaAlias` above; `attachHostBehavior`
+    // overwrites it a few lines later for the rare node that has a behavior.
+    this.payloadFold = undefined;
   }
 
   measure(callback: IMeasureOnSuccess): void {
@@ -388,6 +435,30 @@ export function isEmptyRawText(node: ISymbioteNode): boolean {
 // every render, so marking there would re-dirty the whole tree every commit and hand the win back.
 // The one listener that DOES change a Fabric prop, `layout`, raises `onLayout` through setProp
 // below and is marked that way.
+/**
+ * Change which Fabric view a node commits as, keeping the node's identity.
+ *
+ * The commit walk already re-creates a node whose `viewName` no longer matches its committed one —
+ * that is how a `<Text>` moving in or out of another `<Text>` flips between RCTText and
+ * RCTVirtualText (`commit.ts`, reason `view-kind`). This exposes the same door for a prop-driven
+ * view choice, so `intrinsicWhen` is honoured on UPDATE and not only at create.
+ *
+ * The POLICY stays out of the engine: which prop decides, and which view it decides between, lives
+ * in `HOST_PRIMITIVES` and is read by `resolveIntrinsicTag` in `@symbiote-native/components`. The
+ * engine only knows how to swap the name — the same split every other spec-driven fold has here.
+ *
+ * A no-op when the name is unchanged, so a renderer may call it on every update without comparing
+ * first.
+ */
+export function setNodeComponent(node: ISymbioteNode, component: string): void {
+  if (node.component === component) return;
+  node.component = component;
+  // `dirty` alone is not enough: the walk's reuse test also requires the node be visited at all,
+  // and a node whose own props did not change this tick is exactly the case that would be skipped.
+  markDirty(node);
+  markPropsDirty(node);
+}
+
 export function markDirty(node: ISymbioteNode): void {
   let current: ISymbioteNode | undefined = node;
   while (current !== undefined && !current.dirty) {
@@ -495,6 +566,10 @@ export function setProp(
     }
     node.props[key] = value;
   }
+  // The single choke point for the aria gate. `routeProp`'s other branches — class, style,
+  // activeStyle, on* — return before reaching here and none of them can carry an alias, so every
+  // `role` / `aria-*` write in the engine passes through this line.
+  if (!node.hasAriaAlias && isAriaAliasKey(key)) node.hasAriaAlias = true;
   propStats.writes += 1;
   markPropsDirty(node);
 }
@@ -657,10 +732,24 @@ export interface IClassStyleParts {
   // So `:active` is one way to deliver a pressed look and this is the other; the engine does the
   // same thing with both.
   activeStyle: unknown;
+  // Whether slot 1's pressed variant came from resolving a FUNCTION `style` here, rather than from
+  // an explicit `activeStyle` write by a lowering transform. Only the first kind may be cleared
+  // when `style` later arrives as a plain value — clearing the second would break the transform's
+  // two-write path, where `style` and `activeStyle` are separate props and either may land first.
+  activeStyleFromCallback: boolean;
 }
 
 // All slots are present from the start rather than added as they are written: one hidden class for
 // every styled node in the app, instead of a shape transition per slot.
+// Narrowed rather than cast: `routeProp` takes `unknown`, and a bare `typeof v === 'function'`
+// leaves TS with `Function`, which is callable with anything. This states the shape the contract
+// actually promises.
+function isStyleCallback(
+  value: unknown,
+): value is (state: { pressed: boolean }) => unknown {
+  return typeof value === 'function';
+}
+
 function stylePartsOf(node: ISymbioteNode): IClassStyleParts {
   return (node.styleParts ??= {
     classStyle: undefined,
@@ -669,6 +758,7 @@ function stylePartsOf(node: ISymbioteNode): IClassStyleParts {
     className: undefined,
     isPressed: false,
     activeStyle: undefined,
+    activeStyleFromCallback: false,
   });
 }
 
@@ -874,7 +964,34 @@ export function routeProp(
   }
   if (key === 'style') {
     const parts = stylePartsOf(node);
-    parts.explicitStyle = value;
+    // A FUNCTION `style` is `style={({pressed}) => …}`, the idiom this ecosystem actually writes.
+    // A lowering transform normally splits it at build time into `style` + `activeStyle`, so the
+    // engine never sees the callback — but a PUBLIC primitive tag has no transform in front of it
+    // on three adapters, and there the callback arrives here intact. Resolving it makes the
+    // compile-time split an OPTIMIZATION rather than the mechanism, the same relationship
+    // `foldHostBag` has with the compile-time prop folds.
+    //
+    // Without this the failure is silent and total: a function is not an `on*` name, so it misses
+    // `setEventListener`, lands in `setProp` as a function value, and `fabricProps` drops function
+    // props — the node commits with NO style at all. Traced by the Solid session, 2026-09-01.
+    //
+    // The callback must be PURE in `pressed`: its result is read once per state, here and under
+    // every transform's emission (`core/components/src/state-style.ts` carries the same contract).
+    if (isStyleCallback(value)) {
+      parts.explicitStyle = value({ pressed: false });
+      parts.activeStyle = value({ pressed: true });
+      parts.activeStyleFromCallback = true;
+    } else {
+      parts.explicitStyle = value;
+      // Only a variant WE derived is stale now. `style` switching from a callback to a plain value
+      // must not leave the old pressed look standing, and an `activeStyle` the transform wrote must
+      // survive a `style` write, because the two arrive as independent props in an unspecified
+      // order.
+      if (parts.activeStyleFromCallback) {
+        parts.activeStyle = undefined;
+        parts.activeStyleFromCallback = false;
+      }
+    }
     pushClassStyle(node, parts);
     return;
   }
@@ -883,6 +1000,13 @@ export function routeProp(
   if (key === 'activeStyle') {
     const parts = stylePartsOf(node);
     parts.activeStyle = value;
+    // Slot 1 is no longer ours, by definition — whatever a callback derived earlier has just been
+    // replaced. Without this the flag outlives the value it describes: a callback sets it, this
+    // branch overwrites the slot silently, and a later plain `style` then clears a variant the
+    // engine never derived. Not reachable from a lowering transform (it emits either a callback or
+    // an explicit pair, never both for one node), but a flat-bag adapter routes a bag key by key
+    // and can deliver exactly that sequence.
+    parts.activeStyleFromCallback = false;
     pushClassStyle(node, parts);
     return;
   }

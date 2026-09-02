@@ -42,6 +42,16 @@
 // PURE in `pressed`. It is executed twice. A side-effecting body was already broken under
 // substitution, but only invocation runs it.
 //
+// A `refuse` ROW IS UNPROVEN UNTIL A CONTROL ON THE SAME PRIMITIVE GOES THE OTHER WAY. `refuse` is
+// the ABSENCE of an observation, and "no intrinsic in the output" is produced equally by a
+// transform that refused and by a primitive nothing can lower — an unimported component, a
+// hardcoded default element, an entry withheld from the spec while its runtime half is wired.
+// Withholding is deliberate practice here, so the ambiguous state recurs by design. Measured
+// 2026-08-31: the `TextInput` entry was withdrawn and both `intrinsic-choice-*` rows went GREEN on
+// all three runners, in three different mechanisms. So a runner asserts a shape that MUST lower
+// before it reads a refusal — and the control's failure message says the row cannot distinguish
+// the two, which is the true state. Full account: `.claude/rules/adapter-parity-audit.md`.
+//
 // WHY IT MATTERS THAT NO OTHER AUDIT SEES THIS. Barrels, subpaths, `files` coverage and exported
 // symbols are all untouched by a transform that lowers a call site its sibling refuses. Every suite
 // stays green and the divergence surfaces either as one adapter being mysteriously slower, or as a
@@ -119,12 +129,131 @@ const LOWERING_CASES = [
     expected: 'refuse',
     why: 'the attribute set cannot be enumerated, and a half-read set is a silently wrong render',
   },
+  // THE ROW THAT PROVES A CATEGORY IS A DICTIONARY, NOT AN ENFORCEMENT POINT.
+  //
+  // `REFUSAL_CATEGORIES.bagFold` said an element carrying `role` / `aria-*` must refuse, because
+  // the fold needs the whole bag and a transform reads one attribute at a time. Measured
+  // 2026-08-31, ONE of the four transforms implemented it — Solid. Vue's two lowered such elements
+  // and Svelte's preprocessor does not contain the string `role` at all.
+  //
+  // That was not a dead refusal, it was a live defect: a lowered `aria-label` reached Fabric as a
+  // key no ViewConfig knows, so the accessibility LABEL was silently dropped on device. A category
+  // written in the shared spec binds nobody — each transform separately decides to consult it, and
+  // not consulting it breaks nothing visible. Only a ROW here makes a divergence red.
+  //
+  // The verdict is `lower` because the fold now runs in the engine (`core/engine/src/
+  // accessibility-props.ts`, called from `fabricProps` — the one point where the whole bag is known
+  // on every commit path), so the reason to refuse is gone for every adapter at once. A transform
+  // still refusing is not being safe, it is losing coverage on the props real apps write.
+  // THE TAG CHOICE ITSELF IS DELIBERATELY NOT A ROW, and the reason is this table's own admission
+  // test (`.claude/rules/adapter-parity-audit.md`). A row's verdict vocabulary is `lower` /
+  // `refuse`; it cannot say WHICH intrinsic was emitted. So a row asserting that
+  // `<TextInput multiline />` lowers would pass against a transform emitting the single-line tag —
+  // and `symbiote-text-input` is a PREFIX of `symbiote-text-input-multiline`, so even a
+  // hand-written `toContain` check reads the wrong one as right. The tag choice is pinned by each
+  // adapter's own test, where the emitted text is available; all three carry one.
+  //
+  // What the table CAN decide is the refusal, and that is what these two rows are for: a dynamic
+  // selector must refuse on every transform, or one of them commits the wrong NATIVE VIEW — an
+  // error no later prop write can correct, unlike a merely wrong prop value.
+  {
+    id: 'intrinsic-choice-dynamic',
+    what: 'the intrinsic-selecting prop is a runtime value',
+    expected: 'refuse',
+    why: 'a transform prints a static tag, so a selector it cannot resolve at compile time leaves it guessing which native view to commit',
+  },
+  {
+    id: 'intrinsic-choice-nonboolean-literal',
+    what: 'the intrinsic-selecting prop is a truthy non-boolean literal',
+    expected: 'refuse',
+    why: 'the boundary is IDENTITY, not truthiness — a type-shaped check waves `multiline={1}` through and commits the multiline view for an author who wrote a number',
+  },
+  {
+    id: 'aria-bag-fold',
+    what: 'the element carries role / aria-* attributes',
+    expected: 'lower',
+    why: 'the fold moved to the engine, so a lowered element gets it too — a transform that still refuses only costs coverage, and three of the four never refused in the first place',
+  },
+  // THE VERDICT IS RIGHT AND THE REASON THIS ROW SHIPPED WITH WAS FALSE — kept as a comment because
+  // the correction is the more useful half. It read "a lowered element has no component instance
+  // for the binding to target", which assumes the binding targeted one before. It did not: NO
+  // adapter exposes a public `ref` on `Pressable`. React's `ref: viewRef`
+  // (`components/pressable/index.ts:204`) is internal, handed to the inner View so the machine can
+  // measure its retention region; Vue and Svelte declare none, and Solid's own props type says so
+  // out loud. So `ref={handle}` on an un-lowered `<Pressable>` does nothing at all.
+  //
+  // What lowering does is therefore not to BREAK the binding but to ADD one — the intrinsic hands
+  // back a live engine node. That is the actual hazard, and it is worse than the stated one: the
+  // capability would exist only when the transform happened to lower, so an unrelated attribute
+  // elsewhere on the tag would decide whether an app's `ref` works. A surface that flickers with a
+  // compiler's verdict is harder to reason about than one that is absent everywhere.
+  //
+  // Hence the rule this row now stands on, which generalises past `ref`: A LOWERING TRANSFORM IS AN
+  // OPTIMISATION, AND AN OPTIMISATION THAT CHANGES THE OBSERVABLE SURFACE — IN EITHER DIRECTION — IS
+  // A BUG. Refusing keeps lowered and un-lowered call sites indistinguishable to an app. If
+  // `Pressable` is later given a public ref, it is given one on all five adapters by design
+  // (`<adapters_reach_full_feature_parity>`), and only then can this row be revisited.
+  //
+  // Found by the Solid session 2026-08-30, when Solid's newly-added runner answered `lower` here
+  // and the investigation went looking for the instance the row assumed.
   {
     id: 'instance-bound-directive',
     what: 'the element carries a directive binding the component instance',
     expected: 'refuse',
-    why: 'a lowered element has no component instance for the binding to target',
+    why: 'lowering must not change the observable surface: no adapter exposes a public ref on Pressable, so lowering would ADD one that appears only when the transform happens to lower',
+  },
+  // The first FOLD-ONLY primitive, and the row exists because a transform genuinely decides it: an
+  // entry can be present in the spec and still be dropped between the file and the transform's own
+  // projection (`spec-projection-covers-fields.test.ts` exists because `intrinsicWhen` was), in
+  // which case the tag is simply never recognised and the element stays a component. Nothing else
+  // in this table would catch that.
+  //
+  // No attribute of its own on purpose: what is under test is that the NAME is recognised, not any
+  // rule about a prop. A row that needed an attribute would be testing two things at once.
+  {
+    id: 'image-fold-only',
+    what: 'a fold-only primitive with no attribute worth refusing',
+    expected: 'lower',
+    why: 'the spec carries the entry and the behavior carries the fold, so every transform should recognise the tag; a refusal here means the entry never reached this transform projection',
+  },
+  // A SECOND fold-only name, and it is not a duplicate of the row above. What that one proves is
+  // that a transform's spec projection works at all; what this proves is that it is driven by the
+  // spec rather than by a hardcoded list of names — the shape `adapters/angular` shipped for months
+  // (`LOWERABLE_NAMES = ['View', 'Text']`). A transform can pass `image-fold-only` and fail here.
+  {
+    id: 'input-accessory-view-fold-only',
+    what: 'a second fold-only primitive, proving the name list is read rather than written',
+    expected: 'lower',
+    why: 'nothing about this primitive is refusable — no state, no intrinsic choice, no aliasing — so a refusal can only mean the transform never saw the entry',
+  },
+  // A THIRD name, and it is not fold-only the way the two above are — it carries a real ENGINE
+  // machine (mirrors the last value native reported, sends a platform snap-back command on
+  // disagreement). What decides a TRANSFORM's verdict is `observesState`/`intrinsicWhen`, neither
+  // of which this entry sets (its public surface has no function-valued style and no dynamic
+  // intrinsic choice), so from a transform's perspective it is answered exactly like a fold-only
+  // primitive — the machine is an engine-side fact, invisible to this row. `thumbColor` is a
+  // CONSUMED alias (folds to `thumbTintColor`), same rationale as Image's `alt`.
+  {
+    id: 'switch-fold-only',
+    what: 'a third name with an engine machine but no compile-time refusal — the verdict does not depend on it',
+    expected: 'lower',
+    why: 'no observesState, no intrinsicWhen — a refusal here can only mean the transform never saw the entry, same as the two fold-only rows above',
   },
 ];
+
+// NO `safe-area-view` ROW, deliberately, and the reason belongs here or the next reader files it as
+// a coverage gap. SafeAreaView is a third fold-only primitive, and the two rows above already spend
+// that question: one proves a transform's spec projection works at all, the other proves the name
+// list is READ rather than written. A third attribute-free name is answered identically by every
+// implementation, including a broken one — the admission test in
+// `.claude/rules/adapter-parity-audit.md` ("could a transform get this wrong?") says that is a row
+// which proves nothing.
+//
+// It does carry one thing genuinely new — it is the first entry declaring `aliases: {}`, so a
+// transform that folded `id -> nativeID` unconditionally would be wrong on it. That is NOT
+// expressible here: this table's verdict is lower/refuse, and both the right and the wrong transform
+// LOWER. It needs a payload oracle, which is per-adapter by construction; Svelte's is the pair in
+// `preprocessor/lower-host-primitives.test.ts` ("folds no alias on a primitive whose spec declares
+// none", with the control beside it).
 
 module.exports = { LOWERING_CASES };

@@ -30,6 +30,27 @@
 import { dlog } from './debug';
 import type { ISymbioteNode } from './node';
 
+/**
+ * A pure props -> props mapping a behavior applies on the way to the Fabric payload.
+ *
+ * It exists because a lowered element has no component body, and a wrapper's body is where the
+ * per-primitive prop FOLDS live — TextInput's W3C aliases (`inputMode` -> `keyboardType`,
+ * `readOnly` -> `editable`), Pressable's `disabled` -> `accessibilityState`. Every one of those was
+ * silently dropped the moment the primitive lowered: the raw alias reached Fabric as a key no
+ * ViewConfig declares, so nothing threw and nothing rendered differently in a headless test —
+ * only the device showed a numeric keyboard that never appeared.
+ *
+ * NOT a hook on `setProp`, for the same reason `afterCommit` is not: `setProp` is the hottest path
+ * in the engine. This runs once per node per payload build, and only for a node whose behavior
+ * supplied one.
+ *
+ * MUST be pure and MUST NOT mutate its input — `node.props` is the live bag, and the folds beside
+ * this one return their input by identity when there is nothing to do.
+ */
+export type IPayloadFold = (
+  props: Readonly<Record<string, unknown>>,
+) => Record<string, unknown>;
+
 export interface IHostBehavior {
   // Listener names this behavior OWNS on its tag — engine event names, not `onX` props
   // ('press', 'startShouldSetResponder', ...). `setEventListener` stashes an app listener for an
@@ -47,9 +68,42 @@ export interface IHostBehavior {
   // else. Put the per-node runtime here (timers, flags, a listener installed via
   // setEventListener); read props at event time, not now.
   attach(node: ISymbioteNode): void;
+  // Runs after the commit that first gives the node a Fabric tag — the half `attach` CANNOT do.
+  //
+  // WHY IT IS SEPARATE. `Pressable` never needed it: its machine only reacts to events that arrive
+  // long after commit, so a tagless node at `attach` is enough. Every other lowering candidate needs
+  // a committed tag AT SETUP TIME — TextInput's `autoFocus` dispatches a view command at mount,
+  // TouchableOpacity's `useNativeDriver: true` connects an Animated node to a view, ScrollView's
+  // sticky path calls `attachNativeEvent`. React commits synchronously, so those would work there by
+  // accident; Vue, Solid and Angular commit a tick later, so the same code silently no-ops —
+  // lowered on paper, dead on device, with the headless suite green.
+  //
+  // Optional, and the ENGINE owns its lifecycle: registered by `attachHostBehavior`, dropped by
+  // `detachSubtree`, re-armed by `reattachSubtree`. A behavior can equally call `whenCommitted` by
+  // hand from `attach` — `animated/event.ts` does — but it then owes its own cancel in `detach`, and
+  // forgetting that leaks a waiter pointed at a dead node. This exists to remove that footgun.
+  attachAfterCommit?(node: ISymbioteNode): void;
+  // Runs after EVERY commit while the node is attached, not just the first.
+  //
+  // WHY IT IS NOT `attachAfterCommit` REPEATED. `Pressable`'s machine is driven entirely by events,
+  // so it never needs to look at a prop it was not handed. A controlled `TextInput` does: RN's
+  // contract is that when the app's `value` diverges from what native last reported, JS commands
+  // the text back down — and that comparison is triggered by a PROP CHANGE, not by an event. In a
+  // component the render is what re-runs it; a lowered element has no render, so the commit is the
+  // only equivalent beat.
+  //
+  // A prop-write hook on `setProp` was the obvious alternative and is the wrong shape: `setProp` is
+  // the hottest path in the engine (32 001 writes on one benchmark create) and would need a per-node
+  // registry lookup on every one of them. This costs a Set iteration per commit over ONLY the nodes
+  // whose behavior asked for it — zero for every app that registers none.
+  //
+  // Reads `node.props`, which by here holds the values this commit published.
+  afterCommit?(node: ISymbioteNode): void;
   // Runs once the node is known to have left the tree for good. Must release everything `attach`
   // took — a timer left behind outlives the tree that owned it.
   detach(node: ISymbioteNode): void;
+  // The wrapper-body prop folds this primitive owes its lowered form. See IPayloadFold.
+  readonly foldPayload?: IPayloadFold;
 }
 
 const behaviors = new Map<string, IHostBehavior>();
@@ -90,6 +144,16 @@ export function registerHostBehavior(
   dlog(`registerHostBehavior: ${component}`);
   behaviors.set(component, behavior);
   hasBehaviors = true;
+}
+
+// Read access to the registry, so an audit can DERIVE what a behavior owns instead of restating it.
+// The one that matters: a name in `ownedListeners` is only reachable if `routeProp` also treats it
+// as a registered event — otherwise the app's callback lands in `node.props` and the machine, which
+// reads the stash, never sees it. That set difference is a test
+// (`core/components/src/behaviors/owned-listeners-are-routable.test.ts`) and it needs this to stay
+// derived rather than becoming another hand-written list.
+export function hostBehaviorFor(tag: string): IHostBehavior | undefined {
+  return behaviors.get(tag);
 }
 
 export function hasHostBehaviors(): boolean {
@@ -135,7 +199,53 @@ export function attachHostBehavior(node: ISymbioteNode, tag: string): void {
   const behavior = behaviors.get(tag);
   if (behavior === undefined) return;
   attached.set(node, behavior);
+  // A field rather than a lookup at payload-build time: `fabricProps` runs per node per commit and
+  // must not pay a Map probe to discover that almost nothing has a fold.
+  node.payloadFold = behavior.foldPayload;
   behavior.attach(node);
+  if (behavior.attachAfterCommit !== undefined) awaitingCommit.add(node);
+  if (behavior.afterCommit !== undefined) committedEachTime.add(node);
+}
+
+// Nodes whose behavior declared `afterCommit`. Separate from `awaitingCommit` because the two have
+// opposite lifetimes: one empties as its nodes commit, this one holds until teardown.
+const committedEachTime = new Set<ISymbioteNode>();
+
+// Nodes whose behavior declared `attachAfterCommit` and whose first commit has not happened yet.
+//
+// A plain Set rather than a call into `whenCommitted`: `commit.ts` already imports this module, so
+// reaching back for it would close an import cycle. Metro's `inlineRequires` has made module
+// evaluation order a real hazard here rather than a theoretical one (see this file's own
+// registration comment), so the dependency stays one-directional and commit DRAINS this instead.
+const awaitingCommit = new Set<ISymbioteNode>();
+
+/**
+ * Run the deferred half of every behavior whose node has now been committed. Called from the commit
+ * path immediately after `completeRoot`, where fresh Fabric tags have just been assigned.
+ *
+ * `isCommitted` is passed in for the same no-cycle reason — `committedOf` lives in `commit.ts`. A
+ * still-uncommitted node stays in the set: a create superseded before it ever reached Fabric waits
+ * for the commit that lands it, and `detachSubtree` drops it if that commit never comes.
+ */
+export function runDeferredAttaches(
+  isCommitted: (node: ISymbioteNode) => boolean,
+): void {
+  // The gate: an app registering no behavior pays two Set-size reads per commit, matching the
+  // discipline `hasBehaviors` sets for `createElement`.
+  if (awaitingCommit.size === 0 && committedEachTime.size === 0) return;
+  // SETUP BEFORE THE RECURRING BEAT, and the order is load-bearing on the FIRST commit, where a
+  // node carrying both hooks is drained by both. `attachAfterCommit` is where a behavior seeds the
+  // mirrors that `afterCommit` then compares against; run them the other way round and the first
+  // beat compares against nothing and commands a redundant write down to native.
+  for (const node of awaitingCommit) {
+    if (!isCommitted(node)) continue;
+    awaitingCommit.delete(node);
+    attached.get(node)?.attachAfterCommit?.(node);
+  }
+  for (const node of committedEachTime) {
+    if (!isCommitted(node)) continue;
+    attached.get(node)?.afterCommit?.(node);
+  }
 }
 
 // `removeChild` is NOT the destroy signal, and reading it as one is the bug this indirection
@@ -194,6 +304,20 @@ function detachSubtree(node: ISymbioteNode, seen: Set<ISymbioteNode>): void {
   // machine. Gating the mark on `behaviors.has` made the row wrapper unmarked and the whole walk
   // skip — the first version of the parked-node test caught exactly that.
   tornDown.add(node);
+  // Drop a deferral the node never got to run. NO TEST CAN SEE THIS, and it is kept anyway —
+  // stated rather than left as apparent coverage. The `isCommitted` predicate in the drain already
+  // stops such a node from firing, so removing this line changes no observable behaviour; what it
+  // changes is that a node created and torn down inside one tick stays in the Set forever, holding
+  // a strong reference to a dead subtree. A leak, not a wrong result, and this file's break-test
+  // discipline correctly reports it as unfalsifiable.
+  awaitingCommit.delete(node);
+  // The recurring hook stops with the node, and unlike the deferral above this one has a visible
+  // consequence if forgotten: a torn-down node would keep being asked to reconcile props against a
+  // subtree that has left the tree, on every commit, forever.
+  // The recurring hook stops with the node, and unlike the deferral above this one has a visible
+  // consequence if forgotten: a torn-down node would keep being asked to reconcile props against a
+  // subtree that has left the tree, on every commit, forever.
+  committedEachTime.delete(node);
   // The map, not the registry: by here only the Fabric name is left on the node.
   attached.get(node)?.detach(node);
   for (const child of node.children) detachSubtree(child, seen);
@@ -210,7 +334,14 @@ export function reattachHostBehaviors(node: ISymbioteNode): void {
 function reattachSubtree(node: ISymbioteNode): void {
   if (tornDown.has(node)) {
     tornDown.delete(node);
-    attached.get(node)?.attach(node);
+    const behavior = attached.get(node);
+    behavior?.attach(node);
+    // Re-arm the deferred half too. A parked node usually returns with its tag intact, so this
+    // fires on the next drain — but re-arming is what keeps `attach` and `attachAfterCommit` a
+    // PAIR. Restore only one and a behavior that splits its setup across the two comes back
+    // half-initialised, which is the failure this seam exists to prevent.
+    if (behavior?.attachAfterCommit !== undefined) awaitingCommit.add(node);
+    if (behavior?.afterCommit !== undefined) committedEachTime.add(node);
   }
   for (const child of node.children) reattachSubtree(child);
 }
@@ -220,5 +351,7 @@ function reattachSubtree(node: ISymbioteNode): void {
 export function clearHostBehaviors(): void {
   behaviors.clear();
   detachCandidates.clear();
+  awaitingCommit.clear();
+  committedEachTime.clear();
   hasBehaviors = false;
 }

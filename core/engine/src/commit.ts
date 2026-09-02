@@ -42,7 +42,8 @@ import { nextTag } from './tags';
 import { registerPostCommit, runPostCommitHooks } from './post-commit';
 import { fabricProps } from './fabric-props';
 import { isRecord } from './type-guards';
-import { sweepDetachedBehaviors } from './host-behavior';
+import { isAriaAliasKey } from './accessibility-props';
+import { runDeferredAttaches, sweepDetachedBehaviors } from './host-behavior';
 
 // Re-exported from ./platform-color so callers don't need to change their import path.
 export { processColor, setColorProcessor } from './platform-color';
@@ -690,6 +691,19 @@ function commitContainer(rootTag: IRootTag): void {
 
   // The container's identity is stable, so its un-cloned flag is the no-op signal:
   // an over-scheduled commit that touched nothing makes zero native calls.
+  //
+  // TRAP FOR BEHAVIOR AUTHORS, and it cost two iterations to find: this return is ALSO the gate on
+  // `runDeferredAttaches` and `runPostCommitHooks` below. A host behavior that calls
+  // `requestCommitFor(node)` WITHOUT writing a prop therefore never reaches its `afterCommit` /
+  // `attachAfterCommit` half — the commit it asked for is a no-op, and a no-op returns here.
+  //
+  // That is correct for what the hooks are FOR: they exist to retry once fresh Fabric tags are
+  // assigned, and a commit that made zero native calls assigned none. So the fix is not to hoist
+  // them above this line — that would run every deferred hook on every over-scheduled commit, which
+  // is the common case. A behavior needing a turn of the loop with nothing to write should schedule
+  // its own (`queueMicrotask`, as Switch's snap-back and Angular's `snapBackIfNeeded` both do) and
+  // keep `afterCommit` registered for the case a microtask cannot reach: a prop change with no
+  // preceding native event.
   if (!result.changed) {
     dlog(`commit root=${rootTag} no-op (skipped completeRoot)`);
     return;
@@ -704,6 +718,13 @@ function commitContainer(rootTag: IRootTag): void {
   // and ran too early (the Animated native driver binding a props node to a view under
   // an async-batched commit) retry now. No-op when nothing is pending.
   runPostCommitHooks();
+
+  // The same moment, for the half of a host behavior that could not run at `attach`. A behavior
+  // whose setup needs a Fabric tag (a view command, a native Animated binding, an event attach)
+  // declares `attachAfterCommit` and is drained here. `committedOf` is passed as the predicate
+  // rather than imported by `host-behavior.ts`, keeping that dependency one-directional — this
+  // module already imports from it, and a cycle is a live hazard under Metro's `inlineRequires`.
+  runDeferredAttaches(node => committedOf(node) !== undefined);
 
   if (isDebug()) {
     const mode =
@@ -1091,6 +1112,10 @@ export function setNativeProps(
       };
     } else {
       node.props[key] = value;
+      // Writes `node.props` directly, so it owes the aria gate for the same reason it owes the
+      // props mark below: `setProp` is where that flag is normally raised and this path bypasses
+      // it. An `aria-*` arriving only through setNativeProps would otherwise never be folded.
+      if (!node.hasAriaAlias && isAriaAliasKey(key)) node.hasAriaAlias = true;
     }
   }
   // Writes node.props directly rather than through setProp, so it owes its own mark - and it owes

@@ -15,6 +15,19 @@ export interface IHostPrimitive {
    * Absent means false; only a stateful primitive ever sets it.
    */
   observesState?: boolean;
+  /**
+   * The primitive's TAG depends on a prop. `TextInput` is the only one: `multiline` selects between
+   * two different Fabric views (`symbiote-text-input` / `symbiote-text-input-multiline`), not
+   * between two values of one view. A transform prints a static tag, so it resolves the choice only
+   * for a literal — and the boundary is IDENTITY, not truthiness: a bare attribute is `true`, an
+   * explicit boolean literal is itself, absence is `false`, and everything else refuses (including a
+   * truthy non-boolean like `multiline={1}`, which a type-shaped check waves through).
+   *
+   * ONE selector and ONE alternative, deliberately. Absent means "one tag", so no existing entry
+   * changes. Full rationale in `host-primitives.cjs`, which this file must be kept in step with —
+   * see the note there.
+   */
+  intrinsicWhen?: { prop: string; intrinsic: string };
 }
 
 export declare const HOST_PRIMITIVES: Readonly<Record<string, IHostPrimitive>>;

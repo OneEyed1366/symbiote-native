@@ -32,9 +32,15 @@ import {
   type IPressHandler,
   type IPressMachineConfig,
   type IPressRuntime,
+  rippleProps,
+  type IPressableAndroidRippleConfig,
   type IRectOffset,
 } from '../state/pressable';
-import { buildPressableListeners } from '../view/render-pressable';
+import type { IAccessibilityStateValue } from '../accessibility-props';
+import {
+  buildPressableListeners,
+  resolveDisabledAccessibilityState,
+} from '../view/render-pressable';
 
 export const PRESSABLE_TAG = 'symbiote-pressable';
 
@@ -79,6 +85,98 @@ function asRectOffset(value: unknown): IRectOffset | undefined {
 // listener bag, whose values are `unknown` for the same reason.
 function isPressHandler(value: unknown): value is IPressHandler {
   return typeof value === 'function';
+}
+
+// The props the MACHINE consumes and the host must never see. The wrapper drops them by
+// destructuring — they go into `createPressHandlers` / `buildPressableListeners` and are simply
+// absent from the object it spreads onto its View. A lowered element has no destructure, so every
+// one of them rode into the payload as a key no ViewConfig declares.
+const MACHINE_ONLY_KEYS = [
+  // Consumed below and replaced by the resolved `nativeBackgroundAndroid` /
+  // `nativeForegroundAndroid`; the raw config is not a native prop.
+  'android_ripple',
+  'disabled',
+  'cancelable',
+  'delayLongPress',
+  'unstable_pressDelay',
+  'pressRetentionOffset',
+  'delayHoverIn',
+  'delayHoverOut',
+] as const;
+
+// Narrowed field by field rather than cast: the bag arrives as `unknown` off `node.props`. A local
+// twin of the guard each adapter keeps for its own attrs (Vue's `asAccessibilityState`) — not
+// hoisted to the shared barrel, because every adapter re-exports that barrel wholesale and a
+// narrowing helper is not API anyone should be able to import.
+function asAccessibilityState(
+  value: unknown,
+): IAccessibilityStateValue | undefined {
+  if (!isRecord(value)) return undefined;
+  const state: IAccessibilityStateValue = {};
+  if (typeof value.disabled === 'boolean') state.disabled = value.disabled;
+  if (typeof value.selected === 'boolean') state.selected = value.selected;
+  if (value.checked === 'mixed' || typeof value.checked === 'boolean')
+    state.checked = value.checked;
+  if (typeof value.busy === 'boolean') state.busy = value.busy;
+  if (typeof value.expanded === 'boolean') state.expanded = value.expanded;
+  return state;
+}
+
+// Narrowed field by field, same reason as the accessibility guard above: the config arrives as
+// `unknown` off `node.props`.
+function asRippleConfig(
+  value: unknown,
+): IPressableAndroidRippleConfig | undefined {
+  if (!isRecord(value)) return undefined;
+  const config: IPressableAndroidRippleConfig = {};
+  if (typeof value.color === 'string') config.color = value.color;
+  if (typeof value.borderless === 'boolean')
+    config.borderless = value.borderless;
+  if (typeof value.radius === 'number') config.radius = value.radius;
+  if (typeof value.foreground === 'boolean')
+    config.foreground = value.foreground;
+  return config;
+}
+
+// `disabled` reaches a screen reader ONLY as `accessibilityState.disabled` — it is not a native
+// View prop, so the wrapper folds it (`resolveDisabledAccessibilityState`, called by all five) and
+// forwards the composite. Lowering dropped that fold: press suppression still worked, because the
+// machine reads `node.props.disabled` directly, so the button behaved correctly and announced
+// itself as enabled. An accessibility regression with no visual tell and no failing test.
+//
+// Found by the wrapper-vs-behavior import audit (`.claude/rules/adapter-parity-audit.md`).
+function foldPayload(
+  props: Readonly<Record<string, unknown>>,
+): Record<string, unknown> {
+  const resolved = resolveDisabledAccessibilityState(
+    asAccessibilityState(props.accessibilityState),
+    typeof props.disabled === 'boolean' ? props.disabled : undefined,
+  );
+
+  // The Android ripple. Our WRAPPER paints it through a dedicated inner View, mirroring
+  // TouchableNativeFeedback — and that reading is what made this look unfixable for a lowered
+  // element, which has no child to put it on. RN's own `Pressable` does NOT do that: it spreads
+  // `useAndroidRippleForView`'s `viewProps` onto its own View (`Pressable.js:251`), so the ripple
+  // background is an ordinary prop of the responder itself and a single node carries it fine.
+  //
+  // `rippleProps` returns undefined off Android, so this whole branch is inert on iOS.
+  //
+  // STILL MISSING ON BOTH PATHS, and lowering did not cause it: RN also dispatches
+  // `Commands.hotspotUpdate(x, y)` on pressIn/pressMove and `Commands.setPressed` on
+  // pressIn/pressOut, which is what makes the ripple originate at the touch point. Neither our
+  // wrapper nor this behavior sends them — grep for `hotspotUpdate` returns nothing in the tree.
+  const rippleConfig = asRippleConfig(props.android_ripple);
+  const ripple =
+    rippleConfig !== undefined ? rippleProps(rippleConfig) : undefined;
+
+  const out: Record<string, unknown> = { ...props };
+  for (const key of MACHINE_ONLY_KEYS) delete out[key];
+  if (ripple !== undefined) Object.assign(out, ripple);
+  // Written only when the fold produced something: an unconditional assignment would put an
+  // `accessibilityState: undefined` key on every lowered Pressable in the tree, and `fabricProps`
+  // skipping undefined is a coincidence to lean on, not a contract to rely on here.
+  if (resolved !== undefined) out.accessibilityState = resolved;
+  return out;
 }
 
 // From the STASH, not from `node.props`. Every name below is in `ownedListeners`, so `routeProp`
@@ -253,6 +351,7 @@ export function registerPressableBehavior(): void {
   registerHostBehavior(PRESSABLE_TAG, {
     attach,
     detach,
+    foldPayload,
     // Every name the machine needs as an INPUT. The responder pair is not optional — it is how a
     // gesture starts at all, and `RESPONDER_EVENTS` makes those listeners on any node regardless
     // of ViewConfig, so they collide exactly like `press` does.

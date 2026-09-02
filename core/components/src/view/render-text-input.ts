@@ -15,8 +15,12 @@ import type {
 
 // One host element per native input class. Text carries the only non-trivial nesting elsewhere;
 // here the choice is binary and runtime (the `multiline` prop), so the module stays flat.
-const SINGLELINE_INTRINSIC = 'symbiote-text-input';
-const MULTILINE_INTRINSIC = 'symbiote-text-input-multiline';
+// The `-managed` spelling, NOT the plain one the lowering transforms emit. Both resolve to the
+// same native view; the tag is what decides whether the engine's TextInput machine attaches, and
+// on this path the adapter's own lifecycle already owns that state. Sharing the tag would run both
+// copies at once. Full reasoning in `component-names/shared.ts`.
+const SINGLELINE_INTRINSIC = 'symbiote-text-input-managed';
+const MULTILINE_INTRINSIC = 'symbiote-text-input-multiline-managed';
 
 export type ITextInputViewProps = {
   multiline: boolean;

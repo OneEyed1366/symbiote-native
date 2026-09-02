@@ -17,13 +17,25 @@
   "main": "src/index.ts",
   "module": "src/index.ts",
   "types": "src/index.ts",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "cross-platform-components",
+    "state-machine",
+    "ui-components",
+    "descriptor",
+    "accessibility",
+    "cross-platform"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./bootstrap": "./src/bootstrap/index.ts",
     "./host-primitives": "./host-primitives.cjs",
     "./specialize-state-style": "./specialize-state-style.cjs",
     "./lowering-fixtures": "./lowering-fixtures.cjs",
-    "./state-style": "./src/state-style.ts"
+    "./state-style": "./src/state-style.ts",
+    "./fold-host-bag": "./src/fold-host-bag.ts",
+    "./resolve-intrinsic": "./src/resolve-intrinsic.ts"
   },
   "files": [
     "build",
@@ -60,6 +72,14 @@
       "./state-style": {
         "types": "./build/state-style.d.ts",
         "default": "./build/state-style.js"
+      },
+      "./fold-host-bag": {
+        "types": "./build/fold-host-bag.d.ts",
+        "default": "./build/fold-host-bag.js"
+      },
+      "./resolve-intrinsic": {
+        "types": "./build/resolve-intrinsic.d.ts",
+        "default": "./build/resolve-intrinsic.js"
       }
     }
   },
