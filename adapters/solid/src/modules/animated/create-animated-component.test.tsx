@@ -103,4 +103,39 @@ describe('Solid createAnimatedComponent', () => {
       appView().tag,
     );
   });
+
+  // A TAG base, which is what every primitive becomes under `.claude/skills/symbiote-primitive-tags`.
+  // This arm cannot pass by accident: without the string branch the wrap compiles to
+  // `createComponent(Base, …)` — `untrack(() => Comp(props))` — and a string is not callable, so the
+  // mount dies with `TypeError: Comp is not a function` before any assertion runs. All three
+  // properties are asserted together on purpose: `spread` drives props, `ref` and `children` through
+  // three separate effects, and the branch hands it all of them in one call, so a partial wiring
+  // shows up as one of the three going quiet.
+  it('accepts a TAG as its base, not only a component', async () => {
+    const opacity = new Animated.Value(0.4);
+    const AnimatedTag = createAnimatedComponent('symbiote-view');
+
+    let received: unknown = null;
+    mount(ROOT_TAG, () => (
+      <AnimatedTag
+        style={{ opacity }}
+        testID="tag-base"
+        ref={(instance: unknown) => {
+          received = instance;
+        }}
+      >
+        <symbiote-view testID="tag-child" />
+      </AnimatedTag>
+    ));
+    await tick();
+
+    // The animated node was reduced to a number, so the wrap's own bag ran on the tag path.
+    expect(appView().props.opacity).toBe(0.4);
+    expect(appView().props.testID).toBe('tag-base');
+    expect(appView().children[0].props.testID).toBe('tag-child');
+    expect(isSymbioteNode(received)).toBe(true);
+    expect(isSymbioteNode(received) ? getNativeTag(received) : undefined).toBe(
+      appView().tag,
+    );
+  });
 });

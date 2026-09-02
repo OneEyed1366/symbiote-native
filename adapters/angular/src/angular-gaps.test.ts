@@ -251,9 +251,15 @@ describe('Angular adapter gap regressions', () => {
       pressableSource,
       'hasTVPreferredFocus: this.hasTVPreferredFocus',
     );
+    // The four accessibility gate events moved OFF the template and into this same bag
+    // (2026-09-01, `.claude/rules/fabric-boolean-event-gates.md`) — a template binding here bound
+    // unconditionally on every instance, lighting the Fabric gate whether or not an app ever
+    // subscribed. The handler takes the event NAME rather than the emitter (2026-09-02) because
+    // the gate is no longer decided by `.observed` alone: a wrapper rendering this Pressable is
+    // itself a subscriber, so an injected demand answers for it (`gate-demand.ts`).
     expectSourceToDeclare(
       pressableSource,
-      '(accessibilityAction)="emit(accessibilityAction, $event)"',
+      "onAccessibilityAction: this.accessibilityEmitterHandler('accessibilityAction',)",
     );
   });
 });

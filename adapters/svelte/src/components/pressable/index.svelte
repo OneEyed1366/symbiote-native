@@ -128,38 +128,43 @@
     ),
   );
 
-  const resolvedAccessibilityState = $derived(
-    resolveDisabledAccessibilityState(accessibilityState, disabled),
-  );
-
-  // Folds aria-*/role into accessibility* — Pressable owns its host node directly (it does not
-  // compose View.svelte), so it must fold this itself, exactly like Vue's Pressable and every
-  // other Svelte component that hand-authors a raw host tag (RefreshControl.svelte, modal/
-  // index.svelte).
-  const resolved = $derived(
-    resolveAccessibilityProps({
-      ...rest,
-      accessibilityState: resolvedAccessibilityState,
-    }),
-  );
-
-  const resolvedStyle = $derived(
-    typeof style === 'function' ? style(state) : style,
-  );
-
   // android_ripple rides a dedicated inner View; on iOS rippleProps() returns undefined, so the
   // child renders unwrapped, no extra node — mirrors React's Pressable + touchable-native-feedback.
   const ripple = $derived(
     android_ripple !== undefined ? rippleProps(android_ripple) : undefined,
   );
 
-  const bag = $derived({
-    ...resolved,
-    style: resolvedStyle,
-    class: className,
-    hitSlop,
-    ...(android_disableSound !== undefined ? { android_disableSound } : {}),
-    ...buildPressableListeners(handlers, { disabled, cancelable }),
+  // ONE derived, not four. The accessibility fold and the style resolution used to be their own
+  // `$derived`s, each read by exactly this bag and by nothing else — a memo nobody can reuse, in
+  // exchange for a reaction-graph node per Pressable instance. A 1 000-row list mounts 2 000 of
+  // them, which made this component the largest single allocation site in a create profile.
+  // `handlers` and `ripple` stay separate BECAUSE they are read elsewhere: `handlers` must keep
+  // its identity across an unrelated bag change or every recompute re-registers native listeners,
+  // and `ripple` is read twice (the branch test and the inner view's own bag).
+  const bag = $derived.by(() => {
+    // Folds aria-*/role into accessibility* — Pressable owns its host node directly (it does not
+    // compose View.svelte), so it must fold this itself, exactly like Vue's Pressable and every
+    // other Svelte component that hand-authors a raw host tag (RefreshControl.svelte, modal/
+    // index.svelte).
+    const resolved = resolveAccessibilityProps({
+      ...rest,
+      accessibilityState: resolveDisabledAccessibilityState(
+        accessibilityState,
+        disabled,
+      ),
+    });
+    const next: Record<string, unknown> = {
+      ...resolved,
+      style: typeof style === 'function' ? style(state) : style,
+      class: className,
+      hitSlop,
+      ...buildPressableListeners(handlers, { disabled, cancelable }),
+    };
+    // Assigned rather than conditionally spread: `...(cond ? { x } : {})` allocated an empty
+    // object literal on every evaluation for the overwhelmingly common `undefined` case.
+    if (android_disableSound !== undefined)
+      next.android_disableSound = android_disableSound;
+    return next;
   });
 
   // See View.svelte's note on `{@attach}`.

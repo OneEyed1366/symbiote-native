@@ -29,3 +29,6 @@ package-lock.json
 *.module.scss.d.ts
 *.module.less.d.ts
 *.module.styl.d.ts
+
+# Not a formattable file type — prettier infers no parser and errors on it.
+.npmrc.example

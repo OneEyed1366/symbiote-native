@@ -33,7 +33,11 @@ function listEmittedFiles(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...listEmittedFiles(full));
-    else if (entry.isFile() && EMITTED_EXTS.some(ext => entry.name.endsWith(ext))) out.push(full);
+    else if (
+      entry.isFile() &&
+      EMITTED_EXTS.some(ext => entry.name.endsWith(ext))
+    )
+      out.push(full);
   }
   return out;
 }
@@ -47,7 +51,9 @@ const PLATFORM_SUFFIXES = ['ios', 'android', 'native'];
 // platform. Mirrors react-native-builder-bob's ESM extension-fixer, which skips these same imports.
 function hasPlatformSibling(dirPath, baseName) {
   return PLATFORM_SUFFIXES.some(platform =>
-    EMITTED_EXTS.some(ext => fs.existsSync(path.join(dirPath, `${baseName}.${platform}${ext}`))),
+    EMITTED_EXTS.some(ext =>
+      fs.existsSync(path.join(dirPath, `${baseName}.${platform}${ext}`)),
+    ),
   );
 }
 
@@ -57,7 +63,8 @@ function resolveSpecifier(fromFile, spec) {
   const base = path.resolve(path.dirname(fromFile), spec);
   for (const ext of EMITTED_EXTS) {
     if (fs.existsSync(base + ext)) {
-      if (hasPlatformSibling(path.dirname(base), path.basename(base))) return 'skip';
+      if (hasPlatformSibling(path.dirname(base), path.basename(base)))
+        return 'skip';
       return spec + ext;
     }
   }
@@ -104,8 +111,10 @@ function scanTemplateHole(source, start) {
       if (--depth === 0) return i + 1;
     } else if (c === '"' || c === "'") i = scanString(source, i, c) - 1;
     else if (c === '`') i = scanTemplate(source, i) - 1;
-    else if (c === '/' && source[i + 1] === '/') i = lineCommentEnd(source, i) - 1;
-    else if (c === '/' && source[i + 1] === '*') i = blockCommentEnd(source, i) - 1;
+    else if (c === '/' && source[i + 1] === '/')
+      i = lineCommentEnd(source, i) - 1;
+    else if (c === '/' && source[i + 1] === '*')
+      i = blockCommentEnd(source, i) - 1;
   }
   return source.length;
 }
@@ -117,7 +126,8 @@ function scanTemplate(source, start) {
     const c = source[i];
     if (c === '\\') i++;
     else if (c === '`') return i + 1;
-    else if (c === '$' && source[i + 1] === '{') i = scanTemplateHole(source, i + 2) - 1;
+    else if (c === '$' && source[i + 1] === '{')
+      i = scanTemplateHole(source, i + 2) - 1;
   }
   return source.length;
 }
@@ -172,7 +182,8 @@ function regexAllowed(codeTail) {
   const t = codeTail.replace(/\s+$/, '');
   if (t === '') return true;
   const last = t[t.length - 1];
-  if (/[\w$]/.test(last)) return REGEX_PRECEDING_KEYWORDS.has(t.match(/[\w$]+$/)[0]);
+  if (/[\w$]/.test(last))
+    return REGEX_PRECEDING_KEYWORDS.has(t.match(/[\w$]+$/)[0]);
   return REGEX_PRECEDING_PUNCTUATORS.has(last);
 }
 
@@ -184,6 +195,12 @@ function nextNonSpaceIsCloseParen(source, from) {
 
 const FROM_TAIL_RE = /\bfrom\s+$/; // static import / re-export: `… from '…'`
 const IMPORT_TAIL_RE = /\bimport\(\s*$/; // dynamic import: `import('…')`
+// Side-effect import: `import '…';` — no `from`, no parenthesis, so neither tail above sees it
+// and it stayed extensionless. The first one in this repo is `adapters/vue/src/index.ts`'s
+// `import './register';`, which cannot become a `from` re-export without going lazy under
+// Metro's inlineRequires (see that file). Metro resolves an extensionless specifier fine; Node
+// ESM does not, which is the whole reason this script exists.
+const BARE_IMPORT_TAIL_RE = /\bimport\s+$/;
 
 // Rewrites real relative ESM specifiers in `source`, calling `resolve(spec)` for each one found in
 // code (never in a comment/string/regex). `resolve` returns the replacement specifier, `'skip'`
@@ -215,15 +232,21 @@ export function rewriteEsmSpecifiers(source, resolve) {
       codeTail += end === i + 1 ? '/' : ' '; // bailed (division) → keep as code, else blank
       i = end;
     } else if (c === '"' || c === '`') {
-      const end = c === '"' ? scanString(source, i, '"') : scanTemplate(source, i);
+      const end =
+        c === '"' ? scanString(source, i, '"') : scanTemplate(source, i);
       out += source.slice(i, end);
       codeTail += ' ';
       i = end;
     } else if (c === "'") {
       const end = scanString(source, i, "'");
       const spec = source.slice(i + 1, end - 1);
-      const isDynamic = IMPORT_TAIL_RE.test(codeTail) && nextNonSpaceIsCloseParen(source, end);
-      const isSpecifier = (FROM_TAIL_RE.test(codeTail) || isDynamic) && RELATIVE_RE.test(spec);
+      const isDynamic =
+        IMPORT_TAIL_RE.test(codeTail) && nextNonSpaceIsCloseParen(source, end);
+      const isSpecifier =
+        (FROM_TAIL_RE.test(codeTail) ||
+          BARE_IMPORT_TAIL_RE.test(codeTail) ||
+          isDynamic) &&
+        RELATIVE_RE.test(spec);
       const resolved = isSpecifier ? resolve(spec) : 'skip';
       if (typeof resolved === 'string' && resolved !== 'skip') {
         out += `'${resolved}'`;
@@ -245,7 +268,8 @@ export function rewriteEsmSpecifiers(source, resolve) {
 }
 
 export function fixEsmExtensions(buildDir) {
-  if (!fs.existsSync(buildDir)) return { filesChanged: 0, importsFixed: 0, unresolved: [] };
+  if (!fs.existsSync(buildDir))
+    return { filesChanged: 0, importsFixed: 0, unresolved: [] };
 
   let filesChanged = 0;
   let importsFixed = 0;
@@ -253,7 +277,8 @@ export function fixEsmExtensions(buildDir) {
 
   for (const file of listEmittedFiles(buildDir)) {
     const original = fs.readFileSync(file, 'utf8');
-    const resolve = spec => (EXT_RE.test(spec) ? 'skip' : resolveSpecifier(file, spec));
+    const resolve = spec =>
+      EXT_RE.test(spec) ? 'skip' : resolveSpecifier(file, spec);
     const result = rewriteEsmSpecifiers(original, resolve);
 
     importsFixed += result.importsFixed;
@@ -272,7 +297,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // No args → derive every publishable package's build/ dir from its own
   // publishConfig (scripts/lib/build-dirs.mjs), so a new package is covered
   // automatically instead of needing a hand-maintained arg list here.
-  const dirs = process.argv.slice(2).length > 0 ? process.argv.slice(2) : esmExtensionBuildDirs();
+  const dirs =
+    process.argv.slice(2).length > 0
+      ? process.argv.slice(2)
+      : esmExtensionBuildDirs();
   let totalFiles = 0;
   let totalImports = 0;
   const allUnresolved = [];
@@ -285,7 +313,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`Files changed: ${totalFiles}`);
   console.log(`Import specifiers fixed: ${totalImports}`);
   if (allUnresolved.length) {
-    console.error(`\nUNRESOLVED (${allUnresolved.length}) - fix or investigate before publishing:`);
+    console.error(
+      `\nUNRESOLVED (${allUnresolved.length}) - fix or investigate before publishing:`,
+    );
     allUnresolved.forEach(u => console.error('  ' + u));
     process.exit(1);
   }

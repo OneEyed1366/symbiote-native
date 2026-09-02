@@ -61,11 +61,27 @@ export interface IFabricSlot {
     instanceHandle: unknown,
   ): IFabricNode;
   cloneNodeWithNewProps(node: IFabricNode, newProps: IFabricProps): IFabricNode;
-  cloneNodeWithNewChildren(node: IFabricNode): IFabricNode;
+  // `children` collapses the N `appendChild` calls that otherwise follow a clone into ONE JSI
+  // crossing. Pass it only when `supportsCloneWithChildren` is true — a host that ignores the
+  // argument would commit a parent with NO children, which paints as a blank screen, not an error.
+  // Our JS keeps `newProps` in the second slot to match every call site; the wrapper below
+  // reorders for the host, whose 3-arg form is (node, children, props).
+  cloneNodeWithNewChildren(
+    node: IFabricNode,
+    children?: readonly IFabricNode[],
+  ): IFabricNode;
   cloneNodeWithNewChildrenAndProps(
     node: IFabricNode,
     newProps: IFabricProps,
+    children?: readonly IFabricNode[],
   ): IFabricNode;
+  // True when the host's clone bindings declare the child-list parameter (UIManagerBinding.cpp
+  // gives cloneNodeWithNewChildren paramCount 2 / …AndProps paramCount 3, and has its
+  // validateArgumentCount commented out pending the `passChildrenWhenCloningPersistedNodes`
+  // rollout that removes the per-child `appendChild` path entirely). Probed by arity, so a host
+  // predating that change — or a test double that has not been taught the argument — degrades to
+  // the append loop instead of silently dropping every child.
+  supportsCloneWithChildren: boolean;
   createChildSet(rootTag: IRootTag): IFabricChildSet;
   appendChild(parent: IFabricNode, child: IFabricNode): IFabricNode;
   appendChildToSet(childSet: IFabricChildSet, child: IFabricNode): void;
@@ -97,8 +113,33 @@ export interface IFabricSlot {
 // its type here is how host globals are typed (cf. `window` in lib.dom): the
 // single point where we vouch for the native contract, with no per-call cast.
 // Accessed via globalThis to match how RN itself reads it (global.nativeFabricUIManager).
+// The host is NOT shaped exactly like the slot we hand out: its 3-arg clone form takes
+// (node, children, props), ours keeps props second so every call site reads the same with or
+// without the child list. Modelling the difference here keeps the reorder in one place —
+// the wrapper in getSlot() — instead of leaking the quirk into commit.ts.
+interface IFabricHost extends Omit<
+  IFabricSlot,
+  | 'cloneNodeWithNewChildren'
+  | 'cloneNodeWithNewChildrenAndProps'
+  | 'supportsCloneWithChildren'
+> {
+  cloneNodeWithNewChildren(
+    node: IFabricNode,
+    children?: readonly IFabricNode[],
+  ): IFabricNode;
+  cloneNodeWithNewChildrenAndProps(
+    node: IFabricNode,
+    newProps: IFabricProps,
+  ): IFabricNode;
+  cloneNodeWithNewChildrenAndProps(
+    node: IFabricNode,
+    children: readonly IFabricNode[],
+    newProps: IFabricProps,
+  ): IFabricNode;
+}
+
 declare global {
-  var nativeFabricUIManager: IFabricSlot | undefined;
+  var nativeFabricUIManager: IFabricHost | undefined;
 }
 
 let cached: IFabricSlot | undefined;
@@ -138,9 +179,20 @@ export function getSlot(): IFabricSlot {
       createNode(reactTag, viewName, rootTag, props, instanceHandle),
     cloneNodeWithNewProps: (node, newProps) =>
       cloneNodeWithNewProps(node, newProps),
-    cloneNodeWithNewChildren: node => cloneNodeWithNewChildren(node),
-    cloneNodeWithNewChildrenAndProps: (node, newProps) =>
-      cloneNodeWithNewChildrenAndProps(node, newProps),
+    // The host's 3-arg form is (node, children, props); ours keeps props second.
+    cloneNodeWithNewChildren: (node, children) =>
+      children === undefined
+        ? cloneNodeWithNewChildren(node)
+        : cloneNodeWithNewChildren(node, children),
+    cloneNodeWithNewChildrenAndProps: (node, newProps, children) =>
+      children === undefined
+        ? cloneNodeWithNewChildrenAndProps(node, newProps)
+        : cloneNodeWithNewChildrenAndProps(node, children, newProps),
+    supportsCloneWithChildren:
+      typeof cloneNodeWithNewChildren === 'function' &&
+      cloneNodeWithNewChildren.length >= 2 &&
+      typeof cloneNodeWithNewChildrenAndProps === 'function' &&
+      cloneNodeWithNewChildrenAndProps.length >= 3,
     createChildSet: rootTag => createChildSet(rootTag),
     appendChild: (parent, child) => appendChild(parent, child),
     appendChildToSet: (childSet, child) => appendChildToSet(childSet, child),

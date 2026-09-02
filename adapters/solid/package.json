@@ -2,6 +2,16 @@
   "name": "@symbiote-native/solid",
   "version": "0.1.0",
   "description": "SymbioteNative's Solid adapter — a solid-js/universal createRenderer driving real native iOS/Android views through the same engine as every other adapter.",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "solid",
+    "solid-js",
+    "fabric",
+    "cross-platform",
+    "ios",
+    "android"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -24,11 +34,13 @@
     "./jsx-runtime": "./src/jsx-runtime.ts",
     "./jsx-dev-runtime": "./src/jsx-runtime.ts",
     "./babel-preset": "./babel-preset.cjs",
-    "./metro-css-parser": "./metro-css-parser.cjs"
+    "./metro-css-parser": "./metro-css-parser.cjs",
+    "./state-style": "./src/state-style.ts"
   },
   "files": [
     "build",
     "babel-preset.cjs",
+    "babel-lower-host-primitives.cjs",
     "metro-css-parser.cjs"
   ],
   "publishConfig": {
@@ -58,7 +70,11 @@
         "default": "./build/jsx-runtime.js"
       },
       "./babel-preset": "./babel-preset.cjs",
-      "./metro-css-parser": "./metro-css-parser.cjs"
+      "./metro-css-parser": "./metro-css-parser.cjs",
+      "./state-style": {
+        "types": "./build/state-style.d.ts",
+        "default": "./build/state-style.js"
+      }
     }
   },
   "scripts": {
@@ -77,6 +93,7 @@
     "react-native": ">=0.86"
   },
   "devDependencies": {
+    "@babel/core": "catalog:",
     "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*",
     "solid-js": "catalog:"

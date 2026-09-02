@@ -13,6 +13,18 @@
     "url": "https://github.com/OneEyed1366/symbiote-native/issues"
   },
   "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "expo-local-authentication",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "biometrics",
+    "face-id"
+  ],
   "type": "module",
   "main": "src/core/index.ts",
   "module": "src/core/index.ts",

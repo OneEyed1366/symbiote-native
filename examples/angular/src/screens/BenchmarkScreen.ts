@@ -17,6 +17,7 @@ import {
   SectionList,
   SymbioteHostPropsDirective,
   Text,
+  TextInput,
   View,
   VListItemDirective,
   VSectionHeaderDirective,
@@ -24,11 +25,19 @@ import {
   type ISection,
 } from '@symbiote-native/angular';
 import {
+  readCommitProfile,
   registerPostCommit,
   unregisterPostCommit,
 } from '@symbiote-native/engine';
+import {
+  readFabricCallProfile,
+  type IFabricCallProfile,
+} from '../fabric-call-counter';
 import { ActionButton } from '../components/ActionButton';
-import { JsFrameRateMeter } from '../components/JsFrameRateMeter';
+import {
+  commitProfileGate,
+  JsFrameRateMeter,
+} from '../components/JsFrameRateMeter';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 // static look compiled at build time by @symbiote-native/css-parser
@@ -96,14 +105,24 @@ const NOUNS = [
 const ROW_BATCH = 1000;
 const ROW_BATCH_LARGE = 10000;
 
+// FABRIC currency (native views the host actually paints), not the engine's retained-tree node
+// count — the two diverge on this row and VISITED is where the difference shows, never Fabric.
 // The number that decides whether a row COUNT is even feasible here, and the one krausest cannot
-// tell us: its counts are DOM-node counts. `BenchmarkRow` below expands to NINE native views
-// (1 View + 3x[Text + RawText] + 2 Pressable Views), so 10 000 rows mounted at once is 90 000
-// UIViews. Measured 2026-08-18 on the iOS 26.5 simulator, that never completed: RAM climbed
-// 2.1 -> 2.8 GB and the JS thread sat at 0 fps. 1 000 rows (9 000 views) completes in ~880 ms.
-// That ceiling is the native host's, not the engine's - which is exactly why the two mount modes
-// below exist, so the claim can be measured instead of asserted.
-const NATIVE_VIEWS_PER_ROW = 9;
+// tell us: its counts are DOM-node counts. `BenchmarkRow` below expands to TEN native views
+// (1 View + 3x[Text + RawText] + 2 Pressable Views + 1 TextInput), the same row shape every other
+// adapter's column mounts — no with/without-TextInput toggle, no alternate row shape: one ruler.
+// So 10 000 rows mounted at once is 100 000 UIViews, well past what the native host can hold in
+// one frame — which is exactly why the two mount modes below exist, so the claim can be measured
+// instead of asserted.
+//
+// The engine-node currency is different and HIGHER, and that gap is the measurement, not noise:
+// Vue/Svelte/Solid lower TextInput to a bare intrinsic and pay zero retained anchors for it;
+// Angular has no TextInput lowering, so its `<TextInput>` costs its own component anchor plus one
+// more per branch of its internal `@if (isMultiline) {…} @else {…}` — +4 engine nodes / +3
+// anchors per row on top of the one Fabric view, measured directly in
+// `adapters/angular/src/__tests__/benchmark-row-shape.test.ts` ('adds exactly one native view per
+// row (the TextInput), nothing else'). `NATIVE_VIEWS_PER_ROW` counts Fabric only.
+const NATIVE_VIEWS_PER_ROW = 10;
 // Fixed so getItemLayout is exact in virtualized mode and both modes lay rows out identically.
 const BENCH_ROW_HEIGHT = 44;
 
@@ -120,52 +139,17 @@ const MOUNT_MODE = {
 } as const;
 type IMountMode = (typeof MOUNT_MODE)[keyof typeof MOUNT_MODE];
 
-// DIAGNOSTIC PROBE — delete once the question below is answered either way.
+// Angular has exactly one row shape, the same instrument every other adapter's canary is: a row
+// component and two real <Pressable>s, plus the unconditional <TextInput> below. It used to carry
+// four switchable shapes (`composed`/`flat`/`lowered`/`composed-lowered`) built to isolate whether
+// Angular's ~3x Create gap against its siblings was composed-component anchors, Angular's own
+// LView/TView/DI machinery, or Pressable instantiation specifically — none of that decomposition
+// ran to a device conclusion, and a benchmark with a shape-changing control is not one ruler across
+// adapters, it is several instruments sharing a screen. Dropped 2026-09-01, not commented out:
+// still in git history for whoever wants to pick the investigation back up.
 //
-// THE OPEN QUESTION. Angular builds a 1,000-row list ~3x slower than every other adapter, while
-// its point operations are ordinary. Measured on device, all-mounted Create 1,000 rows:
-//
-//   Angular 2383 ms · Solid 765 · React 814 · Svelte 937 · Vue 1132
-//   Angular's own select 77 ms · swap 81 · remove 84 — in line with everyone else.
-//
-// Two explanations were tested and DIED. ChangeDetectionStrategy.OnPush: every counter
-// byte-identical with and without it. Wasted engine prop writes (Angular pushed 104,000 setProp
-// calls where Solid needed 12,000): real, fixed, and worth exactly nothing — every row within
-// ±10% of baseline afterwards.
-//
-// The remaining structural suspect is the one this toggle exists to test: Angular binds a
-// component to a host ELEMENT, so every composed component instance costs an engine node
-// (anchor-host-registry.ts keeps it from painting), while a Vue/React/Solid/Svelte component is a
-// function that allocates nothing. The row below is 12 engine nodes under Angular against 9 under
-// the others — the row component itself plus its two <Pressable>s. Note the arithmetic that makes
-// this doubtful rather than obvious, and treat it as the thing under test: +33% nodes would have
-// to produce 3x time, which needs a sharply superlinear cost nobody has located. A REFUTATION is
-// a good result here; two convincing hypotheses have already died.
-//
-// So the same row exists in two shapes, switchable at runtime so both numbers come out of ONE
-// build in ONE session with nothing rebuilt in between:
-const ROW_SHAPE = {
-  // The row as every other adapter's canary has it, and what produced the 2383 ms above. The
-  // DEFAULT, and byte-identical to what it was before this toggle existed — the screen stays a
-  // valid cross-adapter instrument for anyone who never touches the toggle.
-  Composed: 'composed',
-  // The same row with ZERO composed components: the two <Pressable>s become plain host elements
-  // carrying a (press) listener, and the row component is inlined into the list template. Same 9
-  // native views, same props, 9 engine nodes instead of 12.
-  //
-  // What it gives up, which is why this measures "composed components as a whole" rather than
-  // anchors alone: Pressable's press machine (hitSlop, pressRetentionOffset, delayLongPress,
-  // unstable_pressDelay, disabled, android_ripple), its responder claim and termination
-  // negotiation, its accessibility fold, and the markForCheck wiring that comes with a component
-  // boundary. A plain (press) on a View still fires — press is a base ViewConfig event the engine
-  // synthesizes from the touch stream — so tapping a row still selects, and the × still removes.
-  Flat: 'flat',
-} as const;
-type IRowShape = (typeof ROW_SHAPE)[keyof typeof ROW_SHAPE];
-
 // The row's class in each state, as literals rather than a template concatenation so a
-// change-detection pass hands `[class]` the same string it saw last time. BenchmarkRow's own
-// getter spells the identical two values; the flat row must not differ from it here either.
+// change-detection pass hands `[class]` the same string it saw last time.
 const ROW_CLASS = 'bench-row';
 const ROW_CLASS_SELECTED = 'bench-row bench-row-selected';
 // krausest's "partial update" touches every 10th row of 10,000 and appends " !!!" to its label.
@@ -367,6 +351,54 @@ type IListState = {
   selectedId: number | undefined;
 };
 
+// What the ENGINE did inside one timed step, captured from readCommitProfile() around the step
+// rather than sampled on a timer. This is the number that separates "our commit is expensive" from
+// "the framework above it is expensive": every adapter builds the same 9 001-node tree for
+// Create 1 000, so a nodesVisited or propWrites that differs between adapters on the SAME step is
+// work the screen is generating, not a cost of the platform.
+//
+// `walkMs` is NOT the engine's JS cost — the window around reconcile() contains the createNode and
+// appendChild JSI crossings it makes. Read it only as a DELTA between adapters, where the native
+// part is a shared constant (measured: identical Fabric call counts across react/vue/solid/svelte).
+type IStepProfile = {
+  nodesVisited: number;
+  propWrites: number;
+  propNoops: number;
+  commits: number;
+  walkMs: number;
+};
+
+const EMPTY_STEP_PROFILE: IStepProfile = {
+  nodesVisited: 0,
+  propWrites: 0,
+  propNoops: 0,
+  commits: 0,
+  walkMs: 0,
+};
+
+const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
+  calls: {},
+  propKeys: {},
+  totalCalls: 0,
+  totalPropKeys: 0,
+};
+
+// The one quantity this canary and `examples/bare-rn` (stock React Native on React's own Fabric
+// renderer) can both report. IStepProfile above counts the ENGINE's reconcile walk, which stock
+// has no equivalent of; `global.nativeFabricUIManager` is what both stacks actually drive, so
+// counting calls there is the only like-for-like number between them.
+function formatFabric(profile: IFabricCallProfile | undefined): string {
+  if (profile === undefined) return '—';
+  const create = profile.calls.createNode ?? 0;
+  const append = profile.calls.appendChild ?? 0;
+  const clones =
+    (profile.calls.cloneNode ?? 0) +
+    (profile.calls.cloneNodeWithNewChildren ?? 0) +
+    (profile.calls.cloneNodeWithNewProps ?? 0) +
+    (profile.calls.cloneNodeWithNewChildrenAndProps ?? 0);
+  return `${create}/${append}/${clones}`;
+}
+
 // One row of the fixed-order suite. `startRows` is recorded rather than derived because it is the
 // number the whole suite exists to pin down - a duration is meaningless without it.
 type ISuiteEntry = {
@@ -374,6 +406,8 @@ type ISuiteEntry = {
   label: string;
   durationMs: number;
   startRows: number;
+  profile: IStepProfile;
+  fabric: IFabricCallProfile;
 };
 
 // A suite row's testID is per-operation, so it cannot be a static attribute; a bound one on a bare
@@ -389,6 +423,16 @@ const SUITE_ROW_HOST_PROPS: Record<string, IHostProps> = Object.fromEntries(
 // the other.
 const PROBE_ROW_HOST_PROPS: Record<string, IHostProps> = Object.fromEntries(
   Object.values(BENCH_OP).map(op => [op, { testID: `bench-probe-${op}` }]),
+);
+
+// And for the engine-per-step table below it.
+const ENGINE_ROW_HOST_PROPS: Record<string, IHostProps> = Object.fromEntries(
+  Object.values(BENCH_OP).map(op => [op, { testID: `bench-engine-${op}` }]),
+);
+
+// And for the Fabric-call table beside it.
+const FABRIC_ROW_HOST_PROPS: Record<string, IHostProps> = Object.fromEntries(
+  Object.values(BENCH_OP).map(op => [op, { testID: `bench-fabric-${op}` }]),
 );
 
 // The suite's fixed order, shared by the runner and the comparison table below, so a step can
@@ -422,18 +466,9 @@ type ISuiteProgress = {
 // other is how "the engine is slow" gets claimed off a number that measured 9,000 native views.
 type ISuiteResults = Record<IMountMode, readonly ISuiteEntry[]>;
 
-// Kept per row shape as well, so the probe's two runs sit side by side instead of the second
-// overwriting the first - the whole point is reading them back to back without a rebuild.
-type IShapedSuiteResults = Record<IRowShape, ISuiteResults>;
-
 const EMPTY_SUITE_RESULTS: ISuiteResults = {
   [MOUNT_MODE.All]: [],
   [MOUNT_MODE.Virtualized]: [],
-};
-
-const EMPTY_SHAPED_RESULTS: IShapedSuiteResults = {
-  [ROW_SHAPE.Composed]: EMPTY_SUITE_RESULTS,
-  [ROW_SHAPE.Flat]: EMPTY_SUITE_RESULTS,
 };
 
 // A step's stopwatch: started by runStep, stopped by the engine's post-commit hook.
@@ -495,10 +530,18 @@ function formatDuration(durationMs: number | undefined): string {
   return `${durationMs.toFixed(1)} ms`;
 }
 
+/**
+ * The row — Angular's only shape now, the same one every other adapter's column mounts: a row
+ * component and two real `<Pressable>`s, plus an unconditional `<TextInput>` last, after the
+ * remove-Pressable — never bound to `multiline`, no change handler, no ref, no functional style.
+ * No row-shape switch, no with/without toggle: this benchmark measures ONE row shape everywhere,
+ * the same instrument as every other adapter's canary (root CLAUDE.md, "Where we stand against
+ * stock React Native").
+ */
 @Component({
   selector: 'BenchmarkRow',
   standalone: true,
-  imports: [Pressable, Text, View],
+  imports: [Pressable, Text, TextInput, View],
   template: `
     <View [class]="rowClass">
       <Text class="bench-row-id">{{ rowId }}</Text>
@@ -508,6 +551,7 @@ function formatDuration(durationMs: number | undefined): string {
       <Pressable class="bench-row-remove" (press)="remove.emit(row.id)">
         <Text class="bench-row-remove-text">×</Text>
       </Pressable>
+      <TextInput class="bench-row-input" [value]="row.label" />
     </View>
   `,
 })
@@ -694,29 +738,17 @@ export class StickySectionListBlock {
           </View>
         </View>
 
-        <!-- The row-shape probe's switch. Sits with the run buttons, not down beside the rows,
-             because it decides what a run MEASURES - press a shape, then press a mode. -->
         <View class="bench-run-row">
           <View class="flex1">
             <ActionButton
-              testID="bench-row-shape-composed"
-              [title]="composedShapeTitle()"
+              testID="bench-toggle-batch-create"
+              [title]="batchCreateTitle()"
               [color]="accent"
-              (press)="onPickRowShape(rowShapeComposed)"
-            ></ActionButton>
-          </View>
-          <View class="flex1">
-            <ActionButton
-              testID="bench-row-shape-flat"
-              [title]="flatShapeTitle()"
-              [color]="accent"
-              (press)="onPickRowShape(rowShapeFlat)"
+              (press)="onToggleBatchCreate()"
             ></ActionButton>
           </View>
         </View>
-        <Text testID="bench-row-shape-note" class="note-text">{{
-          rowShapeNote()
-        }}</Text>
+        <Text class="note-text">{{ batchCreateNote }}</Text>
 
         @if (progress() !== undefined) {
           <View testID="bench-suite-progress" class="bench-progress">
@@ -747,27 +779,51 @@ export class StickySectionListBlock {
             </View>
           }
 
-          <Text class="section-label">PROBE · ROW SHAPE · ALL MOUNTED</Text>
+          <Text class="section-label">ENGINE PER STEP · ALL MOUNTED</Text>
           <View class="bench-compare-row">
             <Text class="bench-compare-label"></Text>
-            <Text class="bench-compare-head-cell">COMPOSED</Text>
-            <Text class="bench-compare-head-cell">FLAT</Text>
+            <Text class="bench-compare-head-cell">VISITED</Text>
+            <Text class="bench-compare-head-cell">WRITES/NOOP</Text>
+            <Text class="bench-compare-head-cell">COMMITS</Text>
           </View>
           @for (step of suiteSteps; track step.op) {
             <View
-              [symbioteHostProps]="probeHostProps(step.op)"
+              [symbioteHostProps]="engineHostProps(step.op)"
               class="bench-compare-row"
             >
               <Text class="bench-compare-label">{{ step.label }}</Text>
               <Text class="bench-compare-cell">{{
-                composedShapeResult(step.op)
+                engineVisited(step.op)
               }}</Text>
               <Text class="bench-compare-cell">{{
-                flatShapeResult(step.op)
+                engineWrites(step.op)
+              }}</Text>
+              <Text class="bench-compare-cell">{{
+                engineCommits(step.op)
               }}</Text>
             </View>
           }
-          <Text class="note-text">{{ probeNote }}</Text>
+          <Text class="note-text">{{ engineNote }}</Text>
+
+          <Text class="section-label">FABRIC CALLS · ALL MOUNTED</Text>
+          <View class="bench-compare-row">
+            <Text class="bench-compare-label"></Text>
+            <Text class="bench-compare-head-cell">CREATE/APPEND/CLONE</Text>
+            <Text class="bench-compare-head-cell">PROP KEYS</Text>
+          </View>
+          @for (step of suiteSteps; track step.op) {
+            <View
+              [symbioteHostProps]="fabricHostProps(step.op)"
+              class="bench-compare-row"
+            >
+              <Text class="bench-compare-label">{{ step.label }}</Text>
+              <Text class="bench-compare-cell">{{ fabricCalls(step.op) }}</Text>
+              <Text class="bench-compare-cell">{{
+                fabricPropKeys(step.op)
+              }}</Text>
+            </View>
+          }
+          <Text class="note-text">{{ fabricNote }}</Text>
         } @else {
           <Text testID="bench-suite-empty" class="note-text"
             >No suite run yet.</Text
@@ -787,57 +843,19 @@ export class StickySectionListBlock {
         </Text>
 
         <Text class="section-label">{{ rowsSectionLabel() }}</Text>
-        <!-- The shape branch is OUTSIDE the mount-mode branch on purpose. Nested the other way,
-             every row would carry an extra @if container - one more engine node per row, in BOTH
-             shapes - and the composed column would stop being the thing the 2383 ms was measured
-             on. This way the composed branch below is byte-identical to what it was before the
-             probe, and the whole toggle costs one anchor for the list. -->
-        @if (isComposedRow()) {
-          @if (isAllMounted()) {
-            @for (row of rows(); track row.id) {
-              <BenchmarkRow
-                [row]="row"
-                [isSelected]="row.id === selectedId()"
-                (select)="onSelect($event)"
-                (remove)="onRemove($event)"
-              />
-            }
-          } @else {
-            <FlatList
-              testID="bench-rows-virtualized"
-              class="bench-rows-viewport"
-              [data]="rows()"
-              [keyExtractor]="rowKeyExtractor"
-              [getItemLayout]="rowItemLayout"
-            >
-              <ng-template vListItem let-item>
-                <BenchmarkRow
-                  [row]="rowOf(item)"
-                  [isSelected]="rowOf(item).id === selectedId()"
-                  (select)="onSelect($event)"
-                  (remove)="onRemove($event)"
-                />
-              </ng-template>
-            </FlatList>
-          }
-        } @else if (isAllMounted()) {
-          <!-- The same nine native views, no component boundary anywhere: the row markup is
-               inlined here rather than living in a @Component, and each <Pressable> is a plain
-               View with a (press) listener. A literal copy of BenchmarkRow's template rather than
-               something shared with it - sharing would need a component, which is the thing being
-               removed. adapters/angular/src/__tests__/benchmark-row-shape.test.ts pins the two
-               against each other so a drifting copy fails there instead of silently voiding a
-               measurement. -->
+        <!-- The only row shape: a row component and two real <Pressable>s, plus the unconditional
+             <TextInput> — the same instrument every other adapter's column mounts. This used to
+             switch across four shapes built to isolate Angular's ~3x Create gap; dropped
+             2026-09-01 so this benchmark measures one thing, the way every other adapter's does
+             (root CLAUDE.md, "Where we stand against stock React Native"). -->
+        @if (isAllMounted()) {
           @for (row of rows(); track row.id) {
-            <View [class]="rowClassFor(row)">
-              <Text class="bench-row-id">{{ row.id }}</Text>
-              <View class="flex1" (press)="onSelect(row.id)">
-                <Text class="bench-row-label">{{ row.label }}</Text>
-              </View>
-              <View class="bench-row-remove" (press)="onRemove(row.id)">
-                <Text class="bench-row-remove-text">×</Text>
-              </View>
-            </View>
+            <BenchmarkRow
+              [row]="row"
+              [isSelected]="row.id === selectedId()"
+              (select)="onSelect($event)"
+              (remove)="onRemove($event)"
+            />
           }
         } @else {
           <FlatList
@@ -848,18 +866,12 @@ export class StickySectionListBlock {
             [getItemLayout]="rowItemLayout"
           >
             <ng-template vListItem let-item>
-              <View [class]="rowClassFor(rowOf(item))">
-                <Text class="bench-row-id">{{ rowOf(item).id }}</Text>
-                <View class="flex1" (press)="onSelect(rowOf(item).id)">
-                  <Text class="bench-row-label">{{ rowOf(item).label }}</Text>
-                </View>
-                <View
-                  class="bench-row-remove"
-                  (press)="onRemove(rowOf(item).id)"
-                >
-                  <Text class="bench-row-remove-text">×</Text>
-                </View>
-              </View>
+              <BenchmarkRow
+                [row]="rowOf(item)"
+                [isSelected]="rowOf(item).id === selectedId()"
+                (select)="onSelect($event)"
+                (remove)="onRemove($event)"
+              />
             </ng-template>
           </FlatList>
         }
@@ -917,25 +929,17 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     selectedId: undefined,
   });
   private readonly mountMode = signal<IMountMode>(MOUNT_MODE.All);
-  // Composed by default, so a screen nobody touches reports the same numbers it always did.
-  private readonly rowShape = signal<IRowShape>(ROW_SHAPE.Composed);
   readonly history = signal<readonly IBenchResult[]>([]);
-  readonly suiteResults = signal<IShapedSuiteResults>(EMPTY_SHAPED_RESULTS);
+  readonly suiteResults = signal<ISuiteResults>(EMPTY_SUITE_RESULTS);
   readonly progress = signal<ISuiteProgress | undefined>(undefined);
   readonly suiteSteps = SUITE_STEPS;
   readonly suiteStepCount = SUITE_STEPS.length;
   readonly mountModeAll = MOUNT_MODE.All;
   readonly mountModeVirtualized = MOUNT_MODE.Virtualized;
-  readonly rowShapeComposed = ROW_SHAPE.Composed;
-  readonly rowShapeFlat = ROW_SHAPE.Flat;
-  readonly probeNote = `Composed is ${NATIVE_VIEWS_PER_ROW + 3} engine nodes per row (the row component and its two Pressables each own a non-painting host element); flat is ${NATIVE_VIEWS_PER_ROW}. Both commit the same ${NATIVE_VIEWS_PER_ROW} native views with the same props, so a difference here is the cost of the component boundaries themselves — press one shape, run a mode, press the other, run the same mode.`;
 
   readonly rows = computed(() => this.list().rows);
   readonly selectedId = computed(() => this.list().selectedId);
   readonly isAllMounted = computed(() => this.mountMode() === MOUNT_MODE.All);
-  readonly isComposedRow = computed(
-    () => this.rowShape() === ROW_SHAPE.Composed,
-  );
 
   // History is newest-first, so the first entry found for an operation is its latest run.
   private readonly lastDurations = computed(() => {
@@ -970,20 +974,6 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
       : 'Run · virtualized',
   );
 
-  readonly composedShapeTitle = computed(() =>
-    this.isComposedRow() ? 'Rows · composed ✓' : 'Rows · composed',
-  );
-
-  readonly flatShapeTitle = computed(() =>
-    this.isComposedRow() ? 'Rows · flat' : 'Rows · flat ✓',
-  );
-
-  readonly rowShapeNote = computed(() =>
-    this.isComposedRow()
-      ? `Composed row · BenchmarkRow + 2 Pressables · ${NATIVE_VIEWS_PER_ROW + 3} engine nodes per row. The default, and the shape every other adapter's canary runs.`
-      : `Flat row · no composed components · ${NATIVE_VIEWS_PER_ROW} engine nodes per row. Diagnostic only — the row loses Pressable's press machine, responder negotiation and accessibility fold.`,
-  );
-
   readonly progressLine = computed(() => {
     const progress = this.progress();
     if (progress === undefined) return '';
@@ -999,16 +989,12 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
       : `${progress.done}/${this.suiteStepCount}`;
   });
 
-  // Every recorded duration in one map, keyed shape:mode:operation. One computed rather than four
-  // because the probe added a second axis and a computed per cell would be four more to keep in
-  // step with each other.
+  // Every recorded duration in one map, keyed mode:operation.
   private readonly durations = computed(() => {
     const durations = new Map<string, number>();
-    for (const [shape, byMode] of Object.entries(this.suiteResults())) {
-      for (const [mode, entries] of Object.entries(byMode)) {
-        for (const entry of entries) {
-          durations.set(`${shape}:${mode}:${entry.op}`, entry.durationMs);
-        }
+    for (const [mode, entries] of Object.entries(this.suiteResults())) {
+      for (const entry of entries) {
+        durations.set(`${mode}:${entry.op}`, entry.durationMs);
       }
     }
     return durations;
@@ -1016,10 +1002,42 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
 
   readonly hasSuiteResults = computed(() => this.durations().size > 0);
 
+  // All-mounted only: the virtualized mode prices two different list implementations rather than
+  // two renderers.
+  private readonly profiles = computed(() => {
+    const entries = this.suiteResults()[MOUNT_MODE.All];
+    return new Map(entries.map(entry => [entry.op, entry.profile]));
+  });
+
+  private readonly fabricProfiles = computed(() => {
+    const entries = this.suiteResults()[MOUNT_MODE.All];
+    return new Map(entries.map(entry => [entry.op, entry.fabric]));
+  });
+
+  // Off by default because the engine's default is off; the toggle only mirrors the global back.
+  readonly isBatchingCreate = signal(false);
+
+  readonly batchCreateTitle = computed(() =>
+    this.isBatchingCreate() ? 'Batch create · on ✓' : 'Batch create · off',
+  );
+
+  readonly batchCreateNote = `Temporary experiment switch. On, the engine hands a parent's children to cloneNodeWithChildren in one call instead of appending them one at a time — about a third fewer JSI calls on Create, paid for with one extra ShadowNode per batched parent. The sign is not predicted, which is why it is a runtime toggle: two builds a day apart drifted 4% on Create and 6x on Clear with no code change, so the only trustworthy comparison is back-to-back on one binary. Flip it, re-run the suite, compare.`;
+
+  readonly engineNote = `Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. On the flat row shape every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a VISITED or WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. The ms is the reconcile window and it CONTAINS the createNode/appendChild JSI calls, so compare it across adapters, never read it as engine JS.`;
+
+  readonly fabricNote = `Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no reconcile walk to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`;
+
   readonly suiteNote = `Every operation in a fixed order, each timed step starting from exactly ${SUITE_ROWS} rows, with untimed resets in between. All-mounted is krausest's own shape (${NATIVE_VIEWS_PER_ROW} native views per row) and the column that compares to the published web numbers; virtualized mounts a window instead, so it prices what an app ships rather than the commit path itself. Pressing the operation buttons by hand leaves Remove and Append measuring whatever happened to be on screen.`;
 
   private pending: IPendingMeasurement | null = null;
   private seq = 0;
+  // Filled by the post-commit hook, read by `timed` right after its own `await this.runStep(...)`.
+  // A plain field, deliberately NOT a signal: nothing renders it directly (the table below reads
+  // the recorded suite entries), and a signal write here would dirty the view from inside the
+  // commit that was just measured. Steps are serialized and `timed` awaits the progress step BEFORE
+  // the measured one, so the value standing here when it reads is always the measured step's.
+  private lastStepProfile: IStepProfile = EMPTY_STEP_PROFILE;
+  private lastFabricProfile: IFabricCallProfile = EMPTY_FABRIC_PROFILE;
 
   readonly operations: readonly IBenchOperation[] = [
     this.operation(BENCH_OP.Create, 'Create 1,000 rows', () => this.onCreate()),
@@ -1061,7 +1079,19 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     const pending = this.pending;
     if (pending === null) return;
     this.pending = null;
-    pending.settle(performance.now() - pending.startedAt);
+    const durationMs = performance.now() - pending.startedAt;
+    // Safe to read here: commitContainer increments walkMs and commits BEFORE completeRoot, and
+    // runPostCommitHooks() fires after it, so the profile for this commit is already complete.
+    const profile = readCommitProfile();
+    this.lastStepProfile = {
+      nodesVisited: profile.nodesVisited,
+      propWrites: profile.propWrites,
+      propNoops: profile.propNoops,
+      commits: profile.commits,
+      walkMs: profile.walkMs,
+    };
+    this.lastFabricProfile = readFabricCallProfile();
+    pending.settle(durationMs);
   };
 
   ngOnInit(): void {
@@ -1088,34 +1118,63 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     return PROBE_ROW_HOST_PROPS[op];
   }
 
-  // The two mode columns follow the row shape currently selected, so the table always prices what
-  // the buttons above it would run right now; the probe table below them holds both shapes.
+  engineHostProps(op: IBenchOpId): IHostProps {
+    return ENGINE_ROW_HOST_PROPS[op];
+  }
+
+  fabricHostProps(op: IBenchOpId): IHostProps {
+    return FABRIC_ROW_HOST_PROPS[op];
+  }
+
+  // Three cells rather than one formatter, so an operation the suite has not run yet reads as a
+  // dash in every column instead of a row of zeroes that looks like a measurement.
+  engineVisited(op: IBenchOpId): string {
+    const profile = this.profiles().get(op);
+    return profile === undefined ? '—' : String(profile.nodesVisited);
+  }
+
+  engineWrites(op: IBenchOpId): string {
+    const profile = this.profiles().get(op);
+    return profile === undefined
+      ? '—'
+      : `${profile.propWrites}/${profile.propNoops}`;
+  }
+
+  engineCommits(op: IBenchOpId): string {
+    const profile = this.profiles().get(op);
+    return profile === undefined
+      ? '—'
+      : `${profile.commits} · ${profile.walkMs.toFixed(1)}ms`;
+  }
+
+  fabricCalls(op: IBenchOpId): string {
+    return formatFabric(this.fabricProfiles().get(op));
+  }
+
+  fabricPropKeys(op: IBenchOpId): string {
+    const fabric = this.fabricProfiles().get(op);
+    return fabric === undefined ? '—' : String(fabric.totalPropKeys);
+  }
+
+  // The engine reads `__SYMBIOTE_BATCH_CREATE__` once per commit, not per node, so it has to be
+  // set BEFORE the mutation that starts a step — which a press between runs always is. Deliberately
+  // a global rather than an input: nothing on the commit path should have to be threaded a flag.
+  onToggleBatchCreate(): void {
+    const next = !this.isBatchingCreate();
+    Reflect.set(globalThis, '__SYMBIOTE_BATCH_CREATE__', next);
+    this.isBatchingCreate.set(next);
+  }
+
   allMountedResult(op: IBenchOpId): string {
-    return this.durationOf(this.rowShape(), MOUNT_MODE.All, op);
+    return this.durationOf(MOUNT_MODE.All, op);
   }
 
   virtualizedResult(op: IBenchOpId): string {
-    return this.durationOf(this.rowShape(), MOUNT_MODE.Virtualized, op);
-  }
-
-  composedShapeResult(op: IBenchOpId): string {
-    return this.durationOf(ROW_SHAPE.Composed, MOUNT_MODE.All, op);
-  }
-
-  flatShapeResult(op: IBenchOpId): string {
-    return this.durationOf(ROW_SHAPE.Flat, MOUNT_MODE.All, op);
+    return this.durationOf(MOUNT_MODE.Virtualized, op);
   }
 
   rowClassFor(row: IBenchmarkRow): string {
     return row.id === this.selectedId() ? ROW_CLASS_SELECTED : ROW_CLASS;
-  }
-
-  // Ignored mid-suite for the same reason a hand-pressed operation is: the shape swap commits a
-  // whole new row list, and that commit would stop the running step's stopwatch and file its own
-  // teardown cost under whichever operation was in flight.
-  onPickRowShape(shape: IRowShape): void {
-    if (this.progress() !== undefined) return;
-    this.rowShape.set(shape);
   }
 
   onRunSuite(mode: IMountMode): void {
@@ -1165,15 +1224,29 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
         if (isSettled) return;
         isSettled = true;
         clearTimeout(timer);
+        // Release before resolving, so the meter is live again the moment the step is over even if
+        // a caller does more work synchronously off this promise. The timeout path below settles
+        // through here too, so a step that never commits still hands the meter back.
+        commitProfileGate.isHeldByBenchmark = false;
         resolve(durationMs);
       };
       const timer = setTimeout(() => {
         // Drop the pending record too: leaving it would make the NEXT step's commit stop this
         // step's stopwatch and report a duration against the wrong operation.
         this.pending = null;
+        this.lastStepProfile = EMPTY_STEP_PROFILE;
+        this.lastFabricProfile = EMPTY_FABRIC_PROFILE;
         settle(SUITE_TIMED_OUT);
       }, SUITE_STEP_TIMEOUT_MS);
 
+      // Stop the meter and zero both sets of counters LAST, immediately before the mutation, so
+      // nothing between here and the commit lands in the step's profile. No install retry for the
+      // Fabric counter: its wrapper has to be in place while the engine binds the slot, which
+      // index.js already did and nothing can redo — an all-zero FABRIC CALLS table means that
+      // install did not land.
+      commitProfileGate.isHeldByBenchmark = true;
+      readCommitProfile();
+      readFabricCallProfile();
       this.pending = { startedAt: performance.now(), settle };
       mutate();
     });
@@ -1224,15 +1297,12 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
    * the operator happened to leave behind.
    *
    * Runs in EITHER mount mode - the pressed button picks it. No 10,000-row step in either: 10,000
-   * rows is 90,000 native views, which the host does not survive in all-mounted (see
+   * rows is 100,000 native views, which the host does not survive in all-mounted (see
    * NATIVE_VIEWS_PER_ROW), and a suite that hangs the screen measures nothing.
    */
   private async runSuite(mode: IMountMode): Promise<void> {
     resetRowData();
 
-    // Read once, up front: the shape cannot change mid-run (onPickRowShape refuses while a suite
-    // is up), and this is the cell the results land in.
-    const shape = this.rowShape();
     const entries: ISuiteEntry[] = [];
     const clearRows = (): void => {
       this.list.set({ rows: [], selectedId: undefined });
@@ -1259,11 +1329,16 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     ): Promise<void> => {
       const label = suiteLabel(op);
       await showProgress(label);
+      const durationMs = await this.runStep(mutate);
+      // Read AFTER the measured step, never after showProgress: the field holds whichever step
+      // committed last, and the progress step commits first by construction.
       entries.push({
         op,
         label,
-        durationMs: await this.runStep(mutate),
+        durationMs,
         startRows,
+        profile: this.lastStepProfile,
+        fabric: this.lastFabricProfile,
       });
     };
 
@@ -1275,10 +1350,7 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     // suite until the timeout. Every step after this one changes the tree by construction.
     await this.runStep(() => {
       this.mountMode.set(mode);
-      this.suiteResults.update(current => ({
-        ...current,
-        [shape]: { ...current[shape], [mode]: [] },
-      }));
+      this.suiteResults.update(current => ({ ...current, [mode]: [] }));
       this.history.set([]);
       this.progress.set({ mode, label: 'Preparing', done: 0 });
       clearRows();
@@ -1331,19 +1403,12 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     await this.runStep(fillRows);
     await timed(BENCH_OP.Clear, SUITE_ROWS, clearRows);
 
-    this.suiteResults.update(current => ({
-      ...current,
-      [shape]: { ...current[shape], [mode]: entries },
-    }));
+    this.suiteResults.update(current => ({ ...current, [mode]: entries }));
     this.progress.set(undefined);
   }
 
-  private durationOf(
-    shape: IRowShape,
-    mode: IMountMode,
-    op: IBenchOpId,
-  ): string {
-    return formatDuration(this.durations().get(`${shape}:${mode}:${op}`));
+  private durationOf(mode: IMountMode, op: IBenchOpId): string {
+    return formatDuration(this.durations().get(`${mode}:${op}`));
   }
 
   private operation(

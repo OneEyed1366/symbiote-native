@@ -74,28 +74,36 @@ describe('AnimatedValue through the clone-on-write commit (integration)', () => 
 
   // why: a JS value drive must recommit through the SAME node identity (clone-on-write), never
   // a brand-new tree, so the leaf's props land in exactly one completeRoot per setValue.
-  it('setValue(0.5) interpolates to width 50 in exactly one completeRoot', () => {
+  // The awaits below are the coalesced setNativeProps flush: a drive queues its write and the
+  // queue publishes at the microtask boundary (commit.ts, flushNativeProps). One await is enough —
+  // the flush is queued before it.
+  it('setValue(0.5) interpolates to width 50 in exactly one completeRoot', async () => {
     const commitsBefore = fabric.counts.completeRoot;
     value.setValue(0.5);
+    await Promise.resolve();
     expect(appView().props.width).toBe(50);
     expect(fabric.counts.completeRoot).toBe(commitsBefore + 1);
   });
 
-  it('setValue(1) interpolates to width 100', () => {
+  it('setValue(1) interpolates to width 100', async () => {
     value.setValue(1);
+    await Promise.resolve();
     expect(appView().props.width).toBe(100);
   });
 
   // why: a plain listener (e.g. an app reading scroll position) must see the RAW driving
   // value, while a bound prop leaf sees the value AFTER interpolation — the graph fans the
   // same setValue out to both representations independently.
-  it('drives listeners with the raw value while the leaf gets the interpolated value', () => {
+  it('drives listeners with the raw value while the leaf gets the interpolated value', async () => {
     let observed = -1;
     value.addListener(({ value: v }) => {
       observed = v;
     });
     value.setValue(0.25);
+    // The listener is synchronous and the committed prop is not — the two halves of this test sit
+    // on opposite sides of the flush boundary deliberately.
     expect(observed).toBe(0.25);
+    await Promise.resolve();
     expect(appView().props.width).toBe(25);
   });
 });

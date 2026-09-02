@@ -98,11 +98,36 @@ const resolvedCache = new Map<string, IResolvedStyle>();
 // not a working set, and an LRU's bookkeeping costs more than the rebuild it saves.
 const RESOLVED_CACHE_LIMIT = 512;
 
+// The pressed variant, keyed by the SAME authored string. Separate from `resolvedCache` so the two
+// can never collide on one key, and string-keyed for the same reason that one is: identity is the
+// whole point. `isAlreadyPublished` (node.ts) turns a re-push away by comparing slot 0 with
+// Object.is, so a thousand unpressed rows only cost zero writes if they all publish the SAME
+// object. Resolve an array or an object instead and every call returns a fresh one, the guard can
+// never fire, and the re-push storm it was added for comes back with a new cause.
+//
+// This doubles the distinct strings a screen can hold. A SECOND state would multiply them, and the
+// cache clears WHOLE on overflow rather than evicting — so a drop breaks identity for every node at
+// once. That is the wall a `:focus` or `:hover` would hit, and it would read as an unexplained
+// regression rather than as a cache limit.
+const activeCache = new Map<string, IResolvedStyle>();
+
+// The token the css-parser emits for `:active` (its `STATE_TOKEN`). Duplicated as a literal rather
+// than imported: the engine does not depend on the parser, and a CSS identifier cannot carry an
+// unescaped `:`, so this can never collide with a real class name.
+const STATE_TOKEN = ':active';
+
+// Whether ANY registered rule carries the state token. Not derivable from `ruleIndex`, which hooks
+// a rule on `tokens[0]` — for `.btn:active` that is `btn`, so `ruleIndex.has(':active')` is always
+// false and a gate built on it silently disables the whole feature. Found by a test, not by
+// reading: the wrong gate makes pressing a no-op with everything green.
+let hasActiveRules = false;
+
 // Every registration is a cascade change, so nothing resolved before it can be trusted. Clearing
 // wholesale beats versioning each entry — registration happens at import time, resolution happens
 // per commit, and only the second one is hot.
 function invalidateResolved(): void {
   resolvedCache.clear();
+  activeCache.clear();
 }
 
 export function registerRules(rules: readonly IStyleRule[]): void {
@@ -110,6 +135,7 @@ export function registerRules(rules: readonly IStyleRule[]): void {
   const epoch = ruleEpoch++;
 
   for (const rule of rules) {
+    if (rule.tokens.includes(STATE_TOKEN)) hasActiveRules = true;
     const hook = rule.tokens[0];
     // The empty set is a subset of every element's tokens, so a token-less rule would paint
     // everything. It names no class and can only come from a broken compile.
@@ -127,6 +153,7 @@ export function registerRules(rules: readonly IStyleRule[]): void {
 // Used between tests to reset registry state.
 export function clearGlobalStyles(): void {
   ruleIndex.clear();
+  hasActiveRules = false;
   ruleEpoch = 0;
   invalidateResolved();
 }
@@ -141,6 +168,29 @@ export function isClassNameValue(value: unknown): value is IClassNameValue {
   );
 }
 
+// An ARRAY of plain strings joined into one, so it takes the memoised string path like any other
+// class. Everything downstream keys off identity — `resolveClassName`'s cache, the `:active`
+// variant, and `isAlreadyPublished`'s Object.is on slot 0 — and the array branch below reduces
+// into a FRESH object on every call, so an array class silently opted out of all three: no pressed
+// styling, and a re-push that re-dirties the node on every update.
+//
+// Only an ALL-STRING array converts. A mixed array carries IResolvedStyle entries — the channel
+// ScrollView / VirtualizedList / FlatList / ImageBackground use to pass a style through the class
+// prop — and those are not tokens; folding them into a string would be a category error rather
+// than a fix. No adapter produces an all-string array today (Vue's createVNode normalises class to
+// a string, Angular joins its accumulated tokens, React's className is a string by convention), so
+// this closes a gap an APPLICATION can reach rather than one we can.
+export function canonicalClassName(
+  className: IClassNameValue,
+): IClassNameValue {
+  if (typeof className === 'string' || !Array.isArray(className)) {
+    return className;
+  }
+  return className.every(part => typeof part === 'string')
+    ? className.join(' ')
+    : className;
+}
+
 export function resolveClassName(className: IClassNameValue): IResolvedStyle {
   if (!className) return {};
 
@@ -149,6 +199,10 @@ export function resolveClassName(className: IClassNameValue): IResolvedStyle {
   }
 
   if (Array.isArray(className)) {
+    // Direct callers (an adapter resolving a class prop itself) get the same canonicalisation as
+    // routeProp's path, so an all-string array is memoised for them too.
+    const canonical = canonicalClassName(className);
+    if (typeof canonical === 'string') return resolveClassName(canonical);
     return className.reduce<IResolvedStyle>((acc, item) => {
       return { ...acc, ...resolveClassName(item) };
     }, {});
@@ -161,6 +215,39 @@ export function resolveClassName(className: IClassNameValue): IResolvedStyle {
 
   if (resolvedCache.size >= RESOLVED_CACHE_LIMIT) resolvedCache.clear();
   resolvedCache.set(className, resolved);
+
+  return resolved;
+}
+
+// The same element's style with `:active` added to its token list — so a `.btn:active` rule joins
+// the cascade exactly as its specificity says, merged by the SAME matcher. That makes the result a
+// complete REPLACEMENT for the unpressed style rather than an overlay, which is why no extra style
+// slot is needed on the node: pressing swaps what sits in slot 0.
+//
+// Non-string input resolves to the plain style, unchanged. An object or array has no stable key to
+// cache under, and the guard above is worthless without one.
+export function resolveActiveClassName(
+  className: IClassNameValue,
+): IResolvedStyle {
+  if (typeof className !== 'string') return resolveClassName(className);
+  // No `:active` rule anywhere in the app — hand back the very SAME object the unpressed path
+  // returns, not an equal one. Two cache keys give two objects even when their contents are
+  // byte-identical, and `isAlreadyPublished` compares with Object.is: pressing a node that has no
+  // pressed styling would otherwise publish a fresh base, dirty the node and pay a walk for a
+  // payload Fabric then rejects as unchanged. One node rather than a thousand, so not a storm —
+  // but it is a cost for literally nothing, and this makes the whole feature free for every app
+  // that does not use it.
+  if (!hasActiveRules) return resolveClassName(className);
+
+  const cached = activeCache.get(className);
+  if (cached !== undefined) return cached;
+
+  const parts = className.trim().split(/\s+/).filter(Boolean);
+  const resolved =
+    parts.length === 0 ? {} : (matchRules([...parts, STATE_TOKEN]) ?? {});
+
+  if (activeCache.size >= RESOLVED_CACHE_LIMIT) activeCache.clear();
+  activeCache.set(className, resolved);
 
   return resolved;
 }

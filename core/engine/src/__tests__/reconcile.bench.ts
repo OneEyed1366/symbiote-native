@@ -45,10 +45,18 @@ import {
   disposeRoot,
   insertBefore,
   removeChild,
+  setNativeProps,
   setProp,
+  setText,
   type ISymbioteNode,
   type SymbioteSurface,
 } from '../index';
+// setNativeProps queues; the flush is what a frame actually pays for, so every row that drives it
+// has to close the frame explicitly or it would time the enqueue and report a fictional win.
+import { flushNativeProps } from '../commit';
+// Not on the public barrel: an adapter never needs it, only a harness that mutates a child list
+// without going through the structural ops (truncateChildren below).
+import { markStructureDirty } from '../node';
 
 const fabric = installFabric();
 
@@ -69,7 +77,13 @@ function makeRow(id: number): ISymbioteNode {
 // `removeChild` finds its target with indexOf, so dropping N children through it is O(N^2) —
 // at 10 000 rows the teardown would dwarf the commit we are trying to time. Clearing the
 // parent pointer by hand is what the surface's own detach does, and it is O(N).
+//
+// It owes the same mark the surface's detach owes, and now for a second reason: a committed record
+// holds its child list BY REFERENCE, so truncating `parent.children` in place also truncates the
+// snapshot the next commit diffs against — the two arrays are one. Without the mark the truncation
+// is literally invisible to reconcile and the row measures nothing.
 function truncateChildren(parent: ISymbioteNode, length: number): void {
+  markStructureDirty(parent);
   for (let index = length; index < parent.children.length; index += 1) {
     parent.children[index].parent = undefined;
   }
@@ -355,6 +369,227 @@ describe('commit with nothing mutated', () => {
   bench(
     'no-op commit, 9761 nodes',
     () => idleScreen.surface.commit(),
+    KRAUSEST_WARMUP,
+  );
+});
+
+// ---------------------------------------------------------------------------------------------
+// The app-shaped series. Neither series above is what a real RN app does per frame, and the
+// difference is not a detail: krausest's flat table asks "how much does ONE huge commit cost",
+// while a shipping app asks "how much does a STREAM of small commits cost while 60 of them have to
+// fit in 16.6 ms". A navigation stack leaves previous screens mounted, lists are windowed so row
+// count stops driving node count, and the dynamics are animation frames, not table rebuilds.
+//
+// Built 2026-08-22 to settle whether the walk's remaining per-visited-node cost was worth
+// attacking. It settled it in the other direction (see the census in symbiote-perf-measurement):
+// `visited` does not scale with tree size at all - 37 of 17 504 nodes on an animation frame,
+// because dirty-marking prunes every untouched screen - so there was nothing there to win. What
+// the same fixture DID surface is the `x5 separate` row below: the JS-driven Animated path commits
+// once per animated LEAF per frame (flushValue -> update() -> setNativeProps -> commitContainer),
+// so five concurrent animations pay five full walks instead of one.
+//
+// Keep the four scenarios together. Read alone, each is a plausible-looking number; the finding is
+// entirely in `x5` vs `x5 separate`, which differ only in how the same five writes are grouped.
+const APP_SCREENS = 32;
+const APP_ROWS_PER_SCREEN = 60;
+// row wrapper + (label + its raw text) x3 + 2 pressable-ish views.
+const APP_NODES_PER_ROW = 9;
+
+interface IMountedApp {
+  surface: SymbioteSurface;
+  /** One leaf per concurrent animation: a header title plus four rows spread through the list. */
+  animTargets: ISymbioteNode[];
+  /** The top screen's list content view, for the windowed-scroll scenario. */
+  listContent: ISymbioteNode;
+}
+
+function makeAppRow(index: number): {
+  row: ISymbioteNode;
+  leaf: ISymbioteNode;
+} {
+  const row = createElement('RCTView');
+  setProp(row, 'testID', `row-${index}`);
+  let leaf = row;
+  for (let label = 0; label < 3; label += 1) {
+    const text = createElement('RCTText', true);
+    const raw = createElement('RCTRawText');
+    setText(raw, `cell ${index}.${label}`);
+    appendChild(text, raw);
+    appendChild(row, text);
+    if (label === 1) leaf = text;
+  }
+  for (let button = 0; button < 2; button += 1)
+    appendChild(row, createElement('RCTView'));
+  return { row, leaf };
+}
+
+function mountApp(screens: number, rowsPerScreen: number): IMountedApp {
+  nextRootTag += 1;
+  const surface = createSurface(nextRootTag);
+  let animTargets: ISymbioteNode[] = [];
+  let listContent = createElement('RCTView');
+
+  for (let index = 0; index < screens; index += 1) {
+    const screen = createElement('RCTView');
+    setProp(screen, 'testID', `screen-${index}`);
+    const header = createElement('RCTView');
+    const title = createElement('RCTText', true);
+    const titleText = createElement('RCTRawText');
+    setText(titleText, `Screen ${index}`);
+    appendChild(title, titleText);
+    appendChild(header, title);
+    appendChild(screen, header);
+
+    const list = createElement('RCTScrollView');
+    const content = createElement('RCTView');
+    appendChild(list, content);
+    appendChild(screen, list);
+
+    const leaves: ISymbioteNode[] = [];
+    for (let rowIndex = 0; rowIndex < rowsPerScreen; rowIndex += 1) {
+      const { row, leaf } = makeAppRow(rowIndex);
+      appendChild(content, row);
+      leaves.push(leaf);
+    }
+    surface.appendChild(screen);
+    // Only the TOP screen is animated - the ones below it are mounted and idle, which is exactly
+    // what makes them the thing dirty-marking has to skip.
+    if (index === screens - 1) {
+      listContent = content;
+      animTargets = [
+        title,
+        leaves[1],
+        leaves[Math.floor(rowsPerScreen / 3)],
+        leaves[Math.floor((rowsPerScreen * 2) / 3)],
+        leaves[rowsPerScreen - 1],
+      ];
+    }
+  }
+  surface.commit();
+  fabric.reset();
+  return { surface, animTargets, listContent };
+}
+
+describe('app-shaped: a navigation stack under animation', () => {
+  const NODES = APP_SCREENS * (7 + APP_ROWS_PER_SCREEN * APP_NODES_PER_ROW);
+  const label = `${APP_SCREENS} screens x ${APP_ROWS_PER_SCREEN} rows (~${NODES} nodes)`;
+
+  const single = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let singleTick = 0;
+  bench(
+    `${label}: 1 animated value, 1 commit`,
+    () => {
+      singleTick += 1;
+      setProp(single.animTargets[0], 'opacity', (singleTick % 20) / 20);
+      single.surface.commit();
+    },
+    KRAUSEST_WARMUP,
+  );
+
+  const batched = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let batchedTick = 0;
+  bench(
+    `${label}: 5 animated values, 1 commit`,
+    () => {
+      batchedTick += 1;
+      for (const target of batched.animTargets)
+        setProp(target, 'opacity', (batchedTick % 20) / 20);
+      batched.surface.commit();
+    },
+    KRAUSEST_WARMUP,
+  );
+
+  // The one to compare against the row above. Same five writes, one commit each - which is what
+  // the JS-driven Animated path does today, one per animated leaf. Multiply this row by 5 to get
+  // its per-frame cost before putting it next to the batched row.
+  const separate = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let separateTick = 0;
+  bench(
+    `${label}: 1 of 5 animated values, its own commit`,
+    () => {
+      separateTick += 1;
+      setProp(
+        separate.animTargets[separateTick % separate.animTargets.length],
+        'opacity',
+        (separateTick % 20) / 20,
+      );
+      separate.surface.commit();
+    },
+    KRAUSEST_WARMUP,
+  );
+
+  // The same single animated value, driven the way the JS Animated path actually drives it:
+  // setNativeProps, which takes commitTargeted's ancestor-chain route instead of walking down from
+  // the root. Compare directly against the first row — same fixture, same one prop, same one
+  // completeRoot, differing only in how the commit finds the work.
+  const targeted = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let targetedTick = 0;
+  bench(
+    `${label}: 1 animated value via setNativeProps (targeted)`,
+    () => {
+      targetedTick += 1;
+      setNativeProps(targeted.animTargets[0], {
+        opacity: 0.1 + (targetedTick % 800) / 1000,
+      });
+      flushNativeProps();
+    },
+    KRAUSEST_WARMUP,
+  );
+
+  // THE row this batching exists for. Five leaves animating on one screen is what a real frame
+  // looks like, and the comparison is against `1 of 5 animated values, its own commit` x 5 - the
+  // per-frame cost when each leaf commits on its own. One flush, one completeRoot, and each shared
+  // ancestor re-cloned once instead of five times.
+  const batchedTargeted = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let batchedTargetedTick = 0;
+  bench(
+    `${label}: 5 animated values via setNativeProps, one flush`,
+    () => {
+      batchedTargetedTick += 1;
+      for (let index = 0; index < batchedTargeted.animTargets.length; index++)
+        setNativeProps(batchedTargeted.animTargets[index], {
+          opacity: 0.1 + ((batchedTargetedTick + index) % 800) / 1000,
+        });
+      flushNativeProps();
+    },
+    KRAUSEST_WARMUP,
+  );
+
+  // The same five writes with NO batching - the pre-change per-frame cost, measured rather than
+  // extrapolated from the single-leaf row.
+  const unbatchedTargeted = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let unbatchedTargetedTick = 0;
+  bench(
+    `${label}: 5 animated values via setNativeProps, flushed one by one`,
+    () => {
+      unbatchedTargetedTick += 1;
+      for (
+        let index = 0;
+        index < unbatchedTargeted.animTargets.length;
+        index++
+      ) {
+        setNativeProps(unbatchedTargeted.animTargets[index], {
+          opacity: 0.1 + ((unbatchedTargetedTick + index) % 800) / 1000,
+        });
+        flushNativeProps();
+      }
+    },
+    KRAUSEST_WARMUP,
+  );
+
+  // A windowed list stepping by one row: the structural shape a scroll frame has, as opposed to
+  // krausest's "rebuild the whole table".
+  const scrolling = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let spare = makeAppRow(9999).row;
+  bench(
+    `${label}: windowed list steps one row`,
+    () => {
+      const first = scrolling.listContent.children[0];
+      removeChild(scrolling.listContent, first);
+      appendChild(scrolling.listContent, spare);
+      spare = first;
+      scrolling.surface.commit();
+    },
     KRAUSEST_WARMUP,
   );
 });

@@ -54,9 +54,24 @@ export default function App() {
 }
 ```
 
-The native entry registers a low-level _runnable_ instead of a React component: RN's Fabric host
-calls it with the surface's `rootTag`, and the renderer takes over from there — `nativeFabric-
-UIManager` is driven directly, RN's own renderer never runs.
+The zero-config entry wires the RN-backed host seams (colors, images, device events,
+third-party ViewConfigs) and registers the app in one call — this is what
+[`examples/react`](../../examples/react) actually uses:
+
+```js
+// index.js
+import { registerApp } from '@symbiote-native/react/bootstrap';
+import App from './App';
+import { name as appName } from './app.json';
+
+registerApp(App, { appName });
+```
+
+`registerApp` mirrors bare RN's own `AppRegistry.registerComponent(appName, () => App)` idiom,
+minus the manual host wiring in front of it — RN's own renderer never runs; `nativeFabric-
+UIManager` is driven directly. For anything the defaults don't cover (a custom color processor,
+image resolver, or manual control over the mount callback), drive the lower-level seam directly —
+a raw _runnable_ instead of a registered component:
 
 ```js
 // index.js
@@ -77,8 +92,8 @@ AppRegistry.registerRunnable(appName, ({ rootTag }) => {
 });
 ```
 
-The runnable example is [`examples/react`](../../examples/react) — a stock RN 0.86 app whose full
-canary ([`App.tsx`](../../examples/react/App.tsx)) exercises every block of the surface below.
+Either way, the full canary ([`App.tsx`](../../examples/react/App.tsx)) exercises every block of
+the surface below.
 
 ---
 

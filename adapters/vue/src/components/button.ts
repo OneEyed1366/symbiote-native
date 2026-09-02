@@ -10,7 +10,7 @@ import {
   type IButtonProps as ICoreButtonProps,
 } from '@symbiote-native/components';
 import type { IClassNameValue, ISymbioteEvent } from '@symbiote-native/engine';
-import { Text } from '../components';
+import { HOST_TEXT } from '../components';
 import { TouchableOpacity } from './touchable';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
@@ -71,7 +71,9 @@ export const Button = defineComponent<IButtonProps, IButtonEmits>(
         onPress: (event: ISymbioteEvent) => emit('press', event),
       };
       return h(TouchableOpacity, touchableProps, {
-        default: () => [h(Text, { style: textStyle }, () => title)],
+        // The intrinsic tag, not our <Text> component — see the note at HOST_VIEW. RN's Text
+        // defaults are seeded by the renderer for a bare tag (seedTextDefaults).
+        default: () => [h(HOST_TEXT, { style: textStyle }, title)],
       });
     };
   },

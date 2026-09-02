@@ -3,14 +3,15 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-standard-web-crypto`](https://github.com/expo/expo/tree/main/packages/expo-standard-web-crypto)
 — a partial W3C [Web Crypto API](https://www.w3.org/TR/WebCryptoAPI/) polyfill exposing
-`crypto.getRandomValues` — usable from **every** adapter, React, Vue, and Angular, not just React.
+`crypto.getRandomValues` — usable from **every** adapter, React, Vue, Svelte, Solid, and Angular,
+not just React.
 Unlike this repo's other Expo ports, this package needs **no native module of its own** — upstream
 is a ~15-line pure-JS shim that delegates straight to `expo-crypto`'s own `getRandomValues`; this
 port delegates to [`@symbiote-native/crypto`](../crypto)'s `getRandomValues` instead, since this
 repo already ships that native random source as a sibling package. Like `@symbiote-native/crypto`,
 every export here is a plain function/object with no per-instance state or event stream, so there
-is no hook/composable/service to wrap — the React, Vue, and Angular entry points are plain
-re-exports of the same `core`.
+is no hook/composable/service to wrap — the React, Vue, Svelte, Solid, and Angular entry points are
+plain re-exports of the same `core`.
 
 ## Install
 
@@ -34,8 +35,8 @@ src/core/     web-crypto.ts — the Crypto class + webCrypto singleton (default 
 src/angular/  @symbiote-native/standard-web-crypto/angular — export * from '../core'
 ```
 
-`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
-physical per-framework file, since there's nothing to subscribe to or clean up. (The `webCrypto`
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/` —
+no physical per-framework file, since there's nothing to subscribe to or clean up. (The `webCrypto`
 named re-export used to live only in those three per-framework barrels; it now lives once in
 `src/core/index.ts` instead.) `./angular` stays a physical file/subpath since Angular ships
 through a separate `ngc`/AOT build (`build-ngc/`).
@@ -57,7 +58,7 @@ polyfillWebCrypto();
 crypto.getRandomValues(bytes);
 ```
 
-The React/Vue/Angular entry points re-export the identical surface:
+The React/Vue/Svelte/Solid/Angular entry points re-export the identical surface:
 
 ```ts
 import webCrypto, {
@@ -66,6 +67,12 @@ import webCrypto, {
 import webCrypto, {
   polyfillWebCrypto,
 } from '@symbiote-native/standard-web-crypto/vue';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/svelte';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/solid';
 import webCrypto, {
   polyfillWebCrypto,
 } from '@symbiote-native/standard-web-crypto/angular';

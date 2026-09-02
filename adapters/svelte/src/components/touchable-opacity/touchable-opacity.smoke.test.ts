@@ -337,6 +337,9 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     expect(asNumber(feedbackProps().opacity, 'resting')).toBe(1);
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
+    // One microtask is the coalesced setNativeProps flush, not a frame: a real fade would still be
+    // near the resting 1 here, which is exactly what this row failed with when it was introduced.
+    await Promise.resolve();
     expect(
       asNumber(feedbackProps().opacity, 'immediately after touch-down'),
       'a non-zero duration would still be fading here',

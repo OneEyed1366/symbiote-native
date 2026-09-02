@@ -3,6 +3,19 @@
   "version": "0.4.0",
   "description": "expo-sensors wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Accelerometer, Barometer, DeviceMotion, Gyroscope, LightSensor, Magnetometer, MagnetometerUncalibrated, Pedometer.",
   "license": "MIT",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "expo-sensors",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "accelerometer",
+    "gyroscope",
+    "pedometer"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OneEyed1366/symbiote-native.git",

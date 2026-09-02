@@ -40,6 +40,14 @@ local.properties
 node_modules/
 npm-debug.log
 yarn-error.log
+# Untracked because the local dev registry writes its resolution into it: one
+# "resolved": "http://localhost:4873/..." per package, and npm prefers that URL on a later
+# install — so a committed lockfile makes `npm install` fail for every clone not running
+# Verdaccio. Matches examples/angular, which has always ignored its own. Nothing here needs
+# it pinned: no `npm ci` runs anywhere in this repo, and the documented repair for an
+# install problem in an example is to DELETE this file. examples/bare-rn keeps its lock —
+# it is the measurement baseline and carries no @symbiote-native dependency to contaminate.
+package-lock.json
 
 # fastlane
 #

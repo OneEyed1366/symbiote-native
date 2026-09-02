@@ -104,13 +104,24 @@ export abstract class ShimNode {
     for (const node of nodes) this.appendChild(node);
   }
 
+  // The fragment branch is the rare one — every ordinary insert is a single node — but
+  // `normalizeInsertable` allocated a one-element array for it regardless, 23 006 of them on a
+  // 1 000-row create. Test the flag first and hand the node straight to insertOne.
   appendChild<T extends ShimNode>(node: T): T {
+    if (!node.isDocumentFragment) {
+      this.insertOne(node, null);
+      return node;
+    }
     for (const single of normalizeInsertable(node))
       this.insertOne(single, null);
     return node;
   }
 
   insertBefore<T extends ShimNode>(node: T, ref: ShimNode | null): T {
+    if (!node.isDocumentFragment) {
+      this.insertOne(node, ref);
+      return node;
+    }
     for (const single of normalizeInsertable(node)) this.insertOne(single, ref);
     return node;
   }

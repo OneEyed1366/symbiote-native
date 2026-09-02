@@ -31,7 +31,8 @@ function collectTypeScript(dir, found = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) collectTypeScript(full, found);
-    else if (entry.name.endsWith('.ts') && !entry.name.includes('.test.')) found.push(full);
+    else if (entry.name.endsWith('.ts') && !entry.name.includes('.test.'))
+      found.push(full);
   }
   return found;
 }
@@ -47,7 +48,8 @@ function declaredNativeNames(packageDir) {
   for (const file of collectTypeScript(srcDir)) {
     const source = readFileSync(file, 'utf8');
     if (!source.includes('requireNativeModule')) continue;
-    for (const [, literal] of source.matchAll(/'([A-Za-z][A-Za-z0-9_]*)'/g)) names.add(literal);
+    for (const [, literal] of source.matchAll(/'([A-Za-z][A-Za-z0-9_]*)'/g))
+      names.add(literal);
   }
   return names;
 }
@@ -57,15 +59,18 @@ export default {
     type: 'problem',
     languages: ['json/json'],
     docs: {
-      description: 'validate the native-link.json manifest expo-modules-link consumes',
+      description:
+        'validate the native-link.json manifest expo-modules-link consumes',
       recommended: true,
     },
     messages: {
       unknownKey:
         'Unknown key "{{key}}" in {{scope}}. expo-modules-link ignores what it does not ' +
         'recognise, so a typo here disables the setting silently. Known keys: {{known}}.',
-      emptyDocument: 'Manifest declares neither "android" nor "ios", so it links nothing.',
-      missingField: 'Android {{scope}} is missing "{{field}}" ({{consequence}}).',
+      emptyDocument:
+        'Manifest declares neither "android" nor "ios", so it links nothing.',
+      missingField:
+        'Android {{scope}} is missing "{{field}}" ({{consequence}}).',
       emptyModules:
         '"android.modules" is empty. Without an entry the module never reaches ' +
         'MainApplication.kt, so requireNativeModule() throws at import on Android.',
@@ -179,7 +184,8 @@ export default {
       }
 
       const nativeNames = declaredNativeNames(packageDir);
-      for (const element of modulesMember.value.elements) checkModule(element.value, nativeNames);
+      for (const element of modulesMember.value.elements)
+        checkModule(element.value, nativeNames);
     }
 
     return {
@@ -197,7 +203,8 @@ export default {
         }
 
         if (android) checkAndroid(android.value);
-        if (ios && ios.value.type === 'Object') reportUnknownKeys(ios.value, 'ios');
+        if (ios && ios.value.type === 'Object')
+          reportUnknownKeys(ios.value, 'ios');
       },
     };
   },

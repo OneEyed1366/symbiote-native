@@ -35,9 +35,8 @@ function isShimElement(value: unknown): value is ShimElement {
 
 // The typed imperative handle (measure/measureInWindow/measureLayout/setNativeProps/focus/blur)
 // a `bind:this` host ref carries — the Svelte twin of a React `ref.current`/Vue template ref
-// already being an `IHostInstance`. `dom-shim/element.ts`'s `createEngineNode()` grafts
-// toPublicInstance onto every host node AT CREATION, so this call is idempotent (its own
-// isHostInstance guard short-circuits); this helper exists only to give app code a correctly
+// already being an `IHostInstance`. Every engine node carries those methods on its prototype, so
+// the toPublicInstance call below is the identity; this helper exists only to give app code a correctly
 // TYPED accessor off the SHIM value (`ShimElement`) instead of the bare `.engineNode` field,
 // with no `as` cast at the call site.
 export function hostInstance(

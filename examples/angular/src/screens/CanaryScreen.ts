@@ -624,11 +624,10 @@ const overlayTunnel = createTunnel();
           createTunnel's Out below works identically wherever it's mounted. -->
       <View
         testID="angular-overlay-host"
-        portalOutlet
-        #overlayHost="portalOutlet"
         pointerEvents="box-none"
         class="overlay-host"
       >
+        <ng-container portalOutlet #overlayHost="portalOutlet"></ng-container>
         <tunnel-out [tunnel]="overlayTunnel" />
       </View>
     </SafeAreaView>

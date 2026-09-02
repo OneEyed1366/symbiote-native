@@ -20,7 +20,11 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import type { ITextInputHandle } from '@symbiote-native/components';
+import {
+  buildTextInputHandle,
+  type ITextInputHandle,
+} from '@symbiote-native/components';
+import { createElement } from '@symbiote-native/engine';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -373,6 +377,68 @@ describe('TextInput (real compiled index.svelte)', () => {
       clearCommand,
       'clear() dispatched setTextAndSelection([count, "", 0, 0])',
     ).toBeDefined();
+  });
+
+  // why: the wrapper builds its imperative surface BY HAND (five exported instance-script
+  // functions), so it does not follow `buildTextInputHandle` — core's own handle, which the host
+  // behavior hands to a LOWERED node. Nothing couples the two, and a method added to one is
+  // silently missing from the other: an app calling it gets `undefined is not a function` on
+  // whichever path it happened to take. Derived from core rather than listing the five names here,
+  // so a sixth method fails this the day it lands.
+  it('exports every method core builds for the lowered path', async () => {
+    const expected = Object.keys(
+      buildTextInputHandle(createElement('RCTSinglelineTextInputView', false)),
+    );
+    expect(expected.length, 'core still builds a handle').toBeGreaterThan(0);
+
+    let captured: ITextInputHandle | null = null;
+    const CapturingParent = await loadMountable();
+    mount(ROOT_TAG, CapturingParent, {
+      fixedValue: 'hi',
+      onCapture: (handle: ITextInputHandle) => {
+        captured = handle;
+      },
+    });
+    await tick();
+    await tick();
+
+    const handle: Record<string, unknown> = captured ?? {};
+    const missing = expected.filter(name => typeof handle[name] !== 'function');
+    expect(missing).toEqual([]);
+  });
+
+  // why: the test above proves the four forwarded names EXIST, and a name-only assertion is
+  // satisfied by an empty stub — `typeof handle.setNativeProps === 'function'` is true for
+  // `() => {}`. So one of them is also driven end to end: a forward that reaches the engine node
+  // changes what the node holds, a stub changes nothing, and only this tells them apart.
+  it('drives a forwarded host method through to the engine node', async () => {
+    let captured: ITextInputHandle | null = null;
+    const CapturingParent = await loadMountable();
+    mount(ROOT_TAG, CapturingParent, {
+      fixedValue: 'hi',
+      onCapture: (handle: ITextInputHandle) => {
+        captured = handle;
+      },
+    });
+    await tick();
+    await tick();
+
+    const handle: ITextInputHandle | null = captured;
+    expect(handle, 'handle captured').not.toBeNull();
+    handle?.setNativeProps({ testID: 'forwarded-through' });
+    await Promise.resolve();
+    await tick();
+    await tick();
+
+    // Walk the props, NOT `fabric.serialize` — that renders view NAMES only
+    // (`"RCTView(RCTSinglelineTextInputView)"`), so a testID could never appear in it and the
+    // assertion would fail for every implementation, working or not.
+    const carries = (nodes: readonly IFakeNode[]): boolean =>
+      nodes.some(
+        node =>
+          node.props.testID === 'forwarded-through' || carries(node.children),
+      );
+    expect(carries(fabric.appRoot().children)).toBe(true);
   });
 
   // why: `setSelection` is part of the same imperative handle as focus/blur/clear but reuses the

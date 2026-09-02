@@ -14,7 +14,6 @@
 import {
   createElement,
   dlog,
-  isDebug,
   routeProp,
   setEventListener,
   toPublicInstance,
@@ -22,9 +21,15 @@ import {
 } from '@symbiote-native/engine';
 import { descriptorFor } from '@symbiote-native/components';
 import { normalizeSvelteClass } from '../class-value';
+import { foldHostBag } from './fold-host-bag';
 import { ShimNode } from './shim-node';
 
 export type IShimPropBag = Record<string, unknown>;
+
+// The bag a not-yet-live element is diffed against in onMadeLive. A module constant rather than a
+// fresh `{}` per node: it is only ever read, and the identity lets applyBagDiff skip its second
+// pass outright on the create path.
+const EMPTY_BAG: IShimPropBag = Object.freeze({});
 
 // Diagnostic-only: a process-wide sequence so every `set p` call across every shim element in a
 // log dump is individually orderable against AnimatedProps reconcile#N / AnimatedView reduced#N
@@ -34,12 +39,26 @@ let globalSetPSeq = 0;
 // `on<Name>` handlers ride inside the prop bag (idiomatic Svelte 5 callback props — see the
 // skill's §3g(c) "most of §5 collapses" note) — they are not addEventListener-style DOM
 // listeners, so they are diffed and routed exactly like any other bag key, through routeProp.
-export class ShimElement extends ShimNode {
+// An empty layer that exists to be what `globalThis.Element` points at, and it is load-bearing.
+// Svelte's `get_setters` (internal/client/dom/elements/attributes.js) walks from the ELEMENT
+// INSTANCE up and STOPS when it reaches `Element.prototype`. While `Element` was `ShimElement`
+// itself, the first prototype step was already the stop, so the walk collected nothing and `p` —
+// which lives on `ShimElement.prototype`, one step past it — was invisible. `set_attributes` then
+// fell through to `setAttribute`, which writes an inert Map, and every prop vanished with nothing
+// red. The rule is therefore that `Element` must be a proper ANCESTOR of the class owning the
+// setters, never that class: `.claude/rules/svelte-shim-element-global-must-be-an-ancestor.md`.
+export abstract class ShimElementBase extends ShimNode {}
+
+export class ShimElement extends ShimElementBase {
   readonly tagName: string;
   readonly namespaceURI: string | undefined;
-  private readonly attributes = new Map<string, string>();
-  private readonly domListeners = new Map<string, (event: unknown) => void>();
-  private lastBag: IShimPropBag = {};
+  // Both LAZY, and that is a measured decision, not a style one. A lowered primitive carries its
+  // whole prop surface in the `p` bag, so neither map is ever written on the create path — but an
+  // eager field allocated two Maps per element regardless, 18 004 of them on a 1 000-row create,
+  // in a window where GC is the largest single bucket (29%).
+  private attributes: Map<string, string> | undefined;
+  private domListeners: Map<string, (event: unknown) => void> | undefined;
+  private lastBag: IShimPropBag = EMPTY_BAG;
 
   constructor(tagName: string, namespaceURI?: string) {
     super();
@@ -51,6 +70,17 @@ export class ShimElement extends ShimNode {
     return this.tagName;
   }
 
+  // `set_style` writes `dom.style.cssText`, so a shim with no `.style` THROWS rather than
+  // no-opping — a `style` attribute on a bare tag crashed the mount. LAZY, for the reason
+  // `.claude/rules/svelte-shim-is-the-per-node-create-path.md` records about the two Maps below it:
+  // an eager field is one object per element, ~9 000 per create, in the window where GC is the
+  // largest bucket. Only `set_style` touches this, and no lowered element takes that path.
+  private styleSlot: { cssText: string } | undefined;
+
+  get style(): { cssText: string } {
+    return (this.styleSlot ??= { cssText: '' });
+  }
+
   // The single object-bag prop. The literal name is ours to choose (§3g(c)) — the adapter's
   // own View.svelte/Text.svelte/… emit `<symbiote-view p={bag}>`; app code never sees it.
   get p(): IShimPropBag {
@@ -58,13 +88,19 @@ export class ShimElement extends ShimNode {
   }
 
   set p(bag: IShimPropBag | undefined) {
-    const next = normalizeBagClasses(bag ?? {});
+    // The fold runs HERE rather than at element creation because an alias can arrive on an update
+    // (`id` bound to a signal), and it runs before the diff so `lastBag` is always the folded shape
+    // — otherwise a seeded default would look like a change on every single set.
+    const next = foldHostBag(this.tagName, normalizeBagClasses(bag ?? {}));
     const prev = this.lastBag;
     this.lastBag = next;
-    const changedKeys = diffKeys(prev, next);
+    // THUNK, not a string (see debug.ts's header): this setter runs once per element per create
+    // and the changed-key list is diagnostic only. Built eagerly it cost a Set, two key arrays, a
+    // join and a template literal on every one of 9 002 elements, with logging off.
     dlog(
-      `ShimElement set-p#${++globalSetPSeq} tag=${this.tagName} live=${this.engineNode !== undefined} ` +
-        `changedKeys=${changedKeys.join(',')}`,
+      () =>
+        `ShimElement set-p#${++globalSetPSeq} tag=${this.tagName} live=${this.engineNode !== undefined} ` +
+        `changedKeys=${diffKeys(prev, next).join(',')}`,
     );
     if (this.engineNode === undefined) return; // not live yet — onMadeLive() replays `next` in full
     applyBagDiff(this.engineNode, prev, next);
@@ -72,33 +108,33 @@ export class ShimElement extends ShimNode {
   }
 
   setAttribute(name: string, value: string): void {
-    this.attributes.set(name, value);
+    (this.attributes ??= new Map()).set(name, value);
   }
 
   getAttribute(name: string): string | null {
-    return this.attributes.get(name) ?? null;
+    return this.attributes?.get(name) ?? null;
   }
 
   removeAttribute(name: string): void {
-    this.attributes.delete(name);
+    this.attributes?.delete(name);
   }
 
   addEventListener(name: string, handler: (event: unknown) => void): void {
-    this.domListeners.set(name, handler);
+    (this.domListeners ??= new Map()).set(name, handler);
     if (this.engineNode !== undefined)
       setEventListener(this.engineNode, name, handler);
   }
 
   removeEventListener(name: string): void {
-    this.domListeners.delete(name);
+    this.domListeners?.delete(name);
     if (this.engineNode !== undefined)
       setEventListener(this.engineNode, name, undefined);
   }
 
   override cloneNode(deep?: boolean): ShimElement {
     const clone = new ShimElement(this.tagName, this.namespaceURI);
-    for (const [key, value] of this.attributes)
-      clone.attributes.set(key, value);
+    if (this.attributes !== undefined)
+      clone.attributes = new Map(this.attributes);
     if (deep === true) {
       for (const child of this.children)
         clone.appendChild(child.cloneNode(true));
@@ -106,22 +142,26 @@ export class ShimElement extends ShimNode {
     return clone;
   }
 
-  // toPublicInstance grafts measure/measureInWindow/measureLayout/setNativeProps/focus/blur
-  // onto the node — the imperative API a `bind:this` host ref hands back, the same augmentation
-  // Vue's renderer applies at its own commit point (renderer/index.ts) and React gets from
-  // getPublicInstance. Mutates in place and returns the SAME node, so this is a safe drop-in for
-  // the previously-bare createElement() call.
+  // measure/measureInWindow/measureLayout/setNativeProps/focus/blur — the imperative API a
+  // `bind:this` host ref hands back — ride on the engine node's prototype, so toPublicInstance is
+  // the identity and this reads the same as Vue's renderer (renderer/index.ts) and React's
+  // getPublicInstance.
   createEngineNode(): ISymbioteNode {
     const descriptor = descriptorFor(this.tagName);
+    // The INTRINSIC TAG as the third argument, and this is the only place the tag alphabet still
+    // exists: `descriptor.component` is the Fabric view name (`symbiote-view` -> `RCTView`), so a
+    // host-behavior registry keyed by tag can only be reached from here. The argument defaults to
+    // `component`, so passing it changes nothing until a behavior is registered.
     return toPublicInstance(
-      createElement(descriptor.component, descriptor.isText),
+      createElement(descriptor.component, descriptor.isText, this.tagName),
     );
   }
 
   override onMadeLive(): void {
     const engineNode = this.engineNode;
     if (engineNode === undefined) return;
-    applyBagDiff(engineNode, {}, this.lastBag);
+    applyBagDiff(engineNode, EMPTY_BAG, this.lastBag);
+    if (this.domListeners === undefined) return;
     for (const [name, handler] of this.domListeners)
       setEventListener(engineNode, name, handler);
   }
@@ -147,15 +187,27 @@ function normalizeBagClasses(bag: IShimPropBag): IShimPropBag {
   return next;
 }
 
+// Diagnostic only — the one caller is the `dlog` thunk above. The allocation-free twin below is
+// what the hot path uses; keep them in step.
 function diffKeys(prev: IShimPropBag, next: IShimPropBag): string[] {
   const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
   return [...keys].filter(key => prev[key] !== next[key]);
 }
 
+// Deliberately NOT `for (const key of diffKeys(...))`: that materialized a Set, two key arrays,
+// a spread and a filtered array per element. Two direct passes route exactly the same keys —
+// changed-or-added from `next`, then dropped keys from `prev` as `undefined`, which is what
+// `next[key]` evaluated to in the old shape.
 function applyBagDiff(
   engineNode: ISymbioteNode,
   prev: IShimPropBag,
   next: IShimPropBag,
 ): void {
-  for (const key of diffKeys(prev, next)) routeProp(engineNode, key, next[key]);
+  for (const key of Object.keys(next)) {
+    if (prev[key] !== next[key]) routeProp(engineNode, key, next[key]);
+  }
+  if (prev === EMPTY_BAG) return;
+  for (const key of Object.keys(prev)) {
+    if (!(key in next)) routeProp(engineNode, key, undefined);
+  }
 }

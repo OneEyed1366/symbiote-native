@@ -3,7 +3,7 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-sms`](https://github.com/expo/expo/tree/main/packages/expo-sms) — opening the system SMS
 composer prefilled with recipients, a message, and optionally an attachment — usable from
-**every** adapter, React, Vue, and Angular, not just React. Built the same way as
+**every** adapter, React, Vue, Svelte, Solid, and Angular, not just React. Built the same way as
 [`@symbiote-native/secure-store`](../secure-store): an `expo-modules-core`-based wrapper (see the
 `symbiote-expo-native-module` project skill for the full mechanism — why `expo-modules-core` is
 depended on directly and never the `expo` meta-package, why the upstream JS is hand-ported into
@@ -63,8 +63,8 @@ src/core/                 the whole API: sendSMSAsync + isAvailableAsync. native
 src/angular/              @symbiote-native/sms/angular
 ```
 
-`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
-physical per-framework file. Both exports are stateless free functions — `sendSMSAsync` resolves
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/` —
+no physical per-framework file. Both exports are stateless free functions — `sendSMSAsync` resolves
 once the composer closes and holds nothing afterwards, and there is no event stream — so there is
 nothing for a hook, composable, or service to wrap, the same reason
 [`@symbiote-native/secure-store`](../secure-store) does the same. `./angular` stays a physical

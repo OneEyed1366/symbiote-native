@@ -101,13 +101,7 @@ export type IAngularTouchableNativeFeedbackProps = Omit<
       [android_ripple]="android_ripple"
       [android_disableSound]="android_disableSound"
     >
-      <symbiote-view
-        [symbioteHostProps]="hostProps()"
-        (accessibilityAction)="emit(accessibilityAction, $event)"
-        (accessibilityTap)="emit(accessibilityTap, $event)"
-        (magicTap)="emit(magicTap, $event)"
-        (accessibilityEscape)="emit(accessibilityEscape, $event)"
-      >
+      <symbiote-view [symbioteHostProps]="hostProps()">
         <ng-content></ng-content>
       </symbiote-view>
     </Pressable>
@@ -263,12 +257,27 @@ export class TouchableNativeFeedback
       nativeID: this.nativeID,
       accessible: this.accessible,
       ...this.folded,
+      onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),
+      onAccessibilityTap: this.eventEmitterHandler(this.accessibilityTap),
+      onMagicTap: this.eventEmitterHandler(this.magicTap),
+      onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
     };
   });
 
   // Forward an engine event to the matching @Output(), narrowing the template's untyped $event.
-  emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
+  private emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     if (isSymbioteEvent(event)) emitter.emit(event);
+  }
+
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`): native fires them only when the committed
+  // payload carries a FUNCTION at that key, so a template binding here lit the gate on every
+  // instance whether or not an app ever subscribed. `.observed`-gated, mirroring Pressable's
+  // `accessibilityEmitterHandler`.
+  private eventEmitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): ((event: unknown) => void) | undefined {
+    return emitter.observed ? event => this.emit(emitter, event) : undefined;
   }
 
   // Fold the web aria-*/role aliases into the canonical accessibility* props once per render, so the

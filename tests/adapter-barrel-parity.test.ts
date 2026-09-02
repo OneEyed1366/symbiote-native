@@ -16,21 +16,32 @@ import path from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+import { adapterNames as adapterDirNames } from '../scripts/lib/adapter-names.mjs';
+
 const REPO_ROOT = path.resolve(__dirname, '..');
 // All five adapters are in scope. 'solid' was held out while that adapter sat at L1 (static paint),
 // when its barrel carried only mount/unmount/findNodeHandle and would have reported every shared
 // name as drift; it joined at L4, and what it still genuinely lacks is named in KNOWN_GAPS.
-const ADAPTERS = ['react', 'vue', 'angular', 'svelte', 'solid'] as const;
+// Read from disk, never written down — see scripts/lib/adapter-names.mjs for the three times a
+// hand-written copy of this list silently omitted a newer adapter.
+const ADAPTERS = adapterDirNames();
 const SHARED_BARRELS = [
   'core/engine/src/index.ts',
   'core/components/src/index.ts',
 ];
 
-type IAdapter = (typeof ADAPTERS)[number];
+type IAdapter = string;
 
 // A shared name an adapter deliberately does NOT re-export. Only a genuine per-adapter difference
 // belongs here; the 22 gaps this test found on its first run were all closed instead.
 const KNOWN_GAPS: Readonly<Record<string, readonly IAdapter[]>> = {
+  // NOTE for whoever adds the next build-tool-facing symbol: `resolveStateStyle` was briefly here
+  // and should not come back. Every adapter barrel re-exports `@symbiote-native/components`
+  // WHOLESALE, so putting a name on that barrel publishes it as API on all five at once — a
+  // transform internal nearly shipped that way. It now lives on the `./state-style` subpath of both
+  // `core/components` and every adapter, which is invisible to THIS test by design and guarded by
+  // `tests/package-subpath-parity.test.ts` instead. A KNOWN_GAPS entry cannot express "should not
+  // be shared at all"; a subpath can.
   // Matches a shared name without being a passthrough: React and Vue DECLARE their own
   // `ITextInputProps` (the agnostic base plus their `className`), so this is the per-adapter half
   // of <prop_types_split_agnostic_vs_per_adapter>. Angular takes props as @Input()s and exposes

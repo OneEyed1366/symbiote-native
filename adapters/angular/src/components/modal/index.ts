@@ -115,10 +115,6 @@ export type IAngularModalInputs = Omit<
         (dismiss)="dismiss.emit()"
         (requestClose)="requestClose.emit()"
         (orientationChange)="emit(orientationChange, $event)"
-        (accessibilityAction)="emit(accessibilityAction, $event)"
-        (accessibilityTap)="emit(accessibilityTap, $event)"
-        (magicTap)="emit(magicTap, $event)"
-        (accessibilityEscape)="emit(accessibilityEscape, $event)"
       >
         <symbiote-view [style]="containerStyle" [collapsable]="false">
           <ng-content></ng-content>
@@ -279,6 +275,10 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
     return {
       ...descriptorProps,
       style: [anchorHostStyle(this.elementRef), descriptorProps.style],
+      onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),
+      onAccessibilityTap: this.eventEmitterHandler(this.accessibilityTap),
+      onMagicTap: this.eventEmitterHandler(this.magicTap),
+      onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
     };
   });
 
@@ -287,8 +287,21 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
     return typeof container === 'string' ? undefined : container.props.style;
   }
 
+  // NOT private: `(orientationChange)="emit(...)"` in the template above calls it, and a template
+  // can only reach public members. `tsc` does not typecheck Angular templates, so `private` here
+  // compiles clean and fails only under `ngc --compilationMode partial`.
   emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     if (isSymbioteEvent(event)) emitter.emit(event);
+  }
+
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`) — `show`/`dismiss`/`requestClose`/
+  // `orientationChange` are NOT (Modal's own MODAL_EVENTS), so those stay unconditional template
+  // bindings above. `.observed`-gated, mirroring Pressable's.
+  private eventEmitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): ((event: unknown) => void) | undefined {
+    return emitter.observed ? event => this.emit(emitter, event) : undefined;
   }
 
   // Typed as the a11y intersection WITH the string index (the bag renderModal spreads into the

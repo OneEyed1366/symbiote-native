@@ -54,6 +54,9 @@ import {
   setInputFocused,
   whenCommitted,
   type IClassNameValue,
+  type IMeasureInWindowOnSuccess,
+  type IMeasureLayoutOnSuccess,
+  type IMeasureOnSuccess,
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -268,6 +271,29 @@ export function TextInput(props: ITextInputProps): JSX.Element {
   // echoing the acknowledged count so native applies them. Every method reads `host` LIVE, so a
   // multiline swap cannot leave the handle pointing at a dead node.
   const handle: ITextInputHandle = {
+    // Forwarded to the node so a TextInput ref is not poorer than any other host ref. Measured
+    // 2026-08-31: the wrapper's handle used to be five methods and thereby CLOSED OVER the node,
+    // costing the component path `measure`/`measureInWindow`/`measureLayout`/`setNativeProps`,
+    // while a lowered element handed back the bare node and lost `clear`/`isFocused`/
+    // `setSelection`. Two different surfaces, crossed by writing `multiline={isLong}` instead of
+    // `multiline`. The union is the fix; refusing to lower would only swap which four go missing.
+    measure: (callback: IMeasureOnSuccess): void => {
+      if (host !== null) host.measure(callback);
+    },
+    measureInWindow: (callback: IMeasureInWindowOnSuccess): void => {
+      if (host !== null) host.measureInWindow(callback);
+    },
+    measureLayout: (
+      relativeToNativeNode: ISymbioteNode | number,
+      onSuccess: IMeasureLayoutOnSuccess,
+      onFail?: () => void,
+    ): void => {
+      if (host !== null)
+        host.measureLayout(relativeToNativeNode, onSuccess, onFail);
+    },
+    setNativeProps: (nativeProps: Record<string, unknown>): void => {
+      if (host !== null) host.setNativeProps(nativeProps);
+    },
     focus: (): void => {
       if (host !== null) dispatchViewCommand(host, 'focus', []);
     },

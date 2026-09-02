@@ -436,3 +436,27 @@ export type {
   ISectionEntry,
   IVirtualizedSectionListHandle,
 } from './state/section-list';
+export {
+  registerPressableBehavior,
+  PRESSABLE_TAG,
+} from './behaviors/pressable';
+export {
+  foldImagePayload,
+  IMAGE_TAG,
+  registerImageBehavior,
+} from './behaviors/image';
+
+export {
+  foldInputAccessoryViewPayload,
+  INPUT_ACCESSORY_VIEW_TAG,
+  registerInputAccessoryViewBehavior,
+} from './behaviors/input-accessory-view';
+
+export {
+  registerTextInputBehavior,
+  buildTextInputHandle,
+  TEXT_INPUT_TAG,
+  TEXT_INPUT_MULTILINE_TAG,
+} from './behaviors/text-input';
+
+export { registerSwitchBehavior, SWITCH_TAG } from './behaviors/switch';

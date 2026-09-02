@@ -1,7 +1,7 @@
 {
   "name": "@symbiote-native/test-utils",
   "version": "0.2.0",
-  "description": "Shared, framework-agnostic fake-Fabric test harness for SymbioteNative — the fake nativeFabricUIManager recorder used by the co-located test suites across the engine, every adapter, and the example apps.",
+  "description": "Shared, framework-agnostic fake-Fabric test harness for SymbioteNative \u2014 the fake nativeFabricUIManager recorder used by the co-located test suites across the engine, every adapter, and the example apps.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,6 +17,16 @@
   "main": "src/index.ts",
   "module": "src/index.ts",
   "types": "src/index.ts",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "testing",
+    "test-utils",
+    "fabric",
+    "vitest",
+    "test-harness",
+    "mock"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },

@@ -2,6 +2,9 @@
 // @symbiote-native/engine. React is a known-good driver: it proves the native pipe
 // and the shared clone-on-write engine before any non-React adapter has to.
 
+// The intrinsic-element table. Re-exported (rather than left as an ambient `.d.ts`) so a consuming
+// app's program includes it and `<View/>` resolves its props — see src/jsx.ts.
+export type { ISymbioteIntrinsicTag } from './jsx';
 export { View, Text } from './components';
 export type { IViewProps, ITextProps } from './components';
 export type {

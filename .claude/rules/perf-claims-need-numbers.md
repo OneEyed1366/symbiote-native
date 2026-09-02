@@ -1,9 +1,9 @@
 ---
 paths:
-  - "core/engine/src/commit.ts"
-  - "**/*.bench.ts"
-  - "examples/*/screens/BenchmarkScreen.*"
-  - "examples/*/components/JsFrameRateMeter.*"
+  - 'core/engine/src/commit.ts'
+  - '**/*.bench.ts'
+  - 'examples/*/screens/BenchmarkScreen.*'
+  - 'examples/*/components/JsFrameRateMeter.*'
 ---
 
 # A performance claim needs a number, and the right number
@@ -56,8 +56,42 @@ changing a benchmark. The must-apply points:
   JS and UI both back at 60 fps. A fault that survives the return to idle is a dropped update that
   never re-converges, NOT a slow path, and no amount of optimizing will remove it. Chasing the fps
   number here wastes the run; the question is whether the final state is correct.
+- **A prop-key count is THREE layers, and only one of them is the app's CSS.** Measured 2026-08-31
+  on one `examples/vue-sfc` BenchmarkRow: 32 keys per row = 23 style declarations + **6 engine-seeded
+  RN text defaults** (`ellipsizeMode` + `allowFontScaling`, two per Text) + 3 `text`. A total
+  compared against another adapter's total is uninterpretable — the same number is reachable by
+  different splits — so decompose before attributing. The middle layer is the one nobody expects: a
+  LOWERED `symbiote-text` has no component wrapper to fold RN's `Text.js` defaults, so the adapter
+  must seed them (`adapters/vue/src/renderer/index.ts`), and of five adapters only Vue and Solid do.
+  A row whose Texts lack those two keys is not leaner, it has lost an RN default — `numberOfLines`
+  then clips with no ellipsis.
+- **A key count taken off a test fixture's own rules measures the fixture.** `benchmark-row-shape.test.ts`
+  registers a hand-simplified `ROW_RULES` (`.bench-row` as 2 declarations where the app's CSS has 10),
+  so its flat row reads 18 keys where the real CSS gives 32. Both numbers are correct about different
+  things, and neither can be diffed against a device reading. Before comparing two adapters' key
+  counts, confirm both sides resolved the SAME rule set — the two apps' `.bench-row*` blocks turned
+  out identical, 23 declarations token for token, which is what made the residual attributable at all.
 - **The walk is no longer the bottleneck, so stop optimizing it.** Same run, idle/scrolling:
   the reconcile walk is **0.1% of the window, 75 nodes/commit, 0.4 ms/commit** at 60 fps. What
   still costs is native view creation and the flat-parent child-set re-append — Fabric's
   persistent-tree protocol, not our JS. Visible in one comparison: `Select row` 9.3 ms
   (props-only clone) vs `Remove row` 103.3 ms (structural → re-append every child handle).
+- **Never leave a non-HostObject on `global.nativeFabricUIManager`.** C++ reads it back on every
+  commit and every event dispatch (`UIManagerBinding::getBinding` → `getHostObject<UIManagerBinding>`),
+  so a plain object or a Proxy left installed kills the app natively — no red box, JS log ending at
+  `Running "<App>"`, looking like a broken build. The JSI call counter every example carries
+  (`examples/*/fabric-call-counter.ts`, byte-identical in all six) therefore swaps the global for
+  ONE synchronous instant, forces the renderer to bind, and restores in `finally`. Its wrapper also
+  copies each host function's `length`: the engine feature-detects the batched-children clone
+  bindings by arity, and a `(...args)` wrapper silently reroutes every adapter to the per-child
+  `appendChild` path. It costs ~18 000 JS calls on Create 1 000 and is in every timing once
+  installed — so it goes on all six examples or none. Mechanism, the stock counts it produced, and
+  what it deliberately does not count: `symbiote-perf-measurement`, "Counting JSI calls on BOTH
+  stacks".
+- **There is a stock-React-Native baseline now: `examples/bare-rn`** — plain RN 0.86, React's own
+  Fabric renderer, zero `@symbiote-native/*`, same benchmark screen and same 20 measurement
+  constants. It is the only way to answer "compared to what". Its all-mounted column is the clean
+  cross-renderer comparison; its virtualized column runs RN's own `FlatList` against our port and
+  compares two implementations, not two renderers. Deviation list, the debug numbers, the
+  mechanism by which beating stock is legitimate, and the four explanations already ruled out:
+  `symbiote-perf-measurement`, "The stock-React-Native baseline".

@@ -12,13 +12,13 @@ architecture — status, seam, bootstrap, version floor, the component-parity
 model, and general cross-cutting gotchas that don't belong to one narrower
 topic. Everything else moved into a focused sibling skill:
 
-| Topic | Skill |
-|---|---|
-| AOT build pipeline (two-stage ngc→linker), package self-build via `prepare`+conditional `exports`, `dev`/`start` + `ngc --watch` | `angular-adapter-build` |
-| Change detection — `whenCommitted`, SignalView vs CheckAlways, `markForCheck`, real `ApplicationRef.tick()` | `angular-adapter-change-detection` |
-| `@Input()` callback → `@Output()` EventEmitter conversion, the anchor double-fire bug, NG2007/NG8002 | `angular-adapter-events` |
-| `createPortal`/`createTunnel`, `AppRegistry` + dynamic component composition | `angular-adapter-portal` |
-| FlatList/SectionList/VirtualizedList/VirtualizedSectionList/ScrollView bugs | `angular-adapter-lists` |
+| Topic                                                                                                                            | Skill                              |
+| -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| AOT build pipeline (two-stage ngc→linker), package self-build via `prepare`+conditional `exports`, `dev`/`start` + `ngc --watch` | `angular-adapter-build`            |
+| Change detection — `whenCommitted`, SignalView vs CheckAlways, `markForCheck`, real `ApplicationRef.tick()`                      | `angular-adapter-change-detection` |
+| `@Input()` callback → `@Output()` EventEmitter conversion, the anchor double-fire bug, NG2007/NG8002                             | `angular-adapter-events`           |
+| `createPortal`/`createTunnel`, `AppRegistry` + dynamic component composition                                                     | `angular-adapter-portal`           |
+| FlatList/SectionList/VirtualizedList/VirtualizedSectionList/ScrollView bugs                                                      | `angular-adapter-lists`            |
 
 Read this skill first for the architecture; jump to the matching topic skill
 for implementation-level gotchas. Section numbers below (§0, §1, …) are
@@ -89,15 +89,21 @@ exception it documents.
 }
 ```
 
-  Note testID naming across the three canaries was NEVER a strict cross-adapter
-  invariant — don't chase full testID-string parity, only content/behavior
-  parity.
+Note testID naming across the three canaries was NEVER a strict cross-adapter
+invariant — don't chase full testID-string parity, only content/behavior
+parity.
+
 - **Both closed (2026-07)**: `packages/slider/src/angular/` ships a real Angular
   build (`@symbiote-native/slider/angular`, same `createNode`-by-ViewConfig wrapper
   React/Vue use — the wrapper mechanism itself lives in the `symbiote-third-party-native-view`
   skill); the docs site's live framework switcher
   (`apps/docs-site/src/pages/index.astro`) lists Angular as `live: true`
-  alongside React/Vue (`LIVE_SYMBIOTES = ['react', 'vue', 'angular']`). The
+  alongside React/Vue. That list has since grown to all five
+  (`LIVE_SYMBIOTES = ['react', 'vue', 'angular', 'svelte', 'solid']`), and unlike the
+  adapter lists in the audits it is CORRECTLY hardcoded: "shown live on the landing
+  page" is a product decision, so an adapter can exist without being listed and the
+  set must not be read off `adapters/`. Read the value at the source rather than
+  from this quote — a copied literal is exactly what went stale here. The
   ONLY remaining Angular-specific gap is third-party **React component**
   packages (`@react-native-community/slider` itself) — React-dispatcher-only
   per `<third_party_rn_packages_are_react_only>`, not fixable by a wrapper.
@@ -277,12 +283,15 @@ pressable/index.ts`): bundle every such prop into ONE plain object and bind it t
 (`adapters/angular/src/primitives/shared.ts`, `exportAs: 'symbioteHost'`) — now also exported
 from the public barrel (`adapters/angular/src/index.ts`) so app/example code can use it
 directly, not just internal composed components:
+
 ```html
-<View [symbioteHostProps]="chip.hostProps" [style]="styles.chip">
+<View [symbioteHostProps]="chip.hostProps" [style]="styles.chip"></View>
 ```
+
 ```ts
 readonly hostProps = { testID: `resp-chip-${index}`, onResponderGrant, onResponderMove, ... };
 ```
+
 This was needed (and fixed) in `examples/angular/components/{ResponderDemo,ParityDemo,
 AccessibilityDemo}.ts` — every one of them binds a MIX of testID + responder/a11y/press
 callbacks onto a bare `View`/`Text`, all through one `hostProps` bag per element, never a
@@ -731,6 +740,16 @@ intercept it.
 }
 
 §21j_open := {
+  SUPERSEDED_2026_08_30: "the proposed experiment below assumed the meter still drives a
+                     markForCheck()/Global-tick walk. It no longer does: examples/angular's
+                     JsFrameRateMeter.ts publishes its rate via signal() specifically because a
+                     write there must NOT re-run the ancestor screen (its own header comment cites
+                     §5), and BenchmarkScreen.ts holds `commitProfileGate.isHeldByBenchmark = true`
+                     around every timed step so the meter's read-and-reset cannot even fire inside
+                     a measurement window. So for the CREATE/REPLACE/APPEND rows specifically, the
+                     meter is not a live suspect — read the two source files before re-opening
+                     this, not this paragraph; a claim about someone else's fix decays the moment
+                     they touch the function (verify-the-deciding-side.md)",
   next_measurement: "proposed three times, still NOT run, costs nothing and needs no rebuild: take
                      the frame-rate meter off the screen (or open a screen without it) and watch
                      for `commit root=… changed=true` at idle.
@@ -739,7 +758,8 @@ intercept it.
                                        whole-screen traversal
                        still running ⟶ change detection is exonerated too, and what is left is
                                        #anchor#NEW from SCROLL-MULTI!!
-                     Run this BEFORE writing any more code against these symptoms",
+                     Still worth running for the SCROLL rows (Select/Swap/Remove ride a live
+                     screen, not a cold Create) — just not as an explanation for Create's gap",
   fix_4_not_done: "wrappers still live inside the window and their count still equals the sticky
                    headers on screen; position-as-identity is defanged, not gone. The ecosystem's
                    answer (§21g) is ONE pinned header rendered above the list, its CONTENT changing,
@@ -761,6 +781,7 @@ intercept it.
     ⟶ diagnose this class on device from the dlog seams; a green headless run does NOT mean sticky works
 }
 ```
+
 ## Prior art
 
 - **NativeScript-Angular** — nearest relative (Angular on native iOS/Android via a
@@ -906,6 +927,148 @@ always took, just no longer paired with a legacy constructor-decorator alternati
 **Takeaway for future DI work here**: don't reach for a constructor parameter decorator as an
 alternative style to `inject()` — it will not compile under this project's tsconfig, regardless of
 whether the target is a component, directive, service, or plain injectable class.
+
+## §24. Host-primitive lowering is a SOURCE pre-pass, never a Babel plugin
+
+Angular's linker reads an inline template by slicing the FILE'S SOURCE TEXT at the AST node's byte
+range — `templateFromPartialCode` in the bundled compiler-cli returns `code: this.code` with a
+`{startPos, endPos}` range, and throws `Unable to read range for node` if the node has no location.
+It never reads the string the AST carries.
+
+So `babel-lower-host-primitives.cjs` cannot run as a plugin beside `babel-linker`. It edits two
+fields and only one survives that pass:
+
+```
+template      rewritten in the AST      linker slices the ORIGINAL text -> ignored
+dependencies  entry deleted from AST    ordinary array read             -> lands
+```
+
+The result is neither lowered nor un-lowered: `<View>` / `<Pressable>` stay in the template while
+the directives answering them are gone, so they match NOTHING — no component template runs, no
+`[symbioteHostProps]` fold, no `(press)` binding. On device that reads as "the adapter is broken":
+every screen unstyled, every button dead, with `tsc` and 5 400 tests green. Shipped and
+device-diagnosed 2026-09-02.
+
+Wiring, and the two must never both be present:
+
+```js
+// metro.config.js
+babelTransformerPath: require.resolve('@symbiote-native/angular/metro-transformer'),
+// babel.config.js — register-composed and the linker only. NOT babel-lower-host-primitives.
+```
+
+`metro-transformer.cjs` runs the plugin over the source, prints it back to TEXT, and hands that to
+the upstream RN transformer, so the linker slices the rewritten template out of the source it was
+given. It composes with the CSS transformer (`createCssMetroTransformer`), which is why it replaces
+`./metro-css-parser` rather than sitting beside it.
+
+Two details that cost real time:
+
+- **`getCacheKey` must hash the lowering plugin.** Metro's own key covers `babel.config.js` and the
+  upstream transformer, not a file the transformer `require()`s — so a rule change would be served
+  from cache and read on device as "the optimisation does nothing". Same trap Svelte's preprocessor
+  records.
+- **The plugin now throws if the linker shares its pass**, detected by effect (a `ɵɵdefineComponent`
+  at its own `Program` exit) rather than by plugin name — the linker's babel key is a generated
+  `base$N`. A loud build failure beats a screen that renders and does nothing.
+
+The adapter's OWN component templates are hand-written with intrinsic tags (`pressable/index.ts`
+renders `<symbiote-view>` directly), so none of this applies to them — the transform exists purely
+for an app's templates, which is why it could be broken for as long as it was.
+
+## §25. `[(value)]` lowers by RENAME, not by refusal — and `[(ngModel)]` still cannot
+
+`[(x)]` desugars to `[x]` + `(xChange)`, and `xChange` is usually not a native event. `TextInput`
+and `Switch` DERIVE `valueChange` from `change` inside the component purely so the banana-in-a-box
+idiom works; no behavior emits it. Lowered, `(valueChange)` becomes an engine listener nothing ever
+fires — and because native echoes keystrokes on its own, the field looks alive while every value
+read off it stays frozen. `[(ngModel)]` is the same class one step out: it needs the
+`ControlValueAccessor` the component PROVIDES, and an element cannot be one.
+
+`DERIVED_OUTPUTS_BY_NAME` + `FORMS_BINDINGS` in `babel-lower-host-primitives.cjs` refuse both.
+It stays beside the transform rather than in `host-primitives.cjs`: which outputs are derived is a
+fact about ANGULAR's component surface, and the shared spec must not carry one answer for five
+adapters.
+
+The general form, worth checking for any adapter: **enumerate the outputs a primitive's wrapper
+declares and ask which the engine actually emits.** The ones it does not are exactly the ones
+lowering silently deletes. On Angular that is `valueChange` on two primitives; `Pressable`'s eleven
+outputs are all real engine events, and `View`/`Text` declare none.
+
+**REFUSING IT WAS WRONG, and the correction is the point of this section.** `[(value)]` is not one
+spelling among several — it is how every Angular template writes a Switch or a TextInput. A refusal
+took BOTH primitives off the lowered path entirely: a census of `examples/angular` after it read
+`Switch 0 lowered / 2 kept`. **An optimisation that asks consumers to write differently does not
+exist.**
+
+The enumeration above stops one question short. `valueChange` is not emitted by the engine as an
+EVENT, true — but the same fold is already there under RN's own spelling, as a function PROP:
+both behaviors call `node.props.onValueChange(value, event)` (`behaviors/switch.ts`,
+`behaviors/text-input.ts`). So the missing piece was a name, not a mechanism. `listen()` routes
+`valueChange` to that prop (`renderer/index.ts`), and `routeProp` lands it via `setProp` because it
+is not a registered Fabric event. Both call sites in `CanaryScreen` now lower, and `[(value)]`
+behaves identically on both paths — break-tested by deleting the rename, which reddens both rows.
+
+The parts that hold: `[(ngModel)]` still refuses (it needs a `ControlValueAccessor`, and an element
+cannot be one — no rename rescues that), and the per-adapter placement is unchanged.
+
+So the question to ask is not "does the engine emit this event" but **"does the engine already
+carry this fold under any name"** — a derived output usually has an RN-idiomatic twin, because our
+behaviors are ports of RN's own components.
+
+## §26. A lowered element must never carry a `style` BINDING under that name
+
+Angular compiles `[style]` to its styling instructions, not to a property write. Those decompose
+the value key by key through Angular's own CSS engine, which cannot represent an RN StyleProp — an
+ARRAY makes `applyStyling` use each element as a style KEY:
+
+```
+TypeError: undefined is not a function
+  at applyStyling            <- prop.indexOf('-'), and prop is a style OBJECT
+  at ɵɵstyleMap
+  at _ImageBackground_Template
+  ... detectChangesInView x14
+```
+
+That throw is inside change detection, so it kills the TICK, not just the component — every
+binding on screen freezes while the app keeps painting. Device-diagnosed 2026-09-02.
+
+**A component `@Input()` shadows the instruction, so an un-lowered element is safe and a lowered
+one is not — the transform is what moves the binding across that line.** `primitives/shared.ts`
+already stated the constraint from the other side ("a raw `[style]` binding would otherwise be
+decomposed key by key by Angular's CSS style engine, which cannot represent an RN StyleProp array
+or an Animated value"); nothing connected it to lowering.
+
+The fix is a RENAME, not a refusal: the transform emits `[symbioteStyle]="x"`, an ordinary property
+binding, and the renderer's `PROP_ALIASES` folds it back to `style`. Refusing instead was measured
+first and cost 150 lowered `symbiote-view` down to 14 — the all-or-nothing rule means one styled
+`<View>` in a template keeps every `<View>` in it as a component.
+
+A STATIC `style="…"` is still refused: its value is CSS text, which the engine's prop layer would
+read as a registered class name.
+
+`class` is NOT affected — `ɵɵclassMap` resolves through `addClass`/`removeClass`, which this
+renderer implements against the engine's class registry.
+
+**It presented as an unrelated bug, and that is the part worth carrying.** The reported symptom was
+a `TextInput` whose `[(value)]` never updated — the field typed, the bound greeting stayed frozen.
+Everything on the TextInput path measured correct: the round trip is green headless (native
+`topChange` -> `handleChange` -> `valueChange.emit` -> the parent field -> the rendered string,
+`components/text-input-two-way-value.test.ts`, break-tested), and the AOT output carries a proper
+`ɵɵtwoWayListener("valueChange")`. Fixing the styling crash fixed the input, untouched.
+
+So: **a throw inside change detection freezes every binding on screen while the app keeps painting
+and keeps dispatching events.** It reads exactly like "this one component's callback is not
+wired". Before chasing a specific binding, scan the log for a CD stack trace — one anywhere in the
+tree indicts the whole tick.
+
+One thing was never explained: the `TextInput change keys=[…]` dlog did not appear on any
+keystroke, which says `handleChange` did not run at all — a dead tick alone does not account for
+that. It stopped reproducing with the crash, so the mechanism is unrecorded rather than known.
+
+**The generalisable half: ask which bindings the framework's COMPILER intercepts before handing a
+lowered element the same attribute list its component had.** On Angular that set is `style` and
+`class`, and only one of the two survives the move.
 
 ## Reference
 

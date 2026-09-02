@@ -29,12 +29,19 @@
 import { forbidWebOnlyConstructs } from '@symbiote-native/svelte/preprocessor';
 import { scopedStyles } from '@symbiote-native/svelte/scoped-styles';
 import { collapseTextWhitespace } from '@symbiote-native/svelte/collapse-text-whitespace';
+// `lowerHostPrimitives()` rewrites <View>/<Text> to their intrinsic tags so a primitive stops
+// costing a Svelte component boundary — which Svelte pays in ANCHOR NODES, 12 per benchmark row
+// (skill §32). MUST come last, and after scopedStyles: it turns `class="x"` into a bag
+// expression the style scoper can no longer find. Metro runs the same chain, so the bundle is
+// correct either way; registering it here is what keeps svelte-check seeing the same source.
+import { lowerHostPrimitives } from '@symbiote-native/svelte/lower-host-primitives';
 
 export default {
   preprocess: [
     forbidWebOnlyConstructs(),
     scopedStyles(),
     collapseTextWhitespace(),
+    lowerHostPrimitives(),
   ],
   compilerOptions: {
     fragments: 'tree',

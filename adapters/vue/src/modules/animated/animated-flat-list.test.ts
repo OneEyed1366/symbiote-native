@@ -135,6 +135,8 @@ describe('Vue Animated.FlatList', () => {
       // The per-frame path (setValue -> flushValue -> AnimatedProps.update -> setNativeProps) only
       // reaches Fabric if the leaf was bound to that same host node.
       opacity.setValue(0.4);
+      // The engine coalesces setNativeProps writes to the microtask boundary.
+      await Promise.resolve();
       expect(scrollView().props.opacity).toBe(0.4);
     });
 

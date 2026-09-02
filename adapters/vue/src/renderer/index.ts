@@ -13,6 +13,7 @@ import {
   insertBefore,
   removeChild,
   routeProp,
+  setProp,
   setText,
   toPublicInstance,
   RAW_TEXT_COMPONENT,
@@ -20,6 +21,7 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { descriptorFor } from '@symbiote-native/components';
+import { normalizeVueAttrKey } from '../utils/normalize-attrs';
 
 // Vue host nodes are all SymbioteNode (elements, raw text, anchors). The mount
 // container is the surface, so a parent can be either a node or the surface root.
@@ -34,6 +36,41 @@ function isRawText(node: ISymbioteNode): boolean {
   return node.component === RAW_TEXT_COMPONENT;
 }
 
+// RN's Text.js applies two defaults on the way to native (core/components/src/text-props.ts:
+// ellipsizeMode 'tail', allowFontScaling true unless literally false). The Vue <Text> wrapper
+// folded them with resolveTextProps; a template that the SFC transformer lowered to the
+// intrinsic `symbiote-text` has no wrapper, so the renderer seeds them instead. Without this a
+// numberOfLines={1} line clips mid-word with no ellipsis — device-observed, and silent.
+const TEXT_DEFAULTS: ReadonlyMap<string, unknown> = new Map<string, unknown>([
+  ['ellipsizeMode', 'tail'],
+  ['allowFontScaling', true],
+]);
+
+function seedTextDefaults(node: ISymbioteNode): void {
+  for (const [key, value] of TEXT_DEFAULTS) setProp(node, key, value);
+}
+
+// RN's `id` is the modern W3C-named alias for `nativeID` — View.js copies it over
+// (`processedProps.nativeID = id`), so the two name ONE native prop. React folds it in its
+// component wrapper and Svelte and Solid in their transforms; Vue had it nowhere, so `<View
+// id="x">` reached Fabric with an unknown `id` and no `nativeID`, silently and on device only.
+// It lives in the renderer rather than in a transform because that covers all four Vue paths at
+// once — lowered SFC, lowered TSX, the component wrapper, and a hand-written
+// `h('symbiote-view', { id })` no compiler ever sees.
+//
+// Caveat, and it matches what Solid's compile-time rename already does: with BOTH `id` and
+// `nativeID` on one element the last patchProp wins, where upstream gives `id` priority
+// unconditionally. Honouring that needs per-node state to remember an `id` arrived; no example or
+// test sets both, so the state is not worth carrying.
+const PROP_ALIASES: ReadonlyMap<string, string> = new Map([['id', 'nativeID']]);
+
+// An explicit `undefined` must NOT clear one of those defaults: RN treats a missing prop and an
+// explicit undefined alike, and only a literal `false` opts out of allowFontScaling. Reached
+// only when a value is already undefined, so it costs nothing on the hot path.
+function textDefaultFor(node: ISymbioteNode, key: string): unknown {
+  return node.isText ? TEXT_DEFAULTS.get(key) : undefined;
+}
+
 // One renderer per mounted surface: the options close over the surface so every mutation
 // can ask it to (microtask-coalesced) recommit. Vue has no resetAfterCommit; instead
 // requestCommit() collapses a burst of insert/patchProp within one tick into a single
@@ -42,13 +79,24 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
   const options: RendererOptions<IHostNode, IHostElement> = {
     createElement(type) {
       const descriptor = descriptorFor(type);
-      const node = createElement(descriptor.component, descriptor.isText);
-      // Graft the imperative public-instance API (measure / setNativeProps / focus / …) onto
-      // the raw node so a template/function ref to a host element exposes it exactly like
-      // React's getPublicInstance. toPublicInstance mutates in place and returns the SAME node
-      // identity, so the engine commit mirror (keyed on the raw node) still resolves it — the
-      // ref must keep holding this raw node by identity (shallowRef), never a deep ref.
-      dlog(`vue createElement ${descriptor.component} -> public instance`);
+      // `type` as the third argument, not just `descriptor.component`: the behavior registry is
+      // keyed by the INTRINSIC TAG (`symbiote-pressable`), while a node only ever carries the
+      // resolved Fabric name (`RCTView`). This is the one place that still holds both, so a
+      // lowered primitive whose machine lives on the engine node can be matched at all.
+      const node = createElement(descriptor.component, descriptor.isText, type);
+      if (descriptor.isText) seedTextDefaults(node);
+      // The imperative public-instance API (measure / setNativeProps / focus / …) is already on
+      // the node's prototype, so a template/function ref to a host element exposes it exactly
+      // like React's getPublicInstance and toPublicInstance is the identity. The ref must keep
+      // holding this raw node by identity (shallowRef), never a deep ref — the engine commit
+      // mirror is keyed on it.
+      //
+      // The message is a THUNK, not a template literal: this runs once per node — 9 000 times on
+      // one benchmark press — and a literal is built at the call site before dlog can decide
+      // anything (see core/engine/src/debug.ts).
+      dlog(
+        () => `vue createElement ${descriptor.component} -> public instance`,
+      );
       return toPublicInstance(node);
     },
 
@@ -137,11 +185,17 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
 
     patchProp(el, key, _prev, next) {
       if (isSurface(el)) return;
+      // Kebab -> camel happens HERE, not only inside a component wrapper: the SFC transformer
+      // lowers View/Text to their intrinsic tags (metro-vue-transformer.cjs), so those props
+      // arrive one key at a time with no component to fold the bag. Idempotent for the wrapped
+      // path, which already normalized.
+      const normalized = normalizeVueAttrKey(key);
+      const name = PROP_ALIASES.get(normalized) ?? normalized;
       // routeProp makes the prop-vs-event decision from the node's ViewConfig (onPress on a
       // View becomes a listener; onTintColor on a Switch stays a prop), shared with React. The
       // class/style merge (explicit :style always winning, regardless of which of Vue's two
       // independent patchProp calls lands last) is centralized there too (core/engine/src/node.ts).
-      routeProp(el, key, next);
+      routeProp(el, name, next === undefined ? textDefaultFor(el, name) : next);
       surface.requestCommit();
     },
 

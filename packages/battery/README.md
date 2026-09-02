@@ -125,6 +125,36 @@ const batteryLevelText = computed(() =>
 </template>
 ```
 
+```svelte
+<!-- Svelte — examples/expo-svelte/screens/BatteryScreen.svelte. Each rune returns a boxed
+     getter object, read as `.current`, since a bare `$state` doesn't survive being handed out
+     of a plain function. -->
+<script lang="ts">
+  import {
+    useBatteryLevel,
+    useBatteryState,
+    useLowPowerMode,
+  } from '@symbiote-native/battery/svelte';
+  import { BatteryState } from '@symbiote-native/battery';
+
+  const batteryLevel = useBatteryLevel(); // { current: number }, -1 until the first reading
+  const batteryState = useBatteryState(); // { current: BatteryState }
+  const lowPowerMode = useLowPowerMode(); // { current: boolean }
+
+  const batteryLevelLabel = $derived(
+    batteryLevel.current < 0
+      ? 'unknown'
+      : `${Math.round(batteryLevel.current * 100)}%`,
+  );
+</script>
+
+<Text>{batteryLevelLabel}</Text>
+<Text>
+  {batteryState.current === BatteryState.CHARGING ? 'Charging' : 'Not charging'}
+</Text>
+<Text>{lowPowerMode.current ? 'On' : 'Off'}</Text>
+```
+
 ```tsx
 // Solid — an accessor per value; call it to read, so a component body that runs once still
 // re-renders the leaf that reads it.
@@ -178,7 +208,7 @@ export class BatteryScreen {
 }
 ```
 
-Each of the three demo screens above also renders a one-shot capabilities card
+Each of the demo screens above also renders a one-shot capabilities card
 (`isAvailableAsync()`, and Android-only `isBatteryOptimizationEnabledAsync()`) resolved directly
 from `@symbiote-native/battery`'s core entry point — see the linked files for the full version.
 The iOS Simulator reports the battery API as unavailable (`isAvailableAsync()` resolves `false`)
@@ -257,6 +287,7 @@ surface, never a view. Tests inject a fake native-module object in place of the 
 ViewConfig. Native rendering itself is verified on-device — see the parent
 [README](../../README.md).
 
-The Android/iOS native wiring is done across all four `examples/expo-*` canary apps
-(`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-angular`);
-this package isn't yet in the public, non-Expo `examples/react` canary.
+The Android/iOS native wiring is done across all six `examples/expo-*` canary apps
+(`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-svelte`,
+`examples/expo-solid`, `examples/expo-angular`); this package isn't yet in the public, non-Expo
+`examples/react` canary.

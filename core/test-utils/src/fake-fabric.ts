@@ -34,8 +34,20 @@ export interface IFabricRecorder {
     commandName: string;
     args: readonly unknown[];
   }>;
-  /** Call counters, for tests that assert "exactly N native nodes were created". */
-  counts: { createNode: number; completeRoot: number };
+  /**
+   * Call counters, for tests that assert "exactly N native nodes were created" — and for pricing
+   * a commit's PROTOCOL half against its walk half. `appendChild` and `clone` are the two Fabric
+   * makes unavoidable: a parent whose child set changed is cloned empty and re-appends every child
+   * handle, so those counts are what a real JSI boundary would charge no matter how cheap the JS
+   * walk above them gets. Counting them here is the only way a headless run can say which half a
+   * proposed optimisation is even aimed at.
+   */
+  counts: {
+    createNode: number;
+    completeRoot: number;
+    appendChild: number;
+    clone: number;
+  };
   /**
    * RN wraps every commit in a synthetic `box-none` AppContainer root.
    * Returns it, asserting it is the single expected root, so each test unwraps the
@@ -64,6 +76,41 @@ function mergeFabricProps(
   return { ...previous, ...diff };
 }
 
+// Fabric clones keep the node's FAMILY, so a handle that already belongs to one parent can never
+// be appended under another. Enforced on both routes into a parent's child list — the append loop
+// and the batched clone — so switching between them cannot quietly drop the check.
+function assertSameFamily(parent: IFakeNode, child: IFakeNode): void {
+  if (
+    child.parentFamilyTag !== undefined &&
+    child.parentFamilyTag !== parent.tag
+  ) {
+    throw new Error(
+      `Fabric family reparent: child ${child.viewName}#${child.tag} already belongs to parent #${child.parentFamilyTag}, cannot append to ${parent.viewName}#${parent.tag}`,
+    );
+  }
+}
+
+// `Array.isArray` narrows to `any[]`, which leaves the OTHER branch of the union un-narrowed;
+// an explicit predicate keeps both sides typed without a cast.
+function isFakeNodeList(
+  value: readonly IFakeNode[] | Record<string, unknown>,
+): value is readonly IFakeNode[] {
+  return Array.isArray(value);
+}
+
+// A clone with no child list comes back EMPTY, exactly as the real binding does.
+function adoptChildren(
+  parent: IFakeNode,
+  children: readonly IFakeNode[] | undefined,
+): IFakeNode[] {
+  if (children === undefined) return [];
+  for (const child of children) {
+    assertSameFamily(parent, child);
+    child.parentFamilyTag = parent.tag;
+  }
+  return [...children];
+}
+
 export function installFabric(): IFabricRecorder {
   let committed: IFakeNode[] = [];
   const created: IFakeNode[] = [];
@@ -72,7 +119,7 @@ export function installFabric(): IFabricRecorder {
     commandName: string;
     args: readonly unknown[];
   }> = [];
-  const counts = { createNode: 0, completeRoot: 0 };
+  const counts = { createNode: 0, completeRoot: 0, appendChild: 0, clone: 0 };
   let eventHandler: IEventHandler | undefined;
 
   const slot = {
@@ -97,32 +144,44 @@ export function installFabric(): IFabricRecorder {
     cloneNodeWithNewProps: (
       node: IFakeNode,
       newProps: Record<string, unknown>,
-    ): IFakeNode => ({
-      ...node,
-      props: mergeFabricProps(node.props, newProps),
-    }),
-    cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({
-      ...node,
-      children: [],
-    }),
+    ): IFakeNode => {
+      counts.clone += 1;
+      return { ...node, props: mergeFabricProps(node.props, newProps) };
+    },
+    // Both clone-with-children forms take the child list as an OPTIONAL trailing/second argument,
+    // mirroring UIManagerBinding.cpp: `cloneNodeWithNewChildren(node, children?)` and the 3-arg
+    // `cloneNodeWithNewChildrenAndProps(node, children, props)`. The engine probes support by
+    // ARITY, so these must keep 2 and 3 declared parameters — a default value on any of them
+    // would drop `.length` below the threshold and silently send every test down the append loop.
+    cloneNodeWithNewChildren: (
+      node: IFakeNode,
+      children?: readonly IFakeNode[],
+    ): IFakeNode => {
+      counts.clone += 1;
+      return { ...node, children: adoptChildren(node, children) };
+    },
     cloneNodeWithNewChildrenAndProps: (
       node: IFakeNode,
-      newProps: Record<string, unknown>,
-    ): IFakeNode => ({
-      ...node,
-      props: mergeFabricProps(node.props, newProps),
-      children: [],
-    }),
+      childrenOrProps: readonly IFakeNode[] | Record<string, unknown>,
+      maybeProps?: Record<string, unknown>,
+    ): IFakeNode => {
+      counts.clone += 1;
+      const children = isFakeNodeList(childrenOrProps)
+        ? childrenOrProps
+        : undefined;
+      const newProps = isFakeNodeList(childrenOrProps)
+        ? (maybeProps ?? {})
+        : childrenOrProps;
+      return {
+        ...node,
+        props: mergeFabricProps(node.props, newProps),
+        children: adoptChildren(node, children),
+      };
+    },
     createChildSet: (): IFakeNode[] => [],
     appendChild(parent: IFakeNode, child: IFakeNode): IFakeNode {
-      if (
-        child.parentFamilyTag !== undefined &&
-        child.parentFamilyTag !== parent.tag
-      ) {
-        throw new Error(
-          `Fabric family reparent: child ${child.viewName}#${child.tag} already belongs to parent #${child.parentFamilyTag}, cannot append to ${parent.viewName}#${parent.tag}`,
-        );
-      }
+      counts.appendChild += 1;
+      assertSameFamily(parent, child);
       child.parentFamilyTag = parent.tag;
       parent.children.push(child);
       return parent;
@@ -188,8 +247,13 @@ export function installFabric(): IFabricRecorder {
       committed = [];
       created.length = 0;
       commands.length = 0;
+      // Every counter, not a subset: `appendChild` and `clone` were left out, so any assertion
+      // on them across a reset read the PREVIOUS phase's total and could not fail. Both are now
+      // the metric that prices the clone protocol, so a stale one is a silent wrong answer.
       counts.createNode = 0;
       counts.completeRoot = 0;
+      counts.appendChild = 0;
+      counts.clone = 0;
     },
   };
 }

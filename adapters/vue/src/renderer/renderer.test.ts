@@ -325,3 +325,121 @@ describe('remove and reorder', () => {
     ]);
   });
 });
+
+// The lowered path: the SFC transformer rewrites <View>/<Text> to their intrinsic TAGS
+// (metro-vue-transformer.cjs), so those nodes reach the renderer with no component wrapper in
+// between. Two things the wrapper used to do must therefore happen here — RN's Text.js defaults
+// (resolveTextProps) and the kebab->camel attr fold (normalizeVueAttrs). Both failures are
+// silent: a clipped line with no ellipsis, and a prop that never reaches Fabric.
+describe('lowered host primitives (intrinsic tags)', () => {
+  const findByTestId = (id: string): IFakeNode | undefined =>
+    findCommitted(node => node.props.testID === id);
+
+  const mountTemplate = async (render: () => unknown): Promise<void> => {
+    mount(ROOT_TAG, defineComponent({ setup: () => render }));
+    await tick();
+  };
+
+  it("seeds RN's Text defaults on an intrinsic symbiote-text", async () => {
+    await mountTemplate(() =>
+      h('symbiote-text', { testID: 'plain' }, ['hello']),
+    );
+    const props = findByTestId('plain')?.props;
+    expect(props?.ellipsizeMode).toBe('tail');
+    expect(props?.allowFontScaling).toBe(true);
+  });
+
+  it('lets an explicit value beat the seeded default', async () => {
+    await mountTemplate(() =>
+      h(
+        'symbiote-text',
+        {
+          testID: 'explicit',
+          ellipsizeMode: 'middle',
+          allowFontScaling: false,
+        },
+        ['hello'],
+      ),
+    );
+    const props = findByTestId('explicit')?.props;
+    expect(props?.ellipsizeMode).toBe('middle');
+    expect(props?.allowFontScaling).toBe(false);
+  });
+
+  // RN treats a missing prop and an explicit `undefined` alike — only a literal `false` opts out
+  // (core/components/src/text-props.ts). Without the re-seed in patchProp the undefined would
+  // delete the default instead.
+  it('keeps the default when the prop is explicitly undefined', async () => {
+    await mountTemplate(() =>
+      h(
+        'symbiote-text',
+        {
+          testID: 'undef',
+          ellipsizeMode: undefined,
+          allowFontScaling: undefined,
+        },
+        ['hello'],
+      ),
+    );
+    const props = findByTestId('undef')?.props;
+    expect(props?.ellipsizeMode).toBe('tail');
+    expect(props?.allowFontScaling).toBe(true);
+  });
+
+  it('folds a kebab attr to camelCase on an intrinsic tag', async () => {
+    await mountTemplate(() =>
+      h('symbiote-view', {
+        testID: 'kebab',
+        'accessibility-label': 'close',
+      }),
+    );
+    const props = findByTestId('kebab')?.props;
+    expect(props?.accessibilityLabel).toBe('close');
+  });
+
+  // The aria- family is the ONE hyphenated group patchProp's kebab -> camel pass must leave alone.
+  // The engine's foldAriaProps reads the hyphenated spelling literally (`bag['aria-label']`), so a
+  // camelized `ariaLabel` is invisible to it: the fold never runs and the key reaches Fabric dead,
+  // where no ViewConfig declares it.
+  //
+  // The witness used to be the raw `aria-label` surviving into the payload. That stopped being
+  // observable once the fold moved into fabricProps — it now consumes the key and nulls it — and
+  // "the key is gone" is exactly what a wrongly-camelized attr would also produce. So the claim is
+  // pinned from BOTH sides instead: the fold's OUTPUT carries the aria value (only reachable if the
+  // hyphenated key arrived intact), and no camelized key is left behind.
+  it('leaves the aria- family hyphenated for the engine to fold', async () => {
+    await mountTemplate(() =>
+      h('symbiote-view', { testID: 'aria', 'aria-label': 'from-aria' }),
+    );
+    const props = findByTestId('aria')?.props;
+    expect(props?.accessibilityLabel).toBe('from-aria');
+    expect(props).not.toHaveProperty('ariaLabel');
+  });
+
+  it('leaves a non-text node without text defaults', async () => {
+    await mountTemplate(() => h('symbiote-view', { testID: 'view' }));
+    const props = findByTestId('view')?.props;
+    expect(props?.ellipsizeMode).toBeUndefined();
+    expect(props?.allowFontScaling).toBeUndefined();
+  });
+
+  // RN's `id` is the W3C alias for `nativeID` and Fabric knows only the latter, so an unfolded
+  // `id` reaches the native view as an unknown prop and the element ends up with no nativeID at
+  // all — which breaks the one thing nativeID is for (InputAccessoryView pairing) with nothing
+  // red anywhere. React, Svelte and Solid all fold it; Vue did not, on any of its four paths.
+  it('folds id to nativeID on an intrinsic tag', async () => {
+    await mountTemplate(() =>
+      h('symbiote-view', { testID: 'aliased', id: 'accessory-1' }),
+    );
+    const props = findByTestId('aliased')?.props;
+    expect(props?.nativeID).toBe('accessory-1');
+    expect(props?.id, 'the alias must not also reach Fabric').toBeUndefined();
+  });
+
+  it('folds id on a Text node too', async () => {
+    await mountTemplate(() =>
+      h('symbiote-text', { testID: 'aliased-text', id: 'label-1' }, 'x'),
+    );
+    expect(findByTestId('aliased-text')?.props.nativeID).toBe('label-1');
+  });
+});

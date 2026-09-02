@@ -48,10 +48,10 @@
     "@symbiote-native/system-ui": "^0.3.0",
     "@symbiote-native/tracking-transparency": "^0.3.0",
     "@symbiote-native/web-browser": "^0.3.0",
+    "expo": "57.0.14",
     "react": "19.2.3",
     "react-native": "0.86.0",
-    "svelte": "^5.56.0",
-    "expo": "57.0.14"
+    "svelte": "^5.56.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

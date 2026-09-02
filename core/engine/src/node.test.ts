@@ -145,28 +145,32 @@ describe('setText', () => {
   });
 });
 
-describe('setEventListener: the layout event raises the onLayout flag prop', () => {
-  // why: Fabric gates layout events behind BaseViewProps.onLayout (unlike scroll/touch/
-  // change, which fire unconditionally) — a `layout` listener with no matching flag prop
-  // never fires on a real host, so registering one must also raise the flag.
-  it('registering a layout listener sets props.onLayout; removing it clears the flag', () => {
+describe('setEventListener: the listener map', () => {
+  // why: six events are ALSO gated behind a boolean prop in Fabric's C++, and registering the
+  // listener is what raises it. That half — which flag, whether it reaches the payload, whether
+  // removing the last listener resets it — is proven end-to-end in
+  // __tests__/gated-event-props.test.ts, against the COMMITTED payload rather than node.props,
+  // because the payload is what native reads. What is only observable here is the listener map
+  // itself: it never reaches Fabric, so no commit-level test can see it.
+  it('registers a handler under the event name and drops it on a non-function value', () => {
     const node = createElement('RCTView');
 
     setEventListener(node, 'layout', () => {});
-    expect(node.props.onLayout).toBe(true);
     expect(node.listeners?.has('layout')).toBe(true);
 
     setEventListener(node, 'layout', undefined);
-    expect(node.props.onLayout).toBeUndefined();
     expect(node.listeners?.has('layout')).toBe(false);
   });
 
-  it('a non-layout listener never touches the onLayout flag', () => {
+  // why: an ungated event is pure JS — the engine dispatches it off the retained node. Putting
+  // anything in the payload for it would be a dead prop on every node carrying a handler.
+  it('leaves the props bag untouched for an ungated event', () => {
     const node = createElement('RCTView');
 
     setEventListener(node, 'change', () => {});
 
-    expect(node.props.onLayout).toBeUndefined();
+    expect(node.listeners?.has('change')).toBe(true);
+    expect(Object.keys(node.props)).toHaveLength(0);
   });
 });
 

@@ -94,9 +94,26 @@ function hostComponent<Props extends object>(
   return component;
 }
 
-export const View = hostComponent<IViewProps>('symbiote-view', 'View');
+// The intrinsic tags the two bare primitives wrap. Exported because ADAPTER-INTERNAL renders must
+// use the TAG, never the component: Vue charges a full component instance even for a functional
+// one, so `h(View, …)` inside our own Pressable/Button costs an instance per node for a wrapper
+// that only forwards attrs.
+//
+// These stay LITERALS rather than being read out of `@symbiote-native/components/host-primitives`,
+// which is where the two transforms now get them: the spec types `intrinsic` as `string`, and
+// reading it here would widen `HOST_VIEW` from the literal type that `hostComponent` and every
+// adapter-internal `h(HOST_VIEW, …)` rely on. So this is the last remaining second encoding, and
+// `components.test.ts` pins it against the spec rather than trusting the two to stay in step.
+//
+// Children go to a tag as an ARRAY (or a bare string / vnode), never a slot function — an element
+// ignores slot children entirely and renders nothing. The reverse of the rule that applies to a
+// component.
+export const HOST_VIEW = 'symbiote-view';
+export const HOST_TEXT = 'symbiote-text';
+
+export const View = hostComponent<IViewProps>(HOST_VIEW, 'View');
 export const Text = hostComponent<ITextProps>(
-  'symbiote-text',
+  HOST_TEXT,
   'Text',
   resolveTextProps,
 );

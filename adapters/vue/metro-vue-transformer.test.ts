@@ -13,6 +13,7 @@
 // (unsupported lang) sits inside its feature's describe, asserting the specific error message.
 import { describe, expect, it } from 'vitest';
 import metroVueTransformer from './metro-vue-transformer.cjs';
+import { HOST_PRIMITIVES } from '@symbiote-native/components/host-primitives';
 
 const {
   compileSfc,
@@ -765,6 +766,260 @@ describe('metro-vue-transformer compileSfc kebab-case class= support', () => {
     // compiled call site wraps the original expression unchanged.
     expect(code).toContain(
       "__scopeClass({ 'is-active': isActive }, __scopedClassNames)",
+    );
+  });
+});
+
+// Host-primitive lowering: <View>/<Text> imported from us compile to their intrinsic TAG, so Vue
+// mounts them as elements and skips a component instance each (measured 14.1% of Vue's create —
+// see the comment on LOWERABLE_HOST_PRIMITIVES). The failure mode if the tagType flip is dropped
+// is silent: codegen emits a component whose children are withCtx slots the element path never
+// mounts, i.e. an empty subtree. So every assertion below pins BOTH halves — the element helper
+// AND the absence of withCtx.
+describe('metro-vue-transformer host-primitive lowering', () => {
+  const sfc = (script: string, template: string): string =>
+    `\n<script setup lang="ts">\n${script}\n</script>\n<template>\n${template}\n</template>\n`;
+
+  it('lowers an imported View/Text to intrinsic element tags with real children', async () => {
+    const code = await compileSfc(
+      sfc(
+        `import { View, Text } from '@symbiote-native/vue'\nconst label = 'hi'`,
+        `<View class="row"><Text class="t">{{ label }}</Text></View>`,
+      ),
+      'lowered.vue',
+    );
+    expect(code).toContain('_createElementBlock("symbiote-view"');
+    expect(code).toContain('"symbiote-text"');
+    expect(code).not.toContain('_withCtx');
+    expect(code).not.toContain('_unref(View)');
+  });
+
+  it('leaves a View that was NOT imported from us as a component', async () => {
+    const code = await compileSfc(
+      sfc(
+        `import { View } from './my-own-view'`,
+        `<View class="row">hello</View>`,
+      ),
+      'foreign.vue',
+    );
+    expect(code).toContain('_unref(View)');
+    expect(code).not.toContain('symbiote-view');
+  });
+
+  it('follows an import alias and leaves the original name alone', async () => {
+    const code = await compileSfc(
+      sfc(
+        `import { View as RNView } from '@symbiote-native/vue'\nimport { View } from './my-own-view'`,
+        `<RNView><View>x</View></RNView>`,
+      ),
+      'aliased.vue',
+    );
+    expect(code).toContain('_createElementBlock("symbiote-view"');
+    expect(code).toContain('_unref(View)');
+  });
+
+  // What this guards: listing in HOST_PRIMITIVES is what makes a tag lowerable, never the name
+  // looking like a primitive.
+  //
+  // The subject is DERIVED rather than named, because naming it rots every time the spec grows and
+  // has already done so twice — `Pressable` stood here until 2026-08-23, `Image` until 2026-09-01,
+  // and each time the failure read as a lowering regression rather than as a stale fixture. Picking
+  // off the spec cannot go stale: the day a candidate is added it simply stops being chosen, and if
+  // every candidate is lowered the test says so instead of quietly asserting nothing.
+  it('does not lower a primitive that is more than a pass-through', async () => {
+    const candidates = [
+      'Switch',
+      'ScrollView',
+      'Modal',
+      'RefreshControl',
+      'SafeAreaView',
+    ];
+    const absent = candidates.filter(
+      name => HOST_PRIMITIVES[name] === undefined,
+    );
+    expect(
+      absent.length,
+      `every candidate is now lowerable (${candidates.join(', ')}) — pick a primitive that is still absent, or retire this case`,
+    ).toBeGreaterThan(0);
+    const subject = absent[0];
+
+    const code = await compileSfc(
+      sfc(
+        `import { ${subject} } from '@symbiote-native/vue'`,
+        `<${subject}><Text>x</Text></${subject}>`,
+      ),
+      'stateful.vue',
+    );
+
+    expect(code).toContain(`_unref(${subject})`);
+  });
+
+  it('still scopes a scoped class on a lowered element', async () => {
+    const code = await compileSfc(
+      `<script setup lang="ts">\nimport { View } from '@symbiote-native/vue'\n</script>\n` +
+        `<template><View class="card" /></template>\n` +
+        `<style scoped>.card { padding: 4px; }</style>\n`,
+      'scoped-lowered.vue',
+    );
+    expect(code).toContain('_createElementBlock("symbiote-view"');
+    expect(code).not.toMatch(/class:\s*"card"/);
+  });
+});
+
+// Pressable OWNS state (`pressed`), so unlike View/Text it lowers only when the template does not
+// read that state — a lowered element has no instance to read it from. Every case below runs
+// through the real `compileSfc`, the same entry Metro calls, because a harness that builds the
+// subject its own way proves nothing about the shipped path
+// (`.claude/rules/test-harness-false-greens.md` §11).
+//
+// Each refusal is paired with the nearest LOWERING case, so a detector that simply refuses
+// everything fails the pair rather than passing the half it was written for.
+describe('Pressable lowering refusals', () => {
+  const compilePressable = (inner: string): Promise<string> =>
+    compileSfc(
+      `<script setup lang="ts">\n` +
+        `import { Pressable, Text } from '@symbiote-native/vue'\n` +
+        `const fnStyle = () => ({})\nconst c = 'red'\nconst obj = {}\n` +
+        `</script>\n<template>${inner}</template>\n`,
+      'pressable.vue',
+    );
+
+  const LOWERED = 'symbiote-pressable';
+
+  it('lowers a Pressable whose template reads no press state', async () => {
+    const code = await compilePressable(
+      '<Pressable class="a"><Text>x</Text></Pressable>',
+    );
+    expect(code).toContain(LOWERED);
+  });
+
+  // A functional :style USED to refuse — a compile-time pass cannot tell an object from a function,
+  // so the only safe reading was to keep the component. It no longer has to tell them apart: the
+  // expression is CALLED once per state, and a name that turns out to hold an object is handled by
+  // a runtime typeof guard rather than by a compile-time proof. What still refuses is anything that
+  // cannot be read twice — see the two cases below this one.
+  // Every style shape lowers and the author's expression reaches the output EXACTLY ONCE,
+  // untouched — the structural form of `REFUSAL_CATEGORIES.emitStyleExpressionOnce`. With the
+  // state-style split gone there is no emission that could print an expression twice, so the
+  // property that used to need a runtime helper holds by construction. `routeProp` resolves the
+  // callback at both values of `pressed`.
+  //
+  // The rows deliberately mirror `babel-jsx.test.ts`: this path sees the expression as SOURCE TEXT
+  // and that one has the AST, so the pair is exactly where the two could drift.
+  it.each([
+    ['a hoisted name', 'fnStyle', 'fnStyle'],
+    ['a call that can do work when read', 'getStyle()', 'getStyle'],
+    [
+      'an inline callback',
+      '({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })',
+      'pressed ? 0.6 : 1',
+    ],
+  ])('lowers %s, printing it once', async (_what, expression, needle) => {
+    const code = await compilePressable(
+      `<Pressable :style="${expression}"><Text>x</Text></Pressable>`,
+    );
+
+    expect(code).toContain(LOWERED);
+    // Counted in the EMITTED ELEMENT, not the whole file: `<script setup>` carries the author's own
+    // declaration of the same name, so a file-wide count reads two for a name printed once.
+    const emitted = code.slice(code.indexOf(LOWERED));
+    expect(emitted.split(needle).length - 1, 'printed exactly once').toBe(1);
+    expect(code, 'no pair is emitted any more').not.toContain('activeStyle');
+    expect(code, 'and no runtime helper is needed').not.toContain(
+      '__symbioteStateStyle',
+    );
+  });
+
+  it('lowers an object literal, which needs no pair at all', async () => {
+    // The shape the ActionButton migration produces once `opacity` moves into
+    // `.action-button:active`. It arrives as a COMPOUND expression, not a simple one, because
+    // transformExpression rewrites `c` to `$setup.c` first — the detail the detector is built on.
+    const lowered = await compilePressable(
+      '<Pressable :style="{ borderColor: c }"><Text>x</Text></Pressable>',
+    );
+    expect(lowered).toContain(LOWERED);
+    expect(lowered, 'an inert style has no active variant').not.toContain(
+      'activeStyle',
+    );
+  });
+
+  // An expression that can DO WORK when read lowers too, but through the runtime helper rather than
+  // the inline guard — the guard prints it on both props, so `getStyle()` would run four times per
+  // bag build. Briefly written as a refusal, which was wrong: the hazard belongs to the emit shape,
+  // not to the expression. The COUNT is what pins it; the verdict alone would ratify either emit.
+  it('keeps the cheap emission for a name, which needs no helper', async () => {
+    const code = await compilePressable(
+      '<Pressable :style="fnStyle"><Text>x</Text></Pressable>',
+    );
+    expect(code).toContain(LOWERED);
+    expect(
+      code,
+      'a read cannot change meaning, so it keeps its patch flag',
+    ).not.toContain('__symbioteStateStyle');
+  });
+
+  // `ref` on a component yields the instance, on an element the host node. Found by the shared
+  // verdict table rather than by any Vue test.
+  it('refuses an element whose ref binds the instance', async () => {
+    const attribute = await compilePressable(
+      '<Pressable ref="handle"><Text>x</Text></Pressable>',
+    );
+    expect(attribute).not.toContain(LOWERED);
+
+    const bound = await compilePressable(
+      '<Pressable :ref="handle"><Text>x</Text></Pressable>',
+    );
+    expect(
+      bound,
+      'the bound form is a directive, not an attribute',
+    ).not.toContain(LOWERED);
+  });
+
+  it('lowers an object literal that needed no binding rewrite', async () => {
+    const code = await compilePressable(
+      '<Pressable :style="{ borderColor: 1 }"><Text>x</Text></Pressable>',
+    );
+    expect(code).toContain(LOWERED);
+  });
+
+  it('refuses a scoped v-slot', async () => {
+    const code = await compilePressable(
+      '<Pressable v-slot="{ pressed }"><Text>x</Text></Pressable>',
+    );
+    expect(code).not.toContain(LOWERED);
+  });
+
+  // Both template forms refuse, including the argument-less one. Lowering an element that has a
+  // <template> child makes codegen throw `Codegen node is missing for element/if/for node`, so
+  // this is not the spec's "zero-arity is not a refusal" case — that carve-out is about a JSX
+  // function child. Found by probing compileSfc before any of these tests existed.
+  it('refuses a <template> child with or without a slot argument', async () => {
+    const withArg = await compilePressable(
+      '<Pressable><template #default="{ pressed }"><Text>x</Text></template></Pressable>',
+    );
+    expect(withArg).not.toContain(LOWERED);
+
+    const withoutArg = await compilePressable(
+      '<Pressable><template #default><Text>x</Text></template></Pressable>',
+    );
+    expect(withoutArg, 'lowering this one makes codegen throw').not.toContain(
+      LOWERED,
+    );
+  });
+
+  it('refuses v-bind of a whole object, which could hide a style fn', async () => {
+    const code = await compilePressable(
+      '<Pressable v-bind="obj"><Text>x</Text></Pressable>',
+    );
+    expect(code).not.toContain(LOWERED);
+  });
+
+  it('still lowers View and Text in the same file', async () => {
+    const code = await compilePressable(
+      '<Pressable :style="fnStyle"><Text>x</Text></Pressable>',
+    );
+    expect(code, 'a Pressable refusal must not disable its siblings').toContain(
+      'symbiote-text',
     );
   });
 });

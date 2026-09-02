@@ -1,80 +1,21 @@
-// The public instance a host ref hands back, RN's ReactFabricHostComponent. toPublicInstance
-// augments the retained node with the imperative API libraries reach through (reanimated,
-// gesture-handler, react-navigation): measure / measureInWindow / measureLayout /
-// setNativeProps / focus / blur. The methods are attached onto the node object itself (not its
-// props, so they never reach Fabric); each resolves the node's CURRENT committed handle at call
-// time through the engine, so a clone-on-write commit between calls is transparent.
+// The public instance a host ref hands back, RN's ReactFabricHostComponent: measure /
+// measureInWindow / measureLayout / setNativeProps / focus / blur, the imperative API libraries
+// reach through (reanimated, gesture-handler, react-navigation).
 //
-// This lives in the engine, not an adapter: it depends only on engine internals (the commit
-// free functions + the retained node), so every adapter inherits the SAME public instance for
-// free — React's getPublicInstance and the Vue renderer both graft this onto their host nodes.
+// EVERY retained node already carries it — the six methods live on the shared node prototype
+// (`SymbioteNode` in ../node), so there is nothing left to graft and `toPublicInstance` is the
+// identity. It used to Object.assign six fresh closures onto each node; that cost 54 000 closures
+// per 1 000-row create and made GC the largest bucket in the profile. The rationale, and why
+// React was the one adapter not paying it, is recorded on ISymbioteNode.
+//
+// The function and the type both stay: they are the seam every adapter names (React's
+// getPublicInstance, Vue's nodeOps createElement, Angular's Renderer2, Svelte's dom-shim), and a
+// call site saying "hand me the public instance" still reads correctly at a no-op.
 
-import {
-  measure as engineMeasure,
-  measureInWindow as engineMeasureInWindow,
-  measureLayout as engineMeasureLayout,
-  setNativeProps as engineSetNativeProps,
-  dispatchViewCommand,
-} from '../commit';
-import { isSymbioteNode, type ISymbioteNode } from '../node';
-import { dlog } from '../debug';
-import type {
-  IMeasureOnSuccess,
-  IMeasureInWindowOnSuccess,
-  IMeasureLayoutOnSuccess,
-} from '../fabric';
+import type { ISymbioteNode } from '../node';
 
-const FOCUS_COMMAND = 'focus';
-const BLUR_COMMAND = 'blur';
+export type IHostInstance = ISymbioteNode;
 
-export interface IHostInstance extends ISymbioteNode {
-  measure(callback: IMeasureOnSuccess): void;
-  measureInWindow(callback: IMeasureInWindowOnSuccess): void;
-  measureLayout(
-    relativeToNativeNode: IHostInstance | number,
-    onSuccess: IMeasureLayoutOnSuccess,
-    onFail?: () => void,
-  ): void;
-  setNativeProps(nativeProps: Record<string, unknown>): void;
-  focus(): void;
-  blur(): void;
-}
-
-function isHostInstance(node: ISymbioteNode): node is IHostInstance {
-  return typeof Reflect.get(node, 'measure') === 'function';
-}
-
-// Augment the retained node with the public-instance methods, once. The same node
-// instance persists across commits, so attaching once is enough, every method reads
-// the live handle through the engine on each call.
 export function toPublicInstance(node: ISymbioteNode): IHostInstance {
-  if (isHostInstance(node)) return node;
-  return Object.assign(node, {
-    measure(callback: IMeasureOnSuccess): void {
-      engineMeasure(node, callback);
-    },
-    measureInWindow(callback: IMeasureInWindowOnSuccess): void {
-      engineMeasureInWindow(node, callback);
-    },
-    measureLayout(
-      relativeToNativeNode: IHostInstance | number,
-      onSuccess: IMeasureLayoutOnSuccess,
-      onFail?: () => void,
-    ): void {
-      if (!isSymbioteNode(relativeToNativeNode)) {
-        dlog('measureLayout: relative target must be a host ref');
-        return;
-      }
-      engineMeasureLayout(node, relativeToNativeNode, onSuccess, onFail);
-    },
-    setNativeProps(nativeProps: Record<string, unknown>): void {
-      engineSetNativeProps(node, nativeProps);
-    },
-    focus(): void {
-      dispatchViewCommand(node, FOCUS_COMMAND, []);
-    },
-    blur(): void {
-      dispatchViewCommand(node, BLUR_COMMAND, []);
-    },
-  });
+  return node;
 }

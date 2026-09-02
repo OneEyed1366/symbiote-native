@@ -21,7 +21,11 @@ export default {
       Document(node) {
         const dir = dirname(context.filename);
         if (existsSync(join(dir, 'README.md'))) return;
-        context.report({ loc: node.loc, messageId: 'missingReadme', data: { dir } });
+        context.report({
+          loc: node.loc,
+          messageId: 'missingReadme',
+          data: { dir },
+        });
       },
     };
   },

@@ -33,6 +33,12 @@ const BASE_EVENTS: readonly string[] = [
   'press',
   'pressIn',
   'pressOut',
+  // Synthesized from the touch stream like its four siblings, and omitted here until 2026-09-02.
+  // A name the press machine OWNS but the engine does not route is dead on the lowered path only:
+  // `routeProp` hands an `on*` prop to `setEventListener` (and thus to the behavior's stash) only
+  // for a registered event, so `onPressMove` landed in `node.props` where nothing reads it, while
+  // a wrapper passes the same callback to the machine directly and stayed correct.
+  'pressMove',
   'longPress',
   'layout',
   'focus',

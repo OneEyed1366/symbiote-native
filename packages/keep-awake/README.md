@@ -40,9 +40,11 @@ with zero further changes:
 
 The recurring per-package half of the Android wiring (`app/build.gradle`'s
 `implementation project(':expo-keep-awake')` line and `MainApplication.kt`'s module-name map
-entry) is automated by this package's own `postinstall` script via
-`@symbiote-native/expo-modules-link` — see that package's README for how the `native-link.json`
-manifest above drives it. Full mechanics — the Podfile pieces that normally ship inside the
+entry) is automated by installing `@symbiote-native/expo-modules-link` in the consuming app —
+its own `postinstall` hook scans `node_modules` for every installed package's `native-link.json`
+(this one included) and regenerates the registration blocks. This package ships no `postinstall`
+of its own — `native-link.json` above is passive data the aggregator reads. See that package's
+README for the full mechanism. Full mechanics — the Podfile pieces that normally ship inside the
 `expo` package, the `expo` peer-dependency exclusion list — live in the
 `symbiote-expo-native-module` skill.
 
@@ -96,6 +98,27 @@ useKeepAwake();
 <template>
   <Text>Screen will not sleep</Text>
 </template>
+```
+
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import { useKeepAwake } from '@symbiote-native/keep-awake/svelte';
+
+  useKeepAwake(); // screen stays on for as long as this component is mounted
+</script>
+<Text>Screen will not sleep</Text>
+```
+
+```tsx
+// Solid
+import { createKeepAwake } from '@symbiote-native/keep-awake/solid';
+
+function KeepAwakeScreen() {
+  createKeepAwake(); // activates in the primitive body, releases via onCleanup on dispose
+
+  return <Text>Screen will not sleep</Text>;
+}
 ```
 
 ```ts

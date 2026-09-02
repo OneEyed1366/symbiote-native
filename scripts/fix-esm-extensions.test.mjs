@@ -122,6 +122,31 @@ test('a bare (non-relative) import is left alone', () => {
   assert.deepEqual(unresolved, []);
 });
 
+// A side-effect import has no `from` and no parenthesis, so it is a third specifier position and
+// was silently left extensionless until 2026-08-23. Real case: `adapters/vue/src/index.ts`'s
+// `import './register';`, which cannot be written as a re-export without going lazy under Metro's
+// inlineRequires. Metro resolves an extensionless specifier; Node ESM does not.
+test('a bare side-effect import gets its extension', () => {
+  const { code, importsFixed, unresolved } = rewriteEsmSpecifiers(
+    `import './register';`,
+    spec => `${spec}.js`,
+  );
+  assert.equal(code, `import './register.js';`);
+  assert.equal(importsFixed, 1);
+  assert.deepEqual(unresolved, []);
+});
+
+// The word `import` inside a STRING must not make the next specifier look like a bare import — the
+// scanner's code-only mirror is what keeps that apart, and this pins it.
+test('the word import inside a string does not create a false position', () => {
+  const src = `const doc = 'import ';\nconst path = './register';`;
+  const { code, importsFixed } = rewriteEsmSpecifiers(src, () => {
+    throw new Error('resolve must not be called outside a specifier position');
+  });
+  assert.equal(code, src);
+  assert.equal(importsFixed, 0);
+});
+
 test('an already-extensioned specifier is skipped via the resolver', () => {
   // Mirrors fixEsmExtensions' EXT_RE guard: `.js`/`.json` specifiers resolve to 'skip'.
   const skipExt = spec => (/\.(js|json)$/.test(spec) ? 'skip' : spec + '.js');

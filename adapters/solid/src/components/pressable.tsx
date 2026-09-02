@@ -58,6 +58,7 @@ import {
   type IViewStyle,
 } from '@symbiote-native/engine';
 import type { IHostInstance } from '../host-instance';
+import { setHostPressed } from '../renderer';
 import { View, type IViewProps } from './view';
 
 export type {
@@ -185,7 +186,19 @@ function PressableImpl(
   // and not a whenCommitted case: the measure is triggered by a touch, which cannot arrive before
   // the view exists.
   const host: IPressHost = {
-    setPressed,
+    // Two sinks for one fact, and both are needed. The signal drives the FRAMEWORK-visible half —
+    // a functional `style`, a render-prop child — which is what forces this element to stay a
+    // component at all. `setHostPressed` drives the ENGINE-visible half, so `.btn:active` applies
+    // to a refused Pressable exactly as it would to a lowered `symbiote-pressable`. That is what
+    // makes a refusal cost the component instance and NOT the pressed styling
+    // (`.claude/rules/host-primitive-tier.md`).
+    //
+    // Before the first commit `responder` is null and the engine call is skipped: nothing is
+    // painted yet, and a press cannot arrive before the view exists.
+    setPressed: next => {
+      setPressed(next);
+      if (responder !== null) setHostPressed(responder, next);
+    },
     getMeasureFn: () => {
       const node = responder;
       if (node === null) return undefined;

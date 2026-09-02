@@ -1799,3 +1799,68 @@ shown the loss.
                 nobody reads when it finally matters",
 }
 ```
+
+## Host-primitive lowering — `<View>`/`<Text>` compile to an ELEMENT, not a component
+
+```
+§why_lowering_exists := {
+  cost: "Vue charges a full component instance for a FUNCTIONAL component too —
+    createComponentInstance + initProps + initSlots + setupRenderEffect. One benchmark row is
+    7 instances (Row + View + 3 Text + 2 Pressable); React pays 7 far cheaper fibers",
+  ⟶ "this is why vue is level with react on js-framework-benchmark (a <div> is an ELEMENT there)
+     and 1.8x behind here (our <View> is a COMPONENT)",
+  measured: "same 36 001-node tree, View/Text as intrinsic tags: 138.0 -> 118.5 ms, 12-14%
+    across runs, and that is NET of the two folds the wrapper used to do",
+  free_extras: "an element gets static-prop hoisting and patch flags out of codegen; a
+    component gets neither",
+  stock_RN_WRAPS_TOO_do_not_misremember_this: "RN's own <View> is a function component over
+    <ViewNativeComponent>, and <Pressable> is memo(fn) -> <View> -> host — the SAME nesting we
+    have. RN even says so in ViewNativeComponent.js: 'Our long term plan is to reduce the overhead
+    of the <Text> and <View> wrappers'. What differs is the PRICE of one wrapper (a React function
+    -component fiber vs a Vue component instance), never its presence. Reading this as 'stock does
+    not wrap' sends the next session hunting a wrapper to delete in the React adapter; there is
+    none. The comparison where the tax genuinely does not exist is the WEB, where a <div> is an
+    element — which is why Vue is level with React on js-framework-benchmark and was not here",
+  not_a_misconfiguration_a_misplacement: "the wrapper did two real jobs (kebab->camel attrs, RN's
+    Text defaults). They were RELOCATED to the renderer, not deleted. A flag flip would have been
+    a misconfiguration; this needed the logic moved",
+  scope: "SFC ONLY. examples/vue-tsx and any h()/JSX call site keep the component wrappers,
+    which therefore must NOT be deleted from components.ts",
+}
+§how_the_compiler_decides_and_why_two_halves_are_needed := {
+  where: "adapters/vue/metro-vue-transformer.cjs — LOWERABLE_HOST_PRIMITIVES,
+    lowerableTagsIn, createHostPrimitiveLowering",
+  fact_1: "a nodeTransform renaming node.tag is NOT enough — the parser already set
+    tagType = COMPONENT (capitalized + a <script setup> binding), and transformElement's exit
+    hook turns children into withCtx slots off that. Must ALSO set node.tagType = 0",
+  fact_2: "isCustomElement is consulted for the ORIGINAL tag, so it must answer true for BOTH
+    'View' and 'symbiote-view'",
+  fact_3: "isCustomElement ALONE does nothing when the tag matches a setup binding — the
+    compiler emits _unref(View) regardless. Verified against @vue/compiler-sfc 3.5.39",
+  failure_if_half_done: "codegen emits a component whose children are slots the ELEMENT mount
+    path never reads ⟶ a silently EMPTY subtree. No error, nothing red",
+  proof: "compiled output must read _createElementBlock(\"symbiote-view\" and contain NO
+    _withCtx — adapters/vue/metro-vue-transformer.test.ts pins both halves",
+}
+§lower_only_what_the_file_imported_from_us := {
+  bug_avoided: "matching on the bare tag name rewrites an APP's own <View>; its component then
+    never renders and the intrinsic paints an empty box",
+  guard: "scan descriptor.scriptSetup/script for `import { … } from '@symbiote-native/vue'`,
+    alias-aware ⟶ `import { View as RNView }` lowers RNView and leaves View alone",
+  only_pass_throughs_qualify: "View, Text. Image folds source/srcSet + statics, Pressable runs
+    a responder state machine — both stay components",
+}
+§what_the_wrapper_did_moves_into_the_renderer := {
+  where: "adapters/vue/src/renderer/index.ts",
+  kebab_to_camel: "normalizeVueAttrKey per KEY in patchProp (the bag-level normalizeVueAttrs
+    has no component to run in any more). Fast-bails on a key with no '-'; aria-*/data- stay",
+  rn_text_defaults: "resolveTextProps no longer runs for a lowered <Text>. seedTextDefaults on
+    createElement when descriptor.isText, PLUS textDefaultFor in patchProp so an explicit
+    `undefined` does not delete the default — RN treats missing and undefined alike and only a
+    literal false opts out (core/components/src/text-props.ts)",
+  silent_if_missed: "a numberOfLines={1} line clips mid-word with no ellipsis; a kebab prop
+    never reaches Fabric. Both device-only symptoms — hence the tests in renderer.test.ts",
+  composes_with_scoped_styles: "the class-rename nodeTransform runs after the lowering one on
+    the same element and still applies; golden-corpus snapshot updated to record the new shape",
+}
+```

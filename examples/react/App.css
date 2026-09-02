@@ -1059,3 +1059,17 @@
   font-size: 18px;
   font-weight: bold;
 }
+
+/* The with-input arm's extra child. A FIXED width and a height under the row's own 44px, because
+   BENCH_ROW_HEIGHT feeds getItemLayout in virtualized mode — a row that grows makes the windowed
+   arm measure a different layout than the all-mounted one. */
+.bench-row-input {
+  width: 96px;
+  height: 28px;
+  padding-left: 6px;
+  padding-right: 6px;
+  border-radius: 4px;
+  background-color: #0f1621;
+  color: #e8ecf1;
+  font-size: 12px;
+}

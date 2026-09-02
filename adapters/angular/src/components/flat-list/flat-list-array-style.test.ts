@@ -2,7 +2,7 @@ import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  advanceTicks,
+  advanceMs,
   installFabric,
   waitForQuiet,
 } from '@symbiote-native/test-utils';
@@ -130,16 +130,16 @@ describe('FlatList array-composed item style', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    // Settle on a real condition FIRST, then observe. The previous shape counted ten fixed
-    // macrotasks and asserted no growth across them, which only held while the machine was idle:
-    // under a loaded full-suite run the window had not finished committing when the count began,
-    // and a harness that gave up early read as free-running change detection. If CD genuinely
-    // free-ran, waitForQuiet never settles and throws — the failure this test is here to catch.
+    // Settle on a real condition FIRST, then observe — and both halves in wall time, not ticks.
+    // Measured 2026-09-02: the list commits its batch once more 30-60 ticks in, so a tick-counted
+    // settle declared quiet before it on an idle machine and caught it under a loaded full-suite
+    // run, reading as free-running change detection. If CD genuinely free-ran, waitForQuiet never
+    // settles and throws — the failure this test is here to catch.
     const settled = await waitForQuiet(
       () => fabric.counts.completeRoot,
       'flat-list window commits',
     );
-    await advanceTicks(10);
+    await advanceMs();
     expect(fabric.counts.completeRoot).toBe(settled);
   });
 });

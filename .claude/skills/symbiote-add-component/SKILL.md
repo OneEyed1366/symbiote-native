@@ -58,8 +58,8 @@ user JSX (renderItem): <ProductCard/> → [framework runs it: hooks / context / 
 ```
 
 The runtime is already there (we are inside a React/Vue/Angular app), so we don't
-run the subtree — we **pass it through**. A render fn is a *generator of view from
-values*; a user subtree has nothing to generate (the user already wrote it), so a
+run the subtree — we **pass it through**. A render fn is a _generator of view from
+values_; a user subtree has nothing to generate (the user already wrote it), so a
 render fn there isn't restricted — it's absent by definition.
 
 **Three "animators" of what core describes.** The model is "core describes, the
@@ -103,12 +103,13 @@ the copies is exactly where a latent bug hides, and structural parity is what cl
 it for good.
 
 **Wrong first approximations (this took 9 passes to pin down — don't re-derive them):**
+
 - ❌ "intertwined with lifecycle" — no: the adapter can feed measurements / refs INTO a render fn as inputs.
 - ❌ "it has to crack the children box" — no: you could crack it if children were Descriptors.
 - ❌ "needs a framework runtime inside" — refined: not "needs a runtime" but "must ANIMATE a subtree vs a value".
 - ❌ "imperative channel = just scrollTo" — refined: the seam is "source of truth is native"; scrollTo is one face of it.
 - ❌ "describe effects declaratively in core" — unnecessary: the effect stays imperative in the adapter (its timing
-     is the framework's idiom); only its BRAIN (the reducer) is in core, and its result flows back as props.
+  is the framework's idiom); only its BRAIN (the reducer) is in core, and its result flows back as props.
 
 ## 1. The P0 rule — parity is structural, not copied
 
@@ -134,12 +135,12 @@ pass, split it honestly in an ADR listing exactly what is and isn't covered.
 Pure state machine. Zero framework, zero render. Unit-testable alone.
 
 ```ts
-export type ISwitchState  = { lastNativeReport: boolean | null };
+export type ISwitchState = { lastNativeReport: boolean | null };
 export type ISwitchAction = { type: 'native-reported'; value: boolean };
-export function createInitialSwitchState(): ISwitchState
-export function switchReducer(state, action): ISwitchState      // (state, action) => state
-export function valueFromChange(event: ISymbioteEvent): boolean | undefined   // pure event reader
-export function shouldSnapBack(state, fabricValue: boolean): boolean           // pure predicate
+export function createInitialSwitchState(): ISwitchState;
+export function switchReducer(state, action): ISwitchState; // (state, action) => state
+export function valueFromChange(event: ISymbioteEvent): boolean | undefined; // pure event reader
+export function shouldSnapBack(state, fabricValue: boolean): boolean; // pure predicate
 ```
 
 ### Layer 2 — View · `core/components/src/view/render-switch.ts`
@@ -250,6 +251,7 @@ the lifecycle's command name).
 ## 5. The two Vue landmines (don't skip)
 
 Any stateful Vue component that grabs the host node hits both:
+
 1. **Identity** — host node in `shallowRef`/`markRaw`, never deep `ref` (a Proxy
    breaks every imperative command).
 2. **Timing** — a native call wired at mount needs `whenCommitted`; a value-driven
@@ -284,6 +286,7 @@ installed via `file:` for the in-progress package (CLAUDE.md's
 adapter under `adapters/`, or a new third-party wrapper under `packages/`),
 two release-related steps are now mandatory immediately after scaffolding,
 before any further feature work — not deferred until release time:
+
 1. The package starts at version `0.0.0`, even with placeholder content and
    no real README yet.
 2. Run `pnpm run trust:publishers <short-name>` right away — do the one-time,
@@ -319,6 +322,7 @@ framework-specific bridge quirk) still needs that adapter on device.
 
 **Enriched-machine extraction conventions (learned across the three instances).**
 When you extract a stateful effect machine into core:
+
 - Inject the clock and scheduler (`now: () => number`, `schedule: (cb, ms) => cancel`)
   so the machine is unit-testable with a fake clock AND timer globals stay out of
   `@symbiote-native/components` (mirrors Pressable's `host.schedule`).
@@ -335,6 +339,127 @@ When you extract a stateful effect machine into core:
 Adding a component to a brand-new adapter that has no renderer yet? Do
 `symbiote-new-adapter` first. Touching the engine API in the process?
 `symbiote-engine-core`.
+
+## 6b. The three tiers — decide this BEFORE writing the component (2026-08-23)
+
+Every compiled framework we target (Vue, Svelte, Solid, Angular) optimizes ELEMENT subtrees and
+stops at a COMPONENT boundary. React is the lone exception — it does no build-time analysis, so
+host and composite are both just fibers, which is why it gained nothing from lowering and sits
+nearest stock. For the other four, declaring a primitive a component is the single most expensive
+decision in this whole workflow, and it is made before a line is written.
+
+```
+§why_a_component_boundary_costs := {
+  root: "an element's NAME IS ITS OUTPUT; a component's name is a function whose output is
+    unknown until called",
+  consequences: [
+    "children must be a CLOSURE (slots / snippet / props.children) — only the component knows
+     where they go, or whether they are used at all",
+    "static props cannot be hoisted — nobody knows which props it reads",
+    "no patch flags, no block participation, no template clone",
+    "plus, at mount, the instance itself",
+  ],
+  vue_codegen_proof: "compile `<View class=\'row\' :id=\'x\'><Text class=\'lbl\'>{{x}}</Text></View>`
+    twice through @vue/compiler-dom. As components: resolveComponent x2, children as
+    slots-obj + withCtx closure, ZERO _hoisted_*. As intrinsic tags: tag string is the answer,
+    children a plain array, _hoisted_1 = ['id'] and _hoisted_2 = {class:'lbl'} created once per
+    MODULE. ~9 allocations per row vs ~3",
+  per_framework_currency: {
+    vue: "createComponentInstance + initProps + initSlots + setupRenderEffect + props Proxy",
+    solid: "createComponent + a props Proxy (traps measured at 16.2% of a 4 000-row create,
+      splitProps another 6.1%)",
+    svelte: "anchor nodes — 12 per row for 6 instances; the boundary itself is free, the
+      {@render children} snippet and {#if} are not. So on Svelte 'drop the children snippet' is
+      NOT sufficient for a tier-2 promotion: Pressable's own `{#if ripple}{:else}` is 2 of its 3
+      anchors, and that branch has to move into the engine too, not just the lifecycle. Measured
+      per construct in svelte-adapter-dom-shim §33",
+    angular: "an LView + a host anchor + change-detection registration; composed 12 nodes/row
+      = 942.9 ms vs flat 9 = 418.2, i.e. 1.7x PER NODE on top of the extra nodes",
+  },
+  price_derived: "lowering removed 4 instances/row. Vue Create 397.4 -> 296.7 = 100.7 ms /
+    4 000 instances = ~25 us each; Solid 337.9 -> 284.7 = 53.2 ms / 4 000 = ~13 us. A DERIVATION,
+    never quote it as a measurement",
+  why_the_two_disagree_and_why_that_is_REASSURING: "Solid's compiler emits neither static hoisting
+    nor patch flags — there is nothing to emit — so 13 us is the wrapper alone, while Vue's 25 us
+    carries bonuses that rode in on the same change. Two very different runtimes landing within 2x,
+    by DIFFERENT mechanisms (Vue: createComponentInstance + initProps + initSlots +
+    setupRenderEffect; Solid: no instance at all, a props Proxy plus splitProps + withStableKeys +
+    mergeProps + spread in the body) is the thesis holding: the cost tracks OPACITY, not the
+    runtime. Use 10-25 us as the band and the low end outside Vue",
+  the_band_is_PER_BODY_and_a_single_number_is_WRONG: "measured 2026-08-23, and it broke the
+    sentence above by 4x. Lowering Solid's Pressable: Create 261.2 -> 159.8 = 101.4 ms / 2 000
+    instances = ~50 us each, against the ~13 us the same adapter charges for a View/Text wrapper.
+    FABRIC 9000/8000/9 @ 32 001, VISITED 9041 and WRITES 12001 all byte-identical, window inside
+    its own +-8%, so the whole 38.8% is pass 1 and nothing structural moved. The mechanism is in
+    the BODY: Solid's Pressable is not a pass-through — splitProps over 19 names, createSignal,
+    createPressRuntime, three createMemo, a createEffect, a host object, and it renders a View
+    COMPONENT inside itself. That row shed four instances plus a machine, not two wrappers. So:
+    ~10-15 us for a PASS-THROUGH wrapper, ~25 us where the framework's compiler bonuses ride along
+    (Vue), ~50 us for a STATEFUL component. Three measured points, and the number tracks what is
+    in the body — quoting one figure for 'a component instance' is the error this entry records.
+    Consequence: Solid Create 0.86x and Append 0.60x against stock, the first adapter to beat
+    stock React Native on a create-shaped row",
+  and_the_gate_cost_settled_itself: "the host-behavior registry turns on a Map.get per
+    createElement and a WeakSet.has per insert once ANY behavior registers — headless put that at
+    ~0.08 ms per 9 002 nodes and a peer's interleaved headless arms could not resolve it at all
+    (within-arm spread larger than between-arm). On device it is 0.08 against a 101 ms win, i.e.
+    invisible. Do not re-litigate it; do not ship registration separately to 'measure the cost'",
+  DOES_NOT_GENERALISE: "'therefore the whole residual deficit vs stock IS instances' is a VUE-ONLY
+    step, and stays one. Both rows carry the same 3 instances (the app's row component + 2
+    Pressable). Vue: 255 - 2x25 = ~205 vs stock ~190, i.e. it closes. On Solid it is simply NOT
+    VERIFIED — do not carry a residual number for it, and specifically do not repeat the ~70 ms
+    an earlier draft of this section claimed",
+  why_no_solid_number: "when Solid's column was taken, the adapter examples did NOT stand on one
+    engine build — styleParts / prototype graft / rewritten fabricProps were present in vue-sfc
+    and svelte, partial in vue-tsx, ABSENT in react/solid/angular, while all six reported version
+    0.3.0. Those three are worth ~42 ms on Vue's Create and the largest (~22 ms, the public
+    instance graft) is recorded as fixing Solid and Svelte too. RESOLVED 2026-08-23 16:37 — all
+    six examples reinstalled and now carry the three. The finding is spent; the RULE it produced
+    is not: a version string cannot tell you which engine an example is on, only a grep of
+    node_modules/@symbiote-native/engine/build/{node,fabric-props}.js can. Re-check before quoting
+    any cross-column ratio",
+}
+§the_three_tiers := {
+  criterion: "NOT 'does this thing have state'. It is 'does the FRAMEWORK need to SEE the state'.
+    A machine can live anywhere; what forces a component is a value the TEMPLATE reads",
+  tier_1_markup: "no state at all -> intrinsic tag. View, Text, Image, SafeAreaView,
+    InputAccessoryView. View/Text are done (the three lowering rules)",
+  tier_2_state_the_template_never_reads: "-> intrinsic tag + engine-owned behavior. Switch,
+    TextInput, ScrollView (onScroll is a CALLBACK, not a render input; Switch/TextInput are
+    CONTROLLED — value in as a prop, change out as an event). This is the browser's <input> /
+    <button> / <select> tier, and it is where all the unclaimed win is. symbiote-switch,
+    symbiote-text-input and symbiote-scroll-view ALREADY EXIST as engine tags — the wrapper
+    component survives only to host the lifecycle, so the work is moving lifecycle DOWN, not
+    inventing a primitive",
+  tier_3_output_shape_decided_in_JS: "-> component, permanently. FlatList / VirtualizedList
+    (the window IS the output), {#if}, a render prop, and children-as-a-function",
+  ⟶ "before writing a component, place it in a tier. Tier 3 is honest and irreducible; a tier-1
+     or tier-2 thing shipped as a component is the mistake this section exists to stop",
+}
+§pressable_is_the_worked_example := {
+  looks_like: "tier 3 — it runs a press state machine",
+  actually: "tier 2 in the common case. The machine (createPressHandlers / createPressRuntime,
+    already framework-agnostic in @symbiote-native/components) can live on the engine node. The
+    ONLY thing forcing a component is that `pressed` reaches the template — via v-slot={pressed}
+    or the function form of `style`, both visible to the SFC compiler",
+  browser_analogue: "`:active`. Press state that never crosses into JS at all — which is exactly
+    why a web <button onclick> costs zero and our Pressable does not",
+  open: "can pressed-state resolve declaratively through the CSS pipeline, under the framework
+    rather than above it? UNBUILT. There is no symbiote-pressable tag today; Pressable renders
+    symbiote-view and keeps the machine in the component",
+  got_cheaper_2026_08_23: "if pressed ever becomes a CLASS toggle resolved by the style registry,
+    the unpressed rows now cost zero writes rather than a thousand dirty nodes — `isAlreadyPublished`
+    in core/engine/src/node.ts makes pushClassStyle return early when the style array it would
+    publish equals the one standing. Measured on Solid: Select 1 001 writes -> 2, window
+    10.3 -> 1.0 ms, FABRIC byte-identical. The declarative path for pressed is now gated on the
+    COMPILER only, not also on the cost of toggling",
+  why_NOT_native: "wrong boundary. (A) framework<->us is component-vs-element and is where we
+    lose; (B) JS<->native is ~1.5 us per JSI crossing. Fixing A means moving BELOW the framework,
+    and the engine already is below it. On a 1 000-row create the press machine never executes
+    once — it is only DECLARED. Native buys touch latency and per-frame animation, neither of
+    which is a row we lose",
+}
+```
 
 ## 7. React Compiler compatibility (React adapter only, 2026-07)
 

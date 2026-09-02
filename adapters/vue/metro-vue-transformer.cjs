@@ -11,8 +11,21 @@
 // babelTransformerPath at it.
 
 const nodeFs = require('fs');
-const { parse, compileScript, registerTS } = require('@vue/compiler-sfc');
-const { createCompoundExpression } = require('@vue/compiler-core');
+const {
+  parse,
+  parseCache,
+  compileScript,
+  registerTS,
+  // Babel's own parser, re-exported. Using it costs no new dependency, which matters: @babel/parser
+  // does not resolve from this package under pnpm's isolated layout, and the alternative — adding
+  // @babel/{parser,types,generator} to a PUBLISHED adapter — would also force every example through
+  // a full reinstall, because the overlay's folder swap cannot install a new dependency.
+  babelParse,
+} = require('@vue/compiler-sfc');
+const {
+  createCompoundExpression,
+  createSimpleExpression,
+} = require('@vue/compiler-core');
 
 // A bare-specifier type import (`import type { X } from '@symbiote-native/navigation/vue'`) needs
 // real node_modules resolution to turn the specifier into a file path - compileScript's own `fs`
@@ -109,6 +122,300 @@ function createScopeClassNodeTransform(renames) {
   };
 }
 
+// Which primitives lower, and to which tag, comes from the SHARED SPEC — this file used to keep
+// its own copy of the map, one of four, and the copies had already drifted apart (Vue folded
+// `id` -> `nativeID` on neither tag while Solid did both and Svelte did one).
+//
+// Only the `intrinsic` field is read here. `aliases` deliberately is NOT: Vue applies that fold at
+// RUNTIME in `src/renderer/index.ts`'s patchProp, because Vue reaches a node by four paths and
+// compile time covers only two of them. The spec says so at its `aliases` declaration; a transform
+// does not own a fold just because the spec describes it.
+//
+// WHY lower at all, measured 2026-08-23: Vue charges a full component instance
+// (createComponentInstance + initProps + initSlots + setupRenderEffect) for a functional component
+// too, and our benchmark row is 7 instances (Row + View + 3 Text + 2 Pressable) where React pays 7
+// far cheaper fibers. That is the whole reason Vue is level with React on the web (a <div> is an
+// element) and 1.8x behind here. Same 36 001-node tree with View/Text lowered: 138.0 -> 118.5 ms,
+// 14.1%. It also lets Vue hoist static props out of the render fn and emit patch flags, neither of
+// which a component gets.
+const {
+  HOST_PRIMITIVES,
+} = require('@symbiote-native/components/host-primitives');
+
+
+const LOWERABLE_HOST_PRIMITIVES = new Map(
+  Object.entries(HOST_PRIMITIVES).map(([name, spec]) => [
+    name,
+    {
+      intrinsic: spec.intrinsic,
+      observesState: spec.observesState === true,
+      intrinsicWhen: spec.intrinsicWhen,
+    },
+  ]),
+);
+
+// Lower ONLY a name this file actually imported from us. Matching on the bare tag would silently
+// rewrite an app's own <View>, and the failure would be invisible: the app's component never
+// renders and the intrinsic paints an empty box. Alias-aware, so `import { View as RNView }`
+// lowers RNView and leaves View alone.
+const SYMBIOTE_VUE_IMPORT =
+  /import\s*\{([^}]*)\}\s*from\s*['"]@symbiote-native\/vue['"]/g;
+
+function lowerableTagsIn(descriptor) {
+  const source =
+    (descriptor.scriptSetup?.content ?? '') +
+    (descriptor.script?.content ?? '');
+  const tags = new Map();
+  for (const match of source.matchAll(SYMBIOTE_VUE_IMPORT)) {
+    for (const clause of match[1].split(',')) {
+      const [imported, local] = clause.trim().split(/\s+as\s+/);
+      const entry = LOWERABLE_HOST_PRIMITIVES.get(imported);
+      if (entry !== undefined) tags.set(local ?? imported, entry);
+    }
+  }
+  return tags;
+}
+
+// A primitive that OWNS STATE (Pressable's pressed) can only lower when the template does not read
+// that state — an element has no instance to read it from, so the machine moves to the engine node
+// and there is nothing left to hand a template. Two authoring shapes ask for it, and both are
+// visible here:
+//
+//   :style="fnStyle"                     the style is a function of press state
+//   v-slot="{ pressed }" / #default=…    the children are a function of press state
+//
+// REFUSING IS ALWAYS SAFE and under-refusing never is: a refused element keeps today's behaviour
+// and merely misses the win, while a wrongly-lowered one is a button that stops responding
+// visually, on device, with every test green. Every judgement below therefore defaults to refusing
+// whenever it cannot PROVE the safe case.
+//
+// The one thing that can be proven is an object literal. `:style="{ borderColor: c }"` provably is
+// not a function; `:style="anything else"` cannot be told apart from one at compile time, because
+// the compiler sees an expression, never its value. That asymmetry is also what makes the
+// ActionButton migration work: move `opacity` into `.action-button:active` and what remains is an
+// object literal, so the same button lowers without the transform learning anything new.
+function refusesLowering(node) {
+  for (const prop of node.props) {
+    // REFUSAL_CATEGORIES.instanceBoundDirective, and it is checked before the directive filter
+    // because `ref="x"` is a plain ATTRIBUTE while `:ref="x"` is a directive. `ref` on a component
+    // yields the component instance and on an element the host node, so lowering silently changes
+    // what the app receives. Found by the shared verdict table, not by a Vue test.
+    if (prop.type === 6 /* ATTRIBUTE */ && prop.name === 'ref') return true;
+    if (prop.type !== 7 /* NodeTypes.DIRECTIVE */) continue;
+    if (prop.name === 'bind' && prop.arg?.content === 'ref') return true;
+
+    // `v-bind="obj"` — a whole attribute set this pass cannot enumerate, so it may be hiding a
+    // functional `style`. REFUSAL_CATEGORIES.unreadableAttributeSet.
+    if (prop.name === 'bind' && !prop.arg) return true;
+
+    // REFUSAL_CATEGORIES.stateInTemplate no longer fires on a `style`: every shape is covered, by
+    // an inert passthrough, a direct call, or the runtime helper. The one thing still unreachable
+    // is an expression whose source text cannot be reconstructed at all, which cannot occur in a
+    // file that compiles — `styleEmissionKind` returning undefined keeps the component if it does.
+    if (
+      prop.name === 'bind' &&
+      prop.arg?.content === 'style' &&
+      !isInertValueExpression(prop.exp) &&
+      styleEmissionKind(prop.exp) === undefined
+    )
+      return true;
+
+    // `v-slot="{ pressed }"` on the element itself. REFUSAL_CATEGORIES.renderPropChild.
+    if (prop.name === 'slot' && prop.exp) return true;
+  }
+
+  // ANY `<template>` child, with or without a slot argument — not only the `#default="{ pressed }"`
+  // form this rule was written for. Measured through the real compileSfc: lowering an element that
+  // has one makes codegen throw `Codegen node is missing for element/if/for node`, because the
+  // element path never builds a codegen node for a child the slot path owns. Loud rather than
+  // silent, but still a build failure in an app that writes a perfectly ordinary template, so it
+  // refuses here. This is the one place the spec's "zero-arity is not a refusal" carve-out does
+  // NOT apply: it is about a JSX function child, and an SFC `<template>` child cannot be lowered
+  // at all.
+  return node.children.some(
+    child =>
+      child.type === 1 /* ELEMENT */ && child.tagType === 3 /* TEMPLATE */,
+  );
+}
+
+// An ALLOW-LIST, never a hunt for a function literal, and the shared spec pins all five transforms
+// to this side of it (`REFUSAL_CATEGORIES.stateInTemplate`). `:style="styleFn"` is an identifier at
+// compile time and NO transform can tell whether it holds an object or a function, so only
+// provably inert value shapes lower — object, array, string/number literal, template literal — and
+// everything else refuses. A narrow "refuse a function literal" reading passes every obvious test
+// and fails on the one call site that hoists its style into a variable, which is exactly what
+// ActionButton does.
+//
+// Which AST node carries the source is NOT what intuition says, and the probe that established it
+// is why this reads both shapes. `transformExpression` runs before this pass and rewrites every
+// setup binding, so `:style="{ borderColor: c }"` arrives as a COMPOUND (type 8) with children
+// `['{ borderColor: ', '$setup.c', ' }']`, while the dangerous `:style="fnStyle"` arrives SIMPLE
+// (type 4) as `'$setup.fnStyle'`. Testing `type === 4` alone therefore refuses exactly the shape it
+// should allow — the first version of this did that, and the probe caught it before any test ran.
+// An object literal with nothing to rewrite (`{ borderColor: 1 }`) stays SIMPLE, so both matter.
+const INERT_VALUE_HEAD = /^[{['"`\d]/;
+
+function isInertValueExpression(exp) {
+  const head = leadingSource(exp);
+  return head !== undefined && INERT_VALUE_HEAD.test(head.trimStart());
+}
+
+// The literal source text the expression opens with. An arrow never opens with one of the
+// characters above — it opens with `(` or its parameter name — so reading only the head is sound.
+function leadingSource(exp) {
+  if (exp?.type === 4 /* SIMPLE_EXPRESSION */) return exp.content;
+  if (exp?.type !== 8 /* COMPOUND_EXPRESSION */) return undefined;
+  const head = exp.children?.[0];
+  return typeof head === 'string' ? head : undefined;
+}
+
+// The FINAL source text of a template expression — what codegen would have emitted. Not
+// `exp.loc.source`, which is the text the AUTHOR wrote: `transformExpression` runs before this pass
+// and rewrites every setup binding, so `loc.source` still says `color` where the compiled render fn
+// must say what the compound's children say. Reading the children is therefore the only correct
+// reconstruction, and re-emitting it verbatim is what keeps the rewrite intact.
+function expressionSource(exp) {
+  if (exp === undefined || exp === null) return undefined;
+  if (exp.type === 4 /* SIMPLE_EXPRESSION */) return exp.content;
+  if (exp.type !== 8 /* COMPOUND_EXPRESSION */) return undefined;
+  let source = '';
+  for (const child of exp.children) {
+    if (typeof child === 'string') {
+      source += child;
+      continue;
+    }
+    const nested = expressionSource(child);
+    if (nested === undefined) return undefined;
+    source += nested;
+  }
+  return source;
+}
+
+// HOW the pair is emitted, never WHETHER the element lowers — every shape lowers. Classified off a
+// real Babel AST so this path and the JSX path cannot drift by reading the same text differently.
+//
+//   literal    (EXPR)({ pressed: false })                      two closures, no read hazard
+//   reference  typeof (E) === 'function' ? (E)({…}) : (E)      E printed twice, but it is a read
+//   opaque     v-bind="__helper(EXPR)"                          EXPR printed ONCE — required
+//
+// The third bucket is `REFUSAL_CATEGORIES.emitStyleExpressionOnce`: `getStyle()`, `bag[i]` and
+// `flag ? a : b` change meaning when printed twice. It is not the default because a spread is the
+// only Vue form yielding two props from one evaluation, and a spread costs the element its patch
+// flag — measured on the real compileSfc, `12 /* STYLE, PROPS */` becomes `16 /* FULL_PROPS */`
+// plus a mergeProps on every render. Paid only where a repeated read would actually be wrong.
+function styleEmissionKind(exp) {
+  const source = expressionSource(exp);
+  if (source === undefined) return undefined;
+  let expression;
+  try {
+    // Wrapped in parens so a bare object or an arrow parses as an EXPRESSION rather than a block.
+    // `typescript` because a template in a lang="ts" SFC may carry an annotation on the callback's
+    // parameter — which is exactly how the real call sites are written.
+    const file = babelParse(`(${source})`, { plugins: ['typescript'] });
+    expression = file.program.body[0]?.expression;
+  } catch {
+    // An expression this parser cannot read is one we cannot classify, so it keeps the component.
+    return undefined;
+  }
+  if (expression === undefined) return undefined;
+  if (
+    expression.type === 'ArrowFunctionExpression' ||
+    expression.type === 'FunctionExpression'
+  )
+    return 'literal';
+  return isCheapReferenceNode(expression) ? 'reference' : 'opaque';
+}
+
+function isCheapReferenceNode(node) {
+  if (node.type === 'Identifier') return true;
+  return (
+    node.type === 'MemberExpression' &&
+    !node.computed &&
+    node.property.type === 'Identifier' &&
+    isCheapReferenceNode(node.object)
+  );
+}
+
+
+// The parser has already decided `<View>` is a COMPONENT (capitalized, and a <script setup>
+// binding), so renaming the tag is not enough — isCustomElement is consulted for the ORIGINAL tag
+// and tagType must be flipped in the same pass, before transformElement's exit hook turns the
+// children into withCtx slots. Get either half wrong and codegen emits a component whose children
+// are slots the element path never mounts: a silently empty subtree, which is how the first
+// attempt at this read.
+// REFUSAL_CATEGORIES.dynamicIntrinsicChoice — the SFC twin of babel-lower-host-primitives.cjs's
+// `intrinsicWhenFor`, same rule over a different AST. A primitive whose spec entry carries
+// `intrinsicWhen` selects between TWO Fabric views by one prop's value, and this pass prints a
+// static tag, so it can choose only from a compile-time literal.
+//
+// Why it refuses harder than the value categories do: an unreadable VALUE lands a prop wrong and a
+// later write can still correct it; the wrong choice here commits the wrong native view, which no
+// prop write can move a node between.
+//
+// `multiline="true"` — a static STRING attribute — deliberately does not resolve, even though the
+// component treats it as truthy. `multiline="false"` is truthy too, which is exactly where author
+// intent and runtime behaviour part company; refusing costs the optimisation, guessing costs the
+// view.
+//
+// Returns the tag to emit, or undefined to refuse.
+function intrinsicWhenFor(node, entry) {
+  const choice = entry.intrinsicWhen;
+  if (choice === undefined) return entry.intrinsic;
+
+  let resolved = false;
+  for (const prop of node.props) {
+    // `v-bind="obj"` may carry the selector prop and cannot be enumerated, so it is indistinguish-
+    // able from the prop being absent — refuse rather than default to the single-line view.
+    if (prop.type === 7 /* DIRECTIVE */ && prop.name === 'bind' && !prop.arg)
+      return undefined;
+
+    if (prop.type === 6 /* ATTRIBUTE */ && prop.name === choice.prop) {
+      // A bare `multiline` carries no value, which is the template spelling of `true`. Anything
+      // else on a plain attribute is a string.
+      if (prop.value === undefined) {
+        resolved = true;
+        continue;
+      }
+      return undefined;
+    }
+
+    if (prop.type !== 7 /* DIRECTIVE */) continue;
+    if (prop.name !== 'bind' || prop.arg?.content !== choice.prop) continue;
+    const source = expressionSource(prop.exp)?.trim();
+    if (source !== 'true' && source !== 'false') return undefined;
+    resolved = source === 'true';
+  }
+
+  return resolved ? choice.intrinsic : entry.intrinsic;
+}
+
+function createHostPrimitiveLowering(tags) {
+  return function lowerHostPrimitive(node) {
+    if (node.type !== 1 /* NodeTypes.ELEMENT */) return;
+    const entry = tags.get(node.tag);
+    if (entry === undefined) return;
+    // Resolved BEFORE the state refusal and OUTSIDE its `observesState` gate — the two guard
+    // different things, and this one applies to a primitive that owns no state. Folding it into
+    // refusesLowering would put it behind that flag, where it would never run for TextInput.
+    const intrinsic = intrinsicWhenFor(node, entry);
+    if (intrinsic === undefined) return;
+    if (entry.observesState && refusesLowering(node)) return;
+    // NO state-style expansion, deliberately. A functional `style` reaches `routeProp` untouched
+    // and the engine resolves it at both values of `pressed` (`isStyleCallback`), so rewriting the
+    // attribute into a resting/active pair here would be this transform carrying BEHAVIOUR — what
+    // `tests/lowering-transform-carries-no-behaviour.test.ts` exists to keep out.
+    //
+    // Removing it is also FASTER, which was not the expectation going in. The split emitted TWO
+    // props per element and Vue hoists neither — the compiled output builds and invokes the
+    // callback twice and allocates two style objects, per element per render. Measured headless
+    // through the real compileSfc on 1 000 styled nodes: 5.2/5.1 ms with the split against
+    // 4.6/4.5 ms without, with createNode 3002, appendChild 3000, VISITED 3003 and WRITES 4000
+    // byte-identical in every arm.
+    node.tag = intrinsic;
+    node.tagType = 0; /* ElementTypes.ELEMENT */
+  };
+}
+
 // A short, stable id per file, used as the SFC scope id regardless of whether the file has
 // scoped styles - built on css-parser's shared hashFilePath so the algorithm isn't duplicated
 // against the standalone .module.css compiler's identical need.
@@ -177,6 +484,23 @@ async function compileStyleBlockContent(style, filename) {
 }
 
 async function compileSfc(src, filename) {
+  // `parse` memoizes its descriptor on (source, filename) in a module-global LRU, and the node
+  // transforms below MUTATE that descriptor's template AST in place — the lowering one rewrites
+  // `node.tag`/`node.tagType`, the scope-class one replaces `prop.exp`. Handing the same object to
+  // a second compile therefore walks a half-transformed tree and generation dies with `Codegen
+  // node is missing for element/if/for node`.
+  //
+  // Metro compiles each file once per build, so the cache buys this caller nothing; the only place
+  // it was ever exercised is css-parser's golden-corpus determinism check, which compiles one
+  // source twice on purpose. That is the ONLY test anywhere that can see this, which is why a
+  // transform bug surfaced as a failure in another package's corpus.
+  //
+  // `clear()` rather than deleting our one key: the key is `source + JSON.stringify(options)`
+  // (`@vue/shared`'s genCacheKey), so reproducing it here would couple this file to an internal
+  // format across every Vue bump. Clearing a pure memo is always safe — the only cost is a
+  // re-parse, which is what we need anyway.
+
+  parseCache.clear();
   const { descriptor, errors } = parse(src, { filename });
   if (errors && errors.length > 0) {
     throw new Error(
@@ -243,13 +567,49 @@ async function compileSfc(src, filename) {
     }
   }
 
-  // Skipped entirely (not even passed to the compiler) when nothing in this file is scoped, so
-  // a .vue with only unscoped/no styles compiles with zero added runtime cost.
+  // Scoped-class rewriting is skipped entirely (not even passed to the compiler) when nothing in
+  // this file is scoped, so a .vue with only unscoped/no styles adds no runtime cost. Host-
+  // primitive lowering is independent of it and applies whenever the file imports one.
+  const lowerableTags = lowerableTagsIn(descriptor);
+  const nodeTransforms = [];
+  if (lowerableTags.size > 0)
+    nodeTransforms.push(
+      createHostPrimitiveLowering(lowerableTags),
+    );
+  if (scopedClassNames.size > 0)
+    nodeTransforms.push(createScopeClassNodeTransform(scopedClassNames));
+  // `.values()` yields the SPEC ENTRIES, so this must map to `.intrinsic` — a Set of entry objects
+  // makes `loweredTags.has('symbiote-pressable')` permanently false, and the failure is not the
+  // obvious one. Pass 1 rewrites the tag and forces tagType, so the file compiles; `@vue/compiler-
+  // sfc` then caches the descriptor by (source, filename) and pass 2 walks the ALREADY-REWRITTEN
+  // AST, where neither `lowerableTags` nor a broken `loweredTags` recognises `symbiote-pressable`.
+  // The node is then an unknown component with no codegen node and generation throws
+  // `Codegen node is missing for element/if/for node` — in the only test anywhere that compiles one
+  // source twice, which is css-parser's golden-corpus determinism check, i.e. nowhere near here.
+  // BOTH tags a spec entry can emit, not just its default — a primitive with an `intrinsicWhen`
+  // has a second intrinsic, and the paragraph above is about exactly what happens to a tag missing
+  // from this set.
+  //
+  // HONEST STATUS: extending the guard to the second tag is UNWITNESSED. Removing it leaves every
+  // test in the repo green, including a case built specifically to catch it by compiling one source
+  // twice. The failure needs pass 2 to walk a rewritten AST, and the only place that happens is
+  // css-parser's golden-corpus determinism check — which will not reach this until a corpus file
+  // renders a multiline TextInput. Kept because the hazard it extends is documented and cost a real
+  // failure once; not kept because a test proves it.
+  const loweredTags = new Set(
+    [...lowerableTags.values()].flatMap(entry =>
+      entry.intrinsicWhen === undefined
+        ? [entry.intrinsic]
+        : [entry.intrinsic, entry.intrinsicWhen.intrinsic],
+    ),
+  );
   const templateOptions =
-    scopedClassNames.size > 0
+    nodeTransforms.length > 0
       ? {
           compilerOptions: {
-            nodeTransforms: [createScopeClassNodeTransform(scopedClassNames)],
+            nodeTransforms,
+            isCustomElement: tag =>
+              lowerableTags.has(tag) || loweredTags.has(tag),
           },
         }
       : undefined;
@@ -303,7 +663,7 @@ async function compileSfc(src, filename) {
     preamble.push(`const ${bindingName} = ${JSON.stringify(classMap)};`);
   }
 
-  const parts = [...preamble, code];
+  const parts = [preamble.join('\n'), code];
   if (hasCssModules) {
     const bindings = [...cssModuleBindings.keys()]
       .map(name => `${JSON.stringify(name)}: ${name}`)

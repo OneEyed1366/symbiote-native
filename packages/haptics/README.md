@@ -6,7 +6,7 @@ Taptic Engine and Android's Vibrator API, plus a direct Android haptics-engine p
 (`performAndroidHapticsAsync`). Built the same way as
 [`@symbiote-native/local-auth`](../local-auth): an `expo-modules-core`-based wrapper, free
 functions with no per-instance state and no event stream. Reachable from every adapter — React,
-Vue, Angular — not just React.
+Vue, Svelte, Solid, Angular — not just React.
 
 ## Install
 
@@ -51,9 +51,10 @@ src/angular/  @symbiote-native/haptics/angular — plain re-export of core.
 ```
 
 Upstream ships four async functions and three enums, not a subscribable sensor — there's
-nothing per-framework to add, so `./react`, `./vue`, and `./svelte` are `exports`-map aliases
-straight onto `src/core/` (no physical per-framework file). `./angular` stays a physical
-file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
+nothing per-framework to add, so `./react`, `./vue`, `./svelte`, and `./solid` are
+`exports`-map aliases straight onto `src/core/` (no physical per-framework file). `./angular`
+stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build
+(`build-ngc/`).
 
 ## Use it
 
@@ -105,6 +106,56 @@ function fireImpact(style: ImpactFeedbackStyle): void {
     :onPress="() => fireImpact(ImpactFeedbackStyle.Medium)"
   />
 </template>
+```
+
+```svelte
+<!-- Svelte — examples/expo-svelte/screens/HapticsScreen.svelte -->
+<script lang="ts">
+  import {
+    impactAsync,
+    ImpactFeedbackStyle,
+    notificationAsync,
+    NotificationFeedbackType,
+    selectionAsync,
+  } from '@symbiote-native/haptics';
+</script>
+
+<ActionButton
+  title="Medium"
+  onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}
+/>
+<ActionButton
+  title="Success"
+  onPress={() => notificationAsync(NotificationFeedbackType.Success)}
+/>
+<ActionButton title="Selection" onPress={() => selectionAsync()} />
+```
+
+```tsx
+// Solid — examples/expo-solid/screens/HapticsScreen.tsx
+import {
+  impactAsync,
+  ImpactFeedbackStyle,
+  notificationAsync,
+  NotificationFeedbackType,
+  selectionAsync,
+} from '@symbiote-native/haptics';
+
+function HapticsScreen() {
+  return (
+    <>
+      <ActionButton
+        title="Medium"
+        onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}
+      />
+      <ActionButton
+        title="Success"
+        onPress={() => notificationAsync(NotificationFeedbackType.Success)}
+      />
+      <ActionButton title="Selection" onPress={() => selectionAsync()} />
+    </>
+  );
+}
 ```
 
 ```ts
@@ -162,6 +213,8 @@ import { impactAsync, ImpactFeedbackStyle } from '@symbiote-native/haptics';
 // or the framework-scoped entry points — identical surface, re-exported verbatim:
 import { impactAsync } from '@symbiote-native/haptics/react';
 import { impactAsync } from '@symbiote-native/haptics/vue';
+import { impactAsync } from '@symbiote-native/haptics/svelte';
+import { impactAsync } from '@symbiote-native/haptics/solid';
 import { impactAsync } from '@symbiote-native/haptics/angular';
 ```
 
@@ -173,8 +226,9 @@ Tests exercise the JS layer via a fake native module in place of the real
 ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md)).
 
-Native wiring for this package is done across all four `examples/expo-*` canary apps (Android
+Native wiring for this package is done across all six `examples/expo-*` canary apps (Android
 3-layer registration in each app's `build.gradle`/`MainApplication.kt`/`AndroidManifest.xml`,
 plus iOS Podfile/pod install) — not yet ported into the plain, non-Expo public canaries
-(`examples/react`, `examples/vue-sfc`, `examples/vue-tsx`, `examples/angular`), and no
-on-device/simulator automated (Detox) smoke test exists yet, only manual verification.
+(`examples/react`, `examples/vue-sfc`, `examples/vue-tsx`, `examples/svelte`, `examples/solid`,
+`examples/angular`), and no on-device/simulator automated (Detox) smoke test exists yet, only
+manual verification.
