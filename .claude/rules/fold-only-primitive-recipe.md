@@ -104,24 +104,33 @@ unknown>` into the typed view and calls `mapImageProps` — the `stringOf` / `bo
 `IHostBehavior` and are deliberately empty; write them out rather than sharing a `noop`, so the
 emptiness reads as a decision.
 
-## 4. THE TAG QUESTION, and it has two answers — decide it with a test, not a precedent
+## 4. THE TAG QUESTION — and there is only ONE tag. Never mint a second
 
 A behavior's fold is keyed on the tag, and `fabricProps` warns why that matters: a wrapper and its
 lowered twin share the component name, so a fold registered on a tag the wrapper also emits runs on
-ALREADY-FOLDED props. TextInput answered this with a `-managed` tag for the wrapper. Image does not
-need one — and the two questions that decide it are separate:
+ALREADY-FOLDED props.
+
+**A SECOND TAG IS NOT AN AVAILABLE ANSWER TO THAT.** Three exist in the tree — the TextInput pair
+and `symbiote-switch-managed` — and they are debt with a deletion date, not a technique: each one
+exists only to keep two owners apart while a wrapper and a lowered element both emit a tag, and this
+migration is removing the wrapper, which removes the second owner. Minting another buys a rename
+across every call site now and a second rename when the wrapper dies. If a fold cannot safely run
+twice, fix the FOLD or move the work into the behavior; if a machine needs a single owner, delete
+the wrapper rather than giving it a private spelling.
+
+The question that remains is therefore about the fold alone, and it is settled by a test:
 
 ```
-1. is the fold idempotent?              no  -> the wrapper needs its own `-managed` tag
-2. does the behavior carry a MACHINE?   yes -> it needs one anyway, idempotent or not
+is the fold idempotent?   no -> make it idempotent, or the primitive is not fold-only
 ```
 
-**Do not infer (1) from TextInput's split; its answer is (2).** Measured 2026-09-01 by reaching
+Measured 2026-09-01 by reaching
 `node.payloadFold` off a real `symbiote-text-input` node and running it twice: TextInput's fold IS
-idempotent — it deletes its alias-only keys and derives the rest. Its split exists because the
-behavior owns `change`/`focus`/`blur` and carries `attach` / `attachAfterCommit` / `afterCommit`,
-so sharing the tag would attach a live machine to a node whose wrapper is already running one.
-Solid's `register.ts` states the rule: one owner per node.
+idempotent — it deletes its alias-only keys and derives the rest. So the second tag it carries was
+never about the fold: the behavior owns `change`/`focus`/`blur` and carries `attach` /
+`attachAfterCommit` / `afterCommit`, and one tag would have put a live machine on a node whose
+wrapper was already running one. Solid's `register.ts` states the rule that matters: one owner per
+node — which the wrapper's deletion satisfies without any tag at all.
 
 Image's mapping is idempotent by construction — every alias it consumes (`src`, `srcSet`, `alt`,
 `width`, `height`) is absent from its own output, `source` comes back in the array shape
@@ -174,9 +183,9 @@ absent", which are the same green otherwise (`adapter-parity-audit.md` records b
 ## What Image did NOT need, and why the next three probably will not either
 
 No `ownedListeners` (it owns no event), no `attachAfterCommit` (nothing needs a Fabric tag at
-setup), no `afterCommit` (no prop-driven handshake), no `-managed` tag. If a candidate needs any of
-those, it is not fold-only and this recipe is the wrong one — ScrollView, Modal, Switch and
-RefreshControl are the four that carry state or a handle.
+setup), no `afterCommit` (no prop-driven handshake). If a candidate needs any of those, it is not
+fold-only and this recipe is the wrong one — ScrollView, Modal, Switch and RefreshControl are the
+four that carry state or a handle.
 
 ## PARKED: what to do about a primitive whose native view is inherently wrapped
 
@@ -192,9 +201,9 @@ paid here in any measurable quantity. The honest objection is uniformity, not pe
 **B. Two-tag lowering.** The transform emits the container tag and the behavior synthesizes the
 spinner child. Cost: a new engine capability — a behavior that CREATES a node — plus a new tag for
 the container (`symbiote-view` is shared, so the registry could not key on it). It also fails this
-recipe's own check (2): a child-creating behavior needs the child's props kept in step, which is a
-commit hook, which is a machine, which is what forces a `-managed` split. So option B is not a
-fold-only primitive at all; it is a new category with its own split to design.
+recipe's own check: a child-creating behavior needs the child's props kept in step, which is a
+commit hook, which is a machine. So option B is not a fold-only primitive at all; it is a new
+category, and one that puts two owners on one node while a wrapper still exists.
 
 **C. Synthesize the container in the engine's commit walk**, the way `RCTVirtualText` is resolved
 (`viewNameFor` in `core/engine/src/commit.ts` re-creates a node when its kind flips). Cost: the walk

@@ -1039,8 +1039,10 @@ compilation — so the hazard is unreachable through a table that asks transform
 addition was correct and completely unwitnessed. Fixed by asserting on the READER directly, which
 reddens 1 of 25.
 
-**So a `-managed` split owes TWO things in the same change: the row, and a reader assertion.** Ship
-only the row and the guard looks covered while nothing tests it.
+**So the general form: a hazard the transforms cannot reach owes a reader assertion, not just a
+fixture row.** Ship only the row and the guard looks covered while nothing tests it. (No further
+wrapper-private tag will be minted — see `fold-only-primitive-recipe.md` §4 — so the instance is
+closed; the shape recurs anywhere a table asks one layer about a hazard that lives in another.)
 
 One break-test caution from the same round, because it produced a confident wrong signal: pointing
 the row's `lowered` marker at the managed name throws from `markersFor` — an EARLIER guard — so the

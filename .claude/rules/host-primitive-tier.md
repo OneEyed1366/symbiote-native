@@ -571,11 +571,13 @@ machine would have read `undefined` for both and stayed inert on three of the fi
 coincidences, not a design: nothing enforces any of them, and the two that DO collide were only
 found by reading the wrapper's focus/blur handlers rather than its prop fold.
 
-The fix is a second tag resolving to the same native view — `symbiote-text-input-managed`, declared
-in `component-names/shared.ts` and both platform tables, rendered by `render-text-input.ts` and by
-Angular's hand-written template. The plain name belongs to the LOWERED path because that is the end
-state: when the wrappers stop owning the state, the `-managed` pair is deleted and nothing else
-moves.
+What was done at the time was a second tag resolving to the same native view — declared in
+`component-names/shared.ts` and both platform tables, rendered by `render-text-input.ts` and by
+Angular's hand-written template. **Do not reach for that again.** It buys a rename across every call
+site now and a second rename when the wrapper dies, and the wrapper's deletion is what this
+migration is for — it removes the second owner outright, which is the only thing the extra tag was
+protecting. Three such tags exist (the TextInput pair and Switch's) and they are debt with a
+deletion date, not a technique. Where two owners collide, delete the wrapper.
 
 Three consequences worth carrying:
 
@@ -746,7 +748,7 @@ primitive silently drops a node and changes layout — an optimisation moving th
 Both escapes were priced (2026-09-01) and both cost more than a spinner is worth:
 
 ```
-a behavior that CREATES a node   needs a commit hook -> a machine -> a `-managed` split.
+a behavior that CREATES a node   needs a commit hook -> a machine -> two owners on one tag.
                                  A new category, not a fold.
 the container in the commit walk NOT the RCTVirtualText precedent it resembles. `viewNameFor`
                                  changes what one node IS and never ADDS one; adding one makes the
