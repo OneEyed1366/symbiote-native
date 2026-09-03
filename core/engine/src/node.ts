@@ -184,6 +184,31 @@ export interface ISymbioteNode {
   // ENGINE-OWNED. An adapter reads and writes style through routeProp, never through this field.
   styleParts: IClassStyleParts | undefined;
 
+  // Where this node's APP children go, when the node owns an internal subtree of its own.
+  //
+  // A host primitive that is a COMPOSITION — ScrollView is a scroll view wrapping a content view —
+  // has structure the app never wrote and must never see. In a component that structure lives in
+  // the wrapper's body, which is exactly the per-instance cost lowering exists to delete; on the
+  // host path the behavior builds it once at attach (`IHostBehavior.buildStructure`) and points
+  // this at the node the app's own children belong under. `appendChild` / `insertBefore` /
+  // `removeChild` then redirect, so the adapter keeps calling them with the OWNER and never learns
+  // that a slot exists. The browser's twin is a UA shadow tree: `<video>`'s controls are real nodes
+  // the page cannot address, and an author's `<track>` still lands where the element decides.
+  //
+  // NOT a serialization of children, and that alternative is worth naming because it is the one
+  // that gets proposed: app children stay ordinary engine nodes, owned by the engine, and only
+  // their PARENT differs from the one the framework named. Nothing is copied, flattened or
+  // replayed.
+  //
+  // A FIELD rather than a WeakMap, for the reason `payloadFold` is one: the redirect is read on
+  // every structural op (~9 000 appends on one benchmark create), so it must not cost a hash probe
+  // to discover that almost no node has a slot. `undefined` on every node that does not.
+  //
+  // SINGLE HOP by design. A slot that itself carried a slot would make "where does this child go"
+  // a walk, on the hottest path in the engine, to express a structure no primitive has. A behavior
+  // that needs depth builds the chain and points this at the innermost node directly.
+  childHost: ISymbioteNode | undefined;
+
   // RN's ReactFabricHostComponent surface - what a template/function ref hands back and what
   // reanimated / gesture-handler / react-navigation reach through. Each resolves the node's
   // CURRENT committed handle at call time, so a clone-on-write commit between calls is
@@ -234,6 +259,7 @@ class SymbioteNode implements ISymbioteNode {
   declare committed: IMirror | undefined;
   declare styleParts: IClassStyleParts | undefined;
   declare payloadFold: IPayloadFold | undefined;
+  declare childHost: ISymbioteNode | undefined;
 
   constructor(
     component: string,
@@ -268,6 +294,10 @@ class SymbioteNode implements ISymbioteNode {
     // Assigned here for the same hidden-class reason as `hasAriaAlias` above; `attachHostBehavior`
     // overwrites it a few lines later for the rare node that has a behavior.
     this.payloadFold = undefined;
+    // Same reason again, and here it is load-bearing rather than tidy: the redirect below is read
+    // on every append, so the slot must be a stable slot on one hidden class, not a property added
+    // to a few nodes after the fact.
+    this.childHost = undefined;
   }
 
   measure(callback: IMeasureOnSuccess): void {
@@ -1069,7 +1099,26 @@ function detach(child: ISymbioteNode): void {
   child.parent = undefined;
 }
 
-export function appendChild(parent: ISymbioteNode, child: ISymbioteNode): void {
+// The one place a composed primitive's slot is honoured. See `ISymbioteNode.childHost`: the adapter
+// always names the OWNER, and a node whose behavior built an internal subtree redirects the app's
+// children into it.
+//
+// SINGLE HOP, not a loop, and the field's own comment says why — a chain would put a walk on the
+// engine's hottest path to express a depth no primitive has. A behavior needing depth points
+// `childHost` at the innermost node itself.
+//
+// Reads a field that is `undefined` on every node in every app that registers no composed
+// primitive, so the cost is one load and one branch — deliberately NOT behind `hasHostBehaviors()`,
+// which would be a second read to save nothing.
+function slotOf(parent: ISymbioteNode): ISymbioteNode {
+  return parent.childHost ?? parent;
+}
+
+export function appendChild(
+  requestedParent: ISymbioteNode,
+  child: ISymbioteNode,
+): void {
+  const parent = slotOf(requestedParent);
   // A node the sweep tore down can be put back — Svelte parks live subtrees offscreen across
   // commits. A WeakSet miss for anything freshly built, so the create path pays nothing.
   if (hasHostBehaviors()) reattachHostBehaviors(child);
@@ -1080,10 +1129,11 @@ export function appendChild(parent: ISymbioteNode, child: ISymbioteNode): void {
 }
 
 export function insertBefore(
-  parent: ISymbioteNode,
+  requestedParent: ISymbioteNode,
   child: ISymbioteNode,
   beforeChild: ISymbioteNode,
 ): void {
+  const parent = slotOf(requestedParent);
   if (hasHostBehaviors()) reattachHostBehaviors(child);
   detach(child);
   markStructureDirty(parent);
@@ -1095,7 +1145,15 @@ export function insertBefore(
 // Removal only NOMINATES a behavior for teardown; the commit sweep decides. A framework may spell
 // a move as remove-then-reinsert (Solid does), so tearing down here kills the machine of a node
 // that comes back alive in the same batch — see host-behavior.ts's markDetachCandidate.
-export function removeChild(parent: ISymbioteNode, child: ISymbioteNode): void {
+export function removeChild(
+  requestedParent: ISymbioteNode,
+  child: ISymbioteNode,
+): void {
+  // Redirected for the same reason the two inserts are: the adapter removes from the node it
+  // appended to, which is the OWNER, while the child actually lives in the slot. Without this the
+  // `indexOf` misses, the splice no-ops, and the child stays committed under the slot forever
+  // while the framework believes it is gone — a leak with nothing red anywhere.
+  const parent = slotOf(requestedParent);
   if (hasHostBehaviors()) markDetachCandidate(child);
   markStructureDirty(parent);
   const index = parent.children.indexOf(child);

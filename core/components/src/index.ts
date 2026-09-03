@@ -460,3 +460,17 @@ export {
 } from './behaviors/text-input';
 
 export { registerSwitchBehavior, SWITCH_TAG } from './behaviors/switch';
+
+// Exported as a FUNCTION, not as a side-effect module, which is what keeps it safe on a barrel:
+// Metro's inlineRequires only defers a re-export until its binding is named as a VALUE, and a
+// caller of `registerScrollViewBehavior()` names it. The shape CLAUDE.md forbids is a module whose
+// evaluation alone registers.
+//
+// NO ADAPTER CALLS IT YET, deliberately — `symbiote-scroll-view` is the tag the wrappers already
+// emit and they build their own content node, so registering globally would double-nest every
+// existing ScrollView. See the behavior's header.
+export {
+  HORIZONTAL_SCROLL_VIEW_TAG,
+  registerScrollViewBehavior,
+  SCROLL_VIEW_TAG,
+} from './behaviors/scroll-view';
