@@ -60,12 +60,14 @@ let compileCounter = 0;
 async function compileComponent(
   source: string,
   name: string,
+  dev = false,
 ): Promise<Component> {
   const result = compile(source, {
     generate: 'client',
     filename: `${name}.svelte`,
     fragments: 'tree',
     css: 'external',
+    dev,
   });
   compileCounter += 1;
   const file = join(TMP_DIR, `${name}-${String(compileCounter)}.mjs`);
@@ -206,6 +208,32 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       const serialized = fabric.serialize([fabric.appRoot()]);
       expect(serialized).toContain('RCTRawText "goodbye"');
       expect(serialized).not.toContain('hello');
+    });
+
+    it('tags the devtools owner on real compiled output when compiled with dev:true', async () => {
+      // why: element.test.ts only ever asserted resolveOwnerFromSvelteMeta against a
+      // MANUALLY-stamped `__svelte_meta`, which never caught that the shim was missing
+      // `nodeType` — Svelte's own `add_locations` (dev/elements.js) gates its element-vs-not
+      // check on `node.nodeType === ELEMENT_NODE`, so with `nodeType` undefined it silently
+      // never stamped anything on a REAL compiled+mounted tree. This drives the actual
+      // compiler + mount pipeline end to end, the only way that gap was ever going to surface.
+      const Hello = await compileComponent(
+        '<symbiote-text p={{}}>hello</symbiote-text>',
+        'OwnerHello',
+        true,
+      );
+
+      const surface = mount(ROOT_TAG, Hello);
+      await tick();
+      await tick();
+
+      // surface.children[0] is root-element.ts's synthetic flex:1 wrapper (never compiled
+      // Svelte output, so it carries no owner) — the compiled component's own root lands one
+      // level in, as that wrapper's child.
+      const [textNode] = surface.children[0]?.children ?? [];
+      expect(textNode?.owner).toEqual({
+        chain: [{ component: 'OwnerHello', file: 'OwnerHello.svelte' }],
+      });
     });
   });
 });

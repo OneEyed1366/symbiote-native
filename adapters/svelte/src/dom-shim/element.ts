@@ -16,13 +16,15 @@ import {
   dlog,
   routeProp,
   setEventListener,
+  setNodeOwner,
   toPublicInstance,
   type ISymbioteNode,
+  type ISymbioteNodeOwner,
 } from '@symbiote-native/engine';
 import { descriptorFor } from '@symbiote-native/components';
 import { normalizeSvelteClass } from '../class-value';
 import { foldHostBag } from './fold-host-bag';
-import { ShimNode } from './shim-node';
+import { ELEMENT_NODE, ShimNode } from './shim-node';
 
 export type IShimPropBag = Record<string, unknown>;
 
@@ -79,6 +81,10 @@ export class ShimElement extends ShimElementBase {
 
   get style(): { cssText: string } {
     return (this.styleSlot ??= { cssText: '' });
+  }
+
+  override get nodeType(): number {
+    return ELEMENT_NODE;
   }
 
   // The single object-bag prop. The literal name is ours to choose (§3g(c)) — the adapter's
@@ -152,9 +158,12 @@ export class ShimElement extends ShimElementBase {
     // exists: `descriptor.component` is the Fabric view name (`symbiote-view` -> `RCTView`), so a
     // host-behavior registry keyed by tag can only be reached from here. The argument defaults to
     // `component`, so passing it changes nothing until a behavior is registered.
-    return toPublicInstance(
+    const node = toPublicInstance(
       createElement(descriptor.component, descriptor.isText, this.tagName),
     );
+    const owner = resolveOwnerFromSvelteMeta(this);
+    if (owner !== undefined) setNodeOwner(node, owner);
+    return node;
   }
 
   override onMadeLive(): void {
@@ -185,6 +194,94 @@ function normalizeBagClasses(bag: IShimPropBag): IShimPropBag {
     next[key] = normalized;
   }
   return next;
+}
+
+// The devtools panel's owner tag (ISymbioteNodeOwner — symbiote-devtools-inspector skill) reads
+// `__svelte_meta`, a property Svelte's OWN compiled output stamps onto every element it creates
+// (via the publicly re-exported `$.add_locations`, only emitted when the compiler runs with
+// `dev: true` — see metro-svelte-transformer.cjs). Nothing here writes `__svelte_meta`; it is
+// pure Svelte-runtime behavior this shim happens to receive because from_tree()'s DOM traversal
+// (nodeType/firstChild/nextSibling) already has to work for compiled output to run at all.
+//
+// `__svelte_meta.loc.file` only names the file whose OWN markup literally created this element —
+// for `<CanaryScreen><View><Text/></View></CanaryScreen>`, the Text's native node's `loc.file` is
+// View.svelte (View's own template creates the intrinsic tag), never CanaryScreen.svelte, because
+// CanaryScreen never calls `document.createElement` itself — it only invokes the `View`
+// component, whose OWN template does. Read that way, a composing-only app component (anything
+// that renders exclusively through other components, which is virtually every real screen) is
+// NEVER `chain[chain.length - 1]` for any node and so never shows up in the panel at all —
+// confirmed against a real build (symbiote-devtools-inspector skill).
+//
+// `__svelte_meta.parent` is the fix: it is Svelte's own `dev_stack`, a linked list Svelte pushes
+// one entry onto every time a `<Component/>` tag is INVOKED (`add_svelte_meta(callback, 'component',
+// callerComponent, line, column, {componentTag})` — verified against real compiler output,
+// compiling nested `Outer.svelte` -> `<Wrapper/>` -> `Wrapper.svelte`). Each entry's `.file` is the
+// CALLING component's file — so walking `loc.file`, then `parent.file`, `parent.parent.file`, ...
+// and reversing yields the full root-first ancestry: [App.svelte, CanaryScreen.svelte,
+// View.svelte] for the Text example above. Non-component dev_stack entries (`{#each}`/`{#if}`
+// blocks etc., pushed by the SAME `add_svelte_meta`) carry the enclosing component's own file too
+// — harmless duplication, collapsed by dedupeConsecutive below (NOT here — see that function's
+// comment for why dedup must run AFTER the library filter, not before).
+function svelteMetaFileChain(meta: unknown): string[] {
+  const files: string[] = [];
+  if (typeof meta !== 'object' || meta === null) return files;
+  const loc: unknown = Reflect.get(meta, 'loc');
+  if (typeof loc === 'object' && loc !== null) {
+    const file = Reflect.get(loc, 'file');
+    if (typeof file === 'string' && file !== '') files.push(file);
+  }
+  let cursor: unknown = Reflect.get(meta, 'parent');
+  while (typeof cursor === 'object' && cursor !== null) {
+    const file = Reflect.get(cursor, 'file');
+    if (typeof file === 'string' && file !== '') files.push(file);
+    cursor = Reflect.get(cursor, 'parent');
+  }
+  files.reverse();
+  return files;
+}
+
+// Collapses ADJACENT duplicate files — safe only once nothing that could sit BETWEEN two same-file
+// entries is still in the list. A library-internal navigator wrapper (Stack.Navigator's own
+// Screen component, etc.) routinely sits between two invocations of the SAME app screen — e.g.
+// `[App, MenuScreen, <library Screen wrapper>, MenuScreen, <library>, MenuScreen, ...]` for a
+// nested-navigators demo that reuses one screen component at every nesting level. Deduping BEFORE
+// the library filter (the original, buggy order) never sees these as adjacent, so filtering the
+// library entries out afterward leaves the app-level duplicates uncollapsed — confirmed on a real
+// device: `App > MenuScreen > MenuScreen > MenuScreen > ...` repeating many times over, which then
+// made the panel pathologically slow to build/render (not a stack overflow — a working algorithm
+// building a genuinely huge but semantically MEANINGLESS tree). Calling this AFTER the filter is
+// what actually collapses it back down to `App > MenuScreen`.
+function dedupeConsecutive(files: readonly string[]): string[] {
+  return files.filter((file, index) => file !== files[index - 1]);
+}
+
+// Library-internal components (@symbiote-native/*'s own View/Text/ScrollView/... wrappers) create
+// a dev_stack entry exactly like any app component, so they'd otherwise show up as a boundary in
+// the panel on equal footing with what the developer actually wrote — see the
+// symbiote-devtools-inspector skill for why that reads as native-tree-level noise on a real
+// device. `node_modules` is the only signal the panel can use to tell "library" from "app" apart
+// without a registry of every current and future @symbiote-native package name.
+function isLibraryFile(file: string): boolean {
+  return file.includes('node_modules');
+}
+
+function svelteFilenameToComponent(file: string): string {
+  const basename = file.split('/').pop() ?? file;
+  return basename.replace(/\.svelte$/, '');
+}
+
+function resolveOwnerFromSvelteMeta(
+  element: ShimElement,
+): ISymbioteNodeOwner | undefined {
+  const meta: unknown = Reflect.get(element, '__svelte_meta');
+  const filteredFiles = svelteMetaFileChain(meta).filter(
+    file => !isLibraryFile(file),
+  );
+  const chain = dedupeConsecutive(filteredFiles).map(file => ({
+    component: svelteFilenameToComponent(file),
+    file,
+  }));
+  return chain.length > 0 ? { chain } : undefined;
 }
 
 // Diagnostic only — the one caller is the `dlog` thunk above. The allocation-free twin below is

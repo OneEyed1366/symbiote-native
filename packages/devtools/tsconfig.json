@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "build"
+  },
+  "include": ["src", "react-native.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "dist"],
+  "references": [{ "path": "../../core/engine" }]
+}

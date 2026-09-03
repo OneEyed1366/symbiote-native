@@ -45,6 +45,16 @@ function shimDocument(): IDocumentLike {
   return documentFactory();
 }
 
+// Standard WHATWG DOM `Node.nodeType` values (`Node.ELEMENT_NODE` etc.) — Svelte's compiled
+// output and its own internals (dev/elements.js's add_locations, dom/operations.js, dom/
+// template.js) branch on this to tell element/text/comment/fragment nodes apart while walking
+// the shim tree via nodeType/firstChild/nextSibling. Every ShimNode subclass must override
+// `nodeType` with its real value below — this is not optional decoration.
+export const ELEMENT_NODE = 1;
+export const TEXT_NODE = 3;
+export const COMMENT_NODE = 8;
+export const DOCUMENT_FRAGMENT_NODE = 11;
+
 export abstract class ShimNode {
   parent: ShimNode | null = null;
   children: ShimNode[] = [];
@@ -74,6 +84,12 @@ export abstract class ShimNode {
 
   get nodeName(): string {
     return '';
+  }
+
+  // Overridden per-subclass below (ELEMENT_NODE/TEXT_NODE/COMMENT_NODE/DOCUMENT_FRAGMENT_NODE) —
+  // this base value is never actually observed since ShimNode itself is abstract.
+  get nodeType(): number {
+    return 0;
   }
 
   // We never emit `<template>` — always undefined, per §3c.

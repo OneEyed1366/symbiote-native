@@ -81,6 +81,32 @@ export function isSymbioteEvent(value: unknown): value is ISymbioteEvent {
   return typeof nativeEvent === 'object' && nativeEvent !== null;
 }
 
+// One level of developer-component ancestry — e.g. `{component: 'CanaryScreen', file:
+// 'CanaryScreen.svelte'}`. See ISymbioteNodeOwner below for why this is a CHAIN, not a single
+// value.
+export interface IOwnerChainEntry {
+  component: string;
+  file?: string;
+}
+
+// The developer-authored component ancestry that led to this node's creation — root-first, so
+// `chain[0]` is the outermost component and `chain[chain.length - 1]` is the one whose OWN
+// template/render literally created this native node (e.g. for a `<CanaryScreen><View><Text/>
+// </View></CanaryScreen>` composition, the Text's native node carries `[CanaryScreen, View,
+// Text]`). A single-element chain (today's React/Vue/Angular shape) means that adapter tags only
+// the nearest creator and hasn't walked its own call-stack yet — see the symbiote-devtools-
+// inspector skill for why the FULL chain matters: a developer component that only composes other
+// components (never touches a native intrinsic directly) never appears as `chain[chain.length -
+// 1]` for ANY node, so collapsing to "nearest creator only" makes it invisible entirely.
+// Populated by each adapter through its OWN mechanism (Vue reads its runtime's own
+// `__vueParentComponent` stamp, React walks its Fiber tree, Angular threads its RendererType2,
+// Svelte reads its compiler's dev-mode `__svelte_meta.parent` call-stack). Optional and
+// devtools-only: nothing in the render/commit path reads it, so a node with no owner set behaves
+// exactly as before this field existed.
+export interface ISymbioteNodeOwner {
+  chain: readonly IOwnerChainEntry[];
+}
+
 export interface ISymbioteNode {
   readonly [BRAND]: true;
   // Fabric view name passed to createNode (RCTView, RCTImageView, RCTText, ...).
@@ -206,6 +232,7 @@ export interface ISymbioteNode {
   setNativeProps(nativeProps: Record<string, unknown>): void;
   focus(): void;
   blur(): void;
+  owner?: ISymbioteNodeOwner;
 }
 
 const FOCUS_COMMAND = 'focus';
@@ -1052,6 +1079,13 @@ export function setText(node: ISymbioteNode, text: string): void {
   node.props.text = text;
   propStats.writes += 1;
   markPropsDirty(node);
+}
+
+export function setNodeOwner(
+  node: ISymbioteNode,
+  owner: ISymbioteNodeOwner | undefined,
+): void {
+  node.owner = owner;
 }
 
 // Structural ops mark the PARENT chain (both the old and the new one), never the moved child:

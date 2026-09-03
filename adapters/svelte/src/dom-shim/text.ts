@@ -27,7 +27,7 @@ import {
   setText,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { ShimNode } from './shim-node';
+import { ShimNode, TEXT_NODE } from './shim-node';
 
 // Deliberately WIDER than Svelte's own whitespace class. `svelte/src/compiler/phases/patterns.js`
 // uses /[^ \t\r\n]/ and says why: "Not \S because that also removes explicit whitespace defined
@@ -76,6 +76,10 @@ export class ShimText extends ShimNode {
 
   override get nodeName(): string {
     return '#text';
+  }
+
+  override get nodeType(): number {
+    return TEXT_NODE;
   }
 
   get data(): string {

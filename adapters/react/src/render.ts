@@ -6,7 +6,10 @@ import type { ReactNode } from 'react';
 import {
   createSurface,
   disposeRoot,
+  isSymbioteNode,
+  registerPostCommit,
   setEventDispatcher,
+  setNodeOwner,
   dlog,
   reportUncaughtError,
   type IRootTag,
@@ -80,6 +83,58 @@ setEventDispatcher(run => {
 // surface on Fast Refresh and on lifecycle/focus changes, reusing the rootTag.
 type IOpaqueRoot = ReturnType<typeof reconciler.createContainer>;
 const containers = new Map<IRootTag, IOpaqueRoot>();
+
+// Devtools-only: tags every host node with the developer-authored React component that
+// created it, for packages/devtools' panel (ISymbioteNodeOwner — see the
+// symbiote-devtools-inspector skill for the per-adapter design). React's host config gets no
+// such information at all (createInstance is only ever called with a resolved host type, after
+// React has already walked past every composite component) — the Fiber tree itself is the only
+// place this exists, so unlike Vue/Angular this is a separate tree walk, not a tag applied at
+// node-creation time. Runs on every commit; not gated behind a subscription flag because it is
+// cheap relative to the Fabric commit that just happened, mirroring the "simple, dev-only,
+// acceptable cost" call already made for the rest of this feature (see the skill).
+function resolveFiberComponentName(type: unknown): string | undefined {
+  if (typeof type !== 'function') return undefined;
+  const displayName = Reflect.get(type, 'displayName');
+  if (typeof displayName === 'string' && displayName !== '') return displayName;
+  const name = Reflect.get(type, 'name');
+  return typeof name === 'string' && name !== '' ? name : undefined;
+}
+
+function tagFiberOwners(
+  fiber: unknown,
+  ambientOwner: string | undefined,
+): void {
+  if (typeof fiber !== 'object' || fiber === null) return;
+
+  const ownName = resolveFiberComponentName(Reflect.get(fiber, 'type'));
+  const effectiveOwner = ownName ?? ambientOwner;
+
+  const stateNode = Reflect.get(fiber, 'stateNode');
+  if (effectiveOwner !== undefined && isSymbioteNode(stateNode)) {
+    // TODO(devtools-owner-chain): single-element chain — tags only the nearest composite
+    // ancestor, same as before this field became a chain. A composing-only component (renders
+    // exclusively through other components, never a host type directly) never becomes
+    // `effectiveOwner` for any node and so never appears, mirroring the gap fixed for Svelte via
+    // its `__svelte_meta.parent` call-stack — see the symbiote-devtools-inspector skill. Bringing
+    // React to full parity means walking the FULL fiber ancestor chain here, not just this
+    // nearest-composite value.
+    setNodeOwner(stateNode, { chain: [{ component: effectiveOwner }] });
+  }
+
+  // `child`/`sibling` is the standard Fiber tree shape (react-reconciler, not our own type) — a
+  // sibling shares ITS parent's ambient owner, not the owner just resolved for this fiber, so it
+  // recurses with the ambient passed into this call, not `effectiveOwner`.
+  tagFiberOwners(Reflect.get(fiber, 'child'), effectiveOwner);
+  tagFiberOwners(Reflect.get(fiber, 'sibling'), ambientOwner);
+}
+
+registerPostCommit(() => {
+  if (Reflect.get(globalThis, '__DEV__') !== true) return;
+  for (const container of containers.values()) {
+    tagFiberOwners(Reflect.get(container, 'current'), undefined);
+  }
+});
 
 // Unmount a surface's React tree (render null → empty completeRoot, clearing the
 // native views) and drop its shared root container so a later mount on the same

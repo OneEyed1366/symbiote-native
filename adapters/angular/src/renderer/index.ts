@@ -18,6 +18,7 @@ import {
   removeChild,
   routeProp,
   setEventListener,
+  setNodeOwner,
   setProp,
   setText,
   toPublicInstance,
@@ -55,6 +56,23 @@ function isRawText(node: ISymbioteNode): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+// The developer-authored component whose template is currently being created, for the devtools
+// panel's owner tag (ISymbioteNodeOwner) — see the symbiote-devtools-inspector skill for the
+// per-adapter design. `type` is declared `RendererType2 | null` (id/encapsulation/styles/data,
+// @publicApi) to match Renderer2's contract, but Angular's Ivy internals actually pass the
+// component's own ComponentDef here at every createRenderer call (confirmed against
+// @angular/core's chunked .d.ts and .mjs: three createComponentView-family call sites pass `def`,
+// not a conforming RendererType2) — `ComponentDef<T>.type: Type<T>` IS the component class. Read
+// via Reflect.get rather than the declared type, since TS has no visibility into that mismatch
+// and a `RendererType2` cast would be exactly the sanctioned-nowhere `as` this codebase forbids.
+function resolveOwnerComponent(type: RendererType2 | null): string | undefined {
+  if (type === null) return undefined;
+  const componentClass = Reflect.get(type, 'type');
+  if (typeof componentClass !== 'function') return undefined;
+  const name = Reflect.get(componentClass, 'name');
+  return typeof name === 'string' && name !== '' ? name : undefined;
 }
 
 // RN's Text.js applies two defaults on the way to native (core/components/host-primitives.cjs's
@@ -173,7 +191,19 @@ export class SymbioteRenderer implements Renderer2 {
   // render.ts (unmount), so per-node cleanup is a no-op.
   destroyNode: ((node: ISymbioteNode) => void) | null = null;
 
+  // Set by SymbioteRendererFactory.createRenderer just before Angular starts creating this
+  // component's own template elements — a single "last known owner" rather than a push/pop
+  // stack, since Renderer2 exposes no "this component's elements are done" signal to pop on.
+  // Correct for the common case (a component's own elements are created before Angular recurses
+  // into a nested component's); embedded-view/ng-content edge cases are unverified — see the
+  // symbiote-devtools-inspector skill.
+  private currentOwnerComponent: string | undefined;
+
   constructor(private readonly surface: SymbioteSurface) {}
+
+  setCurrentOwner(component: string | undefined): void {
+    this.currentOwnerComponent = component;
+  }
 
   destroy(): void {}
 
@@ -211,6 +241,17 @@ export class SymbioteRenderer implements Renderer2 {
       engineName,
     );
     if (descriptor.isText) seedTextDefaults(node);
+    if (this.currentOwnerComponent !== undefined) {
+      // TODO(devtools-owner-chain): single-element chain — tags only the nearest owning
+      // component. A composing-only component (renders exclusively through other components,
+      // never a host element directly) never becomes `currentOwnerComponent` for a node it
+      // doesn't directly create, so it's invisible in the panel — the same gap fixed for Svelte
+      // via its `__svelte_meta.parent` call-stack. Full parity means threading the whole
+      // ComponentDef ancestry here, not just the nearest one.
+      setNodeOwner(node, {
+        chain: [{ component: this.currentOwnerComponent }],
+      });
+    }
     if (isDebug()) {
       dlog(`angular createElement ${name} -> ${descriptor.component}`);
     }
@@ -500,11 +541,10 @@ export class SymbioteRendererFactory implements RendererFactory2 {
 
   constructor(private readonly surface: SymbioteSurface) {}
 
-  createRenderer(
-    _hostElement: unknown,
-    _type: RendererType2 | null,
-  ): Renderer2 {
-    return (this.renderer ??= new SymbioteRenderer(this.surface));
+  createRenderer(_hostElement: unknown, type: RendererType2 | null): Renderer2 {
+    const renderer = (this.renderer ??= new SymbioteRenderer(this.surface));
+    renderer.setCurrentOwner(resolveOwnerComponent(type));
+    return renderer;
   }
 
   // Not commit coalescing (requestCommit owns that) — this is the one moment where a ScrollView's

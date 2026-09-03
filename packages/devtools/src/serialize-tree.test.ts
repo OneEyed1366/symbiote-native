@@ -1,6 +1,42 @@
-import { createAnchor, createElement, createRawText } from '@symbiote-native/engine';
+import {
+  createAnchor,
+  createElement,
+  createRawText,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 import { describe, expect, it } from 'vitest';
-import { serializeNode, serializeSurfaceTree } from './serialize-tree';
+import {
+  MAX_SERIALIZED_NODES,
+  MAX_TREE_DEPTH,
+  serializeNode,
+  serializeSurfaceTree,
+} from './serialize-tree';
+import type { ISerializedNode } from './protocol';
+
+function countSerializedNodes(nodes: readonly ISerializedNode[]): number {
+  return nodes.reduce(
+    (total, node) => total + 1 + countSerializedNodes(node.children),
+    0,
+  );
+}
+
+function serializedDepth(node: ISerializedNode): number {
+  return node.children.length === 0
+    ? 1
+    : 1 + Math.max(...node.children.map(serializedDepth));
+}
+
+function buildChain(length: number): ISymbioteNode {
+  const root = createElement('RCTView');
+  let cursor = root;
+  for (let level = 1; level < length; level += 1) {
+    const child = createElement('RCTView');
+    child.parent = cursor;
+    cursor.children.push(child);
+    cursor = child;
+  }
+  return root;
+}
 
 function expectArray(value: unknown): unknown[] {
   if (!Array.isArray(value)) throw new Error('expected an array');
@@ -41,7 +77,9 @@ describe('serializeSurfaceTree', () => {
     expect(items[50]).toBe('…');
 
     // object nesting capped at depth 5 (a-b-c-d-e is depth 5; f would be depth 6)
-    expect(serializedRoot.props.nested).toEqual({ a: { b: { c: { d: { e: '…' } } } } });
+    expect(serializedRoot.props.nested).toEqual({
+      a: { b: { c: { d: { e: '…' } } } },
+    });
 
     // long strings truncated to 500 chars + a trailing marker
     const longString = expectString(serializedRoot.props.longString);
@@ -115,5 +153,61 @@ describe('serializeSurfaceTree', () => {
 
     expect(serialized).toHaveLength(1);
     expect(serialized[0].component).toBe('RCTView');
+  });
+
+  it('caps total serialized node count and marks the cut point, never silently', () => {
+    // why: this is the real-device crash's node-count half — a screen with more native nodes
+    // than the budget must NOT ship them all as one unbounded JSON payload, and the truncation
+    // must be visible on the wire, not just quietly incomplete.
+    const root = createElement('RCTView');
+    const childCount = MAX_SERIALIZED_NODES + 500;
+    for (let index = 0; index < childCount; index += 1) {
+      const child = createElement('RCTView');
+      child.parent = root;
+      root.children.push(child);
+    }
+
+    const serialized = serializeSurfaceTree([root]);
+
+    expect(countSerializedNodes(serialized)).toBeLessThanOrEqual(
+      MAX_SERIALIZED_NODES,
+    );
+    const [serializedRoot] = serialized;
+    expect(serializedRoot.truncatedChildCount).toBe(
+      childCount - serializedRoot.children.length,
+    );
+    expect(serializedRoot.truncatedChildCount).toBeGreaterThan(0);
+  });
+
+  it('caps tree depth independently of node count and marks the cut point', () => {
+    // why: the real crash was a screen that stayed narrow (few nodes per level) but ran hundreds
+    // of levels deep — a node-count budget alone doesn't bound THAT shape; MAX_TREE_DEPTH does.
+    const deepChain = buildChain(MAX_TREE_DEPTH + 100);
+
+    const [serialized] = serializeSurfaceTree([deepChain]);
+
+    expect(serializedDepth(serialized)).toBeLessThanOrEqual(MAX_TREE_DEPTH);
+    // Walk to the deepest serialized node — it must carry the truncation marker, since its one
+    // real child (the chain continues) was cut by the depth cap, not the node-count budget.
+    let deepest = serialized;
+    while (deepest.children.length > 0) deepest = deepest.children[0];
+    expect(deepest.truncatedChildCount).toBe(1);
+  });
+
+  it('serializeNode (single-node, direct callers) stays uncapped on node count', () => {
+    // why: serializeNode is the public single-subtree entry point tests and other direct
+    // callers use — only serializeSurfaceTree (the whole-payload-over-the-wire path) should pay
+    // the node-count budget.
+    const root = createElement('RCTView');
+    for (let index = 0; index < MAX_SERIALIZED_NODES + 50; index += 1) {
+      const child = createElement('RCTView');
+      child.parent = root;
+      root.children.push(child);
+    }
+
+    const serialized = serializeNode(root);
+
+    expect(serialized.children).toHaveLength(MAX_SERIALIZED_NODES + 50);
+    expect(serialized.truncatedChildCount).toBeUndefined();
   });
 });

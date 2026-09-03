@@ -687,3 +687,259 @@ Sources: [thetarnav/solid-devtools](https://github.com/thetarnav/solid-devtools)
 [npm: @solid-devtools/overlay](https://www.npmjs.com/package/@solid-devtools/overlay),
 [npm: @solid-devtools/debugger](https://www.npmjs.com/package/@solid-devtools/debugger),
 [Solid docs: getOwner](https://docs.solidjs.com/references/api-reference/reactive-utilities/getOwner).
+
+## Developer-component tree (implemented 2026-08-18) — v0 scope EXPANDED beyond tree+props
+
+User pushback on the original v0 panel (tree of raw native primitives — `RCTView`/`RCTText`)
+mid-session: "это должны быть не нативные узлы, а то, что реально написал разработчик. Нативное —
+только в details и по необходимости" (show the DEVELOPER's own components, native primitives only
+on demand). This is a real scope increase over the original "v0 = tree + props, nothing else" line
+earlier in this skill — recorded here as a deliberate, user-driven expansion, not a silent
+re-interpretation. Blocking-parity requirement held (P0 `<adapters_reach_full_feature_parity>`):
+every finding below was verified against real installed/vendored source before writing code, same
+bar as the rest of this skill — do not re-research any of it from scratch.
+
+### The `ISymbioteNodeOwner` design
+
+`core/engine/src/node.ts`: `ISymbioteNode.owner?: { component: string; file?: string }` +
+`setNodeOwner(node, owner)`. Pure data carrier — nothing in the render/commit path reads it, so an
+untagged node behaves exactly as before this field existed. Exported from the engine's public
+barrel (`core/engine/src/index.ts`) but deliberately **not** re-exported from any adapter's own
+public barrel — same pattern as `getActiveSurfaces`/`registerPostCommit` (devtools-only wiring, no
+app ever imports it), so `tests/adapter-barrel-parity.test.ts`'s zero-vs-all-adapters rule
+(`actualGaps()`: a name only counts as a gap if SOME but not all adapters export it) never flags
+it — confirm this test still passes after any change here.
+
+`packages/devtools/src/protocol.ts`'s `ISerializedNode.owner` and `serialize-tree.ts`'s
+`serializeNode` just carry `node.owner` through unchanged — the panel serializer stays 100%
+framework-agnostic, same as before; it has zero knowledge of HOW any adapter populated `owner`.
+
+### Per-adapter mechanism — four different answers, one shared field
+
+No two adapters get this the same way. Verified via two rounds of parallel forks (first pass
+assumed too much and got corrected mid-session — see the Svelte entry below for what that
+correction actually was):
+
+- **Vue — free, zero adapter code beyond a post-commit tag-walk.** `@vue/runtime-core`'s own
+  `mountElement` stamps `el.__vueParentComponent = parentComponent` onto every element it creates,
+  in dev mode, for its own devtools support (`dist/runtime-core.esm-bundler.js:5726-5729` in
+  `@vue/runtime-core@3.5.39`). `adapters/vue/src/renderer/devtools-owner.ts` registers ONE
+  `registerPostCommit` hook (module-scope, `adapters/vue/src/renderer/index.ts`) that walks every
+  active surface and reads that stamp via `Reflect.get` (untyped Vue-internal property, no `as`
+  cast), resolving the component name from `instance.type.{displayName,name,__name}` (Vue's own
+  `getComponentName` is NOT exported publicly — reimplemented the same three-field check locally).
+  Gated on `Reflect.get(globalThis, '__DEV__') === true`, not `process.env.NODE_ENV` (the thing Vue
+  itself checks) — `process` isn't a declared global in this package's TS scope, AND `__DEV__` is
+  the one Metro actually DEAD-CODE-ELIMINATES on `--dev false` (proven for the React DevTools
+  registration below), so it strips this hook from prod bundles entirely rather than just
+  no-op'ing it at runtime.
+- **Angular — needed a real (small) code change, not a wall.** Every component-view creation calls
+  `rendererFactory.createRenderer(host, def)`, where Ivy's Angular internals actually pass the
+  component's own `ComponentDef<T>` as the second argument — `def.type: Type<T>` IS the component
+  class — **despite** the DECLARED public `RendererType2` interface (`id`/`encapsulation`/`styles`/
+  `data`, `@publicApi`, `_debug_node-chunk.d.ts:3673`) having no `type` field at all. Confirmed
+  directly against `@angular/core@22.0.8`'s own `.d.ts`/`.mjs`, not assumed. Our own
+  `SymbioteRendererFactory.createRenderer` (`adapters/angular/src/renderer/index.ts`) previously
+  discarded this argument entirely (`_type` — underscore-prefixed, unused) because the ONE shared
+  `SymbioteRenderer` instance is cached/reused across every component in a surface (deliberate, for
+  `requestCommit()` microtask-coalescing — do not "fix" that caching). Fix: `resolveOwnerComponent`
+  reads `def.type.name` via `Reflect.get` (never trust the declared `RendererType2` shape for
+  `.type` — that would need a forbidden `as` cast), `SymbioteRenderer` tracks ONE
+  `currentOwnerComponent: string | undefined` set by `createRenderer` just before Angular starts
+  creating that component's own elements, stamped in `createElement`. **Known limitation, not yet
+  verified either way:** this is a single "last known owner", not a push/pop stack — correct for
+  the common case (a component's own template elements are created before Angular recurses into a
+  nested component's), but `Renderer2` exposes no "this component's elements are done" signal to
+  pop on, so embedded views / `*ngIf`/`*ngFor` / `ng-content` projection edge cases could
+  misattribute an element to whichever component's `createRenderer` was called most recently. Flag
+  as open if a developer reports a wrong owner label in a projected/structural-directive-heavy
+  tree — don't treat it as a regression, it was never proven correct there.
+- **Svelte — the wall moved twice in one session; the ACTUAL answer is a build-pipeline change,
+  not a runtime read.** First pass (the "Researched 2026-08-17" section far above, and the
+  "Follow-up research" section) found `dev_current_component_function` inside
+  `svelte/internal/client/context.js` and called it "usable with caveats" — WRONG on the specific
+  claim that it's reachable through the public surface. Verified directly (not re-trusted): Node's
+  own `exports` field on `svelte`'s `package.json` only maps the FIXED subpath
+  `"./internal/client"` (no wildcard), whose `index.js` re-exports `push`/`pop`/`add_svelte_meta`
+  from `context.js` — NOT the `dev_current_component_function` variable itself. A real Node import
+  of the deeper path throws `ERR_PACKAGE_PATH_NOT_EXPORTED`; monkey-patching the exported `push`/
+  `pop` bindings from outside doesn't work either (ES module named exports are non-writable from an
+  importer). **The actual answer, found by researching prior art (web search) rather than more
+  private-internals spelunking:** `add_locations` (from `dev/elements.js`) IS re-exported publicly
+  (`svelte/internal/client`'s `index.js` line 6) and IS what the OFFICIAL `vite-plugin-svelte-
+  inspector` (the click-to-IDE tool) relies on. The compiler wraps every dev-mode template-creation
+  function in `$.add_locations(fn, filename, locations)`
+  (`compiler/phases/3-transform/client/transform-template/index.js:73-80`, **gated on the
+  compiler's OWN `dev` option**, confirmed by reading the actual condition — `if (dev) { call =
+  b.call('$.add_locations', ...) }`) — that wrapper walks the created DOM (via plain
+  `nodeType`/`firstChild`/`nextSibling` — the same shim contract every compiled Svelte component
+  already depends on) and stamps `element.__svelte_meta = { loc: { file, line, column } }` on EACH
+  element, per component (a nested child component's own elements get re-tagged with the child's
+  OWN filename by the child's own `add_locations` wrap — correct nearest-owner attribution for
+  free, no ambient-fallback logic needed unlike the other three adapters).
+  **This needed a real, deliberately-scoped-and-confirmed change, not just a read:**
+  `adapters/svelte/metro-svelte-transformer.cjs`'s `COMPILER_OPTIONS` never set `dev` at all before
+  this — Svelte compiled the SAME way in every build, dev or prod, so `__svelte_meta` was never
+  emitted. `dev: true` gates 12+ places across Svelte's compiler (`ConstTag`, `SvelteElement`,
+  `SnippetBlock`, `EachBlock`, `BindDirective`, event/binding validation, class-body handling —
+  not just this one metadata feature), so flipping it is a real behavior change across every
+  `.svelte` file this transformer compiles, not an isolated edit the way the other three adapters'
+  changes were — flagged to the user explicitly before implementing, approved
+  ("соответствует тому, что веб-Svelte всегда получает в dev — просто у нас этого раньше не было").
+  `compileSvelteFile(src, filename, dev = false)` now takes `dev` as an optional third param
+  (default false, so the transformer's own existing direct-call tests keep asserting on the base
+  compiled shape unchanged); the real Metro `transform()` passes `params.options.dev` — Metro's own
+  documented `BabelTransformerArgs.options.dev: boolean` (`metro-babel-transformer`'s
+  `index.d.ts`), not an ambient global read, since this runs in a Node transform worker, not
+  bundled app code. `adapters/svelte/src/dom-shim/element.ts`'s `createEngineNode()` reads
+  `Reflect.get(this, '__svelte_meta')?.loc?.file` and derives the component name from the file's
+  basename (strip `.svelte`). **Unverified edge case, flagged not resolved:** whether
+  `{@render children()}` snippet-forwarding correctly attributes an element to the snippet's
+  DEFINING component vs. the component that RENDERS the snippet — not investigated, same
+  "documented open edge, not silently ignored" treatment as Angular's `ng-content` caveat above.
+- **React — no creation-time hook exists at all; a separate Fiber-tree walk, not a tag applied at
+  node-creation time.** `createInstance(type, props, container, hostContext)`
+  (`adapters/react/src/host-config.ts`) is only ever called for an already-resolved HOST type,
+  after react-reconciler has walked past every composite component — no owner information reaches
+  a host config, structurally, ever. Unlike the other three, this needed the Fiber tree we already
+  have a handle to (from the `injectIntoDevTools` fix earlier this session): `adapters/react/src/
+  render.ts` keeps `containers: Map<IRootTag, FiberRoot>` already, for surface teardown/remount.
+  Added one `registerPostCommit` hook (module scope) that, per container, walks
+  `Reflect.get(container, 'current')` (the `HostRootFiber`) via `child`/`sibling` — the standard
+  Fiber tree shape — resolving a fiber's own component name ONLY when `typeof fiber.type ===
+  'function'` (catches both function and class components without depending on numeric `WorkTag`
+  constants, which drift across react-reconciler versions — more robust than hardcoding
+  `HostComponent = 5` etc.), and calling `setNodeOwner` on `fiber.stateNode` whenever
+  `isSymbioteNode(stateNode)` is true (the engine's own branded guard, not a numeric tag check
+  either). A sibling fiber inherits the AMBIENT owner passed into the recursive call, not the
+  owner just resolved for its previous sibling — get this backwards and every fiber after the
+  first composite child in a list silently inherits the wrong owner. Gated on `__DEV__` the same
+  way as the `injectIntoDevTools` call already was.
+
+### Two panels, not one hybrid view (superseded `tree-inspector-panel.tsx`, 2026-08-18)
+
+First live device screenshot of the original single hybrid panel (native tree + owner rows
+interleaved) read as "still all native, hard to tell what's mine" — user feedback, confirmed on a
+real screenshot, not a hypothetical. Redesigned into TWO separate Rozenite panels/tabs, each its
+own `rozenite.config.ts` entry, sharing `use-snapshot.ts`'s subscribe hook and `prop-row.tsx`'s
+`PropRow`:
+
+- **`native-tree-panel.tsx`** — the old hybrid's native half, unchanged: raw `RCTView`/`RCTText`
+  tree, full native props, zero owner/component awareness. The "what actually painted" view.
+- **`components-panel.tsx`** — pure developer-component tree, ZERO native primitives shown even
+  collapsed (confirmed explicit user choice, not a default guess). The "what did I write" view.
+
+`tree-inspector-panel.tsx` (the old hybrid) is deleted. Its `buildDisplayChildren` algorithm (walk
+native tree, wrap on owner change) is superseded by `components-panel.tsx`'s `buildComponentChildren`
+— which is a different, more powerful algorithm now (see next section), not just a copy-paste split.
+
+### The owner CHAIN redesign (2026-08-18) — why "nearest creator only" made app components invisible
+
+First real on-device test (`examples/svelte`, after fixing the `nodeType` bug below) surfaced a
+DEEPER design bug than the panel split: **zero app-authored components ever appeared** — the tree
+was 100% `@symbiote-native/svelte`'s own internal wrapper files (`View.svelte`, `Text.svelte`,
+`ScrollView`'s internal `index.svelte`, `SafeAreaView.svelte`), never `App.svelte` or any real
+screen. Root cause, confirmed by compiling real nested `.svelte` fixtures and reading the
+compiler's actual output (not guessed): the original design tagged a node with only its NEAREST
+creator (`owner: {component, file}`, one value) — e.g. for `<CanaryScreen><View><Text/></View>
+</CanaryScreen>`, the Text's native node's nearest creator is `View.svelte` (View's own template
+literally calls `document.createElement`), never `CanaryScreen.svelte` (CanaryScreen only ever
+INVOKES the `View` component — it never touches a native intrinsic directly, which is true of
+almost every real screen, since app code always composes through `View`/`Text`/`ScrollView`, never
+raw `<symbiote-view>`). So a purely-composing component is STRUCTURALLY incapable of ever being
+`chain[chain.length - 1]` under "nearest wins" — not a Svelte-only bug: `adapters/react/src/
+render.ts`'s `tagFiberOwners` and `adapters/vue/src/renderer/devtools-owner.ts`'s `tagOwners` both
+have the identical "overwrite `effectiveOwner`/no-op-if-already-set with the nearest one" shape,
+so React/Vue/Angular have this SAME latent gap — just not yet proven on a real screen there (see
+the per-adapter TODOs below).
+
+**Fix — `ISymbioteNodeOwner` is now a root-first CHAIN, not a single value**
+(`core/engine/src/node.ts`): `{chain: readonly {component: string; file?: string}[]}`, `chain[0]`
+outermost, `chain[chain.length - 1]` the nearest/leaf creator. React/Vue/Angular's call sites were
+mechanically updated to wrap their existing single value into a one-element chain (`{chain:
+[{component}]}`) — behaviorally UNCHANGED for those three (still tags only the nearest owner);
+each carries a `TODO(devtools-owner-chain)` comment at its `setNodeOwner` call site recording that
+bringing it to real parity means walking that adapter's own ancestor structure (React: the fiber
+chain up through EVERY composite ancestor, not just the nearest; Vue: `instance.parent`; Angular:
+threading the whole `ComponentDef` ancestry, not just `currentOwnerComponent`) — **not yet done,
+deliberately scoped Svelte-only this round** (user's explicit choice — see below).
+
+**Svelte is the one adapter actually fixed**, because Svelte's compiler already tracks the real
+call-stack for us: `element.__svelte_meta.parent` is Svelte's own `dev_stack`, a linked list pushed
+one entry per `<Component/>` invocation (`add_svelte_meta(callback, 'component', callerComponent,
+line, column, {componentTag})` — verified against real compiled output of a 3-level nested fixture,
+`Grand.svelte` → `{#each}` → `Mid.svelte` → `Leaf.svelte`). `adapters/svelte/src/dom-shim/
+element.ts`'s `resolveOwnerFromSvelteMeta` now walks `loc.file` then `parent.file`,
+`parent.parent.file`, ... , reverses to root-first order, and **collapses consecutive duplicate
+files** (a `{#each}`/`{#if}` block pushes its OWN dev_stack entry carrying the SAME enclosing file
+as the component around it — confirmed in the `Grand.svelte` fixture's compiled output; left
+undeduped this would show `Grand > Grand > Mid` instead of `Grand > Mid`).
+
+**Library-internal noise, filtered by `node_modules` in the file path**
+(`isLibraryFile` in `element.ts`): `@symbiote-native/svelte`'s own `View`/`Text`/`ScrollView`
+wrapper files push a dev_stack entry exactly like an app component, so without filtering they'd
+show as boundaries on equal footing with what the developer actually wrote (confirmed on the real
+device screenshot the fix was built to address). `node_modules` is the only signal available
+without a hand-maintained registry of every current/future `@symbiote-native/*` package — a
+filtered-out level is dropped from the chain entirely (not shown collapsed, not shown at all), so
+`App > CanaryScreen > View > Text` becomes `App > CanaryScreen` in the panel once `View`/`Text` are
+library files.
+
+**Panel grouping — `buildComponentChildren` in `components-panel.tsx` — had to change shape, not
+just read a new field.** A single-owner "walk native tree, wrap on change" algorithm cannot express
+a chain correctly: `CanaryScreen` composing BOTH a `<ScrollView>` and a `<View>` produces TWO
+separate, non-adjacent native subtrees in the flat tree that must still merge into ONE
+`CanaryScreen` row with two children — a naive per-node walk would emit `CanaryScreen` TWICE
+instead. The real algorithm: group the current `nodes` list by "the next new chain element beyond
+`ambientChain`" (a `Map` keyed by `component+file`, not array position), recurse into EACH group
+with `ambientChain` extended by that one entry and the group's ORIGINAL native nodes (not their
+children) — nodes whose own chain fully matches the current group's extended `ambientChain` become
+passthrough on the NEXT recursive call and contribute their children, which is what naturally
+terminates the recursion once every node's full chain has been consumed. `props` on a boundary row
+is populated ONLY when exactly one native node terminates AT that exact chain depth (a component
+whose own template creates a native node directly, e.g. `<View style={x}>{children}</View>`) —
+left empty for a purely-composing boundary spanning multiple native subtrees, since there is no
+single node whose props would represent it (tested directly in `components-panel.test.ts`,
+including the two-separate-subtrees-merge case — the ONE naive implementations get wrong).
+
+### The `nodeType` bug (2026-08-18) — a prerequisite fix, found via live device testing
+
+Before the chain redesign, owner-tagging didn't even fire on Svelte at all — the Components panel
+was completely empty on the first real device test, despite `dev: true` being correctly wired.
+Root cause: `adapters/svelte/src/dom-shim/{shim-node,element,text,comment,document-fragment}.ts`
+never implemented `Node.nodeType` (`ELEMENT_NODE`/`TEXT_NODE`/`COMMENT_NODE`/
+`DOCUMENT_FRAGMENT_NODE`). Svelte's `add_locations` (the function that stamps `__svelte_meta`)
+gates its element-vs-not check on `node.nodeType === ELEMENT_NODE` (`dev/elements.js`'s
+`assign_locations`) — with `nodeType` always `undefined`, that check silently failed on EVERY
+node, so `__svelte_meta` never got written, regardless of `dev: true` being correct. Not
+discoverable by `tsc`/vitest with a hand-stamped `__svelte_meta` (the old `element.test.ts` only
+ever asserted the READ side) — only a real compiled-through-the-actual-compiler mount surfaced it,
+which is why `mount-pipeline.smoke.test.ts` now has a dedicated `dev:true` regression case. Fix:
+each shim class now overrides `nodeType` with the real WHATWG constant (`ShimElement` → 1,
+`ShimText` → 3, `ShimComment` → 8, `ShimDocumentFragment` → 11).
+
+### What's verified vs. still open (2026-08-18, updated after real device testing)
+
+Verified: full monorepo `tsc --build` clean (engine, all four adapters including Angular's `ngc`
+AOT path, devtools), full root `vitest run` green (3318 tests — includes `element.test.ts`'s 5
+chain-walking/dedup/filter cases, `mount-pipeline.smoke.test.ts`'s real-compiler `dev:true`
+regression, and `components-panel.test.ts`'s 5 grouping-algorithm cases including the
+two-subtrees-merge case), `tests/adapter-barrel-parity.test.ts` still green. Rebuilt, repacked
+(`pnpm pack`, never `npm pack`), and reinstalled into `examples/svelte` per
+`<examples_vs_dot_examples>`'s stale-lockfile-avoidance rule (delete both the `node_modules/
+@symbiote-native/<pkg>` folder AND `package-lock.json`, not just one). Confirmed the installed
+`node_modules` build output actually contains each fix (grepped for `nodeType`, `chain`,
+`svelteMetaFileChain` in the built files) before calling any round done.
+
+Still genuinely open:
+- **Not yet re-verified live on a real device/simulator after the chain redesign** — the
+  `nodeType` fix WAS verified live (empty panel → real component names appeared), but that first
+  live pass is what surfaced the deeper "nearest-owner-only" gap; the chain-based fix itself has
+  only been proven by unit/integration tests so far, not by a fresh screenshot.
+- **React/Vue/Angular still tag "nearest owner only"** (single-element chain) — deliberately
+  scoped out this round (user's explicit choice: prove the design on Svelte's real app first, do
+  the other three as a separate task). Each has its own `TODO(devtools-owner-chain)` marking
+  exactly what "real parity" requires for that adapter's own mechanism.
+- Angular embedded-view/`ng-content` projection and Svelte `{@render children()}` snippet-
+  forwarding attribution (documented above, pre-existing from the first pass) remain unverified in
+  either direction.

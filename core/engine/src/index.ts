@@ -20,6 +20,7 @@ export {
   setNodeComponent,
   setNodePressed,
   setText,
+  setNodeOwner,
   isSymbioteNode,
   isSymbioteEvent,
   RAW_TEXT_COMPONENT,
@@ -60,7 +61,13 @@ export type {
   INativeViewConfigSource,
   IPropProcessor,
 } from './registry';
-export type { ISymbioteNode, ISymbioteEvent, IListener } from './node';
+export type {
+  ISymbioteNode,
+  ISymbioteNodeOwner,
+  IOwnerChainEntry,
+  ISymbioteEvent,
+  IListener,
+} from './node';
 
 export { SymbioteSurface, createSurface } from './surface';
 // Devtools-inspector building block: the set of currently-mounted surfaces, kept up to

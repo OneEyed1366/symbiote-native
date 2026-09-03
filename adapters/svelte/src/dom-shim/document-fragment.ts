@@ -4,13 +4,17 @@
 // (svelte-adapter-dom-shim skill §3e) — must stay cheap.
 
 import type { ISymbioteNode } from '@symbiote-native/engine';
-import { ShimNode } from './shim-node';
+import { DOCUMENT_FRAGMENT_NODE, ShimNode } from './shim-node';
 
 export class ShimDocumentFragment extends ShimNode {
   override readonly isDocumentFragment = true;
 
   override get nodeName(): string {
     return '#document-fragment';
+  }
+
+  override get nodeType(): number {
+    return DOCUMENT_FRAGMENT_NODE;
   }
 
   override cloneNode(deep?: boolean): ShimDocumentFragment {

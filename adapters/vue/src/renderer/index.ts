@@ -22,6 +22,9 @@ import {
 } from '@symbiote-native/engine';
 import { descriptorFor } from '@symbiote-native/components';
 import { normalizeVueAttrKey } from '../utils/normalize-attrs';
+import { registerVueOwnerTagging } from './devtools-owner';
+
+registerVueOwnerTagging();
 
 // Vue host nodes are all SymbioteNode (elements, raw text, anchors). The mount
 // container is the surface, so a parent can be either a node or the surface root.

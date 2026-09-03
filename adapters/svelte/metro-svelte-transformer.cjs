@@ -102,8 +102,15 @@ function lowerHostPrimitivesPreprocessor() {
 // resolution needed (unlike @vue/compiler-sfc's compileScript, which needs registerTS + a real
 // `fs` for a type-only import from another file) — so no TypeScript/filesystem wiring is needed
 // here the way metro-vue-transformer.cjs needs it.
-function compileSvelteFile(src, filename) {
-  const { js } = compile(src, { ...COMPILER_OPTIONS, filename });
+// `dev` defaults to false so existing direct callers (this file's own tests) keep asserting on
+// the base compiled shape unchanged. The real Metro pipeline passes it explicitly from
+// `params.options.dev` (see transform() below) — Svelte's compiler only wraps template creation
+// in `$.add_locations(...)` (which stamps `element.__svelte_meta = {loc: {file, line, column}}`,
+// read by adapters/svelte/src/dom-shim/element.ts to tag the devtools panel's owner info) when
+// `dev: true`; see the symbiote-devtools-inspector skill for why this needed enabling here at
+// all — it was never turned on before this feature needed it.
+function compileSvelteFile(src, filename, dev = false) {
+  const { js } = compile(src, { ...COMPILER_OPTIONS, filename, dev });
   return js.code;
 }
 
@@ -165,7 +172,7 @@ module.exports.transform = async function transform(params) {
     const lowered = await (
       await lowerHostPrimitivesPreprocessor()
     ).markup({ content: preprocessed.code, filename: params.filename });
-    const code = compileSvelteFile(lowered.code, params.filename);
+    const code = compileSvelteFile(lowered.code, params.filename, params.options.dev);
     // Re-label as .tsx so RN's transformer processes the module exactly like app source; Metro
     // tracks the real path separately. Matches metro-vue-transformer.cjs's identical trick.
     return upstreamTransformer.transform({

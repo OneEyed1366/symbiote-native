@@ -16,7 +16,18 @@ export type ISerializedNode = {
   props: Record<string, unknown>;
   // Only present for a raw-text node (RCTRawText) — see serialize-tree.ts's getTextPreview.
   textPreview?: string;
+  // The developer-authored component ancestry that led to this node (root-first — [App,
+  // CanaryScreen, Button] — not just the nearest creator), when the owning adapter was able to
+  // determine it — see ISymbioteNodeOwner in @symbiote-native/engine. Absent for a node no
+  // adapter has tagged yet.
+  owner?: { chain: readonly { component: string; file?: string }[] };
   children: ISerializedNode[];
+  // Present when this node had MORE native children than the serializer's total-node budget
+  // allowed for (see MAX_SERIALIZED_NODES in serialize-tree.ts) — the count of children that got
+  // cut, never silently. A deeply-nested-navigator screen can retain tens of thousands of native
+  // nodes; serializing and shipping ALL of them as JSON on every commit is what crashed the panel
+  // on a real device (memory, not a stack-depth issue — see the symbiote-devtools-inspector skill).
+  truncatedChildCount?: number;
 };
 
 export type ISerializedSurface = {

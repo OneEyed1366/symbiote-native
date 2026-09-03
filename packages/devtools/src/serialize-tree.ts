@@ -14,6 +14,22 @@ const MAX_STRING_LENGTH = 500;
 const TEXT_PREVIEW_LENGTH = 80;
 const TRUNCATION_MARKER = '…';
 
+// Hard caps on the WHOLE serialized tree — a deeply-nested-navigator screen can retain tens of
+// thousands of native nodes (React Navigation wraps every screen in many layers and, by default,
+// keeps every pushed/tabbed screen mounted simultaneously). Serializing and JSON-shipping ALL of
+// them over the CDP bridge on every single commit crashed the DevTools panel on a real device
+// (confirmed: browser tab hung, memory exhaustion, not a stack-depth issue — that was a separate,
+// already-fixed bug in the PANEL's own client-side algorithms). These bound the payload itself, at
+// the source, rather than trying to process an unbounded payload more cleverly downstream.
+// MAX_SERIALIZED_NODES is shared across ALL active surfaces in one `serializeSurfaceTree` call —
+// total payload size is what matters, not any one surface's share of it. Truncation is never
+// silent: a node whose children got cut short carries `truncatedChildCount` (protocol.ts) so the
+// panel can show it, rather than silently rendering an incomplete tree with no indication anything
+// was cut.
+// Exported so tests can assert against the real constants rather than duplicating magic numbers.
+export const MAX_SERIALIZED_NODES = 2000;
+export const MAX_TREE_DEPTH = 400;
+
 // Stable per-node id across commits: engine nodes are mutated in place, not recreated, on a
 // re-render (only a real unmount/remount replaces the object), so a WeakMap keyed by node
 // identity gives the panel a key to diff/select against across snapshots without the engine
@@ -30,7 +46,9 @@ function getStableNodeId(node: ISymbioteNode): number {
 }
 
 function truncateString(value: string, maxLength: number): string {
-  return value.length > maxLength ? `${value.slice(0, maxLength)}${TRUNCATION_MARKER}` : value;
+  return value.length > maxLength
+    ? `${value.slice(0, maxLength)}${TRUNCATION_MARKER}`
+    : value;
 }
 
 function isPlainObject(value: object): value is Record<string, unknown> {
@@ -43,7 +61,8 @@ function isPlainObject(value: object): value is Record<string, unknown> {
 // arrays cap at MAX_ARRAY_LENGTH; object nesting caps at MAX_OBJECT_DEPTH.
 function serializeValue(value: unknown, depth: number): unknown {
   if (value === null || value === undefined) return value;
-  if (typeof value === 'string') return truncateString(value, MAX_STRING_LENGTH);
+  if (typeof value === 'string')
+    return truncateString(value, MAX_STRING_LENGTH);
   if (typeof value === 'number' || typeof value === 'boolean') return value;
   if (typeof value === 'function') return '[Function]';
   if (typeof value === 'symbol') return '[Symbol]';
@@ -52,8 +71,12 @@ function serializeValue(value: unknown, depth: number): unknown {
   if (depth >= MAX_OBJECT_DEPTH) return TRUNCATION_MARKER;
 
   if (Array.isArray(value)) {
-    const items = value.slice(0, MAX_ARRAY_LENGTH).map(item => serializeValue(item, depth + 1));
-    return value.length > MAX_ARRAY_LENGTH ? [...items, TRUNCATION_MARKER] : items;
+    const items = value
+      .slice(0, MAX_ARRAY_LENGTH)
+      .map(item => serializeValue(item, depth + 1));
+    return value.length > MAX_ARRAY_LENGTH
+      ? [...items, TRUNCATION_MARKER]
+      : items;
   }
 
   // Not a plain object literal (Map, Set, class instance, engine node, ...) — nothing here
@@ -68,7 +91,9 @@ function serializeValue(value: unknown, depth: number): unknown {
   return result;
 }
 
-function serializeProps(props: Record<string, unknown>): Record<string, unknown> {
+function serializeProps(
+  props: Record<string, unknown>,
+): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(props)) {
     result[key] = serializeValue(value, 0);
@@ -99,23 +124,85 @@ function renderableChildren(node: ISymbioteNode): ISymbioteNode[] {
   return children;
 }
 
-export function serializeNode(node: ISymbioteNode): ISerializedNode {
+// Mutable, shared across one whole `serializeSurfaceTree` call (every root, every descendant) —
+// what actually enforces MAX_SERIALIZED_NODES as a TOTAL across the payload, not per-subtree.
+type IBudget = { remaining: number };
+
+// `depth` is capped independently of `remaining`: a deeply-nested-navigator screen can stay
+// UNDER the node-count budget while still being pathologically deep (many screens, each adding
+// only a handful of wrapper views, compounding into hundreds of levels) — MAX_TREE_DEPTH bounds
+// this recursion's own call depth to a fixed, safe constant regardless of the real tree's shape,
+// rather than relying on Hermes's stack limit (generally larger than a browser tab's, but not
+// unlimited) to save it.
+function serializeNodeBounded(
+  node: ISymbioteNode,
+  depth: number,
+  budget: IBudget,
+): ISerializedNode {
+  budget.remaining -= 1;
   const textPreview = getTextPreview(node);
+  const kids = renderableChildren(node);
+
+  const children: ISerializedNode[] = [];
+  let truncatedChildCount = 0;
+  // `depth` counts ancestors (root = 0), so a node at `depth` is the (depth + 1)th level — this
+  // node is always included regardless; the check only decides whether ITS children (the NEXT
+  // level) get created. Cutting once `depth` reaches `MAX_TREE_DEPTH - 1` keeps the total number
+  // of levels at exactly `MAX_TREE_DEPTH`, not `MAX_TREE_DEPTH + 1`.
+  if (depth >= MAX_TREE_DEPTH - 1) {
+    truncatedChildCount = kids.length;
+  } else {
+    for (const child of kids) {
+      if (budget.remaining <= 0) {
+        truncatedChildCount += kids.length - children.length;
+        break;
+      }
+      children.push(serializeNodeBounded(child, depth + 1, budget));
+    }
+  }
+
   const base: ISerializedNode = {
     id: getStableNodeId(node),
     component: node.component,
     isText: node.isText,
     props: serializeProps(node.props),
-    children: renderableChildren(node).map(serializeNode),
+    children,
   };
-  return textPreview === undefined ? base : { ...base, textPreview };
+  const withText = textPreview === undefined ? base : { ...base, textPreview };
+  const withOwner =
+    node.owner === undefined ? withText : { ...withText, owner: node.owner };
+  return truncatedChildCount === 0
+    ? withOwner
+    : { ...withOwner, truncatedChildCount };
 }
 
-export function serializeSurfaceTree(nodes: readonly ISymbioteNode[]): ISerializedNode[] {
+// Public, single-node entry point — used directly by callers/tests wanting one node's own
+// subtree serialized without the whole-payload node-count cap, which only matters when shipping
+// a FULL surface snapshot over the wire (serializeSurfaceTree, below). Still depth-capped: no
+// caller should ever recurse pathologically deep, budget or not.
+export function serializeNode(node: ISymbioteNode): ISerializedNode {
+  return serializeNodeBounded(node, 0, { remaining: Infinity });
+}
+
+export function serializeSurfaceTree(
+  nodes: readonly ISymbioteNode[],
+): ISerializedNode[] {
   const roots: ISymbioteNode[] = [];
   for (const node of nodes) {
     if (isAnchor(node)) roots.push(...renderableChildren(node));
     else roots.push(node);
   }
-  return roots.map(serializeNode);
+  const budget: IBudget = { remaining: MAX_SERIALIZED_NODES };
+  const result: ISerializedNode[] = [];
+  for (const root of roots) {
+    // A budget exhausted BETWEEN roots (not within one root's own children) has no parent node
+    // to attach `truncatedChildCount` to — narrow, silent edge case, only reachable when a single
+    // surface snapshot call has enough independent top-level roots to exhaust MAX_SERIALIZED_NODES
+    // on its own; real apps have a small, fixed number of roots (one per active surface plus
+    // however many render at a surface's own top level), so budget exhaustion in practice always
+    // happens WITHIN a root's subtree, where it IS signaled.
+    if (budget.remaining <= 0) break;
+    result.push(serializeNodeBounded(root, 0, budget));
+  }
+  return result;
 }

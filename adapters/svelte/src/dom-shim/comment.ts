@@ -5,7 +5,7 @@
 // reads a comment's content on any mandatory path, only its position in the tree.
 
 import { createAnchor, type ISymbioteNode } from '@symbiote-native/engine';
-import { ShimNode } from './shim-node';
+import { COMMENT_NODE, ShimNode } from './shim-node';
 
 export class ShimComment extends ShimNode {
   data: string;
@@ -17,6 +17,10 @@ export class ShimComment extends ShimNode {
 
   override get nodeName(): string {
     return '#comment';
+  }
+
+  override get nodeType(): number {
+    return COMMENT_NODE;
   }
 
   cloneNode(deep?: boolean): ShimComment {
