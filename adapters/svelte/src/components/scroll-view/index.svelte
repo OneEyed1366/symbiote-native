@@ -48,7 +48,7 @@
     resolveDecelerationRate,
     resolveScrollForwarding,
     selectScrollIntrinsics,
-    splitLayoutProps,
+    splitScrollViewStyle,
     type IContentSize,
   } from '@symbiote-native/components';
   import {
@@ -131,18 +131,12 @@
 
   // Android wrap mode only: RN's ScrollView.js splits the flattened style across the two boxes —
   // LAYOUT props (margin/flex/size/position/...) drive the outer AndroidSwipeRefreshLayout frame,
-  // VISUAL props (background/padding/border/...) paint the inner scroll view (mirrors React's/
-  // Vue's index.android.ts splitLayoutProps). Splitting on the resolved [class, style] pair, not
-  // `style` alone: a class-only layout prop (flex/height/gap/...) is invisible to `style` until
-  // resolveClassName runs, so splitting on `style` alone would starve the wrapper of its layout
-  // style and collapse it to nothing — e.g. App.svelte's `class="screen"` (flex:1) on the
+  // VISUAL props (background/padding/border/...) paint the inner scroll view, with the axis base
+  // under both (mirrors React's/Vue's index.android.ts). Splitting on the resolved [class, style]
+  // pair, not `style` alone: a class-only layout prop (flex/height/gap/...) is invisible to `style`
+  // until resolveClassName runs, so splitting on `style` alone would starve the wrapper of its
+  // layout style and collapse it to nothing — e.g. App.svelte's `class="screen"` (flex:1) on the
   // top-level ScrollView, which left the wrapper with no height for its content to grow into.
-  const layoutSplit = $derived(
-    shouldWrapRefreshControl
-      ? splitLayoutProps([resolveSvelteClass(className), style])
-      : undefined,
-  );
-
   // A single AnimatedValue tracks the scroll offset (RN's _scrollAnimatedValue), allocated once
   // per instance — held by IDENTITY (never wrapped in $state, the same reactivity rule the shim
   // node follows), shared with any manually-composed ScrollViewStickyHeader via context below.
@@ -193,6 +187,16 @@
     selectScrollIntrinsics(isHorizontal, resolvedContentContainerStyle),
   );
 
+  // Declared after `intrinsics` because it reads the axis base from it.
+  const layoutSplit = $derived(
+    shouldWrapRefreshControl
+      ? splitScrollViewStyle(intrinsics.scrollViewBaseStyle, [
+          resolveSvelteClass(className),
+          style,
+        ])
+      : undefined,
+  );
+
   const forwarding = $derived(
     resolveScrollForwarding({
       hasStickyHeaders,
@@ -241,12 +245,13 @@
     );
   });
 
-  // Not wrapping: the full [base, style] pair stays on the scroll view, unchanged. Wrapping: only
-  // the VISUAL half (layoutSplit.inner) paints it — the LAYOUT half moved to the wrapper below.
-  const scrollStyle = $derived([
-    intrinsics.scrollViewBaseStyle,
-    layoutSplit !== undefined ? layoutSplit.inner : style,
-  ]);
+  // Not wrapping: the full [base, style] pair stays on the scroll view. Wrapping: `layoutSplit`
+  // already composed the base under the VISUAL half, and the LAYOUT half moved to the wrapper.
+  const scrollStyle = $derived(
+    layoutSplit !== undefined
+      ? layoutSplit.inner
+      : [intrinsics.scrollViewBaseStyle, style],
+  );
 
   const outerBag = $derived.by(() => {
     const forwarded = resolveAccessibilityProps(passthrough);

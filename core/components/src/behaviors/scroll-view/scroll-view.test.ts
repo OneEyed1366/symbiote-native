@@ -11,7 +11,10 @@
 // already emit, so a global registration would give every existing ScrollView a second content
 // node; see the behavior's header for the `-managed` split that resolves it.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  installFabric,
+  type IFakeNode,
+} from '../../../../test-utils/src/index';
 import {
   appendChild,
   clearHostBehaviors,
@@ -24,16 +27,16 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
-import { descriptorFor } from '../component-names';
+import { descriptorFor } from '../../component-names';
 import {
   resolveDecelerationRate,
   selectScrollIntrinsics,
-} from '../view/render-scroll-view';
+} from '../../view/render-scroll-view';
 import {
   HORIZONTAL_SCROLL_VIEW_TAG,
   registerScrollViewBehavior,
   SCROLL_VIEW_TAG,
-} from './scroll-view';
+} from './index';
 
 const fabric = installFabric();
 let nextRootTag = 9700;

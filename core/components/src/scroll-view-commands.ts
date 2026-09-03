@@ -89,6 +89,28 @@ export function splitLayoutProps(style: IStyleProp<IViewStyle> | undefined): {
   return { outer, inner };
 }
 
+// The whole Android wrap style decision: the layout/visual split, AND the axis base composed onto
+// BOTH boxes. RN does the second half too (`StyleSheet.compose(baseStyle, outer)` beside
+// `compose(baseStyle, inner)`, ScrollView.js:1856), and every adapter had dropped it from the
+// wrapper — so an AndroidSwipeRefreshLayout with no explicit user layout style lost `flexGrow: 1`
+// and collapsed to its content height inside a flex parent, where RN's grows.
+//
+// One function rather than five call sites composing `[base, outer]` by hand, because that is what
+// the last one drifted into: a fold written inline is invisible to
+// `tests/lowered-primitive-fold-parity.test.ts`, whose oracle is shared value imports.
+// `style` is `unknown` rather than `IStyleProp`, because a `payloadFold` reads it off an untyped
+// props bag and `flattenStyle` — the only thing that touches it here — already takes `unknown`.
+// Narrowing it would buy a guard at every fold call site and no safety.
+export function splitScrollViewStyle(
+  base: IStyleProp<IViewStyle> | undefined,
+  style: unknown,
+): { outer: IStyleProp<IViewStyle>; inner: IStyleProp<IViewStyle> } {
+  const { outer, inner } = splitLayoutProps(flattenStyle(style));
+  // Base UNDER the split half on both, so an explicit user value still wins — the same order the
+  // unwrapped scroll view composes.
+  return { outer: [base, outer], inner: [base, inner] };
+}
+
 // Re-exported so the package barrel (index.ts) can still export this guard to
 // '@symbiote-native/components' callers, now that it lives in the engine, next to ISymbioteEvent.
 export { isSymbioteEvent };

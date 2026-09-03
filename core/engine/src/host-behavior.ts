@@ -51,6 +51,9 @@ export type IPayloadFold = (
   props: Readonly<Record<string, unknown>>,
 ) => Record<string, unknown>;
 
+// What an owner does with a child it claims. See `IHostBehavior.claimedChildren`.
+export type IClaimMode = 'beside' | 'wrap';
+
 export interface IHostBehavior {
   // Listener names this behavior OWNS on its tag — engine event names, not `onX` props
   // ('press', 'startShouldSetResponder', ...). `setEventListener` stashes an app listener for an
@@ -98,18 +101,24 @@ export interface IHostBehavior {
   // path in practice, and `node.childHost` turns away every node that has no slot before the
   // registry is touched at all.
   readonly slotDerived?: readonly string[];
-  // Children that stay on the OWNER instead of going into the slot, by FABRIC component name.
+  // Children the owner takes out of the ordinary flow, by FABRIC component name, and what it does
+  // with each.
   //
-  // The child twin of `slotProps`: a ScrollView's RefreshControl is a sibling of the content view,
-  // not one of its children, and RN's iOS branch renders `{refreshControl}{contentContainer}` in
-  // that order. `appendChild` puts a claimed child before the slot for exactly that reason.
+  // The child twin of `slotProps`: a ScrollView's RefreshControl is not one of the content view's
+  // children, and the two platforms disagree about what it IS instead —
+  //
+  //   beside   a sibling before the content view      RN iOS,     ScrollView.js:1844
+  //   wrap     the scroll view's own PARENT           RN Android, ScrollView.js:1856
+  //
+  // and the second is a native constraint rather than a JSX one: an Android ScrollView takes
+  // exactly one child, so a sibling refresh control is an `addViewAt` crash.
   //
   // BY FABRIC NAME, unlike the registry itself, and the difference is that a claim is per-PARENT.
   // Keying the registry that way would attach the press machine to every plain `View`, because a
   // Pressable resolves to `RCTView` like any other; a claim is only consulted for children of one
   // owner, so `PullToRefreshView` / `AndroidSwipeRefreshLayout` is unambiguous there and the node
   // needs no field carrying its intrinsic tag.
-  readonly claimedChildren?: readonly string[];
+  readonly claimedChildren?: Readonly<Record<string, IClaimMode>>;
   // Builds the primitive's OWN internal subtree, once, and returns the node the app's children
   // belong under — or undefined when they belong directly on the host.
   //
@@ -152,6 +161,15 @@ export interface IHostBehavior {
   // hand from `attach` — `animated/event.ts` does — but it then owes its own cancel in `detach`, and
   // forgetting that leaks a waiter pointed at a dead node. This exists to remove that footgun.
   attachAfterCommit?(node: ISymbioteNode): void;
+  // Runs when a `wrap` claim puts a node above the owner, and again with `undefined` when it
+  // leaves. Only the WRAP mode notifies: `beside` changes nothing a behavior has to answer for,
+  // while a wrap moves where the owner's own style belongs.
+  //
+  // The wrapper is the APP's node, so the behavior cannot have given it a `payloadFold` at
+  // creation the way it does for a node its own `buildStructure` built. This is where it can —
+  // RN puts the layout half of the scroll view's style on the refresh layout and the visual half
+  // on the scroll view, and neither node can work that out alone.
+  onWrapChange?(owner: ISymbioteNode, wrapper: ISymbioteNode | undefined): void;
   // Runs when the app WIRES or UNWIRES one of `ownedListeners`, never on a re-render that hands the
   // same name a fresh closure. `wired` is the new state.
   //
@@ -269,9 +287,22 @@ export function notifyOwnedListenerChange(
   attached.get(node)?.onOwnedListenerChange?.(node, name, wired);
 }
 
-// Does this owner keep a child of that Fabric component beside its slot? See `claimedChildren`.
-export function claimsChild(node: ISymbioteNode, component: string): boolean {
-  return attached.get(node)?.claimedChildren?.includes(component) === true;
+// Called from the two structural entry points when a wrap claim lands or leaves. See
+// `onWrapChange`.
+export function notifyWrapChange(
+  owner: ISymbioteNode,
+  wrapper: ISymbioteNode | undefined,
+): void {
+  attached.get(owner)?.onWrapChange?.(owner, wrapper);
+}
+
+// What this owner does with a child of that Fabric component, or undefined when it does not claim
+// it at all. See `claimedChildren`.
+export function claimModeFor(
+  node: ISymbioteNode,
+  component: string,
+): IClaimMode | undefined {
+  return attached.get(node)?.claimedChildren?.[component];
 }
 
 // Does this owner key feed the slot's payload? See `slotDerived`. Same `node.childHost` gate as

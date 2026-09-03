@@ -50,7 +50,7 @@ import {
   resolveDecelerationRate,
   resolveScrollForwarding,
   selectScrollIntrinsics,
-  splitLayoutProps,
+  splitScrollViewStyle,
   type IAccessibilityProps,
   type IAriaProps,
   type IContentSize,
@@ -311,7 +311,12 @@ export function createScrollView(
       resolveClassName(local.class),
       local.style,
     ];
-    const splitStyles = createMemo(() => splitLayoutProps(layoutSplitStyle()));
+    const splitStyles = createMemo(() =>
+      splitScrollViewStyle(
+        intrinsics().scrollViewBaseStyle,
+        layoutSplitStyle(),
+      ),
+    );
 
     const forwarding = createMemo(() =>
       resolveScrollForwarding({
@@ -403,11 +408,11 @@ export function createScrollView(
       if (rate !== undefined)
         bag.decelerationRate = resolveDecelerationRate(rate);
       // Base style UNDER the user style, so an explicit height / flexDirection still wins. Under the
-      // Android wrap only the VISUAL half stays here; the LAYOUT half moved to the wrapper.
-      bag.style = [
-        intrinsics().scrollViewBaseStyle,
-        isWrappingRefreshControl ? splitStyles().inner : local.style,
-      ];
+      // Android wrap only the VISUAL half stays here (with the base already composed under it by
+      // splitScrollViewStyle); the LAYOUT half moved to the wrapper.
+      bag.style = isWrappingRefreshControl
+        ? splitStyles().inner
+        : [intrinsics().scrollViewBaseStyle, local.style];
       // Stripped under the wrap: layoutSplitStyle already folded the resolved class into
       // outer/inner, so forwarding it raw too would re-apply its LAYOUT half a second time.
       if (!isWrappingRefreshControl) bag.class = local.class;

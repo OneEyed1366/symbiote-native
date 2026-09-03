@@ -42,7 +42,7 @@ import {
   resolveDecelerationRate,
   resolveScrollForwarding,
   selectScrollIntrinsics,
-  splitLayoutProps,
+  splitScrollViewStyle,
   type IAccessibilityProps,
   type IAccessibilityStateValue,
   type IAriaProps,
@@ -726,13 +726,16 @@ export abstract class ScrollViewBase
   readonly androidWrappedScrollProps = computed<Record<string, unknown>>(() => {
     this.inputsRevision();
     const props = { ...this.scrollProps() };
-    const { inner, outer } = splitLayoutProps(this.layoutSplitStyle);
+    const { inner, outer } = splitScrollViewStyle(
+      this.scrollViewBaseStyle,
+      this.layoutSplitStyle,
+    );
     dlog(
       () =>
         `Angular ScrollView splitProbe layoutSplitStyle=${JSON.stringify(this.layoutSplitStyle)} ` +
         `outer=${JSON.stringify(outer)} inner=${JSON.stringify(inner)}`,
     );
-    props.style = [this.scrollViewBaseStyle, inner];
+    props.style = inner;
     props.nestedScrollEnabled = true;
     return props;
   });
@@ -748,7 +751,10 @@ export abstract class ScrollViewBase
   }
 
   get androidRefreshControlProps(): Record<string, unknown> {
-    const { outer } = splitLayoutProps(this.layoutSplitStyle);
+    const { outer } = splitScrollViewStyle(
+      this.scrollViewBaseStyle,
+      this.layoutSplitStyle,
+    );
     dlog(
       () =>
         `Angular ScrollView refreshControlProbe outer=${JSON.stringify(outer)} ` +

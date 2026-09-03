@@ -1,14 +1,20 @@
-// ScrollView's host behavior — the pilot for `IHostBehavior.buildStructure` + `childHost`, and now
-// for `slotDerived` as well.
+// ScrollView's host behavior, the platform-invariant half — and the pilot for four of the engine's
+// composed-primitive seams: `buildStructure` + `childHost`, `slotProps`, `slotDerived`, and
+// `claimedChildren`.
 //
-// WHAT IS AND IS NOT HERE. Structure, the two style compositions, `decelerationRate` resolution,
-// `collapsableChildren`, and the synthesized `onContentSizeChange` are all wired. The STICKY half is
-// not: `scrollEventThrottle`'s 1/16 defaults and `resolveScrollForwarding`'s `sticky-native` /
-// `sticky-js` modes only mean something once a sticky header is a marked CHILD rather than an index
-// into a children array a lowered element does not have. Resolving the throttle on its own would buy
-// a per-frame scroll event with nothing reading it, so it waits for that step rather than landing
-// half-wired. `onScroll` needs nothing either way — `scroll` is a real Fabric event and routes on
-// its own.
+// THE PLATFORM HALF IS THE REFRESHCONTROL, and only that. `index.ios` claims it `beside` the
+// content view; `index.android` claims it as a `wrap`, because an Android ScrollView holds exactly
+// one child. Everything else here is shared, including the tags, the folds and the content-size
+// synthesis.
+//
+// WHAT IS AND IS NOT WIRED. Structure, the style compositions, `decelerationRate` resolution,
+// `collapsableChildren`, the synthesized `onContentSizeChange` and the RefreshControl on both
+// platforms. The STICKY half is not: `scrollEventThrottle`'s 1/16 defaults and
+// `resolveScrollForwarding`'s `sticky-native` / `sticky-js` modes only mean something once a sticky
+// header is a marked CHILD rather than an index into a children array a lowered element does not
+// have. Resolving the throttle on its own would buy a per-frame scroll event with nothing reading
+// it, so it waits for the mechanism it feeds. `onScroll` needs nothing either way — `scroll` is a
+// real Fabric event and routes on its own.
 //
 // WHAT A COMPOSED PRIMITIVE COSTS TODAY. Every adapter's ScrollView wrapper builds the same two
 // nodes: `selectScrollIntrinsics` picks a scroll intrinsic and a content intrinsic, and the
@@ -30,7 +36,7 @@
 // land. `symbiote-scroll-view` is the tag the WRAPPERS already emit, and a wrapper builds its own
 // content node from `selectScrollIntrinsics`. Registering here would give those trees a second
 // content node — every existing ScrollView, silently double-nested. The precedent for the fix is
-// `symbiote-text-input` vs `symbiote-text-input-managed` in `../component-names/shared.ts`: the
+// `symbiote-text-input` vs `symbiote-text-input-managed` in `../../component-names/shared.ts`: the
 // wrapper and the lowered path get separate tags so exactly one owner builds each node. Splitting
 // the scroll tags is the NEXT step and is not this one; until then `registerScrollViewBehavior()`
 // is called only by tests, which is what exercises it.
@@ -60,6 +66,7 @@ import {
   dlog,
   registerHostBehavior,
   setEventListener,
+  type IClaimMode,
   type IHostBehavior,
   type IPayloadFold,
   type ISymbioteEvent,
@@ -67,8 +74,8 @@ import {
   type IViewStyle,
 } from '@symbiote-native/engine';
 
-import { descriptorFor } from '../component-names';
-import type { ISymbioteIntrinsic } from '../component-names/shared';
+import { descriptorFor } from '../../component-names';
+import type { ISymbioteIntrinsic } from '../../component-names/shared';
 import {
   didContentSizeChange,
   preservesContentChildren,
@@ -77,7 +84,7 @@ import {
   SCROLL_VIEW_BASE_HORIZONTAL,
   SCROLL_VIEW_BASE_VERTICAL,
   type IContentSize,
-} from '../view/render-scroll-view';
+} from '../../view/render-scroll-view';
 
 export const SCROLL_VIEW_TAG = 'symbiote-scroll-view';
 export const HORIZONTAL_SCROLL_VIEW_TAG = 'symbiote-horizontal-scroll-view';
@@ -92,24 +99,19 @@ const SLOT_PROPS: Readonly<Record<string, string>> = {
 // `IHostBehavior.slotDerived` for why nothing else makes that happen.
 const SLOT_DERIVED = ['maintainVisibleContentPosition', 'snapToAlignment'];
 
-// A `<RefreshControl>` written among the app's children belongs beside the content view, not
-// inside it (RN iOS: `{refreshControl}{contentContainer}`). Resolved through `descriptorFor` so it
-// is whatever the platform's name table says — `PullToRefreshView` on iOS.
-//
-// ANDROID IS NOT THIS SHAPE and is not done. An Android ScrollView takes exactly one child, so RN
-// inverts the tree there: `AndroidSwipeRefreshLayout` WRAPS the scroll view
-// (`ScrollView.js:1856`), with `splitLayoutProps` sending the layout half of the style to the
-// wrapper. A claim cannot express that — the refresh control is not a child at all — so it needs a
-// node that goes ABOVE the owner, and the owner has no parent yet when its children arrive. Until
-// that is designed, a lowered ScrollView is iOS-only, which costs nothing today because no adapter
-// registers this behavior.
-const CLAIMED_CHILDREN = [descriptorFor('symbiote-refresh-control').component];
+// A `<RefreshControl>` written among the app's children is claimed, and WHAT the owner does with
+// it is the one thing that genuinely differs per platform — see the platform files. Resolved
+// through `descriptorFor`, so this is `PullToRefreshView` on iOS and `AndroidSwipeRefreshLayout`
+// on Android without either name appearing here.
+export const REFRESH_CONTROL = descriptorFor(
+  'symbiote-refresh-control',
+).component;
 
 // The OWNER's fold: the per-axis base style UNDER the app's (so an explicit `flexDirection` still
 // wins), and `decelerationRate` resolved from RN's two words to the platform's friction constant.
 // The resolution has to happen here rather than in an adapter because a lowered element has no
 // wrapper to do it, and 'normal'/'fast' reach Fabric as strings it cannot read.
-function ownerFold(base: IViewStyle): IPayloadFold {
+export function ownerFold(base: IViewStyle): IPayloadFold {
   return props => {
     const next: Record<string, unknown> = {
       ...props,
@@ -232,16 +234,36 @@ function syncContentSizeWiring(
   }
 }
 
+// The platform half. iOS takes the RefreshControl `beside` the content view and needs nothing
+// else; Android takes it as a `wrap` and has to move the scroll view's layout style up to it,
+// which is what `onWrapChange` is for.
+//
+// The hook is a FACTORY over the axis base rather than the hook itself, because the two behaviors
+// registered below carry different bases (vertical and horizontal) and each needs its own.
+export interface IScrollPlatform {
+  claimMode: IClaimMode;
+  onWrapChange?: (base: IViewStyle) => IHostBehavior['onWrapChange'];
+  // Owner props this platform's WRAPPER fold reads, added to the slot's own. Android's needs
+  // `style`, because the layout half of the scroll view's style is what the wrapper paints.
+  //
+  // It dirties the content node as well as the wrapper — the engine marks both from one list — so a
+  // ScrollView style write on Android re-clones a content node whose payload did not change. A
+  // style write is not a per-frame event, and a second list to avoid one clone is not worth a field.
+  slotDerived?: readonly string[];
+}
+
 function scrollBehavior(
   contentIntrinsic: ISymbioteIntrinsic,
   base: IViewStyle,
   rowStyle: IViewStyle | undefined,
+  platform: IScrollPlatform,
 ): IHostBehavior {
   return {
     ownedListeners: ['contentSizeChange'],
     slotProps: SLOT_PROPS,
-    slotDerived: SLOT_DERIVED,
-    claimedChildren: CLAIMED_CHILDREN,
+    slotDerived: [...SLOT_DERIVED, ...(platform.slotDerived ?? [])],
+    claimedChildren: { [REFRESH_CONTROL]: platform.claimMode },
+    onWrapChange: platform.onWrapChange?.(base),
     buildStructure: buildContent(contentIntrinsic, rowStyle),
     foldPayload: ownerFold(base),
     // No timer and no listener taken here: the one listener this behavior installs is prop-driven,
@@ -256,13 +278,16 @@ function scrollBehavior(
   };
 }
 
-export function registerScrollViewBehavior(): void {
+// Both axes, given the platform's answer to the RefreshControl question. The platform files call
+// this; nothing else should.
+export function registerScrollViewBehaviors(platform: IScrollPlatform): void {
   registerHostBehavior(
     SCROLL_VIEW_TAG,
     scrollBehavior(
       'symbiote-scroll-content',
       SCROLL_VIEW_BASE_VERTICAL,
       undefined,
+      platform,
     ),
   );
   registerHostBehavior(
@@ -270,9 +295,8 @@ export function registerScrollViewBehavior(): void {
     scrollBehavior(
       'symbiote-horizontal-scroll-content',
       SCROLL_VIEW_BASE_HORIZONTAL,
-      {
-        flexDirection: 'row',
-      },
+      { flexDirection: 'row' },
+      platform,
     ),
   );
 }

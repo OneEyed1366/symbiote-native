@@ -26,10 +26,11 @@ import { dlog } from './debug';
 import {
   appListenerFor,
   attachHostBehavior,
-  claimsChild,
+  claimModeFor,
   hasHostBehaviors,
   markDetachCandidate,
   notifyOwnedListenerChange,
+  notifyWrapChange,
   ownsListener,
   reattachHostBehaviors,
   slotDerivesFrom,
@@ -214,6 +215,19 @@ export interface ISymbioteNode {
   // that needs depth builds the chain and points this at the innermost node directly.
   childHost: ISymbioteNode | undefined;
 
+  // The node that stands in THIS node's place in its parent's child list. Set when a behavior
+  // claims a child in `wrap` mode, which is how an Android ScrollView takes a RefreshControl: the
+  // refresh layout becomes the scroll view's parent, because an Android ScrollView holds exactly
+  // one child and a sibling refresh control is an `addViewAt` crash.
+  //
+  // The inversion is confined to the two structural entry points, and only they read this: the
+  // adapter still names the scroll view for every insert, prop write and command, because that is
+  // the node it holds. Nothing above `appendChild` learns the wrapper exists.
+  //
+  // A FIELD for the same reason `childHost` is one, and beside it in the constructor so the pair
+  // costs no extra shape transition.
+  wrapper: ISymbioteNode | undefined;
+
   // RN's ReactFabricHostComponent surface - what a template/function ref hands back and what
   // reanimated / gesture-handler / react-navigation reach through. Each resolves the node's
   // CURRENT committed handle at call time, so a clone-on-write commit between calls is
@@ -287,6 +301,7 @@ class SymbioteNode implements ISymbioteNode {
   declare styleParts: IClassStyleParts | undefined;
   declare payloadFold: IPayloadFold | undefined;
   declare childHost: ISymbioteNode | undefined;
+  declare wrapper: ISymbioteNode | undefined;
 
   constructor(
     component: string,
@@ -325,6 +340,7 @@ class SymbioteNode implements ISymbioteNode {
     // on every append, so the slot must be a stable slot on one hidden class, not a property added
     // to a few nodes after the fact.
     this.childHost = undefined;
+    this.wrapper = undefined;
   }
 
   measure(callback: IMeasureOnSuccess): void {
@@ -649,13 +665,15 @@ export function setProp(
   // activeStyle, on* — return before reaching here and none of them can carry an alias, so every
   // `role` / `aria-*` write in the engine passes through this line.
   if (!node.hasAriaAlias && isAriaAliasKey(key)) node.hasAriaAlias = true;
-  // A composed primitive's slot can carry a value DERIVED from an owner prop, and `markPropsDirty`
-  // bubbles up — so the slot never learns. Here rather than in `routeProp` because this is the one
-  // choke point every writer passes (a structural adapter's `setProperty` does not go through
-  // routeProp), and past the identity guard so a re-render writing an unchanged value costs the
-  // slot nothing. See `IHostBehavior.slotDerived`.
-  if (node.childHost !== undefined && slotDerivesFrom(node, key))
+  // A composed primitive's slot — and its wrapper, where it has one — can carry a value DERIVED
+  // from an owner prop, and `markPropsDirty` bubbles up, so neither ever learns. Here rather than
+  // in `routeProp` because this is the one choke point every writer passes (a structural adapter's
+  // `setProperty` does not go through routeProp), and past the identity guard so a re-render
+  // writing an unchanged value costs them nothing. See `IHostBehavior.slotDerived`.
+  if (node.childHost !== undefined && slotDerivesFrom(node, key)) {
     markPropsDirty(node.childHost);
+    if (node.wrapper !== undefined) markPropsDirty(node.wrapper);
+  }
   propStats.writes += 1;
   markPropsDirty(node);
 }
@@ -1203,7 +1221,57 @@ function detach(child: ISymbioteNode): void {
 function hostFor(parent: ISymbioteNode, child: ISymbioteNode): ISymbioteNode {
   const slot = parent.childHost;
   if (slot === undefined) return parent;
-  return claimsChild(parent, child.component) ? parent : slot;
+  return claimModeFor(parent, child.component) === undefined ? slot : parent;
+}
+
+// What actually occupies this node's place in its parent's child list. See `ISymbioteNode.wrapper`:
+// a wrapped owner is what the adapter names and the wrapper is what the tree holds, so every
+// structural op takes the owner and moves the wrapper.
+function placedNode(node: ISymbioteNode): ISymbioteNode {
+  return node.wrapper ?? node;
+}
+
+// Make `child` the owner's parent, in place. Returns false when this is not a wrap claim, so the
+// two inserts fall through to the ordinary path on one call.
+//
+// The owner being UNATTACHED is the normal case rather than the edge one: every adapter fills a
+// node's children before appending it to its own parent, so the wrap usually happens while
+// `owner.parent` is undefined and the swap below is skipped. The later `appendChild(root, owner)`
+// then inserts the wrapper instead, because `placedNode` says so.
+function wrapsOwner(owner: ISymbioteNode, child: ISymbioteNode): boolean {
+  if (owner.childHost === undefined) return false;
+  if (claimModeFor(owner, child.component) !== 'wrap') return false;
+  if (hasHostBehaviors()) reattachHostBehaviors(child);
+  detach(child);
+  const outerParent = owner.parent;
+  if (outerParent !== undefined) {
+    markStructureDirty(outerParent);
+    outerParent.children[outerParent.children.indexOf(owner)] = child;
+    child.parent = outerParent;
+  }
+  owner.wrapper = child;
+  owner.parent = child;
+  markStructureDirty(child);
+  child.children.push(owner);
+  notifyWrapChange(owner, child);
+  return true;
+}
+
+// Put the owner back where its wrapper stood — the mirror of `wrapsOwner`. It must leave the owner
+// ATTACHED: the framework is removing the RefreshControl, not the ScrollView.
+function unwrapsOwner(owner: ISymbioteNode, child: ISymbioteNode): boolean {
+  if (owner.wrapper !== child) return false;
+  const outerParent = child.parent;
+  owner.wrapper = undefined;
+  if (outerParent !== undefined) {
+    markStructureDirty(outerParent);
+    outerParent.children[outerParent.children.indexOf(child)] = owner;
+  }
+  owner.parent = outerParent;
+  child.parent = undefined;
+  child.children.length = 0;
+  notifyWrapChange(owner, undefined);
+  return true;
 }
 
 // Where the child goes in its host's list.
@@ -1214,11 +1282,13 @@ function hostFor(parent: ISymbioteNode, child: ISymbioteNode): ISymbioteNode {
 // could not find it here anyway.
 function indexFor(
   host: ISymbioteNode,
-  beforeChild: ISymbioteNode | undefined,
+  beforeChild: ISymbioteNode | null | undefined,
 ): number {
   const slot = host.childHost;
   if (slot !== undefined) return host.children.indexOf(slot);
-  if (beforeChild === undefined) return host.children.length;
+  // `null` is Solid's spelling of "append"; `undefined` is `appendChild`'s own. Both end up here.
+  if (beforeChild === undefined || beforeChild === null)
+    return host.children.length;
   const index = host.children.indexOf(beforeChild);
   return index < 0 ? host.children.length : index;
 }
@@ -1227,31 +1297,43 @@ export function appendChild(
   requestedParent: ISymbioteNode,
   child: ISymbioteNode,
 ): void {
+  if (wrapsOwner(requestedParent, child)) return;
   const parent = hostFor(requestedParent, child);
   // A node the sweep tore down can be put back — Svelte parks live subtrees offscreen across
   // commits. A WeakSet miss for anything freshly built, so the create path pays nothing.
   if (hasHostBehaviors()) reattachHostBehaviors(child);
-  detach(child);
+  const placed = placedNode(child);
+  detach(placed);
   markStructureDirty(parent);
-  child.parent = parent;
+  placed.parent = parent;
   if (parent.childHost !== undefined) {
-    parent.children.splice(indexFor(parent, undefined), 0, child);
+    parent.children.splice(indexFor(parent, undefined), 0, placed);
     return;
   }
-  parent.children.push(child);
+  parent.children.push(placed);
 }
 
+// `beforeChild` is genuinely nullable and the signature used to say otherwise: Solid's renderer
+// spells "append" as `insertBefore(parent, child, null)`, which worked by accident because
+// `indexOf(null)` is -1 and the old fallback appended. Reading a field off it is what made the lie
+// fatal, so the type now says what the callers do.
 export function insertBefore(
   requestedParent: ISymbioteNode,
   child: ISymbioteNode,
-  beforeChild: ISymbioteNode,
+  beforeChild: ISymbioteNode | null,
 ): void {
+  if (wrapsOwner(requestedParent, child)) return;
   const parent = hostFor(requestedParent, child);
   if (hasHostBehaviors()) reattachHostBehaviors(child);
-  detach(child);
+  const placed = placedNode(child);
+  detach(placed);
   markStructureDirty(parent);
-  child.parent = parent;
-  parent.children.splice(indexFor(parent, beforeChild), 0, child);
+  placed.parent = parent;
+  parent.children.splice(
+    indexFor(parent, beforeChild === null ? null : placedNode(beforeChild)),
+    0,
+    placed,
+  );
 }
 
 // Removal only NOMINATES a behavior for teardown; the commit sweep decides. A framework may spell
@@ -1265,10 +1347,18 @@ export function removeChild(
   // appended to, which is the OWNER, while the child actually lives in the slot. Without this the
   // `indexOf` misses, the splice no-ops, and the child stays committed under the slot forever
   // while the framework believes it is gone — a leak with nothing red anywhere.
+  //
+  // A wrap claim leaving: the owner takes its own place back and stays in the tree. Nominated for
+  // teardown like any other removed node, because the wrapper IS leaving.
+  if (unwrapsOwner(requestedParent, child)) {
+    if (hasHostBehaviors()) markDetachCandidate(child);
+    return;
+  }
   const parent = hostFor(requestedParent, child);
   if (hasHostBehaviors()) markDetachCandidate(child);
   markStructureDirty(parent);
-  const index = parent.children.indexOf(child);
+  const placed = placedNode(child);
+  const index = parent.children.indexOf(placed);
   if (index >= 0) parent.children.splice(index, 1);
   child.parent = undefined;
 }

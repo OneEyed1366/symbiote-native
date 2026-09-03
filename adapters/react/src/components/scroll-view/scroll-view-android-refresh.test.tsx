@@ -124,3 +124,52 @@ describe('Android ScrollView RefreshControl wrap', () => {
     expect(inner!.props.nestedScrollEnabled).toBe(true);
   });
 });
+
+describe('the axis base reaches BOTH boxes', () => {
+  // why: RN composes `baseStyle` onto the wrapper as well as the inner view
+  // (`StyleSheet.compose(baseStyle, outer)`, ScrollView.js:1856). All five adapters had dropped
+  // it from the wrapper, and the consequence is invisible in a tree dump: without `flexGrow: 1`
+  // an AndroidSwipeRefreshLayout with no explicit user layout style collapses to its content
+  // height inside a flex parent, where RN's fills it.
+  function Bare(): ReactElement {
+    return (
+      <ScrollView refreshControl={<RefreshControl refreshing={false} />}>
+        <View />
+      </ScrollView>
+    );
+  }
+
+  it('grows the wrapper even when the app set no layout style', () => {
+    mount(ROOT_TAG, <Bare />);
+
+    const inner = fabric.find(node => node.viewName === 'RCTScrollView');
+    const wrapper = fabric.find(node =>
+      node.children.some(kid => kid === inner),
+    );
+    expect(
+      wrapper,
+      'a wrapper node wraps the inner RCTScrollView',
+    ).toBeDefined();
+
+    expect(wrapper!.props.flexGrow).toBe(1);
+    expect(wrapper!.props.flexShrink).toBe(1);
+    // The vertical base's own direction, so the scroll view is a main-axis child of the wrapper.
+    expect(wrapper!.props.flexDirection).toBe('column');
+  });
+
+  // The base must lose to the app, on the wrapper exactly as it does on the inner view — it is
+  // composed UNDER the split half, not over it.
+  it('lets an explicit layout value win over the base', () => {
+    mount(ROOT_TAG, <App />);
+
+    const inner = fabric.find(node => node.viewName === 'RCTScrollView');
+    const wrapper = fabric.find(node =>
+      node.children.some(kid => kid === inner),
+    );
+
+    expect(wrapper!.props.height).toBe(200);
+    expect(wrapper!.props.flexGrow).toBe(1);
+    // Still the inner view's job: the base carries `overflow`, which is not a layout key.
+    expect(inner!.props.overflow).toBe('scroll');
+  });
+});

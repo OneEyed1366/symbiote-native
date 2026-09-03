@@ -14,7 +14,7 @@
 
 import { h, isVNode, type Component, type VNode } from '@vue/runtime-core';
 import { dlog } from '@symbiote-native/engine';
-import { splitLayoutProps } from '@symbiote-native/components';
+import { splitScrollViewStyle } from '@symbiote-native/components';
 import { createScrollView } from './shared';
 export type {
   IScrollViewProps,
@@ -46,13 +46,16 @@ export const ScrollView = createScrollView({
 
     // RN splits the flattened style across the two boxes: LAYOUT props (margin/flex/size/
     // position/...) drive the outer AndroidSwipeRefreshLayout frame; VISUAL props (background/
-    // padding/border/...) paint the inner scroll view - not a hardcoded flex:1 that would
-    // override an explicit user height/width.
+    // padding/border/...) paint the inner scroll view, and the axis base rides UNDER both - not a
+    // hardcoded flex:1 that would override an explicit user height/width.
     //
     // layoutSplitStyle (not userStyle): a class-only layout prop is invisible to userStyle (it
     // never carries the resolved `class` value - see isClassNameProp in shared.ts), so splitting
     // on userStyle alone would starve the wrapper of its layout style.
-    const { outer, inner } = splitLayoutProps(input.layoutSplitStyle);
+    const { outer, inner } = splitScrollViewStyle(
+      input.scrollViewBaseStyle,
+      input.layoutSplitStyle,
+    );
     // `class` is stripped here: layoutSplitStyle already folded its resolved value into
     // outer/inner above, so forwarding the raw prop too would re-apply its LAYOUT half a second time.
     const { class: _classAppliedViaSplit, ...innerScrollOuterProps } =
@@ -61,7 +64,7 @@ export const ScrollView = createScrollView({
       input.scrollViewIntrinsic,
       {
         ...innerScrollOuterProps,
-        style: [input.scrollViewBaseStyle, inner],
+        style: inner,
         nestedScrollEnabled: true,
         ref: input.setNodeRef,
       },

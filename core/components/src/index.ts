@@ -96,6 +96,7 @@ export type {
 export {
   buildScrollViewHandle,
   splitLayoutProps,
+  splitScrollViewStyle,
   attachStickyScroll,
   isSymbioteEvent,
   forwardScrollEvent,

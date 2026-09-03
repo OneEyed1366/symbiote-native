@@ -17,7 +17,7 @@ import {
 import { dlog, type ISymbioteNode } from '@symbiote-native/engine';
 import {
   buildScrollViewHandle,
-  splitLayoutProps,
+  splitScrollViewStyle,
 } from '@symbiote-native/components';
 import {
   usePreparedScrollView,
@@ -78,19 +78,17 @@ export const ScrollView = forwardRef<IScrollViewHandle, IScrollViewProps>(
     // RN splits the flattened style across the two boxes (ScrollView.js android branch):
     // LAYOUT props (margin/flex/size/position/transform/gap/…) drive the outer
     // AndroidSwipeRefreshLayout frame; VISUAL props (background/padding/border/opacity/…) paint
-    // the inner scroll view. So the wrapper carries `outer`, and the inner scroll view its base
-    // (flexDirection/overflow) plus the visual `inner` composed over it, NOT a hardcoded flex:1
-    // that would override an explicit user height/width.
+    // the inner scroll view, and the axis base rides UNDER both — NOT a hardcoded flex:1 that
+    // would override an explicit user height/width.
     //
     // layoutSplitStyle (not style): a class-only layout prop (flex/height/gap/…) is invisible to
     // `style` (it never carries the resolved `className` value), so splitting on `style` alone
     // starves the wrapper of its layout style and it collapses to nothing. layoutSplitStyle is
     // `style` merged with the resolved className style (see usePreparedScrollView).
-    const { outer: outerStyle, inner: innerStyle } =
-      splitLayoutProps(layoutSplitStyle);
-    const scrollStyle = scrollViewBaseStyle
-      ? [scrollViewBaseStyle, innerStyle]
-      : innerStyle;
+    const { outer: outerStyle, inner: scrollStyle } = splitScrollViewStyle(
+      scrollViewBaseStyle,
+      layoutSplitStyle,
+    );
     // className is stripped from the spread here: layoutSplitStyle already folded its resolved
     // value into `outer`/`inner` above, so forwarding the raw prop too would re-apply its LAYOUT
     // half onto the inner scroll view a second time (on top of the outer wrapper).
