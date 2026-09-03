@@ -7,14 +7,12 @@
 // one child. Everything else here is shared, including the tags, the folds and the content-size
 // synthesis.
 //
-// WHAT IS AND IS NOT WIRED. Structure, the style compositions, `decelerationRate` resolution,
-// `collapsableChildren`, the synthesized `onContentSizeChange` and the RefreshControl on both
-// platforms. The STICKY half is not: `scrollEventThrottle`'s 1/16 defaults and
-// `resolveScrollForwarding`'s `sticky-native` / `sticky-js` modes only mean something once a sticky
-// header is a marked CHILD rather than an index into a children array a lowered element does not
-// have. Resolving the throttle on its own would buy a per-frame scroll event with nothing reading
-// it, so it waits for the mechanism it feeds. `onScroll` needs nothing either way — `scroll` is a
-// real Fabric event and routes on its own.
+// WHAT IS WIRED. Structure, the style compositions, `decelerationRate` resolution,
+// `collapsableChildren`, the synthesized `onContentSizeChange`, the RefreshControl on both
+// platforms — and, since the sticky half landed, the raised `scrollEventThrottle`, the scroll
+// value that drives the pins, and the owner layout an inverted pin needs. The sticky machinery
+// itself lives in `./sticky`, because a `<StickyHeader>` is a CHILD and the three props above are
+// functions of whether one registered.
 //
 // WHAT A COMPOSED PRIMITIVE COSTS TODAY. Every adapter's ScrollView wrapper builds the same two
 // nodes: `selectScrollIntrinsics` picks a scroll intrinsic and a content intrinsic, and the
@@ -65,6 +63,7 @@ import {
   createElement,
   dlog,
   registerHostBehavior,
+  setBehaviorListener,
   setEventListener,
   type IClaimMode,
   type IHostBehavior,
@@ -85,6 +84,14 @@ import {
   SCROLL_VIEW_BASE_VERTICAL,
   type IContentSize,
 } from '../../view/render-scroll-view';
+import {
+  handleOwnerScroll,
+  markScrollOwner,
+  releaseStickyOwner,
+  stickyHeaderBehavior,
+  STICKY_HEADER_TAG,
+  syncOwnerLayout,
+} from './sticky';
 
 export const SCROLL_VIEW_TAG = 'symbiote-scroll-view';
 export const HORIZONTAL_SCROLL_VIEW_TAG = 'symbiote-horizontal-scroll-view';
@@ -219,11 +226,7 @@ function contentSizeListener(owner: ISymbioteNode) {
 // listener flip changes no payload by itself, so the commit after it is a no-op and a post-commit
 // hook would never fire. Measured on exactly this — the wire worked (mount commits for other
 // reasons) and the UNWIRE silently did not.
-function syncContentSizeWiring(
-  owner: ISymbioteNode,
-  _name: string,
-  wired: boolean,
-): void {
+function syncContentSizeWiring(owner: ISymbioteNode, wired: boolean): void {
   const slot = owner.childHost;
   if (slot === undefined) return;
   if (wired) {
@@ -232,6 +235,18 @@ function syncContentSizeWiring(
     lastContentSize.delete(owner);
     setEventListener(slot, 'layout', undefined);
   }
+}
+
+// Two owned names answer to a flip, and they answer on DIFFERENT nodes: `contentSizeChange` wires
+// the SLOT's layout, `layout` wires the owner's own — which an inverted sticky header also wants,
+// so the two claims are resolved in one place (`syncOwnerLayout`) rather than by whoever wrote last.
+function syncOwnedListener(
+  owner: ISymbioteNode,
+  name: string,
+  wired: boolean,
+): void {
+  if (name === 'contentSizeChange') syncContentSizeWiring(owner, wired);
+  else if (name === 'layout') syncOwnerLayout(owner);
 }
 
 // The platform half. iOS takes the RefreshControl `beside` the content view and needs nothing
@@ -259,21 +274,32 @@ function scrollBehavior(
   platform: IScrollPlatform,
 ): IHostBehavior {
   return {
-    ownedListeners: ['contentSizeChange'],
+    // `scroll` and `layout` are owned for the collision reason rather than because the behavior
+    // consumes them: RN's ScrollView installs `_handleScroll` and `_handleLayout` on the native
+    // view unconditionally and calls the app's own handler from inside them, and `node.listeners`
+    // is single-slot — so a behavior that installed either without owning it would silently evict
+    // the app's.
+    ownedListeners: ['contentSizeChange', 'scroll', 'layout'],
     slotProps: SLOT_PROPS,
     slotDerived: [...SLOT_DERIVED, ...(platform.slotDerived ?? [])],
     claimedChildren: { [REFRESH_CONTROL]: platform.claimMode },
     onWrapChange: platform.onWrapChange?.(base),
     buildStructure: buildContent(contentIntrinsic, rowStyle),
     foldPayload: ownerFold(base),
-    // No timer and no listener taken here: the one listener this behavior installs is prop-driven,
-    // so it is wired from `afterCommit` and released the same way. Written as an explicit no-op
-    // rather than by widening `attach` to optional — a behavior that FORGOT its runtime and one
-    // that has none must not be spelled the same way.
-    attach() {},
-    onOwnedListenerChange: syncContentSizeWiring,
+    // The scroll dispatcher is installed here and never conditionally: it is what drives the
+    // sticky AnimatedValue, and a header can register long after this node was created. It costs a
+    // forward per scroll event on a ScrollView with no sticky child, which is what RN pays too.
+    // Nothing else is taken — no timer, and the two conditional listeners are wired on a flip.
+    attach(node) {
+      markScrollOwner(node);
+      setBehaviorListener(node, 'scroll', event =>
+        handleOwnerScroll(node, event),
+      );
+    },
+    onOwnedListenerChange: syncOwnedListener,
     detach(node) {
       lastContentSize.delete(node);
+      releaseStickyOwner(node);
     },
   };
 }
@@ -299,4 +325,8 @@ export function registerScrollViewBehaviors(platform: IScrollPlatform): void {
       platform,
     ),
   );
+  // With the scroll views, never on its own: a sticky header is meaningless without an owner to
+  // find, and registering the pair together is what makes "did the registration run" one question
+  // rather than two.
+  registerHostBehavior(STICKY_HEADER_TAG, stickyHeaderBehavior);
 }

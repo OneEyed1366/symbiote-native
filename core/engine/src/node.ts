@@ -716,15 +716,22 @@ const GATED_EVENT_PROPS: ReadonlyMap<string, string> = new Map([
  * `setEventListener` diverts an owned name into the stash, which is right for an app listener and
  * circular for the behavior's own dispatcher — it would stash itself and never occupy the slot it
  * exists to hold. This is the one writer allowed past that gate.
+ *
+ * `undefined` removes it, gate flag included. A behavior whose dispatcher is conditional needs
+ * that as much as it needs the install: ScrollView takes the owner's `layout` only while the app
+ * or an inverted sticky header wants it, and a one-way installer leaves `onLayout: true` standing
+ * in the payload of a ScrollView that no longer reads the event.
  */
 export function setBehaviorListener(
   node: ISymbioteNode,
   name: string,
-  listener: IListener,
+  listener: IListener | undefined,
 ): void {
-  (node.listeners ??= new Map()).set(name, listener);
+  if (listener === undefined) node.listeners?.delete(name);
+  else (node.listeners ??= new Map()).set(name, listener);
   const flagProp = GATED_EVENT_PROPS.get(name);
-  if (flagProp !== undefined) setProp(node, flagProp, true);
+  if (flagProp !== undefined)
+    setProp(node, flagProp, listener === undefined ? undefined : true);
 }
 
 export function setEventListener(

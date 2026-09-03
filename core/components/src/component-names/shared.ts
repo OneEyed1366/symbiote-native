@@ -52,6 +52,11 @@ export type ISymbioteIntrinsic =
   | 'symbiote-safe-area-view'
   | 'symbiote-modal'
   | 'symbiote-refresh-control'
+  // The sticky-header wrapper RN builds in JS (ScrollViewStickyHeader.js): an ordinary view
+  // carrying zIndex and an animated translateY. Resolves to the SAME RCTView as a plain view for
+  // the `symbiote-pressable` reason — the behavior registry is keyed by tag, and registering the
+  // sticky machine under RCTView would put it on every View in the app.
+  | 'symbiote-sticky-header'
   | 'symbiote-input-accessory-view';
 
 export interface IComponentDescriptor {

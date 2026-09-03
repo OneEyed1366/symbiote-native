@@ -35,6 +35,7 @@ const IOS_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   'symbiote-safe-area-view': 'SafeAreaView',
   'symbiote-modal': 'ModalHostView',
   'symbiote-refresh-control': 'PullToRefreshView',
+  'symbiote-sticky-header': 'RCTView',
   'symbiote-input-accessory-view': 'RCTInputAccessoryView',
 };
 

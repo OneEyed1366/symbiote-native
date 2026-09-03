@@ -34,6 +34,9 @@ const PRIMITIVE_SELECTORS = new Set([
   'symbiote-safe-area-view',
   'symbiote-modal',
   'symbiote-refresh-control',
+  // RN's JS sticky wrapper as a tag: the same RCTView again, carrying the pin the engine's
+  // ScrollView behavior drives.
+  'symbiote-sticky-header',
   'symbiote-input-accessory-view',
 ]);
 

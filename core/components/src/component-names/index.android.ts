@@ -53,6 +53,7 @@ const ANDROID_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   'symbiote-safe-area-view': 'RCTSafeAreaView',
   'symbiote-modal': 'RCTModalHostView',
   'symbiote-refresh-control': 'AndroidSwipeRefreshLayout',
+  'symbiote-sticky-header': 'RCTView',
   // iOS-only primitive; RN ships no Android InputAccessoryView. Degrade to a plain
   // container so an iOS-targeted usage doesn't red-box on Android.
   'symbiote-input-accessory-view': 'RCTView',

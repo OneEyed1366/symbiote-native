@@ -430,4 +430,8 @@ export {
 // `foldPayload` field cannot type that.
 export type { IClaimMode, IHostBehavior, IPayloadFold } from './host-behavior';
 export { requestCommitFor } from './commit';
-export { setBehaviorListener } from './node';
+// `markPropsDirty` is a behavior's only way to say "the fold reads state I just changed". Every
+// other dirtying route goes through a prop write, and a behavior whose payload is DERIVED — the
+// sticky header's debounced translateY lives in its own runtime, not in `node.props` — has no
+// prop to write. Pair it with `requestCommitFor`: dirtying is not publishing.
+export { setBehaviorListener, markPropsDirty } from './node';
