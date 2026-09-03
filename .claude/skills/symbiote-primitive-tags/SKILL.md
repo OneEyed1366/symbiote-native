@@ -2036,7 +2036,8 @@ Only the tag swap is atomic.
                               onContentSizeChange synthesis
 4a  claimed children          DONE 2026-09-03 — <RefreshControl> beside the content view (iOS)
 4b  the Android inversion     DONE 2026-09-03 — claim mode `wrap` + ISymbioteNode.wrapper
-4c  <StickyHeader>            OPEN — carries scrollEventThrottle and the onScroll modes with it
+4c  <StickyHeader>            DONE 2026-09-03 — a tag with its own behavior; the throttle, the
+                              scroll value and the inverted layout came with it
 5   swap + delete wrappers    one cut, five adapters
 ```
 
@@ -2117,6 +2118,49 @@ after the fact: dropping the base from the wrapper reddens exactly the two new r
 Sticky and refreshControl belong to 4 by nature, not by size: both ARE the marked-child work. The
 prop carrying an element exists in both cases only because the API had no way to MARK an element —
 `stickyHeaderIndices` is an index list precisely because JSX cannot say "this child is sticky".
+
+### 4c: the child form, and the index array turns out to have been the WORKAROUND
+
+`symbiote-sticky-header` is a tag with its own behavior, registered beside the two scroll tags —
+`core/components/src/behaviors/scroll-view/sticky.ts`. It is the FOURTH effect runner for
+`reduceSticky` and the first with no framework above it; the decision half is untouched, which is
+what keeps this a port rather than a second implementation. The runner's shape is Angular's
+projection controller, because that one already drives engine nodes.
+
+**The cross-talk is where the child form stops being a workaround for a missing index and becomes
+the better mechanism.** Each header needs the y of the NEXT one — the point it gets pushed off at —
+and every existing runner reads that out of a map keyed by child index, with a renumbering pass
+when a windowed list moves. The owner here keeps its headers in DOCUMENT ORDER, taken by walking
+the content subtree, so "the next header" is the next entry and a header that moves carries its own
+identity with it. Nothing to renumber, and no `setChildIndex` at all.
+
+The owner half rides along because three of the ScrollView's own props are functions of "does this
+one have sticky headers", which only a registration can answer: the raised `scrollEventThrottle`,
+the `scroll` listener driving the shared AnimatedValue, and — inverted only — the owner's own
+layout. All three are wired on registration and taken back on the last unregister.
+
+**`scroll` and `layout` are OWNED listeners now, and not because the behavior consumes them.**
+`node.listeners` is single-slot, and RN's ScrollView installs `_handleScroll` / `_handleLayout`
+unconditionally and calls the app's handler from inside them. A behavior installing either without
+owning it evicts the app's silently — the same collision `ownedListeners` was built for on the
+press names.
+
+**Two engine seams this needed.** `setBehaviorListener` takes `undefined` to REMOVE, gate flag
+included: the owner's layout is wanted by an inverted pin OR by the app, so one resolver owns the
+slot and a one-way installer would leave `onLayout: true` standing on a ScrollView that reads
+nothing. And `markPropsDirty` is now exported — a behavior whose payload is DERIVED from its own
+runtime (the debounced translateY lives in the runner, not in `node.props`) has no prop to write,
+so it has no other way to say the fold's input moved.
+
+**The passthrough transform is deliberately unwitnessed, and the note in the code says so.** While
+the pin is JS-driven the animated leaf's `setNativeProps` writes the same value and marks the node,
+so removing `markPropsDirty` reddens nothing. It is the NATIVE-driver path it exists for, which a
+headless test cannot reach — recorded rather than deleted, and the fold's transform half IS
+witnessed by a row that re-renders the style out from under a settled pin.
+
+Five arms break-tested, four on disjoint rows: no cross-talk (the two-header row alone), the layout
+resolver ignoring the app (its own row alone), the fold dropping the settled transform (the
+re-render row alone), and a one-way `setBehaviorListener` (the take-back row alone).
 
 ### CLOSED — a slot prop DERIVED from owner props is `slotDerived`, read from `setProp`
 
