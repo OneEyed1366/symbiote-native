@@ -1,0 +1,80 @@
+{
+  "name": "@symbiote-native/foreground-service",
+  "version": "0.0.1",
+  "description": "Android foreground-service lifecycle for SymbioteNative \u2014 microphone/media-playback service types, persistent notifications, state events, and React Native headless-task delivery through one framework-agnostic API.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
+    "directory": "packages/foreground-service"
+  },
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/packages/foreground-service#readme",
+  "bugs": {
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
+  },
+  "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "type": "module",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/index.ts",
+    "./vue": "./src/index.ts",
+    "./svelte": "./src/index.ts",
+    "./solid": "./src/index.ts",
+    "./angular": "./src/index.ts"
+  },
+  "files": [
+    "android",
+    "!android/build",
+    "!android/src/test",
+    "build",
+    "react-native.config.cjs"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/index.js",
+    "module": "./build/index.js",
+    "types": "./build/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      },
+      "./react": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      },
+      "./vue": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      },
+      "./svelte": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      },
+      "./solid": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      },
+      "./angular": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --build",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "peerDependencies": {
+    "@symbiote-native/engine": "workspace:^",
+    "react-native": ">=0.86"
+  },
+  "devDependencies": {
+    "@symbiote-native/engine": "workspace:*",
+    "react-native": "catalog:",
+    "typescript": "catalog:"
+  }
+}

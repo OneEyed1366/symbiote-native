@@ -1,0 +1,139 @@
+---
+title: Foreground service
+description: Android microphone/media-playback foreground-service lifecycle, persistent notifications, and Headless JS task delivery for every SymbioteNative adapter.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@symbiote-native/foreground-service` keeps one Android task alive as a user-visible foreground
+service. It owns the native service lifecycle, notification, state events, and delivery into a
+Headless JS task registered through any adapter's `AppRegistry`.
+
+It does **not** record audio, play media, create a media session, or bypass Android's background
+launch rules. Application code owns that work; this package supplies the lifecycle container.
+
+| OS platform | Support                       |
+| ----------- | ----------------------------- |
+| iOS         | — use an iOS-specific service |
+| Android     | ✅ live                       |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
+
+The framework subpaths (`/react`, `/vue`, `/angular`, `/svelte`, `/solid`) are aliases of the same
+framework-independent API.
+
+## Installation
+
+```sh
+npm install @symbiote-native/foreground-service
+```
+
+React Native autolinking discovers the bundled Kotlin package and service declaration. Rebuild the
+Android application after installation.
+
+<Aside type="danger" title="Microphone mode still needs application permission">
+  The package contributes `FOREGROUND_SERVICE`, the microphone/media-playback
+  foreground-service permissions, and `WAKE_LOCK`. It deliberately does not
+  declare or request `RECORD_AUDIO`: an application using `types:
+  ['microphone']` must declare it and obtain the runtime grant first. Android
+  can also reject a foreground-service start made after the application has
+  already moved to the background.
+</Aside>
+
+Applications targeting Android 13 or later may request `POST_NOTIFICATIONS`. The service still has
+to create a foreground notification when the user denies that permission, although Android may
+show it only in the task manager rather than the notification drawer.
+
+## Usage
+
+```ts
+import { AppRegistry } from '@symbiote-native/react'; // or vue/angular/svelte/solid
+import {
+  addForegroundServiceListener,
+  startForegroundServiceAsync,
+  stopForegroundServiceAsync,
+} from '@symbiote-native/foreground-service';
+
+AppRegistry.registerCancellableHeadlessTask(
+  'voice-session',
+  () => async data => {
+    await runVoiceSession(data);
+  },
+  () => () => cancelVoiceSession(),
+);
+
+const subscription = addForegroundServiceListener(event => {
+  console.log(event.type, event.state.status);
+});
+
+await startForegroundServiceAsync({
+  taskKey: 'voice-session',
+  data: { roomId: 'room-1' },
+  types: ['microphone', 'mediaPlayback'],
+  notification: {
+    channelId: 'voice',
+    channelName: 'Voice sessions',
+    title: 'Voice session active',
+    body: 'Tap to return',
+    smallIcon: 'ic_voice',
+    stopActionLabel: 'Stop',
+  },
+});
+
+await stopForegroundServiceAsync();
+subscription.remove();
+```
+
+The start promise resolves after Android promotes the service and queues the registered Headless JS
+task. Resolving the task promise is the normal completion path and stops the service. Explicit JS
+stops and the optional notification action cancel the registered task before removing the
+notification.
+
+<Aside
+  type="caution"
+  title="Do not use an ordinary rejection as task completion"
+>
+  React Native does not finish native Headless JS accounting for an ordinary
+  rejected task promise. Handle expected failures inside the task and resolve,
+  call `stopForegroundServiceAsync()`, or set a finite `taskTimeoutMs` as a
+  backstop.
+</Aside>
+
+## API
+
+| Signature                                                                   | Description                                                                                            |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `startForegroundServiceAsync(options): Promise<void>`                       | Starts the single service and registered Headless JS task                                              |
+| `updateForegroundServiceNotificationAsync({ title, body? }): Promise<void>` | Replaces the visible title/body without restarting the task                                            |
+| `stopForegroundServiceAsync(): Promise<void>`                               | Cancels the active task and removes the foreground notification                                        |
+| `getForegroundServiceStateAsync(): Promise<IForegroundServiceState>`        | Reads the native authoritative state                                                                   |
+| `addForegroundServiceListener(listener): IEventSubscription`                | Subscribes to `starting`, `started`, `notificationUpdated`, `stopping`, `stopped`, and `failed` events |
+
+### Start options
+
+| Field           | Type                                   | Description                                                                             |
+| --------------- | -------------------------------------- | --------------------------------------------------------------------------------------- |
+| `taskKey`       | `string`                               | Key registered through the active adapter's `AppRegistry`                               |
+| `data`          | `Record<string, unknown> \| undefined` | JSON-like data delivered to the task                                                    |
+| `types`         | `('microphone' \| 'mediaPlayback')[]`  | At least one foreground-service type                                                    |
+| `notification`  | `IForegroundServiceNotification`       | Channel, visible text, optional icon/stop action, and optional positive notification ID |
+| `taskTimeoutMs` | `number \| undefined`                  | Native Headless JS timeout; `0`/omitted means no timeout                                |
+
+Only one service may be active. State is one of `starting`, `running`, `stopping`, `stopped`, or
+`failed`, together with the task key, service types, notification ID, start time, terminal reason,
+and last native error.
+
+## Boundaries
+
+- `mediaPlayback` declares the Android service type; it is not an audio player or Media3 session.
+- `microphone` preserves permission to continue app-owned capture; it is not a recorder.
+- No boot receiver or automatic restart is installed.
+- The service does not make arbitrary background work exempt from Android scheduling limits.
+- The notification icon is a drawable or mipmap resource name; when omitted, the application icon
+  is used.

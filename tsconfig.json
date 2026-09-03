@@ -11,6 +11,7 @@
     { "path": "adapters/svelte" },
     { "path": "adapters/solid" },
     { "path": "packages/application" },
+    { "path": "packages/foreground-service" },
     { "path": "packages/slider" },
     { "path": "packages/splash-screen" },
     { "path": "packages/navigation" },

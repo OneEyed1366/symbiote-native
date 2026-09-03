@@ -195,6 +195,9 @@ catalogs:
     prettier-plugin-svelte:
       specifier: ^4.1.1
       version: 4.1.1
+    react-native:
+      specifier: 0.86.0
+      version: 0.86.0
     react-native-bootsplash:
       specifier: 7.3.2
       version: 7.3.2
@@ -1042,6 +1045,18 @@ importers:
         version: 6.0.3
 
   packages/expo-modules-link: {}
+
+  packages/foreground-service:
+    devDependencies:
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
+      react-native:
+        specifier: 'catalog:'
+        version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   packages/haptics:
     dependencies:

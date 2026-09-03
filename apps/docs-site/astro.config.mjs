@@ -277,6 +277,7 @@ export default defineConfig({
             { label: 'CSS parser', slug: 'docs/packages/css-parser' },
             { label: 'Test utils', slug: 'docs/packages/test-utils' },
             { label: 'Android host shims', slug: 'docs/packages/android' },
+            { label: 'Foreground service', slug: 'docs/packages/foreground-service' },
           ],
         },
         {
