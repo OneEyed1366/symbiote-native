@@ -2032,30 +2032,60 @@ is called only by tests, deliberately, since `symbiote-scroll-view` is still the
 Only the tag swap is atomic.
 
 ```
-3a  no child marking needed   decelerationRate, scrollEventThrottle, collapsableChildren,
-                              onContentSizeChange synthesis, onScroll modes
+3a  no child marking needed   DONE 2026-09-03 — decelerationRate, collapsableChildren,
+                              onContentSizeChange synthesis
 4   named slot + child tags   <RefreshControl> and <StickyHeader> as marked children
 5   swap + delete wrappers    one cut, five adapters
 ```
+
+**`scrollEventThrottle` and the `onScroll` MODES moved out of 3a and into 4, and the reason is a
+dependency rather than an estimate.** Both are functions of `hasStickyHeaders`, which a lowered
+element cannot answer until a sticky header is a marked CHILD — `stickyHeaderIndices` indexes a
+children array the element does not have. Resolving the throttle alone would set it to 1 or 16 and
+buy a per-frame scroll event with nothing reading it, so it waits for the mechanism it feeds rather
+than landing half-wired. Plain `onScroll` needs nothing at all: `scroll` is a real Fabric event and
+routes on its own.
 
 Sticky and refreshControl belong to 4 by nature, not by size: both ARE the marked-child work. The
 prop carrying an element exists in both cases only because the API had no way to MARK an element —
 `stickyHeaderIndices` is an index list precisely because JSX cannot say "this child is sticky".
 
-### OPEN, and it blocks 3a: a slot prop DERIVED from owner props
+### CLOSED — a slot prop DERIVED from owner props is `slotDerived`, read from `setProp`
 
 `collapsableChildren` on the content node is `maintainVisibleContentPosition !== undefined ||
-snapToAlignment !== undefined` — owner props, computed, landing on the slot. Neither seam covers it:
+snapToAlignment !== undefined` — owner props, computed, landing on the slot, which neither existing
+seam covers: `slotProps` renames a value rather than computing one, and a slot fold reading the
+owner never re-runs, because `markPropsDirty` bubbles UP and `reconcile` skips a clean subtree.
 
-- `slotProps` renames a value, it does not compute one.
-- a fold on the slot could close over the owner and read `owner.props`, but **an owner-prop write
-  does not dirty the slot** (`markDirty` bubbles UP), so the slot is skipped by `reconcile` and its
-  payload never rebuilds.
-- `afterCommit` could `setProp` the slot, at the cost of a two-pass mount for that key.
+Resolved as the predicted `slotDerived` name list, with one correction to the prediction: it is read
+from **`setProp`, past its identity guard**, not from `routeProp`. `setProp` is the single choke
+point every writer passes — a structural adapter's `setProperty` does not go through `routeProp` —
+and sitting past the guard means a re-render writing the same value dirties nothing, which is what
+keeps a per-render ScrollView from cloning its content node. Break-tested in both directions:
+dropping the field reddens the after-mount re-derivation, moving the read ABOVE the guard reddens
+the unchanged-rewrite case.
 
-Whichever is chosen widens a seam, so decide it before writing 3a rather than during. The shape that
-keeps folds pure is a declared `slotDerived` name set that makes `routeProp` mark the slot dirty
-when one of those owner keys is written — one field, read only on slot-bearing nodes.
+### The seam 3a needed that the plan did not predict: `onOwnedListenerChange`
+
+`onLayout` is a GATED event, so a lowered ScrollView may install it on its content view only when
+the app passed `onContentSizeChange` — RN and every wrapper do exactly that, and wiring it always
+would put a flag in every ScrollView's payload for an event nobody reads.
+
+`afterCommit` looks like the beat for that and **cannot see it at all**. A listener change writes no
+Fabric prop, so the commit after it is a no-op and `commitContainer` returns above
+`runPostCommitHooks`. Measured: the WIRE worked (the mount commit is a real commit for other
+reasons) and the UNWIRE was silently dead — half a contract, green suite. `markPropsDirty` on the
+flip does not rescue it either: the payload is identical, so `result.changed` stays false.
+
+So the notification happens where the change does — `setEventListener` calls
+`onOwnedListenerChange(node, name, wired)` on a PRESENCE flip, never on the fresh closure a
+framework hands over each render. Synchronous, so the flag lands before the first commit and the
+lowered path has no two-pass mount the wrapper does not have. Full rationale:
+`.claude/rules/engine-mutations-must-mark-dirty.md`.
+
+The general form for whoever wires the next behavior: **before choosing `afterCommit`, ask which
+Fabric prop moves when the thing you are watching changes.** No answer means no commit, and no
+commit means no hook.
 
 ### The per-adapter half, unchanged by any of this
 
