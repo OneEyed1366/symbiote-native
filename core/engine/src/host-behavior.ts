@@ -64,6 +64,24 @@ export interface IHostBehavior {
   // on. The component wrapper used to mediate that pair by destructuring the app's callbacks out
   // before they reached the node; lowering removes the mediator, and this replaces it.
   readonly ownedListeners?: readonly string[];
+  // Props the app writes on the OWNER that belong to the SLOT, as owner name -> slot name.
+  //
+  // The prop twin of `childHost`, and needed for the same reason: an adapter writes
+  // `contentContainerStyle` on the ScrollView because that is where the app wrote it, while the
+  // value styles the content view. A wrapper mediated that by rendering the value onto its inner
+  // node; a lowered element has no wrapper, so the engine has to.
+  //
+  // A RENAME rather than a plain redirect, because the two names differ by design —
+  // `contentContainerStyle` on the owner is `style` on the slot. The redirected write goes through
+  // the slot's own `routeProp`, so it picks up style merging, class merging and the
+  // already-published guard exactly as an authored prop would; nothing here re-implements them.
+  //
+  // Composing a CONSTANT with the redirected value is not this field's job — that is the slot's own
+  // `payloadFold`, which a behavior assigns while building. Keeping the two apart is what lets the
+  // rename stay a pure redirect: `flexDirection: 'row'` must win OVER a horizontal ScrollView's
+  // `contentContainerStyle` (the wrapper writes `[contentContainerStyle, {flexDirection:'row'}]`),
+  // and precedence is a property of the fold, not of the routing.
+  readonly slotProps?: Readonly<Record<string, string>>;
   // Builds the primitive's OWN internal subtree, once, and returns the node the app's children
   // belong under — or undefined when they belong directly on the host.
   //
@@ -181,6 +199,18 @@ export function hostBehaviorFor(tag: string): IHostBehavior | undefined {
 
 export function hasHostBehaviors(): boolean {
   return hasBehaviors;
+}
+
+// What an owner prop is called on the slot, or undefined when it belongs to the owner after all.
+//
+// Called from `routeProp` only for a node that HAS a slot (`node.childHost !== undefined`), which
+// is what keeps a WeakMap probe off the hot path: every other node is turned away by one field
+// read, the same gate `payloadFold` uses one layer down.
+export function slotPropNameFor(
+  node: ISymbioteNode,
+  key: string,
+): string | undefined {
+  return attached.get(node)?.slotProps?.[key];
 }
 
 // The app's listeners for names a behavior owns, per node. Not on the node: this exists only for

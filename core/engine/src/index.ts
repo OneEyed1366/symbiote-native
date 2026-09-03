@@ -425,6 +425,9 @@ export {
   clearHostBehaviors,
   appListenerFor,
 } from './host-behavior';
-export type { IHostBehavior } from './host-behavior';
+// `IPayloadFold` rides along because a behavior that BUILDS a node owns what that node carries: a
+// composed primitive assigns a fold to its own slot (`behaviors/scroll-view.ts`), and the owner's
+// `foldPayload` field cannot type that.
+export type { IHostBehavior, IPayloadFold } from './host-behavior';
 export { requestCommitFor } from './commit';
 export { setBehaviorListener } from './node';
