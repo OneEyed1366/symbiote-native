@@ -2035,7 +2035,7 @@ Only the tag swap is atomic.
 3a  no child marking needed   DONE 2026-09-03 — decelerationRate, collapsableChildren,
                               onContentSizeChange synthesis
 4a  claimed children          DONE 2026-09-03 — <RefreshControl> beside the content view (iOS)
-4b  the Android inversion     OPEN — AndroidSwipeRefreshLayout wraps the scroll view
+4b  the Android inversion     DONE 2026-09-03 — claim mode `wrap` + ISymbioteNode.wrapper
 4c  <StickyHeader>            OPEN — carries scrollEventThrottle and the onScroll modes with it
 5   swap + delete wrappers    one cut, five adapters
 ```
@@ -2064,23 +2064,55 @@ is what lets a claim cost no per-node field carrying an intrinsic tag.
 spread, and the aria fold already runs in the engine (`fabricProps` -> `foldAriaProps`), so the bare
 tag commits the same payload the component does.
 
-### 4b, OPEN: on Android the refresh control is not a child
+### 4b: on Android the refresh control is not a child
 
 An Android ScrollView takes exactly one child, so RN inverts the tree — `AndroidSwipeRefreshLayout`
 WRAPS the scroll view, with `splitLayoutProps` sending the style's layout half to the wrapper and its
 visual half to the inner view (`ScrollView.js:1856`). Read against upstream, not against our wrapper:
 it is a native ViewGroup constraint, not a JSX one, so a host model does not dissolve it.
 
-A claim cannot express it. The refresh control has to become a node ABOVE the owner, and the owner
-has no parent yet when its children arrive — adapters append children before mounting the owner, and
-the existing tests do exactly that. So the shape it needs is a deferred one: the owner remembers a
-wrapper, and its own insertion inserts the wrapper instead. That is a second node field plus a branch
-in both structural entry points, which is its own cut with its own break-tests rather than a
-paragraph inside this one.
+A claim cannot express it as a placement. The refresh control has to become a node ABOVE the owner,
+and the owner has no parent yet when its children arrive — adapters append children before mounting
+the owner, and the existing tests do exactly that.
 
-Nothing ships broken in the meantime because no adapter registers the behavior at all. Note also a
-pre-existing divergence to settle when 4b is built: RN composes `baseStyle` onto BOTH boxes and our
-wrapper puts it only on the inner one.
+**CLOSED 2026-09-03, and the predicted shape was right.** `claimedChildren` carries a MODE per name
+(`beside` / `wrap`), and `ISymbioteNode.wrapper` records the inversion: the owner remembers what
+stands in its place, and `appendChild` / `insertBefore` / `removeChild` move that instead. The swap
+in `wrapsOwner` is skipped entirely in the common case, because the owner is usually still detached.
+
+Everything above the two structural entry points is untouched: the adapter names the scroll view for
+every insert, prop write and command, which is what keeps the ref and the scroll commands pointed at
+the right node.
+
+**The seam it needed that the plan did not predict: `onWrapChange`.** The wrapper is the APP's node,
+so the behavior never got to give it a `payloadFold` the way it does for a node its own
+`buildStructure` built — and it is exactly the node that has to carry the scroll view's layout style.
+The hook fires from the two entry points when a wrap lands or leaves, and Android's behavior uses it
+to install both folds and to restore the plain one on release. Only `wrap` notifies; `beside` changes
+nothing a behavior has to answer for.
+
+Two smaller things fell out and are worth not re-deriving. `slotDerived` now marks the WRAPPER as
+well as the slot, which is what makes an owner style write re-split (Android adds `style` to the
+list). And `insertBefore`'s `beforeChild` was typed non-nullable while Solid's renderer has always
+spelled "append" as `null` — harmless while the code only called `indexOf` on it, fatal the moment it
+read a field. The type now says what the callers do.
+
+### The `baseStyle` divergence, fixed in the same cut
+
+RN composes the axis base onto BOTH boxes (`StyleSheet.compose(baseStyle, outer)` beside
+`compose(baseStyle, inner)`), and all five adapters had dropped it from the wrapper. Consequence: an
+`AndroidSwipeRefreshLayout` with no explicit user layout style loses `flexGrow: 1` and collapses to
+its content height inside a flex parent, where RN's fills it.
+
+It is now one shared function — `splitScrollViewStyle(base, style)` returns the composed pair — and
+that is the point rather than a tidy-up: five call sites composing `[base, outer]` by hand is exactly
+what drifted, and a fold written inline is invisible to `tests/lowered-primitive-fold-parity.test.ts`,
+whose oracle is shared value imports.
+
+**No test moved when the fix landed, which is the finding.** The Android wrap has three dedicated
+suites across three adapters and none of them asserted anything about the wrapper's own base — they
+were written to check the layout/visual SPLIT, and the base is not part of the split. Break-tested
+after the fact: dropping the base from the wrapper reddens exactly the two new rows.
 
 Sticky and refreshControl belong to 4 by nature, not by size: both ARE the marked-child work. The
 prop carrying an element exists in both cases only because the API had no way to MARK an element —
