@@ -2,9 +2,11 @@
 // @symbiote-native/engine. React is a known-good driver: it proves the native pipe
 // and the shared clone-on-write engine before any non-React adapter has to.
 
-// The intrinsic-element table. Re-exported (rather than left as an ambient `.d.ts`) so a consuming
-// app's program includes it and `<View/>` resolves its props — see src/jsx.ts.
-export type { ISymbioteIntrinsicTag } from './jsx';
+// The intrinsic-element table now reaches an app through `jsxImportSource`, not through this
+// barrel: TypeScript resolves the JSX namespace from `@symbiote-native/react/jsx-runtime` and
+// NOTHING else, so an app sets that one tsconfig line and gets the tags. What is re-exported here
+// is only the tag-name type, for code that wants to name it.
+export type { ISymbioteIntrinsicTag } from './jsx-runtime';
 export { View, Text } from './components';
 export type { IViewProps, ITextProps } from './components';
 export type {

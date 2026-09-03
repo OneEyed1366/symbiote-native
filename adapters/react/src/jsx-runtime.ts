@@ -70,3 +70,7 @@ export namespace JSX {
   }
 }
 /* eslint-enable @typescript-eslint/no-namespace */
+
+// Off OUR namespace, not React's. It used to be `keyof import('react').JSX.IntrinsicElements`,
+// which was every HTML and SVG tag plus ours; now it is the host tags alone.
+export type ISymbioteIntrinsicTag = keyof JSX.IntrinsicElements;

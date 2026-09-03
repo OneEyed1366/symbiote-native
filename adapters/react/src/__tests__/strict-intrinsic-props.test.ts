@@ -18,7 +18,10 @@ import { describe, expect, it } from 'vitest';
 
 const SRC = join(__dirname, '..');
 const componentsSource = readFileSync(join(SRC, 'components.ts'), 'utf8');
-const jsxSource = readFileSync(join(SRC, 'jsx.ts'), 'utf8');
+// `jsx-runtime.ts` since the adapter got its own JSX namespace: the table used to merge into
+// `declare module 'react'` from `jsx.ts`, and that merge is what forced the `symbiote-` prefix
+// (@types/react owns `view` / `text` / `image` / `switch` as SVG entries).
+const jsxSource = readFileSync(join(SRC, 'jsx-runtime.ts'), 'utf8');
 
 // A primitive is a TAG here exactly when the barrel exports its name as a string constant whose
 // value is the intrinsic — `export const View = 'symbiote-view'`. No annotation and no `as const`:
@@ -37,7 +40,7 @@ function taggedIntrinsics(): string[] {
 // The names the table declares strictly: everything omitted from the loose Record and re-declared.
 function strictlyDeclared(): string[] {
   const omit = jsxSource.match(
-    /Record<ISymbioteIntrinsic, HostProps>,\s*([^>]+)>/s,
+    /Record<ISymbioteIntrinsic, IHostProps>,\s*([^>]+)>/s,
   );
   if (omit === null) return [];
   return [...omit[1].matchAll(/'(symbiote-[a-z-]+)'/g)]
@@ -56,7 +59,7 @@ describe('intrinsic prop strictness follows the tags', () => {
     ).toBeGreaterThan(0);
     expect(
       strictlyDeclared().length,
-      'strict entries in jsx.ts',
+      'strict entries in jsx-runtime.ts',
     ).toBeGreaterThan(0);
   });
 
@@ -70,6 +73,6 @@ describe('intrinsic prop strictness follows the tags', () => {
   // hand-written — `symbiote-pressable` among them, the next primitive due to cross — and a
   // hand-written list cannot report a name that is absent from it.
   it('declares the tag set by deriving it, not by listing it', () => {
-    expect(jsxSource).toContain('Record<ISymbioteIntrinsic, HostProps>');
+    expect(jsxSource).toContain('Record<ISymbioteIntrinsic, IHostProps>');
   });
 });

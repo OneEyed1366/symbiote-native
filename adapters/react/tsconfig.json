@@ -2,7 +2,14 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "build"
+    "outDir": "build",
+    // This package's own source resolves JSX through this package's namespace, the same line a
+    // consuming app sets. It is what lets `src/jsx.ts`'s `declare module 'react'` augmentation go:
+    // the augmentation is the only reason the tags need the `symbiote-` prefix (it merges into
+    // @types/react's table, where `view` / `text` / `image` / `switch` are SVG entries), and
+    // dropping it while the adapter still compiled against React's namespace would leave the
+    // adapter's own `createElement(tag, …)` calls untyped.
+    "jsxImportSource": "@symbiote-native/react"
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
