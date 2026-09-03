@@ -2034,7 +2034,9 @@ Only the tag swap is atomic.
 ```
 3a  no child marking needed   DONE 2026-09-03 — decelerationRate, collapsableChildren,
                               onContentSizeChange synthesis
-4   named slot + child tags   <RefreshControl> and <StickyHeader> as marked children
+4a  claimed children          DONE 2026-09-03 — <RefreshControl> beside the content view (iOS)
+4b  the Android inversion     OPEN — AndroidSwipeRefreshLayout wraps the scroll view
+4c  <StickyHeader>            OPEN — carries scrollEventThrottle and the onScroll modes with it
 5   swap + delete wrappers    one cut, five adapters
 ```
 
@@ -2045,6 +2047,40 @@ children array the element does not have. Resolving the throttle alone would set
 buy a per-frame scroll event with nothing reading it, so it waits for the mechanism it feeds rather
 than landing half-wired. Plain `onScroll` needs nothing at all: `scroll` is a real Fabric event and
 routes on its own.
+
+### 4a landed as `claimedChildren`, keyed by FABRIC name
+
+A child whose Fabric component the owner's behavior claims stays on the OWNER instead of going into
+the slot, and lands before the slot — RN's iOS branch renders `{refreshControl}{contentContainer}`
+in that order (`ScrollView.js:1844`). `hostFor` picks the node, `indexFor` picks the position, and
+`removeChild` reads the same pair so the adapter can remove from the node it named.
+
+Keyed by the child's **Fabric component name**, unlike the registry itself, and the asymmetry is the
+point: a claim is consulted only for children of ONE owner, so `PullToRefreshView` is unambiguous
+there, while keying the registry that way would attach the press machine to every plain `View`. That
+is what lets a claim cost no per-node field carrying an intrinsic tag.
+
+`RefreshControl` needs no behavior of its own. Its wrapper body is `resolveAccessibilityProps` and a
+spread, and the aria fold already runs in the engine (`fabricProps` -> `foldAriaProps`), so the bare
+tag commits the same payload the component does.
+
+### 4b, OPEN: on Android the refresh control is not a child
+
+An Android ScrollView takes exactly one child, so RN inverts the tree — `AndroidSwipeRefreshLayout`
+WRAPS the scroll view, with `splitLayoutProps` sending the style's layout half to the wrapper and its
+visual half to the inner view (`ScrollView.js:1856`). Read against upstream, not against our wrapper:
+it is a native ViewGroup constraint, not a JSX one, so a host model does not dissolve it.
+
+A claim cannot express it. The refresh control has to become a node ABOVE the owner, and the owner
+has no parent yet when its children arrive — adapters append children before mounting the owner, and
+the existing tests do exactly that. So the shape it needs is a deferred one: the owner remembers a
+wrapper, and its own insertion inserts the wrapper instead. That is a second node field plus a branch
+in both structural entry points, which is its own cut with its own break-tests rather than a
+paragraph inside this one.
+
+Nothing ships broken in the meantime because no adapter registers the behavior at all. Note also a
+pre-existing divergence to settle when 4b is built: RN composes `baseStyle` onto BOTH boxes and our
+wrapper puts it only on the inner one.
 
 Sticky and refreshControl belong to 4 by nature, not by size: both ARE the marked-child work. The
 prop carrying an element exists in both cases only because the API had no way to MARK an element —
