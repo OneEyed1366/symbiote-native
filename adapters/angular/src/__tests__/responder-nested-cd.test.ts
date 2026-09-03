@@ -20,7 +20,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
-import { ViewHost as View, TextHost as Text, SymbioteHostPropsDirective } from '../primitives';
+import {
+  ViewHost as View,
+  TextHost as Text,
+  SymbioteHostPropsDirective,
+} from '../primitives';
 import { registerComposedComponent } from '../anchor-host-registry';
 
 const ROOT_TAG = 972;
@@ -32,7 +36,9 @@ registerComposedComponent('nested-responder-inner');
 
 const fabric = installFabric();
 
-function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findCommitted(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   const stack = [...fabric.committed];
   while (stack.length > 0) {
     const node = stack.pop();
@@ -55,7 +61,8 @@ function handleFor(testID: string): unknown {
   return node.instanceHandle;
 }
 
-const flush = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const flush = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 @Component({
   selector: 'nested-responder-inner',

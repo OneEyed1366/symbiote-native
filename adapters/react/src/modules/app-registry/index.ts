@@ -20,7 +20,9 @@ export type IComponentProvider = () => ComponentType<object>;
 
 // RN's IWrapperComponentProvider: given the surface's parameters, returns a
 // component to wrap the app root in (e.g. a context provider). Optional.
-export type IWrapperComponentProvider = (appParameters: IAppParameters) => ComponentType<object>;
+export type IWrapperComponentProvider = (
+  appParameters: IAppParameters,
+) => ComponentType<object>;
 
 function runnableFor(
   componentProvider: IComponentProvider,
@@ -28,14 +30,21 @@ function runnableFor(
 ): IRunnable {
   return appParameters => {
     dlog(`AppRegistry: mounting on rootTag ${String(appParameters.rootTag)}`);
-    let element = createElement(componentProvider(), appParameters.initialProps);
+    let element = createElement(
+      componentProvider(),
+      appParameters.initialProps,
+    );
     // Wrap the root when a provider is set, mirroring RN's `registerComponent`
     // passing `wrapperComponentProvider && wrapperComponentProvider(...)` into
     // renderApplication (AppRegistryImpl.js:80). Read live (not at registration time) so
     // setWrapperComponentProvider affects every runnable's next run, not just future ones.
     const wrapperComponentProvider = getWrapperComponentProvider();
     if (wrapperComponentProvider !== undefined) {
-      element = createElement(wrapperComponentProvider(appParameters), null, element);
+      element = createElement(
+        wrapperComponentProvider(appParameters),
+        null,
+        element,
+      );
     }
     mount(appParameters.rootTag, element);
   };

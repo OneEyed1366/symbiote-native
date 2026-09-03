@@ -9,7 +9,7 @@
 import '@angular/compiler';
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -60,12 +60,20 @@ function committedNode(testID: string): IFakeNode | undefined {
   return undefined;
 }
 
-const tick = (): Promise<void> => new Promise<void>(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise<void>(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
   toggleFixture = undefined;
-  registerStyles({ dark: { backgroundColor: 'black' } });
+  registerRules([
+    {
+      tokens: ['dark'],
+      specificity: [0, 1, 0],
+      order: 0,
+      style: { backgroundColor: 'black' },
+    },
+  ]);
 });
 afterEach(() => {
   unmount(ROOT_TAG);

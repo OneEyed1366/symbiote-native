@@ -2,8 +2,8 @@
 
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-cellular`](https://docs.expo.dev/versions/latest/sdk/cellular/) — cellular connection
-generation, carrier/SIM info, and VoIP-support detection — reachable from **every** adapter,
-React, Vue, and Angular, not just React. Like [`@symbiote-native/sensors`](../sensors) and
+generation, carrier/SIM info, and VoIP-support detection — reachable from **every** adapter:
+React, Vue, Svelte, Solid, and Angular, not just React. Like [`@symbiote-native/sensors`](../sensors) and
 unlike this repo's plain-RN-module/view wrappers ([`@symbiote-native/slider`](../slider),
 [`@symbiote-native/splash-screen`](../splash-screen)), `expo-cellular` is built on
 `expo-modules-core`, so its native code autolinks straight out of `node_modules` via
@@ -30,18 +30,18 @@ Unlike a plain RN native module, `expo-cellular`'s native code is discovered by
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
-| Android | `AndroidManifest.xml` — the `READ_PHONE_STATE` permission, needed to read carrier/SIM info |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Android  | `AndroidManifest.xml` — the `READ_PHONE_STATE` permission, needed to read carrier/SIM info                                                          |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list, per-module permission strings — live in the
-`symbiote-expo-native-module` project skill. This wiring is already done for all four
-`examples/expo-*` canary apps (React, Vue SFC, Vue TSX, Angular).
+`symbiote-expo-native-module` project skill. This wiring is already done for all six
+`examples/expo-*` canary apps (React, Vue SFC, Vue TSX, Svelte, Solid, Angular).
 
 ## Shape
 
@@ -51,19 +51,26 @@ src/core/              cellular.ts (the free functions) + types.ts (CellularGene
                         expo-modules-core's requireNativeModule.
 src/react/hooks/        @symbiote-native/cellular/react   — usePermissions
 src/vue/composables/    @symbiote-native/cellular/vue     — usePermissions
+src/svelte/runes/       @symbiote-native/cellular/svelte  — usePermissions
+src/solid/primitives/   @symbiote-native/cellular/solid   — createPermissions (Solid says
+                                                            create*, not use*)
 src/angular/services/   @symbiote-native/cellular/angular — PermissionsService
 ```
 
 Each adapter's `usePermissions` hook/composable/service is a thin lifecycle wrapper (fetch on
 mount, expose `request`/`get` to re-check imperatively) over the same `core` functions — the
-permission-fetch logic is written once and shared by all three.
+permission-fetch logic is written once and shared by every adapter.
 
 ## Use it
 
 ```tsx
 // React
 import { useEffect, useState } from 'react';
-import { CellularGeneration, getCarrierNameAsync, getCellularGenerationAsync } from '@symbiote-native/cellular';
+import {
+  CellularGeneration,
+  getCarrierNameAsync,
+  getCellularGenerationAsync,
+} from '@symbiote-native/cellular';
 import { usePermissions } from '@symbiote-native/cellular/react';
 
 function CellularScreen() {
@@ -72,15 +79,19 @@ function CellularScreen() {
   const [status, requestPermission] = usePermissions();
 
   useEffect(() => {
-    Promise.all([getCellularGenerationAsync(), getCarrierNameAsync()]).then(([gen, carrier]) => {
-      setGeneration(gen);
-      setCarrierName(carrier);
-    });
+    Promise.all([getCellularGenerationAsync(), getCarrierNameAsync()]).then(
+      ([gen, carrier]) => {
+        setGeneration(gen);
+        setCarrierName(carrier);
+      },
+    );
   }, []);
 
   return (
     <>
-      <Text>{generation === null ? 'checking…' : CellularGeneration[generation]}</Text>
+      <Text>
+        {generation === null ? 'checking…' : CellularGeneration[generation]}
+      </Text>
       <Text>{carrierName ?? 'checking…'}</Text>
       <Text>{status === null ? 'checking…' : status.status}</Text>
       <Button title="Request permission" onPress={() => requestPermission()} />
@@ -93,7 +104,11 @@ function CellularScreen() {
 <!-- Vue -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { CellularGeneration, getCarrierNameAsync, getCellularGenerationAsync } from '@symbiote-native/cellular';
+import {
+  CellularGeneration,
+  getCarrierNameAsync,
+  getCellularGenerationAsync,
+} from '@symbiote-native/cellular';
 import { usePermissions } from '@symbiote-native/cellular/vue';
 
 const generation = ref<CellularGeneration | null>(null);
@@ -101,32 +116,109 @@ const carrierName = ref<string | null>(null);
 const { status, request: requestPermission } = usePermissions();
 
 onMounted(() => {
-  Promise.all([getCellularGenerationAsync(), getCarrierNameAsync()]).then(([gen, carrier]) => {
-    generation.value = gen;
-    carrierName.value = carrier;
-  });
+  Promise.all([getCellularGenerationAsync(), getCarrierNameAsync()]).then(
+    ([gen, carrier]) => {
+      generation.value = gen;
+      carrierName.value = carrier;
+    },
+  );
 });
 </script>
 <template>
-  <Text>{{ generation === null ? 'checking…' : CellularGeneration[generation] }}</Text>
+  <Text>{{
+    generation === null ? 'checking…' : CellularGeneration[generation]
+  }}</Text>
   <Text>{{ carrierName ?? 'checking…' }}</Text>
   <Text>{{ status === null ? 'checking…' : status.status }}</Text>
   <Button title="Request permission" :onPress="() => requestPermission()" />
 </template>
 ```
 
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import {
+    CellularGeneration,
+    getCarrierNameAsync,
+    getCellularGenerationAsync,
+    usePermissions,
+  } from '@symbiote-native/cellular/svelte';
+
+  let generation = $state<CellularGeneration | null>(null);
+  let carrierName = $state<string | null>(null);
+  const permissions = usePermissions(); // boxed getter: permissions.status / .request()
+
+  Promise.all([getCellularGenerationAsync(), getCarrierNameAsync()]).then(
+    ([gen, carrier]) => {
+      generation = gen;
+      carrierName = carrier;
+    },
+  );
+</script>
+
+<Text>{generation === null ? 'checking…' : CellularGeneration[generation]}</Text>
+<Text>{carrierName ?? 'checking…'}</Text>
+<Text>{permissions.status === null ? 'checking…' : permissions.status.status}</Text>
+<Button title="Request permission" onPress={() => permissions.request()} />
+```
+
+```tsx
+// Solid
+import { createSignal } from 'solid-js';
+import {
+  CellularGeneration,
+  getCarrierNameAsync,
+  getCellularGenerationAsync,
+} from '@symbiote-native/cellular';
+import { createPermissions } from '@symbiote-native/cellular/solid';
+
+function CellularScreen() {
+  const [generation, setGeneration] = createSignal<CellularGeneration | null>(null);
+  const [carrierName, setCarrierName] = createSignal<string | null>(null);
+  const { status, request: requestPermission } = createPermissions();
+
+  Promise.all([getCellularGenerationAsync(), getCarrierNameAsync()]).then(
+    ([gen, carrier]) => {
+      setGeneration(gen);
+      setCarrierName(carrier);
+    },
+  );
+
+  return (
+    <>
+      <Text>
+        {generation() === null ? 'checking…' : CellularGeneration[generation()!]}
+      </Text>
+      <Text>{carrierName() ?? 'checking…'}</Text>
+      <Text>{status() === null ? 'checking…' : status()!.status}</Text>
+      <Button title="Request permission" onPress={() => requestPermission()} />
+    </>
+  );
+}
+```
+
 ```ts
 // Angular
 import { Component, inject, signal } from '@angular/core';
-import { CellularGeneration, PermissionsService, getCarrierNameAsync, getCellularGenerationAsync } from '@symbiote-native/cellular/angular';
+import {
+  CellularGeneration,
+  PermissionsService,
+  getCarrierNameAsync,
+  getCellularGenerationAsync,
+} from '@symbiote-native/cellular/angular';
 
 @Component({
   selector: 'CellularScreen',
   template: `
-    <Text>{{ generation() === null ? 'checking…' : CellularGeneration[generation()!] }}</Text>
+    <Text>{{
+      generation() === null ? 'checking…' : CellularGeneration[generation()!]
+    }}</Text>
     <Text>{{ carrierName() ?? 'checking…' }}</Text>
     <Text>{{ permissionStatus()?.status ?? 'checking…' }}</Text>
-    <Button title="Request permission" (press)="permissionsService.request()"></Button>
+    <Button
+      title="Request permission"
+      (press)="permissionsService.request()"
+    ></Button>
   `,
 })
 export class CellularScreen {
@@ -138,17 +230,20 @@ export class CellularScreen {
   readonly carrierName = signal<string | null>(null);
 
   constructor() {
-    Promise.all([getCellularGenerationAsync(), getCarrierNameAsync()]).then(([generation, carrier]) => {
-      this.generation.set(generation);
-      this.carrierName.set(carrier);
-    });
+    Promise.all([getCellularGenerationAsync(), getCarrierNameAsync()]).then(
+      ([generation, carrier]) => {
+        this.generation.set(generation);
+        this.carrierName.set(carrier);
+      },
+    );
   }
 }
 ```
 
 Trimmed from the real demo screens — `examples/expo-react/screens/CellularScreen.tsx` and its
-Vue SFC, Vue TSX, and Angular twins (`examples/expo-vue-sfc/screens/CellularScreen.vue`,
-`examples/expo-vue-tsx/screens/CellularScreen.tsx`, `examples/expo-angular/src/screens/CellularScreen.ts`),
+Vue SFC, Vue TSX, Svelte, Solid, and Angular twins (`examples/expo-vue-sfc/screens/CellularScreen.vue`,
+`examples/expo-vue-tsx/screens/CellularScreen.tsx`, `examples/expo-svelte/screens/CellularScreen.svelte`,
+`examples/expo-solid/screens/CellularScreen.tsx`, `examples/expo-angular/src/screens/CellularScreen.ts`),
 which also cover `allowsVoipAsync`/`getIsoCountryCodeAsync`/`getMobileCountryCodeAsync`/
 `getMobileNetworkCodeAsync` and gate the Android-only fields behind `Platform.OS === 'android'`.
 
@@ -191,11 +286,16 @@ Plus `CellularGeneration` (enum) and `PermissionResponse`/`PermissionStatus`/
 ported by hand.
 
 ```ts
-import { getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
+import {
+  getCellularGenerationAsync,
+  getCarrierNameAsync,
+} from '@symbiote-native/cellular';
 
 // framework-scoped entry points re-export the same free functions, plus usePermissions:
 import { usePermissions } from '@symbiote-native/cellular/react';
 import { usePermissions } from '@symbiote-native/cellular/vue';
+import { usePermissions } from '@symbiote-native/cellular/svelte';
+import { createPermissions } from '@symbiote-native/cellular/solid';
 import { PermissionsService } from '@symbiote-native/cellular/angular';
 ```
 
@@ -217,6 +317,16 @@ const { status, request, get } = usePermissions();
 ```
 
 ```ts
+// Svelte — the same object, boxed as getters: permissions.status
+const permissions = usePermissions();
+```
+
+```ts
+// Solid — createPermissions, and status/error are accessors: status()
+const { status, request, get } = createPermissions();
+```
+
+```ts
 // Angular — connect() returns a readonly Signal; request()/get() live on the service itself
 readonly status = inject(PermissionsService).connect();
 // later: inject(PermissionsService).request()
@@ -227,6 +337,6 @@ readonly status = inject(PermissionsService).connect();
 No Fabric/Descriptor angle at all — cellular info is a pure async-function + permission surface,
 never a view. Tests inject a fake native-module object in place of the real
 `requireNativeModule` resolution (`src/core/cellular.test.ts`,
-`src/{react,vue,angular}/**/*.test.{ts,tsx}`, run via `vitest`) — no `installFabric()`, no
+`src/{react,vue,svelte,solid,angular}/**/*.test.{ts,tsx}`, run via `vitest`) — no `installFabric()`, no
 ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md)).

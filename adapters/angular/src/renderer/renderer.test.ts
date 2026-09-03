@@ -11,7 +11,7 @@ import {
   disposeRoot,
   isAnchor,
   isSymbioteNode,
-  registerStyles,
+  registerRules,
 } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { SymbioteRenderer, SymbioteRendererFactory } from './index';
@@ -23,7 +23,8 @@ const PROBE_ID = 'probe';
 const fabric = installFabric();
 
 // A macrotask boundary drains the engine's coalesced (requestCommit) commit before asserting.
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 // Fabric is clone-on-write ONLY once a node has been committed at least once — a mutation
 // before the FIRST commit still lands on the same object `fabric.find` (which searches
@@ -31,7 +32,9 @@ const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
 // a NEW cloned object `fabric.find` never observes, so any assertion on a value that changed
 // across two commits must walk the live COMMITTED tree instead (mirrors the __tests__/responder-*
 // files' own `findCommitted` helper).
-function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findCommitted(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   const stack = [...fabric.committed];
   while (stack.length > 0) {
     const node = stack.pop();
@@ -42,9 +45,15 @@ function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | und
   return undefined;
 }
 
-function setup(): { surface: ReturnType<typeof createSurface>; renderer: SymbioteRenderer } {
+function setup(): {
+  surface: ReturnType<typeof createSurface>;
+  renderer: SymbioteRenderer;
+} {
   const surface = createSurface(ROOT_TAG);
-  const renderer = new SymbioteRendererFactory(surface).createRenderer(null, null);
+  const renderer = new SymbioteRendererFactory(surface).createRenderer(
+    null,
+    null,
+  );
   if (!(renderer instanceof SymbioteRenderer))
     throw new Error('unreachable: factory built the renderer');
   return { surface, renderer };
@@ -89,7 +98,9 @@ describe('Angular SymbioteRenderer drives the engine', () => {
 
     // The engine wraps surface.children in the synthetic box-none AppContainer root.
     const root = fabric.appRoot();
-    expect(fabric.serialize(root.children)).toBe('RCTView(RCTText(RCTRawText "Hello"))');
+    expect(fabric.serialize(root.children)).toBe(
+      'RCTView(RCTText(RCTRawText "Hello"))',
+    );
   });
 
   // why: descriptorFor's table is shared across every adapter — a symbiote intrinsic beyond
@@ -102,7 +113,9 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.setProperty(spinner, 'animating', true);
     const image = renderer.createElement('symbiote-image');
     renderer.setProperty(image, 'testID', 'image');
-    renderer.setProperty(image, 'source', { uri: 'https://example.invalid/image.png' });
+    renderer.setProperty(image, 'source', {
+      uri: 'https://example.invalid/image.png',
+    });
     renderer.appendChild(surface, spinner);
     renderer.appendChild(surface, image);
     await tick();
@@ -112,7 +125,9 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     expect(committed?.props.animating).toBe(true);
     const committedImage = fabric.find(node => node.props.testID === 'image');
     expect(committedImage?.viewName).toBe('RCTImageView');
-    expect(committedImage?.props.source).toEqual({ uri: 'https://example.invalid/image.png' });
+    expect(committedImage?.props.source).toEqual({
+      uri: 'https://example.invalid/image.png',
+    });
   });
 
   // why: Angular's ɵɵstyleMap decomposes ONE `[style]` binding into MULTIPLE setStyle(key,
@@ -132,7 +147,11 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     // Angular emits a [style] binding as per-key setStyle; the seam folds them into one style
     // object, then the engine HOISTS style keys to top-level Fabric props (RN's flat C++ props
     // contract — style is never a nested key on a committed node).
-    expect(committed?.props).toMatchObject({ nativeID: PROBE_ID, padding: 24, opacity: 0.5 });
+    expect(committed?.props).toMatchObject({
+      nativeID: PROBE_ID,
+      padding: 24,
+      opacity: 0.5,
+    });
   });
 
   // why: Ivy compiles `class="card highlight"` into per-token addClass calls, never one string
@@ -141,7 +160,14 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // still win over a class-derived value (the same precedence every adapter's class+style merge
   // guarantees), or CSS-module/SFC-style classes would silently behave differently on Angular.
   it('resolves addClass tokens through the shared style registry and lets explicit style win', async () => {
-    registerStyles({ card: { padding: 10, backgroundColor: 'red' } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10, backgroundColor: 'red' },
+      },
+    ]);
     const { surface, renderer } = setup();
     const view = renderer.createElement('symbiote-view');
     renderer.setProperty(view, 'nativeID', PROBE_ID);
@@ -155,7 +181,10 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     const committed = fabric.find(node => node.props.nativeID === PROBE_ID);
     // padding comes from the class; backgroundColor is explicit style, so it wins over the
     // class-derived red — same precedence Vue's class="..."/:style="..." merge guarantees.
-    expect(committed?.props).toMatchObject({ padding: 10, backgroundColor: 'blue' });
+    expect(committed?.props).toMatchObject({
+      padding: 10,
+      backgroundColor: 'blue',
+    });
   });
 
   // why: `[ngClass]`/`[class.foo]="false"` compiles to a removeClass call — the resolved style
@@ -163,7 +192,20 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // style subtracted (which would break if two classes shared a key), matching removeClass's
   // "rejoin the whole Set" implementation strategy.
   it('removeClass drops a token and recomputes the resolved style', async () => {
-    registerStyles({ card: { padding: 10 }, highlight: { opacity: 0.5 } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10 },
+      },
+      {
+        tokens: ['highlight'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { opacity: 0.5 },
+      },
+    ]);
     const { surface, renderer } = setup();
     const view = renderer.createElement('symbiote-view');
     renderer.setProperty(view, 'nativeID', PROBE_ID);
@@ -283,14 +325,18 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.setAttribute(view, 'testID', 'static-attr');
     renderer.appendChild(surface, view);
     await tick();
-    expect(findCommitted(n => n.props.nativeID === PROBE_ID)?.props.testID).toBe('static-attr');
+    expect(
+      findCommitted(n => n.props.nativeID === PROBE_ID)?.props.testID,
+    ).toBe('static-attr');
 
     renderer.removeAttribute(view, 'testID');
     await tick();
     // The fake Fabric's clone-on-write merge keeps a removed key as an explicit `null`, not a
     // deleted one (fake-fabric.ts's own header comment) — this is the real committed contract,
     // not a test-harness quirk: RN's own diff sends an explicit prop-removal, never a delete.
-    expect(findCommitted(n => n.props.nativeID === PROBE_ID)?.props.testID).toBeNull();
+    expect(
+      findCommitted(n => n.props.nativeID === PROBE_ID)?.props.testID,
+    ).toBeNull();
   });
 
   // why: removeStyle is setStyle's inverse (an `[ngStyle]` binding removing one key) — it must
@@ -323,15 +369,17 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     renderer.appendChild(text, raw);
     renderer.appendChild(surface, text);
     await tick();
-    expect(findCommitted(n => n.props.nativeID === PROBE_ID)?.children[0]?.props.text).toBe(
-      'first',
-    );
+    expect(
+      findCommitted(n => n.props.nativeID === PROBE_ID)?.children[0]?.props
+        .text,
+    ).toBe('first');
 
     renderer.setValue(raw, 'second');
     await tick();
-    expect(findCommitted(n => n.props.nativeID === PROBE_ID)?.children[0]?.props.text).toBe(
-      'second',
-    );
+    expect(
+      findCommitted(n => n.props.nativeID === PROBE_ID)?.children[0]?.props
+        .text,
+    ).toBe('second');
   });
 
   // why: parentNode/nextSibling back Angular's own DOM-shaped tree-walk internals (e.g.
@@ -392,10 +440,14 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     const { renderer } = setup();
     const view = renderer.createElement('symbiote-view');
     expect(isSymbioteNode(view)).toBe(true);
-    if (!isSymbioteNode(view)) throw new Error('unreachable: createElement returns a node');
+    if (!isSymbioteNode(view))
+      throw new Error('unreachable: createElement returns a node');
 
     const unlisten = renderer.listen(view, 'press', () => {});
-    expect(view.listeners?.has('press'), 'listener attached under the explicit name').toBe(true);
+    expect(
+      view.listeners?.has('press'),
+      'listener attached under the explicit name',
+    ).toBe(true);
     unlisten();
     expect(view.listeners?.has('press'), 'unlisten removed it').toBe(false);
   });
@@ -420,10 +472,12 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     registerComposedComponent('MixedCaseScreen');
     const { renderer } = setup();
     const node = renderer.createElement('mixedcasescreen');
-    if (!isSymbioteNode(node)) throw new Error('unreachable: createElement returns a node');
-    expect(isAnchor(node), 'a dynamically-mounted screen lowercases before reaching here').toBe(
-      true,
-    );
+    if (!isSymbioteNode(node))
+      throw new Error('unreachable: createElement returns a node');
+    expect(
+      isAnchor(node),
+      'a dynamically-mounted screen lowercases before reaching here',
+    ).toBe(true);
   });
 
   // App/third-party selectors must not be hardcoded into ANCHOR_HOST_COMPONENTS — the owning
@@ -435,8 +489,12 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   it('does not anchor-host an app-owned selector unless it self-registers', () => {
     const { renderer } = setup();
     const node = renderer.createElement('RefApiDemo');
-    if (!isSymbioteNode(node)) throw new Error('unreachable: createElement returns a node');
-    expect(isAnchor(node), 'falls through to a raw Fabric view, not an anchor').toBe(false);
+    if (!isSymbioteNode(node))
+      throw new Error('unreachable: createElement returns a node');
+    expect(
+      isAnchor(node),
+      'falls through to a raw Fabric view, not an anchor',
+    ).toBe(false);
     expect(node.component).toBe('RefApiDemo');
   });
 
@@ -448,7 +506,8 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     registerComposedComponent('RefApiDemo');
     const { renderer } = setup();
     const node = renderer.createElement('RefApiDemo');
-    if (!isSymbioteNode(node)) throw new Error('unreachable: createElement returns a node');
+    if (!isSymbioteNode(node))
+      throw new Error('unreachable: createElement returns a node');
     expect(isAnchor(node)).toBe(true);
   });
 });
@@ -464,7 +523,9 @@ describe('Angular SymbioteRenderer rejects text placed outside a <Text> host', (
   it('throws when a raw text node is appended directly to the surface', () => {
     const { surface, renderer } = setup();
     const raw = renderer.createText('stray');
-    expect(() => renderer.appendChild(surface, raw)).toThrow(/must be rendered inside a <Text>/);
+    expect(() => renderer.appendChild(surface, raw)).toThrow(
+      /must be rendered inside a <Text>/,
+    );
   });
 
   // why: the same guard must apply to insertBefore, not just appendChild — a raw text node

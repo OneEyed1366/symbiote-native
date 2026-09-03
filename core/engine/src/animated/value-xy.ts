@@ -32,7 +32,12 @@ export class AnimatedValueXY {
   // removeListener can tear both down together.
   private readonly jointListeners = new Map<string, { x: string; y: string }>();
 
-  constructor(value: { x: number | AnimatedValue; y: number | AnimatedValue } = { x: 0, y: 0 }) {
+  constructor(
+    value: { x: number | AnimatedValue; y: number | AnimatedValue } = {
+      x: 0,
+      y: 0,
+    },
+  ) {
     if (typeof value.x === 'number' && typeof value.y === 'number') {
       this.x = new AnimatedValue(value.x);
       this.y = new AnimatedValue(value.y);
@@ -127,7 +132,10 @@ export class AnimatedValueXY {
   }
 
   // Convert {x, y} into a usable translation transform array.
-  getTranslateTransform(): [{ translateX: AnimatedValue }, { translateY: AnimatedValue }] {
+  getTranslateTransform(): [
+    { translateX: AnimatedValue },
+    { translateY: AnimatedValue },
+  ] {
     return [{ translateX: this.x }, { translateY: this.y }];
   }
 }

@@ -21,7 +21,8 @@ export interface IRippleBackground {
   rippleRadius?: number;
 }
 
-export type INativeFeedbackBackground = IThemeAttrBackground | IRippleBackground;
+export type INativeFeedbackBackground =
+  IThemeAttrBackground | IRippleBackground;
 
 // Native foreground ripple is Android-only (API 23+). RN gates this on Platform.OS === 'android'
 // && Platform.Version >= 23. Version is a string on iOS (where the gate is irrelevant) and a
@@ -36,11 +37,19 @@ export function canUseNativeForeground(): boolean {
   );
 }
 
-export function selectableBackground(rippleRadius?: number): IThemeAttrBackground {
-  return { type: 'ThemeAttrAndroid', attribute: 'selectableItemBackground', rippleRadius };
+export function selectableBackground(
+  rippleRadius?: number,
+): IThemeAttrBackground {
+  return {
+    type: 'ThemeAttrAndroid',
+    attribute: 'selectableItemBackground',
+    rippleRadius,
+  };
 }
 
-export function selectableBackgroundBorderless(rippleRadius?: number): IThemeAttrBackground {
+export function selectableBackgroundBorderless(
+  rippleRadius?: number,
+): IThemeAttrBackground {
   return {
     type: 'ThemeAttrAndroid',
     attribute: 'selectableItemBackgroundBorderless',

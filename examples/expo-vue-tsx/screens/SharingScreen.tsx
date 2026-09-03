@@ -1,6 +1,12 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/vue';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -12,9 +18,17 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   return value ? 'yes' : 'no';
 }
 
-function CapabilityRow(props: { testID: string; label: string; status: ICapabilityStatus }) {
+function CapabilityRow(props: {
+  testID: string;
+  label: string;
+  status: ICapabilityStatus;
+}) {
   const text =
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
     <View testID={props.testID} class="sharing-row">
       <Text class="sharing-row-label">{props.label}</Text>
@@ -53,7 +67,9 @@ export const SharingScreen = defineComponent(
 
     function handleShare() {
       lastResult.value = 'sharing…';
-      shareAsync(fileUri.value, { dialogTitle: 'Share from the Symbiote canary' })
+      shareAsync(fileUri.value, {
+        dialogTitle: 'Share from the Symbiote canary',
+      })
         .then(() => {
           lastResult.value = 'share sheet dismissed';
         })
@@ -64,7 +80,11 @@ export const SharingScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="sharing-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="sharing-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -75,8 +95,8 @@ export const SharingScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Sharing</Text>
               <Text class="hero-body">
-                @symbiote-native/sharing — opens the platform share sheet for a local file. Type a
-                file URI below, then hand it to the sheet.
+                @symbiote-native/sharing — opens the platform share sheet for a
+                local file. Type a file URI below, then hand it to the sheet.
               </Text>
             </View>
           </View>
@@ -89,17 +109,18 @@ export const SharingScreen = defineComponent(
               status={isAvailable.value}
             />
             <Text class="sharing-note">
-              Reports on the native module, not on any device capability — it is true on both
-              platforms once the module is linked.
+              Reports on the native module, not on any device capability — it is
+              true on both platforms once the module is linked.
             </Text>
           </View>
 
           <View testID="sharing-share-card" class="sharing-card">
             <Text class="sharing-card-title">Share a file</Text>
             <Text class="sharing-note">
-              A real local file URI is required — the share sheet reads the file itself, so a path
-              that does not exist raises an error rather than opening. This app ships no
-              file-system package to produce one, so supply a path from the device.
+              A real local file URI is required — the share sheet reads the file
+              itself, so a path that does not exist raises an error rather than
+              opening. This app ships no file-system package to produce one, so
+              supply a path from the device.
             </Text>
             <TextInput
               testID="sharing-uri-input"
@@ -128,8 +149,8 @@ export const SharingScreen = defineComponent(
               </Text>
             </View>
             <Text class="sharing-note">
-              The sheet does not report which app the user picked, or whether they cancelled — it
-              resolves once dismissed either way.
+              The sheet does not report which app the user picked, or whether
+              they cancelled — it resolves once dismissed either way.
             </Text>
           </View>
         </ScrollView>

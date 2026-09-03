@@ -9,7 +9,13 @@
 // onValueChange MUST be stripped from the forwarded attrs: it is not a ViewConfig event, so
 // leaking it would reach Fabric as a function prop and crash Android's folly::dynamic.
 
-import { defineComponent, onBeforeUnmount, ref, shallowRef, watch } from '@vue/runtime-core';
+import {
+  defineComponent,
+  onBeforeUnmount,
+  ref,
+  shallowRef,
+  watch,
+} from '@vue/runtime-core';
 import {
   resolveAccessibilityProps,
   resolveTextInputProps,
@@ -35,6 +41,9 @@ import {
   type IClassNameValue,
   type ISymbioteEvent,
   type ISymbioteNode,
+  type IMeasureOnSuccess,
+  type IMeasureInWindowOnSuccess,
+  type IMeasureLayoutOnSuccess,
 } from '@symbiote-native/engine';
 import { descriptorToVue } from '../../descriptor-to-vue';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
@@ -42,7 +51,10 @@ import { resolveModelValue, emitModelUpdate } from '../../utils/model-binding';
 
 // `class` can't join ITextInputBaseProps since it's framework-agnostic, so it's added locally
 // (like Image's IImageProps). Not in HANDLED_ATTRS below, so it rides through forwardAttrs.
-export type ITextInputProps = Omit<ITextInputBaseProps, 'onValueChange' | 'onFocus' | 'onBlur'> & {
+export type ITextInputProps = Omit<
+  ITextInputBaseProps,
+  'onValueChange' | 'onFocus' | 'onBlur'
+> & {
   modelValue?: string;
   class?: IClassNameValue;
 };
@@ -210,7 +222,9 @@ export const TextInput = defineComponent<ITextInputProps, ITextInputEmits>(
         if (autoFocused || node === null || rawAttrs.autoFocus !== true) return;
         autoFocused = true;
         dlog('TextInput autoFocus -> focus command');
-        cancelAutoFocus = whenCommitted(node, () => dispatchViewCommand(node, 'focus', []));
+        cancelAutoFocus = whenCommitted(node, () =>
+          dispatchViewCommand(node, 'focus', []),
+        );
       },
       { flush: 'post' },
     );
@@ -230,7 +244,12 @@ export const TextInput = defineComponent<ITextInputProps, ITextInputEmits>(
       clear: (): void => {
         const node = nodeRef.value;
         if (node === null) return;
-        dispatchViewCommand(node, 'setTextAndSelection', [mostRecentEventCount.value, '', 0, 0]);
+        dispatchViewCommand(node, 'setTextAndSelection', [
+          mostRecentEventCount.value,
+          '',
+          0,
+          0,
+        ]);
         lastNativeText = '';
       },
       isFocused: (): boolean => focused,
@@ -244,6 +263,28 @@ export const TextInput = defineComponent<ITextInputProps, ITextInputEmits>(
           start,
           end,
         ]);
+      },
+      // Forwarded from the node, because `expose()` REPLACES the public instance rather than
+      // extending it: without these four, a `<TextInput>` ref could not measure while a `<View>`
+      // ref could, and an app moved between the component and lowered paths — which it does by
+      // writing `:multiline="isLong"` instead of `multiline` — silently swapped which four methods
+      // it had. The lowered path answers all nine through `buildTextInputHandle`; this is the same
+      // set on the component path, so the two surfaces are one.
+      measure: (callback: IMeasureOnSuccess): void => {
+        nodeRef.value?.measure(callback);
+      },
+      measureInWindow: (callback: IMeasureInWindowOnSuccess): void => {
+        nodeRef.value?.measureInWindow(callback);
+      },
+      measureLayout: (
+        relativeToNativeNode: ISymbioteNode | number,
+        onSuccess: IMeasureLayoutOnSuccess,
+        onFail?: () => void,
+      ): void => {
+        nodeRef.value?.measureLayout(relativeToNativeNode, onSuccess, onFail);
+      },
+      setNativeProps: (nativeProps: Record<string, unknown>): void => {
+        nodeRef.value?.setNativeProps(nativeProps);
       },
     });
 
@@ -268,7 +309,10 @@ export const TextInput = defineComponent<ITextInputProps, ITextInputEmits>(
         showSoftInputOnFocus: asBoolean(attrs.showSoftInputOnFocus),
         underlineColorAndroid: asString(attrs.underlineColorAndroid),
       });
-      const text = foldText(resolveModelValue(attrs, isString), asString(attrs.defaultValue));
+      const text = foldText(
+        resolveModelValue(attrs, isString),
+        asString(attrs.defaultValue),
+      );
       return descriptorToVue(
         renderTextInput({
           multiline,

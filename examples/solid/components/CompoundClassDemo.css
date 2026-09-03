@@ -1,0 +1,36 @@
+/* A plain (global) stylesheet, not a `.module.css` — deliberate, and the reason is the compound
+   rule below. A CSS-module suffixes every class as `badge__module__<id>`; the engine's compound
+   lookup factors a shared scope suffix back out only for the `data-v-…` / `svelte-…` shapes its
+   SCOPE_SUFFIX_PATTERN knows (core/engine/src/style-registry/index.ts), so a scoped compound rule
+   would register as `badgeLoud__module__<id>` and never match the two markup tokens. Global keeps
+   the compound half of the demo alive; the scoping half has no Solid equivalent today. */
+
+.badge {
+  padding: 8px;
+  border-radius: 999px;
+  border-width: 1px;
+  border-color: #2c4068;
+  background-color: #20304f;
+}
+
+/* Restates ONLY the two colours: the padding and radius above must survive on `badge loud`.
+
+   The fill is a HUE change, not a shade. It used to be #16305a, which sits within a point of
+   `.badge`'s own #20304f in luminance — the toggle repainted the badge and looked dead, so the
+   1px border was the only thing carrying the whole demo. #1d6b4a is what examples/react's
+   `.badge.loud` uses (Angular picks its own brand red for the same reason): the point of this
+   screen is that the compound rule RESOLVED, and that has to read from across the room. */
+.badge.loud {
+  border-color: #7aa2e3;
+  background-color: #1d6b4a;
+}
+
+.badge-text {
+  font-size: 13px;
+  color: #cdd6ee;
+}
+
+.badge-readout {
+  color: #cdd6ee;
+  font-size: 13px;
+}

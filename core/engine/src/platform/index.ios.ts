@@ -11,7 +11,11 @@ import {
   type IPlatformStatic,
 } from './shared';
 
-export type { IPlatformOSType, IPlatformSelectSpec, IPlatformStatic } from './shared';
+export type {
+  IPlatformOSType,
+  IPlatformSelectSpec,
+  IPlatformStatic,
+} from './shared';
 
 // interfaceIdiom values RN compares against for the device-class getters.
 const IDIOM_PAD = 'pad';
@@ -39,7 +43,9 @@ export interface IPlatformConstantsIOS {
   isMacCatalyst?: boolean;
 }
 
-function isPlatformConstantsIOS(value: unknown): value is IPlatformConstantsIOS {
+function isPlatformConstantsIOS(
+  value: unknown,
+): value is IPlatformConstantsIOS {
   if (typeof value !== 'object' || value === null) return false;
   return 'osVersion' in value && 'interfaceIdiom' in value;
 }

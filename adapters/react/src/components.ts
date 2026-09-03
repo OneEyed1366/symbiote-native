@@ -1,20 +1,20 @@
-// Host primitives exposed to user code. They are thin wrappers that produce the
-// lowercase host elements the reconciler understands (`view` / `text`); the
-// reconciler maps those to shared's mutation API, which resolves them to Fabric
-// view names at commit.
+// Host primitives exposed to user code. They ARE the intrinsic tags — a capitalized export whose
+// value is the tag string — so an app writes `<View>` and React commits a host element directly,
+// with no component instance in between. The reconciler maps the tag through
+// `descriptorFor` to a Fabric view name at commit.
 
-import { createElement, type FC, type Ref, type ReactNode } from 'react';
+import type { Ref, ReactNode } from 'react';
 import type { ISymbioteEvent } from '@symbiote-native/engine';
 import type { IHostInstance } from './host-instance';
-import {
-  resolveAccessibilityProps,
-  type IAccessibilityProps,
-  type IAriaProps,
+import type {
+  IAccessibilityProps,
+  IAriaProps,
 } from '@symbiote-native/components';
 import type { IResponderProps } from './utils/responder-props';
 import type { IStyleProp, ITextStyle, IViewStyle } from './utils/styles';
 
-export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderProps {
+export interface IViewProps
+  extends IAccessibilityProps, IAriaProps, IResponderProps {
   style?: IStyleProp<IViewStyle>;
   // React's own web idiom for a registered class name (RN has no DOM/CSS classes to match
   // against). Resolved through the shared style registry by routeProp's centralized
@@ -39,7 +39,8 @@ export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderP
   // 'box-none' makes the view itself transparent to touches but not its children.
   pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
   // Enlarge the touch target past the view's visual bounds without affecting layout.
-  hitSlop?: number | { top?: number; left?: number; bottom?: number; right?: number };
+  hitSlop?:
+    number | { top?: number; left?: number; bottom?: number; right?: number };
   // testID / nativeID are inherited from IAccessibilityProps (the shared host-anchor base).
   // RN's modern W3C alias for nativeID. Folded into nativeID before commit (id wins
   // when both are set, matching RN's View.js), never sent to Fabric raw.
@@ -87,16 +88,18 @@ export interface ITextProps extends IAccessibilityProps, IAriaProps {
   children?: ReactNode;
 }
 
-// RN's modern `id` is just a W3C-named alias for `nativeID`: View.js copies it over
-// (`processedProps.nativeID = id`), so `id` wins when both are set. We fold it here and
-// blank the alias so a raw `id` never reaches Fabric (every non-function prop passes
-// through to the slot otherwise).
-function resolveId({ id, ...rest }: IViewProps): IViewProps {
-  if (id === undefined) return rest;
-  return { ...rest, nativeID: id };
-}
-
-export const View: FC<IViewProps> = props =>
-  createElement('symbiote-view', resolveAccessibilityProps(resolveId(props)));
-export const Text: FC<ITextProps> = props =>
-  createElement('symbiote-text', resolveAccessibilityProps(props));
+// `View` and `Text` are the intrinsic TAGS, not components wrapping them. JSX resolves a
+// capitalized tag to the value in scope, and a value that is a STRING is a host element to React —
+// so `<View/>` compiles to `_jsx('symbiote-view', …)` with no component instance, while
+// `JSX.IntrinsicElements['symbiote-view']` still supplies the strict props (a bad prop is TS2322).
+//
+// The two folds their component bodies used to apply both moved down a layer, which is what let
+// the bodies go:
+//
+//   aria / accessibility   the engine folds every node in `fabricProps` (accessibility-props.ts)
+//   id -> nativeID,        the renderer folds by spec in `host-config`'s createInstance
+//   Text's defaults        (`foldHostBag`, driven by HOST_PRIMITIVES)
+//
+// A type annotation rather than `as const`: same literal type, no cast (`ts-js-best-practices`).
+export const View = 'symbiote-view';
+export const Text = 'symbiote-text';

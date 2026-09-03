@@ -47,7 +47,10 @@ export const CryptoScreen = defineComponent(
     }
 
     function handleDigest() {
-      digestStringAsync(CryptoDigestAlgorithm.SHA256, DIGEST_SAMPLE_STRING).then(value => {
+      digestStringAsync(
+        CryptoDigestAlgorithm.SHA256,
+        DIGEST_SAMPLE_STRING,
+      ).then(value => {
         if (isMounted) digest.value = value;
       });
     }
@@ -60,7 +63,11 @@ export const CryptoScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="crypto-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="crypto-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -71,8 +78,9 @@ export const CryptoScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Crypto</Text>
               <Text class="hero-body">
-                @symbiote-native/crypto — cryptographically secure random bytes, randomUUID, and
-                string digest hashing (SHA-1/256/384/512, MD2/4/5), no per-instance state.
+                @symbiote-native/crypto — cryptographically secure random bytes,
+                randomUUID, and string digest hashing (SHA-1/256/384/512,
+                MD2/4/5), no per-instance state.
               </Text>
             </View>
           </View>
@@ -94,14 +102,20 @@ export const CryptoScreen = defineComponent(
               onPress={handleDigest}
               color={lineColor}
             />
-            <ValueRow label="SHA-256 digest" value={digest.value ?? 'not computed yet'} />
+            <ValueRow
+              label="SHA-256 digest"
+              value={digest.value ?? 'not computed yet'}
+            />
             <ActionButton
               testID="crypto-random-bytes-button"
               title="Get 16 random bytes"
               onPress={handleGetRandomBytes}
               color={lineColor}
             />
-            <ValueRow label="Random bytes" value={randomBytes.value ?? 'not generated yet'} />
+            <ValueRow
+              label="Random bytes"
+              value={randomBytes.value ?? 'not generated yet'}
+            />
           </View>
         </ScrollView>
       </SafeAreaView>

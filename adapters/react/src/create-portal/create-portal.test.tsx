@@ -30,7 +30,8 @@ function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
 function findText(text: string): IFakeNode | undefined {
   let found: IFakeNode | undefined;
   walk(fabric.committed, node => {
-    if (node.viewName === 'RCTRawText' && node.props.text === text) found = node;
+    if (node.viewName === 'RCTRawText' && node.props.text === text)
+      found = node;
   });
   return found;
 }
@@ -41,7 +42,9 @@ function App(): React.ReactElement {
   const [overlay, setOverlay] = useState<IHostInstance | null>(null);
   return (
     <View>
-      <Text testID="source">{overlay ? createPortal(<Text>ported in</Text>, overlay) : null}</Text>
+      <Text testID="source">
+        {overlay ? createPortal(<Text>ported in</Text>, overlay) : null}
+      </Text>
       <View testID="overlay-host" ref={setOverlay} />
     </View>
   );
@@ -56,7 +59,8 @@ describe('createPortal', () => {
 
     const overlayHost = fabric.find(n => n.props.testID === 'overlay-host');
     expect(overlayHost, 'overlay host View was created').toBeDefined();
-    if (overlayHost === undefined || ported === undefined) throw new Error('unreachable');
+    if (overlayHost === undefined || ported === undefined)
+      throw new Error('unreachable');
 
     const sourceText = fabric.find(n => n.props.testID === 'source');
     expect(sourceText, 'source Text was created').toBeDefined();
@@ -75,7 +79,10 @@ describe('createPortal', () => {
     });
     expect(overlayHostCommitted).toBeDefined();
     expect(sourceTextCommitted).toBeDefined();
-    if (overlayHostCommitted === undefined || sourceTextCommitted === undefined) {
+    if (
+      overlayHostCommitted === undefined ||
+      sourceTextCommitted === undefined
+    ) {
       throw new Error('unreachable');
     }
 
@@ -94,7 +101,11 @@ describe('createPortal', () => {
     // signature would normally reject — exactly the "a JS consumer / bad ref" case being guarded.
     const plainObject = JSON.parse('{}');
     const selectorString = JSON.parse('"body"');
-    expect(() => createPortal(<Text>x</Text>, plainObject)).toThrow(/already-mounted host node/);
-    expect(() => createPortal(<Text>x</Text>, selectorString)).toThrow(/already-mounted host node/);
+    expect(() => createPortal(<Text>x</Text>, plainObject)).toThrow(
+      /already-mounted host node/,
+    );
+    expect(() => createPortal(<Text>x</Text>, selectorString)).toThrow(
+      /already-mounted host node/,
+    );
   });
 });

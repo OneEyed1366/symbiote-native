@@ -5,7 +5,12 @@
 // ngOnChanges on mount + every prop change. Imperative statics are attached to the component
 // object the same way RN does.
 
-import { Component, Input, type OnChanges, type SimpleChanges } from '@angular/core';
+import {
+  Component,
+  Input,
+  type OnChanges,
+  type SimpleChanges,
+} from '@angular/core';
 import {
   applyStatusBarProps,
   statusBarImperative,
@@ -46,12 +51,16 @@ class StatusBarComponent implements OnChanges {
   }
 }
 
-const StatusBarWithStatics = Object.assign(StatusBarComponent, statusBarImperative);
+const StatusBarWithStatics = Object.assign(
+  StatusBarComponent,
+  statusBarImperative,
+);
 
 Object.defineProperty(StatusBarWithStatics, 'currentHeight', {
   get: statusBarCurrentHeight,
   enumerable: true,
 });
 
-export const StatusBar: typeof StatusBarWithStatics & { readonly currentHeight?: number } =
-  StatusBarWithStatics;
+export const StatusBar: typeof StatusBarWithStatics & {
+  readonly currentHeight?: number;
+} = StatusBarWithStatics;

@@ -67,13 +67,17 @@ describe('diffFocusedRoute', () => {
   // why: first mount - nothing was previously focused, so there is nothing to blur, only the
   // newly-focused route should fire.
   it('on first mount (no previous key), focuses only - no blur', () => {
-    expect(diffFocusedRoute(undefined, 'route-a')).toEqual({ focusKey: 'route-a' });
+    expect(diffFocusedRoute(undefined, 'route-a')).toEqual({
+      focusKey: 'route-a',
+    });
   });
 
   // why: unmount / no-longer-focused (e.g. popped off the stack) - the route that had focus must
   // still be blurred even though nothing new gained focus in its place.
   it('on losing focus with nothing new focused, blurs only - no focus', () => {
-    expect(diffFocusedRoute('route-a', undefined)).toEqual({ blurKey: 'route-a' });
+    expect(diffFocusedRoute('route-a', undefined)).toEqual({
+      blurKey: 'route-a',
+    });
   });
 
   // why: an ordinary focus change (e.g. push/pop between two live routes) - the old route must

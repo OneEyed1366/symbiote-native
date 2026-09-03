@@ -1,6 +1,11 @@
 import { requireNativeModule } from 'expo-modules-core';
 
-import type { CryptoDigestAlgorithm, ICryptoDigestOptions, IDigest, ITypedArray } from './types';
+import type {
+  CryptoDigestAlgorithm,
+  ICryptoDigestOptions,
+  IDigest,
+  ITypedArray,
+} from './types';
 
 const EXPO_CRYPTO_MODULE_NAME = 'ExpoCrypto';
 
@@ -14,13 +19,22 @@ const EXPO_CRYPTO_MODULE_NAME = 'ExpoCrypto';
 export type INativeCryptoModule = {
   getRandomValues(typedArray: ITypedArray): void;
   randomUUID(): string;
-  digest(algorithm: CryptoDigestAlgorithm, output: Uint8Array, data: BufferSource): void;
+  digest(
+    algorithm: CryptoDigestAlgorithm,
+    output: Uint8Array,
+    data: BufferSource,
+  ): void;
   digestStringAsync?(
     algorithm: CryptoDigestAlgorithm,
     data: string,
     options: ICryptoDigestOptions,
   ): Promise<IDigest>;
-  digestAsync?(algorithm: CryptoDigestAlgorithm, data: BufferSource): Promise<ArrayBuffer>;
+  digestAsync?(
+    algorithm: CryptoDigestAlgorithm,
+    data: BufferSource,
+  ): Promise<ArrayBuffer>;
 };
 
-export const expoCrypto = requireNativeModule<INativeCryptoModule>(EXPO_CRYPTO_MODULE_NAME);
+export const expoCrypto = requireNativeModule<INativeCryptoModule>(
+  EXPO_CRYPTO_MODULE_NAME,
+);

@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react';
 import { Accelerometer, type IAccelerometerMeasurement } from '../../../core';
 
-export function useAccelerometer(updateIntervalMs?: number): IAccelerometerMeasurement | null {
-  const [measurement, setMeasurement] = useState<IAccelerometerMeasurement | null>(null);
+export function useAccelerometer(
+  updateIntervalMs?: number,
+): IAccelerometerMeasurement | null {
+  const [measurement, setMeasurement] =
+    useState<IAccelerometerMeasurement | null>(null);
 
   useEffect(() => {
     // Re-subscribing on interval change keeps the native update rate in sync with the

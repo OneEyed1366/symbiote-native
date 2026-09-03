@@ -1,0 +1,39 @@
+/* Own names, `resp-` prefixed: App.css already defines a `.chip` (a pill-shaped tab label) and a
+   `.row-tight`, and this demo's chip is a 56x48 drag target — a shared name would make whichever
+   stylesheet registered last win. */
+
+.resp-status {
+  color: #cdd6ee;
+  font-size: 14px;
+}
+
+.resp-transfer {
+  font-size: 13px;
+}
+
+.resp-strip {
+  padding: 12px;
+  border-radius: 12px;
+  background-color: #20304f;
+}
+
+.resp-row {
+  flex-direction: row;
+  gap: 8px;
+}
+
+.resp-chip {
+  width: 56px;
+  height: 48px;
+  border-radius: 8px;
+  background-color: #7aa2e3;
+  border-width: 2px;
+  align-items: center;
+  justify-content: center;
+}
+
+.resp-chip-text {
+  color: #0b1120;
+  font-size: 16px;
+  font-weight: bold;
+}

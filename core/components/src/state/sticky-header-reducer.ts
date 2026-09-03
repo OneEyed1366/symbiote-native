@@ -16,7 +16,10 @@
 // shares. Ported from ScrollViewStickyHeader.js's effect.
 
 import { dlog } from '@symbiote-native/engine';
-import { computeStickyInterpolation, stickyDebounceMs } from '../view/render-scroll-sticky';
+import {
+  computeStickyInterpolation,
+  stickyDebounceMs,
+} from '../view/render-scroll-sticky';
 
 // The un-measured identity interpolation (RN: a fresh AnimatedInterpolation before the header has
 // measured its own y/height). Kept as the reset the initial state and every rebuild start from.
@@ -81,7 +84,11 @@ export type IStickyAction =
 // fires; `apply-passthrough` is the settled translateY to push into the committed transform;
 // `record-header-y` feeds this header's measured y into the parent cross-talk map (Angular projection).
 export type IStickyEffect =
-  | { kind: 'rebuild-interpolation'; inputRange: number[]; outputRange: number[] }
+  | {
+      kind: 'rebuild-interpolation';
+      inputRange: number[];
+      outputRange: number[];
+    }
   | { kind: 'schedule-debounce'; delay: number; value: number }
   | { kind: 'apply-passthrough'; translateY: number }
   | { kind: 'record-header-y'; index: number; y: number };
@@ -153,7 +160,9 @@ export function reduceSticky(
 ): IStickyReduceResult {
   dlog(
     `STICKY[reducer ${headerTag(state)}] action=${action.kind}` +
-      (action.kind === 'layout' ? ` y=${action.y} height=${action.height}` : '') +
+      (action.kind === 'layout'
+        ? ` y=${action.y} height=${action.height}`
+        : '') +
       (action.kind === 'animated-tick' || action.kind === 'debounce-fired'
         ? ` value=${action.value}`
         : '') +
@@ -175,16 +184,24 @@ export function reduceSticky(
       // fresh prop identity on every redundant layout, which can itself provoke another relayout pass —
       // an unbounded same-tick rebuild ping-pong that trips Svelte's effect_update_depth_exceeded guard.
       const alreadyAtThisGeometry =
-        state.measured && state.layoutY === action.y && state.layoutHeight === action.height;
+        state.measured &&
+        state.layoutY === action.y &&
+        state.layoutHeight === action.height;
       state.layoutY = action.y;
       state.layoutHeight = action.height;
       state.measured = true;
       const effects: IStickyEffect[] = [];
       if (inputs.index !== undefined) {
-        effects.push({ kind: 'record-header-y', index: inputs.index, y: action.y });
+        effects.push({
+          kind: 'record-header-y',
+          index: inputs.index,
+          y: action.y,
+        });
       }
       if (alreadyAtThisGeometry && state.rangesEmitted) {
-        dlog(`STICKY[reducer ${headerTag(state)}] layout: redundant geometry, skipped rebuild`);
+        dlog(
+          `STICKY[reducer ${headerTag(state)}] layout: redundant geometry, skipped rebuild`,
+        );
         return { state, effects, changed: effects.length > 0 };
       }
       const { inputRange, outputRange } = deriveRanges(state, inputs);
@@ -260,12 +277,29 @@ export function reduceSticky(
       return {
         state,
         effects: [
-          { kind: 'schedule-debounce', delay: stickyDebounceMs(inputs.os), value: action.value },
+          {
+            kind: 'schedule-debounce',
+            delay: stickyDebounceMs(inputs.os),
+            value: action.value,
+          },
         ],
         changed: false,
       };
     }
     case 'debounce-fired': {
+      // Already sitting at this value: emit nothing. Same bail-out the 'layout' case above spells
+      // out, for the same reason - React's own header gets it free from setTranslateY (an unchanged
+      // primitive bails out of the re-render), a reducer has to say it. Device-confirmed 2026-08-18:
+      // without it a re-arriving settled value emits apply-passthrough, the adapter force-renders,
+      // the passthrough prop gets a fresh identity, the animated graph reconnects and re-emits into
+      // another tick -> another debounce -> another passthrough. One header survives it; a screen of
+      // 200 trips React's "Maximum update depth exceeded" and takes the app down.
+      if (state.translateY === action.value) {
+        dlog(
+          `STICKY[reducer ${headerTag(state)}] debounce-fired: already at translateY=${action.value}, no-op`,
+        );
+        return { state, effects: [], changed: false };
+      }
       // The debounce completed: commit the settled translateY. Once a NON-zero value commits, re-arm
       // the swallow gate so the next interpolation rebuild's spurious 0 is dropped (RN).
       dlog(

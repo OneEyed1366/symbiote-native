@@ -7,7 +7,11 @@
 //
 // Inputs arrive as attrs (untyped) and run through normalizeVueAttrs before each is narrowed by a guard.
 
-import { defineComponent, watchEffect, type SetupContext } from '@vue/runtime-core';
+import {
+  defineComponent,
+  watchEffect,
+  type SetupContext,
+} from '@vue/runtime-core';
 import {
   applyStatusBarProps,
   statusBarImperative,
@@ -25,7 +29,9 @@ function asBoolean(value: unknown): boolean | undefined {
 }
 
 function asBarStyle(value: unknown): IStatusBarStyle | undefined {
-  return value === 'default' || value === 'light-content' || value === 'dark-content'
+  return value === 'default' ||
+    value === 'light-content' ||
+    value === 'dark-content'
     ? value
     : undefined;
 }
@@ -41,7 +47,9 @@ function buildProps(attrs: Record<string, unknown>): IStatusBarProps {
     barStyle: asBarStyle(attrs.barStyle),
     hidden: asBoolean(attrs.hidden),
     animated: asBoolean(attrs.animated),
-    networkActivityIndicatorVisible: asBoolean(attrs.networkActivityIndicatorVisible),
+    networkActivityIndicatorVisible: asBoolean(
+      attrs.networkActivityIndicatorVisible,
+    ),
     backgroundColor: asColorValue(attrs.backgroundColor),
     translucent: asBoolean(attrs.translucent),
   };
@@ -60,7 +68,10 @@ const StatusBarComponent = defineComponent({
   },
 });
 
-const StatusBarWithStatics = Object.assign(StatusBarComponent, statusBarImperative);
+const StatusBarWithStatics = Object.assign(
+  StatusBarComponent,
+  statusBarImperative,
+);
 
 // Android exposes the bar height as a native constant; undefined on iOS / when absent. Read lazily
 // (getter) so nothing touches native at import time; the Android engine impl resolves on access.
@@ -71,5 +82,6 @@ Object.defineProperty(StatusBarWithStatics, 'currentHeight', {
 
 // currentHeight is optional, so the defineProperty-added accessor doesn't need to appear on the
 // runtime object's inferred type for this assignment to hold (no cast).
-export const StatusBar: typeof StatusBarWithStatics & { readonly currentHeight?: number } =
-  StatusBarWithStatics;
+export const StatusBar: typeof StatusBarWithStatics & {
+  readonly currentHeight?: number;
+} = StatusBarWithStatics;

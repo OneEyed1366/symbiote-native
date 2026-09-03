@@ -3,7 +3,8 @@
 Port of [`expo-screen-orientation`](https://docs.expo.dev/versions/latest/sdk/screen-orientation/)
 for [SymbioteNative](../../README.md) — orientation locking (`lockAsync`/`lockPlatformAsync`/
 `unlockAsync`), reading the current orientation and lock, and an auto-updating orientation-change
-subscription, reachable from every adapter (React, Vue, Angular), not just React.
+subscription, reachable from every adapter (React, Vue, Svelte, Solid, Angular), not just
+React.
 
 Built the same way as [`@symbiote-native/network`](../network) and
 [`@symbiote-native/device`](../device), an `expo-modules-core`-based wrapper (see the
@@ -31,12 +32,12 @@ into the native host app **once**, covering this package and every other `expo-m
 package (`@symbiote-native/network`, `@symbiote-native/device`, `@symbiote-native/sensors`, ...)
 with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
@@ -55,23 +56,29 @@ src/core/               screen-orientation.ts — lock*/unlock/get* functions +
                         Orientation/OrientationLock/SizeClassIOS/WebOrientationLock/WebOrientation
                         enums, PlatformOrientationInfo, ScreenOrientationInfo,
                         OrientationChangeEvent, hand-ported from ScreenOrientation.types.ts, plus
-                        ScreenOrientationState (this package's own hook/composable/service shape).
+                        ScreenOrientationState (the shape every adapter's wrapper returns).
 src/react/hooks/        @symbiote-native/screen-orientation/react   — useScreenOrientation
 src/vue/composables/    @symbiote-native/screen-orientation/vue     — useScreenOrientation (same name)
+src/svelte/runes/       @symbiote-native/screen-orientation/svelte  — useScreenOrientation (same name)
+src/solid/primitives/   @symbiote-native/screen-orientation/solid   — createScreenOrientation
+                        (returns an Accessor; Solid reserves `use*` for consuming existing state)
 src/angular/services/   @symbiote-native/screen-orientation/angular — ScreenOrientationService
                         (`.connect()` returns a Signal)
 ```
 
-Each adapter's hook/composable/service is a thin lifecycle wrapper (seed from one-shot
-`getOrientationAsync()`/`getOrientationLockAsync()` calls, subscribe to
+Each adapter's hook/composable/rune/primitive/service is a thin lifecycle wrapper (seed from
+one-shot `getOrientationAsync()`/`getOrientationLockAsync()` calls, subscribe to
 `addOrientationChangeListener`, unsubscribe on unmount) over the same `core` functions — the
-subscription logic is written once and shared by all three.
+subscription logic is written once and shared by all of them.
 
 ## Use it
 
 ```tsx
 // React — examples/expo-react/screens/ScreenOrientationScreen.tsx
-import { lockAsync, OrientationLock } from '@symbiote-native/screen-orientation';
+import {
+  lockAsync,
+  OrientationLock,
+} from '@symbiote-native/screen-orientation';
 import { useScreenOrientation } from '@symbiote-native/screen-orientation/react';
 
 function ScreenOrientationScreen() {
@@ -81,7 +88,10 @@ function ScreenOrientationScreen() {
     <>
       <Text>Orientation: {orientation}</Text>
       <Text>Lock: {orientationLock}</Text>
-      <Button title="Lock landscape" onPress={() => lockAsync(OrientationLock.LANDSCAPE)} />
+      <Button
+        title="Lock landscape"
+        onPress={() => lockAsync(OrientationLock.LANDSCAPE)}
+      />
     </>
   );
 }
@@ -91,7 +101,10 @@ function ScreenOrientationScreen() {
 <!-- Vue — examples/expo-vue-sfc/screens/ScreenOrientationScreen.vue -->
 <script setup lang="ts">
 import { Text } from '@symbiote-native/vue';
-import { lockAsync, OrientationLock } from '@symbiote-native/screen-orientation';
+import {
+  lockAsync,
+  OrientationLock,
+} from '@symbiote-native/screen-orientation';
 import { useScreenOrientation } from '@symbiote-native/screen-orientation/vue';
 
 const screenOrientation = useScreenOrientation(); // Ref<ScreenOrientationState>
@@ -100,6 +113,24 @@ const screenOrientation = useScreenOrientation(); // Ref<ScreenOrientationState>
   <Text>Orientation: {{ screenOrientation.orientation }}</Text>
   <Text>Lock: {{ screenOrientation.orientationLock }}</Text>
 </template>
+```
+
+```svelte
+<!-- Svelte — examples/expo-svelte/screens/ScreenOrientationScreen.svelte -->
+<script lang="ts">
+  import {
+    lockAsync,
+    OrientationLock,
+  } from '@symbiote-native/screen-orientation';
+  import { useScreenOrientation } from '@symbiote-native/screen-orientation/svelte';
+
+  // The rune hands back a boxed getter, so `.current` is what a `$derived` subscribes to —
+  // Svelte's twin of unwrapping Vue's Ref via `.value`.
+  const screenOrientation = useScreenOrientation();
+</script>
+
+<Text>Orientation: {screenOrientation.current.orientation}</Text>
+<Text>Lock: {screenOrientation.current.orientationLock}</Text>
 ```
 
 ```ts
@@ -115,6 +146,31 @@ import { ScreenOrientationService } from '@symbiote-native/screen-orientation/an
 })
 export class ScreenOrientationScreen {
   readonly screenOrientation = inject(ScreenOrientationService).connect(); // Signal<ScreenOrientationState>
+}
+```
+
+```tsx
+// Solid — the accessor is CALLED; a Solid component body runs once, so a snapshot would freeze.
+import { Text } from '@symbiote-native/solid';
+import {
+  lockAsync,
+  OrientationLock,
+} from '@symbiote-native/screen-orientation';
+import { createScreenOrientation } from '@symbiote-native/screen-orientation/solid';
+
+function ScreenOrientationScreen() {
+  const screenOrientation = createScreenOrientation(); // Accessor<ScreenOrientationState>
+
+  return (
+    <>
+      <Text>Orientation: {screenOrientation().orientation}</Text>
+      <Text>Lock: {screenOrientation().orientationLock}</Text>
+      <Button
+        title="Lock landscape"
+        onPress={() => lockAsync(OrientationLock.LANDSCAPE)}
+      />
+    </>
+  );
 }
 ```
 
@@ -143,19 +199,26 @@ Plus `Orientation` (enum: `UNKNOWN`/`PORTRAIT_UP`/`PORTRAIT_DOWN`/`LANDSCAPE_LEF
 `OrientationChangeEvent` — ported from upstream's `ScreenOrientation.types.ts`.
 
 ```ts
-import { getOrientationAsync, addOrientationChangeListener } from '@symbiote-native/screen-orientation';
+import {
+  getOrientationAsync,
+  addOrientationChangeListener,
+} from '@symbiote-native/screen-orientation';
 
 // framework-scoped entry points re-export the same free functions, plus a lifecycle
 // hook/composable/service:
 import { useScreenOrientation } from '@symbiote-native/screen-orientation/react';
 import { useScreenOrientation } from '@symbiote-native/screen-orientation/vue';
+import { useScreenOrientation } from '@symbiote-native/screen-orientation/svelte';
+import { createScreenOrientation } from '@symbiote-native/screen-orientation/solid';
 import { ScreenOrientationService } from '@symbiote-native/screen-orientation/angular';
 ```
 
-`useScreenOrientation` seeds its initial value (`{ orientation: Orientation.UNKNOWN,
-orientationLock: OrientationLock.UNKNOWN }`) from one-shot `getOrientationAsync()`/
-`getOrientationLockAsync()` calls, then subscribes to `addOrientationChangeListener` for updates,
-and unsubscribes on unmount.
+`useScreenOrientation` (Solid: `createScreenOrientation`) seeds its initial value
+(`{ orientation: Orientation.UNKNOWN, orientationLock: OrientationLock.UNKNOWN }`) from one-shot
+`getOrientationAsync()`/`getOrientationLockAsync()` calls, then subscribes to
+`addOrientationChangeListener` for updates, and unsubscribes on unmount. The Solid primitive
+returns an `Accessor<ScreenOrientationState>` and subscribes from its body rather than an effect,
+so nothing can slip between the seed and the subscription.
 
 **Note (Android):** `expo-screen-orientation` doesn't emit its own `expoDidUpdateDimensions`
 event on Android — the module piggybacks on RN's own `Dimensions.addEventListener('change', ...)`
@@ -167,7 +230,7 @@ subscribe to the native `expoDidUpdateDimensions` event directly.
 No Fabric/Descriptor angle at all — screen-orientation is a pure async-function + `EventEmitter`
 listener surface, never a view. Tests inject a fake native-module object in place of the real
 `requireNativeModule` resolution (`src/core/screen-orientation.test.ts`,
-`src/{react,vue,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
+`src/{react,vue,svelte,solid,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
 `@symbiote-native/network`/`@symbiote-native/device`/`@symbiote-native/sensors` use — no
 `installFabric()`, no ViewConfig. Native rendering itself is verified on-device — see the parent
 [README](../../README.md).

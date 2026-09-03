@@ -4,10 +4,13 @@
   // (isAvailableAsync, Android-only isBatteryOptimizationEnabledAsync). A Simulator with no
   // physical battery reports the API as unavailable; a real device is needed for live readings.
   // Svelte twin of examples/expo-vue-sfc/screens/BatteryScreen.vue.
-  //
-  // Markup whitespace is load-bearing here, exactly as in MenuScreen.svelte — siblings are packed
-  // edge-to-edge and every text node stays on ONE source line (svelte-adapter-dom-shim §16).
-  import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/svelte';
+  import {
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    Text,
+    View,
+  } from '@symbiote-native/svelte';
   import {
     BatteryState,
     isAvailableAsync,
@@ -83,34 +86,73 @@
   });
 </script>
 
-<SafeAreaView class="screen"
-  ><ScrollView testID="battery-scroll" class="screen" contentContainerStyle="scroll-content"
-    ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
-    ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: lineColor }}
-        ><Text class="hero-badge-text">{lineInfo.code}</Text></View
-      ><View class="hero-copy"
-        ><Text class="hero-title">Battery</Text><Text class="hero-body">@symbiote-native/battery — live battery level, charging state, and low-power mode, over three Svelte runes. The iOS Simulator reports the battery API as unavailable; a real device is needed to see live readings.</Text></View
-      ></View
-    ><View testID="battery-live-card" class="battery-card"
-      ><Text class="battery-card-title">Live</Text><View class="battery-row"
-        ><Text class="battery-row-label">Level</Text><Text testID="battery-level-value" class="battery-value-text">{batteryLevelText}</Text></View
-      ><View class="battery-row"
-        ><Text class="battery-row-label">State</Text><Text testID="battery-state-value" class="battery-value-text">{batteryStateText}</Text></View
-      ><View class="battery-row"
-        ><Text class="battery-row-label">Low power mode</Text><Text testID="battery-low-power-value" class="battery-value-text">{lowPowerModeText}</Text></View
-      ></View
-    ><View testID="battery-capabilities-card" class="battery-card"
-      ><Text class="battery-card-title">Capabilities</Text><View class="battery-row"
-        ><Text class="battery-row-label">Available</Text><View class={`battery-status-badge battery-status-badge-${availabilityStatus}`}
-          ><Text class="battery-status-text">{CAPABILITY_LABEL[availabilityStatus]}</Text></View
-        ></View
-      >{#if Platform.OS === 'android'}<View class="battery-row"
-        ><Text class="battery-row-label">Battery optimization enabled</Text><View class={`battery-status-badge battery-status-badge-${optimizationStatus}`}
-          ><Text class="battery-status-text">{CAPABILITY_LABEL[optimizationStatus]}</Text></View
-        ></View
-      >{/if}</View
-    ></ScrollView
-  ></SafeAreaView
->
+<SafeAreaView class="screen">
+  <ScrollView
+    testID="battery-scroll"
+    class="screen"
+    contentContainerStyle="scroll-content"
+  >
+    <View class={`line-tag line-tag-${lineInfo.line}`}>
+      <Text class="line-tag-text">
+        {`${lineInfo.code} · ${lineInfo.label}`}
+      </Text>
+    </View>
+    <View class="hero-card">
+      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <Text class="hero-badge-text">{lineInfo.code}</Text>
+      </View>
+      <View class="hero-copy">
+        <Text class="hero-title">Battery</Text>
+        <Text class="hero-body">
+          @symbiote-native/battery — live battery level, charging state, and
+          low-power mode, over three Svelte runes. The iOS Simulator reports the
+          battery API as unavailable; a real device is needed to see live
+          readings.
+        </Text>
+      </View>
+    </View>
+    <View testID="battery-live-card" class="battery-card">
+      <Text class="battery-card-title">Live</Text>
+      <View class="battery-row">
+        <Text class="battery-row-label">Level</Text>
+        <Text testID="battery-level-value" class="battery-value-text">
+          {batteryLevelText}
+        </Text>
+      </View>
+      <View class="battery-row">
+        <Text class="battery-row-label">State</Text>
+        <Text testID="battery-state-value" class="battery-value-text">
+          {batteryStateText}
+        </Text>
+      </View>
+      <View class="battery-row">
+        <Text class="battery-row-label">Low power mode</Text>
+        <Text testID="battery-low-power-value" class="battery-value-text">
+          {lowPowerModeText}
+        </Text>
+      </View>
+    </View>
+    <View testID="battery-capabilities-card" class="battery-card">
+      <Text class="battery-card-title">Capabilities</Text>
+      <View class="battery-row">
+        <Text class="battery-row-label">Available</Text>
+        <View
+          class={`battery-status-badge battery-status-badge-${availabilityStatus}`}
+        >
+          <Text class="battery-status-text">
+            {CAPABILITY_LABEL[availabilityStatus]}
+          </Text>
+        </View>
+      </View>{#if Platform.OS === 'android'}<View class="battery-row">
+          <Text class="battery-row-label">Battery optimization enabled</Text>
+          <View
+            class={`battery-status-badge battery-status-badge-${optimizationStatus}`}
+          >
+            <Text class="battery-status-text">
+              {CAPABILITY_LABEL[optimizationStatus]}
+            </Text>
+          </View>
+        </View>{/if}
+    </View>
+  </ScrollView>
+</SafeAreaView>

@@ -23,14 +23,20 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Tab } from './index';
 import type { ITabNavigatorHandle } from './index';
 import type { IRoute } from '../../core';
-import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '../composables';
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+  useRoute,
+} from '../composables';
 
 const ROOT_TAG = 4640;
 const TOUCH_START = 'topTouchStart';
 const TOUCH_END = 'topTouchEnd';
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedHomeRoute: IRoute<unknown> | undefined;
 
@@ -265,7 +271,11 @@ describe('Vue Tab navigator', () => {
         defineComponent({
           setup: () => () =>
             h(Tab, { initialRouteName: 'Home' }, () => [
-              h(Tab.Screen, { name: 'Home', component: HomeScreen, options: { tabBarBadge: 3 } }),
+              h(Tab.Screen, {
+                name: 'Home',
+                component: HomeScreen,
+                options: { tabBarBadge: 3 },
+              }),
               h(Tab.Screen, { name: 'Profile', component: ProfileScreen }),
             ]),
         }),
@@ -316,7 +326,10 @@ describe('Vue Tab navigator', () => {
           setup: () => () =>
             h(Tab, { ref: handleRef, initialRouteName: 'Home' }, () => [
               h(Tab.Screen, { name: 'Home', component: TrackedHomeScreen }),
-              h(Tab.Screen, { name: 'Profile', component: TrackedProfileScreen }),
+              h(Tab.Screen, {
+                name: 'Profile',
+                component: TrackedProfileScreen,
+              }),
             ]),
         }),
       );
@@ -386,7 +399,8 @@ describe('Vue Tab navigator', () => {
       const { handleRef, hideProfile } = mountToggleTab();
       await tick();
       const homeKey = capturedHomeRoute?.key;
-      if (homeKey === undefined) throw new Error('Home route key was never observed');
+      if (homeKey === undefined)
+        throw new Error('Home route key was never observed');
       handleRef.value?.setParams({ sort: 'trending' }, homeKey);
       await tick();
 

@@ -13,4 +13,7 @@ export class GyroscopeSensor extends DeviceSensor<IGyroscopeMeasurement> {}
 
 const GYROSCOPE_DID_UPDATE_EVENT_NAME = 'gyroscopeDidUpdate';
 
-export const Gyroscope = new GyroscopeSensor(exponentGyroscope, GYROSCOPE_DID_UPDATE_EVENT_NAME);
+export const Gyroscope = new GyroscopeSensor(
+  exponentGyroscope,
+  GYROSCOPE_DID_UPDATE_EVENT_NAME,
+);

@@ -36,7 +36,8 @@ const RE_PUSHES_PER_FRAME = 0;
 
 const fabric = installFabric();
 
-const flush = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const flush = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function handleFor(testID: string): unknown {
   const node = fabric.find((n: IFakeNode) => n.props.testID === testID);
@@ -60,19 +61,28 @@ function probeHostProps(): { setterRuns: () => number; restore: () => void } {
     'symbioteHostProps',
   );
   const original = descriptor?.set;
-  if (original === undefined) throw new Error('symbioteHostProps is not an accessor any more');
+  if (original === undefined)
+    throw new Error('symbioteHostProps is not an accessor any more');
   let runs = 0;
-  Object.defineProperty(SymbioteHostPropsDirective.prototype, 'symbioteHostProps', {
-    ...descriptor,
-    set(this: SymbioteHostPropsDirective, value: Record<string, unknown>) {
-      runs += 1;
-      original.call(this, value);
+  Object.defineProperty(
+    SymbioteHostPropsDirective.prototype,
+    'symbioteHostProps',
+    {
+      ...descriptor,
+      set(this: SymbioteHostPropsDirective, value: Record<string, unknown>) {
+        runs += 1;
+        original.call(this, value);
+      },
     },
-  });
+  );
   return {
     setterRuns: (): number => runs,
     restore: (): void => {
-      Object.defineProperty(SymbioteHostPropsDirective.prototype, 'symbioteHostProps', descriptor);
+      Object.defineProperty(
+        SymbioteHostPropsDirective.prototype,
+        'symbioteHostProps',
+        descriptor,
+      );
     },
   };
 }
@@ -175,9 +185,10 @@ describe('ScrollView prop-bag stability across unrelated change detection', () =
         `rePushes=${perFrameCost} fabricCommits=${commits}`,
     );
 
-    expect(perFrameCost, 'a memoized bag must not re-push on an unchanged scroll frame').toBe(
-      PASSES * RE_PUSHES_PER_FRAME,
-    );
+    expect(
+      perFrameCost,
+      'a memoized bag must not re-push on an unchanged scroll frame',
+    ).toBe(PASSES * RE_PUSHES_PER_FRAME);
     // Where the cost does NOT land, which is as useful to pin as where it does: re-pushing an
     // identical bag never reaches Fabric. The engine's reconcile walk deep-compares, finds
     // nothing changed and skips completeRoot, so `1` here is the mount commit and the ten scroll

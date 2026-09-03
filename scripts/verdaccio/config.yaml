@@ -1,0 +1,52 @@
+# A LOCAL npm registry for the dev loop, so an example can name `@symbiote-native/engine@dev`
+# instead of a `file:` path into somebody's home directory.
+#
+# WHY THIS EXISTS. The documented loop (<examples_vs_dot_examples> in CLAUDE.md) re-points an
+# example's manifest at a `.tarballs/*.tgz`, which works and leaves machine-local install state in a
+# tracked file — six manifests and five lockfiles were dirty with it on 2026-09-01, and the rule
+# against committing them is enforced by nothing but memory. A registry specifier is git-safe by
+# construction: it resolves for whoever runs the registry and is inert for whoever does not.
+#
+# WHY NOT A REAL NPM DIST-TAG. Tried on this project and reverted the same day (2026-07-24, recorded
+# in the symbiote-release-publishing skill): npm's `unpublish` and `deprecate` are OTP-gated even for
+# a token with 2FA bypass, so a snapshot can never be removed and every dev iteration would be a
+# permanent public version. Locally that blocker dissolves and the accumulation gets worse, since
+# perf work publishes many times a day. A registry you own has neither problem.
+#
+# LOCALHOST ONLY, hence no auth anywhere below. `publish: $all` and `unpublish: $all` are what make
+# the iteration loop bearable — republish over a version, or drop it, without a login dance. Do not
+# copy this file to anything reachable from another machine.
+
+listen: 0.0.0.0:4873
+storage: /verdaccio/storage
+
+# Everything this registry does not host is proxied from real npm and cached, so `react-native`,
+# `expo-*` and the rest resolve exactly as before. Pointing an example at this registry does not cut
+# it off from the world.
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+    # The default is 30s and a cold RN tree pulls a lot at once.
+    timeout: 60s
+
+packages:
+  # Ours: served locally, never proxied. A miss here must be a miss, not a silent fall-through to
+  # the published version — that fall-through is the exact staleness this registry exists to end.
+  '@symbiote-native/*':
+    access: $all
+    publish: $all
+    unpublish: $all
+
+  '@*/*':
+    access: $all
+    publish: $all
+    unpublish: $all
+    proxy: npmjs
+
+  '**':
+    access: $all
+    publish: $all
+    unpublish: $all
+    proxy: npmjs
+
+log: { type: stdout, format: pretty, level: warn }

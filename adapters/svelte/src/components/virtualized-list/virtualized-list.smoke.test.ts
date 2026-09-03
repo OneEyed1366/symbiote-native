@@ -16,7 +16,10 @@ import { mount, unmount } from '../../render';
 // fabric.find() walks the CREATION log, which never reflects a later clone's props
 // (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must instead
 // walk the currently COMMITTED tree, same as activity-indicator.smoke.test.ts's findLive.
-function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeNode | undefined {
+function findLive(
+  node: IFakeNode,
+  predicate: (n: IFakeNode) => boolean,
+): IFakeNode | undefined {
   if (predicate(node)) return node;
   for (const child of node.children) {
     const found = findLive(child, predicate);
@@ -25,7 +28,30 @@ function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeN
   return undefined;
 }
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+// Does this committed subtree carry a raw-text payload anywhere inside it? Asks WHERE a node sits
+// rather than merely whether it exists — placement is geometry for a separator.
+function carriesText(node: IFakeNode, text: string): boolean {
+  return (
+    node.props.text === text ||
+    node.children.some(child => carriesText(child, text))
+  );
+}
+
+// The content container's DIRECT children — the level a spacer collapses, and the only level at
+// which "inside the cell" and "beside the cell" look different.
+function contentChildren(): IFakeNode[] {
+  for (const root of fabric.committed) {
+    const content = findLive(
+      root,
+      node => node.viewName === 'RCTScrollContentView',
+    );
+    if (content !== undefined) return content.children;
+  }
+  throw new Error('no content container committed');
+}
+
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -51,12 +77,11 @@ const STICKY_HEADER_OUT = join(
   'scroll-view',
   '.smoke-compiled-sticky-header-for-virtualized-list.mjs',
 );
-// sticky-header.svelte renders a real <Animated.View> (AnimatedView.svelte) — same treatment,
+// sticky-header.svelte renders a real Animated.View (createAnimatedComponent(View)) — same treatment,
 // compiled to a sibling of the real file so ITS OWN relative imports keep resolving unchanged.
-const MODULES_ANIMATED_DIR = join(COMPONENTS_DIR, '..', 'modules', 'animated');
-const ANIMATED_VIEW_OUT = join(
-  MODULES_ANIMATED_DIR,
-  '.smoke-compiled-animated-view-for-virtualized-list.mjs',
+const VIEW_OUT = join(
+  COMPONENTS_DIR,
+  '.smoke-compiled-view-for-virtualized-list.mjs',
 );
 const LIST_OUT = join(__dirname, '.smoke-compiled-virtualized-list.mjs');
 const ROOT_OUT = join(__dirname, '.smoke-compiled-list-root.mjs');
@@ -67,7 +92,8 @@ const REFRESH_ROOT_OUT = join(__dirname, '.smoke-compiled-refresh-root.mjs');
 const STICKY_ROOT_OUT = join(__dirname, '.smoke-compiled-sticky-root.mjs');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -76,7 +102,7 @@ beforeEach(() => {
 afterEach(() => {
   unmount(ROOT_TAG);
   rmSync(REFRESH_CONTROL_OUT, { force: true });
-  rmSync(ANIMATED_VIEW_OUT, { force: true });
+  rmSync(VIEW_OUT, { force: true });
   rmSync(STICKY_HEADER_OUT, { force: true });
   rmSync(LIST_OUT, { force: true });
   rmSync(ROOT_OUT, { force: true });
@@ -85,9 +111,17 @@ afterEach(() => {
   rmSync(HANDLE_ROOT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
@@ -96,14 +130,18 @@ const ITEM_COUNT = 100;
 const DEFAULT_INITIAL_NUM_TO_RENDER = 10;
 
 function compileVirtualizedListWithRefreshControl(): void {
-  const refreshControlSource = readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8');
-  compileToFile(refreshControlSource, 'RefreshControl.svelte', REFRESH_CONTROL_OUT);
-
-  const animatedViewSource = readFileSync(
-    join(MODULES_ANIMATED_DIR, 'AnimatedView.svelte'),
+  const refreshControlSource = readFileSync(
+    join(COMPONENTS_DIR, 'RefreshControl.svelte'),
     'utf8',
   );
-  compileToFile(animatedViewSource, 'AnimatedView.svelte', ANIMATED_VIEW_OUT);
+  compileToFile(
+    refreshControlSource,
+    'RefreshControl.svelte',
+    REFRESH_CONTROL_OUT,
+  );
+
+  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
+  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
 
   const stickyHeaderSource = readFileSync(
     join(COMPONENTS_DIR, 'scroll-view', 'sticky-header.svelte'),
@@ -113,13 +151,16 @@ function compileVirtualizedListWithRefreshControl(): void {
     ...COMPILE_OPTIONS,
     filename: 'sticky-header.svelte',
   }).js.code.replace(
-    "from '../../modules/animated/AnimatedView.svelte'",
-    "from '../../modules/animated/.smoke-compiled-animated-view-for-virtualized-list.mjs'",
+    "from '../View.svelte'",
+    "from '../.smoke-compiled-view-for-virtualized-list.mjs'",
   );
   writeFileSync(STICKY_HEADER_OUT, stickyHeaderResult);
 
   const listSource = readFileSync(join(__dirname, 'index.svelte'), 'utf8');
-  const result = compile(listSource, { ...COMPILE_OPTIONS, filename: 'VirtualizedList.svelte' });
+  const result = compile(listSource, {
+    ...COMPILE_OPTIONS,
+    filename: 'VirtualizedList.svelte',
+  });
   const rewritten = result.js.code
     .replace(
       "from '../RefreshControl.svelte'",
@@ -162,6 +203,51 @@ async function loadMountable(): Promise<Component> {
 // by resolved URL — the same reason ROOT_OUT/REFRESH_ROOT_OUT/STICKY_ROOT_OUT are already separate
 // paths in this file).
 const HANDLE_ROOT_OUT = join(__dirname, '.smoke-compiled-handle-root.mjs');
+const SEPARATOR_ROOT_OUT = join(
+  __dirname,
+  '.smoke-compiled-separator-root.mjs',
+);
+
+// Mounts VirtualizedList with a labelled item snippet AND a separator snippet. getItemLayout pins
+// the geometry so the window is deterministic; windowSize is a parameter because the gate test
+// needs the LAST data index actually rendered, and windowSize=1 zeroes the overscan.
+async function loadMountableWithSeparator(
+  rows: number,
+  windowSize: number,
+): Promise<Component> {
+  compileVirtualizedListWithRefreshControl();
+  compileToFile(
+    `<script>
+       import VirtualizedList from './.smoke-compiled-virtualized-list.mjs';
+       const data = Array.from({ length: ${rows} }, (_u, id) => id);
+       function getItem(source, index) { return source[index]; }
+       function getItemCount(source) { return source.length; }
+       function getItemLayout(_source, index) {
+         return { length: 100, offset: 100 * index, index };
+       }
+     </script>
+     {#snippet cell(info)}<symbiote-text p={{}}>row-{info.item}</symbiote-text>{/snippet}
+     {#snippet divider()}<symbiote-text p={{}}>divider</symbiote-text>{/snippet}
+     <VirtualizedList
+       {data}
+       {getItem}
+       {getItemCount}
+       {getItemLayout}
+       windowSize={${windowSize}}
+       item={cell}
+       separator={divider}
+     />`,
+    'SeparatorRoot.svelte',
+    SEPARATOR_ROOT_OUT,
+  );
+  const mod: unknown = await import(
+    `file://${SEPARATOR_ROOT_OUT}?rows=${rows}&w=${windowSize}`
+  );
+  if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
+    throw new Error('SeparatorRoot.svelte produced no default export');
+  }
+  return mod.default as Component;
+}
 
 // A root exposing the inner VirtualizedList's exported imperative handle on
 // `window.__listHandle` via `bind:this`, same pattern scroll-view.smoke.test.ts uses to drive
@@ -205,12 +291,17 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
     // unbounded native views.
     it('renders only the windowed slice of a large data set, not every item', async () => {
       const ListRoot = await loadMountable();
-      const data = Array.from({ length: ITEM_COUNT }, (_unused, index) => `item-${index}`);
+      const data = Array.from(
+        { length: ITEM_COUNT },
+        (_unused, index) => `item-${index}`,
+      );
       mount(ROOT_TAG, ListRoot, { data });
       await tick();
       await tick();
 
-      const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+      const content = fabric.find(
+        node => node.viewName === 'RCTScrollContentView',
+      );
       expect(content).toBeDefined();
       if (content === undefined) return;
 
@@ -237,7 +328,10 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
     // geometry is known, or a device would forever render the pre-layout placeholder count.
     it('grows the window toward the target as onLayout reports a real viewport', async () => {
       const ListRoot = await loadMountable();
-      const data = Array.from({ length: ITEM_COUNT }, (_unused, index) => `item-${index}`);
+      const data = Array.from(
+        { length: ITEM_COUNT },
+        (_unused, index) => `item-${index}`,
+      );
       mount(ROOT_TAG, ListRoot, { data });
       await tick();
       await tick();
@@ -256,7 +350,9 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+      const content = fabric.find(
+        node => node.viewName === 'RCTScrollContentView',
+      );
       expect(content).toBeDefined();
       if (content === undefined) return;
       expect(content.children.length).toBeGreaterThan(0);
@@ -302,15 +398,26 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
         fabric.appRoot(),
         node => node.props.testID === 'virtualized-list-a11y',
       );
-      expect(scrollView, 'testID reached the committed RCTScrollView').toBeDefined();
+      expect(
+        scrollView,
+        'testID reached the committed RCTScrollView',
+      ).toBeDefined();
       expect(scrollView?.viewName).toBe('RCTScrollView');
 
       // Gap 2: onRefresh/refreshing produce a REAL RefreshControl (PullToRefreshView) as a sibling
       // of the content container inside the scroll view (iOS sibling attachment) — not an inert prop.
-      const refresh = findLive(fabric.appRoot(), node => node.viewName === 'PullToRefreshView');
-      expect(refresh, 'a real RefreshControl.svelte painted PullToRefreshView').toBeDefined();
+      const refresh = findLive(
+        fabric.appRoot(),
+        node => node.viewName === 'PullToRefreshView',
+      );
+      expect(
+        refresh,
+        'a real RefreshControl.svelte painted PullToRefreshView',
+      ).toBeDefined();
       expect(refresh?.props.refreshing).toBe(true);
-      expect(scrollView?.children.some(child => child.tag === refresh?.tag)).toBe(true);
+      expect(
+        scrollView?.children.some(child => child.tag === refresh?.tag),
+      ).toBe(true);
     });
 
     // Unlike ScrollView.svelte (only an opaque children Snippet — no auto-wrap, see
@@ -350,7 +457,10 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       const stickyHost = fabric.find(
         node => node.viewName === 'RCTView' && node.props.zIndex === 10,
       );
-      expect(stickyHost, 'the flagged cell painted through ScrollViewStickyHeader').toBeDefined();
+      expect(
+        stickyHost,
+        'the flagged cell painted through ScrollViewStickyHeader',
+      ).toBeDefined();
       expect(stickyHost?.props.collapsable).toBe(false);
     });
 
@@ -367,13 +477,20 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
     // N/A on that basis rather than duplicated one-by-one.
     it('dispatches a real scrollTo command through the exported scrollToOffset handle', async () => {
       const ListRoot = await loadMountableWithHandle();
-      const data = Array.from({ length: ITEM_COUNT }, (_unused, index) => `item-${index}`);
+      const data = Array.from(
+        { length: ITEM_COUNT },
+        (_unused, index) => `item-${index}`,
+      );
       mount(ROOT_TAG, ListRoot, { data });
       await tick();
       await tick();
 
-      const handle = (globalThis as { __listHandle?: Record<string, unknown> }).__listHandle;
-      expect(handle, 'imperative handle was exposed via bind:this').toBeDefined();
+      const handle = (globalThis as { __listHandle?: Record<string, unknown> })
+        .__listHandle;
+      expect(
+        handle,
+        'imperative handle was exposed via bind:this',
+      ).toBeDefined();
       const scrollToOffset = handle?.scrollToOffset as
         ((params: { offset: number; animated?: boolean }) => void) | undefined;
       expect(typeof scrollToOffset).toBe('function');
@@ -384,6 +501,68 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       expect(fabric.commands[0]?.commandName).toBe('scrollTo');
       expect(fabric.commands[0]?.args).toEqual([0, 240, false]);
       expect(fabric.commands[0]?.node.viewName).toBe('RCTScrollView');
+    });
+
+    // why: WHERE a separator sits, and WHAT decides to render it, are both geometry. RN renders
+    // ItemSeparatorComponent INSIDE the cell's own measuring wrapper
+    // (VirtualizedListCellRenderer.js:218-221) and gates it on the last index of the DATA
+    // (VirtualizedList.js:793). As a SIBLING it is an extra flex child, so the chrome between two
+    // cells is gap + separator + gap while a spacer collapsing that region contributes one gap —
+    // the leading spacer lands every cell below it short by (separator + gap). Gated on the
+    // WINDOW, a cell's own height changes as the window slides past it. Both device-measured
+    // 2026-08-19; see .claude/rules/list-geometry-feedback-loop.md. Counting dividers cannot see
+    // either — the assertion has to ask which node CONTAINS one.
+    it('renders the separator inside its cell rather than beside it', async () => {
+      mount(ROOT_TAG, await loadMountableWithSeparator(20, 1));
+      await tick();
+      await tick();
+
+      const withDivider = contentChildren().filter(child =>
+        carriesText(child, 'divider'),
+      );
+      expect(withDivider.length, 'separators committed').toBeGreaterThan(0);
+      for (const [position, child] of withDivider.entries()) {
+        expect(
+          carriesText(child, `row-${position}`),
+          'the divider sits inside its own cell',
+        ).toBe(true);
+      }
+    });
+
+    // The window's last cell is mid-DATA, so it keeps its separator — the assertion that
+    // separates the two gates, since a window gate drops exactly that one.
+    it('keeps the separator on the window-last cell, which is mid-data', async () => {
+      mount(ROOT_TAG, await loadMountableWithSeparator(20, 1));
+      await tick();
+      await tick();
+
+      const rendered = contentChildren().filter(child =>
+        Array.from({ length: 20 }, (_unused, id) => `row-${id}`).some(label =>
+          carriesText(child, label),
+        ),
+      );
+      expect(rendered.length, 'cells committed').toBeGreaterThan(0);
+      expect(
+        carriesText(rendered[rendered.length - 1], 'divider'),
+        'the window-last cell is mid-data and keeps its separator',
+      ).toBe(true);
+    });
+
+    it('withholds the separator from the last item of the DATA', async () => {
+      mount(ROOT_TAG, await loadMountableWithSeparator(2, 21));
+      await tick();
+      await tick();
+
+      const cells = contentChildren();
+      const first = cells.find(child => carriesText(child, 'row-0'));
+      const last = cells.find(child => carriesText(child, 'row-1'));
+      expect(last, 'the last cell is rendered at all').toBeDefined();
+      expect(first === undefined ? false : carriesText(first, 'divider')).toBe(
+        true,
+      );
+      expect(last === undefined ? true : carriesText(last, 'divider')).toBe(
+        false,
+      );
     });
   });
 });

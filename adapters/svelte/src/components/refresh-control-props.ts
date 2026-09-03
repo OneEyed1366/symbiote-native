@@ -5,8 +5,15 @@
 // rides the object bag as an idiomatic Svelte 5 callback prop (svelte-adapter-dom-shim skill
 // §3g(c)), unlike Vue which re-wires it through a typed `refresh` emit.
 import type { Snippet } from 'svelte';
-import type { IClassNameValue, IStyleProp, IViewStyle } from '@symbiote-native/engine';
-import type { IAccessibilityProps, IAriaProps } from '@symbiote-native/components';
+import type {
+  IClassNameValue,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
+import type {
+  IAccessibilityProps,
+  IAriaProps,
+} from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../class-value';
 
 export interface IRefreshControlProps extends IAccessibilityProps, IAriaProps {

@@ -20,13 +20,15 @@ vi.mock('../../../core', () => ({
   Barometer: {
     addListener: (listener: (measurement: IBarometerMeasurement) => void) =>
       addListenerMock(listener),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
 const ROOT_TAG = 942;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 const MEASUREMENT: IBarometerMeasurement = {
   pressure: 1013.25,
@@ -35,7 +37,8 @@ const MEASUREMENT: IBarometerMeasurement = {
 };
 
 let capturedResult: Signal<IBarometerMeasurement | null> | undefined;
-let capturedListener: ((measurement: IBarometerMeasurement) => void) | undefined;
+let capturedListener:
+  ((measurement: IBarometerMeasurement) => void) | undefined;
 
 @Component({
   selector: 'symbiote-barometer-host',
@@ -111,7 +114,8 @@ describe('BarometerService.connect', () => {
       mount(ROOT_TAG, BarometerHost);
       await tick();
 
-      if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+      if (capturedListener === undefined)
+        throw new Error('addListener callback was not captured');
       capturedListener(MEASUREMENT);
 
       expect(capturedResult?.()).toEqual(MEASUREMENT);

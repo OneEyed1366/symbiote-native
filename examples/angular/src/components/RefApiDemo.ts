@@ -24,13 +24,13 @@ import './RefApiDemo.css';
         >Imperative ref · measure / setNativeProps / findNodeHandle</Text
       >
       <View #boxRef testID="ref-box" class="ref-box">
-        <Text testID="ref-tag" class="ref-box-text"
-          >{{ 'native tag ' + (tag ?? '—') }}</Text
-        >
+        <Text testID="ref-tag" class="ref-box-text">{{
+          'native tag ' + (tag ?? '—')
+        }}</Text>
       </View>
-      <Text testID="measure-frame" class="info-text"
-        >{{ 'frame: ' + frame }}</Text
-      >
+      <Text testID="measure-frame" class="info-text">{{
+        'frame: ' + frame
+      }}</Text>
       <View class="row">
         <View class="flex-1">
           <Button

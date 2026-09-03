@@ -1,5 +1,11 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import {
   BrightnessMode,
   addBrightnessListener,
@@ -21,7 +27,11 @@ function CapabilityBadge(props: { status: ICapabilityStatus }) {
   return (
     <View class={`auth-status-badge auth-status-badge-${props.status}`}>
       <Text class="auth-status-text">
-        {props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO'}
+        {props.status === 'checking'
+          ? 'CHECKING…'
+          : props.status === 'yes'
+            ? 'YES'
+            : 'NO'}
       </Text>
     </View>
   );
@@ -38,10 +48,13 @@ function ValueRow(props: { label: string; value: string }) {
 
 function brightnessModeLabel(mode: BrightnessMode): string {
   switch (mode) {
-    case BrightnessMode.AUTOMATIC: return 'Automatic';
-    case BrightnessMode.MANUAL: return 'Manual';
+    case BrightnessMode.AUTOMATIC:
+      return 'Automatic';
+    case BrightnessMode.MANUAL:
+      return 'Manual';
     case BrightnessMode.UNKNOWN:
-    default: return 'Unknown';
+    default:
+      return 'Unknown';
   }
 }
 
@@ -67,7 +80,8 @@ export const BrightnessScreen = defineComponent(
     const brightness = ref<number | null>(null);
     const systemMode = ref<BrightnessMode>(BrightnessMode.UNKNOWN);
     const isUsingSystem = ref<ICapabilityStatus>('checking');
-    const { status: permissionStatus, request: requestPermission } = usePermissions();
+    const { status: permissionStatus, request: requestPermission } =
+      usePermissions();
 
     let isMounted = true;
     onUnmounted(() => {
@@ -84,14 +98,15 @@ export const BrightnessScreen = defineComponent(
       });
 
       if (Platform.OS === 'android') {
-        Promise.all([getSystemBrightnessModeAsync(), isUsingSystemBrightnessAsync()]).then(
-          ([mode, usingSystem]) => {
-            if (isMounted) {
-              systemMode.value = mode;
-              isUsingSystem.value = usingSystem ? 'yes' : 'no';
-            }
-          },
-        );
+        Promise.all([
+          getSystemBrightnessModeAsync(),
+          isUsingSystemBrightnessAsync(),
+        ]).then(([mode, usingSystem]) => {
+          if (isMounted) {
+            systemMode.value = mode;
+            isUsingSystem.value = usingSystem ? 'yes' : 'no';
+          }
+        });
       }
     });
 
@@ -100,7 +115,9 @@ export const BrightnessScreen = defineComponent(
     });
 
     function handleSetBrightness(value: number) {
-      setBrightnessAsync(value).then(() => getBrightnessAsync().then(value => (brightness.value = value)));
+      setBrightnessAsync(value).then(() =>
+        getBrightnessAsync().then(value => (brightness.value = value)),
+      );
     }
 
     function handleSetSystemMode(mode: BrightnessMode) {
@@ -111,20 +128,30 @@ export const BrightnessScreen = defineComponent(
 
     function handleRestoreSystem() {
       restoreSystemBrightnessAsync().then(() =>
-        isUsingSystemBrightnessAsync().then(value => (isUsingSystem.value = value ? 'yes' : 'no')),
+        isUsingSystemBrightnessAsync().then(
+          value => (isUsingSystem.value = value ? 'yes' : 'no'),
+        ),
       );
     }
 
     const brightnessLabel = computed(() =>
-      brightness.value === null ? 'checking…' : `${Math.round(brightness.value * 100)}%`,
+      brightness.value === null
+        ? 'checking…'
+        : `${Math.round(brightness.value * 100)}%`,
     );
     const permissionLabel = computed(() =>
-      permissionStatus.value === null ? 'checking…' : permissionStatus.value.status,
+      permissionStatus.value === null
+        ? 'checking…'
+        : permissionStatus.value.status,
     );
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="brightness-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="brightness-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -135,9 +162,10 @@ export const BrightnessScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Brightness</Text>
               <Text class="hero-body">
-                @symbiote-native/brightness — screen brightness get/set, Android system-brightness
-                mode, and an iOS-only live listener. Requires SYSTEM_BRIGHTNESS permission on
-                Android before setting the system-wide value.
+                @symbiote-native/brightness — screen brightness get/set, Android
+                system-brightness mode, and an iOS-only live listener. Requires
+                SYSTEM_BRIGHTNESS permission on Android before setting the
+                system-wide value.
               </Text>
             </View>
           </View>
@@ -161,10 +189,18 @@ export const BrightnessScreen = defineComponent(
           {Platform.OS === 'android' && (
             <View testID="brightness-system-card" class="auth-card">
               <View class="auth-card-header">
-                <Text class="auth-card-title">System brightness (Android only)</Text>
+                <Text class="auth-card-title">
+                  System brightness (Android only)
+                </Text>
               </View>
-              <ValueRow label="Mode" value={brightnessModeLabel(systemMode.value)} />
-              <View class="auth-capability-row" testID="brightness-using-system">
+              <ValueRow
+                label="Mode"
+                value={brightnessModeLabel(systemMode.value)}
+              />
+              <View
+                class="auth-capability-row"
+                testID="brightness-using-system"
+              >
                 <Text class="auth-capability-label">Using system value</Text>
                 <CapabilityBadge status={isUsingSystem.value} />
               </View>
@@ -193,7 +229,10 @@ export const BrightnessScreen = defineComponent(
             <View class="auth-card-header">
               <Text class="auth-card-title">Permission</Text>
             </View>
-            <ValueRow label="SYSTEM_BRIGHTNESS status" value={permissionLabel.value} />
+            <ValueRow
+              label="SYSTEM_BRIGHTNESS status"
+              value={permissionLabel.value}
+            />
             <ActionButton
               testID="brightness-request-permission"
               title="Request permission"

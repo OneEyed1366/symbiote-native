@@ -2,7 +2,7 @@
 // and the controlled-write predicate live in @symbiote-native/components/state, the render (intrinsic
 // + native-prop mapping) in @symbiote-native/components/view, both shared verbatim with the React and
 // Vue adapters. Here Angular supplies only the lifecycle: renderTextInput picks ONE of two host
-// intrinsics at runtime (symbiote-text-input / symbiote-text-input-multiline) via `@if`/`@else`,
+// intrinsics at runtime (symbiote-text-input-managed / …-multiline-managed) via `@if`/`@else`,
 // each wired through the shared `SymbioteHostPropsDirective` (`[symbioteHostProps]="hostProps"`,
 // `../primitives/shared.ts`) so the flat resolved prop bag doesn't need enumerating as individual
 // `[prop]` bindings; a @ViewChild reading that directive (by its `#host` template ref, across
@@ -73,6 +73,9 @@ import {
   setInputBlurred,
   setInputFocused,
   whenCommitted,
+  type IMeasureInWindowOnSuccess,
+  type IMeasureLayoutOnSuccess,
+  type IMeasureOnSuccess,
   type IStyleProp,
   type ISymbioteEvent,
   type ISymbioteNode,
@@ -80,18 +83,30 @@ import {
 } from '@symbiote-native/engine';
 import {
   anchorHostStyle,
-  MultilineTextInputHost,
+  ManagedMultilineTextInputHost,
   SymbioteHostPropsDirective,
   SymbioteStyleInputDirective,
-  TextInputHost,
+  ManagedTextInputHost,
 } from '../primitives';
+import {
+  gateWanted,
+  injectGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../gate-demand';
 
-export type { ITextInputHandle, ITextInputSelection, IInputMode, IEnterKeyHint, ISubmitBehavior };
+export type {
+  ITextInputHandle,
+  ITextInputSelection,
+  IInputMode,
+  IEnterKeyHint,
+  ISubmitBehavior,
+};
 
 // Mirrors React's ITextInputProps minus nothing (TextInput has no children) — declared
 // per-adapter over the shared accessibility base because Angular's input surface aliases the
 // aria-* keys to camelCase @Inputs, unlike the plain agnostic fields shared across adapters.
-export interface IAngularTextInputProps extends IAccessibilityProps, IAriaProps {
+export interface IAngularTextInputProps
+  extends IAccessibilityProps, IAriaProps {
   value?: string;
   defaultValue?: string;
   placeholder?: string;
@@ -158,16 +173,26 @@ export type IAngularTextInputInputs = Omit<
 @Component({
   selector: 'TextInput',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  imports: [SymbioteHostPropsDirective, TextInputHost, MultilineTextInputHost],
+  imports: [
+    SymbioteHostPropsDirective,
+    ManagedTextInputHost,
+    ManagedMultilineTextInputHost,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [
-    { provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => TextInput), multi: true },
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => TextInput),
+      multi: true,
+    },
   ],
   template: `
     @if (isMultiline) {
-      <symbiote-text-input-multiline
+      <symbiote-text-input-multiline-managed
         #host
         [symbioteHostProps]="hostProps"
         (change)="handleChange($event)"
@@ -178,13 +203,9 @@ export type IAngularTextInputInputs = Omit<
         (keyPress)="emit(keyPress, $event)"
         (endEditing)="emit(endEditing, $event)"
         (contentSizeChange)="emit(contentSizeChange, $event)"
-        (accessibilityAction)="emit(accessibilityAction, $event)"
-        (accessibilityTap)="emit(accessibilityTap, $event)"
-        (magicTap)="emit(magicTap, $event)"
-        (accessibilityEscape)="emit(accessibilityEscape, $event)"
-      ></symbiote-text-input-multiline>
+      ></symbiote-text-input-multiline-managed>
     } @else {
-      <symbiote-text-input
+      <symbiote-text-input-managed
         #host
         [symbioteHostProps]="hostProps"
         (change)="handleChange($event)"
@@ -195,11 +216,7 @@ export type IAngularTextInputInputs = Omit<
         (keyPress)="emit(keyPress, $event)"
         (endEditing)="emit(endEditing, $event)"
         (contentSizeChange)="emit(contentSizeChange, $event)"
-        (accessibilityAction)="emit(accessibilityAction, $event)"
-        (accessibilityTap)="emit(accessibilityTap, $event)"
-        (magicTap)="emit(magicTap, $event)"
-        (accessibilityEscape)="emit(accessibilityEscape, $event)"
-      ></symbiote-text-input>
+      ></symbiote-text-input-managed>
     }
   `,
 })
@@ -269,6 +286,9 @@ export class TextInput
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
 
+  // Null unless a wrapper renders this TextInput in its own template. See `../gate-demand.ts`.
+  private readonly gateDemand = injectGateDemand();
+
   @Input() accessible?: boolean;
   @Input() accessibilityLabel?: string;
   @Input() accessibilityHint?: string;
@@ -277,8 +297,10 @@ export class TextInput
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -303,7 +325,7 @@ export class TextInput
 
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
   // onto (see anchorHostStyle's doc comment) — NOT `hostRef` above, which targets the real inner
-  // symbiote-text-input(-multiline) one level down.
+  // symbiote-text-input-managed(-multiline-managed) one level down.
   private readonly elementRef = inject(ElementRef);
   // Only setDisabledState() needs this: it mutates `editable` from OUTSIDE Angular's own binding
   // path (@angular/forms calling in directly), which doesn't itself schedule a tick under zoneless CD.
@@ -390,7 +412,9 @@ export class TextInput
     const node = this.hostNode;
     if (node === undefined) return;
     dlog('TextInput autoFocus -> focus command');
-    this.cancelAutoFocus = whenCommitted(node, () => dispatchViewCommand(node, 'focus', []));
+    this.cancelAutoFocus = whenCommitted(node, () =>
+      dispatchViewCommand(node, 'focus', []),
+    );
   }
 
   ngOnDestroy(): void {
@@ -441,6 +465,41 @@ export class TextInput
     if (isSymbioteEvent(event)) emitter.emit(event);
   }
 
+  // `undefined` means `setEventListener` never sees a function, so the gate stays dark. A demand
+  // from above overrides `.observed` for the same reason it does on Pressable: a wrapper's binding
+  // is not a subscriber (`../gate-demand.ts`).
+  private gatedAccessibilityHandler(
+    name: IGatedAccessibilityEvent,
+  ): ((event: unknown) => void) | undefined {
+    const emitter = this[name];
+    return gateWanted(this.gateDemand, name, emitter)
+      ? event => this.emit(emitter, event)
+      : undefined;
+  }
+
+  // Forwarded from the engine node so a TextInput ref is not poorer than any other host ref — an
+  // instance exposing only the five methods below CLOSES the node off (see ITextInputHandle's own
+  // comment). No Angular-specific state to add: these four pass straight through.
+  measure(callback: IMeasureOnSuccess): void {
+    this.hostNode?.measure(callback);
+  }
+
+  measureInWindow(callback: IMeasureInWindowOnSuccess): void {
+    this.hostNode?.measureInWindow(callback);
+  }
+
+  measureLayout(
+    relativeToNativeNode: ISymbioteNode | number,
+    onSuccess: IMeasureLayoutOnSuccess,
+    onFail?: () => void,
+  ): void {
+    this.hostNode?.measureLayout(relativeToNativeNode, onSuccess, onFail);
+  }
+
+  setNativeProps(nativeProps: Record<string, unknown>): void {
+    this.hostNode?.setNativeProps(nativeProps);
+  }
+
   // The imperative API RN exposes on a TextInput ref; in Angular the component instance IS the
   // handle (a parent reads it via @ViewChild(TextInput) and calls these). focus/blur drive native
   // view commands; clear and setSelection reuse setTextAndSelection (the same stale-safe path as a
@@ -458,7 +517,12 @@ export class TextInput
   clear(): void {
     const node = this.hostNode;
     if (node === undefined) return;
-    dispatchViewCommand(node, 'setTextAndSelection', [this.mostRecentEventCount, '', 0, 0]);
+    dispatchViewCommand(node, 'setTextAndSelection', [
+      this.mostRecentEventCount,
+      '',
+      0,
+      0,
+    ]);
     this.lastNativeText = '';
   }
 
@@ -488,12 +552,20 @@ export class TextInput
     const value = this.value;
     if (!shouldCommandText(this.lastNativeText, value)) return;
     const selStart = this.selection?.start ?? SELECTION_NONE;
-    const selEnd = this.selection?.end ?? this.selection?.start ?? SELECTION_NONE;
+    const selEnd =
+      this.selection?.end ?? this.selection?.start ?? SELECTION_NONE;
     const count = this.mostRecentEventCount;
-    dlog(`TextInput setTextAndSelection count=${count} text=${JSON.stringify(value)}`);
+    dlog(
+      `TextInput setTextAndSelection count=${count} text=${JSON.stringify(value)}`,
+    );
     this.lastNativeText = value;
     whenCommitted(node, () =>
-      dispatchViewCommand(node, 'setTextAndSelection', [count, value, selStart, selEnd]),
+      dispatchViewCommand(node, 'setTextAndSelection', [
+        count,
+        value,
+        selStart,
+        selEnd,
+      ]),
     );
   }
 
@@ -501,6 +573,20 @@ export class TextInput
     return {
       ...this.foldedAccessibility,
       accessible: this.accessible,
+      // NOT template bindings, unlike every other event on this component's two host tags. These
+      // four are `on*`-GATED Fabric events (`.claude/rules/fabric-boolean-event-gates.md`): native
+      // fires them only when the committed payload carries a FUNCTION at that key, and a template
+      // `(accessibilityAction)="..."` binding is present unconditionally — so it lit all four gates
+      // on every TextInput in every app whether or not anything listened. Routed through the flat
+      // bag instead, the same shape Pressable uses.
+      onAccessibilityAction: this.gatedAccessibilityHandler(
+        'accessibilityAction',
+      ),
+      onAccessibilityTap: this.gatedAccessibilityHandler('accessibilityTap'),
+      onMagicTap: this.gatedAccessibilityHandler('magicTap'),
+      onAccessibilityEscape: this.gatedAccessibilityHandler(
+        'accessibilityEscape',
+      ),
       testID: this.testID,
       nativeID: this.nativeID,
       placeholder: this.placeholder,
@@ -558,8 +644,10 @@ export class TextInput
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

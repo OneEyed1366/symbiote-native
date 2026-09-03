@@ -22,7 +22,11 @@ vi.mock('./native/exponent-device-motion', () => ({
 // Vitest's Oxc transform can't parse — same fake as device-sensor.test.ts.
 vi.mock('expo-modules-core', () => ({
   Platform: { OS: 'ios' },
-  PermissionStatus: { GRANTED: 'granted', UNDETERMINED: 'undetermined', DENIED: 'denied' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    UNDETERMINED: 'undetermined',
+    DENIED: 'denied',
+  },
 }));
 
 const { DeviceMotion, gravity } = await import('./device-motion');
@@ -44,7 +48,9 @@ describe('DeviceMotion', () => {
       // not an accidental stand-in shared with another sensor.
       DeviceMotion.setUpdateInterval(1234);
 
-      expect(FAKE_NATIVE_DEVICE_MOTION.setUpdateInterval).toHaveBeenCalledWith(1234);
+      expect(FAKE_NATIVE_DEVICE_MOTION.setUpdateInterval).toHaveBeenCalledWith(
+        1234,
+      );
     });
 
     it('subscribes through the "deviceMotionDidUpdate" event name the native module emits', () => {

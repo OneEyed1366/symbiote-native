@@ -5,7 +5,12 @@
 // export): react-native's own source is Flow syntax Vitest's transform can't parse, so anything
 // importing it directly must stay unreachable from the tested main index.ts.
 
-import { processColor, DeviceEventEmitter, Image, type ImageSourcePropType } from 'react-native';
+import {
+  processColor,
+  DeviceEventEmitter,
+  Image,
+  type ImageSourcePropType,
+} from 'react-native';
 import {
   setColorProcessor,
   setDeviceEventSource,
@@ -31,7 +36,9 @@ export type IBootstrapHostOptions = {
 // Third-party Fabric views derive their events + prop processors from RN's own ViewConfig
 // registry; `get` throws for an unregistered name, so undefined is the right answer for
 // anything the registry doesn't know (our built-ins never reach here).
-function defaultNativeViewConfigSource(name: string): INativeViewConfig | undefined {
+function defaultNativeViewConfigSource(
+  name: string,
+): INativeViewConfig | undefined {
   try {
     return ReactNativeViewConfigRegistry.get(name);
   } catch {
@@ -57,7 +64,11 @@ function defaultColorProcessor(value: IColorValue): unknown {
 export function bootstrapHost(options: IBootstrapHostOptions = {}): void {
   globalThis.__SYMBIOTE_DEBUG__ = options.debug ?? process.env.DEBUG === '1';
   setColorProcessor(options.colorProcessor ?? defaultColorProcessor);
-  setImageSourceResolver(options.imageSourceResolver ?? defaultImageSourceResolver);
+  setImageSourceResolver(
+    options.imageSourceResolver ?? defaultImageSourceResolver,
+  );
   setDeviceEventSource(options.deviceEventSource ?? DeviceEventEmitter);
-  setNativeViewConfigSource(options.nativeViewConfigSource ?? defaultNativeViewConfigSource);
+  setNativeViewConfigSource(
+    options.nativeViewConfigSource ?? defaultNativeViewConfigSource,
+  );
 }

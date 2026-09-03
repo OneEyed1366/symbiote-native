@@ -9,7 +9,11 @@
 //
 // `updateIntervalMs` is a plain number, not a getter: it applies once at subscribe time and
 // never reacts to a later change, matching the Vue/React twins.
-import { Accelerometer, type EventSubscription, type IAccelerometerMeasurement } from '../../core';
+import {
+  Accelerometer,
+  type EventSubscription,
+  type IAccelerometerMeasurement,
+} from '../../core';
 
 export function useAccelerometer(updateIntervalMs?: number): {
   readonly current: IAccelerometerMeasurement | null;

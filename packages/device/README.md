@@ -4,7 +4,7 @@ A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-device`](https://github.com/expo/expo/tree/main/packages/expo-device)
 — physical device information: brand/model/OS constants, uptime, max-memory,
 root/jailbreak detection, side-loading detection, and platform-feature queries — usable from
-**every** adapter, React, Vue, and Angular, not just React. Like
+**every** adapter, React, Vue, Svelte, Solid, and Angular, not just React. Like
 [`@symbiote-native/local-auth`](../local-auth) and unlike this repo's stateful Expo wrapper
 ([`@symbiote-native/sensors`](../sensors), an `EventEmitter` + live-subscription surface), every
 export here is either an eagerly-resolved constant or a one-shot async call with no per-instance
@@ -28,12 +28,12 @@ Unlike a plain RN native module, `expo-device`'s native code is discovered by
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
@@ -53,13 +53,13 @@ src/core/     Eager constants (isDevice, brand, manufacturer, modelId, modelName
               isSideLoadingEnabledAsync / getPlatformFeaturesAsync / hasPlatformFeatureAsync,
               and the DeviceType enum. native-module.ts resolves the native module via
               expo-modules-core's requireNativeModule.
-src/react/    @symbiote-native/device/react   — export * from '../core'
-src/vue/      @symbiote-native/device/vue     — export * from '../core'
 src/angular/  @symbiote-native/device/angular — export * from '../core'
 ```
 
-No per-adapter lifecycle wrapper exists because there's nothing to subscribe to or clean up —
-each adapter entry is a single-file re-export.
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto
+`src/core/` — no physical per-framework file, since there's nothing to subscribe to or clean up.
+`./angular` stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build
+(`build-ngc/`).
 
 ## Use it
 
@@ -93,8 +93,14 @@ function DeviceScreen() {
       <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
       <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
       <Text>{deviceName ?? 'unnamed device'}</Text>
-      <Text>{uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}</Text>
-      <Text>{maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`}</Text>
+      <Text>
+        {uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}
+      </Text>
+      <Text>
+        {maxMemory === null
+          ? 'checking memory…'
+          : `Max memory: ${maxMemory} bytes`}
+      </Text>
     </View>
   );
 }
@@ -131,10 +137,94 @@ onMounted(() => {
     <Text>{{ `${brand ?? 'unknown'} ${modelName ?? ''}` }}</Text>
     <Text>{{ `${osName ?? 'unknown OS'} ${osVersion ?? ''}` }}</Text>
     <Text>{{ deviceName ?? 'unnamed device' }}</Text>
-    <Text>{{ uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms` }}</Text>
-    <Text>{{ maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes` }}</Text>
+    <Text>{{
+      uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`
+    }}</Text>
+    <Text>{{
+      maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`
+    }}</Text>
   </View>
 </template>
+```
+
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import { Text, View } from '@symbiote-native/svelte';
+  import {
+    brand,
+    deviceName,
+    getMaxMemoryAsync,
+    getUptimeAsync,
+    isDevice,
+    modelName,
+    osName,
+    osVersion,
+  } from '@symbiote-native/device/svelte';
+
+  let uptime = $state<number | null>(null);
+  let maxMemory = $state<number | null>(null);
+
+  $effect(() => {
+    getUptimeAsync().then(value => (uptime = value));
+    getMaxMemoryAsync().then(value => (maxMemory = value));
+  });
+</script>
+
+<View>
+  <Text>{isDevice ? 'Real device' : 'Simulator/emulator'}</Text>
+  <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
+  <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
+  <Text>{deviceName ?? 'unnamed device'}</Text>
+  <Text>{uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}</Text>
+  <Text>
+    {maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`}
+  </Text>
+</View>
+```
+
+```tsx
+// Solid — a component body runs once, so the two async values need a signal; the eager
+// constants (brand, modelName, ...) are plain reads with nothing to subscribe to.
+import { createSignal, onMount } from 'solid-js';
+import { Text, View } from '@symbiote-native/solid';
+import {
+  brand,
+  deviceName,
+  getMaxMemoryAsync,
+  getUptimeAsync,
+  isDevice,
+  modelName,
+  osName,
+  osVersion,
+} from '@symbiote-native/device/solid';
+
+function DeviceScreen() {
+  const [uptime, setUptime] = createSignal<number | null>(null);
+  const [maxMemory, setMaxMemory] = createSignal<number | null>(null);
+
+  onMount(() => {
+    void getUptimeAsync().then(setUptime);
+    void getMaxMemoryAsync().then(setMaxMemory);
+  });
+
+  return (
+    <View>
+      <Text>{isDevice ? 'Real device' : 'Simulator/emulator'}</Text>
+      <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
+      <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
+      <Text>{deviceName ?? 'unnamed device'}</Text>
+      <Text>
+        {uptime() === null ? 'checking uptime…' : `Uptime: ${uptime()}ms`}
+      </Text>
+      <Text>
+        {maxMemory() === null
+          ? 'checking memory…'
+          : `Max memory: ${maxMemory()} bytes`}
+      </Text>
+    </View>
+  );
+}
 ```
 
 ```ts
@@ -161,8 +251,14 @@ import {
       <Text>{{ brand ?? 'unknown' }} {{ modelName ?? '' }}</Text>
       <Text>{{ osName ?? 'unknown OS' }} {{ osVersion ?? '' }}</Text>
       <Text>{{ deviceName ?? 'unnamed device' }}</Text>
-      <Text>{{ uptime() === null ? 'checking uptime…' : 'Uptime: ' + uptime() + 'ms' }}</Text>
-      <Text>{{ maxMemory() === null ? 'checking memory…' : 'Max memory: ' + maxMemory() + ' bytes' }}</Text>
+      <Text>{{
+        uptime() === null ? 'checking uptime…' : 'Uptime: ' + uptime() + 'ms'
+      }}</Text>
+      <Text>{{
+        maxMemory() === null
+          ? 'checking memory…'
+          : 'Max memory: ' + maxMemory() + ' bytes'
+      }}</Text>
     </View>
   `,
 })
@@ -193,8 +289,8 @@ These snippets mirror the real canary demo screens — `examples/expo-react/scre
 ## API
 
 Eagerly-resolved constants, plus a handful of one-shot async functions — no event stream, no
-per-instance state — so the React/Vue/Angular entry points above are plain re-exports of `core`
-with nothing adapter-specific to add.
+per-instance state — so the React/Vue/Svelte/Solid/Angular entry points above are plain
+re-exports of `core` with nothing adapter-specific to add.
 
 ```ts
 // Constants — resolved once, at import time, straight off the native module:
@@ -235,6 +331,8 @@ import { getDeviceTypeAsync, isDevice } from '@symbiote-native/device';
 // or the framework-scoped entry points — identical surface, re-exported verbatim:
 import { getDeviceTypeAsync } from '@symbiote-native/device/react';
 import { getDeviceTypeAsync } from '@symbiote-native/device/vue';
+import { getDeviceTypeAsync } from '@symbiote-native/device/svelte';
+import { getDeviceTypeAsync } from '@symbiote-native/device/solid';
 import { getDeviceTypeAsync } from '@symbiote-native/device/angular';
 ```
 
@@ -258,9 +356,10 @@ the real `requireNativeModule` resolution (`src/core/device.test.ts`, `vitest`) 
 `installFabric()`, no ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md) for the project's testing model).
 
-Native autolinking wiring for `expo-modules-core` packages is already done in the four Expo
+Native autolinking wiring for `expo-modules-core` packages is already done in all six Expo
 canary apps (`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`,
-`examples/expo-angular`) via `@symbiote-native/local-auth`/`@symbiote-native/sensors` — this
+`examples/expo-svelte`, `examples/expo-solid`, `examples/expo-angular`) via
+`@symbiote-native/local-auth`/`@symbiote-native/sensors` — this
 package reuses that same wiring with zero further app-side changes, since
 `expo-modules-autolinking` discovers any `expo-modules-core` package already present in
 `node_modules`. A dedicated `DeviceScreen` demo has not been wired into those canaries yet.

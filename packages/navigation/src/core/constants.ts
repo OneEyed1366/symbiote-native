@@ -11,12 +11,14 @@ export const RNS_SCREEN_VIEW_NAME = 'RNSScreen';
 // render-stack.ts for why a formSheet/modal screen MUST use this different Fabric name.
 export const RNS_MODAL_SCREEN_VIEW_NAME = 'RNSModalScreen';
 export const RNS_SCREEN_STACK_VIEW_NAME = 'RNSScreenStack';
-export const RNS_SCREEN_STACK_HEADER_CONFIG_VIEW_NAME = 'RNSScreenStackHeaderConfig';
+export const RNS_SCREEN_STACK_HEADER_CONFIG_VIEW_NAME =
+  'RNSScreenStackHeaderConfig';
 // The header-subview leaf react-native-screens itself uses to host arbitrary framework children
 // (left/right/back/title/center/searchBar) inside the header. Registered here for ground-truth
 // parity, but unconsumed by any fold in v1 scope: renderHeaderConfig's Descriptor never takes
 // framework children (see render-stack.ts), so mounting a subview child is left to the adapter.
-export const RNS_SCREEN_STACK_HEADER_SUBVIEW_VIEW_NAME = 'RNSScreenStackHeaderSubview';
+export const RNS_SCREEN_STACK_HEADER_SUBVIEW_VIEW_NAME =
+  'RNSScreenStackHeaderSubview';
 export const RNS_SEARCH_BAR_VIEW_NAME = 'RNSSearchBar';
 // react-native-screens' own JS layer (ScreenStackItem -> DebugContainer -> ScreenContentWrapper)
 // ALWAYS wraps a screen's content in this native view, `collapsable: false` so Fabric can never
@@ -43,7 +45,8 @@ export const STACK_ON_FINISH_TRANSITIONING = 'onFinishTransitioning';
 // plain bar-button-item press, and a press on a (possibly nested) menu action of a 'menu'-type
 // bar-button item.
 export const HEADER_ON_PRESS_BAR_BUTTON_ITEM = 'onPressHeaderBarButtonItem';
-export const HEADER_ON_PRESS_BAR_BUTTON_MENU_ITEM = 'onPressHeaderBarButtonMenuItem';
+export const HEADER_ON_PRESS_BAR_BUTTON_MENU_ITEM =
+  'onPressHeaderBarButtonMenuItem';
 
 // RNSSearchBar event prop keys (all DirectEventHandler in the codegen spec). onClose/onOpen are
 // Android-only per the codegen spec's own comment.

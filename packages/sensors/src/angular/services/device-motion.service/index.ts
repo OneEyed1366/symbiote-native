@@ -1,4 +1,11 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { DeviceMotion, type IDeviceMotionMeasurement } from '../../../core';
 
 // Angular twin of React's `useDeviceMotion` hook / Vue's `useDeviceMotion` composable. Angular
@@ -23,7 +30,9 @@ export class DeviceMotionService {
         if (updateIntervalMs !== undefined) {
           DeviceMotion.setUpdateInterval(updateIntervalMs);
         }
-        const subscription = DeviceMotion.addListener(next => measurement.set(next));
+        const subscription = DeviceMotion.addListener(next =>
+          measurement.set(next),
+        );
         onCleanup(() => subscription.remove());
       },
       { injector: this.injector },

@@ -8,7 +8,10 @@
 // Mirrors RN's AccessibilityInfo.js iOS branches.
 
 import { createDeviceEventModule } from '../native-modules';
-import { type IEventEmitterModule, type IEventSubscription } from '../native-events';
+import {
+  type IEventEmitterModule,
+  type IEventSubscription,
+} from '../native-events';
 import { dlog } from '../debug';
 import {
   isBoolean,
@@ -39,16 +42,17 @@ const ACCESSIBILITY_MODULE = 'AccessibilityManager';
 
 // Public event name -> the iOS device event the native side emits. iOS keeps the names
 // 1:1; the indirection exists only so the mapping stays explicit (Android renames them).
-const IOS_DEVICE_EVENT: Partial<Record<IAccessibilityChangeEventName, string>> = {
-  screenReaderChanged: 'screenReaderChanged',
-  reduceMotionChanged: 'reduceMotionChanged',
-  boldTextChanged: 'boldTextChanged',
-  grayscaleChanged: 'grayscaleChanged',
-  invertColorsChanged: 'invertColorsChanged',
-  reduceTransparencyChanged: 'reduceTransparencyChanged',
-  darkerSystemColorsChanged: 'darkerSystemColorsChanged',
-  announcementFinished: 'announcementFinished',
-};
+const IOS_DEVICE_EVENT: Partial<Record<IAccessibilityChangeEventName, string>> =
+  {
+    screenReaderChanged: 'screenReaderChanged',
+    reduceMotionChanged: 'reduceMotionChanged',
+    boldTextChanged: 'boldTextChanged',
+    grayscaleChanged: 'grayscaleChanged',
+    invertColorsChanged: 'invertColorsChanged',
+    reduceTransparencyChanged: 'reduceTransparencyChanged',
+    darkerSystemColorsChanged: 'darkerSystemColorsChanged',
+    announcementFinished: 'announcementFinished',
+  };
 
 type IStateCallback = (enabled: boolean) => void;
 type IErrorCallback = (error: unknown) => void;
@@ -57,13 +61,34 @@ type IErrorCallback = (error: unknown) => void;
 // focus side effects, plus the observe-counters. announceForAccessibilityWithOptions is
 // optional; older hosts only have the plain announce.
 interface INativeAccessibilityManagerIOS extends IEventEmitterModule {
-  getCurrentVoiceOverState(onSuccess: IStateCallback, onError: IErrorCallback): void;
-  getCurrentReduceMotionState(onSuccess: IStateCallback, onError: IErrorCallback): void;
-  getCurrentBoldTextState(onSuccess: IStateCallback, onError: IErrorCallback): void;
-  getCurrentGrayscaleState(onSuccess: IStateCallback, onError: IErrorCallback): void;
-  getCurrentInvertColorsState(onSuccess: IStateCallback, onError: IErrorCallback): void;
-  getCurrentReduceTransparencyState(onSuccess: IStateCallback, onError: IErrorCallback): void;
-  getCurrentDarkerSystemColorsState?(onSuccess: IStateCallback, onError: IErrorCallback): void;
+  getCurrentVoiceOverState(
+    onSuccess: IStateCallback,
+    onError: IErrorCallback,
+  ): void;
+  getCurrentReduceMotionState(
+    onSuccess: IStateCallback,
+    onError: IErrorCallback,
+  ): void;
+  getCurrentBoldTextState(
+    onSuccess: IStateCallback,
+    onError: IErrorCallback,
+  ): void;
+  getCurrentGrayscaleState(
+    onSuccess: IStateCallback,
+    onError: IErrorCallback,
+  ): void;
+  getCurrentInvertColorsState(
+    onSuccess: IStateCallback,
+    onError: IErrorCallback,
+  ): void;
+  getCurrentReduceTransparencyState(
+    onSuccess: IStateCallback,
+    onError: IErrorCallback,
+  ): void;
+  getCurrentDarkerSystemColorsState?(
+    onSuccess: IStateCallback,
+    onError: IErrorCallback,
+  ): void;
   getCurrentPrefersCrossFadeTransitionsState?(
     onSuccess: IStateCallback,
     onError: IErrorCallback,
@@ -83,10 +108,11 @@ interface INativeAccessibilityManagerIOS extends IEventEmitterModule {
 // `null` when the module isn't linked. The lazy-resolve + lazy-emitter shape itself
 // lives in `createDeviceEventModule` (native-modules.ts); iOS adds no self-subscription
 // on top of it, unlike app-state/appearance/back-handler/keyboard.
-const deviceEventModule = createDeviceEventModule<INativeAccessibilityManagerIOS>({
-  moduleName: ACCESSIBILITY_MODULE,
-  moduleLogPrefix: 'AccessibilityInfo(ios): module',
-});
+const deviceEventModule =
+  createDeviceEventModule<INativeAccessibilityManagerIOS>({
+    moduleName: ACCESSIBILITY_MODULE,
+    moduleLogPrefix: 'AccessibilityInfo(ios): module',
+  });
 
 function getModule(): INativeAccessibilityManagerIOS | null {
   return deviceEventModule.getModule();
@@ -101,7 +127,9 @@ function getEmitter() {
 // getters. (RN rejects on iOS, but a false fallback keeps the unified surface uniform with
 // Android's missing-method getters; the dlog records the miss.)
 function queryState(
-  pick: (module: INativeAccessibilityManagerIOS) => (s: IStateCallback, e: IErrorCallback) => void,
+  pick: (
+    module: INativeAccessibilityManagerIOS,
+  ) => (s: IStateCallback, e: IErrorCallback) => void,
   label: string,
 ): Promise<boolean> {
   const module = getModule();
@@ -152,7 +180,10 @@ class AccessibilityInfoIOS implements IAccessibilityInfoStatic {
   }
 
   isReduceMotionEnabled(): Promise<boolean> {
-    return queryState(m => m.getCurrentReduceMotionState, 'isReduceMotionEnabled');
+    return queryState(
+      m => m.getCurrentReduceMotionState,
+      'isReduceMotionEnabled',
+    );
   }
 
   isBoldTextEnabled(): Promise<boolean> {
@@ -164,11 +195,17 @@ class AccessibilityInfoIOS implements IAccessibilityInfoStatic {
   }
 
   isInvertColorsEnabled(): Promise<boolean> {
-    return queryState(m => m.getCurrentInvertColorsState, 'isInvertColorsEnabled');
+    return queryState(
+      m => m.getCurrentInvertColorsState,
+      'isInvertColorsEnabled',
+    );
   }
 
   isReduceTransparencyEnabled(): Promise<boolean> {
-    return queryState(m => m.getCurrentReduceTransparencyState, 'isReduceTransparencyEnabled');
+    return queryState(
+      m => m.getCurrentReduceTransparencyState,
+      'isReduceTransparencyEnabled',
+    );
   }
 
   // iOS "Increase Contrast": Settings > Accessibility > Display & Text Size. The native
@@ -198,7 +235,9 @@ class AccessibilityInfoIOS implements IAccessibilityInfoStatic {
   // Android-only query; on iOS RN rejects. We resolve false to keep the unified surface
   // non-throwing; the dlog records that it's a no-op on this platform.
   isAccessibilityServiceEnabled(): Promise<boolean> {
-    dlog('AccessibilityInfo(ios).isAccessibilityServiceEnabled -> Android-only (false)');
+    dlog(
+      'AccessibilityInfo(ios).isAccessibilityServiceEnabled -> Android-only (false)',
+    );
     return Promise.resolve(false);
   }
 
@@ -206,7 +245,9 @@ class AccessibilityInfoIOS implements IAccessibilityInfoStatic {
   announceForAccessibility(announcement: string): void {
     const module = getModule();
     if (module === null) {
-      dlog('AccessibilityInfo(ios).announceForAccessibility -> no module (no-op)');
+      dlog(
+        'AccessibilityInfo(ios).announceForAccessibility -> no module (no-op)',
+      );
       return;
     }
     module.announceForAccessibility(announcement);
@@ -220,7 +261,9 @@ class AccessibilityInfoIOS implements IAccessibilityInfoStatic {
   ): void {
     const module = getModule();
     if (module === null) {
-      dlog('AccessibilityInfo(ios).announceForAccessibilityWithOptions -> no module (no-op)');
+      dlog(
+        'AccessibilityInfo(ios).announceForAccessibilityWithOptions -> no module (no-op)',
+      );
       return;
     }
     if (module.announceForAccessibilityWithOptions) {
@@ -252,10 +295,15 @@ class AccessibilityInfoIOS implements IAccessibilityInfoStatic {
   // the ONE thing iOS adds is its own early return on 'click' (VoiceOver has no click
   // producer, AccessibilityInfo.js), passed as the shouldSkip hook so it keeps its
   // exact log text.
-  sendAccessibilityEvent(handle: IAccessibilityHandle, eventType: IAccessibilityEventType): void {
+  sendAccessibilityEvent(
+    handle: IAccessibilityHandle,
+    eventType: IAccessibilityEventType,
+  ): void {
     routeSendAccessibilityEvent('ios', handle, eventType, () => {
       if (eventType !== 'click') return false;
-      dlog('AccessibilityInfo(ios).sendAccessibilityEvent("click") -> iOS no-op (RN parity)');
+      dlog(
+        'AccessibilityInfo(ios).sendAccessibilityEvent("click") -> iOS no-op (RN parity)',
+      );
       return true;
     });
   }
@@ -303,4 +351,5 @@ function isAnnouncementFinished(
   );
 }
 
-export const AccessibilityInfo: IAccessibilityInfoStatic = new AccessibilityInfoIOS();
+export const AccessibilityInfo: IAccessibilityInfoStatic =
+  new AccessibilityInfoIOS();

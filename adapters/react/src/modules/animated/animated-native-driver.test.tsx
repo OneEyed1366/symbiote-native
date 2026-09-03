@@ -17,7 +17,8 @@ interface INativeCall {
   args: unknown[];
 }
 const nativeCalls: INativeCall[] = [];
-let lastStartCallback: ((result: { finished: boolean; value?: number }) => void) | null = null;
+let lastStartCallback:
+  ((result: { finished: boolean; value?: number }) => void) | null = null;
 
 // Mirror the native invariant that crashed on device: RCTNativeAnimatedNodesManager asserts a node
 // exists before connecting it. Reproduce it headlessly so a connect-before-create ordering bug fails
@@ -32,7 +33,9 @@ function record(method: string): (...args: unknown[]) => void {
 
 function assertNodeExists(tag: unknown, method: string): void {
   if (typeof tag !== 'number' || !createdNodeTags.has(tag)) {
-    throw new Error(`${method} referenced animated node ${String(tag)} before createAnimatedNode`);
+    throw new Error(
+      `${method} referenced animated node ${String(tag)} before createAnimatedNode`,
+    );
   }
 }
 
@@ -44,12 +47,18 @@ const fakeNativeAnimated = {
   connectAnimatedNodes(parentTag: number, childTag: number): void {
     assertNodeExists(parentTag, 'connectAnimatedNodes(parent)');
     assertNodeExists(childTag, 'connectAnimatedNodes(child)');
-    nativeCalls.push({ method: 'connectAnimatedNodes', args: [parentTag, childTag] });
+    nativeCalls.push({
+      method: 'connectAnimatedNodes',
+      args: [parentTag, childTag],
+    });
   },
   disconnectAnimatedNodes: record('disconnectAnimatedNodes'),
   connectAnimatedNodeToView(nodeTag: number, viewTag: number): void {
     assertNodeExists(nodeTag, 'connectAnimatedNodeToView');
-    nativeCalls.push({ method: 'connectAnimatedNodeToView', args: [nodeTag, viewTag] });
+    nativeCalls.push({
+      method: 'connectAnimatedNodeToView',
+      args: [nodeTag, viewTag],
+    });
   },
   disconnectAnimatedNodeFromView: record('disconnectAnimatedNodeFromView'),
   restoreDefaultValues: record('restoreDefaultValues'),
@@ -60,7 +69,10 @@ const fakeNativeAnimated = {
     config: Record<string, unknown>,
     endCallback: (result: { finished: boolean; value?: number }) => void,
   ): void {
-    nativeCalls.push({ method: 'startAnimatingNode', args: [animationId, nodeTag, config] });
+    nativeCalls.push({
+      method: 'startAnimatingNode',
+      args: [animationId, nodeTag, config],
+    });
     lastStartCallback = endCallback;
   },
   stopAnimation: record('stopAnimation'),
@@ -68,7 +80,9 @@ const fakeNativeAnimated = {
   setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
   flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
   extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-  startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
+  startListeningToAnimatedNodeValue: record(
+    'startListeningToAnimatedNodeValue',
+  ),
   stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
   getValue: record('getValue'),
   addAnimatedEventToView: record('addAnimatedEventToView'),
@@ -105,29 +119,42 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Animated native driver', () => {
-  it('mirrors the value graph into native and syncs the JS value on completion', () => {
+  it('mirrors the value graph into native and syncs the JS value on completion', async () => {
     // A diamond: one value feeds both opacity and a transform, so `style` has two animated parents
     // (opacity-interp and the transform node). This is the shape that crashed on device. It forces
     // the create-vs-connect ordering the fix guarantees.
     const opacity = new Animated.Value(0);
-    const slide = opacity.interpolate({ inputRange: [0, 1], outputRange: [0, 100] });
+    const slide = opacity.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 100],
+    });
 
     function App(): ReactElement {
-      return <Animated.View style={{ opacity, transform: [{ translateX: slide }] }} />;
+      return (
+        <Animated.View
+          style={{ opacity, transform: [{ translateX: slide }] }}
+        />
+      );
     }
 
     mount(ROOT_TAG, <App />);
     const viewTag = appView().tag;
 
     let finished = false;
-    Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start(result => {
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(result => {
       finished = result.finished;
     });
 
     // the graph was mirrored into native: a value, style, and props node each exist
     const created = callsOf('createAnimatedNode');
     const createdTypes = created.map(call => configType(call.args[1]));
-    expect(createdTypes).toEqual(expect.arrayContaining(['value', 'style', 'props']));
+    expect(createdTypes).toEqual(
+      expect.arrayContaining(['value', 'style', 'props']),
+    );
 
     // value -> style -> props were wired
     expect(callsOf('connectAnimatedNodes').length).toBeGreaterThanOrEqual(2);
@@ -138,7 +165,9 @@ describe('Animated native driver', () => {
     expect(connectView[0].args[1]).toBe(viewTag);
 
     // the curve was handed to native against the value node's tag, as a frames config
-    const valueCreate = created.find(call => configType(call.args[1]) === 'value');
+    const valueCreate = created.find(
+      call => configType(call.args[1]) === 'value',
+    );
     const valueTag = valueCreate?.args[0];
     const start = callsOf('startAnimatingNode');
     expect(start).toHaveLength(1);
@@ -154,6 +183,8 @@ describe('Animated native driver', () => {
     notifyComplete?.({ finished: true, value: 1 });
 
     expect(finished).toBe(true);
+    // The JS sync-back rides the coalesced setNativeProps flush (core/engine/src/commit.ts).
+    await Promise.resolve();
     expect(appView().props.opacity).toBe(1);
   });
 });

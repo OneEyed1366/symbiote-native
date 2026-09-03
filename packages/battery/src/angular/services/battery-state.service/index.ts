@@ -1,5 +1,16 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
-import { addBatteryStateListener, BatteryState, getBatteryStateAsync } from '../../../core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
+import {
+  addBatteryStateListener,
+  BatteryState,
+  getBatteryStateAsync,
+} from '../../../core';
 
 // Angular twin of React's `useBatteryState` hook and Vue's `useBatteryState` composable. See
 // BatteryLevelService for the `connect()` pattern rationale.
@@ -16,7 +27,9 @@ export class BatteryStateService {
     effect(
       onCleanup => {
         getBatteryStateAsync().then(state => batteryState.set(state));
-        const subscription = addBatteryStateListener(event => batteryState.set(event.batteryState));
+        const subscription = addBatteryStateListener(event =>
+          batteryState.set(event.batteryState),
+        );
         onCleanup(() => subscription.remove());
       },
       { injector: this.injector },

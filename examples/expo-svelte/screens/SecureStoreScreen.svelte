@@ -3,7 +3,13 @@
   // canUseBiometricAuthentication), a stored-value card, and a write/read/delete card driving one
   // demo key. Kill and relaunch the app to prove the value survives outside the JS heap. Svelte
   // twin of examples/expo-vue-sfc/screens/SecureStoreScreen.vue.
-  import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/svelte';
+  import {
+    SafeAreaView,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
+  } from '@symbiote-native/svelte';
   import {
     canUseBiometricAuthentication,
     deleteItemAsync,
@@ -44,7 +50,9 @@
       isAvailable = toCapabilityStatus(available);
       // canUseBiometricAuthentication throws when the native module is missing entirely, so it
       // only runs once availability has come back positive.
-      canUseBiometrics = available ? toCapabilityStatus(canUseBiometricAuthentication()) : 'no';
+      canUseBiometrics = available
+        ? toCapabilityStatus(canUseBiometricAuthentication())
+        : 'no';
     });
   });
 
@@ -93,61 +101,102 @@
   }
 </script>
 
-<SafeAreaView class="screen"
-  ><ScrollView testID="secure-store-scroll" class="screen" contentContainerStyle="scroll-content"
-    ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
-    ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: lineColor }}
-        ><Text class="hero-badge-text">{lineInfo.code}</Text></View
-      ><View class="hero-copy"
-        ><Text class="hero-title">Secure Store</Text><Text class="hero-body">@symbiote-native/secure-store — encrypted key/value storage in the iOS Keychain and the Android Keystore. Save a value, kill the app, relaunch, and read it back.</Text></View
-      ></View
-    ><View testID="secure-store-capability-card" class="secure-store-card"
-      ><Text class="secure-store-card-title">Capabilities</Text><View testID="secure-store-available" class="secure-store-row"
-        ><Text class="secure-store-row-label">Available</Text><View class={`secure-store-status-badge secure-store-status-badge-${isAvailable}`}
-          ><Text class="secure-store-status-text">{CAPABILITY_BADGE_TEXT[isAvailable]}</Text></View
-        ></View
-      ><View testID="secure-store-biometrics" class="secure-store-row"
-        ><Text class="secure-store-row-label">Biometrics usable</Text><View class={`secure-store-status-badge secure-store-status-badge-${canUseBiometrics}`}
-          ><Text class="secure-store-status-text">{CAPABILITY_BADGE_TEXT[canUseBiometrics]}</Text></View
-        ></View
-      ></View
-    ><View testID="secure-store-value-card" class="secure-store-card"
-      ><Text class="secure-store-card-title">Stored value</Text><View class="secure-store-row"
-        ><Text class="secure-store-row-label">{DEMO_KEY}</Text><Text testID="secure-store-value" class="secure-store-value-text">{storedValue === null ? '(no entry)' : storedValue}</Text></View
-      ><View class="secure-store-row"
-        ><Text class="secure-store-row-label">Last result</Text><Text testID="secure-store-result" class="secure-store-value-text">{lastResult}</Text></View
-      ></View
-    ><View testID="secure-store-write-card" class="secure-store-card"
-      ><Text class="secure-store-card-title">Write, read, delete</Text><TextInput
+<SafeAreaView class="screen">
+  <ScrollView
+    testID="secure-store-scroll"
+    class="screen"
+    contentContainerStyle="scroll-content"
+  >
+    <View class={`line-tag line-tag-${lineInfo.line}`}>
+      <Text class="line-tag-text">
+        {`${lineInfo.code} · ${lineInfo.label}`}
+      </Text>
+    </View>
+    <View class="hero-card">
+      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <Text class="hero-badge-text">{lineInfo.code}</Text>
+      </View>
+      <View class="hero-copy">
+        <Text class="hero-title">Secure Store</Text>
+        <Text class="hero-body">
+          @symbiote-native/secure-store — encrypted key/value storage in the iOS
+          Keychain and the Android Keystore. Save a value, kill the app,
+          relaunch, and read it back.
+        </Text>
+      </View>
+    </View>
+    <View testID="secure-store-capability-card" class="secure-store-card">
+      <Text class="secure-store-card-title">Capabilities</Text>
+      <View testID="secure-store-available" class="secure-store-row">
+        <Text class="secure-store-row-label">Available</Text>
+        <View
+          class={`secure-store-status-badge secure-store-status-badge-${isAvailable}`}
+        >
+          <Text class="secure-store-status-text">
+            {CAPABILITY_BADGE_TEXT[isAvailable]}
+          </Text>
+        </View>
+      </View>
+      <View testID="secure-store-biometrics" class="secure-store-row">
+        <Text class="secure-store-row-label">Biometrics usable</Text>
+        <View
+          class={`secure-store-status-badge secure-store-status-badge-${canUseBiometrics}`}
+        >
+          <Text class="secure-store-status-text">
+            {CAPABILITY_BADGE_TEXT[canUseBiometrics]}
+          </Text>
+        </View>
+      </View>
+    </View>
+    <View testID="secure-store-value-card" class="secure-store-card">
+      <Text class="secure-store-card-title">Stored value</Text>
+      <View class="secure-store-row">
+        <Text class="secure-store-row-label">{DEMO_KEY}</Text>
+        <Text testID="secure-store-value" class="secure-store-value-text">
+          {storedValue === null ? '(no entry)' : storedValue}
+        </Text>
+      </View>
+      <View class="secure-store-row">
+        <Text class="secure-store-row-label">Last result</Text>
+        <Text testID="secure-store-result" class="secure-store-value-text">
+          {lastResult}
+        </Text>
+      </View>
+    </View>
+    <View testID="secure-store-write-card" class="secure-store-card">
+      <Text class="secure-store-card-title">Write, read, delete</Text>
+      <TextInput
         testID="secure-store-input"
         value={inputText}
         onValueChange={next => (inputText = next)}
         placeholder="Value to store"
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"
-      /><ActionButton
+      />
+      <ActionButton
         testID="secure-store-save-button"
         title="Save"
         onPress={handleSave}
         color={lineColor}
-      /><ActionButton
+      />
+      <ActionButton
         testID="secure-store-save-auth-button"
         title="Save behind biometrics"
         onPress={handleSaveAuthenticated}
         color={lineColor}
-      /><ActionButton
+      />
+      <ActionButton
         testID="secure-store-read-button"
         title="Read"
         onPress={handleRead}
         color={lineColor}
-      /><ActionButton
+      />
+      <ActionButton
         testID="secure-store-delete-button"
         title="Delete"
         onPress={handleDelete}
         color={lineColor}
-      /></View
-    ></ScrollView
-  ></SafeAreaView
->
+      />
+    </View>
+  </ScrollView>
+</SafeAreaView>

@@ -4,7 +4,7 @@
 // centralizing it was that React needed zero renderer changes, only the prop type.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { mount, unmount, View } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
@@ -25,7 +25,14 @@ describe('React className prop', () => {
     // ZERO renderer changes beyond the prop TYPE — this proves className alone, without any
     // React-specific merge code, resolves through the shared registry.
     it('resolves a registered class through the shared style registry', () => {
-      registerStyles({ card: { padding: 10 } });
+      registerRules([
+        {
+          tokens: ['card'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { padding: 10 },
+        },
+      ]);
       mount(ROOT_TAG, <View testID="probe" className="card" />);
 
       const committed = fabric.find(node => node.props.testID === 'probe');
@@ -36,11 +43,28 @@ describe('React className prop', () => {
     // prop is the AUTHOR'S explicit override and must always beat a class-derived value, matching
     // every other adapter's className/class precedence rule.
     it('lets an explicit style prop win over the className-derived one', () => {
-      registerStyles({ card: { padding: 10, backgroundColor: 'red' } });
-      mount(ROOT_TAG, <View testID="probe" className="card" style={{ backgroundColor: 'blue' }} />);
+      registerRules([
+        {
+          tokens: ['card'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { padding: 10, backgroundColor: 'red' },
+        },
+      ]);
+      mount(
+        ROOT_TAG,
+        <View
+          testID="probe"
+          className="card"
+          style={{ backgroundColor: 'blue' }}
+        />,
+      );
 
       const committed = fabric.find(node => node.props.testID === 'probe');
-      expect(committed?.props).toMatchObject({ padding: 10, backgroundColor: 'blue' });
+      expect(committed?.props).toMatchObject({
+        padding: 10,
+        backgroundColor: 'blue',
+      });
     });
   });
 });

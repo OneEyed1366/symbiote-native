@@ -40,9 +40,13 @@ import type { ShimElement } from '../dom-shim';
 // and is not part of the public export surface, so a rename there would otherwise silently
 // disable every attachment. The literal is the fallback for a Svelte build that stops giving the
 // key a description at all.
-const ATTACHMENT_KEY_DESCRIPTION = createAttachmentKey().description ?? '@attach';
+const ATTACHMENT_KEY_DESCRIPTION =
+  createAttachmentKey().description ?? '@attach';
 
-type IAttachmentSync = (host: ShimElement | null | undefined, props: object) => void;
+type IAttachmentSync = (
+  host: ShimElement | null | undefined,
+  props: object,
+) => void;
 
 // Call once during component init, then drive it from an `$effect`:
 //

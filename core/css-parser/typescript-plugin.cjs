@@ -8,10 +8,10 @@
 // separate, on-disk source of truth for `tsc`/`vue-tsc` CLI runs — plugins never load there.
 //
 // Core mechanism: override getScriptSnapshot + resolveModuleNameLiterals to synthesize a virtual
-// .d.ts for the import. Two things worth calling out: (1) the class extractor converts kebab-case
-// to camelCase, so a suggested key like `section-tight` matches the ACTUAL exported key our
-// runtime produces (@symbiote-native/css-parser's parseCSS always camelCases — see
-// src/generate-dts.ts's classNamesToDtsSource, which this plugin's dts shape mirrors); (2) the dts
+// .d.ts for the import. Two things worth calling out: (1) the class extractor keeps the AUTHORED
+// spelling, because that is the key the runtime export map carries — see
+// src/generate-dts/index.ts's classNamesToDtsSource, which this plugin's dts shape mirrors, and
+// which quotes a non-identifier key for the same reason; (2) the dts
 // cache is keyed on the file's mtime, so autocomplete doesn't go stale after editing the CSS file
 // and wait for the IDE to restart tsserver.
 //
@@ -24,9 +24,9 @@
 // completion in the plugin.
 //
 // SCOPE, second cut: only a SIMPLE `.foo { ... }` class selector is recognized correctly — a
-// compound (`.btn.primary`) or descendant (`.card .title`) selector, which the real
-// src/parser.ts's extractClassName merges into ONE key (`btnPrimary`/`cardTitle`), gets
-// extracted here as TWO separate (wrong, non-existent) keys instead.
+// compound (`.btn.primary`) or descendant (`.card .title`) selector is extracted here as TWO
+// separate keys, where the real compiler keeps the tokens together on one rule and exports only
+// the names the author actually wrote.
 //
 // Hand-written plain CommonJS, NOT compiled from a `.ts`/`.cts` source — same convention already
 // used for each adapter's metro-css-parser.cjs shim. tsserver loads a plugin via a synchronous
@@ -46,17 +46,19 @@ function isCssModuleFile(fileName) {
   return CSS_MODULE_RE.test(fileName);
 }
 
-function kebabToCamel(value) {
-  return value.replace(/-([a-z0-9])/gi, (_match, char) => char.toUpperCase());
-}
-
+// Names come out AS AUTHORED — `.section-tight` stays `section-tight`, read as
+// `styles['section-tight']`. This must track `compileCssModule`'s export map exactly: the editor
+// offering a key the runtime does not carry is the one failure this plugin can produce, and it
+// fails in both directions at once (a suggested `sectionTight` is `undefined` at runtime, while
+// the real `styles['section-tight']` reads as a TS2339). `generateDts` quotes a key that is not a
+// valid identifier, which is what makes the kebab spelling usable.
 function extractClassNames(css) {
   const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
   const names = new Set();
   const classRe = /\.([a-zA-Z_][\w-]*)/g;
   let match;
   while ((match = classRe.exec(withoutComments))) {
-    names.add(kebabToCamel(match[1]));
+    names.add(match[1]);
   }
   return [...names];
 }
@@ -112,7 +114,9 @@ function init(modules) {
       return dts;
     }
 
-    const originalGetScriptKind = host.getScriptKind ? host.getScriptKind.bind(host) : undefined;
+    const originalGetScriptKind = host.getScriptKind
+      ? host.getScriptKind.bind(host)
+      : undefined;
     const originalGetScriptSnapshot = host.getScriptSnapshot.bind(host);
     const originalResolveModuleNameLiterals = host.resolveModuleNameLiterals;
 
@@ -150,7 +154,10 @@ function init(modules) {
         return literals.map((literal, index) => {
           const moduleName = literal.text;
           if (isCssModuleFile(moduleName) && moduleName.startsWith('.')) {
-            const resolvedPath = resolveRelativePath(moduleName, containingFile);
+            const resolvedPath = resolveRelativePath(
+              moduleName,
+              containingFile,
+            );
             if (host.fileExists && host.fileExists(resolvedPath)) {
               return {
                 resolvedModule: {

@@ -9,11 +9,10 @@
 // doesn't mutate in place), so assertions read the LATEST committed tree (`fabric.committed`),
 // not the original `createNode`'d node (`fabric.find`), which never reflects a later clone.
 
-import { defineComponent, h, ref, shallowRef, withDirectives } from '@vue/runtime-core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { defineComponent, h, ref, withDirectives } from '@vue/runtime-core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
-import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
-import { Teleport, vShow } from './index';
+import { useCssModule, vShow, withKeys, withModifiers } from './index';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 340;
@@ -21,7 +20,8 @@ const VIEW = 'RCTView';
 const PADDING = 4;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -48,7 +48,9 @@ function mountShowable(visible: boolean): void {
     ROOT_TAG,
     defineComponent({
       setup: () => () =>
-        withDirectives(h('symbiote-view', { style: { padding: PADDING } }), [[vShow, visible]]),
+        withDirectives(h('symbiote-view', { style: { padding: PADDING } }), [
+          [vShow, visible],
+        ]),
     }),
   );
 }
@@ -130,141 +132,106 @@ describe('vShow runtime-helpers shim', () => {
   });
 });
 
-// Proves our Teleport wrapper: content moves under an already-
-// mounted host node OUTSIDE its own template position (same surface), and the guard rejects a
-// target that isn't a real host node instead of silently corrupting the retained tree.
-function findByTestId(testId: string): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.props.testID === testId) found = node;
-  });
-  return found;
-}
-
-function isDescendantOf(root: IFakeNode, target: IFakeNode): boolean {
-  if (root === target) return true;
-  return root.children.some(child => isDescendantOf(child, target));
-}
-
-function mountTeleportApp(): void {
-  const overlayRef = shallowRef<ISymbioteNode | null>(null);
-  mount(
-    ROOT_TAG,
-    defineComponent({
-      setup: () => () =>
-        h('symbiote-view', {}, [
-          h('symbiote-view', { ref: overlayRef, testID: 'overlay-host' }),
-          h('symbiote-view', { testID: 'source' }, [
-            overlayRef.value
-              ? h(Teleport, { to: overlayRef.value }, () =>
-                  h('symbiote-view', { testID: 'ported' }),
-                )
-              : null,
-          ]),
-        ]),
-    }),
-  );
-}
-
-describe('Teleport runtime-helpers shim', () => {
-  describe('Positive', () => {
-    // why: the whole reason this wrapper exists over stock Teleport — a real host node target,
-    // not a CSS selector, moves content under it while keeping it out of the template parent.
-    it('renders content under the target node, not its own template position', async () => {
-      mountTeleportApp();
-      await tick();
-
-      const overlayHost = findByTestId('overlay-host');
-      const source = findByTestId('source');
-      const ported = findByTestId('ported');
-      expect(overlayHost, 'overlay host was committed').toBeDefined();
-      expect(source, 'source was committed').toBeDefined();
-      expect(ported, 'ported node was committed').toBeDefined();
-      if (overlayHost === undefined || source === undefined || ported === undefined) {
-        throw new Error('unreachable');
-      }
-
-      expect(isDescendantOf(overlayHost, ported), 'ported node landed under the overlay host').toBe(
-        true,
-      );
-      expect(
-        isDescendantOf(source, ported),
-        'ported node did NOT stay under its own template parent',
-      ).toBe(false);
-    });
-
-    // why: `disabled` is a documented Vue Teleport option our wrapper passes straight through
-    // (setup only validates `to`) — a regression here would silently ship broken in-place
-    // rendering even though this wrapper's whole reason to exist is validating `to`, not `disabled`.
-    it('keeps content in its own template position when disabled', async () => {
-      const overlayRef = shallowRef<ISymbioteNode | null>(null);
-      mount(
-        ROOT_TAG,
-        defineComponent({
-          setup: () => () =>
-            h('symbiote-view', {}, [
-              h('symbiote-view', { ref: overlayRef, testID: 'overlay-host' }),
-              h('symbiote-view', { testID: 'source' }, [
-                overlayRef.value
-                  ? h(Teleport, { to: overlayRef.value, disabled: true }, () =>
-                      h('symbiote-view', { testID: 'ported' }),
-                    )
-                  : null,
-              ]),
-            ]),
-        }),
-      );
-      await tick();
-
-      const overlayHost = findByTestId('overlay-host');
-      const source = findByTestId('source');
-      const ported = findByTestId('ported');
-      if (overlayHost === undefined || source === undefined || ported === undefined) {
-        throw new Error('unreachable: overlay-host/source/ported missing');
-      }
-
-      expect(isDescendantOf(source, ported), 'ported node stayed in its template position').toBe(
-        true,
-      );
-      expect(
-        isDescendantOf(overlayHost, ported),
-        'ported node did NOT move to the disabled target',
-      ).toBe(false);
-    });
+// why: withModifiers/withKeys are what `v-on.stop`/`.self`/`.enter` compile to — before this shim
+// existed, that compiled import silently resolved to `undefined` from `@vue/runtime-core` (it only
+// exists in the DOM-only `@vue/runtime-dom`), so any template using a v-on modifier would crash at
+// import time. These are plain event-object functions (call `stopPropagation`, compare
+// `target`/`currentTarget`, read `.key`) with no DOM/engine dependency, copied from upstream Vue's
+// own implementation verbatim.
+describe('withModifiers runtime-helpers shim', () => {
+  it('calls the handler when no guard matches', () => {
+    const handler = vi.fn();
+    withModifiers(handler, ['ctrl'])({ ctrlKey: true } as never);
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 
-  describe('Negative — an invalid target throws immediately instead of corrupting the tree', () => {
-    // why: renderer.ts stubs querySelector to null (no DOM), so a DOM-world CSS-selector string
-    // must fail loudly at the Teleport boundary, not silently resolve `to` to nothing deep inside
-    // insert/remove where the failure would be much harder to trace back to the real cause.
-    it('throws for a CSS-selector string target instead of silently no-oping', () => {
-      expect(() =>
-        mount(
-          ROOT_TAG,
-          defineComponent({
-            setup: () => () => h(Teleport, { to: 'body' }, () => h('symbiote-view')),
-          }),
-        ),
-      ).toThrow(/CSS-selector string/);
-    });
+  it('stops propagation and still calls the handler for .stop', () => {
+    const handler = vi.fn();
+    const stopPropagation = vi.fn();
+    withModifiers(handler, ['stop'])({ stopPropagation } as never);
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
 
-    // why: `to` is typed `null` (no compile-time check) so a wrong runtime value — a plain object,
-    // a forgotten `.value` on a ref — must be caught by this component's own runtime guard before
-    // it reaches the real Teleport and silently corrupts the retained tree.
-    it('rejects a target that is not a real host node', () => {
-      // JSON.parse returns an untyped value, the honest way to hand Teleport something its own
-      // `to: null` (no-typecheck) prop would normally accept but our runtime guard must still
-      // reject — no `as` cast needed to reach this input, it is a legitimate runtime value.
-      const garbage = JSON.parse('{}');
-      expect(isSymbioteNode(garbage)).toBe(false);
-      expect(() =>
-        mount(
-          ROOT_TAG,
-          defineComponent({
-            setup: () => () => h(Teleport, { to: garbage }, () => h('symbiote-view')),
-          }),
-        ),
-      ).toThrow(/not a real host node/);
+  it('skips the handler for .self when the event did not originate on the element itself', () => {
+    const handler = vi.fn();
+    withModifiers(handler, ['self'])({
+      target: 'child',
+      currentTarget: 'parent',
+    } as never);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('skips the handler for .right when the event was not the right mouse button', () => {
+    const handler = vi.fn();
+    withModifiers(handler, ['right'])({ button: 0 } as never);
+    expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+describe('withKeys runtime-helpers shim', () => {
+  it('calls the handler when the event key matches a named modifier', () => {
+    const handler = vi.fn();
+    withKeys(handler, ['enter'])({ key: 'Enter' } as never);
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls the handler when the event key matches a documented alias (esc -> escape)', () => {
+    const handler = vi.fn();
+    withKeys(handler, ['esc'])({ key: 'Escape' } as never);
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the handler for a non-matching key', () => {
+    const handler = vi.fn();
+    withKeys(handler, ['enter'])({ key: 'Tab' } as never);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('no-ops on an event with no .key field, same as upstream Vue on a non-keyboard event', () => {
+    const handler = vi.fn();
+    withKeys(handler, ['enter'])({} as never);
+    expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+// why: useCssModule reads `__cssModules` off the component's own options — the compiled artifact
+// @symbiote-native/css-parser's SFC compiler injects for a `<style module>` block. Proven here by
+// setting that field directly, the same shape the real compiler output produces, without needing
+// a full SFC compile pass in a unit test.
+describe('useCssModule runtime-helpers shim', () => {
+  it('returns the class map injected onto the component as __cssModules', async () => {
+    let result: Record<string, string> | undefined;
+    const component = defineComponent({
+      setup: () => () => {
+        result = useCssModule();
+        return h('symbiote-view');
+      },
     });
+    (
+      component as { __cssModules?: Record<string, Record<string, string>> }
+    ).__cssModules = {
+      $style: { card: 'card_a1b2c' },
+    };
+    mount(ROOT_TAG, component);
+    await tick();
+
+    expect(result).toEqual({ card: 'card_a1b2c' });
+  });
+
+  it('returns an empty map when the current component has no CSS module injected', async () => {
+    let result: Record<string, string> | undefined;
+    mount(
+      ROOT_TAG,
+      defineComponent({
+        setup: () => () => {
+          result = useCssModule();
+          return h('symbiote-view');
+        },
+      }),
+    );
+    await tick();
+
+    expect(result).toEqual({});
   });
 });

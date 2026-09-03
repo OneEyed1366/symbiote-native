@@ -64,7 +64,11 @@ export function ScreenOrientationScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="screen-orientation-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="screen-orientation-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -75,8 +79,8 @@ export function ScreenOrientationScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Screen Orientation</Text>
             <Text className="hero-body">
-              @symbiote-native/screen-orientation — lock/unlock orientation, plus a live
-              orientation + lock state hook.
+              @symbiote-native/screen-orientation — lock/unlock orientation,
+              plus a live orientation + lock state hook.
             </Text>
           </View>
         </View>
@@ -86,7 +90,10 @@ export function ScreenOrientationScreen() {
             <Text className="feature-card-title">Current state</Text>
           </View>
           <ValueRow label="Orientation" value={orientationLabel(orientation)} />
-          <ValueRow label="Orientation lock" value={orientationLockLabel(orientationLock)} />
+          <ValueRow
+            label="Orientation lock"
+            value={orientationLockLabel(orientationLock)}
+          />
         </View>
 
         <View testID="screen-orientation-actions-card" className="feature-card">

@@ -3,11 +3,16 @@
 // Fabric names are the codegen spec's registered name (the new-arch name), not the legacy
 // paperComponentName (RCTSwitch, …).
 
-import { buildDescriptors, makeDescriptorFor, type ISymbioteIntrinsic } from './shared';
+import {
+  buildDescriptors,
+  makeDescriptorFor,
+  type ISymbioteIntrinsic,
+} from './shared';
 export type { ISymbioteIntrinsic, IComponentDescriptor } from './shared';
 
 const IOS_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   'symbiote-view': 'RCTView',
+  'symbiote-pressable': 'RCTView',
   'symbiote-text': 'RCTText',
   'symbiote-image': 'RCTImageView',
   'symbiote-scroll-view': 'RCTScrollView',
@@ -18,7 +23,14 @@ const IOS_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   'symbiote-horizontal-scroll-content': 'RCTScrollContentView',
   'symbiote-text-input': 'RCTSinglelineTextInputView',
   'symbiote-text-input-multiline': 'RCTMultilineTextInputView',
+  // The component path's pair — same native views, a tag the behavior registry does not
+  // carry. See `shared.ts` for why the wrapper may not share the lowered tag.
+  'symbiote-text-input-managed': 'RCTSinglelineTextInputView',
+  'symbiote-text-input-multiline-managed': 'RCTMultilineTextInputView',
   'symbiote-switch': 'Switch',
+  // The wrapper's tag — same native view, a tag the behavior registry does not carry. See
+  // `shared.ts` for why the wrapper may not share the lowered tag.
+  'symbiote-switch-managed': 'Switch',
   'symbiote-activity-indicator': 'ActivityIndicatorView',
   'symbiote-safe-area-view': 'SafeAreaView',
   'symbiote-modal': 'ModalHostView',

@@ -19,14 +19,26 @@
 //
 // No Negative group: SectionList's public props have no throwing path.
 
-import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  ref,
+  type FunctionalComponent,
+} from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SectionList, mount, unmount, type ISectionListHandle } from '@symbiote-native/vue';
+import {
+  SectionList,
+  mount,
+  unmount,
+  type ISectionListHandle,
+} from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // SectionList is a generic component (generic construct signature), which h()'s overloads can't
 // resolve. Drive it through a loose functional-component handle (generic-component h() limitation).
-const SectionListHost = SectionList as unknown as FunctionalComponent<Record<string, unknown>>;
+const SectionListHost = SectionList as unknown as FunctionalComponent<
+  Record<string, unknown>
+>;
 
 type ICommandCall = {
   name: string;
@@ -65,7 +77,8 @@ slot.dispatchCommand = (_node, name, args) => {
   commands.push({ name, args });
 };
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -107,7 +120,9 @@ function mountSectionList(extra: Record<string, unknown>): Promise<void> {
             sectionHeader: ({ section }: { section: ISectionShape }) => [
               h('symbiote-text', {}, `header:${section.title}`),
             ],
-            item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)],
+            item: ({ item }: { item: IRow }) => [
+              h('symbiote-text', {}, item.label),
+            ],
           },
         ),
     }),
@@ -123,7 +138,14 @@ describe('Vue SectionList on the engine', () => {
       await mountSectionList({ keyExtractor: (item: IRow) => `k-${item.id}` });
 
       const texts = collectTexts();
-      for (const want of ['header:A', 'row-a0', 'row-a1', 'header:B', 'row-b0', 'row-b1']) {
+      for (const want of [
+        'header:A',
+        'row-a0',
+        'row-a1',
+        'header:B',
+        'row-b0',
+        'row-b1',
+      ]) {
         expect(texts).toContain(want);
       }
     });
@@ -137,7 +159,10 @@ describe('Vue SectionList on the engine', () => {
       const wrappers = stickyWrappers();
       expect(wrappers.length, 'one sticky wrapper per section header').toBe(2);
       for (const wrapper of wrappers) {
-        expect(wrapper.props.collapsable, 'sticky wrapper is collapsable:false').toBe(false);
+        expect(
+          wrapper.props.collapsable,
+          'sticky wrapper is collapsable:false',
+        ).toBe(false);
       }
     });
 
@@ -146,7 +171,10 @@ describe('Vue SectionList on the engine', () => {
       // disables sticky headers must pay zero sticky-wrapper cost.
       await mountSectionList({ stickySectionHeadersEnabled: false });
 
-      expect(stickyWrappers().length, 'disabled sticky headers wrap no header').toBe(0);
+      expect(
+        stickyWrappers().length,
+        'disabled sticky headers wrap no header',
+      ).toBe(0);
     });
 
     it('maps scrollToLocation onto the correct flat offset via scrollTo', async () => {
@@ -168,11 +196,38 @@ describe('Vue SectionList on the engine', () => {
       expect(listRef.value, 'SectionList handle attached').not.toBeNull();
       // Flattened (header + items + footer per section): section B's first item lands at flat
       // index 5 ([h:A,a0,a1,foot:A,h:B,b0,...]) -> offset 5 * ITEM_HEIGHT.
-      listRef.value!.scrollToLocation({ sectionIndex: 1, itemIndex: 1, animated: true });
+      listRef.value!.scrollToLocation({
+        sectionIndex: 1,
+        itemIndex: 1,
+        animated: true,
+      });
       const scrolls = commands.filter(c => c.name === 'scrollTo');
       expect(scrolls.length, 'one scrollTo from scrollToLocation').toBe(1);
       expect(scrolls[0].args[1]).toBe(5 * ITEM_HEIGHT);
       expect(scrolls[0].args[2]).toBe(true);
+    });
+
+    it('forwards getItemLayout so it still receives the sections array', async () => {
+      // why: SectionList is a pure forwarder, so getItemLayout reaches VirtualizedSectionList
+      // through $attrs — this proves it lands on the DECLARED prop there (and thus the
+      // sections-argument wrapper) rather than falling through onto the inner VirtualizedList,
+      // where it would be handed the flattened entries instead.
+      const seen: unknown[] = [];
+      await mountSectionList({
+        stickySectionHeadersEnabled: false,
+        getItemLayout: (data: unknown, index: number) => {
+          seen.push(data);
+          return { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index };
+        },
+      });
+
+      expect(seen.length, 'getItemLayout was invoked').toBeGreaterThan(0);
+      for (const data of seen) {
+        expect(
+          data,
+          'getItemLayout receives the sections array by identity',
+        ).toBe(SECTIONS);
+      }
     });
   });
 });

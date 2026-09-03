@@ -51,7 +51,8 @@ let nextHeaderId = 0;
 // Both adapters import `reduceSticky` from this exact specifier, so one mock covers both.
 let currentAdapter = 'unknown';
 vi.mock('@symbiote-native/components', async importOriginal => {
-  const actual = await importOriginal<typeof import('@symbiote-native/components')>();
+  const actual =
+    await importOriginal<typeof import('@symbiote-native/components')>();
   return {
     ...actual,
     reduceSticky: (
@@ -76,7 +77,8 @@ vi.mock('@symbiote-native/components', async importOriginal => {
   };
 });
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -94,26 +96,46 @@ const SCROLL_Y = 550;
 const REACT_ROOT_TAG = 77_201;
 const SVELTE_ROOT_TAG = 77_202;
 
-const DATA = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({ id: index }));
+const DATA = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({
+  id: index,
+}));
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 // --- Svelte compile harness (same shape as virtualized-list.smoke.test.ts) --------------------
 // No .svelte-aware loader is wired into this repo's Vitest, so every .svelte component in the
 // tree is pre-compiled to a sibling .mjs, with static import specifiers rewritten to match.
 const COMPONENTS_DIR = join(__dirname, '..');
-const MODULES_ANIMATED_DIR = join(COMPONENTS_DIR, '..', 'modules', 'animated');
-const REFRESH_CONTROL_OUT = join(COMPONENTS_DIR, '.parity-compiled-refresh-control.mjs');
-const ANIMATED_VIEW_OUT = join(MODULES_ANIMATED_DIR, '.parity-compiled-animated-view.mjs');
-const STICKY_HEADER_OUT = join(COMPONENTS_DIR, 'scroll-view', '.parity-compiled-sticky-header.mjs');
+const REFRESH_CONTROL_OUT = join(
+  COMPONENTS_DIR,
+  '.parity-compiled-refresh-control.mjs',
+);
+const VIEW_OUT = join(COMPONENTS_DIR, '.parity-compiled-view.mjs');
+const STICKY_HEADER_OUT = join(
+  COMPONENTS_DIR,
+  'scroll-view',
+  '.parity-compiled-sticky-header.mjs',
+);
 const LIST_OUT = join(__dirname, '.parity-compiled-virtualized-list.mjs');
 const ROOT_OUT = join(__dirname, '.parity-compiled-list-root.mjs');
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
-  writeFileSync(outPath, compile(source, { ...COMPILE_OPTIONS, filename }).js.code);
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
+  writeFileSync(
+    outPath,
+    compile(source, { ...COMPILE_OPTIONS, filename }).js.code,
+  );
 }
 
 function compileSvelteList(): void {
@@ -123,17 +145,20 @@ function compileSvelteList(): void {
     REFRESH_CONTROL_OUT,
   );
   compileToFile(
-    readFileSync(join(MODULES_ANIMATED_DIR, 'AnimatedView.svelte'), 'utf8'),
-    'AnimatedView.svelte',
-    ANIMATED_VIEW_OUT,
+    readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'),
+    'View.svelte',
+    VIEW_OUT,
   );
 
   const stickyHeader = compile(
-    readFileSync(join(COMPONENTS_DIR, 'scroll-view', 'sticky-header.svelte'), 'utf8'),
+    readFileSync(
+      join(COMPONENTS_DIR, 'scroll-view', 'sticky-header.svelte'),
+      'utf8',
+    ),
     { ...COMPILE_OPTIONS, filename: 'sticky-header.svelte' },
   ).js.code.replace(
-    "from '../../modules/animated/AnimatedView.svelte'",
-    "from '../../modules/animated/.parity-compiled-animated-view.mjs'",
+    "from '../View.svelte'",
+    "from '../.parity-compiled-view.mjs'",
   );
   writeFileSync(STICKY_HEADER_OUT, stickyHeader);
 
@@ -179,7 +204,8 @@ async function loadSvelteRoot(): Promise<Component> {
 
 function findScrollView(): IFakeNode {
   const node = fabric.find(n => n.viewName === 'RCTScrollView');
-  if (node === undefined) throw new Error('scroll view missing from committed tree');
+  if (node === undefined)
+    throw new Error('scroll view missing from committed tree');
   return node;
 }
 
@@ -203,7 +229,8 @@ function stickyIndexOf(wrapper: IFakeNode): number | undefined {
     const node = stack.pop();
     if (node === undefined) continue;
     const text = node.props.text;
-    if (typeof text === 'string' && text.startsWith('row-')) return Number(text.slice(4));
+    if (typeof text === 'string' && text.startsWith('row-'))
+      return Number(text.slice(4));
     stack.push(...node.children);
   }
   return undefined;
@@ -219,6 +246,9 @@ async function measureStickyHeaders(): Promise<void> {
       layout: { x: 0, y: index * ITEM_HEIGHT, width: 320, height: ITEM_HEIGHT },
     });
   }
+  // Two turns: the first drains the coalesced cross-talk flush (React's ScrollView batches a burst
+  // of header layouts into one handoff), the second lets the resulting state land.
+  await tick();
   await tick();
 }
 
@@ -237,10 +267,13 @@ async function scrollTo(y: number): Promise<void> {
 // The collision input each header currently holds, keyed by which header it is (its own measured
 // y). Comparing this per step is robust to the adapters' different reactivity granularity — React
 // batches, Svelte is fine-grained, so raw call-sequence equality would be noise, not signal.
-function collisionInputsByHeader(adapter: string): Record<string, number | undefined> {
+function collisionInputsByHeader(
+  adapter: string,
+): Record<string, number | undefined> {
   const latest: Record<string, number | undefined> = {};
   for (const entry of trace) {
-    if (entry.adapter === adapter) latest[`header#${entry.headerId}`] = entry.nextHeaderLayoutY;
+    if (entry.adapter === adapter)
+      latest[`header#${entry.headerId}`] = entry.nextHeaderLayoutY;
   }
   return latest;
 }
@@ -249,7 +282,9 @@ function collisionInputsByHeader(adapter: string): Record<string, number | undef
 // collides with the next header, then scrolls back — the exact path the device bug follows.
 const SCROLL_STEPS = [0, 150, 350, 650, 950, 650, 250, 0];
 
-async function runScrollScenario(): Promise<Record<string, number | undefined>[]> {
+async function runScrollScenario(): Promise<
+  Record<string, number | undefined>[]
+> {
   fabric.fireEvent(findScrollView().instanceHandle, 'topLayout', {
     layout: { x: 0, y: 0, width: 320, height: VIEWPORT },
   });
@@ -272,7 +307,7 @@ beforeEach(() => {
 afterEach(() => {
   for (const path of [
     REFRESH_CONTROL_OUT,
-    ANIMATED_VIEW_OUT,
+    VIEW_OUT,
     STICKY_HEADER_OUT,
     LIST_OUT,
     ROOT_OUT,
@@ -306,7 +341,8 @@ async function reactSnapshots(): Promise<Record<string, number | undefined>[]> {
       }),
       windowSize: 1,
       stickyHeaderIndices: STICKY_INDICES,
-      renderItem: ({ item }) => createElement('symbiote-text', {}, `row-${item.id}`),
+      renderItem: ({ item }) =>
+        createElement('symbiote-text', {}, `row-${item.id}`),
     }),
   );
   await tick();
@@ -315,7 +351,9 @@ async function reactSnapshots(): Promise<Record<string, number | undefined>[]> {
   return snapshots;
 }
 
-async function svelteSnapshots(): Promise<Record<string, number | undefined>[]> {
+async function svelteSnapshots(): Promise<
+  Record<string, number | undefined>[]
+> {
   currentAdapter = 'svelte';
   resetHeaderIds();
   const ListRoot = await loadSvelteRoot();
@@ -352,7 +390,9 @@ describe('sticky collision input parity: Svelte vs the React reference', () => {
     const snapshots = await reactSnapshots();
     expect(snapshots.length).toBe(SCROLL_STEPS.length);
     expect(
-      snapshots.some(step => Object.values(step).some(value => value !== undefined)),
+      snapshots.some(step =>
+        Object.values(step).some(value => value !== undefined),
+      ),
       'React established a defined nextHeaderLayoutY somewhere along the scroll path',
     ).toBe(true);
   });
@@ -370,9 +410,10 @@ describe('sticky collision input parity: Svelte vs the React reference', () => {
     const svelte = await svelteSnapshots();
 
     for (const [step, y] of SCROLL_STEPS.entries()) {
-      expect(svelte[step], `collision inputs after scrolling to y=${y} (step ${step})`).toEqual(
-        react[step],
-      );
+      expect(
+        svelte[step],
+        `collision inputs after scrolling to y=${y} (step ${step})`,
+      ).toEqual(react[step]);
     }
   });
 });

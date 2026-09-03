@@ -6,7 +6,7 @@ in **mutation mode** (`appendChild` / `insertBefore` / `removeChild` → the eng
 mutation API); `@symbiote-native/engine` does the clone-on-write commit into Fabric.
 
 This is the **reference adapter**: the known-good driver used to validate the native pipe and the
-commit engine before any other framework lands, so a break in Vue/Svelte/Solid isolates to *that*
+commit engine before any other framework lands, so a break in Vue/Svelte/Solid isolates to _that_
 adapter, not the core.
 
 <div align="center">
@@ -16,7 +16,7 @@ adapter, not the core.
 </div>
 
 > New to SymbioteNative? The [root README](../../README.md) has the architecture and the one fact it
-> rests on — React is just *one client* of `nativeFabricUIManager`.
+> rests on — React is just _one client_ of `nativeFabricUIManager`.
 
 ---
 
@@ -46,7 +46,7 @@ export default function App() {
   return (
     <View style={{ padding: 24 }}>
       <Text>Taps: {count}</Text>
-      <Pressable onPress={() => setCount((c) => c + 1)}>
+      <Pressable onPress={() => setCount(c => c + 1)}>
         <Text>Tap me</Text>
       </Pressable>
     </View>
@@ -54,9 +54,24 @@ export default function App() {
 }
 ```
 
-The native entry registers a low-level *runnable* instead of a React component: RN's Fabric host
-calls it with the surface's `rootTag`, and the renderer takes over from there — `nativeFabric-
-UIManager` is driven directly, RN's own renderer never runs.
+The zero-config entry wires the RN-backed host seams (colors, images, device events,
+third-party ViewConfigs) and registers the app in one call — this is what
+[`examples/react`](../../examples/react) actually uses:
+
+```js
+// index.js
+import { registerApp } from '@symbiote-native/react/bootstrap';
+import App from './App';
+import { name as appName } from './app.json';
+
+registerApp(App, { appName });
+```
+
+`registerApp` mirrors bare RN's own `AppRegistry.registerComponent(appName, () => App)` idiom,
+minus the manual host wiring in front of it — RN's own renderer never runs; `nativeFabric-
+UIManager` is driven directly. For anything the defaults don't cover (a custom color processor,
+image resolver, or manual control over the mount callback), drive the lower-level seam directly —
+a raw _runnable_ instead of a registered component:
 
 ```js
 // index.js
@@ -77,8 +92,8 @@ AppRegistry.registerRunnable(appName, ({ rootTag }) => {
 });
 ```
 
-The runnable example is [`examples/react`](../../examples/react) — a stock RN 0.86 app whose full
-canary ([`App.tsx`](../../examples/react/App.tsx)) exercises every block of the surface below.
+Either way, the full canary ([`App.tsx`](../../examples/react/App.tsx)) exercises every block of
+the surface below.
 
 ---
 
@@ -94,7 +109,7 @@ path:
   `Appearance` · `PixelRatio` · `AppState`, plus imperative `Alert` · `ActionSheetIOS` · `Share` ·
   `Linking` · `Vibration` · `Keyboard` · `StatusBar` — each reaching its real native module on the
   bridgeless host.
-- **`Animated`, both drivers** — JS *and* native driver side by side (`timing` · `spring` · `loop` ·
+- **`Animated`, both drivers** — JS _and_ native driver side by side (`timing` · `spring` · `loop` ·
   `interpolate` · `ValueXY` · tracking · `diffClamp`). Native offload is proven by jamming the JS
   thread 1.5 s: the native-driven animations keep moving, the JS-driven one stalls.
 - **Third-party native views** — `@react-native-community/slider` used straight from the package

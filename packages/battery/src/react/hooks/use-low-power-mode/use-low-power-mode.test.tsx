@@ -13,7 +13,9 @@ import { useLowPowerMode } from './index';
 const { addListener, isLowPowerModeEnabledAsync, remove } = vi.hoisted(() => {
   const remove = vi.fn();
   return {
-    addListener: vi.fn((_listener: (event: { lowPowerMode: boolean }) => void) => ({ remove })),
+    addListener: vi.fn(
+      (_listener: (event: { lowPowerMode: boolean }) => void) => ({ remove }),
+    ),
     isLowPowerModeEnabledAsync: vi.fn(async () => true),
     remove,
   };

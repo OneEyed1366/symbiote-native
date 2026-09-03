@@ -1,9 +1,4 @@
-import {
-  ChangeDetectorRef,
-  Component,
-  OnInit,
-  inject,
-} from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import {
   AccessibilityInfo,
   SymbioteHostPropsDirective,
@@ -83,8 +78,6 @@ export class AccessibilityDemo implements OnInit {
         this.screenReader = 'unavailable';
         this.changeDetector.detectChanges();
       });
-    AccessibilityInfo.announceForAccessibility(
-      'symbiote accessibility online',
-    );
+    AccessibilityInfo.announceForAccessibility('symbiote accessibility online');
   }
 }

@@ -11,10 +11,18 @@ export type {
   IDescriptorChild,
 } from './descriptor';
 
+// The shape-stability guard a fine-grained adapter's Descriptor bridge builds on. Internal to
+// adapter bridges (Svelte's and Solid's), NOT part of an app's surface — so it stays out of the
+// adapter barrels, unlike the passthrough names in tests/adapter-barrel-parity.test.ts.
+export { createDescriptorShapeGuard } from './descriptor';
+export type { IDescriptorShapeGuard } from './descriptor';
+
 // Accessibility folding: the web-alias (aria-*/role) → canonical accessibility* transform
 // and its types. Framework-agnostic, so React, Vue, and the next adapter all fold
 // identically; moved here from @symbiote-native/react. RefreshControl/SafeAreaView/ScrollView consume it.
 export { resolveAccessibilityProps } from './accessibility-props';
+export { resolveTextProps } from './text-props';
+export type { IEllipsizeMode, ITextDefaultableProps } from './text-props';
 export type {
   IAccessibilityProps,
   IAriaProps,
@@ -31,7 +39,10 @@ export type {
 // re-exports iOS for headless. descriptorFor is the per-platform-bound resolver.
 export { descriptorFor, COMPONENT_DESCRIPTORS } from './component-names';
 export { buildDescriptors, makeDescriptorFor } from './component-names/shared';
-export type { ISymbioteIntrinsic, IComponentDescriptor } from './component-names/shared';
+export type {
+  ISymbioteIntrinsic,
+  IComponentDescriptor,
+} from './component-names/shared';
 
 export { renderActivityIndicator } from './view/render-activity-indicator';
 export type {
@@ -98,7 +109,10 @@ export {
   readLayoutNumber,
   STICKY_HEADER_Z_INDEX,
 } from './view/render-scroll-sticky';
-export type { IStickyHeaderProps, IStickyInterpolationParams } from './view/render-scroll-sticky';
+export type {
+  IStickyHeaderProps,
+  IStickyInterpolationParams,
+} from './view/render-scroll-sticky';
 
 // The per-header sticky effect machine: the one pure state machine every sticky-header consumer drives
 // (React/Vue header component, Angular header component, Angular projection wrapper), folding the
@@ -129,7 +143,11 @@ export { renderImage } from './view/render-image';
 // @symbiote-native/engine (image-loader.ts / image-source-resolver.ts), the same imperative,
 // native-bridge-touching shape as Alert/Share, kept out of the pure view layer. Re-exported here
 // so the public `Image.*` surface is unchanged.
-export type { IImageStatics, IImageSize, IImageCacheStatus } from '@symbiote-native/engine';
+export type {
+  IImageStatics,
+  IImageSize,
+  IImageCacheStatus,
+} from '@symbiote-native/engine';
 export { imageStatics, setImageSourceResolver } from '@symbiote-native/engine';
 
 // ImageBackground: render-only composition (absolute-fill image behind, children on top).
@@ -149,19 +167,27 @@ export type {
   IModalOrientation,
   IModalOrientationChangeEvent,
 } from './view/render-modal';
-export { modalReducer, createInitialModalState, shouldRenderModal } from './state/modal';
+export {
+  modalReducer,
+  createInitialModalState,
+  shouldRenderModal,
+} from './state/modal';
 export type { IModalState, IModalAction } from './state/modal';
 
 // KeyboardAvoidingView: pure inset/behavior math; the adapter owns the Keyboard subscription.
 export {
   computeInset,
+  keyboardAvoidingEventNamesFor,
+  readPrefersCrossFadeTransitions,
   readKeyboardFrame,
   readLayoutFrame,
   resolveKeyboardAvoidingLayout,
   DEFAULT_VERTICAL_OFFSET,
 } from './view/render-keyboard-avoiding-view';
 export type {
+  IComputeInsetOptions,
   IKeyboardAvoidingBehavior,
+  IKeyboardAvoidingEventNames,
   IMeasuredFrame,
   IKeyboardFrame,
   IKeyboardAvoidingLayout,
@@ -175,6 +201,7 @@ export type {
 export {
   createPressHandlers,
   createPressRuntime,
+  disposePressRuntime,
   normalizeRect,
   maxEdge,
   isTouchWithinRegion,
@@ -182,6 +209,7 @@ export {
   computeRegion,
   rippleProps,
   DEFAULT_DELAY_LONG_PRESS_MS,
+  DEFAULT_MIN_PRESS_DURATION_MS,
   DEFAULT_PRESS_RECT_OFFSETS,
 } from './state/pressable';
 export type {
@@ -214,12 +242,17 @@ export {
   createTouchableFeedbackRuntime,
   createTouchableFeedbackHandlers,
   DEFAULT_ACTIVE_OPACITY,
+  OPACITY_ACTIVE_GRANT_DURATION_MS,
   OPACITY_ACTIVE_DURATION_MS,
   OPACITY_INACTIVE_DURATION_MS,
   RESTING_OPACITY,
   DEFAULT_HIGHLIGHT_CHILD_OPACITY,
   DEFAULT_UNDERLAY_COLOR,
-  DEFAULT_MIN_PRESS_DURATION_MS,
+  TOUCHABLE_MIN_PRESS_DURATION_MS,
+  restingOpacityFromStyle,
+  hasTouchablePressHandler,
+  createHighlightUnderlayRuntime,
+  createHighlightUnderlayHandlers,
 } from './state/touchable';
 export type {
   IPressTimingProps,
@@ -228,8 +261,17 @@ export type {
   ITouchableFeedbackConfig,
   ITouchableFeedbackCallbacks,
   ITouchableFeedbackHandlers,
+  ITouchablePressHandlerProps,
+  IHighlightUnderlayRuntime,
+  IHighlightUnderlayConfig,
+  IHighlightUnderlayCallbacks,
+  IHighlightUnderlayHandlers,
 } from './state/touchable';
-export { highlightPressedStyle } from './view/render-touchable-highlight';
+export { resolveHighlightExtraStyles } from './view/render-touchable-highlight';
+export type {
+  ITouchableHighlightExtraStyles,
+  ITouchableHighlightUnderlayView,
+} from './view/render-touchable-highlight';
 export {
   backgroundProps,
   canUseNativeForeground,
@@ -280,6 +322,7 @@ export type {
   IEnterKeyHint,
   ISubmitBehavior,
 } from './state/text-input';
+export { keyboardTypeForInputMode } from './state/text-input';
 export { renderTextInput } from './view/render-text-input';
 export type { ITextInputViewProps } from './view/render-text-input';
 
@@ -303,6 +346,7 @@ export {
   INVERTED_X_STYLE,
   readScrollOffset,
   readLayoutLength,
+  readLayoutOffset,
   buildOffsets,
   computeWindow,
   throttleWindow,
@@ -310,6 +354,7 @@ export {
   isCellViewable,
   offsetForIndex,
   averageMeasuredLength,
+  averageMeasuredStride,
   highestMeasuredIndex,
   computeEndReached,
   computeStartReached,
@@ -363,6 +408,12 @@ export type {
   IListReduceResult,
 } from './state/virtualized-list-reducer';
 
+export { subscribeListDiagnostics } from './state/virtualized-list-diagnostics';
+export type {
+  IListDiagnosticFrame,
+  IListDiagnosticMove,
+} from './state/virtualized-list-diagnostics';
+
 export {
   SINGLE_COLUMN,
   chunkIntoRows,
@@ -380,4 +431,32 @@ export {
   sectionEntryKey,
   scrollLocationToFlatIndex,
 } from './state/section-list';
-export type { ISection, ISectionEntry, IVirtualizedSectionListHandle } from './state/section-list';
+export type {
+  ISection,
+  ISectionEntry,
+  IVirtualizedSectionListHandle,
+} from './state/section-list';
+export {
+  registerPressableBehavior,
+  PRESSABLE_TAG,
+} from './behaviors/pressable';
+export {
+  foldImagePayload,
+  IMAGE_TAG,
+  registerImageBehavior,
+} from './behaviors/image';
+
+export {
+  foldInputAccessoryViewPayload,
+  INPUT_ACCESSORY_VIEW_TAG,
+  registerInputAccessoryViewBehavior,
+} from './behaviors/input-accessory-view';
+
+export {
+  registerTextInputBehavior,
+  buildTextInputHandle,
+  TEXT_INPUT_TAG,
+  TEXT_INPUT_MULTILINE_TAG,
+} from './behaviors/text-input';
+
+export { registerSwitchBehavior, SWITCH_TAG } from './behaviors/switch';

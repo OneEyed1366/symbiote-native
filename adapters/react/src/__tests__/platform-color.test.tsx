@@ -79,14 +79,19 @@ describe('PlatformColor / DynamicColorIOS', () => {
       expect(painted, 'a node carries a backgroundColor').toBeDefined();
 
       // The committed prop is the processor's OUTPUT (the native dict), not the raw opaque object.
-      expect(painted!.props.backgroundColor).toEqual({ native: { semantic: ['labelColor'] } });
+      expect(painted!.props.backgroundColor).toEqual({
+        native: { semantic: ['labelColor'] },
+      });
 
       const routedSemantic = seen.some(
         v =>
           isOpaqueColorValue(v) &&
           JSON.stringify(v) === JSON.stringify({ semantic: ['labelColor'] }),
       );
-      expect(routedSemantic, 'the opaque style color reached the processor').toBe(true);
+      expect(
+        routedSemantic,
+        'the opaque style color reached the processor',
+      ).toBe(true);
     });
   });
 });

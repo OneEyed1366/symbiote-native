@@ -73,7 +73,8 @@ export const productName: string | null = expoDevice.productName ?? null;
 export const deviceType: DeviceType | null = expoDevice.deviceType ?? null;
 
 /** The device year class (https://github.com/facebook/device-year-class) of this device. */
-export const deviceYearClass: number | null = expoDevice.deviceYearClass ?? null;
+export const deviceYearClass: number | null =
+  expoDevice.deviceYearClass ?? null;
 
 /**
  * The device's total memory, in bytes — the total memory accessible to the kernel, but not
@@ -110,19 +111,22 @@ export const osBuildId: string | null = expoDevice.osBuildId ?? null;
  * The internal build ID of the OS running on the device. On Android this corresponds to
  * `Build.ID`; on iOS it's the same value as {@link osBuildId}.
  */
-export const osInternalBuildId: string | null = expoDevice.osInternalBuildId ?? null;
+export const osInternalBuildId: string | null =
+  expoDevice.osInternalBuildId ?? null;
 
 /**
  * A string that uniquely identifies the build of the currently running system OS.
  * @platform android
  */
-export const osBuildFingerprint: string | null = expoDevice.osBuildFingerprint ?? null;
+export const osBuildFingerprint: string | null =
+  expoDevice.osBuildFingerprint ?? null;
 
 /**
  * The Android SDK version of the software currently running on this hardware device.
  * @platform android
  */
-export const platformApiLevel: number | null = expoDevice.platformApiLevel ?? null;
+export const platformApiLevel: number | null =
+  expoDevice.platformApiLevel ?? null;
 
 /**
  * The human-readable name of the device, which may be set by the device's user. `null` if the
@@ -169,7 +173,9 @@ export async function getMaxMemoryAsync(): Promise<number> {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getMaxMemoryAsync');
   }
   const maxMemory = await expoDevice.getMaxMemoryAsync();
-  return maxMemory === MAX_MEMORY_UNLIMITED_SENTINEL ? Number.MAX_SAFE_INTEGER : maxMemory;
+  return maxMemory === MAX_MEMORY_UNLIMITED_SENTINEL
+    ? Number.MAX_SAFE_INTEGER
+    : maxMemory;
 }
 
 /**
@@ -179,7 +185,10 @@ export async function getMaxMemoryAsync(): Promise<number> {
  */
 export async function isRootedExperimentalAsync(): Promise<boolean> {
   if (!expoDevice.isRootedExperimentalAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'isRootedExperimentalAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'isRootedExperimentalAsync',
+    );
   }
   return expoDevice.isRootedExperimentalAsync();
 }
@@ -192,7 +201,10 @@ export async function isRootedExperimentalAsync(): Promise<boolean> {
  */
 export async function isSideLoadingEnabledAsync(): Promise<boolean> {
   if (!expoDevice.isSideLoadingEnabledAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'isSideLoadingEnabledAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'isSideLoadingEnabledAsync',
+    );
   }
   return expoDevice.isSideLoadingEnabledAsync();
 }
@@ -214,7 +226,9 @@ export async function getPlatformFeaturesAsync(): Promise<string[]> {
  * when the native method is absent (e.g. on iOS), matching upstream.
  * @platform android
  */
-export async function hasPlatformFeatureAsync(feature: string): Promise<boolean> {
+export async function hasPlatformFeatureAsync(
+  feature: string,
+): Promise<boolean> {
   if (!expoDevice.hasPlatformFeatureAsync) {
     return false;
   }

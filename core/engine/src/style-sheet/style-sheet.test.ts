@@ -36,7 +36,10 @@ describe('StyleSheet', () => {
 
   describe('flatten', () => {
     it('merges with later keys winning (reuses shared flattenStyle)', () => {
-      expect(StyleSheet.flatten([{ a: 1 }, { a: 2, b: 3 }])).toEqual({ a: 2, b: 3 });
+      expect(StyleSheet.flatten([{ a: 1 }, { a: 2, b: 3 }])).toEqual({
+        a: 2,
+        b: 3,
+      });
     });
 
     // why: setStyleAttributePreprocessor's whole purpose is rewriting one style key's value
@@ -107,7 +110,9 @@ describe('StyleSheet', () => {
     const FAKE_SCALE = 3;
 
     it('matches RN formula for the faked DeviceInfo screen scale', () => {
-      installFakeDeviceInfo(() => ({ Dimensions: { window: { scale: FAKE_SCALE } } }));
+      installFakeDeviceInfo(() => ({
+        Dimensions: { window: { scale: FAKE_SCALE } },
+      }));
 
       const width = StyleSheet.hairlineWidth;
       expect(typeof width).toBe('number');
@@ -118,7 +123,9 @@ describe('StyleSheet', () => {
     // why: Android exposes the scale under windowPhysicalPixels, not window — hairlineWidth
     // must resolve either key, or every Android device would silently fall back to 1px.
     it('falls back to windowPhysicalPixels.scale when window.scale is absent', () => {
-      installFakeDeviceInfo(() => ({ Dimensions: { windowPhysicalPixels: { scale: 2 } } }));
+      installFakeDeviceInfo(() => ({
+        Dimensions: { windowPhysicalPixels: { scale: 2 } },
+      }));
       expect(StyleSheet.hairlineWidth).toBe(computeHairlineWidth(2));
     });
 

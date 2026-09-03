@@ -8,19 +8,40 @@ import '../register';
 export { Stack } from './stack';
 export type { INavigatorHandle, IStackProps } from './stack';
 export { Screen } from './screen';
-export type { IScreenOptionsArgs, IScreenOptionsResolver, IScreenProps } from './screen';
-export type { IScreenOptions, IStackAnimation, IStackPresentation } from '../core';
+export type {
+  IScreenOptionsArgs,
+  IScreenOptionsResolver,
+  IScreenProps,
+} from './screen';
+export type {
+  IScreenOptions,
+  IStackAnimation,
+  IStackPresentation,
+} from '../core';
 
-export { useNavigation, useRoute, useIsFocused, useFocusEffect, useNavigationState } from './hooks';
+export {
+  useNavigation,
+  useRoute,
+  useIsFocused,
+  useFocusEffect,
+  useNavigationState,
+} from './hooks';
 export type { INavigationHandle } from './hooks';
-export { useStackNavigation, useTabNavigation, useDrawerNavigation } from './hooks';
+export {
+  useStackNavigation,
+  useTabNavigation,
+  useDrawerNavigation,
+} from './hooks';
 export type {
   IStackNavigationHandle,
   ITabNavigationHandle,
   IDrawerNavigationHandle,
 } from './hooks';
 export { NavigationContext } from './navigation-context';
-export type { INavigationContextValue, IAnyNavigatorHandle } from './navigation-context';
+export type {
+  INavigationContextValue,
+  IAnyNavigatorHandle,
+} from './navigation-context';
 
 export { useLinkingIntegration } from './linking';
 export type { ILinkingConfig, IScreenLinkingConfig } from '../core';
@@ -42,11 +63,20 @@ export type { ITabOptions, ITabBarIcon } from '../core';
 // ../register import above). See react/drawer.ts's header for the feasibility note re:
 // react-native-gesture-handler / react-native-reanimated parity gaps.
 export { Drawer } from './drawer';
-export type { IDrawerNavigatorHandle, IDrawerProps, IDrawerDescriptorMap } from './drawer';
+export type {
+  IDrawerNavigatorHandle,
+  IDrawerProps,
+  IDrawerDescriptorMap,
+} from './drawer';
 export { DrawerScreen } from './drawer-screen';
 export type {
   IDrawerScreenOptionsArgs,
   IDrawerScreenOptionsResolver,
   IDrawerScreenProps,
 } from './drawer-screen';
-export type { IDrawerOptions, IDrawerScreenOptions, IDrawerType, IDrawerPosition } from '../core';
+export type {
+  IDrawerOptions,
+  IDrawerScreenOptions,
+  IDrawerType,
+  IDrawerPosition,
+} from '../core';

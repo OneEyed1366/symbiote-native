@@ -9,8 +9,37 @@ on:
   workflow_call:
 
 jobs:
+  # This exact tree may already have been verified — a push to master re-runs every check on a
+  # merge/squash/rebase commit whose CONTENT was already checked on the PR it came from, just under
+  # a different SHA (all three merge strategies mint a new commit). Keying a cache on the TREE
+  # object (`git rev-parse HEAD^{tree}`) survives that: it is identical whenever the file contents
+  # are, whatever the commit SHA says, and any real change misses the cache and runs everything —
+  # so a hit can only ever skip work that is provably redundant, never real verification.
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+    outputs:
+      tree: ${{ steps.tree.outputs.hash }}
+      cache-hit: ${{ steps.restore.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: tree
+        run: echo "hash=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
+      # lookup-only: checks whether the key exists without downloading anything — there is no
+      # content to restore, the key's existence IS the answer.
+      - id: restore
+        uses: actions/cache/restore@v4
+        with:
+          path: .checks-passed
+          key: checks-passed-${{ steps.tree.outputs.hash }}
+          lookup-only: true
+
   lint:
     name: Lint
+    needs: gate
+    if: needs.gate.outputs.cache-hit != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +57,8 @@ jobs:
 
   typecheck:
     name: Typecheck
+    needs: gate
+    if: needs.gate.outputs.cache-hit != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,6 +76,8 @@ jobs:
 
   test:
     name: Test
+    needs: gate
+    if: needs.gate.outputs.cache-hit != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,3 +92,52 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm run test
+
+  bundle-isolation:
+    name: Packed consumer bundle matrix
+    needs: gate
+    if: needs.gate.outputs.cache-hit != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Build first because every tarball's publishConfig points at build/ (and build-ngc/ for
+      # Angular). The matrix then packs the exact direct @symbiote-native dependencies of all five
+      # standalone examples, installs them into disposable npm consumers, type-checks/AOT-builds
+      # each app, and creates iOS + Android Metro production bundles.
+      - run: pnpm run prepublish-build
+
+      - run: pnpm run check:bundle-isolation
+
+  # Records that this tree passed, so the NEXT push/PR carrying the identical tree (a merge/squash/
+  # rebase commit is the common case) hits the gate above instead of re-running everything. Only
+  # runs when this job's own trigger actually did the work (cache-hit != 'true') and every check
+  # succeeded — `always()` is needed because a skipped or failed dependency must still let this job
+  # EVALUATE its condition rather than being skipped itself by the implicit success() default.
+  mark-passed:
+    name: Mark tree as passed
+    needs: [gate, lint, typecheck, test, bundle-isolation]
+    if: >
+      always() &&
+      needs.gate.outputs.cache-hit != 'true' &&
+      needs.lint.result == 'success' &&
+      needs.typecheck.result == 'success' &&
+      needs.test.result == 'success' &&
+      needs['bundle-isolation'].result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - run: mkdir -p .checks-passed && date -u > .checks-passed/verified-at
+
+      - uses: actions/cache/save@v4
+        with:
+          path: .checks-passed
+          key: checks-passed-${{ needs.gate.outputs.tree }}

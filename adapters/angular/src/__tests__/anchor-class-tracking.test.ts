@@ -16,7 +16,7 @@
 import '@angular/compiler';
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
@@ -24,7 +24,10 @@ import { ActivityIndicator } from '../components/activity-indicator';
 import { FlatList } from '../components/flat-list';
 import { ImageBackground } from '../components/image-background';
 import { TextInput } from '../components/text-input';
-import { VirtualizedList, VListItemDirective } from '../components/virtualized-list';
+import {
+  VirtualizedList,
+  VListItemDirective,
+} from '../components/virtualized-list';
 
 const ROOT_TAG = 981;
 const fabric = installFabric();
@@ -60,7 +63,8 @@ function nearestStyled(testID: string, prop: string): unknown {
     if (below !== undefined) return below.props[prop];
     for (let index = path.length - 2; index >= 0; index -= 1) {
       const ancestor = path[index];
-      if (ancestor !== undefined && ancestor.props[prop] !== undefined) return ancestor.props[prop];
+      if (ancestor !== undefined && ancestor.props[prop] !== undefined)
+        return ancestor.props[prop];
     }
   }
   return undefined;
@@ -154,7 +158,14 @@ describe('a class toggled after mount', () => {
     ['anchor-flat-list'],
     ['anchor-vlist'],
   ])('reaches the committed view of %s', async testID => {
-    registerStyles({ dark: { backgroundColor: 'black' } });
+    registerRules([
+      {
+        tokens: ['dark'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'black' },
+      },
+    ]);
 
     mount(ROOT_TAG, AnchorClassFixture);
     await new Promise<void>(resolve => setTimeout(resolve, 0));

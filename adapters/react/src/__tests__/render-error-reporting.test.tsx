@@ -20,7 +20,10 @@ function Exploding(): ReactElement {
   throw new Error(BOOM);
 }
 
-class Boundary extends Component<{ children: ReactNode }, { hasFailed: boolean }> {
+class Boundary extends Component<
+  { children: ReactNode },
+  { hasFailed: boolean }
+> {
   state = { hasFailed: false };
 
   static getDerivedStateFromError(): { hasFailed: boolean } {
@@ -49,7 +52,9 @@ afterEach(() => {
 });
 
 function loggedMessages(): string[] {
-  return consoleError.mock.calls.map(call => call.map(arg => String(arg)).join(' '));
+  return consoleError.mock.calls.map(call =>
+    call.map(arg => String(arg)).join(' '),
+  );
 }
 
 describe('Negative — a component throws during render', () => {
@@ -62,7 +67,9 @@ describe('Negative — a component throws during render', () => {
   it('names the render seam, so the line is not an anonymous stack', () => {
     mount(ROOT_TAG, <Exploding />);
 
-    expect(loggedMessages().some(message => message.includes('react render'))).toBe(true);
+    expect(
+      loggedMessages().some(message => message.includes('react render')),
+    ).toBe(true);
   });
 
   it('routes to the host reporter when one is installed, as on a native host', () => {
@@ -81,12 +88,19 @@ describe('Negative — a component throws during render', () => {
 
     mount(ROOT_TAG, <Exploding />);
 
-    expect(reportError.mock.calls[0]?.[0]).toMatchObject({ isComponentError: true });
+    expect(reportError.mock.calls[0]?.[0]).toMatchObject({
+      isComponentError: true,
+    });
   });
 
-  it('still reports an error an error boundary caught', () => {
-    // The boundary decides what the USER sees, not whether the developer hears about it — RN's
-    // nativeOnCaughtError calls the same showErrorDialog as the uncaught path.
+  it('keeps an error an error boundary caught OFF the native redbox', () => {
+    // A DELIBERATE divergence from upstream, whose nativeOnCaughtError calls the same
+    // showErrorDialog as the uncaught path. Writing an ErrorBoundary is the developer saying
+    // "this can throw and I am handling it"; answering that with a full-screen redbox over the
+    // fallback the app just rendered contradicts what the app asked for. Solid's boundary is
+    // silent and reads as correct beside React's alarm, which is what prompted the change.
+    // The error is not swallowed — it goes to `dlog`, off unless DEBUG is set.
+    // The UNCAUGHT case above still reports; the difference is whether anyone claimed the error.
     const reportError = vi.fn();
     Object.assign(globalThis, { ErrorUtils: { reportError } });
 
@@ -97,7 +111,7 @@ describe('Negative — a component throws during render', () => {
       </Boundary>,
     );
 
-    expect(reportError).toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
   });
 
   it('lets the boundary paint its fallback all the same', () => {

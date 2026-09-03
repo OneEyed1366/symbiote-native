@@ -41,7 +41,8 @@ const TIERS = [
     applies: dir => existsSync(join(dir, 'src')),
   },
   {
-    reason: 'native-codegen-view packages (codegen-specs/ or *.podspec present)',
+    reason:
+      'native-codegen-view packages (codegen-specs/ or *.podspec present)',
     fields: [
       'codegenConfig',
       'dependencies',
@@ -50,7 +51,8 @@ const TIERS = [
       'peerDependenciesMeta',
     ],
     applies: dir =>
-      existsSync(join(dir, 'codegen-specs')) || readdirSync(dir).some(f => f.endsWith('.podspec')),
+      existsSync(join(dir, 'codegen-specs')) ||
+      readdirSync(dir).some(f => f.endsWith('.podspec')),
   },
   {
     reason: 'native-proxy packages with no src/ directory',
@@ -79,7 +81,8 @@ export default {
       recommended: true,
     },
     messages: {
-      missingField: 'Missing required field "{{field}}" — required for {{reason}}.',
+      missingField:
+        'Missing required field "{{field}}" — required for {{reason}}.',
     },
     schema: [],
   },
@@ -88,7 +91,9 @@ export default {
       Document(node) {
         if (node.body.type !== 'Object') return;
         const dir = dirname(context.filename);
-        const present = new Set(node.body.members.map(member => getKey(member)));
+        const present = new Set(
+          node.body.members.map(member => getKey(member)),
+        );
         for (const [field, reason] of requiredFieldsFor(dir)) {
           if (present.has(field)) continue;
           context.report({

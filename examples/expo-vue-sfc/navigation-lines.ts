@@ -90,29 +90,81 @@ export type INavLineInfo = {
 export type ITourRouteName = Exclude<IRouteName, typeof ROUTE_NAME.Menu>;
 
 export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
-  [ROUTE_NAME.Sensors]: { line: NAV_LINE.Sensors, code: 'SN', label: 'SENSORS LINE' },
-  [ROUTE_NAME.LocalAuth]: { line: NAV_LINE.LocalAuth, code: 'LA', label: 'LOCAL AUTH LINE' },
-  [ROUTE_NAME.Haptics]: { line: NAV_LINE.Haptics, code: 'HP', label: 'HAPTICS LINE' },
-  [ROUTE_NAME.Clipboard]: { line: NAV_LINE.Clipboard, code: 'CB', label: 'CLIPBOARD LINE' },
-  [ROUTE_NAME.Battery]: { line: NAV_LINE.Battery, code: 'BT', label: 'BATTERY LINE' },
-  [ROUTE_NAME.Brightness]: { line: NAV_LINE.Brightness, code: 'BR', label: 'BRIGHTNESS LINE' },
-  [ROUTE_NAME.Cellular]: { line: NAV_LINE.Cellular, code: 'CL', label: 'CELLULAR LINE' },
-  [ROUTE_NAME.Network]: { line: NAV_LINE.Network, code: 'NW', label: 'NETWORK LINE' },
-  [ROUTE_NAME.Device]: { line: NAV_LINE.Device, code: 'DV', label: 'DEVICE LINE' },
-  [ROUTE_NAME.Application]: { line: NAV_LINE.Application, code: 'AP', label: 'APPLICATION LINE' },
-  [ROUTE_NAME.Crypto]: { line: NAV_LINE.Crypto, code: 'CR', label: 'CRYPTO LINE' },
+  [ROUTE_NAME.Sensors]: {
+    line: NAV_LINE.Sensors,
+    code: 'SN',
+    label: 'SENSORS LINE',
+  },
+  [ROUTE_NAME.LocalAuth]: {
+    line: NAV_LINE.LocalAuth,
+    code: 'LA',
+    label: 'LOCAL AUTH LINE',
+  },
+  [ROUTE_NAME.Haptics]: {
+    line: NAV_LINE.Haptics,
+    code: 'HP',
+    label: 'HAPTICS LINE',
+  },
+  [ROUTE_NAME.Clipboard]: {
+    line: NAV_LINE.Clipboard,
+    code: 'CB',
+    label: 'CLIPBOARD LINE',
+  },
+  [ROUTE_NAME.Battery]: {
+    line: NAV_LINE.Battery,
+    code: 'BT',
+    label: 'BATTERY LINE',
+  },
+  [ROUTE_NAME.Brightness]: {
+    line: NAV_LINE.Brightness,
+    code: 'BR',
+    label: 'BRIGHTNESS LINE',
+  },
+  [ROUTE_NAME.Cellular]: {
+    line: NAV_LINE.Cellular,
+    code: 'CL',
+    label: 'CELLULAR LINE',
+  },
+  [ROUTE_NAME.Network]: {
+    line: NAV_LINE.Network,
+    code: 'NW',
+    label: 'NETWORK LINE',
+  },
+  [ROUTE_NAME.Device]: {
+    line: NAV_LINE.Device,
+    code: 'DV',
+    label: 'DEVICE LINE',
+  },
+  [ROUTE_NAME.Application]: {
+    line: NAV_LINE.Application,
+    code: 'AP',
+    label: 'APPLICATION LINE',
+  },
+  [ROUTE_NAME.Crypto]: {
+    line: NAV_LINE.Crypto,
+    code: 'CR',
+    label: 'CRYPTO LINE',
+  },
   [ROUTE_NAME.StandardWebCrypto]: {
     line: NAV_LINE.StandardWebCrypto,
     code: 'WC',
     label: 'WEB CRYPTO LINE',
   },
-  [ROUTE_NAME.SystemUi]: { line: NAV_LINE.SystemUi, code: 'SU', label: 'SYSTEM UI LINE' },
+  [ROUTE_NAME.SystemUi]: {
+    line: NAV_LINE.SystemUi,
+    code: 'SU',
+    label: 'SYSTEM UI LINE',
+  },
   [ROUTE_NAME.StoreReview]: {
     line: NAV_LINE.StoreReview,
     code: 'SR',
     label: 'STORE REVIEW LINE',
   },
-  [ROUTE_NAME.KeepAwake]: { line: NAV_LINE.KeepAwake, code: 'KA', label: 'KEEP AWAKE LINE' },
+  [ROUTE_NAME.KeepAwake]: {
+    line: NAV_LINE.KeepAwake,
+    code: 'KA',
+    label: 'KEEP AWAKE LINE',
+  },
   [ROUTE_NAME.ScreenOrientation]: {
     line: NAV_LINE.ScreenOrientation,
     code: 'SO',
@@ -128,8 +180,20 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'TT',
     label: 'TRACKING TRANSPARENCY LINE',
   },
-  [ROUTE_NAME.SecureStore]: { line: NAV_LINE.SecureStore, code: 'SS', label: 'SECURE STORE LINE' },
-  [ROUTE_NAME.Sharing]: { line: NAV_LINE.Sharing, code: 'SH', label: 'SHARING LINE' },
-  [ROUTE_NAME.WebBrowser]: { line: NAV_LINE.WebBrowser, code: 'WB', label: 'WEB BROWSER LINE' },
+  [ROUTE_NAME.SecureStore]: {
+    line: NAV_LINE.SecureStore,
+    code: 'SS',
+    label: 'SECURE STORE LINE',
+  },
+  [ROUTE_NAME.Sharing]: {
+    line: NAV_LINE.Sharing,
+    code: 'SH',
+    label: 'SHARING LINE',
+  },
+  [ROUTE_NAME.WebBrowser]: {
+    line: NAV_LINE.WebBrowser,
+    code: 'WB',
+    label: 'WEB BROWSER LINE',
+  },
   [ROUTE_NAME.Sms]: { line: NAV_LINE.Sms, code: 'SM', label: 'SMS LINE' },
 };

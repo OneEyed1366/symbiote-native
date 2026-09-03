@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
-import { NetworkStateType, getIpAddressAsync, isAirplaneModeEnabledAsync } from '@symbiote-native/network';
+import {
+  NetworkStateType,
+  getIpAddressAsync,
+  isAirplaneModeEnabledAsync,
+} from '@symbiote-native/network';
 import { useNetworkState } from '@symbiote-native/network/react';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -45,12 +49,14 @@ export function NetworkScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(([ip, airplaneMode]) => {
-      if (isMounted) {
-        setIpAddress(ip);
-        setIsAirplaneMode(airplaneMode);
-      }
-    });
+    Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
+      ([ip, airplaneMode]) => {
+        if (isMounted) {
+          setIpAddress(ip);
+          setIsAirplaneMode(airplaneMode);
+        }
+      },
+    );
     return () => {
       isMounted = false;
     };
@@ -58,7 +64,11 @@ export function NetworkScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="network-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="network-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -69,9 +79,10 @@ export function NetworkScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Network</Text>
             <Text className="hero-body">
-              @symbiote-native/network — live network state via useNetworkState(), plus the
-              device's IP address and airplane-mode check. Toggle Wi-Fi or airplane mode on the
-              device to see the live card update on its own.
+              @symbiote-native/network — live network state via
+              useNetworkState(), plus the device's IP address and airplane-mode
+              check. Toggle Wi-Fi or airplane mode on the device to see the live
+              card update on its own.
             </Text>
           </View>
         </View>
@@ -82,16 +93,28 @@ export function NetworkScreen() {
           </View>
           <View className="capability-row">
             <Text className="capability-label">Type</Text>
-            <Text className="value-text">{networkTypeLabel(networkState.type)}</Text>
+            <Text className="value-text">
+              {networkTypeLabel(networkState.type)}
+            </Text>
           </View>
           <View className="capability-row">
             <Text className="capability-label">Connected</Text>
-            <Text className="value-text">{networkState.isConnected === undefined ? 'checking…' : networkState.isConnected ? 'Yes' : 'No'}</Text>
+            <Text className="value-text">
+              {networkState.isConnected === undefined
+                ? 'checking…'
+                : networkState.isConnected
+                  ? 'Yes'
+                  : 'No'}
+            </Text>
           </View>
           <View className="capability-row">
             <Text className="capability-label">Internet reachable</Text>
             <Text className="value-text">
-              {networkState.isInternetReachable === undefined ? 'checking…' : networkState.isInternetReachable ? 'Yes' : 'No'}
+              {networkState.isInternetReachable === undefined
+                ? 'checking…'
+                : networkState.isInternetReachable
+                  ? 'Yes'
+                  : 'No'}
             </Text>
           </View>
         </View>
@@ -102,11 +125,19 @@ export function NetworkScreen() {
           </View>
           <View className="capability-row">
             <Text className="capability-label">IP address</Text>
-            <Text className="value-text">{ipAddress === null ? 'checking…' : ipAddress}</Text>
+            <Text className="value-text">
+              {ipAddress === null ? 'checking…' : ipAddress}
+            </Text>
           </View>
           <View className="capability-row">
             <Text className="capability-label">Airplane mode</Text>
-            <Text className="value-text">{isAirplaneMode === null ? 'checking…' : isAirplaneMode ? 'On' : 'Off'}</Text>
+            <Text className="value-text">
+              {isAirplaneMode === null
+                ? 'checking…'
+                : isAirplaneMode
+                  ? 'On'
+                  : 'Off'}
+            </Text>
           </View>
         </View>
       </ScrollView>

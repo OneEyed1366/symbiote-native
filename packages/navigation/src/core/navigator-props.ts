@@ -51,8 +51,10 @@ export type IOptionalBooleanNativeProp = 'undefined' | 'false' | 'true';
 // mirrors react-native-screens' own ScreenProps['sheetAllowedDetents'] - a plain fraction array,
 // sorted ascending, or one of RNS's named presets; the fold to the native `sheetAllowedDetents:
 // number[]` array happens in screen-options.ts, replicating RNS's own resolveSheetAllowedDetents.
-export type ISheetAllowedDetents = number[] | 'fitToContents' | 'large' | 'medium' | 'all';
-export type ISheetLargestUndimmedDetent = number | 'last' | 'none' | 'all' | 'large' | 'medium';
+export type ISheetAllowedDetents =
+  number[] | 'fitToContents' | 'large' | 'medium' | 'all';
+export type ISheetLargestUndimmedDetent =
+  number | 'last' | 'none' | 'all' | 'large' | 'medium';
 export type ISheetInitialDetent = number | 'last';
 
 // A bar-button item's icon: SF Symbol / iOS asset-catalog name, or an image asset. Mirrors RNS's
@@ -143,13 +145,20 @@ export type IHeaderBarButtonItemMenu = ISharedHeaderBarButtonItem & {
 export type IHeaderBarButtonItemSpacing = { type: 'spacing'; spacing: number };
 
 export type IHeaderBarButtonItem =
-  IHeaderBarButtonItemAction | IHeaderBarButtonItemMenu | IHeaderBarButtonItemSpacing;
+  | IHeaderBarButtonItemAction
+  | IHeaderBarButtonItemMenu
+  | IHeaderBarButtonItemSpacing;
 
 export type ISearchBarAutoCapitalize =
   'systemDefault' | 'none' | 'words' | 'sentences' | 'characters';
 
 export type ISearchBarPlacement =
-  'automatic' | 'inline' | 'stacked' | 'integrated' | 'integratedButton' | 'integratedCentered';
+  | 'automatic'
+  | 'inline'
+  | 'stacked'
+  | 'integrated'
+  | 'integratedButton'
+  | 'integratedCentered';
 
 // RNSSearchBar's full static config surface plus every event callback react-native-screens'
 // own SearchBarProps exposes (types.tsx): onChangeText/onSearchButtonPress carry the current

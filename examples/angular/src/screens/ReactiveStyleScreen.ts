@@ -45,7 +45,8 @@ import './ReactiveStyleScreen.css';
 // nothing else here means anything. Ordinary inputs are absent deliberately - they propagate
 // correctly everywhere and would only dilute the signal.
 
-const ANGULAR_LOGO_URI = 'https://angular.io/assets/images/logos/angular/angular.png';
+const ANGULAR_LOGO_URI =
+  'https://angular.io/assets/images/logos/angular/angular.png';
 
 // The two themes differ in one declaration each, and the class pair and the style pair carry the
 // SAME two colours - so a tile frozen on one axis is visibly out of step with its twin in the
@@ -104,7 +105,11 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
   ],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="rstyle-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="rstyle-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -115,8 +120,8 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
           <View class="hero-copy">
             <Text class="hero-title">Reactive style</Text>
             <Text class="hero-body">
-              One tap must repaint every tile. A tile left behind is a component whose class or
-              style stopped tracking after mount.
+              One tap must repaint every tile. A tile left behind is a component
+              whose class or style stopped tracking after mount.
             </Text>
           </View>
         </View>
@@ -129,7 +134,8 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
         ></ActionButton>
         <Text testID="rstyle-readout" class="info-text">{{ readout }}</Text>
         <Text class="rstyle-legend">
-          Pressable · TouchableHighlight · ScrollView are the controls - they must always flip.
+          Pressable · TouchableHighlight · ScrollView are the controls - they
+          must always flip.
         </Text>
 
         <Text class="section-label">class= axis</Text>
@@ -141,7 +147,10 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <Text class="rstyle-caption">Pressable</Text>
           </View>
           <View class="rstyle-cell">
-            <TouchableHighlight testID="rstyle-class-highlight" [class]="tileClass">
+            <TouchableHighlight
+              testID="rstyle-class-highlight"
+              [class]="tileClass"
+            >
               <Text class="rstyle-tile-text">control</Text>
             </TouchableHighlight>
             <Text class="rstyle-caption">TouchableHighlight</Text>
@@ -159,7 +168,10 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <Text class="rstyle-caption">TouchableOpacity</Text>
           </View>
           <View class="rstyle-cell">
-            <TouchableWithoutFeedback testID="rstyle-class-plain" [class]="tileClass">
+            <TouchableWithoutFeedback
+              testID="rstyle-class-plain"
+              [class]="tileClass"
+            >
               <Text class="rstyle-tile-text">tile</Text>
             </TouchableWithoutFeedback>
             <Text class="rstyle-caption">TouchableWithoutFeedback</Text>
@@ -283,7 +295,11 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
         <Text class="section-label">[style] axis</Text>
         <View class="rstyle-grid">
           <View class="rstyle-cell">
-            <Pressable testID="rstyle-style-pressable" class="rstyle-tile" [style]="tileStyle">
+            <Pressable
+              testID="rstyle-style-pressable"
+              class="rstyle-tile"
+              [style]="tileStyle"
+            >
               <Text class="rstyle-tile-text">control</Text>
             </Pressable>
             <Text class="rstyle-caption">Pressable</Text>
@@ -299,7 +315,11 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <Text class="rstyle-caption">TouchableHighlight</Text>
           </View>
           <View class="rstyle-cell">
-            <ScrollView testID="rstyle-style-scrollview" class="rstyle-tile" [style]="tileStyle">
+            <ScrollView
+              testID="rstyle-style-scrollview"
+              class="rstyle-tile"
+              [style]="tileStyle"
+            >
               <Text class="rstyle-tile-text">control</Text>
             </ScrollView>
             <Text class="rstyle-caption">ScrollView</Text>
@@ -378,7 +398,11 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <Text class="rstyle-caption">KeyboardAvoidingView</Text>
           </View>
           <View class="rstyle-cell">
-            <AnimatedView testID="rstyle-style-animated" class="rstyle-tile" [style]="tileStyle">
+            <AnimatedView
+              testID="rstyle-style-animated"
+              class="rstyle-tile"
+              [style]="tileStyle"
+            >
               <Text class="rstyle-tile-text">tile</Text>
             </AnimatedView>
             <Text class="rstyle-caption">AnimatedView</Text>

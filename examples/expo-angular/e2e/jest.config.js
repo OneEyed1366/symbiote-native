@@ -15,6 +15,8 @@ module.exports = {
   testEnvironment: 'detox/runners/jest/testEnvironment',
   setupFilesAfterEnv: ['./setup.ts'],
   reporters: ['detox/runners/jest/reporter'],
-  transform: { '\\.tsx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }] },
+  transform: {
+    '\\.tsx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
+  },
   verbose: true,
 };

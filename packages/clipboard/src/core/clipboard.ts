@@ -24,7 +24,9 @@ const NATIVE_MODULE_NAME = 'Clipboard';
  * @returns A promise that resolves to the content of the clipboard, or an empty string if the
  * clipboard is empty or permission was denied.
  */
-export async function getStringAsync(options: IGetStringOptions = {}): Promise<string> {
+export async function getStringAsync(
+  options: IGetStringOptions = {},
+): Promise<string> {
   if (!expoClipboard.getStringAsync) {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getStringAsync');
   }
@@ -115,7 +117,9 @@ export async function hasUrlAsync(): Promise<boolean> {
  * containing the base64 string and metadata of the image. Otherwise resolves to `null` (this
  * includes cases where permission was denied).
  */
-export async function getImageAsync(options: IGetImageOptions): Promise<IClipboardImage | null> {
+export async function getImageAsync(
+  options: IGetImageOptions,
+): Promise<IClipboardImage | null> {
   if (!expoClipboard.getImageAsync) {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getImageAsync');
   }

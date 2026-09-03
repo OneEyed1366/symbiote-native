@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, findNodeHandle, type IHostInstance } from '@symbiote-native/react';
+import {
+  View,
+  Text,
+  findNodeHandle,
+  type IHostInstance,
+} from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 
 // Imperative host-ref API: the seam reanimated / gesture-handler reach through.

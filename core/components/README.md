@@ -51,14 +51,22 @@ types and wires the reducer/render pair from here. Calling the render function d
 adapter itself does, to build its lifecycle wrapper:
 
 ```ts
-import { renderSwitch, createInitialSwitchState, switchReducer } from '@symbiote-native/components';
+import {
+  renderSwitch,
+  createInitialSwitchState,
+  switchReducer,
+} from '@symbiote-native/components';
 
 // inside an adapter's own hook/composable:
 const state = createInitialSwitchState();
 const next = switchReducer(state, { type: 'native-reported', value: true });
 const descriptor = renderSwitch(
   { value: true, disabled: false, passthrough: { onChange, ref } },
-  { trackColorProps: (value, trackColor) => ({ /* platform-specific prop names */ }) },
+  {
+    trackColorProps: (value, trackColor) => ({
+      /* platform-specific prop names */
+    }),
+  },
 );
 // descriptor is then handed to the adapter's own descriptorToReact / descriptorToVue bridge
 ```
@@ -80,17 +88,31 @@ host node untouched — the render function never names a framework type.
   keep-alive frame).
 - **Render-only components** (no state machine) — `ActivityIndicator`, `Image`,
   `ImageBackground`, `InputAccessoryView`.
-- **Pure logic/plumbing without a `Descriptor`** — `Pressable`'s press state machine
-  (`createPressHandlers` / `createPressRuntime`), the `Touchable*` timing constants,
-  `Button`'s shared text-style fold, `TextInput`'s controlled-value/event-count handshake
-  (`resolveTextInputProps`, `foldText`, `eventCountFromChange`, …), `KeyboardAvoidingView`'s inset
-  math, `ScrollView`'s intrinsics/sticky-header math (no full 3-layer split — the adapter owns the
-  element assembly).
+- **Pure logic/plumbing without a full `Descriptor`** — `Pressable`'s press state machine
+  (`createPressHandlers` / `createPressRuntime` in `state/pressable`) plus its render-decision
+  helpers (`buildPressableListeners`, `resolveDisabledAccessibilityState`, `shouldClaimResponder`,
+  … in `view/render-pressable`), the `Touchable*` timing constants, `Button`'s shared text-style
+  fold, `TextInput`'s controlled-value/event-count handshake (`resolveTextInputProps`, `foldText`,
+  `eventCountFromChange`, …), `KeyboardAvoidingView`'s inset math, `ScrollView`'s
+  intrinsics/sticky-header math (no full 3-layer split — the adapter owns the element assembly).
+- **Two more shared reducers, driven by every adapter's reactive glue**: the sticky-header effect
+  machine (`reduceSticky` / `createInitialStickyState`, the zero-swallow gate + debounce pick every
+  sticky-header consumer needs) and the list orchestration reducer (`reduceList` /
+  `createInitialListState`, the after-commit effect skeleton — window recompute → edge →
+  viewability → initial-scroll → MVCP — every list adapter runs).
 - **The `VirtualizedList` family's windowing engine** — `computeWindow`, `buildListPlan`,
   viewability tracking (`computeViewableSet`, `diffViewable`), and the `FlatList`/`SectionList`
   row/section folding helpers. Lists have no `view/render-*.ts` (a cell's content is the
   framework's own children) — the shared layer here is pure state/logic, reused verbatim by every
   adapter.
+- **Host behaviors (`src/behaviors/*.ts`)** — tier-2 host-primitive lowering: a primitive's state
+  machine and prop folds registered directly on the engine node (`registerPressableBehavior`,
+  `registerSwitchBehavior`, `registerImageBehavior`, `registerTextInputBehavior`,
+  `registerInputAccessoryViewBehavior`, plus the folds a lowered element still needs —
+  `foldImagePayload`, `foldInputAccessoryViewPayload`, `buildTextInputHandle`) so a
+  `Pressable`/`Switch`/`TextInput`/`Image`/`InputAccessoryView` can compile to a bare intrinsic tag
+  instead of a framework component. Built on `@symbiote-native/engine`'s `registerHostBehavior`
+  seam; see `.claude/rules/host-primitive-tier.md`.
 
 ## What it does NOT do
 

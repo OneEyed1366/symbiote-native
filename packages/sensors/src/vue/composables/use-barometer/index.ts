@@ -6,9 +6,15 @@
 // a later change of updateIntervalMs, so a plain numeric param is enough.
 
 import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
-import { Barometer, type EventSubscription, type IBarometerMeasurement } from '../../../core';
+import {
+  Barometer,
+  type EventSubscription,
+  type IBarometerMeasurement,
+} from '../../../core';
 
-export function useBarometer(updateIntervalMs?: number): Ref<IBarometerMeasurement | null> {
+export function useBarometer(
+  updateIntervalMs?: number,
+): Ref<IBarometerMeasurement | null> {
   // A plain ref: the value is a POJO measurement, not an engine node, so no shallowRef needed.
   const measurement = ref<IBarometerMeasurement | null>(null);
   let subscription: EventSubscription | undefined;

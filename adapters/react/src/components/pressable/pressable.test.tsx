@@ -9,18 +9,17 @@
 // shared recorder has no `measure`, so graft a configurable one onto the live slot before
 // any mount. Long-press / pressDelay timers run on vitest fake timers.
 //
-// SCOPE: `@symbiote-native/components/state/pressable.ts` (the timer/drift/suppression machine
-// createPressHandlers/createPressRuntime is called from) has NO co-located unit test of its own
-// (unlike touchable.ts, which does — core/components/src/state/touchable.test.ts). This file is
-// therefore not pure adapter-wiring coverage: it is, together with the Svelte smoke test, the
-// only place the shared press machine's actual timer/drift/suppression behavior is proven. Kept
-// here rather than split out, because the machine has no seam to drive without real touch events.
+// SCOPE: core/components/src/state/pressable.test.ts owns the timer/transition machine directly.
+// This file proves the React lifecycle bridge: responder listeners reach the real host, state
+// updates survive a re-render, the 130ms floor uses React's scheduler/clock, and unmount disposes
+// pending work.
 //
 // No Negative group: nothing here has a throwing path. "disabled" suppresses a press silently
 // (a Positive contract — completes without error, callback just never fires), it never rejects.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount, Pressable, Button } from '@symbiote-native/react';
+import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 110;
@@ -31,7 +30,8 @@ const TOUCH_IDENTIFIER = 1;
 const TERMINATION_REQUEST = 'responderTerminationRequest';
 
 // The frame slot.measure reports; undefined disables measure (the radius fallback path).
-let measuredFrame: { width: number; height: number; pageX: number; pageY: number } | undefined;
+let measuredFrame:
+  { width: number; height: number; pageX: number; pageY: number } | undefined;
 
 const fabric = installFabric();
 const slot = globalThis.nativeFabricUIManager;
@@ -56,17 +56,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-// The responder is the Pressable's own RCTView, the first non-box-none RCTView created.
-function responderHandle(): unknown {
-  const view = fabric.find(n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none');
-  if (!view) throw new Error('no RCTView (Pressable responder) was created');
+// The responder is the Pressable's own non-box-none RCTView. `testID` disambiguates multiple
+// simultaneously mounted Pressables; omitted retains the common single-Pressable lookup.
+function responderHandle(testID?: string): unknown {
+  const view = fabric.find(
+    n =>
+      n.viewName === 'RCTView' &&
+      n.props.pointerEvents !== 'box-none' &&
+      (testID === undefined || n.props.testID === testID),
+  );
+  if (!view)
+    throw new Error('no matching RCTView (Pressable responder) was created');
   return view.instanceHandle;
 }
 
 // The latest committed props of the responder View (re-read after each commit).
 function responderProps(): Record<string, unknown> {
   function find(node: IFakeNode): IFakeNode | undefined {
-    if (node.viewName === 'RCTView' && node.props.pointerEvents !== 'box-none') return node;
+    if (node.viewName === 'RCTView' && node.props.pointerEvents !== 'box-none')
+      return node;
     for (const child of node.children) {
       const hit = find(child);
       if (hit) return hit;
@@ -87,9 +95,19 @@ function fire(handle: unknown, type: string): void {
 // A single-touch native event at a page coordinate; topTouchEnd reports the lifted finger
 // only in changedTouches (touches is now empty), start/move keep it in both.
 function fireAt(handle: unknown, type: string, x: number, y: number): void {
-  const touch = { pageX: x, pageY: y, identifier: TOUCH_IDENTIFIER, timestamp: 0 };
+  const touch = {
+    pageX: x,
+    pageY: y,
+    identifier: TOUCH_IDENTIFIER,
+    timestamp: 0,
+  };
   const touches = type === TOUCH_END ? [] : [touch];
-  fabric.fireEvent(handle, type, { pageX: x, pageY: y, touches, changedTouches: [touch] });
+  fabric.fireEvent(handle, type, {
+    pageX: x,
+    pageY: y,
+    touches,
+    changedTouches: [touch],
+  });
 }
 
 function accessibilityDisabled(props: Record<string, unknown>): unknown {
@@ -97,7 +115,9 @@ function accessibilityDisabled(props: Record<string, unknown>): unknown {
   return isRecord(state) ? state.disabled : undefined;
 }
 
-function terminationGate(handle: unknown): ((event: unknown) => unknown) | undefined {
+function terminationGate(
+  handle: unknown,
+): ((event: unknown) => unknown) | undefined {
   if (!isRecord(handle)) return undefined;
   const listeners = handle.listeners;
   if (!(listeners instanceof Map)) return undefined;
@@ -122,6 +142,122 @@ describe('React Pressable on the engine', () => {
     fire(handle, TOUCH_START);
     fire(handle, TOUCH_END);
     expect(presses).toBe(1);
+  });
+
+  it('stays active across multiple touches and completes once on the final lift', () => {
+    const order: string[] = [];
+    mount(
+      ROOT_TAG,
+      <Pressable
+        onPressIn={() => order.push('in')}
+        onPress={() => order.push('press')}
+        onPressOut={() => order.push('out')}
+      />,
+    );
+    const handle = responderHandle();
+    const first = {
+      identifier: 1,
+      pageX: 10,
+      pageY: 10,
+      timestamp: 1,
+      target: handle,
+    };
+    const second = {
+      identifier: 2,
+      pageX: 12,
+      pageY: 10,
+      timestamp: 2,
+      target: handle,
+    };
+
+    fabric.fireEvent(handle, TOUCH_START, {
+      changedTouches: [first],
+      touches: [first],
+    });
+    fabric.fireEvent(handle, TOUCH_START, {
+      changedTouches: [second],
+      touches: [first, second],
+    });
+    expect(order).toEqual(['in']);
+
+    fabric.fireEvent(handle, TOUCH_END, {
+      changedTouches: [first],
+      touches: [second],
+    });
+    expect(order).toEqual(['in']);
+
+    fabric.fireEvent(handle, TOUCH_END, {
+      changedTouches: [second],
+      touches: [],
+    });
+    // The engine completes on the final lift. A higher-level Pressable implementation may retain
+    // its active visual/onPressOut for RN's 130ms minimum duration, so assert completion by that
+    // boundary rather than requiring a synchronous adapter callback.
+    vi.advanceTimersByTime(130);
+    expect(order).toEqual(['in', 'press', 'out']);
+  });
+
+  it('keeps simultaneous sibling Pressables independent', () => {
+    const firstOrder: string[] = [];
+    const siblingOrder: string[] = [];
+    mount(
+      ROOT_TAG,
+      <>
+        <Pressable
+          testID="first"
+          onPressIn={() => firstOrder.push('in')}
+          onPress={() => firstOrder.push('press')}
+          onPressOut={() => firstOrder.push('out')}
+        />
+        <Pressable
+          testID="sibling"
+          onPressIn={() => siblingOrder.push('in')}
+          onPress={() => siblingOrder.push('press')}
+          onPressOut={() => siblingOrder.push('out')}
+        />
+      </>,
+    );
+    const firstHandle = responderHandle('first');
+    const siblingHandle = responderHandle('sibling');
+    const first = {
+      identifier: 1,
+      pageX: 10,
+      pageY: 10,
+      timestamp: 1,
+      target: firstHandle,
+    };
+    const sibling = {
+      identifier: 2,
+      pageX: 30,
+      pageY: 10,
+      timestamp: 2,
+      target: siblingHandle,
+    };
+
+    fabric.fireEvent(firstHandle, TOUCH_START, {
+      changedTouches: [first],
+      touches: [first],
+    });
+    fabric.fireEvent(siblingHandle, TOUCH_START, {
+      changedTouches: [sibling],
+      touches: [first, sibling],
+    });
+    expect(firstOrder).toEqual(['in']);
+    expect(siblingOrder).toEqual(['in']);
+
+    fabric.fireEvent(siblingHandle, TOUCH_END, {
+      changedTouches: [sibling],
+      touches: [first],
+    });
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
+    expect(firstOrder).toEqual(['in']);
+    expect(siblingOrder).toEqual(['in', 'press', 'out']);
+
+    fabric.fireEvent(firstHandle, TOUCH_END, {
+      changedTouches: [first],
+      touches: [],
+    });
+    expect(firstOrder).toEqual(['in', 'press', 'out']);
   });
 
   // why: RN's disabled Pressable must not claim the responder or fire feedback at all — a
@@ -205,7 +341,10 @@ describe('React Pressable on the engine', () => {
   // accessibilityState it's handed; this proves the fold actually reaches the committed native
   // node through the View wiring, and that unrelated a11y props pass through untouched.
   it('reports accessibilityState.disabled and passes a11y props through', () => {
-    mount(ROOT_TAG, <Pressable disabled accessibilityLabel="save" testID="save-btn" />);
+    mount(
+      ROOT_TAG,
+      <Pressable disabled accessibilityLabel="save" testID="save-btn" />,
+    );
     const props = responderProps();
     expect(accessibilityDisabled(props)).toBe(true);
     expect(props.accessibilityLabel).toBe('save');
@@ -216,7 +355,10 @@ describe('React Pressable on the engine', () => {
   // as disabled when `disabled` is set — this proves that mapping survives Button → Pressable →
   // View, not just Pressable's own accessibilityState fold tested above.
   it('gives Button role=button, accessible, and a disabled a11y state', () => {
-    mount(ROOT_TAG, <Button title="OK" disabled accessibilityLabel="confirm" />);
+    mount(
+      ROOT_TAG,
+      <Button title="OK" disabled accessibilityLabel="confirm" />,
+    );
     const props = responderProps();
     expect(props.accessibilityRole).toBe('button');
     expect(props.accessible).toBe(true);
@@ -261,13 +403,17 @@ describe('React Pressable on the engine', () => {
     fireAt(handle, TOUCH_MOVE, 108, 106); // hypot(8,6) = 10 < 30 -> retained
     fireAt(handle, TOUCH_END, 108, 106);
     expect(presses).toBe(1);
+    expect(pressOuts).toBe(0);
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
     expect(pressOuts).toBe(1);
 
-    // (b) large drift past the region -> tap suppressed, early pressOut fired.
+    // (b) large drift past the region -> tap suppressed; pressOut keeps RN's active floor.
     presses = 0;
     pressOuts = 0;
     fireAt(handle, TOUCH_START, 100, 100);
     fireAt(handle, TOUCH_MOVE, 200, 100); // 100 > 30 -> drifted out
+    expect(pressOuts).toBe(0);
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
     expect(pressOuts).toBe(1);
     fireAt(handle, TOUCH_END, 200, 100);
     expect(presses).toBe(0);
@@ -313,6 +459,49 @@ describe('React Pressable on the engine', () => {
     expect(presses).toBe(1);
   });
 
+  it('holds onPressOut for RN’s 130ms minimum active duration', () => {
+    let pressOuts = 0;
+    mount(
+      ROOT_TAG,
+      <Pressable
+        onPress={() => {}}
+        onPressOut={() => {
+          pressOuts++;
+        }}
+      />,
+    );
+    const handle = responderHandle();
+
+    fire(handle, TOUCH_START);
+    fire(handle, TOUCH_END);
+    expect(pressOuts).toBe(0);
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS - 1);
+    expect(pressOuts).toBe(0);
+    vi.advanceTimersByTime(1);
+    expect(pressOuts).toBe(1);
+  });
+
+  it('cancels a pending unstable_pressDelay timer on unmount', () => {
+    let pressIns = 0;
+    mount(
+      ROOT_TAG,
+      <Pressable
+        unstable_pressDelay={120}
+        onPressIn={() => {
+          pressIns++;
+        }}
+      />,
+    );
+
+    const handle = responderHandle();
+    fire(handle, TOUCH_START);
+    unmount(ROOT_TAG);
+    vi.advanceTimersByTime(120);
+    expect(pressIns).toBe(0);
+    // Clear the test harness's process-global responder after proving teardown cancelled the timer.
+    fire(handle, 'topTouchCancel');
+  });
+
   // why: pressRetentionOffset can be set per-edge (not just a uniform radius) — the drift test
   // must measure against the real per-edge frame, not a symmetric approximation, or an
   // asymmetric layout (e.g. a wide short button) would retain/drop on the wrong side.
@@ -339,12 +528,15 @@ describe('React Pressable on the engine', () => {
     fireAt(handle, TOUCH_MOVE, 130, 20);
     fireAt(handle, TOUCH_END, 130, 20);
     expect(presses).toBe(1);
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
 
-    // (b) y=80 is past the bottom edge (40+30=70) -> drifted out, early pressOut, tap dropped.
+    // (b) y=80 is past the bottom edge (40+30=70) -> drifted out, tap dropped.
     presses = 0;
     pressOuts = 0;
     fireAt(handle, TOUCH_START, 50, 20);
     fireAt(handle, TOUCH_MOVE, 50, 80);
+    expect(pressOuts).toBe(0);
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
     expect(pressOuts).toBe(1);
     fireAt(handle, TOUCH_END, 50, 80);
     expect(presses).toBe(0);

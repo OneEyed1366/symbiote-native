@@ -29,6 +29,43 @@ import {
 } from '@symbiote-native/engine';
 import { ShimNode } from './shim-node';
 
+// Deliberately WIDER than Svelte's own whitespace class. `svelte/src/compiler/phases/patterns.js`
+// uses /[^ \t\r\n]/ and says why: "Not \S because that also removes explicit whitespace defined
+// through things like `&nbsp;`". For Svelte the character IS the discriminator, so it must keep
+// an author's deliberate nbsp. For us the PARENT is the discriminator, and it has already proved
+// the node is unrenderable - a raw text under a non-text parent cannot paint whatever character
+// it holds. So `&nbsp;`, `&emsp;`, \f, \v, U+2028, U+3000 and the zero-width family (which `\s`
+// misses) all drop here, while a deliberate nbsp INSIDE a <Text> is kept by the parent check.
+// Measured: each of these arrives as its own text node in the from_tree template.
+const WHITESPACE_ONLY = /^[\s\u200b-\u200d\ufeff]+$/;
+
+// Whitespace-only text under a parent that cannot hold raw text is FORMATTING, not content: the
+// gap Svelte leaves between two sibling tags written on separate lines. Svelte collapses every
+// such run to a single ' ' but never deletes it — in the DOM that space separates inline words
+// and only CSS decides whether it paints. Fabric has no such layer, so a raw text outside a
+// <Text> is simply invalid: the same invariant the engine enforces at commit time.
+//
+// The PARENT is what makes this exact rather than a heuristic. Measured on svelte 5.56.8, a
+// stray gap and an {#each} text placeholder are the same ' ' string in the from_tree template:
+//
+//   stray gap    ['symbiote-view', null, [...], ' ', [...]]   parent takes no raw text -> drop
+//   placeholder  ['symbiote-text', null, ' ']                 parent IS a <Text>       -> keep
+//
+// So `<Text><Text>a</Text> <Text>b</Text></Text>` keeps its separator, correctly — there the
+// space really is a word boundary. This also covers the one shape the source preprocessor
+// admits it cannot catch (two siblings, one line, no newline): by here Svelte has already
+// normalized that form to the very same single space.
+//
+// makeLive() binds a parent before its children, so the parent's engine node is always present
+// by the time this runs; a fragment is unwrapped into the real parent before insertion.
+function isFormattingWhitespace(
+  value: string,
+  parent: ShimNode | null,
+): boolean {
+  if (!WHITESPACE_ONLY.test(value)) return false;
+  return parent?.engineNode?.isText !== true;
+}
+
 export class ShimText extends ShimNode {
   private value: string;
 
@@ -89,7 +126,8 @@ export class ShimText extends ShimNode {
     }
 
     engineRemoveChild(parentEngineNode, anchor);
-    if (reference !== undefined) engineInsertBefore(parentEngineNode, rawText, reference);
+    if (reference !== undefined)
+      engineInsertBefore(parentEngineNode, rawText, reference);
     else engineAppendChild(parentEngineNode, rawText);
     this.engineNode = rawText;
     this.surface?.requestCommit();
@@ -110,6 +148,8 @@ export class ShimText extends ShimNode {
   }
 
   createEngineNode(): ISymbioteNode {
-    return this.value === '' ? createAnchor() : createRawText(this.value);
+    if (this.value === '') return createAnchor();
+    if (isFormattingWhitespace(this.value, this.parent)) return createAnchor();
+    return createRawText(this.value);
   }
 }

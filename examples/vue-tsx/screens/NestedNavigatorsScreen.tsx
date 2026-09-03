@@ -23,14 +23,17 @@ const NestedTabHomeScreen = defineComponent(
               <Text class="line-tag-text">{`${nestedLineInfo.code} · ${nestedLineInfo.label}`}</Text>
             </View>
             <View class="hero-card">
-              <View class="hero-badge" style={{ backgroundColor: LINE_COLOR.structure }}>
+              <View
+                class="hero-badge"
+                style={{ backgroundColor: LINE_COLOR.structure }}
+              >
                 <Text class="hero-badge-text">NN</Text>
               </View>
               <View class="hero-copy">
                 <Text class="hero-title">Nested navigators</Text>
                 <Text class="hero-body">
-                  A Tab navigator nested inside a Stack screen, reaching its parent's own navigation
-                  handle through getParent().
+                  A Tab navigator nested inside a Stack screen, reaching its
+                  parent's own navigation handle through getParent().
                 </Text>
               </View>
             </View>
@@ -61,7 +64,9 @@ const NestedTabInfoScreen = defineComponent(
           <Text class="line-tag-text">{`${nestedLineInfo.code} · ${nestedLineInfo.label}`}</Text>
         </View>
         <Text class="section-label">Nested Tab · Info</Text>
-        <Text class="info-text">A second tab, proving the nested Tab bar switches focus normally.</Text>
+        <Text class="info-text">
+          A second tab, proving the nested Tab bar switches focus normally.
+        </Text>
       </View>
     </SafeAreaView>
   ),
@@ -77,8 +82,16 @@ const NestedTabInfoScreen = defineComponent(
 export const NestedNavigatorsScreen = defineComponent(
   () => () => (
     <Tab initialRouteName="NestedHome">
-      <Tab.Screen name="NestedHome" component={NestedTabHomeScreen} options={{ tabBarLabel: 'Home' }} />
-      <Tab.Screen name="NestedInfo" component={NestedTabInfoScreen} options={{ tabBarLabel: 'Info' }} />
+      <Tab.Screen
+        name="NestedHome"
+        component={NestedTabHomeScreen}
+        options={{ tabBarLabel: 'Home' }}
+      />
+      <Tab.Screen
+        name="NestedInfo"
+        component={NestedTabInfoScreen}
+        options={{ tabBarLabel: 'Info' }}
+      />
     </Tab>
   ),
   { name: 'NestedNavigatorsScreen' },

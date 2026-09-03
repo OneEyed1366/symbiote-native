@@ -5,7 +5,9 @@
   // (CT.WithDefault<boolean, 'true'>) - no ios/android divergence in v1 scope, so a single
   // constant stands in for the per-platform injection point ISliderPlatform-style adapters use
   // elsewhere.
-  const NAVIGATOR_PLATFORM: INavigatorPlatform = { defaultHeaderBackTitleVisible: true };
+  const NAVIGATOR_PLATFORM: INavigatorPlatform = {
+    defaultHeaderBackTitleVisible: true,
+  };
 
   // react-native-screens' RNSScreenStackHeaderConfig.mm requires every header child to be an
   // RNSScreenStackHeaderSubview; `type: 'searchBar'` is how it knows which slot this one fills.
@@ -24,9 +26,9 @@
   // compiles through Svelte's generic setAttribute path and never the custom-element property-SET
   // path the object bag depends on - see ../attachments.ts for the full reasoning.
   //
-  // The whole per-route tree is packed edge-to-edge with zero whitespace between sibling tags:
-  // svelte-adapter-dom-shim skill §16, where a stray space would become a real RCTRawText child
-  // of a react-native-screens view.
+  // Whitespace between sibling tags in the per-route tree is inert: the shim drops a
+  // whitespace-only text node whose parent takes no raw text, so it never becomes an RCTRawText
+  // child of a react-native-screens view (dom-shim/text.ts, svelte-adapter-dom-shim skill §16b).
   import { Platform, dlog } from '@symbiote-native/engine';
   import {
     NAVIGATION_EVENT_BLUR,
@@ -86,13 +88,19 @@
         [SCREEN_ON_WILL_APPEAR]: () =>
           dlog(`Stack: route "${route.name}" will appear at t=${Date.now()}`),
         [SCREEN_ON_APPEAR]: () => {
-          dlog(`Stack: route "${route.name}" appeared (focus) at t=${Date.now()}`);
+          dlog(
+            `Stack: route "${route.name}" appeared (focus) at t=${Date.now()}`,
+          );
           emitter.emit(NAVIGATION_EVENT_FOCUS);
         },
         [SCREEN_ON_WILL_DISAPPEAR]: () =>
-          dlog(`Stack: route "${route.name}" will disappear at t=${Date.now()}`),
+          dlog(
+            `Stack: route "${route.name}" will disappear at t=${Date.now()}`,
+          ),
         [SCREEN_ON_DISAPPEAR]: () => {
-          dlog(`Stack: route "${route.name}" disappeared (blur) at t=${Date.now()}`);
+          dlog(
+            `Stack: route "${route.name}" disappeared (blur) at t=${Date.now()}`,
+          );
           emitter.emit(NAVIGATION_EVENT_BLUR);
         },
       },
@@ -131,7 +139,9 @@
   // controller to attach to, so the header silently never renders. activityState mirrors the
   // outer screen's own value - RNSScreen.mm treats an unset/inactive nested screen as not yet
   // pushed, leaving it parked at its pre-push transition position.
-  const innerStackProps = $derived<Record<string, unknown>>({ style: plan.innerStackStyle });
+  const innerStackProps = $derived<Record<string, unknown>>({
+    style: plan.innerStackStyle,
+  });
   const innerScreenProps = $derived<Record<string, unknown>>({
     style: plan.innerScreenStyle,
     activityState: plan.activityState,
@@ -145,4 +155,51 @@
   });
 </script>
 
-{#snippet chrome()}<svelte:element this={RNS_SCREEN_STACK_HEADER_CONFIG_VIEW_NAME} {@attach hostProps(plan.headerConfig.props)}>{#if plan.searchBarProps !== undefined}<svelte:element this={RNS_SCREEN_STACK_HEADER_SUBVIEW_VIEW_NAME} {@attach hostProps(HEADER_SUBVIEW_PROPS)}><svelte:element this={RNS_SEARCH_BAR_VIEW_NAME} {@attach hostProps(plan.searchBarProps)} {@attach searchBarRef(searchBarOptions?.ref)}></svelte:element></svelte:element>{/if}</svelte:element><svelte:element this={RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME} {@attach hostProps(plan.contentWrapperProps)}><NavigationScope value={scopeValue}><ScreenComponent /></NavigationScope></svelte:element>{/snippet}<svelte:element this={plan.screenViewName} {@attach hostProps(plan.screenProps)}>{#if plan.inModal}<svelte:element this={RNS_SCREEN_STACK_VIEW_NAME} {@attach hostProps(innerStackProps)}><svelte:element this={RNS_SCREEN_VIEW_NAME} {@attach hostProps(innerScreenProps)}>{@render chrome()}</svelte:element></svelte:element>{:else}{@render chrome()}{/if}</svelte:element>
+{#snippet chrome()}
+  <svelte:element
+    this={RNS_SCREEN_STACK_HEADER_CONFIG_VIEW_NAME}
+    {@attach hostProps(plan.headerConfig.props)}
+  >
+    {#if plan.searchBarProps !== undefined}
+      <svelte:element
+        this={RNS_SCREEN_STACK_HEADER_SUBVIEW_VIEW_NAME}
+        {@attach hostProps(HEADER_SUBVIEW_PROPS)}
+      >
+        <svelte:element
+          this={RNS_SEARCH_BAR_VIEW_NAME}
+          {@attach hostProps(plan.searchBarProps)}
+          {@attach searchBarRef(searchBarOptions?.ref)}
+        />
+      </svelte:element>
+    {/if}
+  </svelte:element>
+  <svelte:element
+    this={RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME}
+    {@attach hostProps(plan.contentWrapperProps)}
+  >
+    <NavigationScope value={scopeValue}>
+      <ScreenComponent />
+    </NavigationScope>
+  </svelte:element>
+{/snippet}
+
+<svelte:element
+  this={plan.screenViewName}
+  {@attach hostProps(plan.screenProps)}
+>
+  {#if plan.inModal}
+    <svelte:element
+      this={RNS_SCREEN_STACK_VIEW_NAME}
+      {@attach hostProps(innerStackProps)}
+    >
+      <svelte:element
+        this={RNS_SCREEN_VIEW_NAME}
+        {@attach hostProps(innerScreenProps)}
+      >
+        {@render chrome()}
+      </svelte:element>
+    </svelte:element>
+  {:else}
+    {@render chrome()}
+  {/if}
+</svelte:element>

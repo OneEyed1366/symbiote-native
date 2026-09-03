@@ -53,6 +53,11 @@ export const RefreshControl: FC<IRefreshControlProps> = rawProps => {
   dlog(`RefreshControl refreshing=${String(props.refreshing)}`);
   if (props.enabled !== undefined)
     dlog(`RefreshControl enabled=${String(props.enabled)} (Android-only)`);
-  if (props.onRefresh !== undefined) dlog('RefreshControl onRefresh listener wired');
-  return createElement('symbiote-refresh-control', { ...nativeProps }, children);
+  if (props.onRefresh !== undefined)
+    dlog('RefreshControl onRefresh listener wired');
+  return createElement(
+    'symbiote-refresh-control',
+    { ...nativeProps },
+    children,
+  );
 };

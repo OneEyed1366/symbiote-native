@@ -45,7 +45,9 @@ export type IScreenCollector<TOptions> = {
 const SCREEN_COLLECTOR_KEY = Symbol('symbiote-navigation-screen-collector');
 
 // Called once from a navigator's own init, before it renders the children snippet.
-export function setScreenCollector<TOptions>(collector: IScreenCollector<TOptions>): void {
+export function setScreenCollector<TOptions>(
+  collector: IScreenCollector<TOptions>,
+): void {
   setContext(SCREEN_COLLECTOR_KEY, collector);
 }
 
@@ -55,9 +57,13 @@ export function collectScreen<TOptions>(
   kind: INavigatorKind,
   screen: IRegisteredScreen<TOptions>,
 ): void {
-  const collector = getContext<IScreenCollector<TOptions> | undefined>(SCREEN_COLLECTOR_KEY);
+  const collector = getContext<IScreenCollector<TOptions> | undefined>(
+    SCREEN_COLLECTOR_KEY,
+  );
   if (collector === undefined) {
-    dlog(`navigation: <${kind} screen "${screen.name}"> rendered outside any navigator, ignored`);
+    dlog(
+      `navigation: <${kind} screen "${screen.name}"> rendered outside any navigator, ignored`,
+    );
     return;
   }
   if (collector.kind !== kind) {

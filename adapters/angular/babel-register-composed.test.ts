@@ -96,7 +96,9 @@ describe('babel-register-composed', () => {
       expect(code).toMatch(
         /import \{ registerComposedComponent \} from ["']@symbiote-native\/angular["']/,
       );
-      expect(code).toMatch(/registerComposedComponent\(["']symbiote-descriptor-outlet["']\)/);
+      expect(code).toMatch(
+        /registerComposedComponent\(["']symbiote-descriptor-outlet["']\)/,
+      );
     });
 
     // why: a component can declare more than one selector (AnimatedView's dual
@@ -106,7 +108,9 @@ describe('babel-register-composed', () => {
     it('registers each token of a comma-separated multi-selector', () => {
       const code = run(MULTI_SELECTOR_SNIPPET);
       expect(code).toMatch(/registerComposedComponent\(["']AnimatedView["']\)/);
-      expect(code).toMatch(/registerComposedComponent\(["']symbiote-animated-view["']\)/);
+      expect(code).toMatch(
+        /registerComposedComponent\(["']symbiote-animated-view["']\)/,
+      );
     });
 
     // why: registering a real Fabric primitive (symbiote-view, ...) as an anchor host would be
@@ -124,7 +128,9 @@ describe('babel-register-composed', () => {
     it('does not duplicate an already-present registerComposedComponent import', () => {
       const code = run(ALREADY_IMPORTED_SNIPPET);
       expect(importCountOf(code)).toBe(1);
-      expect(code).toMatch(/registerComposedComponent\(["']symbiote-descriptor-outlet["']\)/);
+      expect(code).toMatch(
+        /registerComposedComponent\(["']symbiote-descriptor-outlet["']\)/,
+      );
     });
   });
 

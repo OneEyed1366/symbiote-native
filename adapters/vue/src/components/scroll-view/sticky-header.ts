@@ -93,7 +93,10 @@ export const ScrollViewStickyHeader = defineComponent({
     // Engine node -> shallowRef (identity rule); the un-measured identity stub until the
     // rebuild-interpolation effect below replaces it.
     const animatedTranslateY = shallowRef<AnimatedInterpolation>(
-      scrollAnimatedValue.interpolate({ inputRange: [-1, 0], outputRange: [0, 0] }),
+      scrollAnimatedValue.interpolate({
+        inputRange: [-1, 0],
+        outputRange: [0, 0],
+      }),
     );
 
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -103,11 +106,16 @@ export const ScrollViewStickyHeader = defineComponent({
 
     const inputs = (): IStickyReducerInputs => ({
       os: Platform.OS,
-      inverted: typeof attrs.inverted === 'boolean' ? attrs.inverted : undefined,
+      inverted:
+        typeof attrs.inverted === 'boolean' ? attrs.inverted : undefined,
       scrollViewHeight:
-        typeof attrs.scrollViewHeight === 'number' ? attrs.scrollViewHeight : undefined,
+        typeof attrs.scrollViewHeight === 'number'
+          ? attrs.scrollViewHeight
+          : undefined,
       nextHeaderLayoutY:
-        typeof attrs.nextHeaderLayoutY === 'number' ? attrs.nextHeaderLayoutY : undefined,
+        typeof attrs.nextHeaderLayoutY === 'number'
+          ? attrs.nextHeaderLayoutY
+          : undefined,
     });
 
     const runEffects = (effects: IStickyEffect[]): void => {
@@ -123,9 +131,12 @@ export const ScrollViewStickyHeader = defineComponent({
               inputRange: effect.inputRange,
               outputRange: effect.outputRange,
             });
-            listenerId = next.addListener(({ value }: { value: number | string }): void => {
-              if (typeof value === 'number') dispatch({ kind: 'animated-tick', value });
-            });
+            listenerId = next.addListener(
+              ({ value }: { value: number | string }): void => {
+                if (typeof value === 'number')
+                  dispatch({ kind: 'animated-tick', value });
+              },
+            );
             interpolation = next;
             animatedTranslateY.value = next;
             break;
@@ -172,12 +183,18 @@ export const ScrollViewStickyHeader = defineComponent({
       const y = readLayoutNumber(event, 'y');
       const height = readLayoutNumber(event, 'height');
       // Keep the previous value when a field is absent (RN sets state only on a defined read).
-      dispatch({ kind: 'layout', y: y ?? state.layoutY, height: height ?? state.layoutHeight });
+      dispatch({
+        kind: 'layout',
+        y: y ?? state.layoutY,
+        height: height ?? state.layoutHeight,
+      });
       const recorder = attrs.onLayout;
       if (isHandler(recorder)) recorder(event);
       const children = slots.default !== undefined ? slots.default() : [];
       const child = children[0];
-      const childOnLayout = isVNode(child) ? readChildOnLayout(child) : undefined;
+      const childOnLayout = isVNode(child)
+        ? readChildOnLayout(child)
+        : undefined;
       if (childOnLayout !== undefined) childOnLayout(event);
     };
 
@@ -228,14 +245,19 @@ export function wrapStickyHeaders(
   headerLayoutYs: ReadonlyMap<number, number>,
   onHeaderLayoutY: (index: number, y: number) => void,
 ): VNode[] {
-  if (stickyHeaderIndices === undefined || stickyHeaderIndices.length === 0) return children;
+  if (stickyHeaderIndices === undefined || stickyHeaderIndices.length === 0)
+    return children;
   const Wrapper = StickyHeaderComponent ?? ScrollViewStickyHeader;
   return children.map((child, index) => {
     const indexOfIndex = stickyHeaderIndices.indexOf(index);
     if (indexOfIndex === -1 || !isVNode(child)) return child;
     // The next flagged header's measured y. undefined until that header has measured (or for the last).
     const nextIndex = stickyHeaderIndices[indexOfIndex + 1];
-    const nextHeaderLayoutY = nextStickyHeaderY(stickyHeaderIndices, indexOfIndex, headerLayoutYs);
+    const nextHeaderLayoutY = nextStickyHeaderY(
+      stickyHeaderIndices,
+      indexOfIndex,
+      headerLayoutYs,
+    );
     dlog(
       `Vue ScrollView sticky-header wrap index=${index} next=${nextIndex} nextY=${nextHeaderLayoutY}`,
     );

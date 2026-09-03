@@ -10,7 +10,7 @@ import {
   type IButtonProps as ICoreButtonProps,
 } from '@symbiote-native/components';
 import type { IClassNameValue, ISymbioteEvent } from '@symbiote-native/engine';
-import { Text } from '../components';
+import { HOST_TEXT } from '../components';
 import { TouchableOpacity } from './touchable';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
@@ -38,7 +38,9 @@ function forwardAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
 // live there, so it's added locally, exactly like Image's IImageProps. Not in HANDLED above, so
 // it forwards via forwardAttrs onto the TouchableOpacity, which (after its own fix) routes it to
 // the same Animated.View `style` targets.
-export type IButtonProps = Omit<ICoreButtonProps, 'onPress'> & { class?: IClassNameValue };
+export type IButtonProps = Omit<ICoreButtonProps, 'onPress'> & {
+  class?: IClassNameValue;
+};
 
 type IButtonEmits = {
   press: (event: ISymbioteEvent) => boolean;
@@ -51,7 +53,8 @@ export const Button = defineComponent<IButtonProps, IButtonEmits>(
       const title = typeof attrs.title === 'string' ? attrs.title : '';
       const color = typeof attrs.color === 'string' ? attrs.color : undefined;
       const disabled = attrs.disabled === true ? true : undefined;
-      const touchSoundDisabled = attrs.touchSoundDisabled === true ? true : undefined;
+      const touchSoundDisabled =
+        attrs.touchSoundDisabled === true ? true : undefined;
 
       const textStyle = resolveButtonTextStyle(color, disabled);
 
@@ -68,7 +71,9 @@ export const Button = defineComponent<IButtonProps, IButtonEmits>(
         onPress: (event: ISymbioteEvent) => emit('press', event),
       };
       return h(TouchableOpacity, touchableProps, {
-        default: () => [h(Text, { style: textStyle }, () => title)],
+        // The intrinsic tag, not our <Text> component — see the note at HOST_VIEW. RN's Text
+        // defaults are seeded by the renderer for a bare tag (seedTextDefaults).
+        default: () => [h(HOST_TEXT, { style: textStyle }, title)],
       });
     };
   },

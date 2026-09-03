@@ -13,7 +13,10 @@ import {
 export type IListener<Measurement> = (measurement: Measurement) => void;
 
 export type INativeSensorModule<Measurement> = {
-  addListener(eventName: string, listener: IListener<Measurement>): EventSubscription;
+  addListener(
+    eventName: string,
+    listener: IListener<Measurement>,
+  ): EventSubscription;
   listenerCount(eventName: string): number;
   removeAllListeners(eventName: string): void;
   setUpdateInterval?(intervalMs: number): void;
@@ -33,7 +36,10 @@ export class DeviceSensor<Measurement> {
   readonly nativeModule: INativeSensorModule<Measurement>;
   readonly nativeEventName: string;
 
-  constructor(nativeModule: INativeSensorModule<Measurement>, nativeEventName: string) {
+  constructor(
+    nativeModule: INativeSensorModule<Measurement>,
+    nativeEventName: string,
+  ) {
     this.nativeModule = nativeModule;
     this.nativeEventName = nativeEventName;
   }

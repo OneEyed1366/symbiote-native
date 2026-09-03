@@ -36,14 +36,21 @@ function mergeProps(
 const fabric = installFabric();
 const installed: unknown = globalThis.nativeFabricUIManager;
 if (!isRecord(installed)) throw new Error('fabric slot was not installed');
-installed.cloneNodeWithNewProps = (node: IFakeNode, patch: Record<string, unknown>): IFakeNode => ({
+installed.cloneNodeWithNewProps = (
+  node: IFakeNode,
+  patch: Record<string, unknown>,
+): IFakeNode => ({
   ...node,
   props: mergeProps(node.props, patch),
 });
 installed.cloneNodeWithNewChildrenAndProps = (
   node: IFakeNode,
   patch: Record<string, unknown>,
-): IFakeNode => ({ ...node, props: mergeProps(node.props, patch), children: [] });
+): IFakeNode => ({
+  ...node,
+  props: mergeProps(node.props, patch),
+  children: [],
+});
 
 afterEach(() => unmount(ROOT_TAG));
 
@@ -86,7 +93,13 @@ describe('React TouchableOpacity style after mount', () => {
     setStyle?.({ margin: 2, borderWidth: 7 });
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    expect(committedStyleProp('borderWidth'), 'the new style must reach the view').toBe(7);
-    expect(committedStyleProp('margin'), 'and the changed value must be the new one').toBe(2);
+    expect(
+      committedStyleProp('borderWidth'),
+      'the new style must reach the view',
+    ).toBe(7);
+    expect(
+      committedStyleProp('margin'),
+      'and the changed value must be the new one',
+    ).toBe(2);
   });
 });

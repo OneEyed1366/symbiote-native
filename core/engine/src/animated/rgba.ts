@@ -25,7 +25,12 @@ export const DEFAULT_COLOR: IRgbaValue = { r: 0, g: 0, b: 0, a: 1 };
 export function normalizeColor(color: string | number): IRgbaValue | undefined {
   if (typeof color === 'number') {
     const c = color >>> 0;
-    return { r: (c >>> 24) & 255, g: (c >>> 16) & 255, b: (c >>> 8) & 255, a: (c & 255) / 255 };
+    return {
+      r: (c >>> 24) & 255,
+      g: (c >>> 16) & 255,
+      b: (c >>> 8) & 255,
+      a: (c & 255) / 255,
+    };
   }
   const trimmed = color.trim();
   if (trimmed.startsWith('#')) return parseHex(trimmed);
@@ -48,7 +53,12 @@ function parseHex(hex: string): IRgbaValue | undefined {
     return { r: (int >>> 16) & 255, g: (int >>> 8) & 255, b: int & 255, a: 1 };
   }
   const c = int >>> 0;
-  return { r: (c >>> 24) & 255, g: (c >>> 16) & 255, b: (c >>> 8) & 255, a: (c & 255) / 255 };
+  return {
+    r: (c >>> 24) & 255,
+    g: (c >>> 16) & 255,
+    b: (c >>> 8) & 255,
+    a: (c & 255) / 255,
+  };
 }
 
 function parseRgb(str: string): IRgbaValue | undefined {
@@ -56,5 +66,10 @@ function parseRgb(str: string): IRgbaValue | undefined {
   if (match === null) return undefined;
   const parts = match[1].split(',').map(part => Number.parseFloat(part.trim()));
   if (parts.length < 3 || parts.some(n => Number.isNaN(n))) return undefined;
-  return { r: parts[0], g: parts[1], b: parts[2], a: parts.length >= 4 ? parts[3] : 1 };
+  return {
+    r: parts[0],
+    g: parts[1],
+    b: parts[2],
+    a: parts.length >= 4 ? parts[3] : 1,
+  };
 }

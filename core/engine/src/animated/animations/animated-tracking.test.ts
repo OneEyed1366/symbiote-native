@@ -8,7 +8,11 @@
 // AnimatedNode pair and any driver factory; there is no invalid input this unit rejects.
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { AnimatedValue, AnimatedTracking, timing } from '@symbiote-native/engine';
+import {
+  AnimatedValue,
+  AnimatedTracking,
+  timing,
+} from '@symbiote-native/engine';
 import type { IAnimation, IEndCallback } from '@symbiote-native/engine';
 
 // Part A starts a real TimingAnimation (to prove the public wiring), which needs a host rAF. We
@@ -24,7 +28,11 @@ beforeAll(() => {
 // without advancing real frames.
 function instantTo(target: number): IAnimation {
   return {
-    start(_fromValue: number, onUpdate: (value: number) => void, onEnd: IEndCallback): void {
+    start(
+      _fromValue: number,
+      onUpdate: (value: number) => void,
+      onEnd: IEndCallback,
+    ): void {
       onUpdate(target);
       onEnd({ finished: true });
     },
@@ -60,7 +68,9 @@ describe('Animated tracking — Positive (mechanism)', () => {
     const follower = new AnimatedValue(0);
     const target = new AnimatedValue(10);
 
-    const tracking = new AnimatedTracking(follower, target, toValue => instantTo(toValue));
+    const tracking = new AnimatedTracking(follower, target, toValue =>
+      instantTo(toValue),
+    );
     follower.track(tracking);
     // track() immediately launches toward the target's current value.
     expect(follower.__getValue()).toBe(10);
@@ -84,10 +94,18 @@ describe('Animated tracking — Positive (mechanism)', () => {
     const firstTarget = new AnimatedValue(10);
     const secondTarget = new AnimatedValue(50);
 
-    follower.track(new AnimatedTracking(follower, firstTarget, toValue => instantTo(toValue)));
+    follower.track(
+      new AnimatedTracking(follower, firstTarget, toValue =>
+        instantTo(toValue),
+      ),
+    );
     expect(firstTarget.__getChildren()).toHaveLength(1);
 
-    follower.track(new AnimatedTracking(follower, secondTarget, toValue => instantTo(toValue)));
+    follower.track(
+      new AnimatedTracking(follower, secondTarget, toValue =>
+        instantTo(toValue),
+      ),
+    );
     expect(firstTarget.__getChildren()).toHaveLength(0); // detached from the old target
     expect(secondTarget.__getChildren()).toHaveLength(1);
     expect(follower.__getValue()).toBe(50); // chasing the NEW target's current value

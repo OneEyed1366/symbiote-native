@@ -7,7 +7,14 @@
 // `symbiote-view`/`symbiote-text` primitives via the shared render fn, so there is no
 // react-native-screens ViewConfig to register here - Tab needs no `../register` import.
 
-import { defineComponent, h, nextTick, onUnmounted, shallowRef, useId } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  nextTick,
+  onUnmounted,
+  shallowRef,
+  useId,
+} from '@vue/runtime-core';
 import type { VNode } from '@vue/runtime-core';
 import { descriptorToVue, normalizeVueAttrs } from '@symbiote-native/vue';
 import { dlog } from '@symbiote-native/engine';
@@ -72,7 +79,9 @@ function asTabOptionsOrResolver(value: unknown): ITabScreenProps['options'] {
   return asTabOptions(value);
 }
 
-function collectRegistry(vnodes: readonly VNode[]): Map<string, ITabRegistryEntry> {
+function collectRegistry(
+  vnodes: readonly VNode[],
+): Map<string, ITabRegistryEntry> {
   const registry = new Map<string, ITabRegistryEntry>();
   for (const vnode of vnodes) {
     if (vnode.type !== TabScreen || !isRecord(vnode.props)) continue;
@@ -94,7 +103,9 @@ function resolveTabOptions(
   screenOptions: ITabOptions | undefined,
 ): ITabOptions {
   const own =
-    typeof entry.options === 'function' ? entry.options(screenComponentProps) : entry.options;
+    typeof entry.options === 'function'
+      ? entry.options(screenComponentProps)
+      : entry.options;
   return { ...screenOptions, ...own };
 }
 
@@ -112,7 +123,9 @@ const TabImpl = defineComponent<ITabProps>(
     const ambientScopeRef = injectNavigationScope();
     const routeIdPrefix = useId();
 
-    function buildRoutes(registry: Map<string, ITabRegistryEntry>): IRoute<unknown>[] {
+    function buildRoutes(
+      registry: Map<string, ITabRegistryEntry>,
+    ): IRoute<unknown>[] {
       return Array.from(registry.entries()).map(([name, entry]) => ({
         key: `${routeIdPrefix}-${name}`,
         name,
@@ -122,7 +135,8 @@ const TabImpl = defineComponent<ITabProps>(
 
     const initialRegistry = collectRegistry(slots.default?.() ?? []);
     const initialRoutes = buildRoutes(initialRegistry);
-    if (initialRoutes.length === 0) dlog('Tab: no <Tab.Screen> children registered');
+    if (initialRoutes.length === 0)
+      dlog('Tab: no <Tab.Screen> children registered');
 
     // A <Tab.Screen> can appear or disappear after mount (a marker behind a v-if, a data-driven
     // screen list), so the route list is re-collected from the slot on every render and the
@@ -147,7 +161,10 @@ const TabImpl = defineComponent<ITabProps>(
     }
 
     function dispatch(action: ITabRouterAction): void {
-      dispatchedState.value = tabRouterReducer(resolveState(latestRoutes), action);
+      dispatchedState.value = tabRouterReducer(
+        resolveState(latestRoutes),
+        action,
+      );
     }
 
     const jumpTo = (name: string, params?: unknown): void =>
@@ -215,7 +232,8 @@ const TabImpl = defineComponent<ITabProps>(
     }
 
     onUnmounted(() => {
-      if (focusedRouteKey !== undefined) emitterFor(focusedRouteKey).emit(NAVIGATION_EVENT_BLUR);
+      if (focusedRouteKey !== undefined)
+        emitterFor(focusedRouteKey).emit(NAVIGATION_EVENT_BLUR);
     });
 
     return () => {
@@ -229,17 +247,27 @@ const TabImpl = defineComponent<ITabProps>(
       const state = resolveState(routes);
       syncFocus(state);
 
-      const focusedRoute: IRoute<unknown> | undefined = state.routes[state.index];
+      const focusedRoute: IRoute<unknown> | undefined =
+        state.routes[state.index];
 
       const items: ITabBarItemView[] = state.routes.map((route, index) => {
         const entry = registry.get(route.name);
         const focused = isFocusedRoute(index, state.index);
         if (entry === undefined) {
           dlog(`Tab: no screen registered for route name "${route.name}"`);
-          return { key: route.key, focused, label: route.name, passthrough: {} };
+          return {
+            key: route.key,
+            focused,
+            label: route.name,
+            passthrough: {},
+          };
         }
 
-        const options = resolveTabOptions(entry, { route, navigation: handle }, screenOptions);
+        const options = resolveTabOptions(
+          entry,
+          { route, navigation: handle },
+          screenOptions,
+        );
 
         return {
           key: route.key,
@@ -257,7 +285,9 @@ const TabImpl = defineComponent<ITabProps>(
         };
       });
 
-      const focusedEntry = focusedRoute ? registry.get(focusedRoute.name) : undefined;
+      const focusedEntry = focusedRoute
+        ? registry.get(focusedRoute.name)
+        : undefined;
       const focusedOptions: ITabOptions | undefined =
         focusedEntry && focusedRoute
           ? resolveTabOptions(
@@ -268,7 +298,11 @@ const TabImpl = defineComponent<ITabProps>(
           : screenOptions;
 
       const tabBar = descriptorToVue(
-        renderTabBar({ items, style: focusedOptions?.tabBarStyle, passthrough: {} }),
+        renderTabBar({
+          items,
+          style: focusedOptions?.tabBarStyle,
+          passthrough: {},
+        }),
       );
 
       // Only the focused route's screen is ever mounted (unlike Stack, which keeps every pushed
@@ -294,7 +328,11 @@ const TabImpl = defineComponent<ITabProps>(
           : null;
 
       return h('symbiote-view', { style: TAB_ROOT_STYLE }, [
-        h('symbiote-view', { style: TAB_CONTENT_STYLE }, content === null ? [] : [content]),
+        h(
+          'symbiote-view',
+          { style: TAB_CONTENT_STYLE },
+          content === null ? [] : [content],
+        ),
         tabBar,
       ]);
     };

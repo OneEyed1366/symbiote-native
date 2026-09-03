@@ -1,6 +1,12 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/vue';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
@@ -20,13 +26,23 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   return value ? 'yes' : 'no';
 }
 
-function CapabilityRow(props: { testID: string; label: string; status: ICapabilityStatus }) {
+function CapabilityRow(props: {
+  testID: string;
+  label: string;
+  status: ICapabilityStatus;
+}) {
   const text =
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
     <View testID={props.testID} class="secure-store-row">
       <Text class="secure-store-row-label">{props.label}</Text>
-      <View class={`secure-store-status-badge secure-store-status-badge-${props.status}`}>
+      <View
+        class={`secure-store-status-badge secure-store-status-badge-${props.status}`}
+      >
         <Text class="secure-store-status-text">{text}</Text>
       </View>
     </View>
@@ -112,7 +128,11 @@ export const SecureStoreScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="secure-store-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="secure-store-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -123,8 +143,9 @@ export const SecureStoreScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Secure Store</Text>
               <Text class="hero-body">
-                @symbiote-native/secure-store — encrypted key/value storage in the iOS Keychain and
-                the Android Keystore. Save a value, kill the app, relaunch, and read it back.
+                @symbiote-native/secure-store — encrypted key/value storage in
+                the iOS Keychain and the Android Keystore. Save a value, kill
+                the app, relaunch, and read it back.
               </Text>
             </View>
           </View>
@@ -153,7 +174,10 @@ export const SecureStoreScreen = defineComponent(
             </View>
             <View class="secure-store-row">
               <Text class="secure-store-row-label">Last result</Text>
-              <Text testID="secure-store-result" class="secure-store-value-text">
+              <Text
+                testID="secure-store-result"
+                class="secure-store-value-text"
+              >
                 {lastResult.value}
               </Text>
             </View>

@@ -25,10 +25,12 @@ export type IOrientation = 'portrait' | 'landscape';
 
 // A square window counts as portrait, matching the CSS `(orientation: portrait)` definition
 // (height >= width), not a coin flip.
-export const orientation: IReactiveValue<IOrientation> = createDimensionsValue(() => {
-  const { width, height } = Dimensions.get('window');
-  return height >= width ? 'portrait' : 'landscape';
-});
+export const orientation: IReactiveValue<IOrientation> = createDimensionsValue(
+  () => {
+    const { width, height } = Dimensions.get('window');
+    return height >= width ? 'portrait' : 'landscape';
+  },
+);
 
 // Both bounds are inclusive, matching CSS `(min-width: …)` / `(max-width: …)`. Widths are in
 // density-independent points — the same unit every style in this repo uses — not CSS pixels.
@@ -37,7 +39,9 @@ export interface IWidthQueryBounds {
   maxWidth?: number;
 }
 
-export function createWidthQuery(bounds: IWidthQueryBounds): IReactiveValue<boolean> {
+export function createWidthQuery(
+  bounds: IWidthQueryBounds,
+): IReactiveValue<boolean> {
   return createDimensionsValue(() => {
     const { width } = Dimensions.get('window');
     if (bounds.minWidth !== undefined && width < bounds.minWidth) return false;

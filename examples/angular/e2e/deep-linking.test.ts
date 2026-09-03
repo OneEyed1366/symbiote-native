@@ -60,7 +60,8 @@ async function bringMenuRowIntoView(id: string): Promise<void> {
 // sidesteps it entirely (see the symbiote-detox-e2e skill, wix/Detox #3130/#4747/#2229).
 async function deviceTap(id: string): Promise<void> {
   const attrs = await element(by.id(id)).getAttributes();
-  if (!('frame' in attrs)) throw new Error(`${id}: getAttributes() returned no frame`);
+  if (!('frame' in attrs))
+    throw new Error(`${id}: getAttributes() returned no frame`);
   const { x, y, width, height } = attrs.frame;
   await device.tap({ x: x + width / 2, y: y + height / 2 });
 }
@@ -71,7 +72,11 @@ async function elementText(id: string): Promise<string> {
   return '';
 }
 
-async function waitForText(id: string, matches: (text: string) => boolean, timeoutMs: number): Promise<void> {
+async function waitForText(
+  id: string,
+  matches: (text: string) => boolean,
+  timeoutMs: number,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let last = '';
   while (Date.now() < deadline) {
@@ -79,7 +84,9 @@ async function waitForText(id: string, matches: (text: string) => boolean, timeo
     if (matches(last)) return;
     await sleep(250);
   }
-  throw new Error(`${id} never matched within ${timeoutMs}ms; last text was "${last}"`);
+  throw new Error(
+    `${id} never matched within ${timeoutMs}ms; last text was "${last}"`,
+  );
 }
 
 // Same value as navigation-linking.ts's SAMPLE_DEEP_LINK_URL, inlined (like every other suite in
@@ -113,7 +120,11 @@ describe('Angular DeepLinking screen — in-app resolve', () => {
   });
 
   it('shows the placeholder before anything has been resolved', async () => {
-    await waitForText('deep-link-result', text => text === RESOLVE_PLACEHOLDER, 5_000);
+    await waitForText(
+      'deep-link-result',
+      text => text === RESOLVE_PLACEHOLDER,
+      5_000,
+    );
   });
 
   it('resolves a typed-in URL to its route on Resolve', async () => {

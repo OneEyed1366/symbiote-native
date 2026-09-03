@@ -1,7 +1,7 @@
 # @symbiote-native/vue
 
 The **Vue 3 adapter** for [SymbioteNative](../../README.md) — render real native iOS/Android views from
-Vue, on the *same* untouched core as React, with React Native's own renderer never in the path. It
+Vue, on the _same_ untouched core as React, with React Native's own renderer never in the path. It
 is a `@vue/runtime-core` `createRenderer` whose nodeOps map each mutation onto the engine's
 four-call API; `@symbiote-native/engine` does the clone-on-write commit into Fabric.
 
@@ -34,9 +34,23 @@ additionally needs a Metro transformer for `.vue` files (see
 
 ## Use it
 
-The native entry reaches the *same* `registerRunnable` seam as React — only the adapter changes. It
-hands the surface's `rootTag` to `mount` from `@symbiote-native/vue`, which drives the engine through Vue's
-`createRenderer`:
+The zero-config entry mirrors real Vue's own `createApp(App).mount(...)` idiom and wires the same
+RN-backed host seams React's `registerApp` does — this is what
+[`examples/vue-tsx`](../../examples/vue-tsx) and [`examples/vue-sfc`](../../examples/vue-sfc)
+actually use:
+
+```js
+// index.js
+import { createApp } from '@symbiote-native/vue/bootstrap';
+import App from './App';
+import { name as appName } from './app.json';
+
+createApp(App).mount(appName);
+```
+
+For anything the defaults don't cover, drive the lower-level seam directly — the same
+`registerRunnable` seam React uses, with `mount` from `@symbiote-native/vue` driving the engine
+through Vue's `createRenderer`:
 
 ```js
 // index.js
@@ -95,19 +109,19 @@ and each adapter supplies only its lifecycle (Vue's `ref`/`watch` + the descript
 The one deliberate gap is third-party **React component** packages such as
 `@react-native-community/slider` used directly. Their body calls React hooks off the React
 dispatcher, so they run only under the React adapter — under Vue the dispatcher is null and they
-throw. SymbioteNative makes the *native view* framework-agnostic, not the library's React *component*; such
+throw. SymbioteNative makes the _native view_ framework-agnostic, not the library's React _component_; such
 a view becomes reachable from Vue only through a thin wrapper over the same `createNode`-by-ViewConfig
 path SymbioteNative uses for its own primitives. `@symbiote-native/slider` (this repo's own wrapper around
-`@react-native-community/slider`) *does* ship a real Vue build (`@symbiote-native/slider/vue`) through
+`@react-native-community/slider`) _does_ ship a real Vue build (`@symbiote-native/slider/vue`) through
 exactly that path — it's what makes this one third-party native view usable from Vue at all; any
-*other* React-only component package stays React-adapter-only until it gets the same treatment.
+_other_ React-only component package stays React-adapter-only until it gets the same treatment.
 
 ---
 
 ## A Vue-specific gotcha — async commit timing
 
 Vue batches commits on a microtask (every mutation schedules one `completeRoot`), so a node's
-Fabric tag is assigned *after* `onMounted` / `watch(flush:'post')` runs. A native bind that reads
+Fabric tag is assigned _after_ `onMounted` / `watch(flush:'post')` runs. A native bind that reads
 the tag at lifecycle time (native-driver `Animated`, sticky-header scroll attach, `TextInput`
 autoFocus) would race the commit and silently no-op — while the JS-path headless test stays green.
 React doesn't hit this because `react-reconciler` commits synchronously.
@@ -115,7 +129,8 @@ React doesn't hit this because `react-reconciler` commits synchronously.
 The fix lives in the engine: `whenCommitted(node, action)` runs `action` now if the node already
 has a tag, else after the commit that assigns it. Any native/imperative call wired at Vue lifecycle
 time must go through it. This is the only place the Vue adapter's timing differs from React's; the
-implementation is in `core/engine/src/post-commit.ts`.
+implementation is `whenCommitted` in `core/engine/src/commit.ts`, built on the generic hook
+registry in `core/engine/src/post-commit.ts`.
 
 ---
 

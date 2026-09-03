@@ -6,7 +6,13 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import {
   AuthenticationType,
   SecurityLevel,
@@ -92,7 +98,9 @@ onMounted(() => {
 });
 
 const enrolledLevelText = computed(() =>
-  enrolledLevel.value === null ? 'checking…' : securityLevelLabel(enrolledLevel.value),
+  enrolledLevel.value === null
+    ? 'checking…'
+    : securityLevelLabel(enrolledLevel.value),
 );
 
 const supportedTypesText = computed(() => {
@@ -101,25 +109,33 @@ const supportedTypesText = computed(() => {
   return supportedTypes.value.map(authenticationTypeLabel).join(', ');
 });
 
-const authenticateButtonTitle = computed(() => (isAuthenticating.value ? 'Authenticating…' : 'Authenticate'));
+const authenticateButtonTitle = computed(() =>
+  isAuthenticating.value ? 'Authenticating…' : 'Authenticate',
+);
 
 const authResultClass = computed(() =>
-  authResult.value ? `auth-result auth-result-${authResult.value.success ? 'success' : 'error'}` : '',
+  authResult.value
+    ? `auth-result auth-result-${authResult.value.success ? 'success' : 'error'}`
+    : '',
 );
 
 const authResultText = computed(() => {
   if (!authResult.value) return '';
   if (authResult.value.success) return 'Success';
-  const warningSuffix = authResult.value.warning ? ` (${authResult.value.warning})` : '';
+  const warningSuffix = authResult.value.warning
+    ? ` (${authResult.value.warning})`
+    : '';
   return `Failed: ${authResult.value.error}${warningSuffix}`;
 });
 
 function handleAuthenticate(): void {
   isAuthenticating.value = true;
-  void authenticateAsync({ promptMessage: 'Confirm it is you' }).then(result => {
-    authResult.value = result;
-    isAuthenticating.value = false;
-  });
+  void authenticateAsync({ promptMessage: 'Confirm it is you' }).then(
+    result => {
+      authResult.value = result;
+      isAuthenticating.value = false;
+    },
+  );
 }
 
 function handleCancel(): void {
@@ -129,9 +145,15 @@ function handleCancel(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="local-auth-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="local-auth-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -140,9 +162,11 @@ function handleCancel(): void {
         <View class="hero-copy">
           <Text class="hero-title">Local auth</Text>
           <Text class="hero-body"
-            >@symbiote-native/local-auth — FaceID/TouchID on iOS, the Fingerprint/Biometric API on
-            Android. A simulator with no enrolled biometrics reports "not enrolled"; a real device
-            with FaceID/TouchID/fingerprint set up is needed to see a live prompt.</Text
+            >@symbiote-native/local-auth — FaceID/TouchID on iOS, the
+            Fingerprint/Biometric API on Android. A simulator with no enrolled
+            biometrics reports "not enrolled"; a real device with
+            FaceID/TouchID/fingerprint set up is needed to see a live
+            prompt.</Text
           >
         </View>
       </View>
@@ -155,7 +179,11 @@ function handleCancel(): void {
           <Text class="auth-capability-label">Hardware present</Text>
           <View :class="`auth-status-badge auth-status-badge-${hasHardware}`">
             <Text class="auth-status-text">{{
-              hasHardware === 'checking' ? 'CHECKING…' : hasHardware === 'yes' ? 'YES' : 'NO'
+              hasHardware === 'checking'
+                ? 'CHECKING…'
+                : hasHardware === 'yes'
+                  ? 'YES'
+                  : 'NO'
             }}</Text>
           </View>
         </View>
@@ -163,7 +191,11 @@ function handleCancel(): void {
           <Text class="auth-capability-label">Enrolled</Text>
           <View :class="`auth-status-badge auth-status-badge-${isEnrolled}`">
             <Text class="auth-status-text">{{
-              isEnrolled === 'checking' ? 'CHECKING…' : isEnrolled === 'yes' ? 'YES' : 'NO'
+              isEnrolled === 'checking'
+                ? 'CHECKING…'
+                : isEnrolled === 'yes'
+                  ? 'YES'
+                  : 'NO'
             }}</Text>
           </View>
         </View>
@@ -181,7 +213,10 @@ function handleCancel(): void {
         <View class="auth-card-header">
           <Text class="auth-card-title">Authenticate</Text>
         </View>
-        <Text class="info-text">Prompts FaceID/TouchID on iOS, or the Biometric/Fingerprint dialog on Android.</Text>
+        <Text class="info-text"
+          >Prompts FaceID/TouchID on iOS, or the Biometric/Fingerprint dialog on
+          Android.</Text
+        >
         <ActionButton
           testID="local-auth-authenticate-button"
           :title="authenticateButtonTitle"
@@ -195,7 +230,11 @@ function handleCancel(): void {
           :onPress="handleCancel"
           :color="lineColor"
         />
-        <View v-if="authResult" testID="local-auth-result" :class="authResultClass">
+        <View
+          v-if="authResult"
+          testID="local-auth-result"
+          :class="authResultClass"
+        >
           <Text class="auth-result-text">{{ authResultText }}</Text>
         </View>
       </View>

@@ -24,7 +24,9 @@ const TEXT_CHILD_MARK = '#';
 function shapeOf(children: readonly IDescriptorChild[]): string {
   return children
     .map(child =>
-      typeof child === 'string' ? TEXT_CHILD_MARK : `${child.type}(${shapeOf(child.children)})`,
+      typeof child === 'string'
+        ? TEXT_CHILD_MARK
+        : `${child.type}(${shapeOf(child.children)})`,
     )
     .join(',');
 }

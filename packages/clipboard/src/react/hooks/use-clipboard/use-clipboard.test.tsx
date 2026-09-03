@@ -17,7 +17,9 @@ import { ContentType } from '../../../core/types';
 const { addClipboardListener, remove } = vi.hoisted(() => {
   const remove = vi.fn();
   return {
-    addClipboardListener: vi.fn((_listener: (event: IClipboardEvent) => void) => ({ remove })),
+    addClipboardListener: vi.fn(
+      (_listener: (event: IClipboardEvent) => void) => ({ remove }),
+    ),
     remove,
   };
 });
@@ -61,7 +63,9 @@ describe('useClipboard (lifecycle wiring over core, no throwing path)', () => {
   it('updates to the latest event once the native listener fires', async () => {
     mount(ROOT_TAG, createElement(Probe));
 
-    const event: IClipboardEvent = { contentTypes: ['plain-text' as ContentType] };
+    const event: IClipboardEvent = {
+      contentTypes: ['plain-text' as ContentType],
+    };
     const listener = addClipboardListener.mock.calls[0][0];
     listener(event);
 

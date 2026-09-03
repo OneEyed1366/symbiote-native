@@ -44,9 +44,12 @@ export type IDrawerDescriptorMap = Record<
 // return this union since they don't know which navigator mounted the calling component; the
 // three guards below narrow it (used once, inside useStackNavigation/useTabNavigation/
 // useDrawerNavigation and their Vue/Angular equivalents) so app code never writes the guard itself.
-export type IAnyNavigatorHandle = INavigatorHandle | ITabNavigatorHandle | IDrawerNavigatorHandle;
+export type IAnyNavigatorHandle =
+  INavigatorHandle | ITabNavigatorHandle | IDrawerNavigatorHandle;
 
-export function isStackNavigatorHandle(handle: IAnyNavigatorHandle): handle is INavigatorHandle {
+export function isStackNavigatorHandle(
+  handle: IAnyNavigatorHandle,
+): handle is INavigatorHandle {
   return 'push' in handle;
 }
 
@@ -58,6 +61,8 @@ export function isDrawerNavigatorHandle(
 
 // jumpTo exists on both Tab and Drawer handles, so a Tab handle is a jumpTo-having handle that
 // isn't a Drawer handle (Drawer's own openDrawer/closeDrawer/toggleDrawer rule it out).
-export function isTabNavigatorHandle(handle: IAnyNavigatorHandle): handle is ITabNavigatorHandle {
+export function isTabNavigatorHandle(
+  handle: IAnyNavigatorHandle,
+): handle is ITabNavigatorHandle {
   return 'jumpTo' in handle && !isDrawerNavigatorHandle(handle);
 }

@@ -48,7 +48,10 @@ function isPresent<T>(value: unknown): value is T {
 }
 
 type IFakeAlertManager = {
-  alertWithArgs(args: ICapturedArgs, callback: (id: number, value: string) => void): void;
+  alertWithArgs(
+    args: ICapturedArgs,
+    callback: (id: number, value: string) => void,
+  ): void;
 };
 
 type IFakeDialogManagerAndroid = {
@@ -80,7 +83,10 @@ function fakeDialogManagerAndroid(): IFakeDialogManagerAndroid {
     },
     showAlert(config, _onError, onAction): void {
       capturedConfig = config;
-      onAction(ANDROID_CONSTANTS.buttonClicked, ANDROID_CONSTANTS.buttonPositive);
+      onAction(
+        ANDROID_CONSTANTS.buttonClicked,
+        ANDROID_CONSTANTS.buttonPositive,
+      );
     },
   };
 }
@@ -91,12 +97,16 @@ function installFakeModules(config: {
 }): void {
   globalThis.__turboModuleProxy = <T>(name: string): T | null => {
     if (name === 'AlertManager') {
-      return config.alert !== undefined && config.alert !== null && isPresent<T>(config.alert)
+      return config.alert !== undefined &&
+        config.alert !== null &&
+        isPresent<T>(config.alert)
         ? config.alert
         : null;
     }
     if (name === 'DialogManagerAndroid') {
-      return config.dialog !== undefined && config.dialog !== null && isPresent<T>(config.dialog)
+      return config.dialog !== undefined &&
+        config.dialog !== null &&
+        isPresent<T>(config.dialog)
         ? config.dialog
         : null;
     }
@@ -108,7 +118,10 @@ beforeEach(async () => {
   captured = null;
   capturedConfig = null;
 
-  installFakeModules({ alert: fakeAlertManager(), dialog: fakeDialogManagerAndroid() });
+  installFakeModules({
+    alert: fakeAlertManager(),
+    dialog: fakeDialogManagerAndroid(),
+  });
 
   vi.resetModules();
   ({ Alert: iosAlert } = await import('./index.ios'));
@@ -198,7 +211,9 @@ describe('Alert (iOS build -> AlertManager)', () => {
       installFakeModules({ alert: null });
       let pressed = false;
       expect(() =>
-        iosAlert.alert('t', 'm', [{ text: 'OK', onPress: () => (pressed = true) }]),
+        iosAlert.alert('t', 'm', [
+          { text: 'OK', onPress: () => (pressed = true) },
+        ]),
       ).not.toThrow();
       expect(pressed).toBe(false);
     });
@@ -279,9 +294,14 @@ describe('Alert (Android build -> DialogManagerAndroid)', () => {
       });
       let dismissed = false;
       let pressed = false;
-      androidAlert.alert('t', 'm', [{ text: 'OK', onPress: () => (pressed = true) }], {
-        onDismiss: () => (dismissed = true),
-      });
+      androidAlert.alert(
+        't',
+        'm',
+        [{ text: 'OK', onPress: () => (pressed = true) }],
+        {
+          onDismiss: () => (dismissed = true),
+        },
+      );
       expect(dismissed).toBe(true);
       expect(pressed).toBe(false);
     });
@@ -302,7 +322,9 @@ describe('Alert (Android build -> DialogManagerAndroid)', () => {
         },
       });
       let pressed = false;
-      androidAlert.alert('t', 'm', [{ text: 'OK', onPress: () => (pressed = true) }]);
+      androidAlert.alert('t', 'm', [
+        { text: 'OK', onPress: () => (pressed = true) },
+      ]);
       expect(pressed).toBe(true);
     });
 
@@ -318,7 +340,9 @@ describe('Alert (Android build -> DialogManagerAndroid)', () => {
       installFakeModules({ dialog: null });
       let pressed = false;
       expect(() =>
-        androidAlert.alert('t', 'm', [{ text: 'OK', onPress: () => (pressed = true) }]),
+        androidAlert.alert('t', 'm', [
+          { text: 'OK', onPress: () => (pressed = true) },
+        ]),
       ).not.toThrow();
       expect(pressed).toBe(false);
     });

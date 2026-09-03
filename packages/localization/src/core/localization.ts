@@ -42,4 +42,5 @@ export const getLocales: () => Locale[] = ExpoLocalizationModule.getLocales;
  * }]
  * ```
  */
-export const getCalendars: () => Calendar[] = ExpoLocalizationModule.getCalendars;
+export const getCalendars: () => Calendar[] =
+  ExpoLocalizationModule.getCalendars;

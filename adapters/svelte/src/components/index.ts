@@ -68,10 +68,16 @@ export type {
 } from './virtualized-list/virtualized-list-props';
 
 export { default as FlatList } from './flat-list/index.svelte';
-export type { IFlatListProps, IFlatListHandle } from './flat-list/flat-list-props';
+export type {
+  IFlatListProps,
+  IFlatListHandle,
+} from './flat-list/flat-list-props';
 
 export { default as VirtualizedSectionList } from './virtualized-section-list/index.svelte';
 export type { IVirtualizedSectionListProps } from './virtualized-section-list/virtualized-section-list-props';
 
 export { default as SectionList } from './section-list/index.svelte';
-export type { ISectionListProps, ISection } from './section-list/section-list-props';
+export type {
+  ISectionListProps,
+  ISection,
+} from './section-list/section-list-props';

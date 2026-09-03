@@ -7,7 +7,11 @@
 import { isOpaqueColorValue, processColor } from '../platform-color';
 import { dlog } from '../debug';
 import { isRecord } from '../type-guards';
-import type { IRadialGradientPosition, IRadialGradientShape, IRadialGradientSize } from '../styles';
+import type {
+  IRadialGradientPosition,
+  IRadialGradientShape,
+  IRadialGradientSize,
+} from '../styles';
 
 // RN processBackgroundImage.js: pre-compiled patterns.
 const NEWLINE_REGEX = /\n/g;
@@ -18,20 +22,30 @@ const COLOR_STOP_PARTS_REGEX = /\S+\([^)]*\)|\S+/g;
 const WHITESPACE_NORMALIZE_REGEX = /\s+/g;
 const LINEAR_GRADIENT_DIRECTION_REGEX =
   /^to\s+(?:top|bottom|left|right)(?:\s+(?:top|bottom|left|right))?/i;
-const LINEAR_GRADIENT_ANGLE_UNIT_REGEX = /^([+-]?\d*\.?\d+)(deg|grad|rad|turn)$/i;
+const LINEAR_GRADIENT_ANGLE_UNIT_REGEX =
+  /^([+-]?\d*\.?\d+)(deg|grad|rad|turn)$/i;
 
 type ILinearGradientDirection =
   { type: 'angle'; value: number } | { type: 'keyword'; value: string };
 
-const LINEAR_GRADIENT_DEFAULT_DIRECTION: ILinearGradientDirection = { type: 'angle', value: 180 };
+const LINEAR_GRADIENT_DEFAULT_DIRECTION: ILinearGradientDirection = {
+  type: 'angle',
+  value: 180,
+};
 const DEFAULT_RADIAL_SHAPE: IRadialGradientShape = 'ellipse';
 const DEFAULT_RADIAL_SIZE: IRadialGradientSize = 'farthest-corner';
-const DEFAULT_RADIAL_POSITION: IRadialGradientPosition = { top: '50%', left: '50%' };
+const DEFAULT_RADIAL_POSITION: IRadialGradientPosition = {
+  top: '50%',
+  left: '50%',
+};
 
 // A parsed color stop: `color` is whatever the platform color processor returns (a platform int
 // on a real host) or `null` for the transition-hint syntax (`red, 20%, blue`); `position` is a
 // resolved px number, a `'50%'` string, or `null` when the stop carries no explicit position.
-export type IParsedColorStop = { color: unknown; position: number | string | null };
+export type IParsedColorStop = {
+  color: unknown;
+  position: number | string | null;
+};
 
 export type IParsedLinearGradient = {
   type: 'linear-gradient';
@@ -47,7 +61,8 @@ export type IParsedRadialGradient = {
   colorStops: ReadonlyArray<IParsedColorStop>;
 };
 
-export type IParsedBackgroundImage = IParsedLinearGradient | IParsedRadialGradient;
+export type IParsedBackgroundImage =
+  IParsedLinearGradient | IParsedRadialGradient;
 
 // The structured input shape: mirrors react's BackgroundImageValue but declared locally to avoid
 // a cross-package import cycle (shared must not depend on @symbiote-native/react). Read loosely: callers
@@ -61,20 +76,26 @@ function isStringOrNumber(value: unknown): value is string | number {
 
 // A color-stop position is a plain px number or a percentage string; anything else is invalid.
 function isPositionValue(value: unknown): value is number | string {
-  return typeof value === 'number' || (typeof value === 'string' && value.endsWith('%'));
+  return (
+    typeof value === 'number' ||
+    (typeof value === 'string' && value.endsWith('%'))
+  );
 }
 
 // A gradient color may already be a platform int (array form) or a CSS string/PlatformColor
 // object needing processColor; mirrors process-box-shadow's processShadowColor.
 function processStopColor(color: unknown): unknown {
   if (typeof color === 'number') return color;
-  if (typeof color === 'string' || isOpaqueColorValue(color)) return processColor(color);
+  if (typeof color === 'string' || isOpaqueColorValue(color))
+    return processColor(color);
   return null;
 }
 
 // RN processBackgroundImage.js's `getPositionFromCSSValue`: `px` resolves to a plain number,
 // `%` stays a string, anything else is unresolvable (returns undefined, like RN's fallthrough).
-function getPositionFromCSSValue(position: string): number | string | undefined {
+function getPositionFromCSSValue(
+  position: string,
+): number | string | undefined {
   if (position.endsWith('px')) return parseFloat(position);
   if (position.endsWith('%')) return position;
   return undefined;
@@ -99,8 +120,12 @@ function getAngleInDegrees(angle: string): number | null {
   }
 }
 
-function getDirectionForKeyword(direction: string): ILinearGradientDirection | null {
-  const normalized = direction.replace(WHITESPACE_NORMALIZE_REGEX, ' ').toLowerCase();
+function getDirectionForKeyword(
+  direction: string,
+): ILinearGradientDirection | null {
+  const normalized = direction
+    .replace(WHITESPACE_NORMALIZE_REGEX, ' ')
+    .toLowerCase();
 
   switch (normalized) {
     case 'to top':
@@ -146,22 +171,32 @@ function resolveRadialSize(value: unknown): IRadialGradientSize | null {
   ) {
     return value;
   }
-  if (isRecord(value) && isStringOrNumber(value.x) && isStringOrNumber(value.y)) {
+  if (
+    isRecord(value) &&
+    isStringOrNumber(value.x) &&
+    isStringOrNumber(value.y)
+  ) {
     return { x: value.x, y: value.y };
   }
   return null;
 }
 
-function isRadialPositionValue(value: unknown): value is IRadialGradientPosition {
+function isRadialPositionValue(
+  value: unknown,
+): value is IRadialGradientPosition {
   if (!isRecord(value)) return false;
-  const hasVertical = isStringOrNumber(value.top) || isStringOrNumber(value.bottom);
-  const hasHorizontal = isStringOrNumber(value.left) || isStringOrNumber(value.right);
+  const hasVertical =
+    isStringOrNumber(value.top) || isStringOrNumber(value.bottom);
+  const hasHorizontal =
+    isStringOrNumber(value.left) || isStringOrNumber(value.right);
   return hasVertical && hasHorizontal;
 }
 
 // RN processBackgroundImage.js's `processColorStops`. Returns `null` on any invalid stop (web
 // semantics: an invalid gradient applies none of it, same as processBoxShadow/processFilter).
-function processColorStopsArray(rawColorStops: unknown): IParsedColorStop[] | null {
+function processColorStopsArray(
+  rawColorStops: unknown,
+): IParsedColorStop[] | null {
   if (!Array.isArray(rawColorStops)) return null;
   const processed: IParsedColorStop[] = [];
 
@@ -170,7 +205,11 @@ function processColorStopsArray(rawColorStops: unknown): IParsedColorStop[] | nu
     const positions = rawStop.positions;
 
     // Color transition hint syntax (`red, 20%, blue`): a position with no color of its own.
-    if (rawStop.color == null && Array.isArray(positions) && positions.length === 1) {
+    if (
+      rawStop.color == null &&
+      Array.isArray(positions) &&
+      positions.length === 1
+    ) {
       const position = positions[0];
       if (!isPositionValue(position)) return null;
       processed.push({ color: null, position });
@@ -210,13 +249,16 @@ function processBackgroundImageArray(
     if (rawBgImage.type === 'linear-gradient') {
       let direction = LINEAR_GRADIENT_DEFAULT_DIRECTION;
       const rawDirection = rawBgImage.direction;
-      const bgDirection = typeof rawDirection === 'string' ? rawDirection.toLowerCase() : null;
+      const bgDirection =
+        typeof rawDirection === 'string' ? rawDirection.toLowerCase() : null;
 
       if (bgDirection != null) {
         if (LINEAR_GRADIENT_ANGLE_UNIT_REGEX.test(bgDirection)) {
           const parsedAngle = getAngleInDegrees(bgDirection);
           if (parsedAngle == null) {
-            dlog(`processBackgroundImage reject: invalid linear-gradient angle "${bgDirection}"`);
+            dlog(
+              `processBackgroundImage reject: invalid linear-gradient angle "${bgDirection}"`,
+            );
             return [];
           }
           direction = { type: 'angle', value: parsedAngle };
@@ -230,7 +272,9 @@ function processBackgroundImageArray(
           }
           direction = parsedDirection;
         } else {
-          dlog(`processBackgroundImage reject: invalid linear-gradient direction "${bgDirection}"`);
+          dlog(
+            `processBackgroundImage reject: invalid linear-gradient direction "${bgDirection}"`,
+          );
           return [];
         }
       }
@@ -254,7 +298,13 @@ function processBackgroundImageArray(
         ? rawBgImage.position
         : DEFAULT_RADIAL_POSITION;
 
-      result.push({ type: 'radial-gradient', shape, size, position, colorStops });
+      result.push({
+        type: 'radial-gradient',
+        shape,
+        size,
+        position,
+        colorStops,
+      });
     }
   }
 
@@ -291,7 +341,9 @@ function splitGradients(input: string): string[] {
   return result;
 }
 
-function parseColorStopsCSSString(parts: ReadonlyArray<string>): IParsedColorStop[] | null {
+function parseColorStopsCSSString(
+  parts: ReadonlyArray<string>,
+): IParsedColorStop[] | null {
   const stops = parts.join(',').split(COMMA_SPLIT_REGEX);
   const colorStops: IParsedColorStop[] = [];
   let prevStopParts: RegExpMatchArray | null = null;
@@ -305,7 +357,8 @@ function parseColorStopsCSSString(parts: ReadonlyArray<string>): IParsedColorSto
       const position1 = getPositionFromCSSValue(colorStopParts[1]!);
       const position2 = getPositionFromCSSValue(colorStopParts[2]!);
       const processedColor = processStopColor(colorStopParts[0]!);
-      if (processedColor == null || position1 == null || position2 == null) return null;
+      if (processedColor == null || position1 == null || position2 == null)
+        return null;
       colorStops.push({ color: processedColor, position: position1 });
       colorStops.push({ color: processedColor, position: position2 });
     } else if (colorStopParts.length === 2) {
@@ -321,7 +374,8 @@ function parseColorStopsCSSString(parts: ReadonlyArray<string>): IParsedColorSto
           prevStopParts != null &&
           prevStopParts.length === 1 &&
           getPositionFromCSSValue(prevStopParts[0]!) != null;
-        if (prevWasPositionOnly || i === stops.length - 1 || i === 0) return null;
+        if (prevWasPositionOnly || i === stops.length - 1 || i === 0)
+          return null;
         colorStops.push({ color: null, position });
       } else {
         const processedColor = processStopColor(colorStopParts[0]!);
@@ -338,7 +392,9 @@ function parseColorStopsCSSString(parts: ReadonlyArray<string>): IParsedColorSto
   return colorStops;
 }
 
-function parseLinearGradientCSSString(gradientContent: string): IParsedLinearGradient | null {
+function parseLinearGradientCSSString(
+  gradientContent: string,
+): IParsedLinearGradient | null {
   const parts = gradientContent.split(',');
   let direction = LINEAR_GRADIENT_DEFAULT_DIRECTION;
   const trimmedDirection = (parts[0] ?? '').trim().toLowerCase();
@@ -364,7 +420,9 @@ function parseLinearGradientCSSString(gradientContent: string): IParsedLinearGra
 // The `at <position>` clause of `radial-gradient(... at <position>, <color-stops>)`. Drains
 // `tokens` (the SAME queue the caller is walking) via `shift()`, mirroring RN's in-place mutation
 // of `firstPartTokens` - not a copy, so the caller sees it emptied after this returns.
-function parseRadialGradientPositionTokens(tokens: string[]): IRadialGradientPosition | null {
+function parseRadialGradientPositionTokens(
+  tokens: string[],
+): IRadialGradientPosition | null {
   if (tokens.length === 0) return null;
 
   let top: string | number | undefined;
@@ -412,10 +470,16 @@ function parseRadialGradientPositionTokens(tokens: string[]): IRadialGradientPos
     const horizontalPositions = ['left', 'center', 'right'];
     const verticalPositions = ['top', 'center', 'bottom'];
 
-    if (horizontalPositions.includes(token1) && verticalPositions.includes(token2)) {
+    if (
+      horizontalPositions.includes(token1) &&
+      verticalPositions.includes(token2)
+    ) {
       left = token1 === 'left' ? '0%' : token1 === 'center' ? '50%' : '100%';
       top = token2 === 'top' ? '0%' : token2 === 'center' ? '50%' : '100%';
-    } else if (verticalPositions.includes(token1) && horizontalPositions.includes(token2)) {
+    } else if (
+      verticalPositions.includes(token1) &&
+      horizontalPositions.includes(token2)
+    ) {
       left = token2 === 'left' ? '0%' : token2 === 'center' ? '50%' : '100%';
       top = token1 === 'top' ? '0%' : token1 === 'center' ? '50%' : '100%';
     } else {
@@ -470,7 +534,9 @@ function parseRadialGradientPositionTokens(tokens: string[]): IRadialGradientPos
   return null;
 }
 
-function parseRadialGradientCSSString(gradientContent: string): IParsedRadialGradient | null {
+function parseRadialGradientCSSString(
+  gradientContent: string,
+): IParsedRadialGradient | null {
   let shape = DEFAULT_RADIAL_SHAPE;
   let size = DEFAULT_RADIAL_SIZE;
   let position: IRadialGradientPosition = { ...DEFAULT_RADIAL_POSITION };
@@ -502,7 +568,8 @@ function parseRadialGradientCSSString(gradientContent: string): IParsedRadialGra
       hasShapeSizeOrPositionString = true;
     } else if (tokenTrimmed.endsWith('px') || tokenTrimmed.endsWith('%')) {
       const sizeX = getPositionFromCSSValue(tokenTrimmed);
-      if (sizeX == null || (typeof sizeX === 'number' && sizeX < 0)) return null;
+      if (sizeX == null || (typeof sizeX === 'number' && sizeX < 0))
+        return null;
       hasShapeSizeOrPositionString = true;
       size = { x: sizeX, y: sizeX };
 
@@ -514,7 +581,8 @@ function parseRadialGradientCSSString(gradientContent: string): IParsedRadialGra
       tokenTrimmed = token.toLowerCase().trim();
       if (tokenTrimmed.endsWith('px') || tokenTrimmed.endsWith('%')) {
         const sizeY = getPositionFromCSSValue(tokenTrimmed);
-        if (sizeY == null || (typeof sizeY === 'number' && sizeY < 0)) return null;
+        if (sizeY == null || (typeof sizeY === 'number' && sizeY < 0))
+          return null;
         size = { x: sizeX, y: sizeY };
       } else {
         hasExplicitSingleSize = true;
@@ -535,7 +603,8 @@ function parseRadialGradientCSSString(gradientContent: string): IParsedRadialGra
   if (hasShapeSizeOrPositionString) {
     remainingParts.shift();
     if (!hasExplicitShape && hasExplicitSingleSize) shape = 'circle';
-    if (hasExplicitSingleSize && hasExplicitShape && shape === 'ellipse') return null;
+    if (hasExplicitSingleSize && hasExplicitShape && shape === 'ellipse')
+      return null;
   }
 
   const colorStops = parseColorStopsCSSString(remainingParts);
@@ -544,7 +613,9 @@ function parseRadialGradientCSSString(gradientContent: string): IParsedRadialGra
   return { type: 'radial-gradient', shape, size, position, colorStops };
 }
 
-function parseBackgroundImageCSSString(cssString: string): IParsedBackgroundImage[] {
+function parseBackgroundImageCSSString(
+  cssString: string,
+): IParsedBackgroundImage[] {
   const gradients: IParsedBackgroundImage[] = [];
 
   for (const bgImageString of splitGradients(cssString)) {
@@ -572,7 +643,9 @@ export function processBackgroundImage(
 ): IParsedBackgroundImage[] {
   if (backgroundImage == null) return [];
   if (typeof backgroundImage === 'string') {
-    return parseBackgroundImageCSSString(backgroundImage.replace(NEWLINE_REGEX, ' '));
+    return parseBackgroundImageCSSString(
+      backgroundImage.replace(NEWLINE_REGEX, ' '),
+    );
   }
   return processBackgroundImageArray(backgroundImage);
 }

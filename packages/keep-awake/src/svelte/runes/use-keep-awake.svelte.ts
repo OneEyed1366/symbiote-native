@@ -13,7 +13,11 @@
 //
 // No `useId` in Svelte, so the default tag comes from a module-local counter, as in Vue's
 // composable.
-import { activateKeepAwakeAsync, deactivateKeepAwake, type KeepAwakeOptions } from '../../core';
+import {
+  activateKeepAwakeAsync,
+  deactivateKeepAwake,
+  type KeepAwakeOptions,
+} from '../../core';
 import { createKeepAwakeListenerAttachment } from '../../core/listener-attachment';
 
 let tagCounter = 0;
@@ -23,7 +27,10 @@ export function useKeepAwake(tag?: string, options?: KeepAwakeOptions): void {
 
   $effect(() => {
     // Inside the effect, so the attachment shares the teardown returned below.
-    const attachment = createKeepAwakeListenerAttachment(tagOrDefault, options?.listener);
+    const attachment = createKeepAwakeListenerAttachment(
+      tagOrDefault,
+      options?.listener,
+    );
 
     activateKeepAwakeAsync(tagOrDefault)
       .then(() => attachment.attach())

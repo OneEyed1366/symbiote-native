@@ -31,7 +31,11 @@ async function elementText(id: string): Promise<string> {
 // in this file round-trips through a native onPress/onFocus/onChangeText callback into
 // navigation.setParams() and back through injectRoute() before the Text node recommits - a bare
 // expect right after a .tap() would race that, so every assertion below goes through this poll.
-async function waitForText(id: string, matches: (text: string) => boolean, timeoutMs: number): Promise<void> {
+async function waitForText(
+  id: string,
+  matches: (text: string) => boolean,
+  timeoutMs: number,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let last = '';
   while (Date.now() < deadline) {
@@ -39,7 +43,9 @@ async function waitForText(id: string, matches: (text: string) => boolean, timeo
     if (matches(last)) return;
     await sleep(250);
   }
-  throw new Error(`${id} never matched within ${timeoutMs}ms; last text was "${last}"`);
+  throw new Error(
+    `${id} never matched within ${timeoutMs}ms; last text was "${last}"`,
+  );
 }
 
 describe('Angular HeaderOptions screen', () => {
@@ -66,7 +72,11 @@ describe('Angular HeaderOptions screen', () => {
       .toBeVisible()
       .withTimeout(10_000);
     await element(by.text('Info')).tap();
-    await waitForText('header-last-action', text => text.includes('left bar button: Info'), 10_000);
+    await waitForText(
+      'header-last-action',
+      text => text.includes('left bar button: Info'),
+      10_000,
+    );
   });
 
   // Least-proven interaction in this file: 'More' opens a native UIMenu (iOS context menu), a
@@ -80,7 +90,11 @@ describe('Angular HeaderOptions screen', () => {
       .toBeVisible()
       .withTimeout(5_000);
     await element(by.text('Share')).tap();
-    await waitForText('header-last-action', text => text.includes('menu: Share'), 10_000);
+    await waitForText(
+      'header-last-action',
+      text => text.includes('menu: Share'),
+      10_000,
+    );
   });
 
   // SKIPPED: search-bar-focus sits well inside the viewport (view bounds y=505 of an 874pt
@@ -106,13 +120,21 @@ describe('Angular HeaderOptions screen', () => {
       .withTimeout(10_000);
 
     await element(by.id('search-bar-focus')).tap();
-    await waitForText('header-search-event', text => text.includes('focused'), 10_000);
+    await waitForText(
+      'header-search-event',
+      text => text.includes('focused'),
+      10_000,
+    );
 
     await element(by.id('search-bar-set-text')).tap();
     // Proves setText fires the search bar's onChangeText callback, not just a visual native
     // update - if header-search-text never picks up 'preset value', that's a real product gap in
     // the SearchBarCommands wiring, not a test bug; report it rather than loosening this assert.
-    await waitForText('header-search-text', text => text.includes('preset value'), 10_000);
+    await waitForText(
+      'header-search-text',
+      text => text.includes('preset value'),
+      10_000,
+    );
 
     await element(by.id('search-bar-clear')).tap();
     // clearText's exact onChangeText payload (empty string vs no callback at all) isn't confirmed
@@ -120,9 +142,17 @@ describe('Angular HeaderOptions screen', () => {
     // dispatched, not react-native-screens' native-side behavior. Asserting the observable
     // contract that matters here (the stale 'preset value' readout is gone), not a specific empty
     // string - if it stays stuck on 'preset value', that's the behavior to report, not paper over.
-    await waitForText('header-search-text', text => !text.includes('preset value'), 10_000);
+    await waitForText(
+      'header-search-text',
+      text => !text.includes('preset value'),
+      10_000,
+    );
 
     await element(by.id('search-bar-cancel')).tap();
-    await waitForText('header-search-event', text => text.includes('cancel pressed'), 10_000);
+    await waitForText(
+      'header-search-event',
+      text => text.includes('cancel pressed'),
+      10_000,
+    );
   });
 });

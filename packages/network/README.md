@@ -3,7 +3,7 @@
 Port of [`expo-network`](https://docs.expo.dev/versions/latest/sdk/network/) for
 [SymbioteNative](../../README.md) — network connection state (type/connected/internet-reachable)
 with a change listener, device IP address, and airplane-mode detection, reachable from every
-adapter (React, Vue, Angular), not just React.
+adapter (React, Vue, Svelte, Solid, Angular), not just React.
 
 Built the same way as [`@symbiote-native/battery`](../battery) and
 [`@symbiote-native/local-auth`](../local-auth), an `expo-modules-core`-based wrapper (see the
@@ -31,12 +31,12 @@ into the native host app **once**, covering this package and every other `expo-m
 package (`@symbiote-native/battery`, `@symbiote-native/sensors`, `@symbiote-native/local-auth`)
 with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
@@ -56,37 +56,50 @@ src/core/               network.ts — get*Async functions + addNetworkStateList
                         NetworkStateEvent, hand-ported from Network.types.ts.
 src/react/hooks/        @symbiote-native/network/react   — useNetworkState
 src/vue/composables/    @symbiote-native/network/vue     — useNetworkState (same name)
+src/svelte/runes/       @symbiote-native/network/svelte  — useNetworkState (same name)
+src/solid/primitives/   @symbiote-native/network/solid   — createNetworkState (returns an
+                        Accessor; Solid reserves `use*` for consuming existing state)
 src/angular/services/   @symbiote-native/network/angular — NetworkStateService (`.connect()`
                         returns a Signal)
 ```
 
-Each adapter's hook/composable/service is a thin lifecycle wrapper (seed from the one-shot
-`getNetworkStateAsync()` call, subscribe to `addNetworkStateListener`, unsubscribe on unmount) over
-the same `core` functions — the subscription logic is written once and shared by all three.
+Each adapter's hook/composable/rune/primitive/service is a thin lifecycle wrapper (seed from the
+one-shot `getNetworkStateAsync()` call, subscribe to `addNetworkStateListener`, unsubscribe on
+unmount) over the same `core` functions — the subscription logic is written once and shared by all
+of them.
 
 ## Use it
 
 ```tsx
 // React — examples/expo-react/screens/NetworkScreen.tsx
 import { useEffect, useState } from 'react';
-import { getIpAddressAsync, isAirplaneModeEnabledAsync } from '@symbiote-native/network';
+import {
+  getIpAddressAsync,
+  isAirplaneModeEnabledAsync,
+} from '@symbiote-native/network';
 import { useNetworkState } from '@symbiote-native/network/react';
 
 function NetworkScreen() {
-  const networkState = useNetworkState();          // { type, isConnected, isInternetReachable }
+  const networkState = useNetworkState(); // { type, isConnected, isInternetReachable }
   const [ipAddress, setIpAddress] = useState<string | null>(null);
   const [isAirplaneMode, setIsAirplaneMode] = useState<boolean | null>(null);
 
   useEffect(() => {
-    Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(([ip, airplaneMode]) => {
-      setIpAddress(ip);
-      setIsAirplaneMode(airplaneMode);
-    });
+    Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
+      ([ip, airplaneMode]) => {
+        setIpAddress(ip);
+        setIsAirplaneMode(airplaneMode);
+      },
+    );
   }, [networkState]);
 
   return (
     <>
-      <Text>{networkState.isConnected ? `Connected via ${networkState.type}` : 'Offline'}</Text>
+      <Text>
+        {networkState.isConnected
+          ? `Connected via ${networkState.type}`
+          : 'Offline'}
+      </Text>
       <Text>{ipAddress ?? 'checking…'}</Text>
       <Text>{isAirplaneMode ? 'Airplane mode: On' : 'Airplane mode: Off'}</Text>
     </>
@@ -99,28 +112,66 @@ function NetworkScreen() {
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { Text } from '@symbiote-native/vue';
-import { getIpAddressAsync, isAirplaneModeEnabledAsync } from '@symbiote-native/network';
+import {
+  getIpAddressAsync,
+  isAirplaneModeEnabledAsync,
+} from '@symbiote-native/network';
 import { useNetworkState } from '@symbiote-native/network/vue';
 
-const networkState = useNetworkState();           // Ref<NetworkState>
+const networkState = useNetworkState(); // Ref<NetworkState>
 const ipAddress = ref<string | null>(null);
 const isAirplaneMode = ref<boolean | null>(null);
 
 watch(
   networkState,
   () => {
-    void Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(([ip, airplaneMode]) => {
-      ipAddress.value = ip;
-      isAirplaneMode.value = airplaneMode;
-    });
+    void Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
+      ([ip, airplaneMode]) => {
+        ipAddress.value = ip;
+        isAirplaneMode.value = airplaneMode;
+      },
+    );
   },
   { immediate: true },
 );
 </script>
 <template>
-  <Text>{{ networkState.isConnected ? `Connected via ${networkState.type}` : 'Offline' }}</Text>
+  <Text>{{
+    networkState.isConnected ? `Connected via ${networkState.type}` : 'Offline'
+  }}</Text>
   <Text>{{ ipAddress ?? 'checking…' }}</Text>
 </template>
+```
+
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import {
+    getIpAddressAsync,
+    isAirplaneModeEnabledAsync,
+  } from '@symbiote-native/network';
+  import { useNetworkState } from '@symbiote-native/network/svelte';
+
+  const networkState = useNetworkState(); // { readonly current: NetworkState }
+  let ipAddress = $state<string | null>(null);
+  let isAirplaneMode = $state<boolean | null>(null);
+
+  $effect(() => {
+    networkState.current; // establishes the dependency, so this re-runs on network change
+    void Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
+      ([ip, airplaneMode]) => {
+        ipAddress = ip;
+        isAirplaneMode = airplaneMode;
+      },
+    );
+  });
+</script>
+<Text>
+  {networkState.current.isConnected
+    ? `Connected via ${networkState.current.type}`
+    : 'Offline'}
+</Text>
+<Text>{ipAddress ?? 'checking…'}</Text>
 ```
 
 ```ts
@@ -145,15 +196,59 @@ export class NetworkScreen {
   constructor() {
     effect(() => {
       this.networkState();
-      Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(([ip]) => {
-        this.ipAddress.set(ip);
-      });
+      Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
+        ([ip]) => {
+          this.ipAddress.set(ip);
+        },
+      );
     });
   }
 }
 ```
 
-Each of the three demo screens above also re-fetches the IP address and airplane-mode card
+```tsx
+// Solid — the accessor is CALLED; a Solid component body runs once, so a snapshot would freeze.
+import { createSignal, onMount } from 'solid-js';
+import { Text } from '@symbiote-native/solid';
+import {
+  getIpAddressAsync,
+  isAirplaneModeEnabledAsync,
+} from '@symbiote-native/network';
+import { createNetworkState } from '@symbiote-native/network/solid';
+
+function NetworkScreen() {
+  const networkState = createNetworkState(); // Accessor<NetworkState>
+  const [ipAddress, setIpAddress] = createSignal<string | null>(null);
+  const [isAirplaneMode, setIsAirplaneMode] = createSignal<boolean | null>(
+    null,
+  );
+
+  onMount(() => {
+    void Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
+      ([ip, airplaneMode]) => {
+        setIpAddress(ip);
+        setIsAirplaneMode(airplaneMode);
+      },
+    );
+  });
+
+  return (
+    <>
+      <Text>
+        {networkState().isConnected
+          ? `Connected via ${networkState().type}`
+          : 'Offline'}
+      </Text>
+      <Text>{ipAddress() ?? 'checking…'}</Text>
+      <Text>
+        {isAirplaneMode() ? 'Airplane mode: On' : 'Airplane mode: Off'}
+      </Text>
+    </>
+  );
+}
+```
+
+Each of the demo screens above also re-fetches the IP address and airplane-mode card
 whenever the live network state changes (toggling Wi-Fi/airplane mode on the device updates both
 cards together) — see the linked files for the full version, including the connection-type label
 switch and the layout around it.
@@ -174,29 +269,37 @@ Plus `NetworkStateType` (enum: `NONE`/`UNKNOWN`/`CELLULAR`/`WIFI`/`BLUETOOTH`/`E
 `VPN`/`OTHER`), `NetworkState`, `NetworkStateEvent` — ported from upstream's `Network.types.ts`.
 
 ```ts
-import { getNetworkStateAsync, addNetworkStateListener } from '@symbiote-native/network';
+import {
+  getNetworkStateAsync,
+  addNetworkStateListener,
+} from '@symbiote-native/network';
 
 // framework-scoped entry points re-export the same free functions, plus a lifecycle
 // hook/composable/service:
 import { useNetworkState } from '@symbiote-native/network/react';
 import { useNetworkState } from '@symbiote-native/network/vue';
+import { useNetworkState } from '@symbiote-native/network/svelte';
+import { createNetworkState } from '@symbiote-native/network/solid';
 import { NetworkStateService } from '@symbiote-native/network/angular';
 ```
 
-`useNetworkState` seeds its initial value from a one-shot `getNetworkStateAsync()` call, then
-subscribes to `addNetworkStateListener` for updates, and unsubscribes on unmount — mirroring
-upstream's own `useNetworkState`.
+`useNetworkState` (Solid: `createNetworkState`) seeds its initial value from a one-shot
+`getNetworkStateAsync()` call, then subscribes to `addNetworkStateListener` for updates, and
+unsubscribes on unmount — mirroring upstream's own `useNetworkState`. The Solid primitive returns
+an `Accessor<NetworkState>` and subscribes from its body rather than an effect, so nothing can slip
+between the seed and the subscription.
 
 ## Test it
 
 No Fabric/Descriptor angle at all — network is a pure async-function + `EventEmitter` listener
 surface, never a view. Tests inject a fake native-module object in place of the real
 `requireNativeModule` resolution (`src/core/network.test.ts`,
-`src/{react,vue,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
+`src/{react,vue,svelte,solid,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
 `@symbiote-native/battery`/`@symbiote-native/sensors`/`@symbiote-native/local-auth` use — no
 `installFabric()`, no ViewConfig. Native rendering itself is verified on-device — see the parent
 [README](../../README.md).
 
-The Android/iOS native wiring is done across all four `examples/expo-*` canary apps
-(`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-angular`);
-this package isn't yet in the public, non-Expo `examples/react` canary.
+The Android/iOS native wiring is done across all six `examples/expo-*` canary apps
+(`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-svelte`,
+`examples/expo-solid`, `examples/expo-angular`); this package isn't yet in the public, non-Expo
+`examples/react` canary.

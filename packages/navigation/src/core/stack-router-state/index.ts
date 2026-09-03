@@ -42,8 +42,11 @@ export function reconcileStackRoutes(
   state: INavigatorState,
   registeredNames: readonly string[],
 ): INavigatorState {
-  const routes = state.routes.filter(route => registeredNames.includes(route.name));
+  const routes = state.routes.filter(route =>
+    registeredNames.includes(route.name),
+  );
   // filter preserves order, so an unchanged length means nothing was dropped.
-  if (routes.length === state.routes.length || routes.length === 0) return state;
+  if (routes.length === state.routes.length || routes.length === 0)
+    return state;
   return { routes };
 }

@@ -20,7 +20,8 @@ function sleep(ms: number): Promise<void> {
 // for a raw simulator-level tap instead of going through the broken hittability check.
 async function deviceTap(id: string): Promise<void> {
   const attrs = await element(by.id(id)).getAttributes();
-  if (!('frame' in attrs)) throw new Error(`${id}: getAttributes() returned no frame`);
+  if (!('frame' in attrs))
+    throw new Error(`${id}: getAttributes() returned no frame`);
   const { x, y, width, height } = attrs.frame;
   await device.tap({ x: x + width / 2, y: y + height / 2 });
 }
@@ -28,7 +29,10 @@ async function deviceTap(id: string): Promise<void> {
 // Same reasoning applied to toBeVisible(): the formSheet's own presentation transition moves
 // sheet-dismiss into place, so poll its real frame instead of the geometry check that never
 // resolves — settled once it stops moving for two consecutive reads.
-async function waitForFrameSettle(id: string, timeoutMs: number): Promise<void> {
+async function waitForFrameSettle(
+  id: string,
+  timeoutMs: number,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let last: { x: number; y: number } | undefined;
   let stableReads = 0;

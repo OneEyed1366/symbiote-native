@@ -14,7 +14,14 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { InputAccessoryView, Text, TextInput, View, mount, unmount } from '@symbiote-native/react';
+import {
+  InputAccessoryView,
+  Text,
+  TextInput,
+  View,
+  mount,
+  unmount,
+} from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const NATIVE_ID = 'accessory-1';
@@ -78,9 +85,13 @@ describe('InputAccessoryView', () => {
     // somewhere along its own path when both are mounted together.
     it('keeps the nativeID <-> inputAccessoryViewID docking pair intact across both components', () => {
       mount(ROOT_TAG, <App />);
-      const input = fabric.find(n => n.viewName === 'RCTSinglelineTextInputView');
+      const input = fabric.find(
+        n => n.viewName === 'RCTSinglelineTextInputView',
+      );
       expect(input, 'a TextInput was created').toBeDefined();
-      expect(input!.props.inputAccessoryViewID).toBe(accessoryNode().props.nativeID);
+      expect(input!.props.inputAccessoryViewID).toBe(
+        accessoryNode().props.nativeID,
+      );
     });
   });
 });

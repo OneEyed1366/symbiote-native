@@ -11,7 +11,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { createElement } from '@symbiote-native/engine';
-import type { IPanResponderGestureState, ISymbioteEvent } from '@symbiote-native/engine';
+import type {
+  IPanResponderGestureState,
+  ISymbioteEvent,
+} from '@symbiote-native/engine';
 import {
   DRAWER_DEFAULT_POSITION,
   DRAWER_DEFAULT_TYPE,
@@ -48,7 +51,9 @@ function fakeEvent(nativeEvent: Record<string, unknown>): ISymbioteEvent {
   };
 }
 
-function gestureState(overrides: Partial<IPanResponderGestureState>): IPanResponderGestureState {
+function gestureState(
+  overrides: Partial<IPanResponderGestureState>,
+): IPanResponderGestureState {
   return {
     stateID: 1,
     moveX: 0,
@@ -99,7 +104,9 @@ describe('resolveDrawerGeometry', () => {
   const WIDTH = DRAWER_DEFAULT_WIDTH;
 
   it('front + left: only the panel moves off/on screen, content stays put', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'front', drawerPosition: 'left' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'front', drawerPosition: 'left' }),
+    ).toEqual({
       panelTranslateXClosed: -WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -110,7 +117,9 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('front + right: the panel closes toward the opposite edge from left', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'front', drawerPosition: 'right' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'front', drawerPosition: 'right' }),
+    ).toEqual({
       panelTranslateXClosed: WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -121,7 +130,9 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('back + left: only the content slides away; the panel never translates', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'back', drawerPosition: 'left' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'back', drawerPosition: 'left' }),
+    ).toEqual({
       panelTranslateXClosed: 0,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -132,7 +143,9 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('back + right: content slides the mirrored way, still no overlay', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'back', drawerPosition: 'right' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'back', drawerPosition: 'right' }),
+    ).toEqual({
       panelTranslateXClosed: 0,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -143,7 +156,9 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('slide + left: panel and content move together by the same delta', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'slide', drawerPosition: 'left' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'slide', drawerPosition: 'left' }),
+    ).toEqual({
       panelTranslateXClosed: -WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -154,7 +169,9 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('slide + right: both translate toward the mirrored side', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'slide', drawerPosition: 'right' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'slide', drawerPosition: 'right' }),
+    ).toEqual({
       panelTranslateXClosed: WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -170,7 +187,12 @@ describe('resolveDrawerGeometry', () => {
   // animated interpolation behind isDrawerAnimated() and never reads these numbers for
   // 'permanent' - but the comment is inaccurate about what this function itself returns.
   it('permanent + left: falls through to front\'s non-zero offsets, not "all zero"', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'permanent', drawerPosition: 'left' })).toEqual({
+    expect(
+      resolveDrawerGeometry({
+        drawerType: 'permanent',
+        drawerPosition: 'left',
+      }),
+    ).toEqual({
       panelTranslateXClosed: -WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -181,7 +203,12 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('permanent + right: mirrors front + right', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'permanent', drawerPosition: 'right' })).toEqual({
+    expect(
+      resolveDrawerGeometry({
+        drawerType: 'permanent',
+        drawerPosition: 'right',
+      }),
+    ).toEqual({
       panelTranslateXClosed: WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -277,28 +304,47 @@ describe('isSwipeStartInEdge', () => {
   const SCREEN_WIDTH = 375;
 
   it('left position, closed: a start within the edge zone counts', () => {
-    expect(isSwipeStartInEdge(20, SCREEN_WIDTH, false, { drawerPosition: 'left' })).toBe(true);
+    expect(
+      isSwipeStartInEdge(20, SCREEN_WIDTH, false, { drawerPosition: 'left' }),
+    ).toBe(true);
   });
 
   it('left position, closed: a start past the edge zone does not count', () => {
-    expect(isSwipeStartInEdge(40, SCREEN_WIDTH, false, { drawerPosition: 'left' })).toBe(false);
+    expect(
+      isSwipeStartInEdge(40, SCREEN_WIDTH, false, { drawerPosition: 'left' }),
+    ).toBe(false);
   });
 
   it('right position, closed: a start within the edge zone (measured from the right) counts', () => {
-    expect(isSwipeStartInEdge(360, SCREEN_WIDTH, false, { drawerPosition: 'right' })).toBe(true);
+    expect(
+      isSwipeStartInEdge(360, SCREEN_WIDTH, false, { drawerPosition: 'right' }),
+    ).toBe(true);
   });
 
   it('right position, closed: a start past the edge zone does not count', () => {
-    expect(isSwipeStartInEdge(300, SCREEN_WIDTH, false, { drawerPosition: 'right' })).toBe(false);
+    expect(
+      isSwipeStartInEdge(300, SCREEN_WIDTH, false, { drawerPosition: 'right' }),
+    ).toBe(false);
   });
 
   it('open: any start position counts, regardless of position or distance from the edge', () => {
-    expect(isSwipeStartInEdge(-9_999, SCREEN_WIDTH, true, { drawerPosition: 'left' })).toBe(true);
-    expect(isSwipeStartInEdge(9_999, SCREEN_WIDTH, true, { drawerPosition: 'right' })).toBe(true);
+    expect(
+      isSwipeStartInEdge(-9_999, SCREEN_WIDTH, true, {
+        drawerPosition: 'left',
+      }),
+    ).toBe(true);
+    expect(
+      isSwipeStartInEdge(9_999, SCREEN_WIDTH, true, {
+        drawerPosition: 'right',
+      }),
+    ).toBe(true);
   });
 
   it('honors a custom swipeEdgeWidth over the default', () => {
-    const options: IDrawerOptions = { drawerPosition: 'left', swipeEdgeWidth: 100 };
+    const options: IDrawerOptions = {
+      drawerPosition: 'left',
+      swipeEdgeWidth: 100,
+    };
     expect(isSwipeStartInEdge(80, SCREEN_WIDTH, false, options)).toBe(true);
   });
 });
@@ -347,23 +393,35 @@ describe('resolveSwipeIntent', () => {
   });
 
   it('neither threshold met snaps back to the current closed state', () => {
-    const intent = resolveSwipeIntent(gestureState({ dx: 10, vx: 0.1 }), false, {
-      drawerPosition: 'left',
-    });
+    const intent = resolveSwipeIntent(
+      gestureState({ dx: 10, vx: 0.1 }),
+      false,
+      {
+        drawerPosition: 'left',
+      },
+    );
     expect(intent).toBe('close');
   });
 
   it('neither threshold met snaps back to the current open state', () => {
-    const intent = resolveSwipeIntent(gestureState({ dx: -10, vx: -0.1 }), true, {
-      drawerPosition: 'left',
-    });
+    const intent = resolveSwipeIntent(
+      gestureState({ dx: -10, vx: -0.1 }),
+      true,
+      {
+        drawerPosition: 'left',
+      },
+    );
     expect(intent).toBe('open');
   });
 
   it('right position: the physical drag direction that opens is mirrored', () => {
-    const intent = resolveSwipeIntent(gestureState({ dx: -100, vx: 0 }), false, {
-      drawerPosition: 'right',
-    });
+    const intent = resolveSwipeIntent(
+      gestureState({ dx: -100, vx: 0 }),
+      false,
+      {
+        drawerPosition: 'right',
+      },
+    );
     expect(intent).toBe('open');
   });
 
@@ -380,7 +438,9 @@ describe('resolveSwipeIntent', () => {
       swipeMinDistance: 10,
       swipeMinVelocity: 5,
     };
-    expect(resolveSwipeIntent(gestureState({ dx: 15, vx: 0 }), false, options)).toBe('open');
+    expect(
+      resolveSwipeIntent(gestureState({ dx: 15, vx: 0 }), false, options),
+    ).toBe('open');
   });
 });
 
@@ -431,10 +491,14 @@ describe('resolveDragProgress', () => {
 
   it('clamps the result to [0, 1] past either end', () => {
     expect(
-      resolveDragProgress(gestureState({ dx: WIDTH * 2 }), 0, { drawerPosition: 'left' }),
+      resolveDragProgress(gestureState({ dx: WIDTH * 2 }), 0, {
+        drawerPosition: 'left',
+      }),
     ).toBe(1);
     expect(
-      resolveDragProgress(gestureState({ dx: -WIDTH * 2 }), 1, { drawerPosition: 'left' }),
+      resolveDragProgress(gestureState({ dx: -WIDTH * 2 }), 1, {
+        drawerPosition: 'left',
+      }),
     ).toBe(0);
   });
 });

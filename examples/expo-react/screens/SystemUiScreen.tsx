@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
-import { getBackgroundColorAsync, setBackgroundColorAsync } from '@symbiote-native/system-ui';
+import {
+  getBackgroundColorAsync,
+  setBackgroundColorAsync,
+} from '@symbiote-native/system-ui';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -26,7 +29,9 @@ export function SystemUiScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SystemUi];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [backgroundColor, setBackgroundColorValue] = useState<string | null>(null);
+  const [backgroundColor, setBackgroundColorValue] = useState<string | null>(
+    null,
+  );
 
   const refresh = useCallback(() => {
     getBackgroundColorAsync().then(color => {
@@ -47,7 +52,11 @@ export function SystemUiScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="system-ui-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="system-ui-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -58,7 +67,8 @@ export function SystemUiScreen() {
           <View className="hero-copy">
             <Text className="hero-title">System UI</Text>
             <Text className="hero-body">
-              @symbiote-native/system-ui — get/set the root view's background color.
+              @symbiote-native/system-ui — get/set the root view's background
+              color.
             </Text>
           </View>
         </View>
@@ -67,7 +77,10 @@ export function SystemUiScreen() {
           <View className="feature-card-header">
             <Text className="feature-card-title">Root view background</Text>
           </View>
-          <ValueRow label="Current color" value={backgroundColor ?? 'not set'} />
+          <ValueRow
+            label="Current color"
+            value={backgroundColor ?? 'not set'}
+          />
           <ActionButton
             testID="system-ui-red-button"
             title="Red"

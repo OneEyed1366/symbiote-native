@@ -8,7 +8,9 @@ import type { INavigationHandle } from './use-navigation.svelte';
 export type IDrawerNavigationHandle = IDrawerNavigatorHandle &
   Pick<INavigationHandle, 'addListener' | 'getParent'>;
 
-export function useDrawerNavigation(): { readonly current: IDrawerNavigationHandle } {
+export function useDrawerNavigation(): {
+  readonly current: IDrawerNavigationHandle;
+} {
   const navigation = useNavigation();
   const narrowed = $derived.by<IDrawerNavigationHandle>(() => {
     const value = navigation.current;

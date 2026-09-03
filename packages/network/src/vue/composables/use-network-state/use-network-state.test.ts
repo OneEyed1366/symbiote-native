@@ -16,7 +16,11 @@ import { useNetworkState } from './index';
 
 const ROOT_TAG = 9953;
 
-type INetworkState = { type?: string; isConnected?: boolean; isInternetReachable?: boolean };
+type INetworkState = {
+  type?: string;
+  isConnected?: boolean;
+  isInternetReachable?: boolean;
+};
 type IListener = (event: INetworkState) => void;
 
 let registeredListener: IListener | undefined;
@@ -99,7 +103,11 @@ describe('useNetworkState (Vue) — lifecycle (mount seeds + subscribes, event u
     const networkState = mountNetworkState();
     await vi.waitFor(() => expect(networkState.value.type).toBe('WIFI'));
 
-    registeredListener?.({ type: 'CELLULAR', isConnected: true, isInternetReachable: false });
+    registeredListener?.({
+      type: 'CELLULAR',
+      isConnected: true,
+      isInternetReachable: false,
+    });
 
     expect(networkState.value.type).toBe('CELLULAR');
   });

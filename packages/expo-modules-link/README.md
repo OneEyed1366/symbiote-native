@@ -24,7 +24,7 @@ Then wire the `postinstall` hook so every install re-runs the linker:
 ```json
 {
   "dependencies": {
-    "@symbiote-native/expo-modules-link": "^0.1.0"
+    "@symbiote-native/expo-modules-link": "^0.4.0"
   },
   "scripts": {
     "postinstall": "symbiote-expo-link"
@@ -156,5 +156,5 @@ iOS Info.plist permission strings. iOS's own autolinking (`use_expo_modules!(exc
 already auto-discovers every installed expo-modules-core package with zero per-package Podfile
 edits once wired - see the `symbiote-expo-native-module` skill. The one-time per-app native
 bootstrap (Podfile monkey-patch, `SymbioteExpoModulesFactory`, bridging header) is still a
-manual, one-time step per app - this package only automates the *recurring* per-package
+manual, one-time step per app - this package only automates the _recurring_ per-package
 registration that repeats on every new native module.

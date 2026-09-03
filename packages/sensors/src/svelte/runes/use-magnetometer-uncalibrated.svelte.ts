@@ -17,9 +17,10 @@ export function useMagnetometerUncalibrated(updateIntervalMs?: number): {
     if (updateIntervalMs !== undefined) {
       MagnetometerUncalibrated.setUpdateInterval(updateIntervalMs);
     }
-    const subscription: EventSubscription = MagnetometerUncalibrated.addListener(next => {
-      measurement = next;
-    });
+    const subscription: EventSubscription =
+      MagnetometerUncalibrated.addListener(next => {
+        measurement = next;
+      });
     return () => subscription.remove();
   });
 

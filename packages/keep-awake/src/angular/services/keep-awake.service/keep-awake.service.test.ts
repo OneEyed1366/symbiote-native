@@ -21,7 +21,9 @@ import { KeepAwakeService } from './index';
 
 const activateKeepAwakeAsyncMock = vi.fn(async (_tag: string) => undefined);
 const removeSubscriptionMock = vi.fn();
-const addListenerMock = vi.fn((..._args: unknown[]) => ({ remove: removeSubscriptionMock }));
+const addListenerMock = vi.fn((..._args: unknown[]) => ({
+  remove: removeSubscriptionMock,
+}));
 const deactivateKeepAwakeMock = vi.fn(async (_tag: string) => undefined);
 const explicitListener = vi.fn();
 
@@ -38,7 +40,8 @@ vi.mock('../../../core/keep-awake', () => ({
 
 const ROOT_TAG = 974;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 @Component({
   selector: 'symbiote-keep-awake-default-host',
@@ -69,7 +72,9 @@ class KeepAwakeCustomHost {
 })
 class KeepAwakeListenerHost {
   constructor() {
-    inject(KeepAwakeService).connect('custom-tag', { listener: explicitListener });
+    inject(KeepAwakeService).connect('custom-tag', {
+      listener: explicitListener,
+    });
   }
 }
 
@@ -80,7 +85,9 @@ class KeepAwakeListenerHost {
 })
 class KeepAwakeSuppressHost {
   constructor() {
-    inject(KeepAwakeService).connect('custom-tag', { suppressDeactivateWarnings: true });
+    inject(KeepAwakeService).connect('custom-tag', {
+      suppressDeactivateWarnings: true,
+    });
   }
 }
 
@@ -149,7 +156,10 @@ describe('KeepAwakeService.connect', () => {
       mount(ROOT_TAG, KeepAwakeListenerHost);
       await tick();
 
-      expect(addListenerMock).toHaveBeenCalledWith('custom-tag', explicitListener);
+      expect(addListenerMock).toHaveBeenCalledWith(
+        'custom-tag',
+        explicitListener,
+      );
     });
   });
 
@@ -158,7 +168,9 @@ describe('KeepAwakeService.connect', () => {
     // rejection — a failed activation must never attach a listener for a lock that was never
     // actually acquired.
     it('does not register a listener when activateKeepAwakeAsync rejects', async () => {
-      activateKeepAwakeAsyncMock.mockRejectedValueOnce(new Error('activation failed'));
+      activateKeepAwakeAsyncMock.mockRejectedValueOnce(
+        new Error('activation failed'),
+      );
 
       mount(ROOT_TAG, KeepAwakeListenerHost);
       await tick();
@@ -171,7 +183,9 @@ describe('KeepAwakeService.connect', () => {
     // warning upstream expo-keep-awake surfaces — the rejection must be swallowed, not become an
     // unhandled promise rejection.
     it('swallows a deactivation rejection when suppressDeactivateWarnings is set', async () => {
-      deactivateKeepAwakeMock.mockRejectedValueOnce(new Error('deactivate failed'));
+      deactivateKeepAwakeMock.mockRejectedValueOnce(
+        new Error('deactivate failed'),
+      );
       const unhandled = vi.fn();
       process.once('unhandledRejection', unhandled);
 

@@ -30,7 +30,9 @@ test('tap increments the counter', () => {
   const fabric = installFabric();
   mount(1, createElement(App));
 
-  const button = fabric.find((n) => n.viewName === 'RCTView' && n.props.testID === 'tap-target');
+  const button = fabric.find(
+    n => n.viewName === 'RCTView' && n.props.testID === 'tap-target',
+  );
   fabric.fireEvent(button!.instanceHandle, 'topClick', {});
 
   expect(fabric.serialize(fabric.committed)).toContain('Taps: 1');
@@ -67,6 +69,32 @@ stays `null`, so a test can tell "explicitly reset" apart from "never set"), and
 throws on an illegal family reparent. A persistence bug in the fake is fixed once, here, for every
 test that depends on it.
 
+## Waiting for async settling
+
+`waitUntil(condition, label, timeoutMs?)` polls once per macrotask until `condition()` holds and
+throws (naming `label`) on timeout — the honest replacement for a fixed `setTimeout` tick count,
+which is only a proxy for "the framework has settled" and breaks under a loaded test run.
+`waitForQuiet(sample, label, stableTicks?, timeoutMs?)` waits until `sample()` returns the same
+value across `stableTicks` consecutive macrotasks and returns that settled value — the shape for
+"work has stopped arriving" (a batched commit, a zoneless change-detection pass, a press-timing
+timer). `advanceTicks(count)` is kept for the genuine "let the queue drain N times" case. Do not
+raise a tick count to fix a flaky test — that trades a fast failure for a slow one and keeps the
+race; reach for `waitUntil`/`waitForQuiet` instead.
+
+## The host-primitive lowering oracle
+
+`normalizeCommitted(nodes)` strips per-mount identity (`tag`, `instanceHandle`,
+`parentFamilyTag`) from a committed Fabric tree, and `compareLoweringEquivalence` /
+`expectCommittedProps` compare two such trees — used by React, Vue, Svelte, and Solid to mount a
+primitive (`Pressable`, `TextInput`, …) as a framework COMPONENT and as a lowered intrinsic tag
+with the same props, and assert the two committed payloads agree. It exists because a lowered
+element inherits nothing its wrapper component did — prop defaults, alias renames, and bag folds
+all live in the wrapper — so a naive lowering silently drops them (a lost `ellipsizeMode`, a
+never-applied `id -> nativeID`) with every other test green. Write BOTH assertions on every case:
+`compareLoweringEquivalence` catches a fold one path lost, `expectCommittedProps` catches a fold
+BOTH paths lost (an equivalence check alone can't tell "both arms agree" from "both arms are
+broken the same way").
+
 ## What it does NOT do
 
 - It is not a mocking framework — there's nothing to configure beyond calling `installFabric()`;
@@ -81,5 +109,5 @@ test that depends on it.
 
 ## Test it
 
-This package has no tests of its own — it *is* the test double every other package's `vitest` suite
+This package has no tests of its own — it _is_ the test double every other package's `vitest` suite
 imports.

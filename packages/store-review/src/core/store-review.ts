@@ -49,7 +49,9 @@ function urlFor(options?: IStoreReviewUrlOptions): string | null {
  * Play; a sideloaded build runs the whole Play Core flow and displays nothing. Both stores also
  * enforce a quota.
  */
-export async function requestReview(options?: IStoreReviewUrlOptions): Promise<void> {
+export async function requestReview(
+  options?: IStoreReviewUrlOptions,
+): Promise<void> {
   if (expoStoreReview.requestReview) {
     return expoStoreReview.requestReview();
   }
@@ -73,6 +75,8 @@ export async function requestReview(options?: IStoreReviewUrlOptions): Promise<v
  * @return `true` if `requestReview()` is capable of directing the user to some kind of store
  * review flow — either the native flow is available, or a store URL was supplied via `options`.
  */
-export async function hasAction(options?: IStoreReviewUrlOptions): Promise<boolean> {
+export async function hasAction(
+  options?: IStoreReviewUrlOptions,
+): Promise<boolean> {
   return !!urlFor(options) || (await isAvailableAsync());
 }

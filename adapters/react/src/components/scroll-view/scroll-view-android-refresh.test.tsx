@@ -52,7 +52,9 @@ describe('Android ScrollView RefreshControl wrap', () => {
 
     const shape = fabric.serialize(fabric.appRoot().children);
     // The wrap shape: the RefreshControl node WRAPS RCTScrollView, which holds the content.
-    expect(shape.endsWith('(RCTScrollView(RCTScrollContentView(RCTView)))')).toBe(true);
+    expect(
+      shape.endsWith('(RCTScrollView(RCTScrollContentView(RCTView)))'),
+    ).toBe(true);
   });
 
   // why: with the scroll view now nested inside the refresh wrapper, whichever node gets the
@@ -63,8 +65,13 @@ describe('Android ScrollView RefreshControl wrap', () => {
 
     const inner = fabric.find(node => node.viewName === 'RCTScrollView');
     expect(inner, 'inner RCTScrollView was created').toBeDefined();
-    const wrapper = fabric.find(node => node.children.some(kid => kid === inner));
-    expect(wrapper, 'a wrapper node wraps the inner RCTScrollView').toBeDefined();
+    const wrapper = fabric.find(node =>
+      node.children.some(kid => kid === inner),
+    );
+    expect(
+      wrapper,
+      'a wrapper node wraps the inner RCTScrollView',
+    ).toBeDefined();
 
     // `margin` is a pure-layout key: it drives the wrapper's frame and must NOT leak onto the inner.
     expect(wrapper!.props.margin).toBe(4);
@@ -81,8 +88,13 @@ describe('Android ScrollView RefreshControl wrap', () => {
 
     const inner = fabric.find(node => node.viewName === 'RCTScrollView');
     expect(inner, 'inner RCTScrollView was created').toBeDefined();
-    const wrapper = fabric.find(node => node.children.some(kid => kid === inner));
-    expect(wrapper, 'a wrapper node wraps the inner RCTScrollView').toBeDefined();
+    const wrapper = fabric.find(node =>
+      node.children.some(kid => kid === inner),
+    );
+    expect(
+      wrapper,
+      'a wrapper node wraps the inner RCTScrollView',
+    ).toBeDefined();
 
     // backgroundColor and padding paint the scrolling content; they belong on the inner scroll view.
     expect(inner!.props.backgroundColor).toBe('#123');

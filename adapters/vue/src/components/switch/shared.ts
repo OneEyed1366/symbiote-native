@@ -118,7 +118,10 @@ export function createSwitch(platform: ISwitchHostPlatform) {
         if (next === undefined) return;
         emit('valueChange', next, event);
         emitModelUpdate<boolean>(emit, next);
-        state.value = switchReducer(state.value, { type: 'native-reported', value: next });
+        state.value = switchReducer(state.value, {
+          type: 'native-reported',
+          value: next,
+        });
       };
 
       // Snap-back: when native reported a value the parent rejected, command the JS value back
@@ -153,12 +156,19 @@ export function createSwitch(platform: ISwitchHostPlatform) {
           renderSwitch(
             {
               value: resolveModelValue(attrs, isBoolean) === true,
-              disabled: typeof attrs.disabled === 'boolean' ? attrs.disabled : undefined,
+              disabled:
+                typeof attrs.disabled === 'boolean'
+                  ? attrs.disabled
+                  : undefined,
               trackColor: normalizeTrackColor(attrs.trackColor),
               thumbColor: asString(attrs.thumbColor),
               ios_backgroundColor: asString(attrs.ios_backgroundColor),
               style: isViewStyleObject(attrs.style) ? attrs.style : undefined,
-              passthrough: { ...forwardAttrs(attrs), ref: setNodeRef, onChange: handleChange },
+              passthrough: {
+                ...forwardAttrs(attrs),
+                ref: setNodeRef,
+                onChange: handleChange,
+              },
             },
             platform,
           ),

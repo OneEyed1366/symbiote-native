@@ -9,13 +9,17 @@
 import { dlog } from './debug';
 
 // RN processAspectRatio.js:15-63. number → number; ratio string → number; invalid → undefined.
-export function processAspectRatio(aspectRatio: number | string | undefined): number | undefined {
+export function processAspectRatio(
+  aspectRatio: number | string | undefined,
+): number | undefined {
   if (typeof aspectRatio === 'number') {
     return aspectRatio;
   }
   if (typeof aspectRatio !== 'string') {
     if (aspectRatio != null) {
-      dlog(`processAspectRatio reject: must be a number, ratio string or "auto"`);
+      dlog(
+        `processAspectRatio reject: must be a number, ratio string or "auto"`,
+      );
     }
     return undefined;
   }

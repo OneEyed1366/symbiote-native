@@ -47,8 +47,13 @@ beforeEach(async () => {
   nativeCalls = [];
   deviceHub = undefined;
 
-  globalThis.nativeModuleProxy = { SettingsManager: fakeSettingsManager({ foo: 1 }) };
-  globalThis.RN$registerCallableModule = (name: string, factory: () => IDeviceHub): void => {
+  globalThis.nativeModuleProxy = {
+    SettingsManager: fakeSettingsManager({ foo: 1 }),
+  };
+  globalThis.RN$registerCallableModule = (
+    name: string,
+    factory: () => IDeviceHub,
+  ): void => {
     if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   };
 
@@ -171,7 +176,9 @@ describe('Settings', () => {
         fires += 1;
       });
 
-      expect(() => deviceHub?.emit('settingsUpdated', 'not-an-object')).not.toThrow();
+      expect(() =>
+        deviceHub?.emit('settingsUpdated', 'not-an-object'),
+      ).not.toThrow();
       expect(Settings.get('foo')).toBe(1); // unchanged
       expect(fires).toBe(0);
     });

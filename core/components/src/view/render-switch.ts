@@ -6,7 +6,11 @@
 // Pure and prop-driven; no hooks, no events. The adapter owns those.
 
 import { dlog } from '@symbiote-native/engine';
-import type { IStyleProp, IViewStyle, ISymbioteEvent } from '@symbiote-native/engine';
+import type {
+  IStyleProp,
+  IViewStyle,
+  ISymbioteEvent,
+} from '@symbiote-native/engine';
 import { el } from '../descriptor';
 import type { IDescriptor } from '../descriptor';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
@@ -33,7 +37,10 @@ export interface ISwitchProps extends IAccessibilityProps, IAriaProps {
 // (iOS onTintColor/tintColor vs Android trackColorForTrue/trackColorForFalse + trackTintColor
 // for the current value). The adapter's .ios/.android file supplies the mapping.
 export type ISwitchPlatform = {
-  trackColorProps: (value: boolean, trackColor?: ISwitchTrackColor) => Record<string, unknown>;
+  trackColorProps: (
+    value: boolean,
+    trackColor?: ISwitchTrackColor,
+  ) => Record<string, unknown>;
 };
 
 // The pre-resolved inputs the render fn paints from. `value` arrives already folded to a
@@ -52,6 +59,13 @@ export type ISwitchViewProps = {
 // RN rounds the iOS background pill to this radius when ios_backgroundColor is set.
 const IOS_BACKGROUND_BORDER_RADIUS = 16;
 
+// The `-managed` spelling, NOT the plain one the engine's Switch behavior registers under
+// (`core/components/src/behaviors/switch.ts`) — the wrapper still runs its own lifecycle
+// (lastNativeReport, the snap-back effect), so it may not share a tag the behavior registry would
+// also attach to; see that behavior's module header and `.claude/rules/host-primitive-tier.md`,
+// "A lowered element and its wrapper must not share an intrinsic tag" (the TextInput precedent).
+const SWITCH_MANAGED_INTRINSIC = 'symbiote-switch-managed';
+
 // Fold ios_backgroundColor into the style, matching RN's iOS branch: it paints the
 // background that shows through the shrunken track. Untouched when unset, so a caller's own
 // backgroundColor wins by simply not passing ios_backgroundColor.
@@ -60,10 +74,16 @@ function foldIosBackground(
   color: string | undefined,
 ): IStyleProp<IViewStyle> | undefined {
   if (color === undefined) return style;
-  return [style, { backgroundColor: color, borderRadius: IOS_BACKGROUND_BORDER_RADIUS }];
+  return [
+    style,
+    { backgroundColor: color, borderRadius: IOS_BACKGROUND_BORDER_RADIUS },
+  ];
 }
 
-export function renderSwitch(view: ISwitchViewProps, platform: ISwitchPlatform): IDescriptor {
+export function renderSwitch(
+  view: ISwitchViewProps,
+  platform: ISwitchPlatform,
+): IDescriptor {
   dlog(`Switch render value=${view.value} disabled=${String(view.disabled)}`);
 
   // These color props reach Fabric as ordinary props: the shared ViewConfig declares
@@ -78,5 +98,5 @@ export function renderSwitch(view: ISwitchViewProps, platform: ISwitchPlatform):
     style: foldIosBackground(view.style, view.ios_backgroundColor),
   };
 
-  return el('symbiote-switch', props);
+  return el(SWITCH_MANAGED_INTRINSIC, props);
 }

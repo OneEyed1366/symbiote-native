@@ -8,7 +8,12 @@
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FlatList, mount, unmount, type IViewableItemsChangedInfo } from '@symbiote-native/react';
+import {
+  FlatList,
+  mount,
+  unmount,
+  type IViewableItemsChangedInfo,
+} from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 22;
@@ -55,7 +60,10 @@ function GatedApp(): ReactElement {
       offset: ITEM_HEIGHT * index,
       index,
     }),
-    viewabilityConfig: { itemVisiblePercentThreshold: 50, waitForInteraction: true },
+    viewabilityConfig: {
+      itemVisiblePercentThreshold: 50,
+      waitForInteraction: true,
+    },
     onViewableItemsChanged: (info: IViewableItemsChangedInfo<IRow>) => {
       viewableReports.push(info);
     },
@@ -125,7 +133,8 @@ function findCellWithRowText(): IFakeNode | undefined {
     let carriesRow = false;
     walk([textChild], descendant => {
       const text = descendant.props.text;
-      if (typeof text === 'string' && text.startsWith('row-')) carriesRow = true;
+      if (typeof text === 'string' && text.startsWith('row-'))
+        carriesRow = true;
     });
     if (carriesRow) found = node;
   });
@@ -162,11 +171,20 @@ describe('React FlatList inverted + waitForInteraction on the engine (Positive)'
     expect(cellNode, 'a cell wrapper carrying a row label').toBeDefined();
 
     // The outer scroll node IS flipped.
-    expect(hasInversionTransform(scrollNode!.props), 'scroll node flipped').toBe(true);
+    expect(
+      hasInversionTransform(scrollNode!.props),
+      'scroll node flipped',
+    ).toBe(true);
     // Each cell IS flipped (counter-flip so its content reads upright).
-    expect(hasInversionTransform(cellNode!.props), 'cell wrapper counter-flipped').toBe(true);
+    expect(
+      hasInversionTransform(cellNode!.props),
+      'cell wrapper counter-flipped',
+    ).toBe(true);
     // The content container is NOT flipped: the bug was a third, cancelling flip here.
-    expect(hasInversionTransform(contentNode!.props), 'content container NOT flipped').toBe(false);
+    expect(
+      hasInversionTransform(contentNode!.props),
+      'content container NOT flipped',
+    ).toBe(false);
   });
 
   it('suppresses viewable items until the first scroll', () => {
@@ -183,7 +201,9 @@ describe('React FlatList inverted + waitForInteraction on the engine (Positive)'
 
     // Before any scroll: waitForInteraction must suppress every viewable item.
     const viewableBefore = viewableReports.flatMap(r => r.viewableItems);
-    expect(viewableBefore.length, 'no viewable items before interaction').toBe(0);
+    expect(viewableBefore.length, 'no viewable items before interaction').toBe(
+      0,
+    );
 
     // First scroll = the interaction that ungates the config.
     fabric.fireEvent(gatedScroll.instanceHandle, 'topScroll', {
@@ -193,7 +213,10 @@ describe('React FlatList inverted + waitForInteraction on the engine (Positive)'
     });
 
     const viewableAfter = viewableReports.flatMap(r => r.viewableItems);
-    expect(viewableAfter.length, 'viewable items reported after scroll').toBeGreaterThan(0);
+    expect(
+      viewableAfter.length,
+      'viewable items reported after scroll',
+    ).toBeGreaterThan(0);
     // The window at offset 80, 400px viewport, 40px rows => rows ~2..11 fully visible.
     const labelsAfter = new Set(viewableAfter.map(token => token.item.label));
     expect(labelsAfter.has('row-3'), 'row-3 viewable after scroll').toBe(true);

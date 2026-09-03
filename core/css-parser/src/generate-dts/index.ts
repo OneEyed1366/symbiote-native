@@ -8,9 +8,10 @@
 // appended rather than replaced — e.g. `Card.module.css.d.ts`) so TypeScript's own module
 // resolution picks it up for a default import of `Card.module.css` without a separate
 // registration step, the same convention typed-css-modules uses.
-import { parseCSS } from '../parser/index.ts';
-import { compile, detectLanguage } from '../preprocessors/index.ts';
-import { isCssModuleFile } from '../metro-css-module/index.ts';
+import {
+  isCssModuleFile,
+  moduleClassNames,
+} from '../metro-css-module/index.ts';
 
 const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
@@ -36,14 +37,13 @@ export function classNamesToDtsSource(classNames: readonly string[]): string {
 }
 
 // Mirrors compileCssFile's own module/non-module branch: a plain (non-`.module.*`) style file
-// has no default export to type (registerStyles() runs as a side effect only), so it gets no
+// has no default export to type (registerRules() runs as a side effect only), so it gets no
 // `.d.ts` at all.
-export async function generateModuleDts(source: string, filename: string): Promise<string | null> {
+export async function generateModuleDts(
+  source: string,
+  filename: string,
+): Promise<string | null> {
   if (!isCssModuleFile(filename)) return null;
 
-  const lang = detectLanguage(filename);
-  const css = lang === 'css' ? source : await compile(source, lang, filename);
-  const parsed = parseCSS(css, { filename });
-
-  return classNamesToDtsSource(Object.keys(parsed));
+  return classNamesToDtsSource(await moduleClassNames(source, filename));
 }

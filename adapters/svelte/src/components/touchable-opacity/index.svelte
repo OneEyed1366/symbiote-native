@@ -1,22 +1,29 @@
 <script lang="ts" module>
-  // TouchableOpacity: built on Pressable, like the rest of the family. RN realizes its feedback
-  // with Animated (an opacity fade to activeOpacity on press-in, back to 1 on press-out); the
-  // press-timing constants and the deactivation-floor math are shared with every adapter
-  // (@symbiote-native/components/state/touchable). No `Animated.View` binding exists yet for
-  // this adapter — core/engine/src/animated is the framework-agnostic value-graph plumbing, but
-  // React and Vue each wrote their OWN reactive binding on top of it
-  // (adapters/react/src/modules/animated, adapters/vue/src/modules/animated); porting that
-  // binding to Svelte runes is separate, standalone work, out of scope for this Pressable/
-  // Touchable/Button pass. `tweenOpacity` below is a deliberate, documented stand-in: it
-  // reproduces Animated.timing's quad-inOut curve over the SAME shared duration constants
-  // directly onto the style bag via `$state`, using `setTimeout` (not `requestAnimationFrame`,
-  // which this adapter must never patch globally per the dom-shim skill §6c, and which a bare
-  // headless test sandbox does not provide) so TouchableOpacity still visibly fades. It is not
-  // wired into the native Animated node graph — `useNativeDriver`-style native-thread driving is
-  // NOT available here until a real Animated adapter binding lands.
+  // TouchableOpacity: built on Pressable, like the rest of the family. Ported against RN's own
+  // source (.vendors/react-native/.../Components/Touchable/TouchableOpacity.js) after the
+  // 2026-08-19 audit found ten divergences shared by every adapter; Solid migrated first, then
+  // React, Vue and Angular, and this is Svelte.
+  //
+  // Shared (framework-agnostic) half: the press-scheduling machine and the resting-opacity math
+  // (@symbiote-native/components). Svelte owns only the lifecycle — runes, the real timers, and
+  // the Animated wiring.
+  //
+  // The interim `tweenOpacity` stand-in this file used to carry is GONE. Its header claimed no
+  // Animated binding existed for this adapter; that stopped being true when
+  // modules/animated landed, and a setTimeout tween can never be native-driven — which is
+  // exactly what RN asks for here (useNativeDriver: true, TouchableOpacity.js:242).
   import type { ITouchableOpacityProps } from './touchable-opacity-props';
+  import View from '../View.svelte';
+  import { createAnimatedComponent } from '../../modules/animated/create-animated-component';
 
   export type { ITouchableOpacityProps };
+
+  // Wrapped here, not imported from modules/animated: that barrel pulls in six `.svelte`
+  // components (View/Text/Image/ScrollView/FlatList/SectionList), and this package's vitest has
+  // no `.svelte` loader — a smoke test would have to pre-compile the whole tree to reach one
+  // Animated.View. Same reasoning, different cause, as sticky-header.svelte's own local wrap.
+  // Module scope, so every TouchableOpacity instance shares one component identity.
+  const AnimatedView = createAnimatedComponent(View);
 </script>
 
 <script lang="ts">
@@ -24,37 +31,28 @@
     createTouchableFeedbackHandlers,
     createTouchableFeedbackRuntime,
     DEFAULT_ACTIVE_OPACITY,
-    DEFAULT_MIN_PRESS_DURATION_MS,
-    OPACITY_ACTIVE_DURATION_MS,
+    OPACITY_ACTIVE_GRANT_DURATION_MS,
     OPACITY_INACTIVE_DURATION_MS,
-    RESTING_OPACITY,
+    TOUCHABLE_MIN_PRESS_DURATION_MS,
+    restingOpacityFromStyle,
   } from '@symbiote-native/components';
-  import type { ISymbioteEvent } from '@symbiote-native/engine';
+  import {
+    AnimatedMock,
+    AnimatedValue,
+    Easing,
+    Platform,
+    dlog,
+    timing,
+    type ISymbioteEvent,
+  } from '@symbiote-native/engine';
   import Pressable from '../pressable/index.svelte';
 
-  const TWEEN_FRAME_MS = 16;
-
-  // See the module header above: the interim substitute for a real Animated.View driver.
-  function tweenOpacity(
-    from: number,
-    to: number,
-    durationMs: number,
-    onFrame: (value: number) => void,
-  ): () => void {
-    const start = Date.now();
-    let cancelled = false;
-    function step(): void {
-      if (cancelled) return;
-      const t = Math.min(1, (Date.now() - start) / durationMs);
-      const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
-      onFrame(from + (to - from) * eased);
-      if (t < 1) setTimeout(step, TWEEN_FRAME_MS);
-    }
-    step();
-    return () => {
-      cancelled = true;
-    };
-  }
+  // modules/animated's barrel swaps the WHOLE driver namespace for the mock when the host
+  // reports reduced motion; reaching it here would close the import the module block above
+  // avoids, so the one driver this component uses is swapped locally on the same flag.
+  const startTiming = Platform.isDisableAnimations
+    ? AnimatedMock.timing
+    : timing;
 
   function scheduleTimeout(callback: () => void, ms: number): () => void {
     const id = setTimeout(callback, ms);
@@ -70,21 +68,36 @@
     onPressOut,
     delayPressIn = 0,
     delayPressOut = 0,
-    minPressDuration = DEFAULT_MIN_PRESS_DURATION_MS,
+    // RN's Touchables override Pressability's own 130ms floor with 0 (TouchableOpacity.js:195);
+    // what holds the active visual is the fade's duration, not a press-duration floor.
+    minPressDuration = TOUCHABLE_MIN_PRESS_DURATION_MS,
     ...rest
   }: ITouchableOpacityProps = $props();
 
-  let opacity = $state(RESTING_OPACITY);
-  let cancelTween: (() => void) | undefined;
+  // RN's _getChildStyleOpacityWithDefault: the fade settles at the opacity the CALLER's style
+  // asks for, not at a hard 1.
+  const restingOpacity = $derived(restingOpacityFromStyle(style));
+
+  // One Animated.Value per mount, held by IDENTITY in a plain `const` — never `$state`, which
+  // would deep-proxy an engine object whose graph bookkeeping is keyed on the raw instance
+  // (same concern as Pressable's `$state.raw` hostShim).
+  // svelte-ignore state_referenced_locally -- the SEED is a one-shot read of the initial style;
+  // later changes are re-settled by the update effect below, not by re-seeding.
+  const opacity = new AnimatedValue(restingOpacity);
+
   // Setup-scope only, mutated by the machine — same as Pressable's own runtime, never `$state`.
   const runtime = createTouchableFeedbackRuntime();
 
   function setOpacityTo(toValue: number, duration: number): void {
-    cancelTween?.();
-    const from = opacity;
-    cancelTween = tweenOpacity(from, toValue, duration, value => {
-      opacity = value;
-    });
+    dlog(`TouchableOpacity opacity -> ${toValue} over ${duration}ms`);
+    // useNativeDriver: true is RN's own (TouchableOpacity.js:242). opacity is natively drivable,
+    // so the fade survives a busy JS thread — the whole point of press feedback.
+    startTiming(opacity, {
+      toValue,
+      duration,
+      easing: Easing.inOut(Easing.quad),
+      useNativeDriver: true,
+    }).start();
   }
 
   // Rebuilt whenever the timing config changes (mirrors Vue's per-render rebuild); the runtime
@@ -101,24 +114,68 @@
       runtime,
       {
         activate(event: ISymbioteEvent): void {
-          setOpacityTo(activeOpacity, OPACITY_ACTIVE_DURATION_MS);
+          // 0, not 150 (TouchableOpacity.js:215-220): the duration is chosen by where the
+          // press-in came from, and Pressability re-dispatches the GRANT event as the delay
+          // signal when delayPressIn is 0 — so an ordinary tap darkens instantly in RN. The 150ms
+          // branch is a re-activation (finger returning inside after leaving the bounds), which
+          // our engine never emits — it sends pressIn from one place, on topTouchStart.
+          setOpacityTo(activeOpacity, OPACITY_ACTIVE_GRANT_DURATION_MS);
           onPressIn?.(event);
         },
         deactivate(event: ISymbioteEvent): void {
-          setOpacityTo(RESTING_OPACITY, OPACITY_INACTIVE_DURATION_MS);
+          setOpacityTo(restingOpacity, OPACITY_INACTIVE_DURATION_MS);
           onPressOut?.(event);
         },
       },
     ),
   );
 
-  const foldedStyle = $derived([style, { opacity }]);
+  // Two SEPARATE deriveds, not one object: each memoizes by value, so an unrelated prop change
+  // cannot re-settle the opacity — the Svelte form of Vue's deliberate two-getter watch source.
+  const disabledInput = $derived(rest.disabled);
+
+  // RN's componentDidUpdate: a changed `disabled` or a changed style opacity re-settles the view,
+  // so a Touchable disabled mid-press does not stay stuck at its active opacity. The first run is
+  // skipped — RN does this on UPDATE only, and firing at mount would animate over the value the
+  // Animated.Value was just seeded with.
+  let settled: { disabled: unknown; resting: number } | undefined;
+  $effect(() => {
+    const current = { disabled: disabledInput, resting: restingOpacity };
+    const previous = settled;
+    settled = current;
+    if (previous === undefined) return;
+    if (
+      previous.disabled === current.disabled &&
+      previous.resting === current.resting
+    ) {
+      return;
+    }
+    setOpacityTo(current.resting, OPACITY_INACTIVE_DURATION_MS);
+  });
+
+  // RN's componentWillUnmount: stop the animation and drop the value back, so a teardown
+  // mid-fade leaves no driver running against a node that is gone.
+  $effect(() => {
+    return () => {
+      opacity.resetAnimation();
+    };
+  });
+
+  // Depends on `style` alone. `opacity` is a stable graph node, so a press changes what the node
+  // HOLDS, never this array — the per-frame path is setValue -> AnimatedProps.update ->
+  // setNativeProps, which never re-renders this component.
+  const feedbackStyle = $derived([style, { opacity }]);
 </script>
 
-<Pressable {...rest} onPressIn={handlers.handlePressIn} onPressOut={handlers.handlePressOut}>
+<Pressable
+  __minPressDuration={0}
+  {...rest}
+  onPressIn={handlers.handlePressIn}
+  onPressOut={handlers.handlePressOut}
+>
   {#snippet children()}
-    <symbiote-view p={{ style: foldedStyle, class: className }}>
+    <AnimatedView style={feedbackStyle} class={className}>
       {@render content?.()}
-    </symbiote-view>
+    </AnimatedView>
   {/snippet}
 </Pressable>

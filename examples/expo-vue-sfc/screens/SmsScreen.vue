@@ -5,7 +5,13 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/vue';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
@@ -54,9 +60,15 @@ function handleSend(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="sms-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="sms-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -65,8 +77,9 @@ function handleSend(): void {
         <View class="hero-copy">
           <Text class="hero-title">SMS</Text>
           <Text class="hero-body"
-            >@symbiote-native/sms — opens the system SMS composer prefilled with recipients and a
-            message. The user still has to press send themselves.</Text
+            >@symbiote-native/sms — opens the system SMS composer prefilled with
+            recipients and a message. The user still has to press send
+            themselves.</Text
           >
         </View>
       </View>
@@ -80,8 +93,9 @@ function handleSend(): void {
           </View>
         </View>
         <Text class="sms-note"
-          >NO on the iOS simulator, which ships no Messages app, and on Android devices without
-          telephony hardware. A real iPhone or an Android device with a SIM reports YES.</Text
+          >NO on the iOS simulator, which ships no Messages app, and on Android
+          devices without telephony hardware. A real iPhone or an Android device
+          with a SIM reports YES.</Text
         >
       </View>
 
@@ -111,12 +125,15 @@ function handleSend(): void {
         />
         <View class="sms-row">
           <Text class="sms-row-label">Last result</Text>
-          <Text testID="sms-result" class="sms-value-text">{{ lastResult }}</Text>
+          <Text testID="sms-result" class="sms-value-text">{{
+            lastResult
+          }}</Text>
         </View>
         <Text class="sms-note"
-          >iOS reports sent or cancelled; Android always reports unknown, because reading the real
-          outcome needs the READ_SMS permission Google restricts to default-SMS-app publishers.
-          Treat unknown as "the composer closed".</Text
+          >iOS reports sent or cancelled; Android always reports unknown,
+          because reading the real outcome needs the READ_SMS permission Google
+          restricts to default-SMS-app publishers. Treat unknown as "the
+          composer closed".</Text
         >
       </View>
     </ScrollView>

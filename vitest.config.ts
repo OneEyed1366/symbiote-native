@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import solidPlugin from 'vite-plugin-solid';
 
 // Root unit/integration runner. Tests are co-located with what they exercise. `@symbiote-native/*`
 // packages resolve to raw `src/*.ts` (their package `main`), so they must be inlined for Vitest
@@ -20,6 +21,16 @@ const INCLUDE_ALL = [
   'tests/**/*.test.{ts,tsx}',
 ];
 
+// `vitest bench` files, co-located next to the tests of the thing they time. Scoped
+// explicitly because both projects below would otherwise match the same file by default and
+// run every benchmark twice.
+const BENCH_ALL = [
+  'core/**/src/**/*.bench.ts',
+  'adapters/**/src/**/*.bench.ts',
+  'packages/**/src/**/*.bench.ts',
+];
+const SVELTE_BENCH = ['adapters/svelte/**/*.bench.ts'];
+
 // `**/e2e/**` keeps the Detox on-device suite (jest-based) out of the vitest run.
 // Its `*.test.ts` files import `detox` and drive a real device, not the fake-Fabric slot.
 const EXCLUDE_ALL = ['**/node_modules/**', '**/build/**', '**/e2e/**'];
@@ -33,12 +44,47 @@ const SVELTE_TESTS = [
   'packages/**/src/svelte/**/*.test.{ts,tsx}',
 ];
 
+// Everything that compiles Solid JSX. adapters/solid builds with `jsx: 'preserve'` — tsc type-checks
+// the JSX and emits it untouched, because the real compilation is babel-preset-solid's job in the
+// consuming app's Metro. That leaves nothing executable for Vitest, so this project runs the same
+// transform through Vite, with the SAME two options ../adapters/solid/babel-preset.cjs pins for the
+// app. They must not drift: a test running against `generate: 'dom'` would exercise DOM operations
+// that never appear on a device.
+const SOLID_TESTS = [
+  'adapters/solid/**/*.test.{ts,tsx}',
+  'packages/**/src/solid/**/*.test.{ts,tsx}',
+];
+
+// `dev: false` is NOT a production-mode nicety — without it this project loads TWO solid-js builds
+// at once. vite-plugin-solid re-adds the `development` export condition from its own config() hook,
+// so solid-js resolves to dist/dev.js for the plugin's own path while dist/solid.js is resolved
+// elsewhere; a profile of one create showed functions from both files. Signals then live in one
+// runtime and the renderer's prop effects in the other, so THEY NEVER SEE EACH OTHER: measured
+// 2026-08-23, a signal driving a prop on an intrinsic element went clip -> clip -> clip (no update
+// at all), and clip -> head -> tail with this flag. Structural updates (<Show>, <For>) kept working
+// because they run inside the test file's own solid-js, which is why nothing was red.
+//
+// `conditions: ['browser']` picks solid-js's client build over its `node` -> dist/server.js entry,
+// and BOTH resolve and ssr.resolve are needed for the reason the svelte project states below:
+// Vitest runs test files through Vite's SSR module graph.
+const SOLID_TRANSFORM = solidPlugin({
+  dev: false,
+  hot: false,
+  solid: {
+    moduleName: '@symbiote-native/solid/renderer',
+    generate: 'universal',
+  },
+});
+
 // Vitest imports Angular adapter source directly. The production AOT path is still ngc partial
 // compilation, but source tests need Vite/Oxc to lower Angular's legacy TS decorators before
 // Node evaluates @Component/@Directive files.
 const SHARED = {
   oxc: { decorator: { legacy: true } },
-  test: { environment: 'node' as const, server: { deps: { inline: [/@symbiote-native\//] } } },
+  test: {
+    environment: 'node' as const,
+    server: { deps: { inline: [/@symbiote-native\//] } },
+  },
 };
 
 // svelte's package.json "." export splits on a `browser` condition (client runtime, mount()/
@@ -67,7 +113,24 @@ export default defineConfig({
       {
         ...SHARED,
         ...BROWSER_CONDITIONS,
-        test: { ...SHARED.test, name: 'svelte', include: SVELTE_TESTS, exclude: EXCLUDE_ALL },
+        test: {
+          ...SHARED.test,
+          name: 'svelte',
+          include: SVELTE_TESTS,
+          exclude: EXCLUDE_ALL,
+          benchmark: { include: SVELTE_BENCH, exclude: EXCLUDE_ALL },
+        },
+      },
+      {
+        ...SHARED,
+        ...BROWSER_CONDITIONS,
+        plugins: [SOLID_TRANSFORM],
+        test: {
+          ...SHARED.test,
+          name: 'solid',
+          include: SOLID_TESTS,
+          exclude: EXCLUDE_ALL,
+        },
       },
       {
         ...SHARED,
@@ -75,7 +138,11 @@ export default defineConfig({
           ...SHARED.test,
           name: 'default',
           include: INCLUDE_ALL,
-          exclude: [...EXCLUDE_ALL, ...SVELTE_TESTS],
+          exclude: [...EXCLUDE_ALL, ...SVELTE_TESTS, ...SOLID_TESTS],
+          benchmark: {
+            include: BENCH_ALL,
+            exclude: [...EXCLUDE_ALL, ...SVELTE_BENCH],
+          },
         },
       },
     ],

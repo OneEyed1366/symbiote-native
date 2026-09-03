@@ -14,15 +14,18 @@ type IOrientationChangeEvent = {
   orientationInfo: { orientation: number };
 };
 
-const { addListener, getOrientationAsync, getOrientationLockAsync, remove } = vi.hoisted(() => {
-  const remove = vi.fn();
-  return {
-    addListener: vi.fn((_listener: (event: IOrientationChangeEvent) => void) => ({ remove })),
-    getOrientationAsync: vi.fn(async () => 1),
-    getOrientationLockAsync: vi.fn(async () => 0),
-    remove,
-  };
-});
+const { addListener, getOrientationAsync, getOrientationLockAsync, remove } =
+  vi.hoisted(() => {
+    const remove = vi.fn();
+    return {
+      addListener: vi.fn(
+        (_listener: (event: IOrientationChangeEvent) => void) => ({ remove }),
+      ),
+      getOrientationAsync: vi.fn(async () => 1),
+      getOrientationLockAsync: vi.fn(async () => 0),
+      remove,
+    };
+  });
 
 vi.mock('../../../core', () => ({
   addOrientationChangeListener: addListener,
@@ -63,7 +66,10 @@ describe('useScreenOrientation', () => {
   it('reports OrientationLock/Orientation UNKNOWN before the initial fetch resolves', () => {
     mount(ROOT_TAG, createElement(Probe));
 
-    expect(results[results.length - 1]).toEqual({ orientation: 0, orientationLock: 9 });
+    expect(results[results.length - 1]).toEqual({
+      orientation: 0,
+      orientationLock: 9,
+    });
   });
 
   // why: the hook must actually apply the values core's one-shot getters resolve to, not just
@@ -72,7 +78,10 @@ describe('useScreenOrientation', () => {
     mount(ROOT_TAG, createElement(Probe));
 
     await vi.waitFor(() =>
-      expect(results[results.length - 1]).toEqual({ orientation: 1, orientationLock: 0 }),
+      expect(results[results.length - 1]).toEqual({
+        orientation: 1,
+        orientationLock: 0,
+      }),
     );
   });
 
@@ -80,7 +89,9 @@ describe('useScreenOrientation', () => {
   // the initial read — a hook that only reflects the one-shot fetch would go stale immediately
   it('updates when the native listener fires', async () => {
     mount(ROOT_TAG, createElement(Probe));
-    await vi.waitFor(() => expect(results[results.length - 1].orientation).toBe(1));
+    await vi.waitFor(() =>
+      expect(results[results.length - 1].orientation).toBe(1),
+    );
 
     const listener = addListener.mock.calls[0][0];
     listener({ orientationLock: 5, orientationInfo: { orientation: 3 } });

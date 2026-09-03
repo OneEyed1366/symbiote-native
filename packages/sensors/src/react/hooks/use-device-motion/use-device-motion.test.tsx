@@ -17,17 +17,20 @@ import { installFabric } from '@symbiote-native/test-utils';
 import { useDeviceMotion } from './index';
 import type { IDeviceMotionMeasurement } from '../../../core';
 
-const { addListener, removeAllListeners, setUpdateInterval, remove } = vi.hoisted(() => {
-  const remove = vi.fn();
-  return {
-    addListener: vi.fn((_listener: (measurement: IDeviceMotionMeasurement) => void) => ({
+const { addListener, removeAllListeners, setUpdateInterval, remove } =
+  vi.hoisted(() => {
+    const remove = vi.fn();
+    return {
+      addListener: vi.fn(
+        (_listener: (measurement: IDeviceMotionMeasurement) => void) => ({
+          remove,
+        }),
+      ),
+      removeAllListeners: vi.fn(),
+      setUpdateInterval: vi.fn(),
       remove,
-    })),
-    removeAllListeners: vi.fn(),
-    setUpdateInterval: vi.fn(),
-    remove,
-  };
-});
+    };
+  });
 
 vi.mock('../../../core', () => ({
   DeviceMotion: { addListener, removeAllListeners, setUpdateInterval },
@@ -91,7 +94,9 @@ describe('useDeviceMotion', () => {
       // The mock invokes the listener directly, outside the engine's event dispatcher
       // (setEventDispatcher in render.ts), which is what normally flushes a native-driven
       // setState synchronously — so the resulting re-render lands on a later microtask here.
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(FIRST_READING));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(FIRST_READING),
+      );
     });
 
     it('replaces the previous measurement rather than merging with it, including nullable fields', async () => {
@@ -102,10 +107,14 @@ describe('useDeviceMotion', () => {
       const listener = addListener.mock.calls[0][0];
 
       listener(FIRST_READING);
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(FIRST_READING));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(FIRST_READING),
+      );
       listener(SECOND_READING);
 
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(SECOND_READING));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(SECOND_READING),
+      );
     });
 
     it('unsubscribes from the native listener on unmount', () => {

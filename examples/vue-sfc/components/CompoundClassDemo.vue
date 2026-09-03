@@ -22,11 +22,11 @@
   pass through unscoped, which is the other half of the rule.
 -->
 <script setup lang="ts">
-import { ref } from 'vue'
-import { View, Text } from '@symbiote-native/vue'
-import ActionButton from './ActionButton.vue'
+import { ref } from 'vue';
+import { View, Text } from '@symbiote-native/vue';
+import ActionButton from './ActionButton.vue';
 
-const isLoud = ref(false)
+const isLoud = ref(false);
 </script>
 
 <template>
@@ -39,7 +39,10 @@ const isLoud = ref(false)
       <View class="badge loud" testID="compound-badge-loud">
         <Text class="badge-text">loud</Text>
       </View>
-      <View :class="isLoud ? 'badge loud' : 'badge'" testID="compound-badge-dynamic">
+      <View
+        :class="isLoud ? 'badge loud' : 'badge'"
+        testID="compound-badge-dynamic"
+      >
         <Text class="badge-text">dynamic</Text>
       </View>
     </View>

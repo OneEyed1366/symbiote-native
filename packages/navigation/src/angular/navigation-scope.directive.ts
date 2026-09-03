@@ -9,7 +9,10 @@
 
 import { Directive, Input, inject, type OnChanges } from '@angular/core';
 import type { INavigationEmitter, IRoute } from '../core';
-import { NavigationContextService, type IAnyNavigatorHandle } from './navigation-context.service';
+import {
+  NavigationContextService,
+  type IAnyNavigatorHandle,
+} from './navigation-context.service';
 
 @Directive({
   selector: '[symbioteNavigationScope]',
@@ -17,7 +20,8 @@ import { NavigationContextService, type IAnyNavigatorHandle } from './navigation
   providers: [NavigationContextService],
 })
 export class NavigationScopeDirective implements OnChanges {
-  @Input({ required: true, alias: 'symbioteNavigationScope' }) route!: IRoute<unknown>;
+  @Input({ required: true, alias: 'symbioteNavigationScope' })
+  route!: IRoute<unknown>;
   @Input({ required: true }) navigation!: IAnyNavigatorHandle;
   @Input({ required: true }) emitter!: INavigationEmitter;
 

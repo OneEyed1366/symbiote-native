@@ -67,8 +67,9 @@ minimumReleaseAgeExclude:
 # instead of a literal, so a bump happens HERE, in one place. The guard that
 # nobody slips a literal version past this file is syncpack (`pnpm deps:check`).
 #
-# peerDependencies are deliberately NOT catalogued — they are compatibility
-# ranges (`>=19.0.0`, `>=0.86`) a consumer satisfies, not a pinned version.
+# peerDependencies are deliberately NOT catalogued. External peers are compatibility
+# ranges (`>=19.0.0`, `>=0.86`); internal @symbiote-native peers use `workspace:^`, which
+# `pnpm pack` rewrites to a bounded caret range for the peer's current workspace version.
 catalog:
   # framework runtimes — exactly one copy across the monorepo (the RN/react
   # singleton the `overrides` below also guards transitively)
@@ -124,6 +125,22 @@ catalog:
   # Same library `svelte-package` uses for the job; it is also what `svelte-check` runs on internally,
   # so it moves with `svelte` above, not independently.
   svelte2tsx: ^0.7.61
+  # 1.9 stable, deliberately NOT 2.0 (RC as of 2026-08). The universal-renderer contract differs
+  # non-cosmetically between the two, so this is a rewrite of adapters/solid/src/renderer.ts, not a
+  # range widening: 2.0 moved the package (`solid-js/universal` -> `@solidjs/universal`), added
+  # `createSentinel`/`cleanupNodes` to RendererOptions, gave `createElement` a second staticProps
+  # argument, replaced `use()` with `applyRef`/`ref`, and changed `effect(fn, init)` to
+  # `effect(fn, effectFn)` — i.e. both the options we implement AND the compiled-output shape our
+  # `/renderer` subpath must satisfy. Full diff recorded in the solid-adapter skill.
+  solid-js: ^1.9.14
+  # Compiles our JSX into universal-renderer calls (`generate: 'universal'` + our `moduleName`).
+  # Moves in lock-step with `solid-js` above — which functions the compiled output imports is a
+  # private contract between the preset and the runtime, not a public API.
+  babel-preset-solid: ^1.9.12
+  # Runs that same compilation under Vite for the headless `solid` vitest project. Needed because
+  # adapters/solid builds with `jsx: 'preserve'` (tsc leaves JSX untouched so the consuming app's
+  # Babel compiles it), which leaves nothing to execute under Vitest without its own transform.
+  vite-plugin-solid: ^2.11.14
 
   # type packages
   '@types/react': ^19.2.0
@@ -133,11 +150,20 @@ catalog:
 
   # workspace tooling (builds/lints/tests the library packages)
   '@changesets/cli': ^2.31.0
+  '@changesets/changelog-github': ^1.0.0
   pkg-pr-new: ^0.0.75
   typescript: ~6.0.0
   vitest: ^4.1.9
   eslint: ^10.6.0
   prettier: ^3.9.1
+  # Root needs it only to READ examples/svelte/.prettierrc.js: prettier loads a resolved
+  # config's `plugins` for EVERY file it covers, not just the .svelte ones, so the root
+  # format sweep over examples/ cannot even reach that tree's .ts files without it. The
+  # sweep's glob still excludes *.svelte (.claude/rules/svelte-prettier-whitespace-safety.md).
+  prettier-plugin-svelte: ^4.1.1
+  # Same reason as the svelte plugin, for apps/docs-site's .astro pages: without it the
+  # format sweep aborts with `No parser could be inferred` on the first one.
+  prettier-plugin-astro: ^0.14.1
   '@eslint/js': ^10.0.1
   # Official Language Plugin for linting package.json as JSON (not TS/JS) — backs the
   # local require-readme / require-package-fields rules in eslint.config.js.
@@ -151,6 +177,9 @@ catalog:
   syncpack: ^15.3.2
   postcss: ^8.4.49
   postcss-value-parser: ^4.2.0
+  # CSS-Modules renaming / `composes` / `:global()` for core/css-parser. MPL-2.0 while this repo
+  # is MIT: depending on it is fine, vendoring or patching its sources is not.
+  lightningcss: ^1.32.0
   # optional CSS preprocessors — devDependencies of core/css-parser ONLY, never a dependency of
   # that package or any consuming app
   sass: ^1.101.0

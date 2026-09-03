@@ -22,13 +22,19 @@
 
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Modal, mount, unmount, type ISymbioteEvent } from '@symbiote-native/vue';
+import {
+  Modal,
+  mount,
+  unmount,
+  type ISymbioteEvent,
+} from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 421;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -42,11 +48,15 @@ function modalNode(): IFakeNode {
 
 function containerNode(): IFakeNode {
   const child = modalNode().children[0];
-  if (child === undefined) throw new Error('ModalHostView has no container child');
+  if (child === undefined)
+    throw new Error('ModalHostView has no container child');
   return child;
 }
 
-function mountModal(props: Record<string, unknown>, onDefault = () => h('symbiote-view')): void {
+function mountModal(
+  props: Record<string, unknown>,
+  onDefault = () => h('symbiote-view'),
+): void {
   mount(
     ROOT_TAG,
     defineComponent({
@@ -64,7 +74,9 @@ describe('Vue Modal on the engine', () => {
       mountModal({ visible: true });
       await tick();
 
-      expect(fabric.serialize(fabric.appRoot().children)).toBe('ModalHostView(RCTView(RCTView))');
+      expect(fabric.serialize(fabric.appRoot().children)).toBe(
+        'ModalHostView(RCTView(RCTView))',
+      );
 
       const host = modalNode();
       expect(host.props.visible).toBe(true);
@@ -130,7 +142,11 @@ describe('Vue Modal on the engine', () => {
       // background to 'transparent' regardless of a user-supplied backgroundColor, and flips the
       // iOS presentationStyle default to overFullScreen so the modal doesn't paint an opaque sheet
       // behind transparent content.
-      mountModal({ visible: true, transparent: true, style: { backgroundColor: 'red' } });
+      mountModal({
+        visible: true,
+        transparent: true,
+        style: { backgroundColor: 'red' },
+      });
       await tick();
       expect(containerNode().props.backgroundColor).toBe('transparent');
       expect(modalNode().props.presentationStyle).toBe('overFullScreen');

@@ -8,7 +8,8 @@
 // Pressable whose pressed style sets opacity:0.2 fully drops opacity on release.
 
 import { createElement, useState, type ReactElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { Pressable, Text, View, mount, unmount } from '@symbiote-native/react';
 
 interface IFakeNode {
@@ -20,7 +21,8 @@ interface IFakeNode {
 
 let committed: IFakeNode[] = [];
 let eventHandler:
-  ((handle: unknown, type: string, event: Record<string, unknown>) => void) | undefined;
+  | ((handle: unknown, type: string, event: Record<string, unknown>) => void)
+  | undefined;
 
 // Fabric-faithful merge: raw props layer onto the node's current props; a null value
 // resets that prop to its default (modelled here as removal).
@@ -43,14 +45,28 @@ const slot = {
     _r: number,
     props: Record<string, unknown>,
     instanceHandle: unknown,
-  ): IFakeNode => ({ viewName, props: { ...props }, children: [], instanceHandle }),
-  cloneNodeWithNewProps: (node: IFakeNode, raw: Record<string, unknown>): IFakeNode => ({
+  ): IFakeNode => ({
+    viewName,
+    props: { ...props },
+    children: [],
+    instanceHandle,
+  }),
+  cloneNodeWithNewProps: (
+    node: IFakeNode,
+    raw: Record<string, unknown>,
+  ): IFakeNode => ({
     ...node,
     props: mergeProps(node.props, raw),
     children: [...node.children],
   }),
-  cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({ ...node, children: [] }),
-  cloneNodeWithNewChildrenAndProps: (node: IFakeNode, raw: Record<string, unknown>): IFakeNode => ({
+  cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({
+    ...node,
+    children: [],
+  }),
+  cloneNodeWithNewChildrenAndProps: (
+    node: IFakeNode,
+    raw: Record<string, unknown>,
+  ): IFakeNode => ({
     ...node,
     props: mergeProps(node.props, raw),
     children: [],
@@ -67,7 +83,11 @@ const slot = {
     committed = childSet;
   },
   registerEventHandler: (
-    handler: (handle: unknown, type: string, event: Record<string, unknown>) => void,
+    handler: (
+      handle: unknown,
+      type: string,
+      event: Record<string, unknown>,
+    ) => void,
   ): void => {
     eventHandler = handler;
   },
@@ -92,11 +112,14 @@ function App(): ReactElement {
         testID: TEST_ID,
         onPress: () => setOpen(true),
         // pressed -> dim; released -> NO opacity key at all (TouchableOpacity's shape).
-        style: ({ pressed }: { pressed: boolean }) => (pressed ? { opacity: ACTIVE_OPACITY } : {}),
+        style: ({ pressed }: { pressed: boolean }) =>
+          pressed ? { opacity: ACTIVE_OPACITY } : {},
       },
       createElement(Text, null, 'tap'),
     ),
-    open ? createElement(View, null, createElement(Text, null, 'opened')) : null,
+    open
+      ? createElement(View, null, createElement(Text, null, 'opened'))
+      : null,
   );
 }
 
@@ -110,9 +133,13 @@ function findByTestId(nodes: IFakeNode[], id: string): IFakeNode | undefined {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   committed = [];
 });
-afterEach(() => unmount(ROOT_TAG));
+afterEach(() => {
+  unmount(ROOT_TAG);
+  vi.useRealTimers();
+});
 
 describe('clone-on-write prop removal', () => {
   // Positive only: this is a regression on the commit's merge semantics, not a guard clause —
@@ -129,10 +156,21 @@ describe('clone-on-write prop removal', () => {
       const handle = button!.instanceHandle;
 
       eventHandler!(handle, 'topTouchStart', {});
-      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(ACTIVE_OPACITY);
+      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
+        ACTIVE_OPACITY,
+      );
 
       eventHandler!(handle, 'topTouchEnd', {});
-      // The whole point: opacity must be GONE (reset), not stuck at 0.2 after the merge.
+      // Plain Pressable follows RN's 130ms active-duration floor, so the prop remains during the
+      // floor and must then be GONE (reset), not stuck at 0.2 after the Fabric merge.
+      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
+        ACTIVE_OPACITY,
+      );
+      vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS - 1);
+      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
+        ACTIVE_OPACITY,
+      );
+      vi.advanceTimersByTime(1);
       expect(findByTestId(committed, TEST_ID)?.props.opacity).toBeUndefined();
     });
   });

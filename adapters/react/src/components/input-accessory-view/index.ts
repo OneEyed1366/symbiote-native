@@ -12,7 +12,8 @@ import {
 } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 
-export interface IInputAccessoryViewProps extends IAccessibilityProps, IAriaProps {
+export interface IInputAccessoryViewProps
+  extends IAccessibilityProps, IAriaProps {
   // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard.
   nativeID?: string;
   backgroundColor?: string;
@@ -28,7 +29,12 @@ export const InputAccessoryView: FC<IInputAccessoryViewProps> = rawProps => {
   // resolved accessibility* surface rides the node via `...passthrough`.
   const { nativeID, backgroundColor, style, children, ...passthrough } =
     resolveAccessibilityProps(rawProps);
-  const host = renderInputAccessoryView({ nativeID, backgroundColor, style, passthrough });
+  const host = renderInputAccessoryView({
+    nativeID,
+    backgroundColor,
+    style,
+    passthrough,
+  });
   // host has no structural children; the user children nest directly under it.
   return createElement(host.type, { key: host.key, ...host.props }, children);
 };

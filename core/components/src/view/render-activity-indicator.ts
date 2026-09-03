@@ -1,3 +1,29 @@
+// ACTIVITYINDICATOR IS NOT A LOWERABLE PRIMITIVE, AND WILL NOT BECOME ONE. Decided 2026-09-01.
+// It stays a component in every adapter; do not add it to `HOST_PRIMITIVES`.
+//
+// The reason is the `el('symbiote-view', wrapperProps, [el('symbiote-activity-indicator', …)])` at
+// the bottom of this file: the render SYNTHESIZES a node that is not the primitive itself. A lowered
+// tag is ONE engine node, and a host behavior's `foldPayload` maps props to props on that node — it
+// cannot create a child. Lowering would therefore drop the centering container and change layout,
+// which is an optimisation moving the observable surface, the one thing this design may not do.
+//
+// The wrapper is not over-building: RN's own `ActivityIndicator.js:112` renders a `<View>` around
+// the native spinner too, so the two nodes are inherent. And the container cannot be folded INTO the
+// spinner — it carries `alignItems`/`justifyContent`, which centre the spinner inside the space it
+// was given; moved onto the spinner they would centre its children, of which it has none.
+//
+// The two alternatives were priced and both cost more than the primitive is worth. A behavior that
+// CREATES a node needs a commit hook, i.e. a machine, i.e. a `-managed` tag split — a new category,
+// not a fold. Synthesising the container inside the engine's commit walk is NOT the `RCTVirtualText`
+// precedent it resembles: `viewNameFor` changes what one node IS and never ADDS one, so adding one
+// would make the retained and committed trees disagree on node count — which every counter, census
+// probe and benchmark in this repo assumes. Spinners are rare on a screen, so the per-instance cost
+// lowering removes is not measurably paid here; the objection to leaving it is uniformity, not speed.
+//
+// Under half A this costs an app NOTHING: `View` and `ActivityIndicator` are both ordinary imports
+// from the adapter barrel, so which one is internally a tag and which a component is invisible at
+// the call site. The general rule is in `.claude/rules/host-primitive-tier.md`.
+//
 // ActivityIndicator: the render half (framework-agnostic). RN wraps the native spinner
 // in a centering View and translates `size` in JS: 'small'/'large' map to a native size
 // enum AND a fixed box style; a numeric size never reaches native (it sizes the spinner
@@ -10,7 +36,11 @@
 // file supplies those bits via `platform`.
 
 import { dlog } from '@symbiote-native/engine';
-import type { IStyleProp, IViewStyle, ISymbioteEvent } from '@symbiote-native/engine';
+import type {
+  IStyleProp,
+  IViewStyle,
+  ISymbioteEvent,
+} from '@symbiote-native/engine';
 import { el } from '../descriptor';
 import type { IDescriptor } from '../descriptor';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
@@ -20,7 +50,8 @@ export type IActivityIndicatorSize = 'small' | 'large' | number;
 // Author-facing props: the framework-agnostic public surface every adapter exposes. The
 // fields are identical across adapters (no framework element / ref / children), so they live
 // here once; each adapter only supplies its lifecycle + descriptor bridge.
-export interface IActivityIndicatorProps extends IAccessibilityProps, IAriaProps {
+export interface IActivityIndicatorProps
+  extends IAccessibilityProps, IAriaProps {
   animating?: boolean;
   color?: string;
   size?: IActivityIndicatorSize;
@@ -68,10 +99,16 @@ type INativeSize = {
 
 function resolveSize(size: IActivityIndicatorSize): INativeSize {
   if (size === 'small') {
-    return { sizeStyle: { width: SIZE_SMALL_PX, height: SIZE_SMALL_PX }, sizeProp: 'small' };
+    return {
+      sizeStyle: { width: SIZE_SMALL_PX, height: SIZE_SMALL_PX },
+      sizeProp: 'small',
+    };
   }
   if (size === 'large') {
-    return { sizeStyle: { width: SIZE_LARGE_PX, height: SIZE_LARGE_PX }, sizeProp: 'large' };
+    return {
+      sizeStyle: { width: SIZE_LARGE_PX, height: SIZE_LARGE_PX },
+      sizeProp: 'large',
+    };
   }
   return { sizeStyle: { width: size, height: size } };
 }
@@ -106,5 +143,7 @@ export function renderActivityIndicator(
     style: [CONTAINER_STYLE, view.style],
   };
 
-  return el('symbiote-view', wrapperProps, [el('symbiote-activity-indicator', nativeProps)]);
+  return el('symbiote-view', wrapperProps, [
+    el('symbiote-activity-indicator', nativeProps),
+  ]);
 }

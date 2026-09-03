@@ -48,7 +48,11 @@
   import type { INavigationScopeValue } from '../navigation-context';
   import NavigationScope from '../navigation-scope.svelte';
   import { SCREEN_REGISTRY_HOST_PROPS } from '../registry-host';
-  import { setScreenCollector, toRegistry, withoutScreen } from '../screen-registry';
+  import {
+    setScreenCollector,
+    toRegistry,
+    withoutScreen,
+  } from '../screen-registry';
   import type { IRegisteredScreen } from '../screen-registry';
   import type { ITabScreenProps } from '../tab-screen-props';
   import type { ITabProps } from './tab-props';
@@ -94,7 +98,8 @@
   let dispatchedState = $state.raw<ITabRouterState | null>(null);
 
   const state = $derived.by<ITabRouterState>(() => {
-    if (registeredRoutes.length === 0) dlog('Tab: no <Tab.Screen> children registered');
+    if (registeredRoutes.length === 0)
+      dlog('Tab: no <Tab.Screen> children registered');
     const dispatched = dispatchedState;
     return dispatched === null
       ? createInitialTabState(registeredRoutes, initialRouteName)
@@ -207,29 +212,33 @@
   );
 
   const tabBar = $derived.by<IDescriptor>(() =>
-    renderTabBar({ items, style: focusedOptions?.tabBarStyle, passthrough: {} }),
+    renderTabBar({
+      items,
+      style: focusedOptions?.tabBarStyle,
+      passthrough: {},
+    }),
   );
 
   // Only the focused route's screen is ever mounted (unlike Stack, which keeps every pushed route
   // alive), so a fresh NavigationScope per focus change is sufficient - the previous screen's
   // whole subtree (and any listeners it registered) is torn down by an ordinary unmount when
   // focus moves on.
-  const focusedScreen = $derived.by<{ scope: INavigationScopeValue; component: Component } | undefined>(
-    () => {
-      if (focusedRoute === undefined) return undefined;
-      const entry = registry.get(focusedRoute.name);
-      if (entry === undefined) return undefined;
-      return {
-        component: entry.component,
-        scope: {
-          route: focusedRoute,
-          navigation: handle,
-          emitter: emitterFor(focusedRoute.key),
-          parent: parentScope?.current,
-        },
-      };
-    },
-  );
+  const focusedScreen = $derived.by<
+    { scope: INavigationScopeValue; component: Component } | undefined
+  >(() => {
+    if (focusedRoute === undefined) return undefined;
+    const entry = registry.get(focusedRoute.name);
+    if (entry === undefined) return undefined;
+    return {
+      component: entry.component,
+      scope: {
+        route: focusedRoute,
+        navigation: handle,
+        emitter: emitterFor(focusedRoute.key),
+        parent: parentScope?.current,
+      },
+    };
+  });
 
   // The bar's ROOT stays a literal template tag (so `bind:this` has a statically known tag) and
   // only its children go through the Descriptor bridge - the uniform shape every Svelte component
@@ -244,4 +253,17 @@
   });
 </script>
 
-<symbiote-view p={TAB_ROOT_PROPS}><symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>{@render children?.()}</symbiote-text><symbiote-view p={TAB_CONTENT_PROPS}>{#if focusedScreen !== undefined}{@const FocusedComponent = focusedScreen.component}<NavigationScope value={focusedScreen.scope}><FocusedComponent /></NavigationScope>{/if}</symbiote-view><symbiote-view p={tabBar.props} bind:this={tabBarHost}></symbiote-view></symbiote-view>
+<symbiote-view p={TAB_ROOT_PROPS}>
+  <symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>
+    {@render children?.()}
+  </symbiote-text>
+  <symbiote-view p={TAB_CONTENT_PROPS}>
+    {#if focusedScreen !== undefined}
+      {@const FocusedComponent = focusedScreen.component}
+      <NavigationScope value={focusedScreen.scope}>
+        <FocusedComponent />
+      </NavigationScope>
+    {/if}
+  </symbiote-view>
+  <symbiote-view p={tabBar.props} bind:this={tabBarHost} />
+</symbiote-view>

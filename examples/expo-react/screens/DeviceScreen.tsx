@@ -90,7 +90,11 @@ export function DeviceScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="device-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="device-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -101,8 +105,9 @@ export function DeviceScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Device</Text>
             <Text className="hero-body">
-              @symbiote-native/device — brand/model/OS constants resolved eagerly at import time,
-              plus one-shot async checks for device type, uptime, and root/jailbreak detection.
+              @symbiote-native/device — brand/model/OS constants resolved
+              eagerly at import time, plus one-shot async checks for device
+              type, uptime, and root/jailbreak detection.
             </Text>
           </View>
         </View>
@@ -132,7 +137,9 @@ export function DeviceScreen() {
             onPress={handleGetDeviceType}
             color={lineColor}
           />
-          {asyncDeviceType !== null && <ValueRow label="Device type (async)" value={asyncDeviceType} />}
+          {asyncDeviceType !== null && (
+            <ValueRow label="Device type (async)" value={asyncDeviceType} />
+          )}
           <ActionButton
             testID="device-uptime-button"
             title="Get uptime"
@@ -146,7 +153,12 @@ export function DeviceScreen() {
             onPress={handleCheckRooted}
             color={lineColor}
           />
-          {isRooted !== null && <ValueRow label="Rooted/jailbroken" value={isRooted ? 'true' : 'false'} />}
+          {isRooted !== null && (
+            <ValueRow
+              label="Rooted/jailbroken"
+              value={isRooted ? 'true' : 'false'}
+            />
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

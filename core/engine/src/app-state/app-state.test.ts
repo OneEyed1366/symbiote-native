@@ -31,7 +31,9 @@ beforeEach(async () => {
   moduleLinked = true;
 
   const fakeAppState = {
-    getConstants: (): { initialAppState: string } => ({ initialAppState: 'active' }),
+    getConstants: (): { initialAppState: string } => ({
+      initialAppState: 'active',
+    }),
     addListener: (): void => {
       appStateAdded += 1;
     },
@@ -41,10 +43,14 @@ beforeEach(async () => {
   };
 
   globalThis.__turboModuleProxy = <T>(name: string): T | null => {
-    const module: unknown = name === 'AppState' && moduleLinked ? fakeAppState : undefined;
+    const module: unknown =
+      name === 'AppState' && moduleLinked ? fakeAppState : undefined;
     return isPresent<T>(module) ? module : null;
   };
-  globalThis.RN$registerCallableModule = (name: string, factory: () => IDeviceHub): void => {
+  globalThis.RN$registerCallableModule = (
+    name: string,
+    factory: () => IDeviceHub,
+  ): void => {
     if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   };
 

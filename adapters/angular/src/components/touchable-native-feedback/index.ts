@@ -44,8 +44,16 @@ import {
   type IPressableAndroidRippleConfig,
   type IRectOffset,
 } from '@symbiote-native/components';
-import { dlog, isSymbioteEvent, type ISymbioteEvent } from '@symbiote-native/engine';
-import { anchorHostStyle, SymbioteHostPropsDirective, ViewHost } from '../../primitives';
+import {
+  dlog,
+  isSymbioteEvent,
+  type ISymbioteEvent,
+} from '@symbiote-native/engine';
+import {
+  anchorHostStyle,
+  SymbioteHostPropsDirective,
+  ViewHost,
+} from '../../primitives';
 import { Pressable, type IAngularPressableInputs } from '../pressable';
 
 export type {
@@ -58,7 +66,10 @@ export type {
 // feedback config) minus children (Angular takes children via <ng-content>) and minus the press/
 // hover events (declared as this component's OWN @Output()s below). Declared per-adapter over the
 // shared Pressable INPUT surface.
-export type IAngularTouchableNativeFeedbackProps = Omit<IAngularPressableInputs, 'style'> & {
+export type IAngularTouchableNativeFeedbackProps = Omit<
+  IAngularPressableInputs,
+  'style'
+> & {
   background?: INativeFeedbackBackground;
   useForeground?: boolean;
 };
@@ -71,6 +82,7 @@ export type IAngularTouchableNativeFeedbackProps = Omit<IAngularPressableInputs,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <Pressable
+      [__minPressDuration]="0"
       (press)="press.emit($event)"
       (pressIn)="pressIn.emit($event)"
       (pressOut)="pressOut.emit($event)"
@@ -89,13 +101,7 @@ export type IAngularTouchableNativeFeedbackProps = Omit<IAngularPressableInputs,
       [android_ripple]="android_ripple"
       [android_disableSound]="android_disableSound"
     >
-      <symbiote-view
-        [symbioteHostProps]="hostProps()"
-        (accessibilityAction)="emit(accessibilityAction, $event)"
-        (accessibilityTap)="emit(accessibilityTap, $event)"
-        (magicTap)="emit(magicTap, $event)"
-        (accessibilityEscape)="emit(accessibilityEscape, $event)"
-      >
+      <symbiote-view [symbioteHostProps]="hostProps()">
         <ng-content></ng-content>
       </symbiote-view>
     </Pressable>
@@ -107,7 +113,8 @@ export class TouchableNativeFeedback
   // The static helpers are pure config-dict producers; they live as members on the component class
   // so callers reach them as `TouchableNativeFeedback.Ripple(...)`, exactly like RN.
   static readonly SelectableBackground = selectableBackground;
-  static readonly SelectableBackgroundBorderless = selectableBackgroundBorderless;
+  static readonly SelectableBackgroundBorderless =
+    selectableBackgroundBorderless;
   static readonly Ripple = rippleBackground;
   static readonly canUseNativeForeground = canUseNativeForeground;
 
@@ -144,8 +151,10 @@ export class TouchableNativeFeedback
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -222,7 +231,10 @@ export class TouchableNativeFeedback
   // backgroundProps picks the foreground slot only where the platform supports it, else the
   // background slot (canUseNativeForeground) — shared with React/Vue. One side is always undefined.
   get feedback(): Record<string, INativeFeedbackBackground> {
-    return backgroundProps(this.resolvedBackground, this.useForeground === true);
+    return backgroundProps(
+      this.resolvedBackground,
+      this.useForeground === true,
+    );
   }
 
   // Assembles the SAME resolved values the template used to bind one-by-one into a single
@@ -245,12 +257,27 @@ export class TouchableNativeFeedback
       nativeID: this.nativeID,
       accessible: this.accessible,
       ...this.folded,
+      onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),
+      onAccessibilityTap: this.eventEmitterHandler(this.accessibilityTap),
+      onMagicTap: this.eventEmitterHandler(this.magicTap),
+      onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
     };
   });
 
   // Forward an engine event to the matching @Output(), narrowing the template's untyped $event.
-  emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
+  private emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     if (isSymbioteEvent(event)) emitter.emit(event);
+  }
+
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`): native fires them only when the committed
+  // payload carries a FUNCTION at that key, so a template binding here lit the gate on every
+  // instance whether or not an app ever subscribed. `.observed`-gated, mirroring Pressable's
+  // `accessibilityEmitterHandler`.
+  private eventEmitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): ((event: unknown) => void) | undefined {
+    return emitter.observed ? event => this.emit(emitter, event) : undefined;
   }
 
   // Fold the web aria-*/role aliases into the canonical accessibility* props once per render, so the
@@ -261,7 +288,10 @@ export class TouchableNativeFeedback
       accessibilityLabel: this.accessibilityLabel,
       accessibilityHint: this.accessibilityHint,
       accessibilityRole: this.accessibilityRole,
-      accessibilityState: resolveDisabledAccessibilityState(this.accessibilityState, this.disabled),
+      accessibilityState: resolveDisabledAccessibilityState(
+        this.accessibilityState,
+        this.disabled,
+      ),
       accessibilityValue: this.accessibilityValue,
       accessibilityActions: this.accessibilityActions,
       accessibilityLabelledBy: this.accessibilityLabelledBy,
@@ -272,8 +302,10 @@ export class TouchableNativeFeedback
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

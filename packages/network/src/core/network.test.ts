@@ -115,7 +115,9 @@ describe('Negative (native method absent — must throw the specific Unavailabil
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_NETWORK.getNetworkStateAsync = undefined;
 
-      await expect(getNetworkStateAsync()).rejects.toBeInstanceOf(UnavailabilityError);
+      await expect(getNetworkStateAsync()).rejects.toBeInstanceOf(
+        UnavailabilityError,
+      );
       await expect(getNetworkStateAsync()).rejects.toThrow(
         'getNetworkStateAsync is not available on expo-network',
       );
@@ -130,7 +132,9 @@ describe('Negative (native method absent — must throw the specific Unavailabil
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_NETWORK.getIpAddressAsync = undefined;
 
-      await expect(getIpAddressAsync()).rejects.toBeInstanceOf(UnavailabilityError);
+      await expect(getIpAddressAsync()).rejects.toBeInstanceOf(
+        UnavailabilityError,
+      );
       await expect(getIpAddressAsync()).rejects.toThrow(
         'getIpAddressAsync is not available on expo-network',
       );
@@ -145,7 +149,9 @@ describe('Negative (native method absent — must throw the specific Unavailabil
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_NETWORK.isAirplaneModeEnabledAsync = undefined;
 
-      await expect(isAirplaneModeEnabledAsync()).rejects.toBeInstanceOf(UnavailabilityError);
+      await expect(isAirplaneModeEnabledAsync()).rejects.toBeInstanceOf(
+        UnavailabilityError,
+      );
       await expect(isAirplaneModeEnabledAsync()).rejects.toThrow(
         'isAirplaneModeEnabledAsync is not available on expo-network',
       );

@@ -81,7 +81,10 @@ export interface IAccessibilityInfoStatic {
   ): void;
   setAccessibilityFocus(reactTag: number): void;
   getRecommendedTimeoutMillis(originalTimeout: number): Promise<number>;
-  sendAccessibilityEvent(handle: IAccessibilityHandle, eventType: IAccessibilityEventType): void;
+  sendAccessibilityEvent(
+    handle: IAccessibilityHandle,
+    eventType: IAccessibilityEventType,
+  ): void;
   addEventListener(
     eventName: IAccessibilityChangeEventName,
     handler: IAccessibilityChangeEventHandler,
@@ -89,7 +92,8 @@ export interface IAccessibilityInfoStatic {
 }
 
 // The named events sendAccessibilityEvent can dispatch (RN's AccessibilityEventTypes).
-export type IAccessibilityEventType = 'click' | 'focus' | 'viewHoverEnter' | 'windowStateChange';
+export type IAccessibilityEventType =
+  'click' | 'focus' | 'viewHoverEnter' | 'windowStateChange';
 
 // The routing behind IAccessibilityInfoStatic.sendAccessibilityEvent, shared by both
 // platforms: resolve the handle to a real SymbioteNode and dispatch through the Fabric
@@ -116,6 +120,8 @@ export function routeSendAccessibilityEvent(
     );
     return;
   }
-  dlog(`AccessibilityInfo(${platformLabel}).sendAccessibilityEvent("${eventType}") -> slot`);
+  dlog(
+    `AccessibilityInfo(${platformLabel}).sendAccessibilityEvent("${eventType}") -> slot`,
+  );
   dispatchAccessibilityEvent(handle, eventType);
 }

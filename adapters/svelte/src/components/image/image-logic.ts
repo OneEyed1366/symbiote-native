@@ -19,7 +19,11 @@ import {
   type IStyleProp,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import type { IImageSource, IImageSourceProp, IImageViewProps } from '@symbiote-native/components';
+import type {
+  IImageSource,
+  IImageSourceProp,
+  IImageViewProps,
+} from '@symbiote-native/components';
 
 function normalizeSource(source: IImageSourceProp): unknown[] {
   const resolved = resolveImageSource(source);
@@ -55,7 +59,13 @@ function expandSrcSet(
     const scale = parseInt(xScale.slice(0, -1), 10);
     if (Number.isNaN(scale)) continue;
     if (scale === 1) useSrcForDefaultScale = false;
-    sources.push({ uri, scale, width: view.width, height: view.height, ...{ headers } });
+    sources.push({
+      uri,
+      scale,
+      width: view.width,
+      height: view.height,
+      ...{ headers },
+    });
   }
   if (useSrcForDefaultScale && view.src !== undefined) {
     sources.push({
@@ -76,7 +86,9 @@ function resolveSourceArray(view: IImageViewProps): unknown[] {
     return expandSrcSet(view.srcSet, view, headers);
   }
   if (view.src !== undefined) {
-    return [{ uri: view.src, width: view.width, height: view.height, ...{ headers } }];
+    return [
+      { uri: view.src, width: view.width, height: view.height, ...{ headers } },
+    ];
   }
   if (view.source === undefined) {
     dlog('Image: no source / src / srcSet provided');
@@ -85,7 +97,11 @@ function resolveSourceArray(view: IImageViewProps): unknown[] {
   const sources = normalizeSource(view.source);
   if (Object.keys(headers).length > 0 && sources.length === 1) {
     const [only] = sources;
-    if (typeof only === 'object' && only !== null && typeof Reflect.get(only, 'uri') === 'string') {
+    if (
+      typeof only === 'object' &&
+      only !== null &&
+      typeof Reflect.get(only, 'uri') === 'string'
+    ) {
       return [{ ...only, headers }];
     }
   }
@@ -130,10 +146,12 @@ export function buildImageBag(view: IImageViewProps): Record<string, unknown> {
   // `alt` is the accessibility text: it sets accessibilityLabel and marks the image accessible.
   // An explicit accessibilityLabel (already folded into passthrough) still wins.
   if (view.alt !== undefined) {
-    if (mapped.accessibilityLabel === undefined) mapped.accessibilityLabel = view.alt;
+    if (mapped.accessibilityLabel === undefined)
+      mapped.accessibilityLabel = view.alt;
     mapped.accessible = true;
   }
-  if (view.defaultSource !== undefined) mapped.defaultSource = normalizeSource(view.defaultSource);
+  if (view.defaultSource !== undefined)
+    mapped.defaultSource = normalizeSource(view.defaultSource);
   if (view.loadingIndicatorSource !== undefined) {
     mapped.loadingIndicatorSrc = readSourceUri(view.loadingIndicatorSource);
   }

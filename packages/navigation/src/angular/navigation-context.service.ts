@@ -38,7 +38,8 @@ export class NavigationContextService {
   // package's zoneless/signals-first convention. `navigation`/`emitter` are stable for a screen's
   // whole lifetime, so they stay plain fields - no reactivity needed there.
   private readonly routeSignal = signal<IRoute<unknown> | undefined>(undefined);
-  readonly route: Signal<IRoute<unknown> | undefined> = this.routeSignal.asReadonly();
+  readonly route: Signal<IRoute<unknown> | undefined> =
+    this.routeSignal.asReadonly();
 
   navigation!: IAnyNavigatorHandle;
   emitter!: INavigationEmitter;
@@ -57,7 +58,9 @@ export class NavigationContextService {
 // identical everywhere instead of six independently-typed copies. Must be called from an
 // injection context, same requirement `inject()` itself has - every call site is the first line
 // of an injectX function, which callers already only invoke from their own injection context.
-export function requireNavigationContext(injectorName: string): NavigationContextService {
+export function requireNavigationContext(
+  injectorName: string,
+): NavigationContextService {
   const context = inject(NavigationContextService, { optional: true });
   if (!context) {
     throw new Error(

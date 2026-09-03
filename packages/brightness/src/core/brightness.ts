@@ -6,14 +6,20 @@ import { Platform, UnavailabilityError } from 'expo-modules-core';
 import type { EventSubscription } from 'expo-modules-core';
 
 import { expoBrightness } from './native-module';
-import { BrightnessMode, type BrightnessEvent, type PermissionResponse } from './types';
+import {
+  BrightnessMode,
+  type BrightnessEvent,
+  type PermissionResponse,
+} from './types';
 
 const NATIVE_MODULE_NAME = 'expo-brightness';
 
 function clampBrightness(brightnessValue: number, callerName: string): number {
   const clamped = Math.max(0, Math.min(brightnessValue, 1));
   if (Number.isNaN(clamped)) {
-    throw new TypeError(`${callerName} cannot be called with ${brightnessValue}`);
+    throw new TypeError(
+      `${callerName} cannot be called with ${brightnessValue}`,
+    );
   }
   return clamped;
 }
@@ -35,7 +41,9 @@ export async function getBrightnessAsync(): Promise<number> {
  * Sets the current screen brightness. On iOS this only affects the screen while the app is
  * foregrounded; on Android it persists until changed again.
  */
-export async function setBrightnessAsync(brightnessValue: number): Promise<void> {
+export async function setBrightnessAsync(
+  brightnessValue: number,
+): Promise<void> {
   const clamped = clampBrightness(brightnessValue, 'setBrightnessAsync');
   if (!expoBrightness.setBrightnessAsync) {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'setBrightnessAsync');
@@ -53,7 +61,10 @@ export async function getSystemBrightnessAsync(): Promise<number> {
     return getBrightnessAsync();
   }
   if (!expoBrightness.getSystemBrightnessAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getSystemBrightnessAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'getSystemBrightnessAsync',
+    );
   }
   return expoBrightness.getSystemBrightnessAsync();
 }
@@ -63,13 +74,18 @@ export async function getSystemBrightnessAsync(): Promise<number> {
  * no separate system-level brightness to set.
  * @platform android
  */
-export async function setSystemBrightnessAsync(brightnessValue: number): Promise<void> {
+export async function setSystemBrightnessAsync(
+  brightnessValue: number,
+): Promise<void> {
   const clamped = clampBrightness(brightnessValue, 'setSystemBrightnessAsync');
   if (Platform.OS !== 'android') {
     return setBrightnessAsync(clamped);
   }
   if (!expoBrightness.setSystemBrightnessAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'setSystemBrightnessAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'setSystemBrightnessAsync',
+    );
   }
   await expoBrightness.setSystemBrightnessAsync(clamped);
 }
@@ -84,7 +100,10 @@ export async function restoreSystemBrightnessAsync(): Promise<void> {
     return;
   }
   if (!expoBrightness.restoreSystemBrightnessAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'restoreSystemBrightnessAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'restoreSystemBrightnessAsync',
+    );
   }
   await expoBrightness.restoreSystemBrightnessAsync();
 }
@@ -102,7 +121,10 @@ export async function isUsingSystemBrightnessAsync(): Promise<boolean> {
     return false;
   }
   if (!expoBrightness.isUsingSystemBrightnessAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'isUsingSystemBrightnessAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'isUsingSystemBrightnessAsync',
+    );
   }
   return expoBrightness.isUsingSystemBrightnessAsync();
 }
@@ -117,7 +139,10 @@ export async function getSystemBrightnessModeAsync(): Promise<BrightnessMode> {
     return BrightnessMode.UNKNOWN;
   }
   if (!expoBrightness.getSystemBrightnessModeAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getSystemBrightnessModeAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'getSystemBrightnessModeAsync',
+    );
   }
   return expoBrightness.getSystemBrightnessModeAsync();
 }
@@ -127,12 +152,17 @@ export async function getSystemBrightnessModeAsync(): Promise<BrightnessMode> {
  * when passed `BrightnessMode.UNKNOWN` (there is nothing meaningful to set it to).
  * @platform android
  */
-export async function setSystemBrightnessModeAsync(brightnessMode: BrightnessMode): Promise<void> {
+export async function setSystemBrightnessModeAsync(
+  brightnessMode: BrightnessMode,
+): Promise<void> {
   if (Platform.OS !== 'android' || brightnessMode === BrightnessMode.UNKNOWN) {
     return;
   }
   if (!expoBrightness.setSystemBrightnessModeAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'setSystemBrightnessModeAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'setSystemBrightnessModeAsync',
+    );
   }
   await expoBrightness.setSystemBrightnessModeAsync(brightnessMode);
 }

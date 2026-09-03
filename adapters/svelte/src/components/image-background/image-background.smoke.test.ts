@@ -29,10 +29,11 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -42,14 +43,25 @@ const OUT = join(__dirname, '.smoke-compiled-image-background.mjs');
 // Node's import() caches by resolved file path (svelte-adapter-dom-shim skill §15), so a second
 // scenario baking a DIFFERENT markup string into the compiled parent needs its OWN filename or it
 // silently re-imports the first scenario's stale module.
-const PARENT_OUT = join(__dirname, '.smoke-compiled-image-background-parent.mjs');
-const PARENT_STYLE_OUT = join(__dirname, '.smoke-compiled-image-background-parent-style.mjs');
+const PARENT_OUT = join(
+  __dirname,
+  '.smoke-compiled-image-background-parent.mjs',
+);
+const PARENT_STYLE_OUT = join(
+  __dirname,
+  '.smoke-compiled-image-background-parent-style.mjs',
+);
 // Co-located next to the REAL View.svelte (one level up) so a relative import from PARENT_OUT
 // resolves it, following button.smoke.test.ts's precedent for pulling in a real sibling.
-const VIEW_OUT = join(__dirname, '..', '.smoke-compiled-view-for-image-background.mjs');
+const VIEW_OUT = join(
+  __dirname,
+  '..',
+  '.smoke-compiled-view-for-image-background.mjs',
+);
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -64,9 +76,17 @@ afterEach(() => {
   rmSync(VIEW_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
@@ -81,7 +101,8 @@ async function loadMountable(imageStyle?: string): Promise<Component> {
     VIEW_OUT,
   );
 
-  const imageStyleAttr = imageStyle === undefined ? '' : ` imageStyle="${imageStyle}"`;
+  const imageStyleAttr =
+    imageStyle === undefined ? '' : ` imageStyle="${imageStyle}"`;
   const parentOut = imageStyle === undefined ? PARENT_OUT : PARENT_STYLE_OUT;
 
   // No whitespace anywhere between the </script> and the markup, or between sibling elements —
@@ -121,7 +142,8 @@ describe('ImageBackground (real compiled index.svelte)', () => {
 
       const wrapper = fabric.find(
         node =>
-          node.viewName === 'RCTView' && node.children.some(c => c.viewName === 'RCTImageView'),
+          node.viewName === 'RCTView' &&
+          node.children.some(c => c.viewName === 'RCTImageView'),
       );
       expect(wrapper).toBeDefined();
       if (wrapper === undefined) return;
@@ -146,7 +168,14 @@ describe('ImageBackground (real compiled index.svelte)', () => {
     // inner Image, after the dimension proxy, rather than forwarding the raw string to native
     // (which Fabric cannot consume as a style value).
     it('resolves a string imageStyle through the class registry and merges it onto the Image', async () => {
-      registerStyles({ ibTint: { opacity: 0.5 } });
+      registerRules([
+        {
+          tokens: ['ibTint'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { opacity: 0.5 },
+        },
+      ]);
       const Parent = await loadMountable('ibTint');
       mount(ROOT_TAG, Parent);
       await tick();

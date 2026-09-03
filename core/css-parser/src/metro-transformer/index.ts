@@ -49,7 +49,8 @@ export function createCssMetroTransformer(
 ): IMetroTransformer {
   return {
     async transform(params) {
-      if (!isStyleFile(params.filename)) return upstreamTransformer.transform(params);
+      if (!isStyleFile(params.filename))
+        return upstreamTransformer.transform(params);
       const { code } = await compileCssFile(params.src, params.filename);
       return upstreamTransformer.transform({
         ...params,

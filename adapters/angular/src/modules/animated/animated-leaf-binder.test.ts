@@ -85,7 +85,7 @@ describe('AnimatedLeafBinder', () => {
     // why: this is the entire point of the leaf — an AnimatedValue mutation must reach the
     // committed Fabric node's own prop, or every Animated.* component (View/Text/Image/
     // ScrollView) driven through this binder would render a static, non-animating value.
-    it('creates and attaches an AnimatedProps leaf, wiring value changes onto the host node', () => {
+    it('creates and attaches an AnimatedProps leaf, wiring value changes onto the host node', async () => {
       const node = committedNode();
       const binder = new AnimatedLeafBinder(() => node, 'test');
       const opacity = new AnimatedValue(1);
@@ -96,6 +96,9 @@ describe('AnimatedLeafBinder', () => {
       binder.reconcile({ style: { opacity } }, false);
 
       opacity.setValue(0.4);
+      // The engine coalesces setNativeProps writes to the microtask boundary, so an animated
+      // value reaches Fabric one tick after the drive (core/engine/src/commit.ts).
+      await Promise.resolve();
       expect(fakeView()?.props.opacity).toBe(0.4);
     });
 
@@ -104,7 +107,7 @@ describe('AnimatedLeafBinder', () => {
     // Fabric tag exists, so binding eagerly would silently no-op forever; whenCommitted's
     // post-commit retry is what makes an Animated prop on a not-yet-committed component work
     // at all instead of only working by accident of timing.
-    it('binds to the host node via whenCommitted, deferring until the node is actually committed', () => {
+    it('binds to the host node via whenCommitted, deferring until the node is actually committed', async () => {
       const { node, commit } = uncommittedNode();
       const binder = new AnimatedLeafBinder(() => node, 'test');
       const opacity = new AnimatedValue(1);
@@ -117,6 +120,7 @@ describe('AnimatedLeafBinder', () => {
       commit();
       // whenCommitted's post-commit retry binds the leaf now; a subsequent change flushes.
       opacity.setValue(0.7);
+      await Promise.resolve();
       expect(fakeView()?.props.opacity).toBe(0.7);
     });
 
@@ -160,7 +164,9 @@ describe('AnimatedLeafBinder', () => {
       const binder = new AnimatedLeafBinder(() => null, 'test');
       const opacity = new AnimatedValue(1);
 
-      expect(() => binder.reconcile({ style: { opacity } }, false)).not.toThrow();
+      expect(() =>
+        binder.reconcile({ style: { opacity } }, false),
+      ).not.toThrow();
       opacity.setValue(0.4);
       // Nothing to bind to yet: no Fabric node was ever created, let alone flushed onto.
       expect(fabric.created).toHaveLength(0);

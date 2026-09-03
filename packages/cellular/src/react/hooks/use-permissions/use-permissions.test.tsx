@@ -60,7 +60,9 @@ function Probe(): ReactElement {
 
 // Node only reports an unhandled rejection a macrotask after the promise settles, so a plain
 // `await` on the hook's own state is too early to prove one did not happen.
-async function collectUnhandledRejections(run: () => Promise<void>): Promise<unknown[]> {
+async function collectUnhandledRejections(
+  run: () => Promise<void>,
+): Promise<unknown[]> {
   const unhandled: unknown[] = [];
   const onUnhandledRejection = (reason: unknown): void => {
     unhandled.push(reason);
@@ -151,7 +153,9 @@ describe('usePermissions', () => {
       mount(ROOT_TAG, createElement(Probe));
       await vi.waitFor(() => expect(latestStatus).toEqual(GRANTED));
 
-      requestPermissionsAsync.mockRejectedValueOnce(new Error('permission request failed'));
+      requestPermissionsAsync.mockRejectedValueOnce(
+        new Error('permission request failed'),
+      );
 
       await expect(requestFn?.()).rejects.toThrow('permission request failed');
       expect(latestStatus).toEqual(GRANTED);
@@ -161,7 +165,9 @@ describe('usePermissions', () => {
       mount(ROOT_TAG, createElement(Probe));
       await vi.waitFor(() => expect(latestStatus).toEqual(GRANTED));
 
-      getPermissionsAsync.mockRejectedValueOnce(new Error('permission check failed'));
+      getPermissionsAsync.mockRejectedValueOnce(
+        new Error('permission check failed'),
+      );
 
       await expect(getFn?.()).rejects.toThrow('permission check failed');
       expect(latestStatus).toEqual(GRANTED);
@@ -171,11 +177,15 @@ describe('usePermissions', () => {
       // why: the mount-time auto-fetch has no caller to reject to. It used to be
       // `void getPermission()`, so a native rejection escaped the hook entirely as an unhandled
       // promise rejection and left `status` at null — indistinguishable from "still fetching".
-      getPermissionsAsync.mockRejectedValueOnce(new Error('permission check failed'));
+      getPermissionsAsync.mockRejectedValueOnce(
+        new Error('permission check failed'),
+      );
 
       const unhandled = await collectUnhandledRejections(async () => {
         mount(ROOT_TAG, createElement(Probe));
-        await vi.waitFor(() => expect(latestError?.message).toBe('permission check failed'));
+        await vi.waitFor(() =>
+          expect(latestError?.message).toBe('permission check failed'),
+        );
       });
 
       expect(unhandled).toEqual([]);
@@ -186,7 +196,9 @@ describe('usePermissions', () => {
     it('clears the recorded error once a later getPermission() succeeds', async () => {
       // why: a consumer that retries by hand after a failed mount fetch must end up with a clean
       // slate — a stale error next to a freshly fetched status would keep reading as "broken".
-      getPermissionsAsync.mockRejectedValueOnce(new Error('permission check failed'));
+      getPermissionsAsync.mockRejectedValueOnce(
+        new Error('permission check failed'),
+      );
       mount(ROOT_TAG, createElement(Probe));
       await vi.waitFor(() => expect(latestError).not.toBeNull());
 

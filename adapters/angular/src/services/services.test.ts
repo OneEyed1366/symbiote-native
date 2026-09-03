@@ -1,7 +1,11 @@
 import '@angular/compiler';
 import { Component, inject } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Appearance, Dimensions, type IDimensionsSet } from '@symbiote-native/engine';
+import {
+  Appearance,
+  Dimensions,
+  type IDimensionsSet,
+} from '@symbiote-native/engine';
 
 // `IAppearancePreferences` isn't exported from the engine barrel — derived structurally from
 // the real `addChangeListener` signature instead of re-declaring (and risking drifting from)
@@ -144,12 +148,16 @@ describe('Angular DI services over engine modules', () => {
   it('provides WindowDimensionsService from the Symbiote root injector', async () => {
     const initialMetrics = { width: 100, height: 200, scale: 1, fontScale: 1 };
     vi.spyOn(Dimensions, 'get').mockReturnValue(initialMetrics);
-    vi.spyOn(Dimensions, 'addEventListener').mockReturnValue({ remove: vi.fn() });
+    vi.spyOn(Dimensions, 'addEventListener').mockReturnValue({
+      remove: vi.fn(),
+    });
 
     mount(ROOT_TAG, RootWindowDimensionsConsumer);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    expect(capturedWindowDimensionsService?.dimensions()).toEqual(initialMetrics);
+    expect(capturedWindowDimensionsService?.dimensions()).toEqual(
+      initialMetrics,
+    );
   });
 
   // why: the signal setter is guarded by a field-by-field equality check (width/height/scale/
@@ -164,10 +172,12 @@ describe('Angular DI services over engine modules', () => {
 
     const initialMetrics = { width: 100, height: 200, scale: 1, fontScale: 1 };
     vi.spyOn(Dimensions, 'get').mockReturnValue(initialMetrics);
-    vi.spyOn(Dimensions, 'addEventListener').mockImplementation((_type, listener) => {
-      capturedListener = set => listener(set);
-      return { remove };
-    });
+    vi.spyOn(Dimensions, 'addEventListener').mockImplementation(
+      (_type, listener) => {
+        capturedListener = set => listener(set);
+        return { remove };
+      },
+    );
 
     mount(ROOT_TAG, WindowDimensionsConsumer);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -191,7 +201,12 @@ describe('Angular DI services over engine modules', () => {
       window: { width: 300, height: 400, scale: 2, fontScale: 2 },
       screen: { width: 300, height: 400, scale: 2, fontScale: 2 },
     });
-    expect(service.dimensions()).toEqual({ width: 300, height: 400, scale: 2, fontScale: 2 });
+    expect(service.dimensions()).toEqual({
+      width: 300,
+      height: 400,
+      scale: 2,
+      fontScale: 2,
+    });
 
     unmount(ROOT_TAG);
     expect(remove).toHaveBeenCalledOnce();
@@ -209,8 +224,12 @@ describe('Angular DI services over engine modules', () => {
     const currentMetrics = { width: 300, height: 400, scale: 2, fontScale: 2 };
     // First call = the signal's field initializer; every call after (including the
     // constructor's own post-subscribe re-check) reflects the metrics having since changed.
-    vi.spyOn(Dimensions, 'get').mockReturnValueOnce(staleMetrics).mockReturnValue(currentMetrics);
-    vi.spyOn(Dimensions, 'addEventListener').mockReturnValue({ remove: vi.fn() });
+    vi.spyOn(Dimensions, 'get')
+      .mockReturnValueOnce(staleMetrics)
+      .mockReturnValue(currentMetrics);
+    vi.spyOn(Dimensions, 'addEventListener').mockReturnValue({
+      remove: vi.fn(),
+    });
 
     mount(ROOT_TAG, WindowDimensionsConsumer);
     await new Promise<void>(resolve => setTimeout(resolve, 0));

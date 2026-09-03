@@ -16,7 +16,11 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, ActivityIndicator as ActivityIndicatorIOS } from '@symbiote-native/react';
+import {
+  mount,
+  unmount,
+  ActivityIndicator as ActivityIndicatorIOS,
+} from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { ActivityIndicator as ActivityIndicatorAndroid } from './index.android';
 
@@ -36,7 +40,9 @@ function findSpinner(): IFakeNode {
 function findWrapper(): IFakeNode {
   // Skip the synthetic AppContainer root (RCTView, box-none); the centering wrapper is
   // ActivityIndicator's own RCTView.
-  const node = fabric.find(n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none');
+  const node = fabric.find(
+    n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+  );
   if (!node) throw new Error('no RCTView wrapper was created');
   return node;
 }
@@ -67,11 +73,19 @@ describe('ActivityIndicator (iOS platform build, index.ios.ts)', () => {
       // spinner visually centered regardless of its box size — a product requirement, not an
       // accident of the native view's own layout.
       function App(): ReactElement {
-        return <ActivityIndicatorIOS size="large" color="#0000ff" animating={false} />;
+        return (
+          <ActivityIndicatorIOS
+            size="large"
+            color="#0000ff"
+            animating={false}
+          />
+        );
       }
       mount(ROOT_TAG, <App />);
 
-      expect(fabric.serialize(fabric.appRoot().children)).toBe('RCTView(ActivityIndicatorView)');
+      expect(fabric.serialize(fabric.appRoot().children)).toBe(
+        'RCTView(ActivityIndicatorView)',
+      );
 
       const spinner = findSpinner();
       expect(spinner.props.animating).toBe(false);
@@ -117,7 +131,9 @@ describe('ActivityIndicator (iOS platform build, index.ios.ts)', () => {
       // why: hidesWhenStopped defaults true (spinner vanishes once stopped, matching RN);
       // callers that want a static/stopped spinner to stay visible must be able to opt out.
       function App(): ReactElement {
-        return <ActivityIndicatorIOS animating={false} hidesWhenStopped={false} />;
+        return (
+          <ActivityIndicatorIOS animating={false} hidesWhenStopped={false} />
+        );
       }
       mount(ROOT_TAG, <App />);
 

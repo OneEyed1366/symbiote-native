@@ -47,12 +47,20 @@ function stripReactJsxDevAttrs() {
   };
 }
 
+// The Vue JSX pair comes from the adapter, not from a hand-written '@vue/babel-plugin-jsx' entry:
+// it is the plugin PLUS the isCustomElement option that makes <View>/<Text> compile to their
+// intrinsic tags instead of to a Vue component instance each. Either half alone is broken — see
+// @symbiote-native/vue/babel-jsx, which is why they arrive as one require() rather than two lines
+// here. @vue/babel-plugin-jsx is a dependency of the adapter now, so a fresh install of a published
+// @symbiote-native/vue brings it along; this app's own entry for it is redundant but harmless.
+const symbioteVueJsx = require('@symbiote-native/vue/babel-jsx');
+
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
-  // @vue/babel-plugin-jsx is listed FIRST so it runs before the RN preset's React-JSX
+  // The Vue JSX pair is listed FIRST so it runs before the RN preset's React-JSX
   // transform: babel applies `plugins` before `presets`, so the Vue plugin rewrites every
   // JSXElement into a @vue/runtime-core createVNode call, leaving no JSX for the React
   // transform to touch (it no-ops). The helper imports it injects come `from 'vue'`, which
   // metro.config.js aliases to @vue/runtime-core, the one Vue runtime the adapter renders on.
-  plugins: ['@vue/babel-plugin-jsx', stripReactJsxDevAttrs, inlineDebugFlag],
+  plugins: [...symbioteVueJsx(), stripReactJsxDevAttrs, inlineDebugFlag],
 };

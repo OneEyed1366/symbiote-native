@@ -6,7 +6,10 @@
 // Libraries/Utilities/Appearance.js, slimmed to the parts we need.
 
 import { createDeviceEventModule } from '../native-modules';
-import { type IEventEmitterModule, type IEventSubscription } from '../native-events';
+import {
+  type IEventEmitterModule,
+  type IEventSubscription,
+} from '../native-events';
 import { dlog } from '../debug';
 
 // The native module name RN registers the appearance module under, confirmed from
@@ -36,7 +39,9 @@ interface IAppearancePreferences {
   colorScheme: IColorSchemeName | null;
 }
 
-function isAppearancePreferences(value: unknown): value is IAppearancePreferences {
+function isAppearancePreferences(
+  value: unknown,
+): value is IAppearancePreferences {
   return typeof value === 'object' && value !== null && 'colorScheme' in value;
 }
 
@@ -53,7 +58,9 @@ const deviceEventModule = createDeviceEventModule<INativeAppearance>({
   onEmitterCreated: emitter => {
     emitter.addListener(APPEARANCE_CHANGED_EVENT, payload => {
       if (!isAppearancePreferences(payload)) return;
-      dlog(`Appearance: ${APPEARANCE_CHANGED_EVENT} -> ${String(payload.colorScheme)}`);
+      dlog(
+        `Appearance: ${APPEARANCE_CHANGED_EVENT} -> ${String(payload.colorScheme)}`,
+      );
       cachedScheme = payload.colorScheme;
     });
   },
@@ -88,11 +95,16 @@ export const Appearance = {
       return;
     }
     module.setColorScheme(colorScheme);
-    cachedScheme = colorScheme === 'unspecified' ? (module.getColorScheme() ?? null) : colorScheme;
+    cachedScheme =
+      colorScheme === 'unspecified'
+        ? (module.getColorScheme() ?? null)
+        : colorScheme;
   },
 
   // Subscribe to color-scheme changes. The listener receives `{ colorScheme }`.
-  addChangeListener(listener: (preferences: IAppearancePreferences) => void): IEventSubscription {
+  addChangeListener(
+    listener: (preferences: IAppearancePreferences) => void,
+  ): IEventSubscription {
     dlog('Appearance.addChangeListener');
     return getEmitter().addListener(APPEARANCE_CHANGED_EVENT, payload => {
       if (!isAppearancePreferences(payload)) return;

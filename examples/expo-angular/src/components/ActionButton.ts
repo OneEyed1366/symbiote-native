@@ -13,7 +13,12 @@ import { Pressable, Text } from '@symbiote-native/angular';
   standalone: true,
   imports: [Pressable, Text],
   template: `
-    <Pressable [testID]="testID" (press)="press.emit()" class="action-button" [style]="buttonStyle">
+    <Pressable
+      [testID]="testID"
+      (press)="press.emit()"
+      class="action-button"
+      [style]="buttonStyle"
+    >
       <Text class="action-button-text" [style]="textStyle">{{ title }}</Text>
     </Pressable>
   `,
@@ -26,7 +31,10 @@ export class ActionButton {
 
   get buttonStyle(): (state: { pressed: boolean }) => Record<string, unknown> {
     const color = this.color;
-    return ({ pressed }) => ({ borderColor: color, opacity: pressed ? 0.6 : 1 });
+    return ({ pressed }) => ({
+      borderColor: color,
+      opacity: pressed ? 0.6 : 1,
+    });
   }
 
   get textStyle(): Record<string, unknown> {

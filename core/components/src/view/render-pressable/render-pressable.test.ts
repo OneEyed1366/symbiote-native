@@ -104,7 +104,9 @@ describe('buildPressableListeners', () => {
   // merely tests `'onPress' in props` still sees a genuinely non-interactive view.
   it('returns no listeners at all when disabled', () => {
     const calls: string[] = [];
-    const listeners = buildPressableListeners(makeHandlers(calls), { disabled: true });
+    const listeners = buildPressableListeners(makeHandlers(calls), {
+      disabled: true,
+    });
     expect(listeners).toEqual({});
   });
 
@@ -123,7 +125,9 @@ describe('buildPressableListeners', () => {
   // single built bag stay correct if disabled flips without rebuilding the listeners.
   it('onStartShouldSetResponder delegates to shouldClaimResponder with the given disabled flag', () => {
     const calls: string[] = [];
-    const enabled = buildPressableListeners(makeHandlers(calls), { disabled: false });
+    const enabled = buildPressableListeners(makeHandlers(calls), {
+      disabled: false,
+    });
     expect(typeof enabled.onStartShouldSetResponder).toBe('function');
     const fn = enabled.onStartShouldSetResponder as () => boolean;
     expect(fn()).toBe(true);
@@ -140,7 +144,9 @@ describe('buildPressableListeners', () => {
 
   it('attaches onResponderTerminationRequest, delegating to isTerminationAllowed, when cancelable is set', () => {
     const calls: string[] = [];
-    const listeners = buildPressableListeners(makeHandlers(calls), { cancelable: false });
+    const listeners = buildPressableListeners(makeHandlers(calls), {
+      cancelable: false,
+    });
     expect(typeof listeners.onResponderTerminationRequest).toBe('function');
     const fn = listeners.onResponderTerminationRequest as () => boolean;
     expect(fn()).toBe(false);

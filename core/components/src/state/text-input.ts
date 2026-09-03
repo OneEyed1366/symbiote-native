@@ -12,12 +12,22 @@
 // without a render. So the logic layer is the pure folds/maps + the controlled-write predicate;
 // each adapter holds the two pieces in ITS own primitives (React useState/useRef, Vue ref/let).
 
-import type { ISymbioteEvent, ITextStyle } from '@symbiote-native/engine';
+import { Platform } from '@symbiote-native/engine';
+import type {
+  IMeasureOnSuccess,
+  IMeasureInWindowOnSuccess,
+  IMeasureLayoutOnSuccess,
+  ISymbioteNode,
+  IPlatformOSType,
+  ISymbioteEvent,
+  ITextStyle,
+} from '@symbiote-native/engine';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
 
 export type IInputMode =
   'none' | 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url';
-export type IEnterKeyHint = 'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send';
+export type IEnterKeyHint =
+  'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send';
 export type ISubmitBehavior = 'submit' | 'blurAndSubmit' | 'newline';
 export type ITextInputSelection = { start: number; end?: number };
 export type ITextInputEventHandler = (event: ISymbioteEvent) => void;
@@ -42,11 +52,28 @@ const inputModeToKeyboardType: Record<string, string> = {
   email: 'email-address',
   none: 'default',
   numeric: 'number-pad',
-  search: 'default',
   tel: 'phone-pad',
   text: 'default',
   url: 'url',
 };
+
+// `search` is the ONE inputMode token RN resolves per platform (TextInput.js:815-825):
+//   search: Platform.OS === 'ios' ? 'web-search' : 'default'
+// iOS has a dedicated search keyboard whose return key is a magnifier; every other host falls back
+// to the default one. It is deliberately absent from the map above, so there is one source for it
+// rather than a map entry and an override that can drift apart.
+//
+// The host is an ARGUMENT rather than a `Platform.OS` read inside the body, because the headless
+// Platform module always resolves to iOS (platform/index.ts re-exports index.ios) — a direct read
+// would leave the android branch permanently unprovable. resolveTextInputProps supplies the real
+// value. This costs the callers nothing: the exported fold signature is unchanged.
+export function keyboardTypeForInputMode(
+  inputMode: string,
+  os: IPlatformOSType,
+): string | undefined {
+  if (inputMode === 'search') return os === 'ios' ? 'web-search' : 'default';
+  return mapAutoComplete(inputModeToKeyboardType, inputMode);
+}
 
 // RN's enterKeyHint -> returnKeyType map (TextInput.js:805). Note `enter` -> 'default'.
 const enterKeyHintToReturnKeyType: Record<string, string> = {
@@ -138,8 +165,13 @@ const autoCompleteWebToTextContentType: Record<string, string> = {
 // Safe lookup into a W3C->native / alias->native map (no `as`): own-property guard, undefined
 // if the token has no native equivalent. The caller decides the per-platform fallback. Named
 // for its first user (autoComplete), but it is the one generic safe lookup every map shares.
-export function mapAutoComplete(map: Record<string, string>, token: string): string | undefined {
-  return Object.prototype.hasOwnProperty.call(map, token) ? map[token] : undefined;
+export function mapAutoComplete(
+  map: Record<string, string>,
+  token: string,
+): string | undefined {
+  return Object.prototype.hasOwnProperty.call(map, token)
+    ? map[token]
+    : undefined;
 }
 
 // RN folds W3C `autoComplete` per platform (TextInput.js:938): Android takes the mapped
@@ -152,7 +184,8 @@ export function foldAutoComplete(token: string | undefined): {
   autoComplete: string | undefined;
   textContentType: string | undefined;
 } {
-  if (token === undefined) return { autoComplete: undefined, textContentType: undefined };
+  if (token === undefined)
+    return { autoComplete: undefined, textContentType: undefined };
   return {
     autoComplete: mapAutoComplete(autoCompleteWebToAndroid, token) ?? token,
     textContentType: mapAutoComplete(autoCompleteWebToTextContentType, token),
@@ -193,7 +226,9 @@ export function textFromChange(event: ISymbioteEvent): string | undefined {
   return typeof text === 'string' ? text : undefined;
 }
 
-export function eventCountFromChange(event: ISymbioteEvent): number | undefined {
+export function eventCountFromChange(
+  event: ISymbioteEvent,
+): number | undefined {
   const count = event.nativeEvent.eventCount;
   return typeof count === 'number' ? count : undefined;
 }
@@ -253,30 +288,47 @@ export type IFoldedTextInputProps = {
 // autoComplete token folds to the per-platform native prop (an explicit textContentType still
 // wins), inputMode forces softInput visibility, and underlineColorAndroid defaults to
 // 'transparent' to hide the Material EditText bar.
-export function resolveTextInputProps(input: ITextInputFoldInput): IFoldedTextInputProps {
+export function resolveTextInputProps(
+  input: ITextInputFoldInput,
+): IFoldedTextInputProps {
   const folded = foldAutoComplete(input.autoComplete);
   return {
     keyboardType:
       input.inputMode !== undefined
-        ? mapAutoComplete(inputModeToKeyboardType, input.inputMode)
+        ? keyboardTypeForInputMode(input.inputMode, Platform.OS)
         : input.keyboardType,
     returnKeyType:
       input.enterKeyHint !== undefined
         ? mapAutoComplete(enterKeyHintToReturnKeyType, input.enterKeyHint)
         : input.returnKeyType,
     editable: input.readOnly !== undefined ? !input.readOnly : input.editable,
-    submitBehavior: foldSubmitBehavior(input.submitBehavior, input.blurOnSubmit, input.multiline),
+    submitBehavior: foldSubmitBehavior(
+      input.submitBehavior,
+      input.blurOnSubmit,
+      input.multiline,
+    ),
     selectionColor: input.selectionColor,
-    cursorColor: input.cursorColor !== undefined ? input.cursorColor : input.selectionColor,
+    cursorColor:
+      input.cursorColor !== undefined
+        ? input.cursorColor
+        : input.selectionColor,
     selectionHandleColor:
-      input.selectionHandleColor !== undefined ? input.selectionHandleColor : input.selectionColor,
+      input.selectionHandleColor !== undefined
+        ? input.selectionHandleColor
+        : input.selectionColor,
     underlineColorAndroid:
-      input.underlineColorAndroid !== undefined ? input.underlineColorAndroid : 'transparent',
+      input.underlineColorAndroid !== undefined
+        ? input.underlineColorAndroid
+        : 'transparent',
     autoComplete: folded.autoComplete,
     textContentType:
-      input.textContentType !== undefined ? input.textContentType : folded.textContentType,
+      input.textContentType !== undefined
+        ? input.textContentType
+        : folded.textContentType,
     showSoftInputOnFocus:
-      input.inputMode !== undefined ? input.inputMode !== 'none' : input.showSoftInputOnFocus,
+      input.inputMode !== undefined
+        ? input.inputMode !== 'none'
+        : input.showSoftInputOnFocus,
   };
 }
 
@@ -344,13 +396,71 @@ export type ITextInputProps = IAccessibilityProps &
     onContentSizeChange?: ITextInputEventHandler;
   };
 
+// The callback surface AS A VALUE, so a test can enumerate it instead of restating it. A hand-kept
+// second list is exactly the drift that let `onValueChange` go a month without reaching the app on
+// the lowered path, so this one is derived: `Record` over the keys of the prop type above makes it
+// exhaustive in BOTH directions — a callback declared and not listed fails to compile, and a name
+// listed and not declared fails too.
+//
+// IT LIVES IN A SOURCE FILE ON PURPOSE. The same check written inside the test that consumes it
+// would never run: every package tsconfig excludes `*.test.ts`, the root config is an empty
+// references shell, and vitest strips types without checking them — so a type-level oracle in a
+// test file is inert in this repo. Here `pnpm typecheck` is what enforces it.
+//
+// The accessibility/aria mixin's own `on*` callbacks are subtracted: they belong to every
+// primitive rather than to this one, and the boolean gate they ride has its own oracle
+// (`core/engine/src/__tests__/gated-event-props.test.ts`).
+type ITextInputOwnCallback = Exclude<
+  Extract<keyof ITextInputProps, `on${string}`>,
+  Extract<keyof (IAccessibilityProps & IAriaProps), `on${string}`>
+>;
+
+const TEXT_INPUT_CALLBACKS: Record<ITextInputOwnCallback, true> = {
+  onValueChange: true,
+  onFocus: true,
+  onBlur: true,
+  onEndEditing: true,
+  onSubmitEditing: true,
+  onKeyPress: true,
+  onSelectionChange: true,
+  onContentSizeChange: true,
+};
+
+export const TEXT_INPUT_CALLBACK_NAMES: readonly string[] =
+  Object.keys(TEXT_INPUT_CALLBACKS);
+
 // The imperative handle RN exposes on a TextInput ref. focus/blur/clear/setSelection drive
 // native view commands; isFocused is tracked JS-side from the focus/blur event pair (RN keeps
 // the same state in TextInputState (there is no native getter to query).
+//
+// IT IS A UNION, and that is the whole point of the type. The five TextInput methods below are
+// what the wrappers used to expose, and a wrapper that exposes ONLY those closes the node off —
+// so a component-path ref loses `measure`/`measureInWindow`/`measureLayout`/`setNativeProps`,
+// which every other primitive's ref hands over. A LOWERED element gives the bare node and loses
+// the other direction: no `clear`, `isFocused` or `setSelection`.
+//
+// So the two paths were not "lowering narrows the surface" but TWO DIFFERENT surfaces, and an app
+// crossed between them by writing `:multiline="isLong"` instead of `multiline` — a runtime
+// selector refuses lowering, a literal does not. Measured on Vue 2026-08-31, both paths, and the
+// same shape holds for every adapter: all five hand-rolled their handle and all five listed
+// exactly the same five names.
+//
+// The fix is the union rather than a refusal: refusing to lower a ref'd TextInput would only swap
+// which four methods go missing, and on `View`/`Text` — where a lowered ref is strictly BETTER,
+// handing back the node instead of a component instance — it would be a plain regression.
 export type ITextInputHandle = {
   focus(): void;
   blur(): void;
   clear(): void;
   isFocused(): boolean;
   setSelection(start: number, end: number): void;
+  // Forwarded from the engine node, so a TextInput ref is not poorer than any other host ref.
+  measure(callback: IMeasureOnSuccess): void;
+  measureInWindow(callback: IMeasureInWindowOnSuccess): void;
+  measureLayout(
+    relativeToNativeNode: ISymbioteNode | number,
+    onSuccess: IMeasureLayoutOnSuccess,
+    onFail?: () => void,
+  ): void;
+  setNativeProps(nativeProps: Record<string, unknown>): void;
 };

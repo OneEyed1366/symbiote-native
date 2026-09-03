@@ -15,7 +15,10 @@ interface INativeCall {
 
 let nativeCalls: INativeCall[];
 
-function record(method: string, ret: unknown): (...args: unknown[]) => Promise<unknown> {
+function record(
+  method: string,
+  ret: unknown,
+): (...args: unknown[]) => Promise<unknown> {
   return (...args: unknown[]) => {
     nativeCalls.push({ method, args });
     return Promise.resolve(ret);
@@ -41,10 +44,15 @@ describe('PermissionsAndroid (no native module)', () => {
   it('degrades gracefully: check resolves false and request resolves DENIED, no throw', async () => {
     globalThis.nativeModuleProxy = undefined;
     vi.resetModules();
-    const { PermissionsAndroid, PERMISSIONS, RESULTS } = await import('./index');
+    const { PermissionsAndroid, PERMISSIONS, RESULTS } =
+      await import('./index');
 
-    await expect(PermissionsAndroid.check(PERMISSIONS.CAMERA)).resolves.toBe(false);
-    await expect(PermissionsAndroid.request(PERMISSIONS.CAMERA)).resolves.toBe(RESULTS.DENIED);
+    await expect(PermissionsAndroid.check(PERMISSIONS.CAMERA)).resolves.toBe(
+      false,
+    );
+    await expect(PermissionsAndroid.request(PERMISSIONS.CAMERA)).resolves.toBe(
+      RESULTS.DENIED,
+    );
   });
 
   // why: requestMultiple and shouldShowRequestPermissionRationale have the SAME
@@ -55,9 +63,13 @@ describe('PermissionsAndroid (no native module)', () => {
     vi.resetModules();
     const { PermissionsAndroid, PERMISSIONS } = await import('./index');
 
-    await expect(PermissionsAndroid.requestMultiple([PERMISSIONS.CAMERA])).resolves.toEqual({});
     await expect(
-      PermissionsAndroid.shouldShowRequestPermissionRationale(PERMISSIONS.CAMERA),
+      PermissionsAndroid.requestMultiple([PERMISSIONS.CAMERA]),
+    ).resolves.toEqual({});
+    await expect(
+      PermissionsAndroid.shouldShowRequestPermissionRationale(
+        PERMISSIONS.CAMERA,
+      ),
     ).resolves.toBe(false);
   });
 });
@@ -68,13 +80,18 @@ describe('PermissionsAndroid (native module present)', () => {
     const fakePermissionsAndroid = {
       checkPermission: record('checkPermission', true),
       requestPermission: record('requestPermission', 'granted'),
-      shouldShowRequestPermissionRationale: record('shouldShowRequestPermissionRationale', false),
+      shouldShowRequestPermissionRationale: record(
+        'shouldShowRequestPermissionRationale',
+        false,
+      ),
       requestMultiplePermissions: record('requestMultiplePermissions', {
         'android.permission.CAMERA': 'granted',
         'android.permission.ACCESS_FINE_LOCATION': 'denied',
       }),
     };
-    globalThis.nativeModuleProxy = { PermissionsAndroid: fakePermissionsAndroid };
+    globalThis.nativeModuleProxy = {
+      PermissionsAndroid: fakePermissionsAndroid,
+    };
     vi.resetModules();
     return import('./index');
   }
@@ -86,15 +103,21 @@ describe('PermissionsAndroid (native module present)', () => {
     expect(RESULTS.DENIED).toBe('denied');
     expect(RESULTS.NEVER_ASK_AGAIN).toBe('never_ask_again');
     expect(PERMISSIONS.CAMERA).toBe('android.permission.CAMERA');
-    expect(PERMISSIONS.ACCESS_FINE_LOCATION).toBe('android.permission.ACCESS_FINE_LOCATION');
-    expect(PermissionsAndroid.PERMISSIONS.CAMERA).toBe('android.permission.CAMERA');
+    expect(PERMISSIONS.ACCESS_FINE_LOCATION).toBe(
+      'android.permission.ACCESS_FINE_LOCATION',
+    );
+    expect(PermissionsAndroid.PERMISSIONS.CAMERA).toBe(
+      'android.permission.CAMERA',
+    );
     expect(PermissionsAndroid.RESULTS.GRANTED).toBe('granted');
   });
 
   it('check resolves the native boolean and calls checkPermission once', async () => {
     const { PermissionsAndroid, PERMISSIONS } = await loadWithFake();
 
-    await expect(PermissionsAndroid.check(PERMISSIONS.CAMERA)).resolves.toBe(true);
+    await expect(PermissionsAndroid.check(PERMISSIONS.CAMERA)).resolves.toBe(
+      true,
+    );
     const calls = callsOf('checkPermission');
     expect(calls).toHaveLength(1);
     expect(calls[0].args[0]).toBe('android.permission.CAMERA');
@@ -103,7 +126,9 @@ describe('PermissionsAndroid (native module present)', () => {
   it('request resolves the native RESULTS string and calls requestPermission once', async () => {
     const { PermissionsAndroid, PERMISSIONS, RESULTS } = await loadWithFake();
 
-    await expect(PermissionsAndroid.request(PERMISSIONS.CAMERA)).resolves.toBe(RESULTS.GRANTED);
+    await expect(PermissionsAndroid.request(PERMISSIONS.CAMERA)).resolves.toBe(
+      RESULTS.GRANTED,
+    );
     const calls = callsOf('requestPermission');
     expect(calls).toHaveLength(1);
     expect(calls[0].args[0]).toBe('android.permission.CAMERA');
@@ -124,7 +149,9 @@ describe('PermissionsAndroid (native module present)', () => {
     const { PermissionsAndroid, PERMISSIONS } = await loadWithFake();
 
     await expect(
-      PermissionsAndroid.shouldShowRequestPermissionRationale(PERMISSIONS.CAMERA),
+      PermissionsAndroid.shouldShowRequestPermissionRationale(
+        PERMISSIONS.CAMERA,
+      ),
     ).resolves.toBe(false);
     expect(callsOf('shouldShowRequestPermissionRationale')).toHaveLength(1);
   });
@@ -138,14 +165,19 @@ describe('PermissionsAndroid (native module present)', () => {
       PermissionsAndroid: {
         checkPermission: record('checkPermission', 'not-a-boolean'),
         requestPermission: record('requestPermission', null),
-        shouldShowRequestPermissionRationale: record('shouldShowRequestPermissionRationale', null),
+        shouldShowRequestPermissionRationale: record(
+          'shouldShowRequestPermissionRationale',
+          null,
+        ),
         requestMultiplePermissions: record('requestMultiplePermissions', null),
       },
     };
     vi.resetModules();
     const { PermissionsAndroid, PERMISSIONS } = await import('./index');
 
-    await expect(PermissionsAndroid.check(PERMISSIONS.CAMERA)).resolves.toBe(false);
+    await expect(PermissionsAndroid.check(PERMISSIONS.CAMERA)).resolves.toBe(
+      false,
+    );
   });
 
   it('request falls back to DENIED for an unrecognized native status string', async () => {
@@ -153,14 +185,20 @@ describe('PermissionsAndroid (native module present)', () => {
       PermissionsAndroid: {
         checkPermission: record('checkPermission', true),
         requestPermission: record('requestPermission', 'some_future_status'),
-        shouldShowRequestPermissionRationale: record('shouldShowRequestPermissionRationale', false),
+        shouldShowRequestPermissionRationale: record(
+          'shouldShowRequestPermissionRationale',
+          false,
+        ),
         requestMultiplePermissions: record('requestMultiplePermissions', {}),
       },
     };
     vi.resetModules();
-    const { PermissionsAndroid, PERMISSIONS, RESULTS } = await import('./index');
+    const { PermissionsAndroid, PERMISSIONS, RESULTS } =
+      await import('./index');
 
-    await expect(PermissionsAndroid.request(PERMISSIONS.CAMERA)).resolves.toBe(RESULTS.DENIED);
+    await expect(PermissionsAndroid.request(PERMISSIONS.CAMERA)).resolves.toBe(
+      RESULTS.DENIED,
+    );
   });
 
   it('requestMultiple resolves an empty map for a non-object native return', async () => {
@@ -168,14 +206,19 @@ describe('PermissionsAndroid (native module present)', () => {
       PermissionsAndroid: {
         checkPermission: record('checkPermission', true),
         requestPermission: record('requestPermission', 'granted'),
-        shouldShowRequestPermissionRationale: record('shouldShowRequestPermissionRationale', false),
+        shouldShowRequestPermissionRationale: record(
+          'shouldShowRequestPermissionRationale',
+          false,
+        ),
         requestMultiplePermissions: record('requestMultiplePermissions', null),
       },
     };
     vi.resetModules();
     const { PermissionsAndroid, PERMISSIONS } = await import('./index');
 
-    await expect(PermissionsAndroid.requestMultiple([PERMISSIONS.CAMERA])).resolves.toEqual({});
+    await expect(
+      PermissionsAndroid.requestMultiple([PERMISSIONS.CAMERA]),
+    ).resolves.toEqual({});
   });
 });
 
@@ -219,7 +262,11 @@ describe('PermissionsAndroid.request with a rationale', () => {
     };
     if (options.dialogPresent) {
       registeredModules.DialogManagerAndroid = {
-        showAlert: (alertRationale: unknown, onError: () => void, onAction: () => void): void => {
+        showAlert: (
+          alertRationale: unknown,
+          onError: () => void,
+          onAction: () => void,
+        ): void => {
           showAlertCalls.push({ rationale: alertRationale, onError, onAction });
         },
       };
@@ -293,9 +340,9 @@ describe('PermissionsAndroid.request with a rationale', () => {
     });
     const { PermissionsAndroid, PERMISSIONS, RESULTS } = module;
 
-    await expect(PermissionsAndroid.request(PERMISSIONS.CAMERA, rationale)).resolves.toBe(
-      RESULTS.GRANTED,
-    );
+    await expect(
+      PermissionsAndroid.request(PERMISSIONS.CAMERA, rationale),
+    ).resolves.toBe(RESULTS.GRANTED);
     expect(showAlertCalls).toHaveLength(0);
   });
 
@@ -309,9 +356,9 @@ describe('PermissionsAndroid.request with a rationale', () => {
     });
     const { PermissionsAndroid, PERMISSIONS, RESULTS } = module;
 
-    await expect(PermissionsAndroid.request(PERMISSIONS.CAMERA, rationale)).resolves.toBe(
-      RESULTS.GRANTED,
-    );
+    await expect(
+      PermissionsAndroid.request(PERMISSIONS.CAMERA, rationale),
+    ).resolves.toBe(RESULTS.GRANTED);
     expect(showAlertCalls).toHaveLength(0);
   });
 });

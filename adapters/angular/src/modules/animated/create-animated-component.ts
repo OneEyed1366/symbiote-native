@@ -53,8 +53,10 @@ import {
   IMAGE_INPUTS,
   IMAGE_OUTPUTS,
   ImageBase,
+  isImageEventCallback,
   resolveImageProps,
 } from '../../components/image/shared';
+import type { IGatedAccessibilityEvent } from '../../gate-demand';
 import { SectionList } from '../../components/section-list';
 import { AnimatedLeafBinder } from './animated-leaf-binder';
 
@@ -69,7 +71,11 @@ const PASSTHROUGH_PROP = 'passthroughAnimatedPropExplicitValues';
 // plus static host props to forward (the React/Vue `rest`). Each concrete @Component re-lists
 // these (Angular's inputs-on-base convention, mirroring Switch/Image).
 export const ANIMATED_INPUTS = ['style', 'animatedProps', PASSTHROUGH_PROP];
-export const ANIMATED_IMAGE_INPUTS = [...IMAGE_INPUTS, 'animatedProps', PASSTHROUGH_PROP];
+export const ANIMATED_IMAGE_INPUTS = [
+  ...IMAGE_INPUTS,
+  'animatedProps',
+  PASSTHROUGH_PROP,
+];
 
 // The shared lifecycle for every animated wrapper. Concrete subclasses add ONLY a @Component
 // decorator (selector + the host-primitive template) — no behavior. Plain fields (no @Input
@@ -92,7 +98,8 @@ export abstract class AnimatedComponentBase
 
   // The directive sitting on the inner host primitive; its `node` is the committed SymbioteNode
   // the leaf binds to. Inherited by the decorated subclass (Angular collects base-class queries).
-  @ViewChild(SymbioteHostPropsDirective) private hostDirective?: SymbioteHostPropsDirective;
+  @ViewChild(SymbioteHostPropsDirective)
+  private hostDirective?: SymbioteHostPropsDirective;
 
   // The leaf-lifecycle orchestration (build/attach/swap/bind/detach an AnimatedProps leaf) is a
   // Pure Fabrication shared with AnimatedImage, which cannot extend this class (it must extend
@@ -110,10 +117,14 @@ export abstract class AnimatedComponentBase
   // array, which the commit layer flattens) so the ShadowTree carries the current transform.
   get reducedProps(): Record<string, unknown> {
     const reduced = reduceProps(this.mergedProps());
-    const passthroughStyle = readPassthroughStyle(this.passthroughAnimatedPropExplicitValues);
+    const passthroughStyle = readPassthroughStyle(
+      this.passthroughAnimatedPropExplicitValues,
+    );
     if (passthroughStyle !== undefined) {
       reduced['style'] =
-        reduced['style'] === undefined ? passthroughStyle : [reduced['style'], passthroughStyle];
+        reduced['style'] === undefined
+          ? passthroughStyle
+          : [reduced['style'], passthroughStyle];
     }
     reduced['style'] = [this.anchorStyle(), reduced['style']];
     return reduced;
@@ -162,7 +173,8 @@ export abstract class AnimatedComponentBase
     const hasPassthroughAnimatedValues =
       this.passthroughAnimatedPropExplicitValues !== null &&
       this.passthroughAnimatedPropExplicitValues !== undefined;
-    const wantsNative = hasPassthroughAnimatedValues && isNativeAnimatedAvailable();
+    const wantsNative =
+      hasPassthroughAnimatedValues && isNativeAnimatedAvailable();
     this.leafBinder.reconcile(props, wantsNative);
   }
 
@@ -171,7 +183,9 @@ export abstract class AnimatedComponentBase
   // never disagree.
   private mergedProps(): Record<string, unknown> {
     const base = this.animatedProps ?? {};
-    return this.style === undefined ? { ...base } : { ...base, style: this.style };
+    return this.style === undefined
+      ? { ...base }
+      : { ...base, style: this.style };
   }
 
   // The committed host node held by IDENTITY. resolveHostNode unwraps an imperative scroll
@@ -186,7 +200,9 @@ export abstract class AnimatedComponentBase
 @Component({
   selector: 'AnimatedView, symbiote-animated-view',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SymbioteHostPropsDirective, ViewHost],
   inputs: ANIMATED_INPUTS,
@@ -202,7 +218,9 @@ export class AnimatedView extends AnimatedComponentBase {}
 @Component({
   selector: 'AnimatedText, symbiote-animated-text',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SymbioteHostPropsDirective, TextHost],
   inputs: ANIMATED_INPUTS,
@@ -218,7 +236,9 @@ export class AnimatedText extends AnimatedComponentBase {}
 @Component({
   selector: 'AnimatedImage, symbiote-animated-image',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SymbioteHostPropsDirective, ImageHost],
   inputs: ANIMATED_IMAGE_INPUTS,
@@ -226,10 +246,6 @@ export class AnimatedText extends AnimatedComponentBase {}
   template: `
     <symbiote-image
       [symbioteHostProps]="animatedImageProps"
-      (accessibilityAction)="handleAccessibilityAction($event)"
-      (accessibilityTap)="handleAccessibilityTap($event)"
-      (magicTap)="handleMagicTap($event)"
-      (accessibilityEscape)="handleAccessibilityEscape($event)"
       (loadStart)="handleLoadStart($event)"
       (load)="handleLoad($event)"
       (loadEnd)="handleLoadEnd($event)"
@@ -242,7 +258,10 @@ export class AnimatedText extends AnimatedComponentBase {}
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AnimatedImage extends ImageBase implements AfterViewInit, OnChanges, OnDestroy {
+export class AnimatedImage
+  extends ImageBase
+  implements AfterViewInit, OnChanges, OnDestroy
+{
   animatedProps: Record<string, unknown> | undefined;
   passthroughAnimatedPropExplicitValues: unknown;
 
@@ -250,7 +269,8 @@ export class AnimatedImage extends ImageBase implements AfterViewInit, OnChanges
   // comment on AnimatedComponentBase.elementRef.
   private readonly elementRef = inject(ElementRef);
 
-  @ViewChild(SymbioteHostPropsDirective) private hostDirective?: SymbioteHostPropsDirective;
+  @ViewChild(SymbioteHostPropsDirective)
+  private hostDirective?: SymbioteHostPropsDirective;
 
   // Same Pure Fabrication AnimatedComponentBase holds — see its matching comment. AnimatedImage
   // can't extend AnimatedComponentBase (it must extend ImageBase, see the file header), so it
@@ -261,15 +281,40 @@ export class AnimatedImage extends ImageBase implements AfterViewInit, OnChanges
   );
   private viewReady = false;
 
+  private gateInto(
+    props: Record<string, unknown>,
+    name: IGatedAccessibilityEvent,
+    key: string,
+  ): void {
+    const carried = props[key];
+    props[key] = this.gatedAccessibilityHandler(
+      name,
+      isImageEventCallback(carried) ? carried : undefined,
+    );
+  }
+
   get animatedImageProps(): Record<string, unknown> {
     const reduced = reduceProps(this.mergedProps());
-    const passthroughStyle = readPassthroughStyle(this.passthroughAnimatedPropExplicitValues);
+    const passthroughStyle = readPassthroughStyle(
+      this.passthroughAnimatedPropExplicitValues,
+    );
     if (passthroughStyle !== undefined) {
       reduced['style'] =
-        reduced['style'] === undefined ? passthroughStyle : [reduced['style'], passthroughStyle];
+        reduced['style'] === undefined
+          ? passthroughStyle
+          : [reduced['style'], passthroughStyle];
     }
     const resolved = resolveImageProps(reduced);
     resolved['style'] = [anchorHostStyle(this.elementRef), resolved['style']];
+    // The four gated accessibility events, which used to be template bindings on the host tag and
+    // therefore lit their Fabric flags on every AnimatedImage in the app
+    // (`.claude/rules/fabric-boolean-event-gates.md`). Routed through the base's gate instead, so
+    // both channels still reach the app — the `onX` callback carried in the animated prop bag, and
+    // the `@Output()` an app may bind on <AnimatedImage> (IMAGE_OUTPUTS declares all four).
+    this.gateInto(resolved, 'accessibilityAction', 'onAccessibilityAction');
+    this.gateInto(resolved, 'accessibilityTap', 'onAccessibilityTap');
+    this.gateInto(resolved, 'magicTap', 'onMagicTap');
+    this.gateInto(resolved, 'accessibilityEscape', 'onAccessibilityEscape');
     return resolved;
   }
 
@@ -311,7 +356,8 @@ export class AnimatedImage extends ImageBase implements AfterViewInit, OnChanges
     const hasPassthroughAnimatedValues =
       this.passthroughAnimatedPropExplicitValues !== null &&
       this.passthroughAnimatedPropExplicitValues !== undefined;
-    const wantsNative = hasPassthroughAnimatedValues && isNativeAnimatedAvailable();
+    const wantsNative =
+      hasPassthroughAnimatedValues && isNativeAnimatedAvailable();
     this.leafBinder.reconcile(props, wantsNative);
   }
 
@@ -332,7 +378,9 @@ export class AnimatedImage extends ImageBase implements AfterViewInit, OnChanges
 @Component({
   selector: 'AnimatedScrollView, symbiote-animated-scroll-view',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SymbioteHostPropsDirective, ScrollViewHost],
   inputs: ANIMATED_INPUTS,

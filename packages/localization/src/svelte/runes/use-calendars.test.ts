@@ -14,9 +14,11 @@ import metroSvelteTransformer from '@symbiote-native/svelte/metro-svelte-transfo
 
 const {
   compileSvelteModuleFile,
-}: { compileSvelteModuleFile: (src: string, filename: string) => string } = metroSvelteTransformer;
+}: { compileSvelteModuleFile: (src: string, filename: string) => string } =
+  metroSvelteTransformer;
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -57,7 +59,8 @@ vi.mock('../../core', () => ({
 }));
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -74,11 +77,21 @@ afterEach(() => {
   rmSync(RUNE_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 function compileRuneModule(): void {
-  const source = readFileSync(join(__dirname, 'use-calendars.svelte.ts'), 'utf-8');
-  writeFileSync(RUNE_OUT, compileSvelteModuleFile(source, 'use-calendars.svelte.ts'));
+  const source = readFileSync(
+    join(__dirname, 'use-calendars.svelte.ts'),
+    'utf-8',
+  );
+  writeFileSync(
+    RUNE_OUT,
+    compileSvelteModuleFile(source, 'use-calendars.svelte.ts'),
+  );
 }
 
 async function loadProbe(): Promise<Component> {
@@ -104,7 +117,9 @@ async function loadProbe(): Promise<Component> {
 
 async function mountCalendars(values: Calendar[][]): Promise<void> {
   const Probe = await loadProbe();
-  mount(ROOT_TAG, Probe, { onValue: (calendars: Calendar[]) => values.push(calendars) });
+  mount(ROOT_TAG, Probe, {
+    onValue: (calendars: Calendar[]) => values.push(calendars),
+  });
   await tick();
 }
 

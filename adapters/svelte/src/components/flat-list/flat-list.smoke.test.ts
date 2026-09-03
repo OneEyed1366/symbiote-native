@@ -16,7 +16,10 @@ import { mount, unmount } from '../../render';
 // fabric.find() walks the CREATION log, which never reflects a later clone's props
 // (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must instead
 // walk the currently COMMITTED tree.
-function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeNode | undefined {
+function findLive(
+  node: IFakeNode,
+  predicate: (n: IFakeNode) => boolean,
+): IFakeNode | undefined {
   if (predicate(node)) return node;
   for (const child of node.children) {
     const found = findLive(child, predicate);
@@ -25,7 +28,8 @@ function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeN
   return undefined;
 }
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -59,23 +63,27 @@ const STICKY_HEADER_OUT = join(
   'scroll-view',
   '.smoke-compiled-sticky-header-for-flat-list.mjs',
 );
-// sticky-header.svelte renders a real <Animated.View> (AnimatedView.svelte) — same treatment,
+// sticky-header.svelte renders a real Animated.View (createAnimatedComponent(View)) — same treatment,
 // compiled to a sibling of the real file so ITS OWN relative imports keep resolving unchanged.
-const MODULES_ANIMATED_DIR = join(__dirname, '..', '..', 'modules', 'animated');
-const ANIMATED_VIEW_OUT = join(
-  MODULES_ANIMATED_DIR,
-  '.smoke-compiled-animated-view-for-flat-list.mjs',
-);
+const COMPONENTS_DIR = join(__dirname, '..');
+const VIEW_OUT = join(COMPONENTS_DIR, '.smoke-compiled-view-for-flat-list.mjs');
 const FLAT_OUT = join(__dirname, '.smoke-compiled-flat-list.mjs');
 const ROOT_OUT = join(__dirname, '.smoke-compiled-flat-root.mjs');
-const REFRESH_ROOT_OUT = join(__dirname, '.smoke-compiled-flat-refresh-root.mjs');
+const REFRESH_ROOT_OUT = join(
+  __dirname,
+  '.smoke-compiled-flat-refresh-root.mjs',
+);
 // Distinct from ROOT_OUT: Node's dynamic `import()` cache is keyed by resolved URL, so
 // re-writing ROOT_OUT with different content and re-importing the same path would silently hand
 // back an earlier test's cached module (the same reason REFRESH_ROOT_OUT is its own path).
-const COLUMNS_ROOT_OUT = join(__dirname, '.smoke-compiled-flat-columns-root.mjs');
+const COLUMNS_ROOT_OUT = join(
+  __dirname,
+  '.smoke-compiled-flat-columns-root.mjs',
+);
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -84,7 +92,7 @@ beforeEach(() => {
 afterEach(() => {
   unmount(ROOT_TAG);
   rmSync(REFRESH_CONTROL_OUT, { force: true });
-  rmSync(ANIMATED_VIEW_OUT, { force: true });
+  rmSync(VIEW_OUT, { force: true });
   rmSync(STICKY_HEADER_OUT, { force: true });
   rmSync(LIST_OUT, { force: true });
   rmSync(FLAT_OUT, { force: true });
@@ -93,9 +101,17 @@ afterEach(() => {
   rmSync(COLUMNS_ROOT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
@@ -108,14 +124,18 @@ function compileFlatListWithVirtualizedList(): void {
   // the exact relative location ('../RefreshControl.svelte' from virtualized-list/'s own compiled
   // sibling) so that import resolves, then rewrite the compiled VirtualizedList's specifier the
   // same way scroll-view.smoke.test.ts / virtualized-list.smoke.test.ts do.
-  const refreshControlSource = readFileSync(join(__dirname, '..', 'RefreshControl.svelte'), 'utf8');
-  compileToFile(refreshControlSource, 'RefreshControl.svelte', REFRESH_CONTROL_OUT);
-
-  const animatedViewSource = readFileSync(
-    join(MODULES_ANIMATED_DIR, 'AnimatedView.svelte'),
+  const refreshControlSource = readFileSync(
+    join(__dirname, '..', 'RefreshControl.svelte'),
     'utf8',
   );
-  compileToFile(animatedViewSource, 'AnimatedView.svelte', ANIMATED_VIEW_OUT);
+  compileToFile(
+    refreshControlSource,
+    'RefreshControl.svelte',
+    REFRESH_CONTROL_OUT,
+  );
+
+  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
+  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
 
   const stickyHeaderSource = readFileSync(
     join(__dirname, '..', 'scroll-view', 'sticky-header.svelte'),
@@ -125,8 +145,8 @@ function compileFlatListWithVirtualizedList(): void {
     ...COMPILE_OPTIONS,
     filename: 'sticky-header.svelte',
   }).js.code.replace(
-    "from '../../modules/animated/AnimatedView.svelte'",
-    "from '../../modules/animated/.smoke-compiled-animated-view-for-flat-list.mjs'",
+    "from '../View.svelte'",
+    "from '../.smoke-compiled-view-for-flat-list.mjs'",
   );
   writeFileSync(STICKY_HEADER_OUT, stickyHeaderResult);
 
@@ -184,7 +204,9 @@ async function loadMountable(): Promise<Component> {
   return mod.default as Component;
 }
 
-async function loadMountableWithColumns(numColumns: number): Promise<Component> {
+async function loadMountableWithColumns(
+  numColumns: number,
+): Promise<Component> {
   compileFlatListWithVirtualizedList();
 
   compileToFile(
@@ -247,12 +269,17 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
     // does.
     it('renders only the windowed slice of a plain data array, not every item', async () => {
       const FlatListRoot = await loadMountable();
-      const data = Array.from({ length: ITEM_COUNT }, (_unused, index) => `row-${index}`);
+      const data = Array.from(
+        { length: ITEM_COUNT },
+        (_unused, index) => `row-${index}`,
+      );
       mount(ROOT_TAG, FlatListRoot, { data });
       await tick();
       await tick();
 
-      const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+      const content = fabric.find(
+        node => node.viewName === 'RCTScrollContentView',
+      );
       expect(content).toBeDefined();
       if (content === undefined) return;
 
@@ -276,7 +303,9 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       await tick();
       await tick();
 
-      const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+      const content = fabric.find(
+        node => node.viewName === 'RCTScrollContentView',
+      );
       expect(content, 'content container painted').toBeDefined();
       if (content === undefined) return;
 
@@ -289,7 +318,10 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
         // rowItem's own symbiote-view (flexDirection: 'row'), one level inside VirtualizedList's
         // per-row measure wrapper.
         const row = cellWrapper.children[0];
-        expect(row?.props.flexDirection, 'the row snippet painted flexDirection: row').toBe('row');
+        expect(
+          row?.props.flexDirection,
+          'the row snippet painted flexDirection: row',
+        ).toBe('row');
         for (const itemWrapper of row?.children ?? []) {
           for (const textNode of itemWrapper.children) {
             const text = textNode.props.text;
@@ -315,16 +347,30 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       // Gap 1: testID passed to <FlatList> reaches the committed RCTScrollView through the
       // component-to-component forward onto <VirtualizedList> — walk the LIVE tree, not
       // fabric.find()'s creation log.
-      const scrollView = findLive(fabric.appRoot(), node => node.props.testID === 'flat-list-a11y');
-      expect(scrollView, 'testID reached the committed RCTScrollView').toBeDefined();
+      const scrollView = findLive(
+        fabric.appRoot(),
+        node => node.props.testID === 'flat-list-a11y',
+      );
+      expect(
+        scrollView,
+        'testID reached the committed RCTScrollView',
+      ).toBeDefined();
       expect(scrollView?.viewName).toBe('RCTScrollView');
 
       // Gap 2: onRefresh/refreshing set on <FlatList> produce a real RefreshControl
       // (PullToRefreshView), attached as a sibling of the content container.
-      const refresh = findLive(fabric.appRoot(), node => node.viewName === 'PullToRefreshView');
-      expect(refresh, 'a real RefreshControl.svelte painted PullToRefreshView').toBeDefined();
+      const refresh = findLive(
+        fabric.appRoot(),
+        node => node.viewName === 'PullToRefreshView',
+      );
+      expect(
+        refresh,
+        'a real RefreshControl.svelte painted PullToRefreshView',
+      ).toBeDefined();
       expect(refresh?.props.refreshing).toBe(true);
-      expect(scrollView?.children.some(child => child.tag === refresh?.tag)).toBe(true);
+      expect(
+        scrollView?.children.some(child => child.tag === refresh?.tag),
+      ).toBe(true);
     });
   });
 });

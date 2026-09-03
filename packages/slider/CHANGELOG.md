@@ -1,5 +1,38 @@
 # @symbiote-native/slider
 
+## 6.0.0
+
+### Patch Changes
+
+- [#59](https://github.com/OneEyed1366/symbiote-native/pull/59) [`2d34a11`](https://github.com/OneEyed1366/symbiote-native/commit/2d34a115848c1062f0ae7f67840f0e81df1f754c) Thanks [@mustafa0x](https://github.com/mustafa0x)! - Derive internal peer compatibility from the current workspace package versions so packed
+  manifests reject older engine and adapter releases that do not provide the APIs they import.
+
+- [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Declare npm `keywords` and refresh the README of every companion package. Registry metadata only —
+  no runtime change.
+- Updated dependencies [[`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1), [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1), [`2d34a11`](https://github.com/OneEyed1366/symbiote-native/commit/2d34a115848c1062f0ae7f67840f0e81df1f754c), [`fd70625`](https://github.com/OneEyed1366/symbiote-native/commit/fd70625deff7d13c29a8606259a44f30249e040f), [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1), [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1), [`093144d`](https://github.com/OneEyed1366/symbiote-native/commit/093144d13bc3278353388e4b38ec904bf541f881), [`6e6df80`](https://github.com/OneEyed1366/symbiote-native/commit/6e6df80861f25d146c2b0d7c4837346dc0a86b16), [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1)]:
+  - @symbiote-native/angular@1.0.0
+  - @symbiote-native/components@1.0.0
+  - @symbiote-native/react@1.0.0
+  - @symbiote-native/solid@1.0.0
+  - @symbiote-native/svelte@1.0.0
+  - @symbiote-native/vue@1.0.0
+  - @symbiote-native/engine@0.4.0
+
+## 5.2.0
+
+### Minor Changes
+
+- 3acd869: Add Solid.js as a supported framework: a new `@symbiote-native/solid` adapter reaching full
+  component/runtime parity with the other four adapters, plus a `./solid` export subpath on every
+  companion package. Engine and shared-component packages gained portal/tunnel, retained-tree
+  census, and profiling infrastructure that the new adapter (and the others' portal/tunnel work
+  landing alongside it) build on.
+
+### Patch Changes
+
+- Updated dependencies [3acd869]
+  - @symbiote-native/components@0.5.0
+
 ## 5.1.0
 
 ### Minor Changes

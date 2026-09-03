@@ -17,7 +17,9 @@ import {
   type ScreenOrientationState,
 } from '../../core';
 
-export function useScreenOrientation(): { readonly current: ScreenOrientationState } {
+export function useScreenOrientation(): {
+  readonly current: ScreenOrientationState;
+} {
   let screenOrientation = $state<ScreenOrientationState>({
     orientation: Orientation.UNKNOWN,
     orientationLock: OrientationLock.UNKNOWN,
@@ -31,12 +33,14 @@ export function useScreenOrientation(): { readonly current: ScreenOrientationSta
         screenOrientation = { orientation, orientationLock };
       },
     );
-    const subscription: EventSubscription = addOrientationChangeListener(event => {
-      screenOrientation = {
-        orientation: event.orientationInfo.orientation,
-        orientationLock: event.orientationLock,
-      };
-    });
+    const subscription: EventSubscription = addOrientationChangeListener(
+      event => {
+        screenOrientation = {
+          orientation: event.orientationInfo.orientation,
+          orientationLock: event.orientationLock,
+        };
+      },
+    );
     return () => subscription.remove();
   });
 

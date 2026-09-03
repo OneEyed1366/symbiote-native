@@ -2,7 +2,11 @@
 // use-accelerometer.svelte.ts's shape exactly. See its header for why this lives in `runes/` with
 // a `.svelte.ts` extension, returns a boxed getter object, and takes a plain `updateIntervalMs`
 // rather than a getter.
-import { Barometer, type EventSubscription, type IBarometerMeasurement } from '../../core';
+import {
+  Barometer,
+  type EventSubscription,
+  type IBarometerMeasurement,
+} from '../../core';
 
 export function useBarometer(updateIntervalMs?: number): {
   readonly current: IBarometerMeasurement | null;

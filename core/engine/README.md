@@ -9,7 +9,7 @@ current one, clones only what changed, and calls `completeRoot` — the persiste
 dance Fabric requires, done **once**, for every framework.
 
 > New to SymbioteNative? The [root README](../../README.md) has the architecture and the one fact it
-> rests on — React is just *one client* of `nativeFabricUIManager`. This package is what sits
+> rests on — React is just _one client_ of `nativeFabricUIManager`. This package is what sits
 > between every adapter and that native slot.
 
 ---
@@ -48,17 +48,24 @@ The entire surface a renderer seam drives:
 
 ```ts
 import {
-  createElement, createRawText, createAnchor,
-  appendChild, insertBefore, removeChild,
-  routeProp, setEventListener, setProp, setText,
+  createElement,
+  createRawText,
+  createAnchor,
+  appendChild,
+  insertBefore,
+  removeChild,
+  routeProp,
+  setEventListener,
+  setProp,
+  setText,
 } from '@symbiote-native/engine';
 
-const node = createElement('RCTView');          // component IS the Fabric view name
+const node = createElement('RCTView'); // component IS the Fabric view name
 const text = createRawText('Hello');
 appendChild(node, text);
-routeProp(node, 'onPress', () => {});            // ← the flat-bag entry point (React/Vue/Solid):
-                                                  //   decides event-vs-prop via the ViewConfig,
-                                                  //   NOT by the "onX" naming convention
+routeProp(node, 'onPress', () => {}); // ← the flat-bag entry point (React/Vue/Solid):
+//   decides event-vs-prop via the ViewConfig,
+//   NOT by the "onX" naming convention
 ```
 
 `routeProp` is the one call a flat-bag adapter should route every prop through — a **structural**
@@ -72,7 +79,7 @@ import { createSurface } from '@symbiote-native/engine';
 
 const surface = createSurface(rootTag);
 surface.appendChild(root, node);
-surface.commit();          // synchronous — for a framework that already batches (React)
+surface.commit(); // synchronous — for a framework that already batches (React)
 // surface.requestCommit(); // microtask-coalesced — for reactive frameworks (Vue/Svelte/Angular)
 ```
 
@@ -90,15 +97,21 @@ before a tag is guaranteed to exist.
 - **Runtime modules**, framework-agnostic, re-exported by every adapter: `Platform`,
   `StyleSheet` (+ `computeHairlineWidth`), `Dimensions`, `PixelRatio`, `Appearance`, `AppState`,
   `Keyboard`, `AccessibilityInfo`, `BackHandler`, `PermissionsAndroid`, `LayoutAnimation`,
-  `InteractionManager`, `PanResponder`, and the imperative modules `Alert`, `Share`,
+  `InteractionManager`, `PanResponder`, `StatusBar`, and the imperative modules `Alert`, `Share`,
   `ActionSheetIOS`, `Linking`, `Vibration`, `ToastAndroid`, `Settings`, `I18nManager`.
+- **Host behaviors** (`registerHostBehavior` / `IHostBehavior` / `hasHostBehaviors` /
+  `clearHostBehaviors` / `appListenerFor` / `setBehaviorListener` / `requestCommitFor`) — the
+  registry that lets a primitive's state machine live directly on the engine node instead of
+  inside a framework component, so a `Pressable`/`Switch`/`TextInput`/`Image` can compile to a
+  bare intrinsic tag ("host-primitive lowering"). `@symbiote-native/components` registers its
+  behaviors against this seam; the engine never imports them back.
 - **`Animated`** — both the JS and native driver (`timing` / `spring` / `decay` / `loop` /
   `ValueXY` / tracking / `diffClamp` / `Easing`), including the native-event attachment path
   (`attachNativeEvent`, `AnimatedEvent`).
 - **The style pipeline** — `flattenStyle`, the CSS-style processors RN itself runs in JS
   (`processBoxShadow`, `processFilter`, `processTransform`, `processTransformOrigin`,
   `processAspectRatio`, `processFontVariant`, `processBackgroundImage`), and the runtime
-  **class-name registry** (`registerStyles` / `resolveClassName` / `scopeClassName`) that
+  **class-name registry** (`registerRules` / `resolveClassName` / `renameClassTokens`) that
   `@symbiote-native/css-parser`'s build-time output resolves against — shared by every adapter's
   `class` / `className` / `addClass` prop path.
 - **`AppRegistry` core** (`createAppRegistry`) — registry bookkeeping + headless-task plumbing;

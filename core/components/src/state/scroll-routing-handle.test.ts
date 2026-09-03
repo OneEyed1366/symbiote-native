@@ -62,7 +62,11 @@ describe('IScrollRoutingHandle composition (Positive — structural, not behavio
     handle.scrollToOffset({ offset: 10 });
     handle.recordInteraction();
     handle.flashScrollIndicators();
-    expect(calls).toEqual(['scrollToOffset:10', 'recordInteraction', 'flashScrollIndicators']);
+    expect(calls).toEqual([
+      'scrollToOffset:10',
+      'recordInteraction',
+      'flashScrollIndicators',
+    ]);
   });
 
   // why: the section-list twin — same routing tail, its own scrollToLocation primary.

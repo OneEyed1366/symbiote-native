@@ -21,7 +21,8 @@ vi.mock('react-native', () => ({
   processColor: vi.fn((color: string) => `processed(${color})`),
 }));
 
-const { getBackgroundColorAsync, setBackgroundColorAsync } = await import('./system-ui');
+const { getBackgroundColorAsync, setBackgroundColorAsync } =
+  await import('./system-ui');
 const { Platform, processColor } = await import('react-native');
 
 afterEach(() => {
@@ -39,7 +40,9 @@ describe('setBackgroundColorAsync', () => {
       await setBackgroundColorAsync(null);
 
       expect(processColor).not.toHaveBeenCalled();
-      expect(FAKE_NATIVE_SYSTEM_UI.setBackgroundColorAsync).toHaveBeenCalledWith(null);
+      expect(
+        FAKE_NATIVE_SYSTEM_UI.setBackgroundColorAsync,
+      ).toHaveBeenCalledWith(null);
     });
 
     it('runs a non-null color through processColor on native platforms', async () => {
@@ -49,9 +52,9 @@ describe('setBackgroundColorAsync', () => {
       await setBackgroundColorAsync('tomato');
 
       expect(processColor).toHaveBeenCalledWith('tomato');
-      expect(FAKE_NATIVE_SYSTEM_UI.setBackgroundColorAsync).toHaveBeenCalledWith(
-        'processed(tomato)',
-      );
+      expect(
+        FAKE_NATIVE_SYSTEM_UI.setBackgroundColorAsync,
+      ).toHaveBeenCalledWith('processed(tomato)');
     });
 
     it('passes the raw color straight through on web, skipping processColor', async () => {
@@ -62,7 +65,9 @@ describe('setBackgroundColorAsync', () => {
       await setBackgroundColorAsync('tomato');
 
       expect(processColor).not.toHaveBeenCalled();
-      expect(FAKE_NATIVE_SYSTEM_UI.setBackgroundColorAsync).toHaveBeenCalledWith('tomato');
+      expect(
+        FAKE_NATIVE_SYSTEM_UI.setBackgroundColorAsync,
+      ).toHaveBeenCalledWith('tomato');
     });
   });
 });

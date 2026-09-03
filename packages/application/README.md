@@ -4,12 +4,11 @@ A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-application`](https://github.com/expo/expo/tree/main/packages/expo-application)
 — native app version/build/name/ID, the Android ID, install-referrer and install/update-time
 lookups, and the iOS vendor ID / release type / push-notification-service environment — usable
-from **every** adapter, React, Vue, and Angular, not just React. Like
+from **every** adapter, React, Vue, Svelte, Solid, and Angular. Like
 [`@symbiote-native/local-auth`](../local-auth) (and unlike `@symbiote-native/sensors`'s
 `EventEmitter` + live-subscription surface), everything here is either a plain constant resolved
 once at import time or a one-shot async call with no per-instance state, so there is no hook/
-composable/service to wrap — the React, Vue, and Angular entry points are plain re-exports of
-the same `core`.
+composable/service to wrap — every adapter's entry point is a plain re-export of the same `core`.
 
 ## Install
 
@@ -28,12 +27,12 @@ Unlike a plain RN native module, `expo-application`'s native code is discovered 
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
@@ -51,13 +50,12 @@ src/core/     nativeApplicationVersion / nativeBuildVersion / applicationName / 
               getInstallationTimeAsync, getLastUpdateTimeAsync, plus ApplicationReleaseType and
               PushNotificationServiceEnvironment. native-module.ts resolves the native module via
               expo-modules-core's requireNativeModule.
-src/react/    @symbiote-native/application/react   — export * from '../core'
-src/vue/      @symbiote-native/application/vue     — export * from '../core'
 src/angular/  @symbiote-native/application/angular — export * from '../core'
 ```
 
-No per-adapter lifecycle wrapper exists because there's nothing to subscribe to or clean up —
-each adapter entry is a single-file re-export.
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/`
+— no physical per-framework file, since there's nothing to subscribe to or clean up. `./angular`
+stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 
@@ -82,8 +80,12 @@ function ApplicationScreen() {
 
   return (
     <View>
-      <Text>{applicationName} ({applicationId})</Text>
-      <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+      <Text>
+        {applicationName} ({applicationId})
+      </Text>
+      <Text>
+        v{nativeApplicationVersion} (build {nativeBuildVersion})
+      </Text>
       {Platform.OS === 'android' && installedAt && (
         <Text>Installed {installedAt.toLocaleDateString()}</Text>
       )}
@@ -115,7 +117,9 @@ onMounted(() => {
 <template>
   <View>
     <Text>{{ applicationName }} ({{ applicationId }})</Text>
-    <Text>v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</Text>
+    <Text
+      >v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</Text
+    >
     <Text v-if="Platform.OS === 'android' && installedAt">
       Installed {{ installedAt?.toLocaleDateString() }}
     </Text>
@@ -141,7 +145,9 @@ import {
   template: `
     <View>
       <Text>{{ applicationName }} ({{ applicationId }})</Text>
-      <Text>v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</Text>
+      <Text
+        >v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</Text
+      >
       @if (Platform.OS === 'android' && installedAt(); as date) {
         <Text>Installed {{ date.toLocaleDateString() }}</Text>
       }
@@ -158,10 +164,75 @@ export class ApplicationScreen {
 }
 ```
 
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import { Platform, Text, View } from '@symbiote-native/svelte';
+  import {
+    applicationId,
+    applicationName,
+    getInstallationTimeAsync,
+    nativeApplicationVersion,
+    nativeBuildVersion,
+  } from '@symbiote-native/application/svelte';
+
+  let installedAt = $state<Date | null>(null);
+
+  getInstallationTimeAsync().then(value => {
+    installedAt = value;
+  });
+</script>
+
+<View>
+  <Text>{applicationName} ({applicationId})</Text>
+  <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+  {#if Platform.OS === 'android' && installedAt !== null}
+    <Text>Installed {installedAt.toLocaleDateString()}</Text>
+  {/if}
+</View>
+```
+
+```tsx
+// Solid
+import { createSignal } from 'solid-js';
+import { Platform, Text, View } from '@symbiote-native/solid';
+import {
+  applicationId,
+  applicationName,
+  getInstallationTimeAsync,
+  nativeApplicationVersion,
+  nativeBuildVersion,
+} from '@symbiote-native/application/solid';
+
+function ApplicationScreen() {
+  const [installedAt, setInstalledAt] = createSignal<Date | null>(null);
+
+  getInstallationTimeAsync().then(setInstalledAt);
+
+  return (
+    <View>
+      <Text>
+        {applicationName} ({applicationId})
+      </Text>
+      <Text>
+        v{nativeApplicationVersion} (build {nativeBuildVersion})
+      </Text>
+      {Platform.OS === 'android' && installedAt() !== null && (
+        <Text>Installed {installedAt()!.toLocaleDateString()}</Text>
+      )}
+    </View>
+  );
+}
+```
+
 There's no per-instance service to `inject()` in the Angular case — every function is a plain
-free function off the core package, called straight from the constructor. All three examples
-mirror the real canary demo screens — `examples/expo-react/screens/ApplicationScreen.tsx`,
-`examples/expo-vue-sfc/screens/ApplicationScreen.vue`, `examples/expo-vue-tsx/screens/ApplicationScreen.tsx`,
+free function off the core package, called straight from the constructor (or, on Solid, straight
+from the component body). All five examples mirror the real canary demo screens —
+`examples/expo-react/screens/ApplicationScreen.tsx`,
+`examples/expo-vue-sfc/screens/ApplicationScreen.vue`,
+`examples/expo-vue-tsx/screens/ApplicationScreen.tsx`,
+`examples/expo-svelte/screens/ApplicationScreen.svelte`,
+`examples/expo-solid/screens/ApplicationScreen.tsx`,
 `examples/expo-angular/src/screens/ApplicationScreen.ts`.
 
 ## API
@@ -191,7 +262,10 @@ Plus `ApplicationReleaseType` and `PushNotificationServiceEnvironment` — porte
 carries no `I` prefix; `ts-js-best-practices`).
 
 ```ts
-import { getInstallationTimeAsync, nativeApplicationVersion } from '@symbiote-native/application';
+import {
+  getInstallationTimeAsync,
+  nativeApplicationVersion,
+} from '@symbiote-native/application';
 // or the framework-scoped entry points — identical surface, re-exported verbatim:
 import { getInstallationTimeAsync } from '@symbiote-native/application/react';
 import { getInstallationTimeAsync } from '@symbiote-native/application/vue';

@@ -1,5 +1,15 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
-import { MagnetometerUncalibrated, type IMagnetometerUncalibratedMeasurement } from '../../../core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
+import {
+  MagnetometerUncalibrated,
+  type IMagnetometerUncalibratedMeasurement,
+} from '../../../core';
 
 // Angular twin of React's `useMagnetometerUncalibrated` hook / Vue's
 // `useMagnetometerUncalibrated` composable. Angular has no per-instance hook, so `connect()`
@@ -14,8 +24,12 @@ export class MagnetometerUncalibratedService {
   // `effect()` even when called from a field initializer that isn't one on its own.
   private readonly injector = inject(Injector);
 
-  connect(updateIntervalMs?: number): Signal<IMagnetometerUncalibratedMeasurement | null> {
-    const measurement = signal<IMagnetometerUncalibratedMeasurement | null>(null);
+  connect(
+    updateIntervalMs?: number,
+  ): Signal<IMagnetometerUncalibratedMeasurement | null> {
+    const measurement = signal<IMagnetometerUncalibratedMeasurement | null>(
+      null,
+    );
 
     effect(
       onCleanup => {
@@ -24,7 +38,9 @@ export class MagnetometerUncalibratedService {
         if (updateIntervalMs !== undefined) {
           MagnetometerUncalibrated.setUpdateInterval(updateIntervalMs);
         }
-        const subscription = MagnetometerUncalibrated.addListener(next => measurement.set(next));
+        const subscription = MagnetometerUncalibrated.addListener(next =>
+          measurement.set(next),
+        );
         onCleanup(() => subscription.remove());
       },
       { injector: this.injector },

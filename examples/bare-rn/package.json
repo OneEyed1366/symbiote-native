@@ -1,0 +1,39 @@
+{
+  "name": "BareRN",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "android:release": "react-native run-android --mode Release",
+    "ios": "react-native run-ios",
+    "ios:release": "react-native run-ios --mode Release",
+    "lint": "eslint .",
+    "start": "react-native start",
+    "dev": "react-native start --reset-cache"
+  },
+  "dependencies": {
+    "react": "19.2.3",
+    "react-native": "0.86.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "20.1.0",
+    "@react-native-community/cli-platform-android": "20.1.0",
+    "@react-native-community/cli-platform-ios": "20.1.0",
+    "@react-native/babel-preset": "0.86.0",
+    "@react-native/codegen": "0.86.0",
+    "@react-native/eslint-config": "0.86.0",
+    "@react-native/gradle-plugin": "0.86.0",
+    "@react-native/metro-config": "0.86.0",
+    "@react-native/typescript-config": "0.86.0",
+    "@types/react": "^19.2.0",
+    "eslint": "^8.19.0",
+    "prettier": "^3.9.1",
+    "typescript": "~6.0.0"
+  },
+  "engines": {
+    "node": ">= 22.11.0"
+  }
+}

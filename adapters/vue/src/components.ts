@@ -17,10 +17,16 @@ import type {
   ITextStyle,
   IViewStyle,
 } from '@symbiote-native/engine';
-import type { IAccessibilityProps, IAriaProps, IResponderProps } from '@symbiote-native/components';
+import type {
+  IAccessibilityProps,
+  IAriaProps,
+  IResponderProps,
+} from '@symbiote-native/components';
+import { resolveTextProps } from '@symbiote-native/components';
 import { normalizeVueAttrs } from './utils/normalize-attrs';
 
-export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderProps {
+export interface IViewProps
+  extends IAccessibilityProps, IAriaProps, IResponderProps {
   style?: IStyleProp<IViewStyle>;
   // Resolved through the shared style registry by routeProp's centralized class+style merge
   // (core/engine/src/node.ts). Scoped to View/Text only for now, matching React's exact scope -
@@ -33,7 +39,8 @@ export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderP
   onFocus?: (event: ISymbioteEvent) => void;
   onBlur?: (event: ISymbioteEvent) => void;
   pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
-  hitSlop?: number | { top?: number; left?: number; bottom?: number; right?: number };
+  hitSlop?:
+    number | { top?: number; left?: number; bottom?: number; right?: number };
   id?: string;
   focusable?: boolean;
   collapsable?: boolean;
@@ -70,12 +77,16 @@ export interface ITextProps extends IAccessibilityProps, IAriaProps {
 function hostComponent<Props extends object>(
   intrinsic: string,
   name: string,
+  // An optional last fold over the normalized attrs. Text needs one (RN's ellipsizeMode /
+  // allowFontScaling defaults); View does not, so it stays a straight pass-through.
+  fold: (attrs: Record<string, unknown>) => Record<string, unknown> = attrs =>
+    attrs,
 ): FunctionalComponent<Props> {
   // normalizeVueAttrs folds kebab template props (:accessibility-label) to the RN camelCase contract.
   const component: FunctionalComponent<Props> = (_props, { slots, attrs }) =>
     h(
       intrinsic,
-      normalizeVueAttrs(attrs),
+      fold(normalizeVueAttrs(attrs)),
       slots.default !== undefined ? slots.default() : undefined,
     );
   component.displayName = name;
@@ -83,8 +94,30 @@ function hostComponent<Props extends object>(
   return component;
 }
 
-export const View = hostComponent<IViewProps>('symbiote-view', 'View');
-export const Text = hostComponent<ITextProps>('symbiote-text', 'Text');
+// The intrinsic tags the two bare primitives wrap. Exported because ADAPTER-INTERNAL renders must
+// use the TAG, never the component: Vue charges a full component instance even for a functional
+// one, so `h(View, …)` inside our own Pressable/Button costs an instance per node for a wrapper
+// that only forwards attrs.
+//
+// These stay LITERALS rather than being read out of `@symbiote-native/components/host-primitives`,
+// which is where the two transforms now get them: the spec types `intrinsic` as `string`, and
+// reading it here would widen `HOST_VIEW` from the literal type that `hostComponent` and every
+// adapter-internal `h(HOST_VIEW, …)` rely on. So this is the last remaining second encoding, and
+// `components.test.ts` pins it against the spec rather than trusting the two to stay in step.
+//
+// Children go to a tag as an ARRAY (or a bare string / vnode), never a slot function — an element
+// ignores slot children entirely and renders nothing. The reverse of the rule that applies to a
+// component.
+export const HOST_VIEW = 'symbiote-view';
+export const HOST_TEXT = 'symbiote-text';
+
+export const View = hostComponent<IViewProps>(HOST_VIEW, 'View');
+export const Text = hostComponent<ITextProps>(
+  HOST_TEXT,
+  'Text',
+  resolveTextProps,
+);
+// Text is no longer bare either — it carries RN's Text.js defaults through resolveTextProps.
 // Image is NOT a bare host primitive: it needs the shared fold (source/src/srcSet resolution,
 // width/height -> style, alt -> accessibility) + the Image statics, so it lives in ./image as a
 // functional component over renderImage. View/Text stay bare; they forward attrs verbatim.

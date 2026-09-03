@@ -23,7 +23,9 @@ function isNavigatorState(value: unknown): value is INavigatorState {
   return isRecord(value) && Array.isArray(value.routes);
 }
 
-export function useNavigationState<TResult>(selector: (state: INavigatorState) => TResult): {
+export function useNavigationState<TResult>(
+  selector: (state: INavigatorState) => TResult,
+): {
   readonly current: TResult;
 } {
   const scope = requireNavigationScope('useNavigationState');

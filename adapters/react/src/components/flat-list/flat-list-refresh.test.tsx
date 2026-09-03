@@ -90,7 +90,8 @@ function findScrollWithRefreshChild(): IFakeNode | undefined {
   let found: IFakeNode | undefined;
   walk(fabric.committed, node => {
     if (found !== undefined || node.viewName !== 'RCTScrollView') return;
-    if (node.children.some(child => child.viewName === REFRESH_VIEW_NAME)) found = node;
+    if (node.children.some(child => child.viewName === REFRESH_VIEW_NAME))
+      found = node;
   });
   return found;
 }
@@ -121,7 +122,10 @@ describe('React FlatList pull-to-refresh on the engine (Positive)', () => {
     expect(refreshNode, `${REFRESH_VIEW_NAME} committed`).toBeDefined();
 
     const scrollWithRefresh = findScrollWithRefreshChild();
-    expect(scrollWithRefresh, `${REFRESH_VIEW_NAME} is a child of the RCTScrollView`).toBeDefined();
+    expect(
+      scrollWithRefresh,
+      `${REFRESH_VIEW_NAME} is a child of the RCTScrollView`,
+    ).toBeDefined();
 
     expect(refreshNode!.props.refreshing).toBe(true);
     expect(refreshNode!.props.progressViewOffset).toBe(12);
@@ -137,6 +141,9 @@ describe('React FlatList pull-to-refresh on the engine (Positive)', () => {
       layout: { x: 0, y: 0, width: 320, height: VIEWPORT_HEIGHT },
     });
 
-    expect(findCommitted(REFRESH_VIEW_NAME), 'refresh control absent').toBeUndefined();
+    expect(
+      findCommitted(REFRESH_VIEW_NAME),
+      'refresh control absent',
+    ).toBeUndefined();
   });
 });

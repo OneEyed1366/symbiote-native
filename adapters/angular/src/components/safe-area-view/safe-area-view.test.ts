@@ -9,7 +9,7 @@
 import '@angular/compiler';
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -17,6 +17,33 @@ import { SafeAreaView } from './index';
 
 const ROOT_TAG = 910;
 const fabric = installFabric();
+
+@Component({
+  selector: 'symbiote-safe-area-view-gate-host',
+  standalone: true,
+  imports: [SafeAreaView],
+  template: `<SafeAreaView [testID]="'safe-area'"
+    ><symbiote-text>Hello</symbiote-text></SafeAreaView
+  >`,
+})
+class SafeAreaViewNoSubscriberFixture {}
+
+@Component({
+  selector: 'symbiote-safe-area-view-gate-subscribed-host',
+  standalone: true,
+  imports: [SafeAreaView],
+  template: `
+    <SafeAreaView
+      [testID]="'safe-area'"
+      (accessibilityAction)="onAction($event)"
+    >
+      <symbiote-text>Hello</symbiote-text>
+    </SafeAreaView>
+  `,
+})
+class SafeAreaViewOneSubscriberFixture {
+  onAction(): void {}
+}
 
 @Component({
   selector: 'symbiote-safe-area-view-host',
@@ -92,7 +119,14 @@ describe('SafeAreaView', () => {
   // why: without the anchorHostStyle merge, a class= on <SafeAreaView> silently paints nothing —
   // addClass toggles a token on the ANCHOR element only, and the anchor is never committed to Fabric.
   it('resolves a class= on the SafeAreaView use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ screen: { backgroundColor: 'navy' } });
+    registerRules([
+      {
+        tokens: ['screen'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'navy' },
+      },
+    ]);
 
     mount(ROOT_TAG, SafeAreaViewHostFixture);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -106,7 +140,14 @@ describe('SafeAreaView', () => {
   // index.ts's ngDoCheck bump the bag would keep the class it was built with, and an [ngClass]
   // that flips after mount would silently never repaint.
   it('picks up a class toggled after mount, with no @Input change', async () => {
-    registerStyles({ dark: { backgroundColor: 'black' } });
+    registerRules([
+      {
+        tokens: ['dark'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'black' },
+      },
+    ]);
 
     mount(ROOT_TAG, SafeAreaViewToggleFixture);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -116,5 +157,34 @@ describe('SafeAreaView', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
     expect(committedNode('safe-area')?.props.backgroundColor).toBe('black');
+  });
+
+  // why: `layout` and the four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`) — native fires them only when the committed
+  // payload carries a FUNCTION at that key. Before this, the template bound all five
+  // unconditionally, so every SafeAreaView lit all five gate flags whether or not an app ever
+  // subscribed. No test covered this at all until now.
+  it('lights no accessibility/layout gate flag with no subscriber', async () => {
+    mount(ROOT_TAG, SafeAreaViewNoSubscriberFixture);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+    const props = committedNode('safe-area')?.props;
+    expect(props?.onLayout ?? null).toBeNull();
+    expect(props?.onAccessibilityAction ?? null).toBeNull();
+    expect(props?.onAccessibilityTap ?? null).toBeNull();
+    expect(props?.onMagicTap ?? null).toBeNull();
+    expect(props?.onAccessibilityEscape ?? null).toBeNull();
+  });
+
+  it('lights only the subscribed gate flag', async () => {
+    mount(ROOT_TAG, SafeAreaViewOneSubscriberFixture);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+    const props = committedNode('safe-area')?.props;
+    expect(props?.onAccessibilityAction).toBe(true);
+    expect(props?.onLayout ?? null).toBeNull();
+    expect(props?.onAccessibilityTap ?? null).toBeNull();
+    expect(props?.onMagicTap ?? null).toBeNull();
+    expect(props?.onAccessibilityEscape ?? null).toBeNull();
   });
 });

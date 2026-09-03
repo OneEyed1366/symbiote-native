@@ -1,5 +1,122 @@
 # @symbiote-native/angular
 
+## 1.0.0
+
+### Minor Changes
+
+- [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `createPortal` now delivers content INSIDE the target host, matching React and Vue.
+
+  A `ViewContainerRef` anchors at its host element and `createEmbeddedView` inserts after that
+  anchor, so `<View portalOutlet>` made the ported content the host's SIBLING — an app's overlay
+  could not lay it out, because the node was never in the overlay.
+
+  The outlet marker therefore goes on an `<ng-container>` inside the target:
+
+  ```html
+  <View class="overlay-host">
+    <ng-container portalOutlet #overlayHost="portalOutlet"></ng-container>
+  </View>
+  ```
+
+  `PortalOutletDirective` throws when the marker sits on a real element instead, since the wrong
+  placement otherwise commits a divergent tree with nothing to detect it.
+
+- [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Angular gains the lowering pipeline, and three renderer fixes it uncovered.
+
+  Lowering runs as a Metro source pre-pass, `@symbiote-native/angular/metro-transformer`, rather
+  than as a Babel plugin. Angular's linker reads an inline template by slicing the file's source
+  text at the AST node's byte range, so a `template` rewritten in the AST is invisible to it while
+  the same plugin's `dependencies` edit lands — half-applied lowering, which leaves tags matching
+  nothing. Point `metro.config.js` at the new transformer and drop the plugin from
+  `babel.config.js`.
+
+  Fixed alongside it, all three independent of lowering:
+
+  - `id` never folded to `nativeID` on any Angular path, so `<View id="x">` reached Fabric with a
+    key no ViewConfig declares and the native ID was silently lost. Both that fold and `Text`'s RN
+    defaults now run in the renderer, which covers the wrapper, the lowered element and a host tag
+    hand-written in adapter source alike.
+  - An array-composed `[style]` crashed inside Angular's own styling engine
+    (`prop.indexOf is not a function`) and the throw landed in a zoneless change-detection tick with
+    nothing catching it, so the retry re-fired forever. Arrays are flattened before the binding.
+  - `[(value)]` on `Switch` and `TextInput` lowers as written, instead of forcing an app to spell
+    the two-way binding some other way.
+
+  Accessibility events are no longer forwarded eagerly. `accessibilityTap`, `magicTap`,
+  `accessibilityEscape` and `accessibilityAction` fire only when a boolean prop reaches the payload,
+  so an unconditional template binding lit the gate on every instance whether or not anything
+  subscribed. Components now answer their own gate, and a wrapper declares demand for its template
+  through DI so the cascade `Button -> TouchableOpacity -> Pressable` still works.
+
+  Renderer hot-path diagnostics are behind `isDebug()`. Nine sites built a template string on every
+  `createElement`, `appendChild`, `insertBefore`, `removeChild` and `setValue` in a Release build
+  that emits none of them, plus a closure per removed node: Create -5.5%, Append -10.7%,
+  Clear -25.5%.
+
+- [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Host primitives compile to intrinsic tags instead of framework components.
+
+  `View`, `Text`, `Image`, `SafeAreaView`, `InputAccessoryView`, `Switch`, `TextInput` and
+  `Pressable` are lowered at build time on Vue, Svelte, Solid and Angular, so a screen no longer
+  allocates a component instance, a props proxy, an anchor node or an LView per primitive. The
+  import and the call site are unchanged — which primitive is internally a tag is invisible to an
+  app.
+
+  What moved down with them:
+
+  - The state each primitive needs is an engine host behavior keyed on its tag, not a framework
+    lifecycle. Press, switch, text-input, image and input-accessory-view all register one.
+  - The prop folds a wrapper used to perform run on the payload instead — `id` to `nativeID`,
+    `Text`'s `ellipsizeMode`/`allowFontScaling` defaults, `TextInput`'s `inputMode`/`readOnly`/
+    `enterKeyHint`, `Pressable`'s `disabled` accessibility state and its Android ripple. A lowered
+    element commits the same payload as its wrapper; `core/test-utils`' equivalence oracle asserts
+    it per primitive.
+  - The `aria-*`/`role` fold resolves in the engine, so it reaches every path rather than the
+    fourteen component bodies that used to carry it.
+  - A functional `style={({pressed}) => …}` is specialised into a resting/active pair at build time,
+    so the idiom the ecosystem writes lowers as authored. A CSS `:active` rule is not required.
+
+  A transform refuses where lowering would change what an app can observe: a spread on a stateful
+  primitive, a render-prop child, an instance-bound directive, a runtime value choosing the
+  intrinsic. All five transforms answer one shared fixture table, so a divergence is a failing row
+  rather than a device-only surprise.
+
+  React keeps its wrappers — it has no build-time analysis, and host and composite are both fibers —
+  and exports the same names.
+
+  Measured on an iOS 26.5 simulator, Release, 1 000 rows of 10 native views, against stock React
+  Native 0.86 on React's own Fabric renderer: Solid is under stock on all eight benchmark rows,
+  Svelte and Vue on six of eight. Create is 0.76x/0.80x/0.89x and Append 0.49x/0.54x/0.55x for
+  Solid/Svelte/Vue.
+
+### Patch Changes
+
+- [#59](https://github.com/OneEyed1366/symbiote-native/pull/59) [`2d34a11`](https://github.com/OneEyed1366/symbiote-native/commit/2d34a115848c1062f0ae7f67840f0e81df1f754c) Thanks [@mustafa0x](https://github.com/mustafa0x)! - Derive internal peer compatibility from the current workspace package versions so packed
+  manifests reject older engine and adapter releases that do not provide the APIs they import.
+
+- [#62](https://github.com/OneEyed1366/symbiote-native/pull/62) [`093144d`](https://github.com/OneEyed1366/symbiote-native/commit/093144d13bc3278353388e4b38ec904bf541f881) Thanks [@mustafa0x](https://github.com/mustafa0x)! - Match React Native Pressability's delayed activation, retention-region re-entry, 130 ms plain
+  Pressable active-duration floor, Touchable zero-floor override, and timer cleanup on framework
+  teardown across all five adapters.
+- Updated dependencies [[`2d34a11`](https://github.com/OneEyed1366/symbiote-native/commit/2d34a115848c1062f0ae7f67840f0e81df1f754c), [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1), [`fd70625`](https://github.com/OneEyed1366/symbiote-native/commit/fd70625deff7d13c29a8606259a44f30249e040f), [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1), [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1), [`093144d`](https://github.com/OneEyed1366/symbiote-native/commit/093144d13bc3278353388e4b38ec904bf541f881), [`6e6df80`](https://github.com/OneEyed1366/symbiote-native/commit/6e6df80861f25d146c2b0d7c4837346dc0a86b16)]:
+  - @symbiote-native/components@1.0.0
+  - @symbiote-native/css-parser@0.5.0
+  - @symbiote-native/engine@0.4.0
+
+## 0.8.0
+
+### Minor Changes
+
+- 3acd869: Add Solid.js as a supported framework: a new `@symbiote-native/solid` adapter reaching full
+  component/runtime parity with the other four adapters, plus a `./solid` export subpath on every
+  companion package. Engine and shared-component packages gained portal/tunnel, retained-tree
+  census, and profiling infrastructure that the new adapter (and the others' portal/tunnel work
+  landing alongside it) build on.
+
+### Patch Changes
+
+- Updated dependencies [3acd869]
+  - @symbiote-native/components@0.5.0
+  - @symbiote-native/css-parser@0.4.0
+
 ## 0.7.0
 
 ### Minor Changes

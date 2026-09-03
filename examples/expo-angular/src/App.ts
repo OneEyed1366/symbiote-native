@@ -50,29 +50,144 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
   imports: [Stack, ScreenDirective],
   template: `
     <Stack initialRouteName="Menu">
-      <ng-template symbioteScreen name="Menu" [component]="menuScreen" [options]="menuOptions"></ng-template>
-      <ng-template symbioteScreen name="Sensors" [component]="sensorsScreen" [options]="sensorsOptions"></ng-template>
-      <ng-template symbioteScreen name="LocalAuth" [component]="localAuthScreen" [options]="localAuthOptions"></ng-template>
-      <ng-template symbioteScreen name="Haptics" [component]="hapticsScreen" [options]="hapticsOptions"></ng-template>
-      <ng-template symbioteScreen name="Clipboard" [component]="clipboardScreen" [options]="clipboardOptions"></ng-template>
-      <ng-template symbioteScreen name="Battery" [component]="batteryScreen" [options]="batteryOptions"></ng-template>
-      <ng-template symbioteScreen name="Brightness" [component]="brightnessScreen" [options]="brightnessOptions"></ng-template>
-      <ng-template symbioteScreen name="Cellular" [component]="cellularScreen" [options]="cellularOptions"></ng-template>
-      <ng-template symbioteScreen name="Network" [component]="networkScreen" [options]="networkOptions"></ng-template>
-      <ng-template symbioteScreen name="Device" [component]="deviceScreen" [options]="deviceOptions"></ng-template>
-      <ng-template symbioteScreen name="Application" [component]="applicationScreen" [options]="applicationOptions"></ng-template>
-      <ng-template symbioteScreen name="Crypto" [component]="cryptoScreen" [options]="cryptoOptions"></ng-template>
-      <ng-template symbioteScreen name="StandardWebCrypto" [component]="webCryptoScreen" [options]="webCryptoOptions"></ng-template>
-      <ng-template symbioteScreen name="SystemUi" [component]="systemUiScreen" [options]="systemUiOptions"></ng-template>
-      <ng-template symbioteScreen name="StoreReview" [component]="storeReviewScreen" [options]="storeReviewOptions"></ng-template>
-      <ng-template symbioteScreen name="KeepAwake" [component]="keepAwakeScreen" [options]="keepAwakeOptions"></ng-template>
-      <ng-template symbioteScreen name="ScreenOrientation" [component]="screenOrientationScreen" [options]="screenOrientationOptions"></ng-template>
-      <ng-template symbioteScreen name="Localization" [component]="localizationScreen" [options]="localizationOptions"></ng-template>
-      <ng-template symbioteScreen name="TrackingTransparency" [component]="trackingTransparencyScreen" [options]="trackingTransparencyOptions"></ng-template>
-      <ng-template symbioteScreen name="SecureStore" [component]="secureStoreScreen" [options]="secureStoreOptions"></ng-template>
-      <ng-template symbioteScreen name="Sharing" [component]="sharingScreen" [options]="sharingOptions"></ng-template>
-      <ng-template symbioteScreen name="WebBrowser" [component]="webBrowserScreen" [options]="webBrowserOptions"></ng-template>
-      <ng-template symbioteScreen name="Sms" [component]="smsScreen" [options]="smsOptions"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Menu"
+        [component]="menuScreen"
+        [options]="menuOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Sensors"
+        [component]="sensorsScreen"
+        [options]="sensorsOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="LocalAuth"
+        [component]="localAuthScreen"
+        [options]="localAuthOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Haptics"
+        [component]="hapticsScreen"
+        [options]="hapticsOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Clipboard"
+        [component]="clipboardScreen"
+        [options]="clipboardOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Battery"
+        [component]="batteryScreen"
+        [options]="batteryOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Brightness"
+        [component]="brightnessScreen"
+        [options]="brightnessOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Cellular"
+        [component]="cellularScreen"
+        [options]="cellularOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Network"
+        [component]="networkScreen"
+        [options]="networkOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Device"
+        [component]="deviceScreen"
+        [options]="deviceOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Application"
+        [component]="applicationScreen"
+        [options]="applicationOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Crypto"
+        [component]="cryptoScreen"
+        [options]="cryptoOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="StandardWebCrypto"
+        [component]="webCryptoScreen"
+        [options]="webCryptoOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="SystemUi"
+        [component]="systemUiScreen"
+        [options]="systemUiOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="StoreReview"
+        [component]="storeReviewScreen"
+        [options]="storeReviewOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="KeepAwake"
+        [component]="keepAwakeScreen"
+        [options]="keepAwakeOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="ScreenOrientation"
+        [component]="screenOrientationScreen"
+        [options]="screenOrientationOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Localization"
+        [component]="localizationScreen"
+        [options]="localizationOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="TrackingTransparency"
+        [component]="trackingTransparencyScreen"
+        [options]="trackingTransparencyOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="SecureStore"
+        [component]="secureStoreScreen"
+        [options]="secureStoreOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Sharing"
+        [component]="sharingScreen"
+        [options]="sharingOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="WebBrowser"
+        [component]="webBrowserScreen"
+        [options]="webBrowserOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Sms"
+        [component]="smsScreen"
+        [options]="smsOptions"
+      ></ng-template>
     </Stack>
   `,
 })

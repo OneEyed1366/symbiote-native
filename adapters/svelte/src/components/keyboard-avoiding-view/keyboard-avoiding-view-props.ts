@@ -21,7 +21,8 @@ import type { ISvelteClassValue } from '../../class-value';
 
 export type { IKeyboardAvoidingBehavior } from '@symbiote-native/components';
 
-export interface IKeyboardAvoidingViewProps extends IAccessibilityProps, IAriaProps {
+export interface IKeyboardAvoidingViewProps
+  extends IAccessibilityProps, IAriaProps {
   behavior?: IKeyboardAvoidingBehavior;
   // When false, the view passes through untouched; no inset is applied in any behavior mode.
   enabled?: boolean;

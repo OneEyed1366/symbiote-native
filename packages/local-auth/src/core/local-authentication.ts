@@ -28,9 +28,14 @@ export async function hasHardwareAsync(): Promise<boolean> {
  * multiple authentication methods — e.g. `[FINGERPRINT, FACIAL_RECOGNITION]` means the device
  * supports both. Returns an empty array if none are supported.
  */
-export async function supportedAuthenticationTypesAsync(): Promise<AuthenticationType[]> {
+export async function supportedAuthenticationTypesAsync(): Promise<
+  AuthenticationType[]
+> {
   if (!expoLocalAuthentication.supportedAuthenticationTypesAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'supportedAuthenticationTypesAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'supportedAuthenticationTypesAsync',
+    );
   }
   return expoLocalAuthentication.supportedAuthenticationTypesAsync();
 }
@@ -72,7 +77,8 @@ export async function authenticateAsync(
 
   if (options.promptMessage !== undefined) {
     invariant(
-      typeof options.promptMessage === 'string' && options.promptMessage.length > 0,
+      typeof options.promptMessage === 'string' &&
+        options.promptMessage.length > 0,
       'LocalAuthentication.authenticateAsync: `options.promptMessage` must be a non-empty string.',
     );
   }

@@ -13,7 +13,11 @@
 import { getNativeModule } from '../native-modules';
 import { dlog } from '../debug';
 import { processColor, type IColorValue } from '../platform-color';
-import { STATUS_BAR_MANAGER, type IStatusBarImperative, type IStatusBarProps } from './shared';
+import {
+  STATUS_BAR_MANAGER,
+  type IStatusBarImperative,
+  type IStatusBarProps,
+} from './shared';
 export type { IStatusBarProps, IStatusBarStyle } from './shared';
 
 // The native module typed as the interface we vouch for: only the Android setters we
@@ -52,8 +56,15 @@ function applyBackgroundColor(
 // single-arg Android setters. The adapter calls this from its declarative component's effect,
 // on mount and on every prop change.
 export function applyStatusBarProps(props: IStatusBarProps): void {
-  const { barStyle, hidden, animated = false, backgroundColor, translucent } = props;
-  const manager = getNativeModule<INativeStatusBarManagerAndroid>(STATUS_BAR_MANAGER);
+  const {
+    barStyle,
+    hidden,
+    animated = false,
+    backgroundColor,
+    translucent,
+  } = props;
+  const manager =
+    getNativeModule<INativeStatusBarManagerAndroid>(STATUS_BAR_MANAGER);
   if (manager === null) {
     dlog('StatusBar android: StatusBarManager not resolvable — skipping');
     return;
@@ -64,17 +75,22 @@ export function applyStatusBarProps(props: IStatusBarProps): void {
   if (barStyle !== undefined) manager.setStyle(barStyle);
   if (hidden !== undefined) manager.setHidden(hidden);
   if (translucent !== undefined) manager.setTranslucent(translucent);
-  if (backgroundColor !== undefined) applyBackgroundColor(manager, backgroundColor, animated);
+  if (backgroundColor !== undefined)
+    applyBackgroundColor(manager, backgroundColor, animated);
 }
 
 export const statusBarImperative: IStatusBarImperative = {
   setBarStyle(style) {
     dlog(`StatusBar.setBarStyle android ${style}`);
-    getNativeModule<INativeStatusBarManagerAndroid>(STATUS_BAR_MANAGER)?.setStyle(style);
+    getNativeModule<INativeStatusBarManagerAndroid>(
+      STATUS_BAR_MANAGER,
+    )?.setStyle(style);
   },
   setHidden(hidden) {
     dlog(`StatusBar.setHidden android ${hidden}`);
-    getNativeModule<INativeStatusBarManagerAndroid>(STATUS_BAR_MANAGER)?.setHidden(hidden);
+    getNativeModule<INativeStatusBarManagerAndroid>(
+      STATUS_BAR_MANAGER,
+    )?.setHidden(hidden);
   },
   setNetworkActivityIndicatorVisible() {
     // No Android equivalent: an iOS-only concept.
@@ -82,16 +98,17 @@ export const statusBarImperative: IStatusBarImperative = {
   },
   setBackgroundColor(color, animated = false) {
     dlog(`StatusBar.setBackgroundColor android ${String(color)}`);
-    const manager = getNativeModule<INativeStatusBarManagerAndroid>(STATUS_BAR_MANAGER);
+    const manager =
+      getNativeModule<INativeStatusBarManagerAndroid>(STATUS_BAR_MANAGER);
     if (manager === null) return;
     applyBackgroundColor(manager, color, animated);
   },
   setTranslucent(translucent) {
     // RISK: window translucent flag is device-verify-pending (may blank the surface).
     dlog(`StatusBar.setTranslucent android ${translucent}`);
-    getNativeModule<INativeStatusBarManagerAndroid>(STATUS_BAR_MANAGER)?.setTranslucent(
-      translucent,
-    );
+    getNativeModule<INativeStatusBarManagerAndroid>(
+      STATUS_BAR_MANAGER,
+    )?.setTranslucent(translucent);
   },
 };
 
@@ -99,6 +116,7 @@ export const statusBarImperative: IStatusBarImperative = {
 // constant is absent (older RN, or a fake that doesn't define getConstants). Read lazily
 // so nothing touches native at import time.
 export function statusBarCurrentHeight(): number | undefined {
-  return getNativeModule<INativeStatusBarManagerAndroid>(STATUS_BAR_MANAGER)?.getConstants?.()
-    .HEIGHT;
+  return getNativeModule<INativeStatusBarManagerAndroid>(
+    STATUS_BAR_MANAGER,
+  )?.getConstants?.().HEIGHT;
 }

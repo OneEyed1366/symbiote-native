@@ -9,7 +9,13 @@
 // shared-core behavior, and every adapter's sibling test file proves them through its own
 // lifecycle.
 
-import { Component, createElement, type ErrorInfo, type ReactElement, type ReactNode } from 'react';
+import {
+  Component,
+  createElement,
+  type ErrorInfo,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount, View } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
@@ -29,7 +35,9 @@ vi.mock('react-native-bootsplash', () => ({
 const ROOT_TAG = 900;
 
 const FAKE_NATIVE_MODULE = { getConstants: () => ({ darkModeEnabled: false }) };
-const DARK_MODE_NATIVE_MODULE = { getConstants: () => ({ darkModeEnabled: true }) };
+const DARK_MODE_NATIVE_MODULE = {
+  getConstants: () => ({ darkModeEnabled: true }),
+};
 
 function isPresent<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
@@ -39,7 +47,9 @@ let activeNativeModule: unknown = FAKE_NATIVE_MODULE;
 
 Object.assign(globalThis, {
   __turboModuleProxy: <T,>(name: string): T | null =>
-    name === 'RNBootSplash' && isPresent<T>(activeNativeModule) ? activeNativeModule : null,
+    name === 'RNBootSplash' && isPresent<T>(activeNativeModule)
+      ? activeNativeModule
+      : null,
 });
 
 const MANIFEST: IManifest = {
@@ -94,7 +104,12 @@ describe('useHideAnimation', () => {
     it('reports the skip sentinel and no onLoadEnd when logo is omitted', () => {
       // why: a splash with no logo asset configured must not wait on an onLoadEnd that will
       // never fire — the sentinel source lets the app skip rendering the Image entirely.
-      mount(ROOT_TAG, createElement(Probe, { config: { manifest: MANIFEST, animate: () => {} } }));
+      mount(
+        ROOT_TAG,
+        createElement(Probe, {
+          config: { manifest: MANIFEST, animate: () => {} },
+        }),
+      );
 
       const last = results[results.length - 1];
       expect(last.logo.source).toBe(-1);
@@ -155,7 +170,11 @@ describe('useHideAnimation', () => {
       // same readiness callback (e.g. a duplicate native layout event) must not replay the
       // fade-out animation.
       const { hide } = await import('react-native-bootsplash');
-      const config: IHideAnimationConfig = { manifest: MANIFEST, ready: true, animate: () => {} };
+      const config: IHideAnimationConfig = {
+        manifest: MANIFEST,
+        ready: true,
+        animate: () => {},
+      };
 
       mount(ROOT_TAG, createElement(Probe, { config }));
       const result = results[results.length - 1];
@@ -219,7 +238,10 @@ describe('useHideAnimation', () => {
       // the splash hidden once layout/logo settle, not have it stuck forever for lack of an
       // explicit `ready: true`.
       const { hide } = await import('react-native-bootsplash');
-      const config: IHideAnimationConfig = { manifest: MANIFEST, animate: () => {} };
+      const config: IHideAnimationConfig = {
+        manifest: MANIFEST,
+        animate: () => {},
+      };
 
       mount(ROOT_TAG, createElement(Probe, { config }));
       const result = results[results.length - 1];
@@ -277,7 +299,9 @@ describe('useHideAnimation', () => {
       mount(ROOT_TAG, createElement(Probe, { config }));
       results[results.length - 1].container.onLayout();
 
-      await vi.waitFor(() => expect(failures).toEqual([{ stage: 'animate', error: animateError }]));
+      await vi.waitFor(() =>
+        expect(failures).toEqual([{ stage: 'animate', error: animateError }]),
+      );
     });
   });
 
@@ -292,10 +316,15 @@ describe('useHideAnimation', () => {
       // that ship looking fine.
       activeNativeModule = null;
       const captured: Error[] = [];
-      const config: IHideAnimationConfig = { manifest: MANIFEST, animate: () => {} };
+      const config: IHideAnimationConfig = {
+        manifest: MANIFEST,
+        animate: () => {},
+      };
       // The throw is the point of this test, and mount() now reports it to the host - silenced so
       // a passing run does not print a stack trace that reads like a failure.
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       mount(
         ROOT_TAG,
@@ -307,7 +336,10 @@ describe('useHideAnimation', () => {
 
       expect(captured).toHaveLength(1);
       expect(String(captured[0])).toMatch(/RNBootSplash/);
-      expect(results, 'the hook must not hand back defaults it could not read').toHaveLength(0);
+      expect(
+        results,
+        'the hook must not hand back defaults it could not read',
+      ).toHaveLength(0);
       consoleError.mockRestore();
     });
   });

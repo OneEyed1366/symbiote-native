@@ -15,7 +15,11 @@
 // the declaring module, so a raw `let x = $state(...)` handed out of a plain function arrives
 // dead at the caller. `{ get current() { … } }` is the sanctioned way across, read as `.current`
 // exactly like Vue's `Ref` is unwrapped via `.value`.
-import { addBatteryLevelListener, getBatteryLevelAsync, type EventSubscription } from '../../core';
+import {
+  addBatteryLevelListener,
+  getBatteryLevelAsync,
+  type EventSubscription,
+} from '../../core';
 
 // core/battery.ts's documented sentinel for "this device cannot report a battery level".
 const UNKNOWN_BATTERY_LEVEL = -1;

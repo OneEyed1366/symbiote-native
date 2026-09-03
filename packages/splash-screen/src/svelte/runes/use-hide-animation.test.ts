@@ -29,9 +29,11 @@ import metroSvelteTransformer from '@symbiote-native/svelte/metro-svelte-transfo
 
 const {
   compileSvelteModuleFile,
-}: { compileSvelteModuleFile: (src: string, filename: string) => string } = metroSvelteTransformer;
+}: { compileSvelteModuleFile: (src: string, filename: string) => string } =
+  metroSvelteTransformer;
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -41,27 +43,44 @@ vi.mock('react-native-bootsplash', () => ({
   isVisible: vi.fn(() => true),
 }));
 
-const FAKE_NATIVE_MODULE = { getConstants: vi.fn(() => ({ darkModeEnabled: false })) };
+const FAKE_NATIVE_MODULE = {
+  getConstants: vi.fn(() => ({ darkModeEnabled: false })),
+};
 
 function isPresent<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
 }
 
 const ROOT_TAG = 91_502;
-const PROBE_OUT = join(__dirname, '.smoke-compiled-use-hide-animation-probe.mjs');
-const REACTIVE_PROBE_OUT = join(__dirname, '.smoke-compiled-use-hide-animation-reactive-probe.mjs');
-const RUNE_OUT = join(__dirname, '.smoke-compiled-use-hide-animation.svelte.mjs');
+const PROBE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-hide-animation-probe.mjs',
+);
+const REACTIVE_PROBE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-hide-animation-reactive-probe.mjs',
+);
+const RUNE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-hide-animation.svelte.mjs',
+);
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
-const MANIFEST: IManifest = { background: '#ffffff', logo: { width: 100, height: 100 } };
+const MANIFEST: IManifest = {
+  background: '#ffffff',
+  logo: { width: 100, height: 100 },
+};
 
 beforeEach(() => {
   fabric.reset();
   vi.clearAllMocks();
   globalThis.__turboModuleProxy = <T>(name: string): T | null =>
-    name === 'RNBootSplash' && isPresent<T>(FAKE_NATIVE_MODULE) ? FAKE_NATIVE_MODULE : null;
+    name === 'RNBootSplash' && isPresent<T>(FAKE_NATIVE_MODULE)
+      ? FAKE_NATIVE_MODULE
+      : null;
 });
 
 afterEach(() => {
@@ -72,14 +91,21 @@ afterEach(() => {
   globalThis.__turboModuleProxy = undefined;
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 // $state/$effect require Svelte's MODULE compiler, not the component compiler — a bare,
 // uncompiled rune call throws `rune_outside_svelte` at runtime. vitest doesn't run the real
 // Metro transformer, so this test drives its exact compileSvelteModuleFile step (TS-strip +
 // compileModule) against the real rune source, exercising the actual shipped implementation.
 function compileRuneModule(): void {
-  const source = readFileSync(join(__dirname, 'use-hide-animation.svelte.ts'), 'utf-8');
+  const source = readFileSync(
+    join(__dirname, 'use-hide-animation.svelte.ts'),
+    'utf-8',
+  );
   const code = compileSvelteModuleFile(source, 'use-hide-animation.svelte.ts');
   writeFileSync(RUNE_OUT, code);
 }
@@ -139,7 +165,9 @@ async function loadReactiveReadyProbe(): Promise<Component> {
   writeFileSync(REACTIVE_PROBE_OUT, result.js.code);
   const mod: unknown = await import(`file://${REACTIVE_PROBE_OUT}`);
   if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
-    throw new Error('HideAnimationReactiveProbe.svelte produced no default export');
+    throw new Error(
+      'HideAnimationReactiveProbe.svelte produced no default export',
+    );
   }
   return mod.default as Component;
 }
@@ -220,7 +248,10 @@ describe('useHideAnimation (Svelte)', () => {
       // caller's own Image binding checks for, and skipping onLoadEnd is what keeps logoReady true
       // from construction (HideAnimationController's own comment) instead of hanging forever.
       const results: IHideAnimationResult[] = [];
-      const getConfig = (): IHideAnimationConfig => ({ manifest: MANIFEST, animate: () => {} });
+      const getConfig = (): IHideAnimationConfig => ({
+        manifest: MANIFEST,
+        animate: () => {},
+      });
 
       const Probe = await loadProbe();
       mount(ROOT_TAG, Probe, {
@@ -261,7 +292,10 @@ describe('useHideAnimation (Svelte)', () => {
 
       const last = results[results.length - 1];
       last.container.onLayout();
-      expect(hide, 'brand image has not finished loading yet').not.toHaveBeenCalled();
+      expect(
+        hide,
+        'brand image has not finished loading yet',
+      ).not.toHaveBeenCalled();
 
       last.brand.onLoadEnd?.();
       expect(hide).toHaveBeenCalledTimes(1);
@@ -285,7 +319,8 @@ describe('useHideAnimation (Svelte)', () => {
         },
       });
       await tick();
-      if (controls === undefined) throw new Error('the reactive probe did not expose controls');
+      if (controls === undefined)
+        throw new Error('the reactive probe did not expose controls');
 
       results[results.length - 1].container.onLayout();
       expect(hide, 'userReady is still false').not.toHaveBeenCalled();
@@ -358,7 +393,10 @@ describe('useHideAnimation (Svelte)', () => {
         }),
       ).toThrow(/RNBootSplash/);
 
-      expect(results, 'the rune must not hand back defaults it could not read').toHaveLength(0);
+      expect(
+        results,
+        'the rune must not hand back defaults it could not read',
+      ).toHaveLength(0);
     });
   });
 });

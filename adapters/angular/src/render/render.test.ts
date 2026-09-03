@@ -4,7 +4,7 @@
 // through the engine.
 
 import '@angular/compiler';
-import { Component } from '@angular/core';
+import { Component, resource } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from './index';
@@ -12,7 +12,8 @@ import { mount, unmount } from './index';
 const ROOT_TAG = 808;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 const drainAngularAndCommit = async (): Promise<void> => {
   await tick();
   await tick();
@@ -98,6 +99,22 @@ Component({
   template: `<symbiote-view><counter-child /><unrelated-sibling-child /></symbiote-view>`,
 })(TargetedComponent);
 
+// A component whose only unusual move is calling `resource()`. Angular resolves TransferState
+// while constructing it, and TransferState's root factory probes `document.getElementById` — so
+// this component is a canary for the DOCUMENT stub in render.ts, not for resource() itself.
+class ResourceComponent {
+  readonly probe = resource({
+    params: () => ({ id: 1 }),
+    loader: (): Promise<string> => Promise.resolve('loaded'),
+  });
+}
+Component({
+  selector: 'symbiote-angular-resource',
+  standalone: true,
+  imports: [TestText],
+  template: '<symbiote-text>resource mounted</symbiote-text>',
+})(ResourceComponent);
+
 class InitialPropsComponent {
   greeting = 'unset';
 }
@@ -117,6 +134,20 @@ Component({
 // modules/app-registry/app-registry.test.ts's "projects the root component into a registered
 // wrapper via <ng-content>" — not duplicated here.
 describe('Angular mount', () => {
+  // A screen that calls resource() rendered NOTHING on device — white body under a native
+  // header — because TransferState's factory hit `document.getElementById` on a stub that had
+  // only { head, body }. The throw lands during component construction, so the failure is a
+  // blank tree rather than an error anyone sees. Assert the tree, not the absence of a throw:
+  // the symptom was silence.
+  it('renders a component that calls resource(), whose TransferState probes the document', async () => {
+    mount(ROOT_TAG, ResourceComponent);
+    await tick();
+
+    expect(fabric.serialize(fabric.appRoot().children)).toBe(
+      'RCTText(RCTRawText "resource mounted")',
+    );
+  });
+
   it('bootstraps a standalone component into a committed Fabric tree', async () => {
     mount(ROOT_TAG, SmokeComponent);
     await tick();
@@ -144,7 +175,9 @@ describe('Angular mount', () => {
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 1×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 1×"',
+    );
   });
 
   // why: see the file-level comment above CounterChild/UnrelatedSiblingChild — a real
@@ -164,7 +197,9 @@ describe('Angular mount', () => {
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 1×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 1×"',
+    );
     // UnrelatedSiblingChild has no dirty descendant of its own, so it must not be re-checked
     // just because CounterChild (a completely separate branch) got pressed. This does NOT prove
     // the root's own template stays untouched — the root's template still re-runs on every
@@ -177,10 +212,14 @@ describe('Angular mount', () => {
   // initialProps` through it too (modules/app-registry/index.ts), so a regression here breaks
   // every app that passes launch params. Untested before this rewrite.
   it('applies IMountOptions.initialProps to the root component via setInput', async () => {
-    mount(ROOT_TAG, InitialPropsComponent, { initialProps: { greeting: 'from native' } });
+    mount(ROOT_TAG, InitialPropsComponent, {
+      initialProps: { greeting: 'from native' },
+    });
     await tick();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "from native"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "from native"',
+    );
   });
 
   // why: mount()'s own header comment states "A re-mount on a live rootTag starts clean;
@@ -196,12 +235,16 @@ describe('Angular mount', () => {
     fabric.fireEvent(counter?.instanceHandle, 'topTouchStart');
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 1×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 1×"',
+    );
 
     // Re-mount the SAME rootTag WITHOUT an intervening unmount() call.
     mount(ROOT_TAG, SmokeComponent);
     await tick();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 0×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 0×"',
+    );
   });
 
   // why: `global.RN$stopSurface` is the JSI hook C++ calls to stop a Fabric surface (render.ts's
@@ -216,13 +259,17 @@ describe('Angular mount', () => {
     fabric.fireEvent(counter?.instanceHandle, 'topTouchStart');
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 1×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 1×"',
+    );
 
     expect(globalThis.RN$stopSurface).toBeTypeOf('function');
     globalThis.RN$stopSurface?.(ROOT_TAG);
 
     mount(ROOT_TAG, SmokeComponent);
     await tick();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 0×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 0×"',
+    );
   });
 });

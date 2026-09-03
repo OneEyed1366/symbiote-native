@@ -56,7 +56,9 @@ const rows: IRow[] = Array.from({ length: 5 }, (_unused, index) => ({
         <symbiote-text testID="header">header</symbiote-text>
       </ng-template>
       <ng-template vListItem let-item>
-        <symbiote-text [testID]="'row-' + item.n">{{ 'row ' + item.n }}</symbiote-text>
+        <symbiote-text [testID]="'row-' + item.n">{{
+          'row ' + item.n
+        }}</symbiote-text>
       </ng-template>
       <ng-template vListFooter>
         <symbiote-text testID="footer">footer</symbiote-text>

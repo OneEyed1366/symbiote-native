@@ -16,17 +16,25 @@
   // the wiring re-runs the moment the binding resolves — no mount-ordering guarantee needed. See
   // packages/navigation/src/svelte/linking.svelte.ts's header.
   //
-  // MARKUP FORMATTING IS LOAD-BEARING: sibling markers are packed edge-to-edge with zero
-  // whitespace between them (svelte-adapter-dom-shim skill §16). The navigator parks the markers
-  // inside a collapsed symbiote-text so a stray space could not crash a device, but the audit
-  // (`node scripts/audit-svelte-stray-whitespace.mjs`) still expects zero.
+  // The markers below can be laid out normally. A whitespace-only text node under a parent that
+  // takes no raw text becomes an anchor in the shim, so the gap between two <Screen> markers
+  // never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b) — on top of the
+  // navigator already parking the markers inside a collapsed symbiote-text.
   import './App.css';
-  import { Screen, Stack, useLinkingIntegration } from '@symbiote-native/navigation/svelte';
-  import type { INavigatorHandle, IScreenOptions } from '@symbiote-native/navigation/svelte';
+  import {
+    Screen,
+    Stack,
+    useLinkingIntegration,
+  } from '@symbiote-native/navigation/svelte';
+  import type {
+    INavigatorHandle,
+    IScreenOptions,
+  } from '@symbiote-native/navigation/svelte';
   import { hide } from '@symbiote-native/splash-screen/svelte';
 
   import MenuScreen from './screens/MenuScreen.svelte';
   import CanaryScreen from './screens/CanaryScreen.svelte';
+  import ApiPlaygroundScreen from './screens/ApiPlaygroundScreen.svelte';
   import DetailsScreen from './screens/DetailsScreen.svelte';
   import HeaderOptionsScreen from './screens/HeaderOptionsScreen.svelte';
   import { headerOptionsScreenOptions } from './screens/header-options-screen-options';
@@ -37,6 +45,8 @@
   import HooksDemoScreen from './screens/HooksDemoScreen.svelte';
   import DeepLinkingScreen from './screens/DeepLinkingScreen.svelte';
   import StatePersistenceScreen from './screens/StatePersistenceScreen.svelte';
+  import BenchmarkScreen from './screens/BenchmarkScreen.svelte';
+  import StyleShowcaseScreen from './screens/StyleShowcaseScreen.svelte';
   import { APP_LINKING_CONFIG } from './navigation-linking';
   import { ROUTE_NAME } from './routes';
   import { LINE_COLOR } from './navigation-lines';
@@ -46,7 +56,7 @@
   const HEADER_BACKGROUND = '#1a1a1a';
   const DETAILS_TRANSITION_DURATION_MS = 300;
 
-  // Seven of the nine tour stops carry a byte-identical header apart from title and tint, so they
+  // Eight of the ten tour stops carry a byte-identical header apart from title and tint, so they
   // share this builder. Menu, Details, HeaderOptions and SheetDemo each deviate on purpose (no
   // headerShown, a transition, a large title, formSheet sizing) and are written out in full below.
   function darkHeader(title: string, headerTintColor: string): IScreenOptions {
@@ -69,7 +79,15 @@
     headerUserInterfaceStyle: 'dark',
   };
 
-  const canaryScreenOptions: IScreenOptions = darkHeader('Symbiote Canary', LINE_COLOR.primitives);
+  const canaryScreenOptions: IScreenOptions = darkHeader(
+    'Symbiote Canary',
+    LINE_COLOR.primitives,
+  );
+
+  const apiPlaygroundScreenOptions: IScreenOptions = darkHeader(
+    'API Playground',
+    LINE_COLOR.primitives,
+  );
 
   const detailsScreenOptions: IScreenOptions = {
     title: 'Navigation Demo',
@@ -110,8 +128,14 @@
     sheetInitialDetentIndex: 0,
   };
 
-  const tabsDemoScreenOptions: IScreenOptions = darkHeader('Tabs Demo', LINE_COLOR.structure);
-  const drawerDemoScreenOptions: IScreenOptions = darkHeader('Drawer Demo', LINE_COLOR.structure);
+  const tabsDemoScreenOptions: IScreenOptions = darkHeader(
+    'Tabs Demo',
+    LINE_COLOR.structure,
+  );
+  const drawerDemoScreenOptions: IScreenOptions = darkHeader(
+    'Drawer Demo',
+    LINE_COLOR.structure,
+  );
   const nestedNavigatorsScreenOptions: IScreenOptions = darkHeader(
     'Nested Navigators',
     LINE_COLOR.structure,
@@ -120,10 +144,21 @@
     'Hooks Demo',
     LINE_COLOR.introspection,
   );
-  const deepLinkingScreenOptions: IScreenOptions = darkHeader('Deep Linking', LINE_COLOR.routing);
+  const deepLinkingScreenOptions: IScreenOptions = darkHeader(
+    'Deep Linking',
+    LINE_COLOR.routing,
+  );
   const statePersistenceScreenOptions: IScreenOptions = darkHeader(
     'State Persistence',
     LINE_COLOR.routing,
+  );
+  const benchmarkScreenOptions: IScreenOptions = darkHeader(
+    'Benchmark',
+    LINE_COLOR.performance,
+  );
+  const styleShowcaseScreenOptions: IScreenOptions = darkHeader(
+    'Styling showcase',
+    LINE_COLOR.styling,
   );
 
   // `unknown` + a runtime guard, not `INavigatorHandle | null` directly. @symbiote-native/navigation
@@ -135,7 +170,12 @@
   let stackInstance = $state.raw<unknown>(null);
 
   function isNavigatorHandle(value: unknown): value is INavigatorHandle {
-    return typeof value === 'object' && value !== null && 'push' in value && 'replace' in value;
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'push' in value &&
+      'replace' in value
+    );
   }
 
   useLinkingIntegration(APP_LINKING_CONFIG, () =>
@@ -151,38 +191,75 @@
   });
 </script>
 
-<Stack bind:this={stackInstance} initialRouteName={ROUTE_NAME.Menu}
-  ><Screen name={ROUTE_NAME.Menu} component={MenuScreen} options={menuScreenOptions}
-  /><Screen name={ROUTE_NAME.Canary} component={CanaryScreen} options={canaryScreenOptions}
-  /><Screen name={ROUTE_NAME.Details} component={DetailsScreen} options={detailsScreenOptions}
-  /><Screen
+<Stack bind:this={stackInstance} initialRouteName={ROUTE_NAME.Menu}>
+  <Screen
+    name={ROUTE_NAME.Menu}
+    component={MenuScreen}
+    options={menuScreenOptions}
+  />
+  <Screen
+    name={ROUTE_NAME.Canary}
+    component={CanaryScreen}
+    options={canaryScreenOptions}
+  />
+  <Screen
+    name={ROUTE_NAME.ApiPlayground}
+    component={ApiPlaygroundScreen}
+    options={apiPlaygroundScreenOptions}
+  />
+  <Screen
+    name={ROUTE_NAME.Details}
+    component={DetailsScreen}
+    options={detailsScreenOptions}
+  />
+  <Screen
     name={ROUTE_NAME.HeaderOptions}
     component={HeaderOptionsScreen}
     options={headerOptionsScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.SheetDemo}
     component={SheetDemoScreen}
     options={sheetDemoScreenOptions}
-  /><Screen name={ROUTE_NAME.TabsDemo} component={TabsDemoScreen} options={tabsDemoScreenOptions}
-  /><Screen
+  />
+  <Screen
+    name={ROUTE_NAME.TabsDemo}
+    component={TabsDemoScreen}
+    options={tabsDemoScreenOptions}
+  />
+  <Screen
     name={ROUTE_NAME.DrawerDemo}
     component={DrawerDemoScreen}
     options={drawerDemoScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.NestedNavigators}
     component={NestedNavigatorsScreen}
     options={nestedNavigatorsScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.HooksDemo}
     component={HooksDemoScreen}
     options={hooksDemoScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.DeepLinking}
     component={DeepLinkingScreen}
     options={deepLinkingScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.StatePersistence}
     component={StatePersistenceScreen}
     options={statePersistenceScreenOptions}
-  /></Stack
->
+  />
+  <Screen
+    name={ROUTE_NAME.Benchmark}
+    component={BenchmarkScreen}
+    options={benchmarkScreenOptions}
+  />
+  <Screen
+    name={ROUTE_NAME.StyleShowcase}
+    component={StyleShowcaseScreen}
+    options={styleShowcaseScreenOptions}
+  />
+</Stack>

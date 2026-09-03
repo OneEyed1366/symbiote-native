@@ -24,7 +24,11 @@ interface ISyntheticTouch {
   timestamp: number;
 }
 
-function makeTouch(pageX: number, pageY: number, timestamp: number): ISyntheticTouch {
+function makeTouch(
+  pageX: number,
+  pageY: number,
+  timestamp: number,
+): ISyntheticTouch {
   return {
     pageX,
     pageY,
@@ -38,7 +42,11 @@ function makeTouch(pageX: number, pageY: number, timestamp: number): ISyntheticT
 // A real branded RCTView node so no cast is needed; the gesture never reads it.
 const targetNode = createElement('RCTView');
 
-function buildEvent(pageX: number, pageY: number, timestamp: number): ISymbioteEvent {
+function buildEvent(
+  pageX: number,
+  pageY: number,
+  timestamp: number,
+): ISymbioteEvent {
   const touch = makeTouch(pageX, pageY, timestamp);
   const nativeEvent: Record<string, unknown> = {
     touches: [touch],
@@ -102,7 +110,9 @@ beforeAll(() => {
   });
   const { panHandlers } = responder;
 
-  gateResult = panHandlers.onStartShouldSetResponder(buildEvent(GRANT_X, GRANT_Y, GRANT_T));
+  gateResult = panHandlers.onStartShouldSetResponder(
+    buildEvent(GRANT_X, GRANT_Y, GRANT_T),
+  );
   panHandlers.onResponderGrant(buildEvent(GRANT_X, GRANT_Y, GRANT_T));
 
   for (let frame = 1; frame <= MOVE_COUNT; frame++) {
@@ -163,7 +173,9 @@ describe('PanResponder', () => {
         secondGrant = snapshot(gestureState);
       },
     });
-    second.panHandlers.onStartShouldSetResponderCapture(buildEvent(0, 0, 2_000));
+    second.panHandlers.onStartShouldSetResponderCapture(
+      buildEvent(0, 0, 2_000),
+    );
     second.panHandlers.onResponderGrant(buildEvent(0, 0, 2_000));
     expect(secondGrant).toBeDefined();
     expect(secondGrant?.dx).toBeCloseTo(0, PRECISION);
@@ -182,20 +194,30 @@ describe('PanResponder should-set defaults (no callback configured)', () => {
   // (say) onPanResponderMove configured must not silently start claiming touches.
   it('onStartShouldSetResponder / onMoveShouldSetResponder default to false', () => {
     const { panHandlers } = PanResponder.create({});
-    expect(panHandlers.onStartShouldSetResponder(buildEvent(0, 0, 0))).toBe(false);
-    expect(panHandlers.onMoveShouldSetResponder(buildEvent(0, 0, 0))).toBe(false);
+    expect(panHandlers.onStartShouldSetResponder(buildEvent(0, 0, 0))).toBe(
+      false,
+    );
+    expect(panHandlers.onMoveShouldSetResponder(buildEvent(0, 0, 0))).toBe(
+      false,
+    );
   });
 
   // why: RN's documented default is implicit consent to a termination request --
   // a responder with no opinion must let another claimant take over.
   it('onResponderTerminationRequest defaults to true', () => {
     const { panHandlers } = PanResponder.create({});
-    expect(panHandlers.onResponderTerminationRequest(buildEvent(0, 0, 0))).toBe(true);
+    expect(panHandlers.onResponderTerminationRequest(buildEvent(0, 0, 0))).toBe(
+      true,
+    );
   });
 
   it('onResponderTerminationRequest returns the configured callback result', () => {
-    const { panHandlers } = PanResponder.create({ onPanResponderTerminationRequest: () => false });
-    expect(panHandlers.onResponderTerminationRequest(buildEvent(0, 0, 0))).toBe(false);
+    const { panHandlers } = PanResponder.create({
+      onPanResponderTerminationRequest: () => false,
+    });
+    expect(panHandlers.onResponderTerminationRequest(buildEvent(0, 0, 0))).toBe(
+      false,
+    );
   });
 
   // why: RN blocks the native responder by default once a PanResponder gesture is
@@ -207,7 +229,9 @@ describe('PanResponder should-set defaults (no callback configured)', () => {
   });
 
   it('onResponderGrant returns the configured onShouldBlockNativeResponder result', () => {
-    const { panHandlers } = PanResponder.create({ onShouldBlockNativeResponder: () => false });
+    const { panHandlers } = PanResponder.create({
+      onShouldBlockNativeResponder: () => false,
+    });
     expect(panHandlers.onResponderGrant(buildEvent(0, 0, 0))).toBe(false);
   });
 });
@@ -243,7 +267,9 @@ describe('PanResponder reject / terminate', () => {
     });
 
     panHandlers.onResponderGrant(buildEvent(GRANT_X, GRANT_Y, GRANT_T));
-    panHandlers.onResponderMove(buildEvent(GRANT_X + STEP_X, GRANT_Y + STEP_Y, GRANT_T + FRAME_MS));
+    panHandlers.onResponderMove(
+      buildEvent(GRANT_X + STEP_X, GRANT_Y + STEP_Y, GRANT_T + FRAME_MS),
+    );
     panHandlers.onResponderTerminate(
       buildEvent(GRANT_X + STEP_X, GRANT_Y + STEP_Y, GRANT_T + FRAME_MS),
     );
@@ -273,7 +299,11 @@ describe('PanResponder duplicate-frame guard', () => {
       },
     });
     panHandlers.onResponderGrant(buildEvent(GRANT_X, GRANT_Y, GRANT_T));
-    const moveEvent = buildEvent(GRANT_X + STEP_X, GRANT_Y + STEP_Y, GRANT_T + FRAME_MS);
+    const moveEvent = buildEvent(
+      GRANT_X + STEP_X,
+      GRANT_Y + STEP_Y,
+      GRANT_T + FRAME_MS,
+    );
     panHandlers.onResponderMove(moveEvent);
     panHandlers.onResponderMove(moveEvent);
     expect(moveCount).toBe(1);
@@ -373,7 +403,10 @@ describe('PanResponder touch-history store (RN-faithful multitouch)', () => {
       },
     });
     panHandlers.onResponderGrant(
-      historyEvent([makeTouch(100, 0, 1_000), makeTouch(300, 0, 1_000)], grantHistory),
+      historyEvent(
+        [makeTouch(100, 0, 1_000), makeTouch(300, 0, 1_000)],
+        grantHistory,
+      ),
     );
     expect(grantSnap?.numberActiveTouches).toBe(2);
 
@@ -405,7 +438,10 @@ describe('PanResponder touch-history store (RN-faithful multitouch)', () => {
       mostRecentTimeStamp: 1_016,
     };
     panHandlers.onResponderMove(
-      historyEvent([makeTouch(150, 0, 1_016), makeTouch(300, 0, 1_016)], moveHistory),
+      historyEvent(
+        [makeTouch(150, 0, 1_016), makeTouch(300, 0, 1_016)],
+        moveHistory,
+      ),
     );
 
     // Only A's +50 delta counts -- if B's stale-but-included position had diluted
@@ -457,8 +493,12 @@ describe('PanResponder touch-history store (RN-faithful multitouch)', () => {
         moveSnap = snapshot(gestureState);
       },
     });
-    panHandlers.onResponderGrant(historyEvent([makeTouch(100, 200, 1_000)], grantHistory));
-    panHandlers.onResponderMove(historyEvent([makeTouch(130, 200, 1_016)], moveHistory));
+    panHandlers.onResponderGrant(
+      historyEvent([makeTouch(100, 200, 1_000)], grantHistory),
+    );
+    panHandlers.onResponderMove(
+      historyEvent([makeTouch(130, 200, 1_016)], moveHistory),
+    );
 
     expect(moveSnap?.dx).toBeCloseTo(30, PRECISION);
     expect(moveSnap?.numberActiveTouches).toBe(1);

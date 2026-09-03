@@ -3,11 +3,11 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-local-authentication`](https://github.com/expo/expo/tree/main/packages/expo-local-authentication)
 — FaceID/TouchID on iOS, the Fingerprint/Biometric API on Android — usable from **every**
-adapter, React, Vue, and Angular, not just React. Unlike this repo's other Expo wrapper
+adapter, React, Vue, Svelte, Solid, and Angular, not just React. Unlike this repo's other Expo wrapper
 ([`@symbiote-native/sensors`](../sensors), an `EventEmitter` + live-subscription surface),
 every function here is a one-shot async call with no per-instance state, so there is no hook/
-composable/service to wrap — the React, Vue, and Angular entry points are plain re-exports of
-the same `core`.
+composable/service to wrap — the React, Vue, Svelte, Solid, and Angular entry points are plain
+re-exports of the same `core`.
 
 ## Install
 
@@ -26,12 +26,12 @@ Unlike a plain RN native module, `expo-local-authentication`'s native code is di
 into the native host app **once**, covering this package and every other
 `expo-modules-core` package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
@@ -52,13 +52,13 @@ src/core/     hasHardwareAsync / isEnrolledAsync / getEnrolledLevelAsync /
               AuthenticationType, SecurityLevel, and the option/result/error types.
               native-module.ts resolves the native module via expo-modules-core's
               requireNativeModule.
-src/react/    @symbiote-native/local-auth/react   — export * from '../core'
-src/vue/      @symbiote-native/local-auth/vue     — export * from '../core'
 src/angular/  @symbiote-native/local-auth/angular — export * from '../core'
 ```
 
-No per-adapter lifecycle wrapper exists because there's nothing to subscribe to or clean up —
-each adapter entry is a single-file re-export.
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto
+`src/core/` — no physical per-framework file, since there's nothing to subscribe to or clean up.
+`./angular` stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build
+(`build-ngc/`).
 
 ## Use it
 
@@ -77,7 +77,8 @@ import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/rea
 function LocalAuthScreen() {
   const [hasHardware, setHasHardware] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
-  const [authResult, setAuthResult] = useState<ILocalAuthenticationResult | null>(null);
+  const [authResult, setAuthResult] =
+    useState<ILocalAuthenticationResult | null>(null);
 
   useEffect(() => {
     hasHardwareAsync().then(setHasHardware);
@@ -85,12 +86,18 @@ function LocalAuthScreen() {
   }, []);
 
   const handleAuthenticate = () => {
-    authenticateAsync({ promptMessage: 'Confirm it is you' }).then(setAuthResult);
+    authenticateAsync({ promptMessage: 'Confirm it is you' }).then(
+      setAuthResult,
+    );
   };
 
   return (
     <View>
-      <Text>{hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled'}</Text>
+      <Text>
+        {hasHardware && isEnrolled
+          ? 'Ready to authenticate'
+          : 'No biometrics enrolled'}
+      </Text>
       <Pressable onPress={handleAuthenticate}>
         <Text>Authenticate</Text>
       </Pressable>
@@ -99,7 +106,11 @@ function LocalAuthScreen() {
           <Text>Cancel</Text>
         </Pressable>
       )}
-      {authResult && <Text>{authResult.success ? 'Success' : `Failed: ${authResult.error}`}</Text>}
+      {authResult && (
+        <Text>
+          {authResult.success ? 'Success' : `Failed: ${authResult.error}`}
+        </Text>
+      )}
     </View>
   );
 }
@@ -136,16 +147,124 @@ function handleAuthenticate(): void {
 
 <template>
   <View>
-    <Text>{{ hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled' }}</Text>
+    <Text>{{
+      hasHardware && isEnrolled
+        ? 'Ready to authenticate'
+        : 'No biometrics enrolled'
+    }}</Text>
     <Pressable @press="handleAuthenticate">
       <Text>Authenticate</Text>
     </Pressable>
     <Pressable v-if="Platform.OS === 'android'" @press="cancelAuthenticate">
       <Text>Cancel</Text>
     </Pressable>
-    <Text v-if="authResult">{{ authResult.success ? 'Success' : `Failed: ${authResult.error}` }}</Text>
+    <Text v-if="authResult">{{
+      authResult.success ? 'Success' : `Failed: ${authResult.error}`
+    }}</Text>
   </View>
 </template>
+```
+
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import { Platform, Pressable, Text, View } from '@symbiote-native/svelte';
+  import {
+    authenticateAsync,
+    cancelAuthenticate,
+    hasHardwareAsync,
+    isEnrolledAsync,
+  } from '@symbiote-native/local-auth/svelte';
+  import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/svelte';
+
+  let hasHardware = $state(false);
+  let isEnrolled = $state(false);
+  let authResult = $state<ILocalAuthenticationResult | null>(null);
+
+  $effect(() => {
+    hasHardwareAsync().then(value => (hasHardware = value));
+    isEnrolledAsync().then(value => (isEnrolled = value));
+  });
+
+  function handleAuthenticate(): void {
+    authenticateAsync({ promptMessage: 'Confirm it is you' }).then(value => {
+      authResult = value;
+    });
+  }
+</script>
+
+<View>
+  <Text>
+    {hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled'}
+  </Text>
+  <Pressable onPress={handleAuthenticate}>
+    <Text>Authenticate</Text>
+  </Pressable>
+  {#if Platform.OS === 'android'}
+    <Pressable onPress={() => cancelAuthenticate()}>
+      <Text>Cancel</Text>
+    </Pressable>
+  {/if}
+  {#if authResult}
+    <Text>{authResult.success ? 'Success' : `Failed: ${authResult.error}`}</Text>
+  {/if}
+</View>
+```
+
+```tsx
+// Solid
+import { Show, createSignal, onMount } from 'solid-js';
+import { Platform, Pressable, Text, View } from '@symbiote-native/solid';
+import {
+  authenticateAsync,
+  cancelAuthenticate,
+  hasHardwareAsync,
+  isEnrolledAsync,
+} from '@symbiote-native/local-auth/solid';
+import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/solid';
+
+function LocalAuthScreen() {
+  const [hasHardware, setHasHardware] = createSignal(false);
+  const [isEnrolled, setIsEnrolled] = createSignal(false);
+  const [authResult, setAuthResult] =
+    createSignal<ILocalAuthenticationResult | null>(null);
+
+  onMount(() => {
+    void hasHardwareAsync().then(setHasHardware);
+    void isEnrolledAsync().then(setIsEnrolled);
+  });
+
+  const handleAuthenticate = () => {
+    void authenticateAsync({ promptMessage: 'Confirm it is you' }).then(
+      setAuthResult,
+    );
+  };
+
+  return (
+    <View>
+      <Text>
+        {hasHardware() && isEnrolled()
+          ? 'Ready to authenticate'
+          : 'No biometrics enrolled'}
+      </Text>
+      <Pressable onPress={handleAuthenticate}>
+        <Text>Authenticate</Text>
+      </Pressable>
+      {Platform.OS === 'android' && (
+        <Pressable onPress={() => cancelAuthenticate()}>
+          <Text>Cancel</Text>
+        </Pressable>
+      )}
+      <Show when={authResult()} keyed>
+        {result => (
+          <Text>
+            {result.success ? 'Success' : `Failed: ${result.error}`}
+          </Text>
+        )}
+      </Show>
+    </View>
+  );
+}
 ```
 
 ```ts
@@ -165,7 +284,11 @@ import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/ang
   imports: [Pressable, Text, View],
   template: `
     <View>
-      <Text>{{ hasHardware() && isEnrolled() ? 'Ready to authenticate' : 'No biometrics enrolled' }}</Text>
+      <Text>{{
+        hasHardware() && isEnrolled()
+          ? 'Ready to authenticate'
+          : 'No biometrics enrolled'
+      }}</Text>
       <Pressable (press)="handleAuthenticate()">
         <Text>Authenticate</Text>
       </Pressable>
@@ -175,7 +298,9 @@ import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/ang
         </Pressable>
       }
       @if (authResult(); as result) {
-        <Text>{{ result.success ? 'Success' : 'Failed: ' + result.error }}</Text>
+        <Text>{{
+          result.success ? 'Success' : 'Failed: ' + result.error
+        }}</Text>
       }
     </View>
   `,
@@ -192,7 +317,9 @@ export class LocalAuthScreen {
   }
 
   handleAuthenticate(): void {
-    authenticateAsync({ promptMessage: 'Confirm it is you' }).then(value => this.authResult.set(value));
+    authenticateAsync({ promptMessage: 'Confirm it is you' }).then(value =>
+      this.authResult.set(value),
+    );
   }
 
   handleCancel(): void {
@@ -202,17 +329,19 @@ export class LocalAuthScreen {
 ```
 
 There's no per-instance service to `inject()` in the Angular case — every function is a plain
-free function off the core package, called straight from the constructor. All three examples are
-trimmed from the real canary demo screens (`examples/expo-react/screens/LocalAuthScreen.tsx`,
+free function off the core package, called straight from the constructor. The React/Vue/Angular
+examples are trimmed from the real canary demo screens
+(`examples/expo-react/screens/LocalAuthScreen.tsx`,
 `examples/expo-vue-sfc/screens/LocalAuthScreen.vue`, `examples/expo-vue-tsx/screens/LocalAuthScreen.tsx`,
 `examples/expo-angular/src/screens/LocalAuthScreen.ts`), which also cover
-`getEnrolledLevelAsync`/`supportedAuthenticationTypesAsync` and render a capabilities card.
+`getEnrolledLevelAsync`/`supportedAuthenticationTypesAsync` and render a capabilities card. No
+canary demo screen exists yet for Svelte/Solid — the two snippets above follow the same surface.
 
 ## API
 
 Free functions, no event stream, no per-instance state — upstream ships a handful of async
-functions and two enums, not a subscribable sensor, so the React/Vue/Angular entry points above
-are plain re-exports of `core` with nothing adapter-specific to add.
+functions and two enums, not a subscribable sensor, so the React/Vue/Svelte/Solid/Angular entry
+points above are plain re-exports of `core` with nothing adapter-specific to add.
 
 ```ts
 hasHardwareAsync(): Promise<boolean>
@@ -229,10 +358,15 @@ from upstream's `LocalAuthentication.types.ts`, renamed with this repo's `I`-pre
 for exported types (`ts-js-best-practices`).
 
 ```ts
-import { authenticateAsync, hasHardwareAsync } from '@symbiote-native/local-auth';
+import {
+  authenticateAsync,
+  hasHardwareAsync,
+} from '@symbiote-native/local-auth';
 // or the framework-scoped entry points — identical surface, re-exported verbatim:
 import { authenticateAsync } from '@symbiote-native/local-auth/react';
 import { authenticateAsync } from '@symbiote-native/local-auth/vue';
+import { authenticateAsync } from '@symbiote-native/local-auth/svelte';
+import { authenticateAsync } from '@symbiote-native/local-auth/solid';
 import { authenticateAsync } from '@symbiote-native/local-auth/angular';
 ```
 
@@ -241,7 +375,7 @@ import { authenticateAsync } from '@symbiote-native/local-auth/angular';
 - **`not_enrolled` on Android almost always means the device's own lock screen has no PIN,
   pattern, or password set.** A real symptom on a fresh emulator or factory-reset device:
   `authenticateAsync` resolves `{ success: false, error: 'not_enrolled', warning:
-  'KeyguardManager#isDeviceSecure() returned false' }`. This is **not** a missing app
+'KeyguardManager#isDeviceSecure() returned false' }`. This is **not** a missing app
   permission — the manifest permission this package needs is an ordinary build-time merge with
   no runtime prompt, so there's nothing for your app to request. The fix lives on the device:
   Settings → Security → Screen lock → set a PIN/pattern/password, then optionally enroll a
@@ -259,10 +393,11 @@ a view or per-instance state. Tests inject a fake native-module object in place 
 `src/core/types.test.ts`, `vitest`) — no `installFabric()`, no ViewConfig. Native rendering itself
 is verified on-device (see the parent [README](../../README.md) for the project's testing model).
 
-Native autolinking wiring is done in the four Expo canary apps
-(`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-angular`)
-— iOS Podfile/`AppDelegate.swift` + `NSFaceIDUsageDescription`, Android Gradle/
-`MainApplication.kt` + `USE_BIOMETRIC`, all four confirmed present. The one remaining gap: this
-package isn't yet demoed in the plain, non-Expo `examples/react`/`vue-sfc`/`vue-tsx`/`angular`
-canaries, since an `expo-modules-core` package needs the `expo-modules-autolinking` wiring only
-the `examples/expo-*` apps have set up so far.
+Native autolinking wiring is done in all six Expo canary apps
+(`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-svelte`,
+`examples/expo-solid`, `examples/expo-angular`) — iOS Podfile/`AppDelegate.swift` +
+`NSFaceIDUsageDescription`, Android Gradle/`MainApplication.kt` + `USE_BIOMETRIC`, all six
+confirmed present. The one remaining gap: this package isn't yet demoed in the plain, non-Expo
+`examples/react`/`vue-sfc`/`vue-tsx`/`svelte`/`solid`/`angular` canaries, since an
+`expo-modules-core` package needs the `expo-modules-autolinking` wiring only the
+`examples/expo-*` apps have set up so far.

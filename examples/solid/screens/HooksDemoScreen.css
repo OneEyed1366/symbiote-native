@@ -1,0 +1,10 @@
+/*
+ * HooksDemoScreen's own leftover — the route-stack rows. Everything shared with the other tour
+ * screens (.demo-section, .line-tag*, .hero-*, .info-text, .note-text) comes from App.css;
+ * only what is unique here lives in this file, screen-prefixed because the class registry is global.
+ */
+
+.hooks-list-row {
+  color: #9aa6c4;
+  font-size: 15px;
+}

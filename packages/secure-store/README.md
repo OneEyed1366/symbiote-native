@@ -3,8 +3,8 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-secure-store`](https://github.com/expo/expo/tree/main/packages/expo-secure-store) —
 encrypted key-value storage in the iOS Keychain and the Android Keystore, optionally gated behind
-the device's own biometrics — usable from **every** adapter, React, Vue, and Angular, not just
-React. Built the same way as [`@symbiote-native/local-auth`](../local-auth): an
+the device's own biometrics — usable from **every** adapter, React, Vue, Svelte, Solid, and
+Angular, not just React. Built the same way as [`@symbiote-native/local-auth`](../local-auth): an
 `expo-modules-core`-based wrapper (see the `symbiote-expo-native-module` project skill for the
 full mechanism — why `expo-modules-core` is depended on directly and never the `expo`
 meta-package, why the upstream JS is hand-ported into `core/` rather than imported, and how
@@ -26,12 +26,12 @@ Unlike a plain RN native module, `expo-secure-store`'s native code is discovered
 `expo-modules-autolinking` — this needs wiring into the native host app **once**, covering this
 package and every other `expo-modules-core` package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a native-module name map |
+| Platform | Touches                                                                               |
+| -------- | ------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                               |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                   |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a native-module name map           |
 
 Full mechanics live in the `symbiote-expo-native-module` skill. The per-package half of that
 table — the Gradle dependency, the module map entry, the `NSFaceIDUsageDescription` string, and
@@ -62,17 +62,16 @@ describe the rule files).
 src/core/                 the whole API: seven keychain-accessibility constants plus the
                           get/set/delete surface. native-module.ts resolves ExpoSecureStore
                           through expo-modules-core's requireNativeModule.
-src/react/                @symbiote-native/secure-store/react
-src/vue/                  @symbiote-native/secure-store/vue
 src/angular/              @symbiote-native/secure-store/angular
 ```
 
-All three adapter entries are plain re-exports of `core/`. Upstream ships free functions and
-constants — no per-instance state, no event stream — so there is nothing for a hook, composable,
-or service to wrap, the same reason [`@symbiote-native/local-auth`](../local-auth) re-exports
-rather than wraps. Import from `@symbiote-native/secure-store` directly if you don't care which
-adapter you're on; the per-adapter subpaths exist so every wrapper package has the same import
-surface.
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/` —
+no physical per-framework file. Upstream ships free functions and constants — no per-instance state,
+no event stream — so there is nothing for a hook, composable, or service to wrap, the same reason
+[`@symbiote-native/local-auth`](../local-auth) does the same. `./angular` stays a physical
+file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`). Import from
+`@symbiote-native/secure-store` directly if you don't care which adapter you're on; the
+per-adapter subpaths exist so every wrapper package has the same import surface.
 
 ## Use it
 
@@ -103,20 +102,22 @@ Values are strings. JSON-encode anything else:
 
 ```ts
 await SecureStore.setItemAsync('profile', JSON.stringify(profile));
-const profile = JSON.parse((await SecureStore.getItemAsync('profile')) ?? 'null');
+const profile = JSON.parse(
+  (await SecureStore.getItemAsync('profile')) ?? 'null',
+);
 ```
 
 ## API
 
-| Export | Signature | Notes |
-|---|---|---|
-| `isAvailableAsync` | `() => Promise<boolean>` | `true` on Android and iOS. Says nothing about permissions. |
-| `getItemAsync` | `(key, options?) => Promise<string \| null>` | `null` when there is no entry, or when the key has been invalidated. |
-| `getItem` | `(key, options?) => string \| null` | Blocks the JS thread. |
-| `setItemAsync` | `(key, value, options?) => Promise<void>` | Rejects if the value cannot be stored. |
-| `setItem` | `(key, value, options?) => void` | Blocks the JS thread. |
-| `deleteItemAsync` | `(key, options?) => Promise<void>` | |
-| `canUseBiometricAuthentication` | `() => boolean` | Whether `requireAuthentication` can be used at all. |
+| Export                                                                                                                                                                                    | Signature                                     | Notes                                                                                                                                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAvailableAsync`                                                                                                                                                                        | `() => Promise<boolean>`                      | `true` on Android and iOS. Says nothing about permissions.                                                                                                                                         |
+| `getItemAsync`                                                                                                                                                                            | `(key, options?) => Promise<string \| null>`  | `null` when there is no entry, or when the key has been invalidated.                                                                                                                               |
+| `getItem`                                                                                                                                                                                 | `(key, options?) => string \| null`           | Blocks the JS thread.                                                                                                                                                                              |
+| `setItemAsync`                                                                                                                                                                            | `(key, value, options?) => Promise<void>`     | Rejects if the value cannot be stored.                                                                                                                                                             |
+| `setItem`                                                                                                                                                                                 | `(key, value, options?) => void`              | Blocks the JS thread.                                                                                                                                                                              |
+| `deleteItemAsync`                                                                                                                                                                         | `(key, options?) => Promise<void>`            |                                                                                                                                                                                                    |
+| `canUseBiometricAuthentication`                                                                                                                                                           | `() => boolean`                               | Whether `requireAuthentication` can be used at all.                                                                                                                                                |
 | `AFTER_FIRST_UNLOCK`, `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`, `ALWAYS`, `ALWAYS_THIS_DEVICE_ONLY`, `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`, `WHEN_UNLOCKED`, `WHEN_UNLOCKED_THIS_DEVICE_ONLY` | `IKeychainAccessibilityConstant \| undefined` | Values for `options.keychainAccessible`. iOS only — Android's native module declares none of them, so they read `undefined` there. `ALWAYS` and `ALWAYS_THIS_DEVICE_ONLY` are deprecated upstream. |
 
 `ISecureStoreOptions`: `keychainService`, `requireAuthentication`, `authenticationPrompt`,

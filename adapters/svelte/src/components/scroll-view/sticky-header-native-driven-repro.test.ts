@@ -18,20 +18,24 @@ import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
 const ROOT_TAG = 91_777;
 const COMPONENTS_DIR = join(__dirname, '..');
-const MODULES_ANIMATED_DIR = join(COMPONENTS_DIR, '..', 'modules', 'animated');
-const ANIMATED_VIEW_OUT = join(MODULES_ANIMATED_DIR, '.smoke-repro-animated-view.mjs');
-const STICKY_HEADER_OUT = join(__dirname, '.smoke-repro-sticky-header-native-driven.mjs');
+const VIEW_OUT = join(COMPONENTS_DIR, '.smoke-repro-view.mjs');
+const STICKY_HEADER_OUT = join(
+  __dirname,
+  '.smoke-repro-sticky-header-native-driven.mjs',
+);
 const ROOT_OUT = join(__dirname, '.smoke-repro-root.mjs');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let createAnimatedNodeCalls: number;
 
@@ -68,14 +72,22 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(ANIMATED_VIEW_OUT, { force: true });
+  rmSync(VIEW_OUT, { force: true });
   rmSync(STICKY_HEADER_OUT, { force: true });
   rmSync(ROOT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
@@ -93,7 +105,10 @@ const CRASHING_STICKY_HEADER_SOURCE = `<script lang="ts">
     STICKY_HEADER_Z_INDEX,
   } from '@symbiote-native/components';
   import { AnimatedValue, Platform, type AnimatedInterpolation, type ISymbioteEvent } from '@symbiote-native/engine';
-  import AnimatedView from '../../modules/animated/.smoke-repro-animated-view.mjs';
+  import View from '../.smoke-repro-view.mjs';
+  import { createAnimatedComponent } from '../../modules/animated/create-animated-component';
+
+  const AnimatedView = createAnimatedComponent(View);
 
   let {
     nextHeaderLayoutY,
@@ -193,11 +208,8 @@ const CRASHING_STICKY_HEADER_SOURCE = `<script lang="ts">
 `;
 
 async function loadMountable(): Promise<Component> {
-  const animatedViewSource = readFileSync(
-    join(MODULES_ANIMATED_DIR, 'AnimatedView.svelte'),
-    'utf8',
-  );
-  compileToFile(animatedViewSource, 'AnimatedView.svelte', ANIMATED_VIEW_OUT);
+  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
+  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
 
   compileToFile(
     CRASHING_STICKY_HEADER_SOURCE,
@@ -243,7 +255,9 @@ describe('sticky-header native-driven shape — reconstructed pre-revert repro',
     await tick();
     await tick();
 
-    const stickyHost = fabric.find(node => node.viewName === 'RCTView' && node.props.zIndex === 10);
+    const stickyHost = fabric.find(
+      node => node.viewName === 'RCTView' && node.props.zIndex === 10,
+    );
     expect(stickyHost).toBeDefined();
 
     // Measure the header (RN's real onLayout), matching how it always gets its first real
@@ -278,7 +292,9 @@ describe('sticky-header native-driven shape — reconstructed pre-revert repro',
     await tick();
     await tick();
 
-    const stickyHost = fabric.find(node => node.viewName === 'RCTView' && node.props.zIndex === 10);
+    const stickyHost = fabric.find(
+      node => node.viewName === 'RCTView' && node.props.zIndex === 10,
+    );
     expect(stickyHost).toBeDefined();
 
     // Measure, then settle a real debounced translateY so `passthroughAnimatedPropExplicitValues`

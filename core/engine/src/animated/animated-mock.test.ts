@@ -23,12 +23,14 @@ describe('AnimatedMock — Positive (every animation resolves synchronously)', (
     let endCount = 0;
     let landedValue = -1;
     let finishedInCallback = false;
-    AnimatedMock.timing(value, { toValue: 1, duration: 10_000 }).start((result: IEndResult) => {
-      endCount += 1;
-      finishedInCallback = result.finished;
-      // The callback runs INSIDE start(): value is already final here, no await.
-      landedValue = value.__getValue();
-    });
+    AnimatedMock.timing(value, { toValue: 1, duration: 10_000 }).start(
+      (result: IEndResult) => {
+        endCount += 1;
+        finishedInCallback = result.finished;
+        // The callback runs INSIDE start(): value is already final here, no await.
+        landedValue = value.__getValue();
+      },
+    );
 
     expect(finishedInCallback).toBe(true);
     // No frame loop ran: even with a 10s duration the value is already at the target.
@@ -41,7 +43,11 @@ describe('AnimatedMock — Positive (every animation resolves synchronously)', (
   it('spring jumps to toValue synchronously', () => {
     const value = new AnimatedValue(0);
     let finished = false;
-    AnimatedMock.spring(value, { toValue: 42, stiffness: 200, damping: 20 }).start(result => {
+    AnimatedMock.spring(value, {
+      toValue: 42,
+      stiffness: 200,
+      damping: 20,
+    }).start(result => {
       finished = result.finished;
     });
     expect(value.__getValue()).toBe(42);
@@ -125,7 +131,9 @@ describe('AnimatedMock — Positive (every animation resolves synchronously)', (
   it('loop is the empty animation: the wrapped animation never actually runs', () => {
     const value = new AnimatedValue(0);
     let called = false;
-    AnimatedMock.loop(AnimatedMock.timing(value, { toValue: 1, duration: 1_000 })).start(() => {
+    AnimatedMock.loop(
+      AnimatedMock.timing(value, { toValue: 1, duration: 1_000 }),
+    ).start(() => {
       called = true;
     });
     expect(value.__getValue()).toBe(0);

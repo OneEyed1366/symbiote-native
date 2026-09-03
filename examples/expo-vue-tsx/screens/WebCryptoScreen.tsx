@@ -1,7 +1,10 @@
 import { defineComponent, ref } from 'vue';
 import type { Ref } from 'vue';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
-import { webCrypto, polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/vue';
+import {
+  webCrypto,
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -31,13 +34,18 @@ function ValueRow(props: { label: string; value: string }) {
 export const WebCryptoScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StandardWebCrypto];
-    const lineColor = LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.StandardWebCrypto].line];
+    const lineColor =
+      LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.StandardWebCrypto].line];
 
     const randomBytesHex: Ref<string | null> = ref(null);
-    const hasGlobalCrypto: Ref<boolean> = ref(typeof globalThis.crypto !== 'undefined');
+    const hasGlobalCrypto: Ref<boolean> = ref(
+      typeof globalThis.crypto !== 'undefined',
+    );
 
     function handleGenerateRandomBytes() {
-      const bytes = webCrypto.getRandomValues(new Uint8Array(RANDOM_BYTE_COUNT));
+      const bytes = webCrypto.getRandomValues(
+        new Uint8Array(RANDOM_BYTE_COUNT),
+      );
       randomBytesHex.value = bytesToHex(bytes);
     }
 
@@ -48,7 +56,11 @@ export const WebCryptoScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="standard-web-crypto-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="standard-web-crypto-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -59,9 +71,9 @@ export const WebCryptoScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Web Crypto</Text>
               <Text class="hero-body">
-                @symbiote-native/standard-web-crypto — a partial W3C Web Crypto API polyfill
-                exposing crypto.getRandomValues, backed by @symbiote-native/crypto's native random
-                source.
+                @symbiote-native/standard-web-crypto — a partial W3C Web Crypto
+                API polyfill exposing crypto.getRandomValues, backed by
+                @symbiote-native/crypto's native random source.
               </Text>
             </View>
           </View>
@@ -76,7 +88,10 @@ export const WebCryptoScreen = defineComponent(
               onPress={handleGenerateRandomBytes}
               color={lineColor}
             />
-            <ValueRow label="Random bytes (hex)" value={randomBytesHex.value ?? 'not generated yet'} />
+            <ValueRow
+              label="Random bytes (hex)"
+              value={randomBytesHex.value ?? 'not generated yet'}
+            />
           </View>
 
           <View testID="standard-web-crypto-polyfill-card" class="auth-card">

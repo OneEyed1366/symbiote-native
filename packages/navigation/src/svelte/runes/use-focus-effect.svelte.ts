@@ -24,8 +24,14 @@ export function useFocusEffect(effect: () => (() => void) | void): void {
   // once. The teardown also runs any still-pending cleanup, matching Vue's onUnmounted.
   $effect(() => {
     const { emitter } = untrack(() => scope.current);
-    const unsubscribeFocus = emitter.addListener(NAVIGATION_EVENT_FOCUS, runEffect);
-    const unsubscribeBlur = emitter.addListener(NAVIGATION_EVENT_BLUR, runCleanup);
+    const unsubscribeFocus = emitter.addListener(
+      NAVIGATION_EVENT_FOCUS,
+      runEffect,
+    );
+    const unsubscribeBlur = emitter.addListener(
+      NAVIGATION_EVENT_BLUR,
+      runCleanup,
+    );
     return () => {
       unsubscribeFocus();
       unsubscribeBlur();

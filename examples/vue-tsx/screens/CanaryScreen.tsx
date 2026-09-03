@@ -759,8 +759,13 @@ const ResponderDemo = defineComponent({
                 }}
                 class="chip"
                 style={{
+                  // White, not #42b883: `.chip`'s own fill IS #42b883, so the grabbed ring used
+                  // to be painted in the chip's background colour and the active state was
+                  // literally invisible. The sibling canaries all ring the chip in a colour that
+                  // reads against their fill (React #7fb5ff on #2b6cb0) — do not "restore" the
+                  // accent here.
                   borderColor:
-                    activeChip.value === index ? '#42b883' : 'transparent',
+                    activeChip.value === index ? '#ffffff' : 'transparent',
                   transform: [
                     {
                       translateX: activeChip.value === index ? chipDx.value : 0,
@@ -1306,11 +1311,7 @@ export const CanaryScreen = defineComponent({
               />
             </View>
           </View>
-          <Button
-            title="Open vuejs.org"
-            onPress={onOpenUrl}
-            color="#42b883"
-          />
+          <Button title="Open vuejs.org" onPress={onOpenUrl} color="#42b883" />
 
           {/* The native UIRefreshControl spinner only shows while iOS holds the scroll
             view pulled-down; our full re-commit snaps the offset back, so we drive
@@ -1541,6 +1542,14 @@ export const CanaryScreen = defineComponent({
                     <Text class="list-row-text">{item.label}</Text>
                   </View>
                 ),
+                // This list measures its own cells (no getItemLayout), and the divider is CHROME
+                // the list renders BETWEEN them — so it belongs to the distance from one row to
+                // the next, not to either row's height. That is the case the offset table has to
+                // get right; a model built by summing heights alone is short by every divider it
+                // skipped, and the content below a windowed-out region slides up and back as the
+                // window moves (core/components buildOffsets). Deliberately on the MVCP list:
+                // prepend-without-jump is exactly where a few points of offset error show.
+                separator: () => <View class="mvcp-divider" />,
               } satisfies IFlatListSlots<{ id: string; label: string }>
             }
           </FlatList>

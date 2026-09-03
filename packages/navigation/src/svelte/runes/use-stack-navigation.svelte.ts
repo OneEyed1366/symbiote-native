@@ -11,7 +11,9 @@ import type { INavigationHandle } from './use-navigation.svelte';
 export type IStackNavigationHandle = INavigatorHandle &
   Pick<INavigationHandle, 'addListener' | 'getParent'>;
 
-export function useStackNavigation(): { readonly current: IStackNavigationHandle } {
+export function useStackNavigation(): {
+  readonly current: IStackNavigationHandle;
+} {
   const navigation = useNavigation();
   const narrowed = $derived.by<IStackNavigationHandle>(() => {
     const value = navigation.current;

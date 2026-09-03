@@ -24,7 +24,9 @@ const FAKE_NATIVE_DEVICE = {
   getMaxMemoryAsync: vi.fn(async () => 402_653_184),
   isRootedExperimentalAsync: vi.fn(async () => false),
   isSideLoadingEnabledAsync: vi.fn(async () => false),
-  getPlatformFeaturesAsync: vi.fn(async () => ['android.hardware.sensor.accelerometer']),
+  getPlatformFeaturesAsync: vi.fn(async () => [
+    'android.hardware.sensor.accelerometer',
+  ]),
   hasPlatformFeatureAsync: vi.fn(async () => true),
 };
 
@@ -266,9 +268,9 @@ describe('hasPlatformFeatureAsync', () => {
   // a platform with no such native concept, not an error. No Negative group.
   describe('positive', () => {
     it('delegates to the native module', async () => {
-      await expect(hasPlatformFeatureAsync('android.hardware.sensor.accelerometer')).resolves.toBe(
-        true,
-      );
+      await expect(
+        hasPlatformFeatureAsync('android.hardware.sensor.accelerometer'),
+      ).resolves.toBe(true);
     });
   });
 

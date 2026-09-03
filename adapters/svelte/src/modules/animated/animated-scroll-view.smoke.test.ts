@@ -2,21 +2,21 @@
 // ScrollView.svelte (full RCTScrollView/RCTScrollContentView shape, RefreshControl included via
 // ScrollView's own import) rather than a reduced duplicate, and that the imperative handle
 // (scrollTo/getScrollNode) forwards through AnimatedScrollView's own bind:this exports — the
-// AnimatedScrollView.svelte twin of scroll-view.smoke.test.ts's bind:this assertions.
+// Animated.ScrollView twin of scroll-view.smoke.test.ts's bind:this assertions.
 //
-// AnimatedScrollView.svelte statically imports the real ScrollView, which itself statically
+// The wrap drives the real ScrollView, which itself statically
 // imports RefreshControl.svelte — both are pre-compiled to co-located sibling `.mjs` files with
 // their import specifiers rewritten, the same chained technique scroll-view.smoke.test.ts uses
 // for ScrollView -> RefreshControl (see that file's compileScrollViewWithRefreshControl).
 //
 // Scope note: ScrollView's own feature surface (sticky headers, RefreshControl,
 // maintainVisibleContentPosition) is covered by scroll-view.smoke.test.ts; this file's job is the
-// narrower, Animated-specific claim from AnimatedScrollView.svelte's own header comment — that it
+// narrower, Animated-specific claim — that the wrap
 // WRAPS the real component (so that surface comes along for free) instead of hand-authoring a
 // reduced duplicate, and that the wrapper forwards ScrollView's imperative handle rather than
 // exposing its own.
 //
-// No Negative group: AnimatedScrollView.svelte has no throwing/rejecting path — every prop rides
+// No Negative group: Animated.ScrollView has no throwing/rejecting path — every prop rides
 // the same open IAnimatedComponentProps bag as every other Animated.* component.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -27,7 +27,8 @@ import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -40,12 +41,18 @@ const REFRESH_CONTROL_OUT = join(
   COMPONENTS_DIR,
   '.smoke-compiled-refresh-control-for-animated.mjs',
 );
-const SCROLL_VIEW_OUT = join(SCROLL_VIEW_DIR, '.smoke-compiled-scroll-view-for-animated.mjs');
-const ANIMATED_SCROLL_VIEW_OUT = join(__dirname, '.smoke-compiled-animated-scroll-view.mjs');
-const PARENT_OUT = join(__dirname, '.smoke-compiled-animated-scroll-parent.mjs');
+const SCROLL_VIEW_OUT = join(
+  SCROLL_VIEW_DIR,
+  '.smoke-compiled-scroll-view-for-animated.mjs',
+);
+const PARENT_OUT = join(
+  __dirname,
+  '.smoke-compiled-animated-scroll-parent.mjs',
+);
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -55,22 +62,39 @@ afterEach(() => {
   unmount(ROOT_TAG);
   rmSync(REFRESH_CONTROL_OUT, { force: true });
   rmSync(SCROLL_VIEW_OUT, { force: true });
-  rmSync(ANIMATED_SCROLL_VIEW_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
 
 function compileChain(): void {
-  const refreshControlSource = readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8');
-  compileToFile(refreshControlSource, 'RefreshControl.svelte', REFRESH_CONTROL_OUT);
+  const refreshControlSource = readFileSync(
+    join(COMPONENTS_DIR, 'RefreshControl.svelte'),
+    'utf8',
+  );
+  compileToFile(
+    refreshControlSource,
+    'RefreshControl.svelte',
+    REFRESH_CONTROL_OUT,
+  );
 
-  const scrollViewSource = readFileSync(join(SCROLL_VIEW_DIR, 'index.svelte'), 'utf8');
+  const scrollViewSource = readFileSync(
+    join(SCROLL_VIEW_DIR, 'index.svelte'),
+    'utf8',
+  );
   const scrollViewResult = compile(scrollViewSource, {
     ...COMPILE_OPTIONS,
     filename: 'ScrollView.svelte',
@@ -80,20 +104,6 @@ function compileChain(): void {
     "from '../.smoke-compiled-refresh-control-for-animated.mjs'",
   );
   writeFileSync(SCROLL_VIEW_OUT, rewrittenScrollView);
-
-  const animatedScrollViewSource = readFileSync(
-    join(__dirname, 'AnimatedScrollView.svelte'),
-    'utf8',
-  );
-  const animatedResult = compile(animatedScrollViewSource, {
-    ...COMPILE_OPTIONS,
-    filename: 'AnimatedScrollView.svelte',
-  });
-  const rewrittenAnimated = animatedResult.js.code.replace(
-    "from '../../components/scroll-view/index.svelte'",
-    "from '../../components/scroll-view/.smoke-compiled-scroll-view-for-animated.mjs'",
-  );
-  writeFileSync(ANIMATED_SCROLL_VIEW_OUT, rewrittenAnimated);
 }
 
 async function loadParent(): Promise<Component> {
@@ -103,7 +113,9 @@ async function loadParent(): Promise<Component> {
   // the compiled component tree so the test can drive the imperative handle from outside.
   compileToFile(
     `<script>
-       import AnimatedScrollView from './.smoke-compiled-animated-scroll-view.mjs';
+       import ScrollView from '../../components/scroll-view/.smoke-compiled-scroll-view-for-animated.mjs';
+       import { createAnimatedComponent } from './create-animated-component';
+       const AnimatedScrollView = createAnimatedComponent(ScrollView);
        let handle = $state();
        $effect(() => {
          window.__animatedScrollHandle = handle;
@@ -129,12 +141,15 @@ function isScrollHandle(
   value: unknown,
 ): value is { scrollTo: unknown; getScrollNode: () => unknown } {
   return (
-    typeof value === 'object' && value !== null && 'scrollTo' in value && 'getScrollNode' in value
+    typeof value === 'object' &&
+    value !== null &&
+    'scrollTo' in value &&
+    'getScrollNode' in value
   );
 }
 
 describe('Animated.ScrollView (real compiled source) (Positive)', () => {
-  // why: the wrap-vs-hand-author choice is the whole point of AnimatedScrollView.svelte (see its
+  // why: the wrap-vs-hand-author choice is the whole point of Animated.ScrollView (see the
   // own header comment) — a hand-authored duplicate would silently lose sticky headers,
   // RefreshControl and maintainVisibleContentPosition, an <adapters_reach_full_feature_parity>
   // violation. Asserting the exact committed shape (both native views, the outer's own prop) is
@@ -150,7 +165,9 @@ describe('Animated.ScrollView (real compiled source) (Positive)', () => {
       outer,
       'RCTScrollView was created via the real ScrollView, not a reduced duplicate',
     ).toBeDefined();
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+    const content = fabric.find(
+      node => node.viewName === 'RCTScrollContentView',
+    );
     expect(content, 'RCTScrollContentView was created').toBeDefined();
     expect(outer?.props.height).toBe(200);
   });

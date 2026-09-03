@@ -2,7 +2,7 @@
 
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`react-native-bootsplash`](https://github.com/zoontek/react-native-bootsplash) usable from
-**every** adapter — React, Vue, and Angular — not just React. Unlike a native-*view* wrapper
+**every** adapter — React, Vue, Svelte, Solid, and Angular — not just React. Unlike a native-_view_ wrapper
 (see `@symbiote-native/slider`), bootsplash exposes an imperative TurboModule (`hide`/`isVisible`)
 plus a React hook (`useHideAnimation`) that composes a fade-out overlay from plain `View`/`Image`
 primitives — there is no `ViewConfig` to register, only lifecycle to port per adapter.
@@ -26,6 +26,9 @@ src/core/       hide()/isVisible() (re-exported as-is — zero React upstream), 
                 react-native-bootsplash's useHideAnimation body, framework-agnostic
 src/react/      @symbiote-native/splash-screen/react   — useHideAnimation hook
 src/vue/        @symbiote-native/splash-screen/vue     — useHideAnimation composable
+src/svelte/     @symbiote-native/splash-screen/svelte  — useHideAnimation rune
+src/solid/      @symbiote-native/splash-screen/solid   — createHideAnimation primitive (Solid
+                reserves `use*` for consuming existing state)
 src/angular/    @symbiote-native/splash-screen/angular — HideAnimationService (signals)
 ```
 
@@ -109,6 +112,25 @@ import { hide } from '@symbiote-native/splash-screen/angular';
 // call once from the root component's constructor/ngOnInit.
 ```
 
+```svelte
+<!-- Svelte — examples/svelte/App.svelte -->
+<script lang="ts">
+  import { hide } from '@symbiote-native/splash-screen/svelte';
+
+  $effect(() => {
+    hide();
+  });
+</script>
+```
+
+```tsx
+// Solid
+import { onMount } from 'solid-js';
+import { hide } from '@symbiote-native/splash-screen/solid';
+
+onMount(() => void hide());
+```
+
 For a fade transition gated on real readiness (layout committed + logo/brand images loaded +
 your own `ready` flag) instead of an immediate `hide()`, use `useHideAnimation` — it returns the
 same `{ container, logo, brand }` prop bags upstream's hook does, which you bind onto your own
@@ -128,7 +150,7 @@ const { container, logo } = useHideAnimation({
 ```
 
 See the docs-site package page (`docs/packages/splash-screen`) for the full config surface and
-the Vue/Angular equivalents.
+the Vue/Svelte/Solid/Angular equivalents.
 
 ## API
 
@@ -162,14 +184,20 @@ useHideAnimation(config: IHideAnimationConfig): IHideAnimationResult
 // @symbiote-native/splash-screen/vue — setup runs once, so a getter
 useHideAnimation(getConfig: () => IHideAnimationConfig): ComputedRef<IHideAnimationResult>
 
+// @symbiote-native/splash-screen/svelte — the script body runs once, so a getter
+useHideAnimation(getConfig: () => IHideAnimationConfig): { readonly current: IHideAnimationResult }
+
+// @symbiote-native/splash-screen/solid — the component body runs once, so an accessor
+createHideAnimation(config: Accessor<IHideAnimationConfig>): Accessor<IHideAnimationResult>
+
 // @symbiote-native/splash-screen/angular — inject(HideAnimationService), connect() once
 connect(getConfig: () => IHideAnimationConfig): Signal<IHideAnimationResult>
 ```
 
 ## Test it
 
-Headless hook/composable tests live next to each adapter entry
-(`src/{react,vue}/{hooks,composables}/use-hide-animation.test.{ts,tsx}`) and mock
+Headless lifecycle-wrapper tests live next to each adapter entry
+(`src/{react,vue,svelte,solid}/{hooks,composables,runes,primitives}/*hide-animation*.test.{ts,tsx}`) and mock
 `react-native-bootsplash`'s `hide`/`isVisible` plus a fake `__turboModuleProxy` for
 `getConstants()`, so they run without a real Fabric host. Native asset generation and the
 Android/iOS wiring above are verified on-device (see the parent [README](../../README.md) for the

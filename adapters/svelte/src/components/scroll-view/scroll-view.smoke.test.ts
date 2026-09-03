@@ -19,7 +19,8 @@ import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -32,17 +33,27 @@ const ROOT_TAG = 91_003;
 // point at it — both compiled files stay in their REAL source directories so every OTHER relative
 // import (`./refresh-control-props`, `./scroll-view-platform`, …) keeps resolving unchanged.
 const COMPONENTS_DIR = join(__dirname, '..');
-const REFRESH_CONTROL_OUT = join(COMPONENTS_DIR, '.smoke-compiled-refresh-control.mjs');
+const REFRESH_CONTROL_OUT = join(
+  COMPONENTS_DIR,
+  '.smoke-compiled-refresh-control.mjs',
+);
 const SCROLL_VIEW_OUT = join(__dirname, '.smoke-compiled-scroll-view.mjs');
 const PARENT_OUT = join(__dirname, '.smoke-compiled-scroll-parent.mjs');
 // A SEPARATE file, not a rewrite of PARENT_OUT: Node's dynamic `import()` caches by resolved
 // URL, so re-writing PARENT_OUT with different content and re-importing the SAME path would
 // silently hand back the earlier test's cached module instead of this one's.
-const EVENT_PARENT_OUT = join(__dirname, '.smoke-compiled-scroll-event-parent.mjs');
-const REFRESH_PARENT_OUT = join(__dirname, '.smoke-compiled-scroll-refresh-parent.mjs');
+const EVENT_PARENT_OUT = join(
+  __dirname,
+  '.smoke-compiled-scroll-event-parent.mjs',
+);
+const REFRESH_PARENT_OUT = join(
+  __dirname,
+  '.smoke-compiled-scroll-refresh-parent.mjs',
+);
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -57,19 +68,40 @@ afterEach(() => {
   rmSync(REFRESH_PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
 
 function compileScrollViewWithRefreshControl(): void {
-  const refreshControlSource = readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8');
-  compileToFile(refreshControlSource, 'RefreshControl.svelte', REFRESH_CONTROL_OUT);
+  const refreshControlSource = readFileSync(
+    join(COMPONENTS_DIR, 'RefreshControl.svelte'),
+    'utf8',
+  );
+  compileToFile(
+    refreshControlSource,
+    'RefreshControl.svelte',
+    REFRESH_CONTROL_OUT,
+  );
 
-  const scrollViewSource = readFileSync(join(__dirname, 'index.svelte'), 'utf8');
-  const result = compile(scrollViewSource, { ...COMPILE_OPTIONS, filename: 'ScrollView.svelte' });
+  const scrollViewSource = readFileSync(
+    join(__dirname, 'index.svelte'),
+    'utf8',
+  );
+  const result = compile(scrollViewSource, {
+    ...COMPILE_OPTIONS,
+    filename: 'ScrollView.svelte',
+  });
   const rewritten = result.js.code.replace(
     "from '../RefreshControl.svelte'",
     "from '../.smoke-compiled-refresh-control.mjs'",
@@ -123,7 +155,9 @@ describe('ScrollView (real compiled index.svelte)', () => {
 
       const outer = fabric.find(node => node.viewName === 'RCTScrollView');
       expect(outer, 'RCTScrollView was created').toBeDefined();
-      const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+      const content = fabric.find(
+        node => node.viewName === 'RCTScrollContentView',
+      );
       expect(content, 'RCTScrollContentView was created').toBeDefined();
       expect(content?.props.padding).toBe(8);
       // overflow:'scroll' is RN's base clip style on both axes (SCROLL_VIEW_BASE_VERTICAL).
@@ -140,11 +174,22 @@ describe('ScrollView (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      const handle = (globalThis as { __scrollHandle?: Record<string, unknown> }).__scrollHandle;
-      expect(handle, 'imperative handle was exposed via bind:this').toBeDefined();
+      const handle = (
+        globalThis as { __scrollHandle?: Record<string, unknown> }
+      ).__scrollHandle;
+      expect(
+        handle,
+        'imperative handle was exposed via bind:this',
+      ).toBeDefined();
       const scrollTo = handle?.scrollTo;
       expect(typeof scrollTo).toBe('function');
-      (scrollTo as (options?: { x?: number; y?: number; animated?: boolean }) => void)({
+      (
+        scrollTo as (options?: {
+          x?: number;
+          y?: number;
+          animated?: boolean;
+        }) => void
+      )({
         x: 0,
         y: 42,
         animated: false,
@@ -164,7 +209,9 @@ describe('ScrollView (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      const handle = (globalThis as { __scrollHandle?: Record<string, unknown> }).__scrollHandle;
+      const handle = (
+        globalThis as { __scrollHandle?: Record<string, unknown> }
+      ).__scrollHandle;
       const flashScrollIndicators = handle?.flashScrollIndicators;
       expect(typeof flashScrollIndicators).toBe('function');
       (flashScrollIndicators as () => void)();
@@ -233,7 +280,9 @@ describe('ScrollView (real compiled index.svelte)', () => {
       );
       const mod: unknown = await import(`file://${REFRESH_PARENT_OUT}`);
       if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
-        throw new Error('ScrollRefreshParent.svelte produced no default export');
+        throw new Error(
+          'ScrollRefreshParent.svelte produced no default export',
+        );
       }
 
       mount(ROOT_TAG, mod.default as Component);
@@ -242,12 +291,19 @@ describe('ScrollView (real compiled index.svelte)', () => {
 
       const outer = fabric.find(node => node.viewName === 'RCTScrollView');
       expect(outer, 'RCTScrollView was created').toBeDefined();
-      const refresh = fabric.find(node => node.viewName === 'PullToRefreshView');
-      expect(refresh, 'the real RefreshControl.svelte painted PullToRefreshView').toBeDefined();
+      const refresh = fabric.find(
+        node => node.viewName === 'PullToRefreshView',
+      );
+      expect(
+        refresh,
+        'the real RefreshControl.svelte painted PullToRefreshView',
+      ).toBeDefined();
       expect(refresh?.props.refreshing).toBe(true);
       expect(refresh?.props.tintColor).toBe('red');
       // Sibling, not wrap: RefreshControl is a CHILD of the scroll view (iOS mode), not its parent.
-      expect(outer?.children.some(child => child.tag === refresh?.tag)).toBe(true);
+      expect(outer?.children.some(child => child.tag === refresh?.tag)).toBe(
+        true,
+      );
     });
   });
 });

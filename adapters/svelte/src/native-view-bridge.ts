@@ -24,6 +24,9 @@
 // 'RNCSlider') that cannot be written as a literal Svelte template tag — see
 // packages/slider/src/svelte/slider/index.svelte's header for the full reasoning.
 export { mount, unmount } from './render';
-export { mountDescriptorChildren, createDescriptorChildrenSync } from './descriptor-to-svelte';
+export {
+  mountDescriptorChildren,
+  createDescriptorChildrenSync,
+} from './descriptor-to-svelte';
 export type { IDescriptorChildrenMount } from './descriptor-to-svelte';
 export type { ShimElement } from './dom-shim';

@@ -8,7 +8,11 @@ export type { IAccelerometerMeasurement } from '../core';
 export { useBarometer } from './runes/use-barometer.svelte';
 export type { IBarometerMeasurement } from '../core';
 export { useDeviceMotion } from './runes/use-device-motion.svelte';
-export { DeviceMotionOrientation, gravity, type IDeviceMotionMeasurement } from '../core';
+export {
+  DeviceMotionOrientation,
+  gravity,
+  type IDeviceMotionMeasurement,
+} from '../core';
 export { useGyroscope } from './runes/use-gyroscope.svelte';
 export type { IGyroscopeMeasurement } from '../core';
 export { useLightSensor } from './runes/use-light-sensor.svelte';

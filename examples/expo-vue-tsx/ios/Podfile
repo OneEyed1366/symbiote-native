@@ -65,13 +65,23 @@ module ::Expo
   end
 end
 
-def use_expo_modules!(options = {})
-  return if @current_target_definition.autolinking_manager.present?
+# `class ::Object` (leading `::`, matching `module ::Expo` above), not a bare top-level `def`:
+# CocoaPods loads this Podfile via instance_eval, so a bare `def use_expo_modules!` becomes a
+# singleton method of the Podfile instance — invisible when `Expo.podspec` later checks
+# `defined?(use_expo_modules!)` via its own separate `eval(string, nil, path)` (self = the `Pod`
+# module). That check silently stays false, `Expo.podspec` never adds its `ExpoModulesCore`/
+# `ExpoModulesJSI` dependency, and the Expo pod fails to build with `'ExpoModulesCore/Platform.h'
+# file not found` — its header search path never gets wired. Reopening `::Object` puts the method
+# on every object (as a real `require`d top-level def would), so both call sites see it.
+class ::Object
+  def use_expo_modules!(options = {})
+    return if @current_target_definition.autolinking_manager.present?
 
-  @current_target_definition.autolinking_manager =
-    ::Expo::AutolinkingManager.new(self, @current_target_definition, options).use_expo_modules!
-  maybe_generate_xcode_env_file!()
-  generate_or_remove_xcode_env_updates_file!()
+    @current_target_definition.autolinking_manager =
+      ::Expo::AutolinkingManager.new(self, @current_target_definition, options).use_expo_modules!
+    maybe_generate_xcode_env_file!()
+    generate_or_remove_xcode_env_updates_file!()
+  end
 end
 
 # expo-sensors pins a higher iOS deployment target than react-native's own minimum. CocoaPods

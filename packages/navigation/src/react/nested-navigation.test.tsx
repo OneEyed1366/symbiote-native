@@ -10,7 +10,11 @@
 
 import { act, createElement, createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/react';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/react';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from './stack';
@@ -48,12 +52,21 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
     },
   },
   [STACK_VIEW]: {
-    directEventTypes: { topFinishTransitioning: directEvent('onFinishTransitioning') },
+    directEventTypes: {
+      topFinishTransitioning: directEvent('onFinishTransitioning'),
+    },
     validAttributes: {},
   },
   [HEADER_CONFIG_VIEW]: {
-    directEventTypes: { topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem') },
-    validAttributes: { title: true, hidden: true, backTitle: true, backTitleVisible: true },
+    directEventTypes: {
+      topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem'),
+    },
+    validAttributes: {
+      title: true,
+      hidden: true,
+      backTitle: true,
+      backTitleVisible: true,
+    },
   },
 };
 
@@ -67,7 +80,10 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   const found: string[] = [];
   const collect = (list: readonly IFakeNode[]): void => {
     for (const node of list) {
-      if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string') {
+      if (
+        node.viewName === 'RCTRawText' &&
+        typeof node.props.text === 'string'
+      ) {
         found.push(node.props.text);
       }
       collect(node.children);
@@ -125,7 +141,10 @@ describe('nested navigators (Context parent chain)', () => {
         return createElement(
           Tab,
           { initialRouteName: 'TabHome' },
-          createElement(Tab.Screen, { name: 'TabHome', component: NestedTabHomeScreen }),
+          createElement(Tab.Screen, {
+            name: 'TabHome',
+            component: NestedTabHomeScreen,
+          }),
         );
       }
 
@@ -135,8 +154,14 @@ describe('nested navigators (Context parent chain)', () => {
         createElement(
           Stack,
           { ref, initialRouteName: 'Root' },
-          createElement(Stack.Screen, { name: 'Root', component: RootScreenRendersTab }),
-          createElement(Stack.Screen, { name: 'Details', component: StackDetailsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Root',
+            component: RootScreenRendersTab,
+          }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: StackDetailsScreen,
+          }),
         ),
       );
 

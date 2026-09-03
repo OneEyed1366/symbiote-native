@@ -1,7 +1,21 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
-import { useBatteryLevel, useBatteryState, useLowPowerMode } from '@symbiote-native/battery/vue';
-import { BatteryState, isAvailableAsync, isBatteryOptimizationEnabledAsync } from '@symbiote-native/battery';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
+import {
+  useBatteryLevel,
+  useBatteryState,
+  useLowPowerMode,
+} from '@symbiote-native/battery/vue';
+import {
+  BatteryState,
+  isAvailableAsync,
+  isBatteryOptimizationEnabledAsync,
+} from '@symbiote-native/battery';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -13,22 +27,36 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 
 function batteryStateLabel(state: BatteryState): string {
   switch (state) {
-    case BatteryState.UNKNOWN: return 'Unknown';
-    case BatteryState.UNPLUGGED: return 'Unplugged';
-    case BatteryState.CHARGING: return 'Charging';
-    case BatteryState.FULL: return 'Full';
-    case BatteryState.NOT_CHARGING: return 'Not charging';
-    default: return 'Unknown';
+    case BatteryState.UNKNOWN:
+      return 'Unknown';
+    case BatteryState.UNPLUGGED:
+      return 'Unplugged';
+    case BatteryState.CHARGING:
+      return 'Charging';
+    case BatteryState.FULL:
+      return 'Full';
+    case BatteryState.NOT_CHARGING:
+      return 'Not charging';
+    default:
+      return 'Unknown';
   }
 }
 
-function CapabilityRow(props: { testID: string; label: string; status: ICapabilityStatus }) {
+function CapabilityRow(props: {
+  testID: string;
+  label: string;
+  status: ICapabilityStatus;
+}) {
   return (
     <View testID={props.testID} class="auth-capability-row">
       <Text class="auth-capability-label">{props.label}</Text>
       <View class={`auth-status-badge auth-status-badge-${props.status}`}>
         <Text class="auth-status-text">
-          {props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO'}
+          {props.status === 'checking'
+            ? 'CHECKING…'
+            : props.status === 'yes'
+              ? 'YES'
+              : 'NO'}
         </Text>
       </View>
     </View>
@@ -61,7 +89,9 @@ export const BatteryScreen = defineComponent(
     const lowPowerMode = useLowPowerMode();
 
     const batteryLevelLabel = computed(() =>
-      batteryLevel.value < 0 ? 'unknown' : `${Math.round(batteryLevel.value * 100)}%`,
+      batteryLevel.value < 0
+        ? 'unknown'
+        : `${Math.round(batteryLevel.value * 100)}%`,
     );
 
     const isAvailable = ref<ICapabilityStatus>('checking');
@@ -78,14 +108,19 @@ export const BatteryScreen = defineComponent(
       });
       if (Platform.OS === 'android') {
         isBatteryOptimizationEnabledAsync().then(value => {
-          if (isMounted) isBatteryOptimizationEnabled.value = toCapabilityStatus(value);
+          if (isMounted)
+            isBatteryOptimizationEnabled.value = toCapabilityStatus(value);
         });
       }
     });
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="battery-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="battery-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -96,9 +131,10 @@ export const BatteryScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Battery</Text>
               <Text class="hero-body">
-                @symbiote-native/battery — live battery level, charging state, and low-power-mode,
-                via three composables. The iOS Simulator reports battery level as unknown — a real
-                device is needed for live readings.
+                @symbiote-native/battery — live battery level, charging state,
+                and low-power-mode, via three composables. The iOS Simulator
+                reports battery level as unknown — a real device is needed for
+                live readings.
               </Text>
             </View>
           </View>
@@ -108,7 +144,10 @@ export const BatteryScreen = defineComponent(
               <Text class="auth-card-title">Live state</Text>
             </View>
             <ValueRow label="Battery level" value={batteryLevelLabel.value} />
-            <ValueRow label="Battery state" value={batteryStateLabel(batteryState.value)} />
+            <ValueRow
+              label="Battery state"
+              value={batteryStateLabel(batteryState.value)}
+            />
             <CapabilityRow
               testID="battery-low-power-mode"
               label="Low power mode"
@@ -120,7 +159,11 @@ export const BatteryScreen = defineComponent(
             <View class="auth-card-header">
               <Text class="auth-card-title">Capabilities</Text>
             </View>
-            <CapabilityRow testID="battery-available" label="Battery API available" status={isAvailable.value} />
+            <CapabilityRow
+              testID="battery-available"
+              label="Battery API available"
+              status={isAvailable.value}
+            />
             {Platform.OS === 'android' && (
               <CapabilityRow
                 testID="battery-optimization-enabled"

@@ -5,7 +5,8 @@
   import { collectScreen } from './screen-registry';
   import type { IDrawerScreenProps } from './drawer-screen-props';
 
-  let { name, component, options, initialParams }: IDrawerScreenProps = $props();
+  let { name, component, options, initialParams }: IDrawerScreenProps =
+    $props();
 
   collectScreen('drawer', {
     get name(): IDrawerScreenProps['name'] {

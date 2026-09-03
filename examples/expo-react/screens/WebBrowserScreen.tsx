@@ -1,5 +1,12 @@
 import { useCallback, useState } from 'react';
-import { Platform, SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/react';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/react';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -35,55 +42,80 @@ export function WebBrowserScreen() {
 
   const [url, setUrl] = useState(DEMO_URL);
   const [lastResult, setLastResult] = useState('idle');
-  const [servicePackage, setServicePackage] = useState<string | undefined>(undefined);
+  const [servicePackage, setServicePackage] = useState<string | undefined>(
+    undefined,
+  );
   const [customTabsSummary, setCustomTabsSummary] = useState('not queried');
 
   const handleOpen = useCallback(() => {
     setLastResult('opening…');
-    openBrowserAsync(url, { toolbarColor: '#0b1622', enableBarCollapsing: true })
-      .then((result) => setLastResult(`result: ${result.type}`))
+    openBrowserAsync(url, {
+      toolbarColor: '#0b1622',
+      enableBarCollapsing: true,
+    })
+      .then(result => setLastResult(`result: ${result.type}`))
       .catch((error: Error) => setLastResult(`open failed: ${error.message}`));
   }, [url]);
 
   // iOS only — a Custom Tab cannot be closed programmatically, so this rejects on Android.
   const handleDismiss = useCallback(() => {
     dismissBrowser()
-      .then((result) => setLastResult(`dismissed: ${result.type}`))
-      .catch((error: Error) => setLastResult(`dismiss failed: ${error.message}`));
+      .then(result => setLastResult(`dismissed: ${result.type}`))
+      .catch((error: Error) =>
+        setLastResult(`dismiss failed: ${error.message}`),
+      );
   }, []);
 
   const handleWarmUp = useCallback(() => {
     warmUpAsync()
-      .then((result) => {
+      .then(result => {
         setServicePackage(result.servicePackage);
-        setLastResult(`warmed up: ${result.servicePackage ?? '(no service package)'}`);
+        setLastResult(
+          `warmed up: ${result.servicePackage ?? '(no service package)'}`,
+        );
       })
-      .catch((error: Error) => setLastResult(`warm-up failed: ${error.message}`));
+      .catch((error: Error) =>
+        setLastResult(`warm-up failed: ${error.message}`),
+      );
   }, []);
 
   const handleMayInit = useCallback(() => {
     mayInitWithUrlAsync(url, servicePackage)
-      .then((result) => setLastResult(`may-init: ${result.servicePackage ?? '(no service package)'}`))
-      .catch((error: Error) => setLastResult(`may-init failed: ${error.message}`));
+      .then(result =>
+        setLastResult(
+          `may-init: ${result.servicePackage ?? '(no service package)'}`,
+        ),
+      )
+      .catch((error: Error) =>
+        setLastResult(`may-init failed: ${error.message}`),
+      );
   }, [url, servicePackage]);
 
   const handleCoolDown = useCallback(() => {
     coolDownAsync(servicePackage)
-      .then((result) => setLastResult(`cooled down: ${result.servicePackage ?? '(no service package)'}`))
-      .catch((error: Error) => setLastResult(`cool-down failed: ${error.message}`));
+      .then(result =>
+        setLastResult(
+          `cooled down: ${result.servicePackage ?? '(no service package)'}`,
+        ),
+      )
+      .catch((error: Error) =>
+        setLastResult(`cool-down failed: ${error.message}`),
+      );
   }, [servicePackage]);
 
   const handleQueryBrowsers = useCallback(() => {
     setCustomTabsSummary('querying…');
     getCustomTabsSupportingBrowsersAsync()
-      .then((result) => {
+      .then(result => {
         setCustomTabsSummary(
           `default: ${result.defaultBrowserPackage ?? '(none)'} · browsers: ${describeList(
             result.browserPackages,
           )} · services: ${describeList(result.servicePackages)}`,
         );
       })
-      .catch((error: Error) => setCustomTabsSummary(`query failed: ${error.message}`));
+      .catch((error: Error) =>
+        setCustomTabsSummary(`query failed: ${error.message}`),
+      );
   }, []);
 
   return (
@@ -103,8 +135,9 @@ export function WebBrowserScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Web Browser</Text>
             <Text className="hero-body">
-              @symbiote-native/web-browser — an in-app browser that keeps the user inside the app,
-              unlike Linking.openURL, plus the OAuth auth session.
+              @symbiote-native/web-browser — an in-app browser that keeps the
+              user inside the app, unlike Linking.openURL, plus the OAuth auth
+              session.
             </Text>
           </View>
         </View>
@@ -135,9 +168,9 @@ export function WebBrowserScreen() {
             color={lineColor}
           />
           <Text className="info-text">
-            iOS resolves once the browser closes (cancel, or dismiss when closed by
-            dismissBrowser); Android resolves opened as soon as the Custom Tab launches. Dismiss is
-            iOS-only and rejects on Android.
+            iOS resolves once the browser closes (cancel, or dismiss when closed
+            by dismissBrowser); Android resolves opened as soon as the Custom
+            Tab launches. Dismiss is iOS-only and rejects on Android.
           </Text>
           <View className="capability-row">
             <Text className="capability-label">Last result</Text>
@@ -153,9 +186,10 @@ export function WebBrowserScreen() {
               <Text className="feature-card-title">Custom Tabs service</Text>
             </View>
             <Text className="info-text">
-              Android only. getCustomTabsSupportingBrowsersAsync throws on iOS — its native stub is
-              registered without the Async suffix, so the availability check fires before the
-              not-Android branch — so this whole card is gated on Platform.OS.
+              Android only. getCustomTabsSupportingBrowsersAsync throws on iOS —
+              its native stub is registered without the Async suffix, so the
+              availability check fires before the not-Android branch — so this
+              whole card is gated on Platform.OS.
             </Text>
             <ActionButton
               testID="web-browser-query-browsers-button"

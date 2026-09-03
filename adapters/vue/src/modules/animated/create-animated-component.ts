@@ -31,9 +31,14 @@ import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 const PASSTHROUGH_PROP = 'passthroughAnimatedPropExplicitValues';
 
 // Reads either a functional component's or a stateful defineComponent's display name, without a
-// cast, for the wrapper's devtools name.
-function baseName(component: Component): string {
-  if (component === null || (typeof component !== 'function' && typeof component !== 'object')) {
+// cast, for the wrapper's devtools name. A string base IS its own name — an intrinsic tag carries
+// no displayName to read.
+function baseName(component: Component | string): string {
+  if (typeof component === 'string') return component;
+  if (
+    component === null ||
+    (typeof component !== 'function' && typeof component !== 'object')
+  ) {
     return 'Anonymous';
   }
   const display = Reflect.get(component, 'displayName');
@@ -43,7 +48,9 @@ function baseName(component: Component): string {
   return 'Anonymous';
 }
 
-export function createAnimatedComponent(Component: Component) {
+// The base may be an intrinsic TAG, not only a component: `Animated.View` is built over `View`,
+// and a primitive that becomes a public tag hands this a string. `h()` takes either.
+export function createAnimatedComponent(Component: Component | string) {
   return defineComponent({
     name: `Animated(${baseName(Component)})`,
     inheritAttrs: false,
@@ -90,12 +97,17 @@ export function createAnimatedComponent(Component: Component) {
         new Proxy(Object.create(null), {
           get: (_target, key): unknown => {
             const instance = instanceRef.value;
-            if (instance === null || typeof instance !== 'object') return undefined;
+            if (instance === null || typeof instance !== 'object')
+              return undefined;
             return Reflect.get(instance, key);
           },
           has: (_target, key): boolean => {
             const instance = instanceRef.value;
-            return instance !== null && typeof instance === 'object' && Reflect.has(instance, key);
+            return (
+              instance !== null &&
+              typeof instance === 'object' &&
+              Reflect.has(instance, key)
+            );
           },
         }),
       );
@@ -126,14 +138,24 @@ export function createAnimatedComponent(Component: Component) {
         const passthroughStyle = readPassthroughStyle(passthrough);
         if (passthroughStyle !== undefined) {
           reduced.style =
-            reduced.style === undefined ? passthroughStyle : [reduced.style, passthroughStyle];
+            reduced.style === undefined
+              ? passthroughStyle
+              : [reduced.style, passthroughStyle];
         }
         reduced.ref = captureRef;
-        return h(
-          Component,
-          reduced,
-          slots.default !== undefined ? { default: slots.default } : undefined,
-        );
+        // The WHOLE slots object, for a component base AND for a tag base. Not just `default`:
+        // the list containers take their content through named scoped slots (`item`,
+        // `sectionHeader`, ...), which a default-only forward drops silently — Animated.FlatList
+        // would commit empty cells.
+        //
+        // A string base needs no branch here, and the reason is worth recording because the code
+        // that reads it looks like it does. For an element Vue unwraps the object itself, calling
+        // `children.default()` and recursing on the RESULT rather than going back through `h`
+        // (`normalizeChildren`, the `shapeFlag & (1 | 64)` branch) — so a slot returning a lone
+        // VNode would be re-read as an object, found to have no `.default`, and dropped, with no
+        // error. That case cannot arise: Vue wraps every slot at initSlots so `slots.default()`
+        // returns an ARRAY whatever the author's function returned. Measured both spellings.
+        return h(Component, reduced, slots);
       };
     },
   });

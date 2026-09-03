@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IExponentPedometerModule } from './native/exponent-pedometer';
 
-const defaultGetStepCountAsync = (): IExponentPedometerModule['getStepCountAsync'] =>
-  vi.fn(async () => ({ steps: 42 }));
+const defaultGetStepCountAsync =
+  (): IExponentPedometerModule['getStepCountAsync'] =>
+    vi.fn(async () => ({ steps: 42 }));
 
 const FAKE_NATIVE_PEDOMETER: IExponentPedometerModule = {
   addListener: vi.fn(() => ({ remove: vi.fn() })),
@@ -33,7 +34,11 @@ vi.mock('./native/exponent-pedometer', () => ({
 // entry transitively drags in the Flow-typed 'react-native' source that Vitest's Oxc transform
 // can't parse — same fake as device-sensor.test.ts / accelerometer.test.ts.
 vi.mock('expo-modules-core', () => ({
-  PermissionStatus: { GRANTED: 'granted', UNDETERMINED: 'undetermined', DENIED: 'denied' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    UNDETERMINED: 'undetermined',
+    DENIED: 'denied',
+  },
   UnavailabilityError: class UnavailabilityError extends Error {
     constructor(moduleName: string, propertyName: string) {
       super(`${propertyName} is not available on ${moduleName}`);
@@ -90,7 +95,9 @@ describe('Pedometer', () => {
       // same-instant query is a legitimate zero-length window, not an inverted range.
       const same = new Date('2026-07-01T00:00:00Z');
 
-      return expect(getStepCountAsync(same, same)).resolves.toEqual({ steps: 42 });
+      return expect(getStepCountAsync(same, same)).resolves.toEqual({
+        steps: 42,
+      });
     });
 
     it('isAvailableAsync delegates to the native module', async () => {

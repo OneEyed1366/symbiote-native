@@ -1,7 +1,11 @@
 import { Platform, UnavailabilityError } from 'expo-modules-core';
 
 import { expoHaptics } from './native-module';
-import { AndroidHaptics, ImpactFeedbackStyle, NotificationFeedbackType } from './types';
+import {
+  AndroidHaptics,
+  ImpactFeedbackStyle,
+  NotificationFeedbackType,
+} from './types';
 
 const NATIVE_MODULE_NAME = 'expo-haptics';
 
@@ -49,7 +53,9 @@ export async function selectionAsync(): Promise<void> {
  * every platform except Android.
  * @platform android
  */
-export async function performAndroidHapticsAsync(type: AndroidHaptics): Promise<void> {
+export async function performAndroidHapticsAsync(
+  type: AndroidHaptics,
+): Promise<void> {
   if (Platform.OS !== 'android') {
     return;
   }

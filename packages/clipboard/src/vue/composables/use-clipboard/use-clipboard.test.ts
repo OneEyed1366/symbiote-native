@@ -25,7 +25,8 @@ const addClipboardListenerMock = vi.fn((listener: IListener) => {
 });
 
 vi.mock('../../../core', () => ({
-  addClipboardListener: (listener: IListener) => addClipboardListenerMock(listener),
+  addClipboardListener: (listener: IListener) =>
+    addClipboardListenerMock(listener),
 }));
 
 const fabric = installFabric();

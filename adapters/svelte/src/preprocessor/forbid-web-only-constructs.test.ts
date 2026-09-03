@@ -42,7 +42,10 @@ describe('forbidWebOnlyConstructs — markup', () => {
     it.each([
       ['<svelte:head>', '<svelte:head><title>x</title></svelte:head>'],
       ['<svelte:window>', '<svelte:window onresize={() => {}} />'],
-      ['<svelte:document>', '<svelte:document onvisibilitychange={() => {}} />'],
+      [
+        '<svelte:document>',
+        '<svelte:document onvisibilitychange={() => {}} />',
+      ],
       ['<svelte:body>', '<svelte:body onclick={() => {}} />'],
     ])(
       // why: each of these compiles and then is permanently inert under the DOM shim (skill §4)
@@ -57,15 +60,17 @@ describe('forbidWebOnlyConstructs — markup', () => {
     // still has to name SOME source rather than crash on a missing string — the '<svelte>'
     // placeholder is the documented fallback for that path.
     it('falls back to a <svelte> placeholder in the message when no filename is given', () => {
-      expect(() => runWithNoFilename('<svelte:head><title>x</title></svelte:head>')).toThrow(
-        '<svelte>: <svelte:head>',
-      );
+      expect(() =>
+        runWithNoFilename('<svelte:head><title>x</title></svelte:head>'),
+      ).toThrow('<svelte>: <svelte:head>');
     });
   });
 
   describe('Negative ({@html} — compiles, then renders nothing into a native tree)', () => {
     it('rejects {@html} at the top level', () => {
-      expect(() => run('<script>let s = $state("")</script>{@html s}')).toThrow('{@html …}');
+      expect(() => run('<script>let s = $state("")</script>{@html s}')).toThrow(
+        '{@html …}',
+      );
     });
 
     // why: {@html} can sit inside an {#if}/{#each}/snippet body, which hang off different AST
@@ -112,57 +117,65 @@ describe('forbidWebOnlyConstructs — browser-only svelte imports', () => {
   describe('Negative (whole-module ban: svelte/reactivity/window)', () => {
     it("rejects any import from 'svelte/reactivity/window'", () => {
       expect(() =>
-        run('<script>import { innerWidth } from "svelte/reactivity/window";</script>'),
+        run(
+          '<script>import { innerWidth } from "svelte/reactivity/window";</script>',
+        ),
       ).toThrow('svelte/reactivity/window');
     });
 
     it('names the RN replacements rather than just refusing', () => {
       expect(() =>
-        run('<script>import { innerHeight } from "svelte/reactivity/window";</script>'),
+        run(
+          '<script>import { innerHeight } from "svelte/reactivity/window";</script>',
+        ),
       ).toThrow(/devicePixelRatio/);
     });
 
     it('explains that scrollX/screenLeft have no equivalent at all', () => {
       expect(() =>
-        run('<script>import { scrollY } from "svelte/reactivity/window";</script>'),
+        run(
+          '<script>import { scrollY } from "svelte/reactivity/window";</script>',
+        ),
       ).toThrow(/no equivalent for scrollX/);
     });
 
     // why: the ban applies at the module boundary, so a namespace import bans the same as a
     // named one — an author cannot dodge it by renaming the import shape.
     it('rejects a namespace import of svelte/reactivity/window too', () => {
-      expect(() => run('<script>import * as w from "svelte/reactivity/window";</script>')).toThrow(
-        'svelte/reactivity/window',
-      );
+      expect(() =>
+        run('<script>import * as w from "svelte/reactivity/window";</script>'),
+      ).toThrow('svelte/reactivity/window');
     });
 
     it('checks a <script module> block too, not only the instance script', () => {
       expect(() =>
-        run('<script module>import { devicePixelRatio } from "svelte/reactivity/window";</script>'),
+        run(
+          '<script module>import { devicePixelRatio } from "svelte/reactivity/window";</script>',
+        ),
       ).toThrow('svelte/reactivity/window');
     });
   });
 
   describe('Negative (named-only ban: MediaQuery out of svelte/reactivity)', () => {
     it("rejects MediaQuery specifically, not all of 'svelte/reactivity'", () => {
-      expect(() => run('<script>import { MediaQuery } from "svelte/reactivity";</script>')).toThrow(
-        'MediaQuery',
-      );
+      expect(() =>
+        run('<script>import { MediaQuery } from "svelte/reactivity";</script>'),
+      ).toThrow('MediaQuery');
     });
 
     // why: a namespace binding defers member selection to runtime, so `R.MediaQuery` is
     // unreachable to this check — `import * as R` used to walk straight past the ban and hand
     // the author the exact silently-false MediaQuery the guard exists to catch.
     it('rejects a namespace import of svelte/reactivity, which it cannot see through', () => {
-      expect(() => run('<script>import * as R from "svelte/reactivity";</script>')).toThrow(
-        'imported as a namespace',
-      );
+      expect(() =>
+        run('<script>import * as R from "svelte/reactivity";</script>'),
+      ).toThrow('imported as a namespace');
     });
 
     it('still names MediaQuery and its RN replacement when refusing the namespace import', () => {
-      expect(() => run('<script>import * as R from "svelte/reactivity";</script>')).toThrow(
-        /MediaQuery[\s\S]*createWidthQuery/,
-      );
+      expect(() =>
+        run('<script>import * as R from "svelte/reactivity";</script>'),
+      ).toThrow(/MediaQuery[\s\S]*createWidthQuery/);
     });
 
     // why: the namespace refusal must not spill onto the modules that carry no `named`

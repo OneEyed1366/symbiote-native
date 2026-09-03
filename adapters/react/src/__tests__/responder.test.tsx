@@ -23,7 +23,14 @@ function touch(
   timestamp: number,
   target: number,
 ): Record<string, unknown> {
-  const point = { pageX, pageY, locationX: pageX, locationY: pageY, identifier: 1, timestamp };
+  const point = {
+    pageX,
+    pageY,
+    locationX: pageX,
+    locationY: pageY,
+    identifier: 1,
+    timestamp,
+  };
   return { touches: [point], changedTouches: [point], target, timestamp };
 }
 
@@ -55,7 +62,9 @@ describe('React responder system through the event layer', () => {
       });
 
       function App(): ReactElement {
-        return <View {...responder.panHandlers} style={{ width: 50, height: 50 }} />;
+        return (
+          <View {...responder.panHandlers} style={{ width: 50, height: 50 }} />
+        );
       }
 
       mount(ROOT_TAG, <App />);

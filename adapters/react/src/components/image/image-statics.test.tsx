@@ -32,7 +32,9 @@ describe('Image statics (React entry-point wiring)', () => {
       // references — a rewrap or partial copy here would silently desync the React entry point
       // from core's behavior (including the Negative-path guarantees core/engine/src/
       // image-loader.test.ts already proves), without any test noticing at either layer.
-      const staticKeys = Object.keys(imageStatics) as Array<keyof typeof imageStatics>;
+      const staticKeys = Object.keys(imageStatics) as Array<
+        keyof typeof imageStatics
+      >;
       expect(staticKeys.length).toBeGreaterThan(0);
       for (const key of staticKeys) {
         expect(Image[key]).toBe(imageStatics[key]);

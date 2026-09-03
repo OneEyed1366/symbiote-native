@@ -1,0 +1,73 @@
+/* ApiPlaygroundScreen's static look. `pg-` prefix throughout — the style registry is one flat
+   Map shared app-wide (see the style-registry-collisions rule), and .section/.section-label/
+   .info-text/.row/.list-row-text/.hero-… /.line-tag… already exist in App.css, reused as-is
+   rather than redeclared here. */
+.pg-subsection-label {
+  color: #8fa3c4;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.pg-row {
+  gap: 6px;
+}
+
+.pg-card {
+  padding: 12px;
+  border-radius: 10px;
+  background-color: #181f33;
+  gap: 6px;
+}
+
+.pg-swatch {
+  width: 40px;
+  height: 24px;
+  border-radius: 6px;
+  background-color: #24304a;
+  /* RN defaults borderColor to BLACK, which is invisible on this panel — so the
+     `[style.borderWidth.px]` swatch animated 1px -> 4px of nothing. A width binding is only
+     observable once the colour is. */
+  border-color: #a3d94f;
+}
+
+.pg-lifecycle-box {
+  padding: 8px;
+  border-radius: 8px;
+  background-color: #101827;
+  gap: 2px;
+}
+
+/* Loud on purpose. This was #1c3a52 against .pg-swatch's #24304a — two dark blues a few points
+   apart, so every binding that flips this class (`[ngClass]`, `[class.x]`, a HostBinding) LOOKED
+   dead on device and read as "the toggle does nothing". A demo swatch has exactly one job: make
+   its own state legible from arm's length. */
+.pg-hb-active {
+  background-color: #4fd1a5;
+}
+
+.pg-host-meta-active {
+  background-color: #24304a;
+}
+
+.pg-skip-note {
+  color: #6b7d9c;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Own copies of ReactiveStyleScreen.css's .rstyle-caption/.rstyle-tile-text: PlaygroundCard.ts,
+   PlaygroundHostBindingTile.ts and this screen used those names without importing that stylesheet,
+   which only worked because App.ts eagerly imports every screen. A lazy-loaded route would ship
+   these two classes unregistered — this file should own everything it uses. */
+.rstyle-caption {
+  color: #cbd5e1;
+  font-size: 10px;
+}
+
+.rstyle-tile-text {
+  color: #ffffff;
+  font-size: 10px;
+  padding-left: 4px;
+  padding-top: 4px;
+}

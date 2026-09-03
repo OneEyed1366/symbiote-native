@@ -11,18 +11,21 @@ import { processTransform } from './index';
 describe('processTransform', () => {
   describe('array input — no-regression passthrough', () => {
     it('returns a single rotate entry unchanged', () => {
-      expect(processTransform([{ rotate: '6deg' }])).toEqual([{ rotate: '6deg' }]);
+      expect(processTransform([{ rotate: '6deg' }])).toEqual([
+        { rotate: '6deg' },
+      ]);
     });
 
     it('returns a numeric translateY entry unchanged', () => {
-      expect(processTransform([{ translateY: 12 }])).toEqual([{ translateY: 12 }]);
+      expect(processTransform([{ translateY: 12 }])).toEqual([
+        { translateY: 12 },
+      ]);
     });
 
     it('returns a multi-entry array unchanged', () => {
-      expect(processTransform([{ translateX: '50%' }, { scale: 1.2 }])).toEqual([
-        { translateX: '50%' },
-        { scale: 1.2 },
-      ]);
+      expect(processTransform([{ translateX: '50%' }, { scale: 1.2 }])).toEqual(
+        [{ translateX: '50%' }, { scale: 1.2 }],
+      );
     });
 
     it('returns the SAME reference (no clone) so the commit flush diffs it as unchanged', () => {
@@ -46,7 +49,9 @@ describe('processTransform', () => {
     });
 
     it("parses 'translateX(10px)' to a number", () => {
-      expect(processTransform('translateX(10px)')).toEqual([{ translateX: 10 }]);
+      expect(processTransform('translateX(10px)')).toEqual([
+        { translateX: 10 },
+      ]);
     });
 
     it("parses 'scale(1.5)'", () => {
@@ -61,17 +66,23 @@ describe('processTransform', () => {
     });
 
     it("normalizes 'translate(x, y)' to a [x, y] numeric array", () => {
-      expect(processTransform('translate(10px, 20px)')).toEqual([{ translate: [10, 20] }]);
+      expect(processTransform('translate(10px, 20px)')).toEqual([
+        { translate: [10, 20] },
+      ]);
     });
 
     it('gives a single-axis translate an implicit y of 0', () => {
-      expect(processTransform('translate(1px)')).toEqual([{ translate: [1, 0] }]);
+      expect(processTransform('translate(1px)')).toEqual([
+        { translate: [1, 0] },
+      ]);
     });
 
     // why: RN normalizes translate3d down to the 2-value 'translate' key — Fabric has no
     // separate translate3d prop.
     it("normalizes 'translate3d(x, y, z)' down to the 'translate' key", () => {
-      expect(processTransform('translate3d(5px, 10px, 0)')).toEqual([{ translate: [5, 10, 0] }]);
+      expect(processTransform('translate3d(5px, 10px, 0)')).toEqual([
+        { translate: [5, 10, 0] },
+      ]);
     });
 
     it('parses a percentage translateX axis to a number', () => {
@@ -89,7 +100,9 @@ describe('processTransform', () => {
     // why: perspective shares translateX/Y's single-arg-with-unit parse path but is its own
     // transform key — worth its own proof that the key name survives, not just the value.
     it("parses 'perspective(100)'", () => {
-      expect(processTransform('perspective(100)')).toEqual([{ perspective: 100 }]);
+      expect(processTransform('perspective(100)')).toEqual([
+        { perspective: 100 },
+      ]);
     });
 
     // why: an empty arg list resolves to `value: undefined`, and the entry-push guard

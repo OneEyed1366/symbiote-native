@@ -25,6 +25,8 @@ file needs a real RN binding (`processColor`, `DeviceEventEmitter`, `Image`,
 applies — check this skill first, don't rediscover it by chasing a cryptic Rolldown
 parse error.
 
+This boundary is Vitest-specific; Detox e2e runs the real built app where `react-native` resolves normally — see `symbiote-detox-e2e`.
+
 ## The rule
 
 **A new file that imports `'react-native'` directly must be unreachable from every
@@ -100,36 +102,30 @@ import * as ReactNativeViewConfigRegistry from 'react-native/Libraries/Renderer/
 
 (precedent: `adapters/react/src/create-portal.ts`, `host-config.ts`, `render.ts`).
 
-**A standalone ambient `declare module 'x' {}` `.d.ts` file was tried first and
-rejected** — it works for the file's own package's `tsc --build` (the `.d.ts` sits in
-that package's own `"include"` glob), but silently fails to help a **different**
-package's separate TypeScript program that transitively resolves into the same raw
-source. Concretely: `core/components/src/react-native-view-config-registry.d.ts`
-fixed `pnpm --filter @symbiote-native/components run typecheck`, but
-`adapters/angular`'s own `ngc -p tsconfig.angular.json` (a completely separate
-compile, `"include": ["src/**/*.ts"]` scoped to `adapters/angular/src` only) still
-threw `TS7016: Could not find a declaration file`, because it resolves
-`@symbiote-native/components/bootstrap` to raw source and ambient module declarations
-are only visible within the SAME TypeScript Program's `include` set — not merely
-"reachable via an import chain." `@ts-expect-error` has no such cross-program
-visibility problem: it's self-contained at the one call site, so it works identically
-regardless of which tsconfig/build tool (`tsc --build`, `ngc`, Vitest's transform) ends
-up parsing that line.
+An ambient `declare module 'x' {}` `.d.ts` file was tried first and rejected:
+
+```
+§ambient_dts_rejected := {
+  tried: "ambient `declare module` .d.ts (core/components/src/react-native-view-config-registry.d.ts)",
+  ok_for: "core/components' own tsc --build (typecheck) — .d.ts sits in that package's own include glob",
+  fails_for: "adapters/angular's ngc -p tsconfig.angular.json (include: src/**/*.ts, a separate Program) ⟶ TS7016: Could not find a declaration file",
+  root_cause: "ambient declarations visible only within the SAME Program's include set, not via import chain — ngc resolves @symbiote-native/components/bootstrap to raw source",
+  fix: "@ts-expect-error at the import site — self-contained per call site, works under tsc/ngc/Vitest alike",
+}
+```
 
 ## A new package may not inherit `@types/node` (`process`, `console`, …) for free
 
-`core/engine` resolves `process.env`/`console` fine with **no** explicit `@types/node`
-devDependency and no `"types"` tsconfig field — apparently via incidental pnpm
-hoisting. A brand-new sibling package is not guaranteed the same luck: `core/components`
-needed an explicit `"@types/node": "catalog:"` devDependency **and** an explicit
-`"types": ["node"]` added to its `tsconfig.json`'s `compilerOptions` before `process`
-resolved, even after confirming (`node -e "require.resolve('@types/node/package.json',
-{paths:['core/components']})"`) that the package really was symlinked in. The exact
-root cause (a pnpm-hoisting / TS composite-project interaction — `core/components` has
-a `"references": [{"path": "../engine"}]` entry engine itself lacks) wasn't fully
-chased down; the practical rule is: **don't assume a new package inherits ambient
-Node-global resolution from a sibling — verify with a real `tsc --build` /
-`--noEmit` run, and add `"types": ["node"]` if it doesn't.**
+```
+§types_node_inheritance := {
+  observed: "core/engine resolves process/console with no @types/node devDependency, no tsconfig 'types' — incidental pnpm hoisting",
+  counter_case: "core/components did NOT inherit it — needed \"@types/node\": \"catalog:\" devDependency AND \"types\": [\"node\"] in tsconfig.json before `process` resolved",
+  verified_symlinked: "require.resolve('@types/node/package.json', {paths:['core/components']}) confirmed present — resolution still failed without tsconfig 'types'",
+  suspected_cause: "pnpm-hoisting / TS composite-project interaction — core/components has references:[{path:'../engine'}], engine lacks that entry",
+  open: "root cause not fully chased down",
+  rule: "verify with a real tsc --build/--noEmit run before assuming inheritance; add \"types\":[\"node\"] if missing",
+}
+```
 
 ## Related skills
 
@@ -141,3 +137,8 @@ Node-global resolution from a sibling — verify with a real `tsc --build` /
   published npm version instead.
 - `symbiote-third-party-native-view` — a related but distinct RN-import concern (the
   library's own React *component*, not a raw RN binding).
+- `symbiote-engine-core` — `core/engine/src/node.ts`'s mutation API avoids importing
+  `react-native` at all; check it before assuming a new engine file needs a direct RN
+  binding rather than routing through the existing seam.
+- `symbiote-detox-e2e` — the real-device testing layer this Flow-parse boundary doesn't
+  apply to (see the intro note above).

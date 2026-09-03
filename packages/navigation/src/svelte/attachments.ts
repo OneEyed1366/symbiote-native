@@ -31,7 +31,9 @@ function isShimElement(value: unknown): value is ShimElement {
 
 // The object-bag prop set, the same entry point every adapter's props go through (routeProp).
 // Re-runs on every change of `props`, and the shim's own `p` setter diffs per key from there.
-export function hostProps(props: Record<string, unknown>): (node: unknown) => void {
+export function hostProps(
+  props: Record<string, unknown>,
+): (node: unknown) => void {
   return node => {
     if (!isShimElement(node)) {
       dlog('navigation: hostProps attached to a non-shim element, ignored');

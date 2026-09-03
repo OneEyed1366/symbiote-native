@@ -23,7 +23,11 @@ describe('processTransformOrigin', () => {
     });
 
     it('passes an array input through unchanged (RN re-validates arrays only in __DEV__)', () => {
-      expect(processTransformOrigin(['25%', '75%', 3])).toEqual(['25%', '75%', 3]);
+      expect(processTransformOrigin(['25%', '75%', 3])).toEqual([
+        '25%',
+        '75%',
+        3,
+      ]);
     });
   });
 
@@ -74,7 +78,11 @@ describe('processTransformOrigin', () => {
 
     // why: 'top'/'bottom' can never be the Z (depth) component.
     it('rejects top/bottom used as the third (z) token', () => {
-      expect(processTransformOrigin('right bottom top')).toEqual(['100%', '100%', 0]);
+      expect(processTransformOrigin('right bottom top')).toEqual([
+        '100%',
+        '100%',
+        0,
+      ]);
     });
 
     // why: 'center' can be X or Y but never Z.
@@ -111,6 +119,9 @@ describe('processFontVariant', () => {
   });
 
   it('splits a space-separated string', () => {
-    expect(processFontVariant('small-caps tabular-nums')).toEqual(['small-caps', 'tabular-nums']);
+    expect(processFontVariant('small-caps tabular-nums')).toEqual([
+      'small-caps',
+      'tabular-nums',
+    ]);
   });
 });

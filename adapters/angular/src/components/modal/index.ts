@@ -101,7 +101,9 @@ export type IAngularModalInputs = Omit<
 @Component({
   selector: 'Modal',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [ModalHost, ViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -113,10 +115,6 @@ export type IAngularModalInputs = Omit<
         (dismiss)="dismiss.emit()"
         (requestClose)="requestClose.emit()"
         (orientationChange)="emit(orientationChange, $event)"
-        (accessibilityAction)="emit(accessibilityAction, $event)"
-        (accessibilityTap)="emit(accessibilityTap, $event)"
-        (magicTap)="emit(magicTap, $event)"
-        (accessibilityEscape)="emit(accessibilityEscape, $event)"
       >
         <symbiote-view [style]="containerStyle" [collapsable]="false">
           <ng-content></ng-content>
@@ -154,8 +152,10 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -216,7 +216,10 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
     // Queue on a microtask so the reducer runs AFTER this CD pass renders with the OLD state —
     // the keep-alive frame. A synchronous dispatch here would unmount in the same pass.
     queueMicrotask(() => {
-      this.state = modalReducer(this.state, isVisible ? { type: 'show' } : { type: 'hide' });
+      this.state = modalReducer(
+        this.state,
+        isVisible ? { type: 'show' } : { type: 'hide' },
+      );
       this.changeDetector.markForCheck();
     });
   }
@@ -269,7 +272,14 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
   readonly hostProps = computed<Record<string, unknown>>(() => {
     this.hostPropsRevision();
     const descriptorProps = this.descriptor.props;
-    return { ...descriptorProps, style: [anchorHostStyle(this.elementRef), descriptorProps.style] };
+    return {
+      ...descriptorProps,
+      style: [anchorHostStyle(this.elementRef), descriptorProps.style],
+      onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),
+      onAccessibilityTap: this.eventEmitterHandler(this.accessibilityTap),
+      onMagicTap: this.eventEmitterHandler(this.magicTap),
+      onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
+    };
   });
 
   get containerStyle(): unknown {
@@ -277,13 +287,28 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
     return typeof container === 'string' ? undefined : container.props.style;
   }
 
+  // NOT private: `(orientationChange)="emit(...)"` in the template above calls it, and a template
+  // can only reach public members. `tsc` does not typecheck Angular templates, so `private` here
+  // compiles clean and fails only under `ngc --compilationMode partial`.
   emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     if (isSymbioteEvent(event)) emitter.emit(event);
   }
 
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`) — `show`/`dismiss`/`requestClose`/
+  // `orientationChange` are NOT (Modal's own MODAL_EVENTS), so those stay unconditional template
+  // bindings above. `.observed`-gated, mirroring Pressable's.
+  private eventEmitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): ((event: unknown) => void) | undefined {
+    return emitter.observed ? event => this.emit(emitter, event) : undefined;
+  }
+
   // Typed as the a11y intersection WITH the string index (the bag renderModal spreads into the
   // host props), so resolveAccessibilityProps's result stays assignable to passthrough.
-  private accessibilityInputs(): IAccessibilityProps & IAriaProps & Record<string, unknown> {
+  private accessibilityInputs(): IAccessibilityProps &
+    IAriaProps &
+    Record<string, unknown> {
     return {
       testID: this.testID,
       accessible: this.accessible,
@@ -301,8 +326,10 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

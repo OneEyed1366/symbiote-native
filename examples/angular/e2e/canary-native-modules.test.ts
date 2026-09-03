@@ -24,7 +24,8 @@ async function deviceTap(id: string): Promise<void> {
   let last: { x: number; y: number; width: number; height: number } | undefined;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const attrs = await element(by.id(id)).getAttributes();
-    if (!('frame' in attrs)) throw new Error(`${id}: getAttributes() returned no frame`);
+    if (!('frame' in attrs))
+      throw new Error(`${id}: getAttributes() returned no frame`);
     const { x, y, width, height } = attrs.frame;
     if (last && Math.abs(x - last.x) < 1 && Math.abs(y - last.y) < 1) break;
     last = { x, y, width, height };
@@ -33,7 +34,9 @@ async function deviceTap(id: string): Promise<void> {
   if (!last) throw new Error(`${id}: getAttributes() returned no frame`);
   const point = { x: last.x + last.width / 2, y: last.y + last.height / 2 };
   // TEMP DIAGNOSTIC — remove before merging.
-  console.log(`DIAG deviceTap(${id}) frame=${JSON.stringify(last)} point=${JSON.stringify(point)}`);
+  console.log(
+    `DIAG deviceTap(${id}) frame=${JSON.stringify(last)} point=${JSON.stringify(point)}`,
+  );
   await device.takeScreenshot(`DIAG-before-${id}`);
   await device.tap(point);
   await device.takeScreenshot(`DIAG-after-${id}`);

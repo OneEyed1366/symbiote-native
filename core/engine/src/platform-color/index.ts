@@ -35,7 +35,9 @@ export function PlatformColor(...names: string[]): IOpaqueColorValue {
   return { semantic: names };
 }
 
-export function DynamicColorIOS(tuple: IDynamicColorIOSTuple): IOpaqueColorValue {
+export function DynamicColorIOS(
+  tuple: IDynamicColorIOSTuple,
+): IOpaqueColorValue {
   return {
     dynamic: {
       light: tuple.light,
@@ -49,7 +51,11 @@ export function DynamicColorIOS(tuple: IDynamicColorIOSTuple): IOpaqueColorValue
 // True for the opaque objects above: the color seam uses this to route them
 // through the platform processor alongside CSS-string colors.
 export function isOpaqueColorValue(value: unknown): value is IOpaqueColorValue {
-  return typeof value === 'object' && value !== null && ('semantic' in value || 'dynamic' in value);
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    ('semantic' in value || 'dynamic' in value)
+  );
 }
 
 // Color props must reach Fabric as platform ints, not CSS strings. Fabric's C++ color
@@ -61,7 +67,9 @@ export function isOpaqueColorValue(value: unknown): value is IOpaqueColorValue {
 // processColor/isProcessableColor from here, never from commit.ts.
 let colorProcessor: (value: IColorValue) => unknown = value => value;
 
-export function setColorProcessor(process: (value: IColorValue) => unknown): void {
+export function setColorProcessor(
+  process: (value: IColorValue) => unknown,
+): void {
   colorProcessor = process;
 }
 

@@ -20,18 +20,26 @@ vi.mock('../../../core', () => ({
   Accelerometer: {
     addListener: (listener: (measurement: IAccelerometerMeasurement) => void) =>
       addListenerMock(listener),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
 const ROOT_TAG = 941;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
-const MEASUREMENT: IAccelerometerMeasurement = { x: 0.1, y: 0.2, z: 0.3, timestamp: 123 };
+const MEASUREMENT: IAccelerometerMeasurement = {
+  x: 0.1,
+  y: 0.2,
+  z: 0.3,
+  timestamp: 123,
+};
 
 let capturedResult: Signal<IAccelerometerMeasurement | null> | undefined;
-let capturedListener: ((measurement: IAccelerometerMeasurement) => void) | undefined;
+let capturedListener:
+  ((measurement: IAccelerometerMeasurement) => void) | undefined;
 
 @Component({
   selector: 'symbiote-accelerometer-host',
@@ -107,7 +115,8 @@ describe('AccelerometerService.connect', () => {
       mount(ROOT_TAG, AccelerometerHost);
       await tick();
 
-      if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+      if (capturedListener === undefined)
+        throw new Error('addListener callback was not captured');
       capturedListener(MEASUREMENT);
 
       expect(capturedResult?.()).toEqual(MEASUREMENT);

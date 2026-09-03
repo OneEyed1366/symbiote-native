@@ -43,7 +43,8 @@ import {
 
 // Mirrors React's IInputAccessoryViewProps minus children (Angular takes children via
 // <ng-content>), declared per-adapter over the shared a11y base.
-export interface IAngularInputAccessoryViewProps extends IAccessibilityProps, IAriaProps {
+export interface IAngularInputAccessoryViewProps
+  extends IAccessibilityProps, IAriaProps {
   // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard.
   nativeID?: string;
   backgroundColor?: string;
@@ -55,29 +56,30 @@ export interface IAngularInputAccessoryViewProps extends IAccessibilityProps, IA
 // mirroring Pressable's IAngularPressableInputs split.
 export type IAngularInputAccessoryViewInputs = Omit<
   IAngularInputAccessoryViewProps,
-  'onAccessibilityAction' | 'onAccessibilityTap' | 'onMagicTap' | 'onAccessibilityEscape'
+  | 'onAccessibilityAction'
+  | 'onAccessibilityTap'
+  | 'onMagicTap'
+  | 'onAccessibilityEscape'
 >;
 
 @Component({
   selector: 'InputAccessoryView',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [InputAccessoryViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <symbiote-input-accessory-view
-      [symbioteHostProps]="hostProps()"
-      (accessibilityAction)="emit(accessibilityAction, $event)"
-      (accessibilityTap)="emit(accessibilityTap, $event)"
-      (magicTap)="emit(magicTap, $event)"
-      (accessibilityEscape)="emit(accessibilityEscape, $event)"
-    >
+    <symbiote-input-accessory-view [symbioteHostProps]="hostProps()">
       <ng-content></ng-content>
     </symbiote-input-accessory-view>
   `,
 })
-export class InputAccessoryView implements IAngularInputAccessoryViewInputs, OnChanges, DoCheck {
+export class InputAccessoryView
+  implements IAngularInputAccessoryViewInputs, OnChanges, DoCheck
+{
   @Input() nativeID?: string;
   @Input() backgroundColor?: string;
   @Input() style?: IStyleProp<IViewStyle>;
@@ -94,8 +96,10 @@ export class InputAccessoryView implements IAngularInputAccessoryViewInputs, OnC
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -126,8 +130,16 @@ export class InputAccessoryView implements IAngularInputAccessoryViewInputs, OnC
   private readonly elementRef = inject(ElementRef);
 
   // Forward an engine event to the matching @Output(), narrowing the template's untyped $event.
-  emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
+  private emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     if (isSymbioteEvent(event)) emitter.emit(event);
+  }
+
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`). `.observed`-gated, mirroring Pressable's.
+  private eventEmitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): ((event: unknown) => void) | undefined {
+    return emitter.observed ? event => this.emit(emitter, event) : undefined;
   }
 
   // renderInputAccessoryView owns the host-node assembly (shared with React/Vue); the adapter reads
@@ -177,12 +189,21 @@ export class InputAccessoryView implements IAngularInputAccessoryViewInputs, OnC
   readonly hostProps = computed<Record<string, unknown>>(() => {
     this.hostPropsRevision();
     const descriptorProps = this.descriptor.props;
-    return { ...descriptorProps, style: [anchorHostStyle(this.elementRef), descriptorProps.style] };
+    return {
+      ...descriptorProps,
+      style: [anchorHostStyle(this.elementRef), descriptorProps.style],
+      onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),
+      onAccessibilityTap: this.eventEmitterHandler(this.accessibilityTap),
+      onMagicTap: this.eventEmitterHandler(this.magicTap),
+      onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
+    };
   });
 
   // Typed as the a11y intersection WITH the string index (the bag renderInputAccessoryView spreads
   // into the host props), so resolveAccessibilityProps's result stays assignable to passthrough.
-  private accessibilityInputs(): IAccessibilityProps & IAriaProps & Record<string, unknown> {
+  private accessibilityInputs(): IAccessibilityProps &
+    IAriaProps &
+    Record<string, unknown> {
     return {
       testID: this.testID,
       accessible: this.accessible,
@@ -200,8 +221,10 @@ export class InputAccessoryView implements IAngularInputAccessoryViewInputs, OnC
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

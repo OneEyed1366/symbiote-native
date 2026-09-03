@@ -6,7 +6,7 @@ Taptic Engine and Android's Vibrator API, plus a direct Android haptics-engine p
 (`performAndroidHapticsAsync`). Built the same way as
 [`@symbiote-native/local-auth`](../local-auth): an `expo-modules-core`-based wrapper, free
 functions with no per-instance state and no event stream. Reachable from every adapter — React,
-Vue, Angular — not just React.
+Vue, Svelte, Solid, Angular — not just React.
 
 ## Install
 
@@ -25,12 +25,12 @@ Unlike a plain RN native module, `expo-haptics`' native code is discovered by
 wiring into the native host app **once**, covering this package and every other
 `expo-modules-core` package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
@@ -47,26 +47,38 @@ src/core/     notificationAsync / impactAsync / selectionAsync / performAndroidH
               plus NotificationFeedbackType / ImpactFeedbackStyle / AndroidHaptics.
               native-module.ts resolves the ExpoHaptics native module via
               expo-modules-core's requireNativeModule.
-src/react/    @symbiote-native/haptics/react   — plain re-export of core.
-src/vue/      @symbiote-native/haptics/vue     — plain re-export of core.
 src/angular/  @symbiote-native/haptics/angular — plain re-export of core.
 ```
 
 Upstream ships four async functions and three enums, not a subscribable sensor — there's
-nothing per-framework to add, so all three adapter entry points are identical re-exports of
-`core`.
+nothing per-framework to add, so `./react`, `./vue`, `./svelte`, and `./solid` are
+`exports`-map aliases straight onto `src/core/` (no physical per-framework file). `./angular`
+stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build
+(`build-ngc/`).
 
 ## Use it
 
 ```tsx
 // React — examples/expo-react/screens/HapticsScreen.tsx
-import { impactAsync, ImpactFeedbackStyle, notificationAsync, NotificationFeedbackType, selectionAsync } from '@symbiote-native/haptics';
+import {
+  impactAsync,
+  ImpactFeedbackStyle,
+  notificationAsync,
+  NotificationFeedbackType,
+  selectionAsync,
+} from '@symbiote-native/haptics';
 
 function HapticsScreen() {
   return (
     <>
-      <ActionButton title="Medium" onPress={() => impactAsync(ImpactFeedbackStyle.Medium)} />
-      <ActionButton title="Success" onPress={() => notificationAsync(NotificationFeedbackType.Success)} />
+      <ActionButton
+        title="Medium"
+        onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}
+      />
+      <ActionButton
+        title="Success"
+        onPress={() => notificationAsync(NotificationFeedbackType.Success)}
+      />
       <ActionButton title="Selection" onPress={() => selectionAsync()} />
     </>
   );
@@ -76,25 +88,92 @@ function HapticsScreen() {
 ```vue
 <!-- Vue — examples/expo-vue-sfc/screens/HapticsScreen.vue -->
 <script setup lang="ts">
-import { impactAsync, ImpactFeedbackStyle, notificationAsync, NotificationFeedbackType, selectionAsync } from '@symbiote-native/haptics';
+import {
+  impactAsync,
+  ImpactFeedbackStyle,
+  notificationAsync,
+  NotificationFeedbackType,
+  selectionAsync,
+} from '@symbiote-native/haptics';
 
 function fireImpact(style: ImpactFeedbackStyle): void {
   void impactAsync(style);
 }
 </script>
 <template>
-  <ActionButton title="Medium" :onPress="() => fireImpact(ImpactFeedbackStyle.Medium)" />
+  <ActionButton
+    title="Medium"
+    :onPress="() => fireImpact(ImpactFeedbackStyle.Medium)"
+  />
 </template>
+```
+
+```svelte
+<!-- Svelte — examples/expo-svelte/screens/HapticsScreen.svelte -->
+<script lang="ts">
+  import {
+    impactAsync,
+    ImpactFeedbackStyle,
+    notificationAsync,
+    NotificationFeedbackType,
+    selectionAsync,
+  } from '@symbiote-native/haptics';
+</script>
+
+<ActionButton
+  title="Medium"
+  onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}
+/>
+<ActionButton
+  title="Success"
+  onPress={() => notificationAsync(NotificationFeedbackType.Success)}
+/>
+<ActionButton title="Selection" onPress={() => selectionAsync()} />
+```
+
+```tsx
+// Solid — examples/expo-solid/screens/HapticsScreen.tsx
+import {
+  impactAsync,
+  ImpactFeedbackStyle,
+  notificationAsync,
+  NotificationFeedbackType,
+  selectionAsync,
+} from '@symbiote-native/haptics';
+
+function HapticsScreen() {
+  return (
+    <>
+      <ActionButton
+        title="Medium"
+        onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}
+      />
+      <ActionButton
+        title="Success"
+        onPress={() => notificationAsync(NotificationFeedbackType.Success)}
+      />
+      <ActionButton title="Selection" onPress={() => selectionAsync()} />
+    </>
+  );
+}
 ```
 
 ```ts
 // Angular — examples/expo-angular/src/screens/HapticsScreen.ts
 import { Component } from '@angular/core';
-import { impactAsync, ImpactFeedbackStyle, notificationAsync, NotificationFeedbackType } from '@symbiote-native/haptics';
+import {
+  impactAsync,
+  ImpactFeedbackStyle,
+  notificationAsync,
+  NotificationFeedbackType,
+} from '@symbiote-native/haptics';
 
 @Component({
   selector: 'HapticsScreen',
-  template: `<ActionButton title="Medium" (press)="handleImpact()"></ActionButton>`,
+  template: `<ActionButton
+    title="Medium"
+    (press)="handleImpact()"
+  ></ActionButton>`,
 })
 export class HapticsScreen {
   handleImpact(): void {
@@ -134,6 +213,8 @@ import { impactAsync, ImpactFeedbackStyle } from '@symbiote-native/haptics';
 // or the framework-scoped entry points — identical surface, re-exported verbatim:
 import { impactAsync } from '@symbiote-native/haptics/react';
 import { impactAsync } from '@symbiote-native/haptics/vue';
+import { impactAsync } from '@symbiote-native/haptics/svelte';
+import { impactAsync } from '@symbiote-native/haptics/solid';
 import { impactAsync } from '@symbiote-native/haptics/angular';
 ```
 
@@ -145,8 +226,9 @@ Tests exercise the JS layer via a fake native module in place of the real
 ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md)).
 
-Native wiring for this package is done across all four `examples/expo-*` canary apps (Android
+Native wiring for this package is done across all six `examples/expo-*` canary apps (Android
 3-layer registration in each app's `build.gradle`/`MainApplication.kt`/`AndroidManifest.xml`,
 plus iOS Podfile/pod install) — not yet ported into the plain, non-Expo public canaries
-(`examples/react`, `examples/vue-sfc`, `examples/vue-tsx`, `examples/angular`), and no
-on-device/simulator automated (Detox) smoke test exists yet, only manual verification.
+(`examples/react`, `examples/vue-sfc`, `examples/vue-tsx`, `examples/svelte`, `examples/solid`,
+`examples/angular`), and no on-device/simulator automated (Detox) smoke test exists yet, only
+manual verification.

@@ -49,7 +49,8 @@ function ValueRow(props: { label: string; value: string }) {
 export const ScreenOrientationScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.ScreenOrientation];
-    const lineColor = LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.ScreenOrientation].line];
+    const lineColor =
+      LINE_COLOR[ROUTE_LINE_INFO[ROUTE_NAME.ScreenOrientation].line];
 
     const screenOrientation = useScreenOrientation();
 
@@ -67,7 +68,11 @@ export const ScreenOrientationScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="screen-orientation-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="screen-orientation-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -78,8 +83,8 @@ export const ScreenOrientationScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Screen Orientation</Text>
               <Text class="hero-body">
-                @symbiote-native/screen-orientation — live orientation state plus lock/unlock
-                controls.
+                @symbiote-native/screen-orientation — live orientation state
+                plus lock/unlock controls.
               </Text>
             </View>
           </View>
@@ -94,7 +99,9 @@ export const ScreenOrientationScreen = defineComponent(
             />
             <ValueRow
               label="Orientation lock"
-              value={ORIENTATION_LOCK_LABEL[screenOrientation.value.orientationLock]}
+              value={
+                ORIENTATION_LOCK_LABEL[screenOrientation.value.orientationLock]
+              }
             />
           </View>
 

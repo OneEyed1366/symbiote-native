@@ -1,5 +1,21 @@
 {
-  "printWidth": 100,
+  "printWidth": 80,
   "singleQuote": true,
-  "arrowParens": "avoid"
+  "arrowParens": "avoid",
+  "plugins": ["prettier-plugin-astro", "prettier-plugin-svelte"],
+  "overrides": [
+    {
+      "files": "*.astro",
+      "options": {
+        "parser": "astro"
+      }
+    },
+    {
+      "files": "*.svelte",
+      "options": {
+        "parser": "svelte",
+        "htmlWhitespaceSensitivity": "ignore"
+      }
+    }
+  ]
 }

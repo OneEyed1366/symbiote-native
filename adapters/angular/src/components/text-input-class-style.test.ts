@@ -6,7 +6,7 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
@@ -28,7 +28,14 @@ class TextInputClassHost {}
 
 beforeEach(() => {
   fabric.reset();
-  registerStyles({ card: { backgroundColor: 'red' } });
+  registerRules([
+    {
+      tokens: ['card'],
+      specificity: [0, 1, 0],
+      order: 0,
+      style: { backgroundColor: 'red' },
+    },
+  ]);
 });
 afterEach(() => {
   unmount(ROOT_TAG);

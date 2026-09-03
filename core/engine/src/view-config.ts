@@ -33,6 +33,12 @@ const BASE_EVENTS: readonly string[] = [
   'press',
   'pressIn',
   'pressOut',
+  // Synthesized from the touch stream like its four siblings, and omitted here until 2026-09-02.
+  // A name the press machine OWNS but the engine does not route is dead on the lowered path only:
+  // `routeProp` hands an `on*` prop to `setEventListener` (and thus to the behavior's stash) only
+  // for a registered event, so `onPressMove` landed in `node.props` where nothing reads it, while
+  // a wrapper passes the same callback to the machine directly and stayed correct.
+  'pressMove',
   'longPress',
   'layout',
   'focus',
@@ -59,7 +65,12 @@ const TEXT_INPUT_EVENTS: readonly string[] = [
   'selectionChange',
   'contentSizeChange',
 ];
-const MODAL_EVENTS: readonly string[] = ['show', 'dismiss', 'requestClose', 'orientationChange'];
+const MODAL_EVENTS: readonly string[] = [
+  'show',
+  'dismiss',
+  'requestClose',
+  'orientationChange',
+];
 
 // A scroll view's events are the same on both axes and both platforms; only the native
 // NAME differs (iOS RCTScrollView for both; Android RCTScrollView vertical vs
@@ -85,7 +96,14 @@ const TEXT_EVENTS: readonly string[] = ['textLayout'];
 // SymbioteNode.component (what createNode is called with). A component absent here
 // still gets BASE_EVENTS, so a new primitive has working press/layout for free.
 const COMPONENT_EVENTS: Readonly<Record<string, readonly string[]>> = {
-  RCTImageView: ['loadStart', 'load', 'loadEnd', 'error', 'progress', 'partialLoad'],
+  RCTImageView: [
+    'loadStart',
+    'load',
+    'loadEnd',
+    'error',
+    'progress',
+    'partialLoad',
+  ],
   RCTScrollView: SCROLL_EVENTS,
   AndroidHorizontalScrollView: SCROLL_EVENTS,
   RCTSinglelineTextInputView: TEXT_INPUT_EVENTS,

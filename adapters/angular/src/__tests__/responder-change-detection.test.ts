@@ -25,7 +25,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
-import { ViewHost as View, TextHost as Text, SymbioteHostPropsDirective } from '../primitives';
+import {
+  ViewHost as View,
+  TextHost as Text,
+  SymbioteHostPropsDirective,
+} from '../primitives';
 
 const ROOT_TAG = 970;
 const TOUCH_START = 'topTouchStart';
@@ -36,7 +40,9 @@ const fabric = installFabric();
 
 // Fabric is clone-on-write: a prop update yields a NEW node object in the committed tree,
 // never in `created`. Walk the live committed child-set for post-mutation assertions.
-function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findCommitted(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   const stack = [...fabric.committed];
   while (stack.length > 0) {
     const node = stack.pop();
@@ -61,7 +67,8 @@ function handleFor(testID: string): unknown {
   return node.instanceHandle;
 }
 
-const flush = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const flush = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 @Component({
   selector: 'symbiote-responder-cd-host',

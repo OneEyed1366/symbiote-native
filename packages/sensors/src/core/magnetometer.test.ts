@@ -19,7 +19,11 @@ vi.mock('./native/exponent-magnetometer', () => ({
 // Vitest's Oxc transform can't parse — same fake as device-sensor.test.ts.
 vi.mock('expo-modules-core', () => ({
   Platform: { OS: 'ios' },
-  PermissionStatus: { GRANTED: 'granted', UNDETERMINED: 'undetermined', DENIED: 'denied' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    UNDETERMINED: 'undetermined',
+    DENIED: 'denied',
+  },
 }));
 
 const { Magnetometer } = await import('./magnetometer');
@@ -41,7 +45,9 @@ describe('Magnetometer', () => {
       // not an accidental stand-in shared with another sensor (e.g. MagnetometerUncalibrated).
       Magnetometer.setUpdateInterval(1234);
 
-      expect(FAKE_NATIVE_MAGNETOMETER.setUpdateInterval).toHaveBeenCalledWith(1234);
+      expect(FAKE_NATIVE_MAGNETOMETER.setUpdateInterval).toHaveBeenCalledWith(
+        1234,
+      );
     });
 
     it('subscribes through the "magnetometerDidUpdate" event name the native module emits', () => {

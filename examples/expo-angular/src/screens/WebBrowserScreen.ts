@@ -1,5 +1,12 @@
 import { Component, signal } from '@angular/core';
-import { Platform, SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/angular';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/angular';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -29,7 +36,11 @@ const DEMO_URL = 'https://symbiote-native.dev';
   imports: [ActionButton, SafeAreaView, ScrollView, Text, TextInput, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="web-browser-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="web-browser-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -40,8 +51,9 @@ const DEMO_URL = 'https://symbiote-native.dev';
           <View class="hero-copy">
             <Text class="hero-title">Web Browser</Text>
             <Text class="hero-body">
-              @symbiote-native/web-browser — an in-app browser (SFSafariViewController on iOS,
-              Custom Tabs on Android) that keeps the user inside the app, unlike Linking.openURL.
+              @symbiote-native/web-browser — an in-app browser
+              (SFSafariViewController on iOS, Custom Tabs on Android) that keeps
+              the user inside the app, unlike Linking.openURL.
             </Text>
           </View>
         </View>
@@ -70,13 +82,15 @@ const DEMO_URL = 'https://symbiote-native.dev';
               [color]="lineColor"
             ></ActionButton>
             <Text class="web-browser-note">
-              The presented browser covers the app, so Dismiss is only reachable once the browser
-              is already gone — it then reports that no browser was presented.
+              The presented browser covers the app, so Dismiss is only reachable
+              once the browser is already gone — it then reports that no browser
+              was presented.
             </Text>
           } @else {
             <Text class="web-browser-note">
-              Android has no dismiss: a Custom Tab runs in its own task and cannot be closed
-              programmatically, so dismissBrowser throws off iOS.
+              Android has no dismiss: a Custom Tab runs in its own task and
+              cannot be closed programmatically, so dismissBrowser throws off
+              iOS.
             </Text>
           }
         </View>
@@ -85,13 +99,19 @@ const DEMO_URL = 'https://symbiote-native.dev';
           <Text class="web-browser-card-title">Last result</Text>
           <View class="web-browser-row">
             <Text class="web-browser-row-label">Open</Text>
-            <Text testID="web-browser-open-result" class="web-browser-value-text">
+            <Text
+              testID="web-browser-open-result"
+              class="web-browser-value-text"
+            >
               {{ openResult() }}
             </Text>
           </View>
           <View class="web-browser-row">
             <Text class="web-browser-row-label">Dismiss</Text>
-            <Text testID="web-browser-dismiss-result" class="web-browser-value-text">
+            <Text
+              testID="web-browser-dismiss-result"
+              class="web-browser-value-text"
+            >
               {{ dismissResult() }}
             </Text>
           </View>
@@ -101,9 +121,10 @@ const DEMO_URL = 'https://symbiote-native.dev';
           <View testID="web-browser-service-card" class="web-browser-card">
             <Text class="web-browser-card-title">Custom Tabs service</Text>
             <Text class="web-browser-note">
-              Android only. Warming the service up before a known URL makes the tab open faster;
-              cool it down when you are done. getCustomTabsSupportingBrowsersAsync throws on iOS,
-              which has no such concept, so this whole card is behind the platform check.
+              Android only. Warming the service up before a known URL makes the
+              tab open faster; cool it down when you are done.
+              getCustomTabsSupportingBrowsersAsync throws on iOS, which has no
+              such concept, so this whole card is behind the platform check.
             </Text>
             <View class="button-row">
               <ActionButton
@@ -133,13 +154,19 @@ const DEMO_URL = 'https://symbiote-native.dev';
             </View>
             <View class="web-browser-row">
               <Text class="web-browser-row-label">Service package</Text>
-              <Text testID="web-browser-service-package" class="web-browser-value-text">
+              <Text
+                testID="web-browser-service-package"
+                class="web-browser-value-text"
+              >
                 {{ servicePackage() }}
               </Text>
             </View>
             <View class="web-browser-row">
               <Text class="web-browser-row-label">Supporting browsers</Text>
-              <Text testID="web-browser-browsers" class="web-browser-value-text">
+              <Text
+                testID="web-browser-browsers"
+                class="web-browser-value-text"
+              >
                 {{ browsers() }}
               </Text>
             </View>
@@ -175,27 +202,43 @@ export class WebBrowserScreen {
   handleDismiss(): void {
     dismissBrowser()
       .then(result => this.dismissResult.set(result.type))
-      .catch((error: Error) => this.dismissResult.set(`failed: ${error.message}`));
+      .catch((error: Error) =>
+        this.dismissResult.set(`failed: ${error.message}`),
+      );
   }
 
   handleWarmUp(): void {
     warmUpAsync()
-      .then(result => this.servicePackage.set(result.servicePackage ?? '(no service package)'))
-      .catch((error: Error) => this.servicePackage.set(`failed: ${error.message}`));
+      .then(result =>
+        this.servicePackage.set(
+          result.servicePackage ?? '(no service package)',
+        ),
+      )
+      .catch((error: Error) =>
+        this.servicePackage.set(`failed: ${error.message}`),
+      );
   }
 
   // Hints the warmed-up service at the URL about to be opened; the package it reports back is the
   // one warmUpAsync picked, which is why that button comes first.
   handleMayInit(): void {
     mayInitWithUrlAsync(this.url())
-      .then(result => this.servicePackage.set(result.servicePackage ?? '(no service package)'))
-      .catch((error: Error) => this.servicePackage.set(`failed: ${error.message}`));
+      .then(result =>
+        this.servicePackage.set(
+          result.servicePackage ?? '(no service package)',
+        ),
+      )
+      .catch((error: Error) =>
+        this.servicePackage.set(`failed: ${error.message}`),
+      );
   }
 
   handleCoolDown(): void {
     coolDownAsync()
       .then(() => this.servicePackage.set('(cooled down)'))
-      .catch((error: Error) => this.servicePackage.set(`failed: ${error.message}`));
+      .catch((error: Error) =>
+        this.servicePackage.set(`failed: ${error.message}`),
+      );
   }
 
   handleListBrowsers(): void {

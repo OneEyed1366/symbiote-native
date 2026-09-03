@@ -1,0 +1,23 @@
+.module-text {
+  color: #cdd6ee;
+  font-size: 14px;
+}
+
+.module-text-flex {
+  color: #cdd6ee;
+  font-size: 14px;
+  flex: 1;
+}
+
+.module-logo-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.module-logo-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background-color: #20304f;
+}

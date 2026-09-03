@@ -3,14 +3,23 @@
 
 import { act, createElement, createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource, Dimensions } from '@symbiote-native/react';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+  Dimensions,
+} from '@symbiote-native/react';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
 import type { INavigatorHandle } from '../stack';
 import { Tab } from '../tabs';
 import { Drawer } from '../drawer';
-import { useDrawerNavigation, useStackNavigation, useTabNavigation } from './index';
+import {
+  useDrawerNavigation,
+  useStackNavigation,
+  useTabNavigation,
+} from './index';
 
 const ROOT_TAG = 613;
 const SCREEN_VIEW = 'RNSScreen';
@@ -24,7 +33,9 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
       topWillAppear: { registrationName: 'onWillAppear' },
       topWillDisappear: { registrationName: 'onWillDisappear' },
       topDismissed: { registrationName: 'onDismissed' },
-      topHeaderBackButtonClicked: { registrationName: 'onHeaderBackButtonClicked' },
+      topHeaderBackButtonClicked: {
+        registrationName: 'onHeaderBackButtonClicked',
+      },
     },
     validAttributes: {
       screenId: true,
@@ -36,7 +47,9 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
     },
   },
   [STACK_VIEW]: {
-    directEventTypes: { topFinishTransitioning: { registrationName: 'onFinishTransitioning' } },
+    directEventTypes: {
+      topFinishTransitioning: { registrationName: 'onFinishTransitioning' },
+    },
     validAttributes: {},
   },
 };
@@ -82,8 +95,14 @@ describe('useStackNavigation', () => {
         createElement(
           Stack,
           { ref, initialRouteName: 'Home' },
-          createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-          createElement(Stack.Screen, { name: 'Details', component: textScreen('details') }),
+          createElement(Stack.Screen, {
+            name: 'Home',
+            component: TrackedHomeScreen,
+          }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: textScreen('details'),
+          }),
         ),
       );
       expect(canPush).toBe(true);
@@ -107,8 +126,14 @@ describe('useStackNavigation', () => {
             createElement(
               Tab,
               { initialRouteName: 'Home' },
-              createElement(Tab.Screen, { name: 'Home', component: TrackedHomeTab }),
-              createElement(Tab.Screen, { name: 'Search', component: textScreen('search') }),
+              createElement(Tab.Screen, {
+                name: 'Home',
+                component: TrackedHomeTab,
+              }),
+              createElement(Tab.Screen, {
+                name: 'Search',
+                component: textScreen('search'),
+              }),
             ),
           );
         });
@@ -133,8 +158,14 @@ describe('useTabNavigation', () => {
         createElement(
           Tab,
           { initialRouteName: 'Home' },
-          createElement(Tab.Screen, { name: 'Home', component: TrackedHomeTab }),
-          createElement(Tab.Screen, { name: 'Search', component: textScreen('search') }),
+          createElement(Tab.Screen, {
+            name: 'Home',
+            component: TrackedHomeTab,
+          }),
+          createElement(Tab.Screen, {
+            name: 'Search',
+            component: textScreen('search'),
+          }),
         ),
       );
       expect(canJumpTo).toBe(true);
@@ -156,8 +187,14 @@ describe('useTabNavigation', () => {
             createElement(
               Stack,
               { initialRouteName: 'Home' },
-              createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-              createElement(Stack.Screen, { name: 'Details', component: textScreen('details') }),
+              createElement(Stack.Screen, {
+                name: 'Home',
+                component: TrackedHomeScreen,
+              }),
+              createElement(Stack.Screen, {
+                name: 'Details',
+                component: textScreen('details'),
+              }),
             ),
           );
         });
@@ -182,8 +219,14 @@ describe('useDrawerNavigation', () => {
         createElement(
           Drawer,
           { initialRouteName: 'Home' },
-          createElement(Drawer.Screen, { name: 'Home', component: TrackedHomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: textScreen('profile') }),
+          createElement(Drawer.Screen, {
+            name: 'Home',
+            component: TrackedHomeScreen,
+          }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: textScreen('profile'),
+          }),
         ),
       );
       expect(canOpenDrawer).toBe(true);
@@ -205,8 +248,14 @@ describe('useDrawerNavigation', () => {
             createElement(
               Stack,
               { initialRouteName: 'Home' },
-              createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-              createElement(Stack.Screen, { name: 'Details', component: textScreen('details') }),
+              createElement(Stack.Screen, {
+                name: 'Home',
+                component: TrackedHomeScreen,
+              }),
+              createElement(Stack.Screen, {
+                name: 'Details',
+                component: textScreen('details'),
+              }),
             ),
           );
         });

@@ -24,7 +24,11 @@ import {
   type Type,
 } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/angular';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/angular';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
@@ -63,7 +67,8 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -133,7 +138,9 @@ class NavigationRouteScreenComponent {
   constructor() {
     capturedNavigation = injectNavigation();
     capturedRoute = injectRoute();
-    capturedNavigation.addListener('focus', () => focusListenerEvents.push('focus'));
+    capturedNavigation.addListener('focus', () =>
+      focusListenerEvents.push('focus'),
+    );
   }
 }
 
@@ -147,7 +154,9 @@ let capturedRouteCount: Signal<number> | undefined;
 })
 class NavigationStateScreenComponent {
   constructor() {
-    capturedRouteCount = injectNavigationState((state: INavigatorState) => state.routes.length);
+    capturedRouteCount = injectNavigationState(
+      (state: INavigatorState) => state.routes.length,
+    );
   }
 }
 
@@ -159,8 +168,16 @@ let capturedHost: InjectorsTestHost | undefined;
   imports: [Stack, ScreenDirective],
   template: `
     <Stack #nav initialRouteName="Home">
-      <ng-template symbioteScreen name="Home" [component]="homeComponent"></ng-template>
-      <ng-template symbioteScreen name="Details" [component]="detailsComponent"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Home"
+        [component]="homeComponent"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Details"
+        [component]="detailsComponent"
+      ></ng-template>
     </Stack>
   `,
 })

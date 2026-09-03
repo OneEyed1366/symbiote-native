@@ -26,7 +26,11 @@ export function LocalizationScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="localization-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="localization-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -37,8 +41,8 @@ export function LocalizationScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Localization</Text>
             <Text className="hero-body">
-              @symbiote-native/localization — locales and calendars, each reactive to device
-              settings changes via its own hook.
+              @symbiote-native/localization — locales and calendars, each
+              reactive to device settings changes via its own hook.
             </Text>
           </View>
         </View>
@@ -48,8 +52,14 @@ export function LocalizationScreen() {
             <Text className="feature-card-title">Locale</Text>
           </View>
           <ValueRow label="Language tag" value={locale.languageTag} />
-          <ValueRow label="Currency code" value={locale.currencyCode ?? 'unknown'} />
-          <ValueRow label="Currency symbol" value={locale.currencySymbol ?? 'unknown'} />
+          <ValueRow
+            label="Currency code"
+            value={locale.currencyCode ?? 'unknown'}
+          />
+          <ValueRow
+            label="Currency symbol"
+            value={locale.currencySymbol ?? 'unknown'}
+          />
           <ValueRow label="Text direction" value={locale.textDirection} />
         </View>
 
@@ -60,7 +70,13 @@ export function LocalizationScreen() {
           <ValueRow label="Calendar" value={calendar.calendar ?? 'unknown'} />
           <ValueRow
             label="Uses 24-hour clock"
-            value={calendar.uses24hourClock === null ? 'unknown' : calendar.uses24hourClock ? 'Yes' : 'No'}
+            value={
+              calendar.uses24hourClock === null
+                ? 'unknown'
+                : calendar.uses24hourClock
+                  ? 'Yes'
+                  : 'No'
+            }
           />
           <ValueRow label="Time zone" value={calendar.timeZone ?? 'unknown'} />
         </View>

@@ -19,7 +19,9 @@
   let focusCount = $state(0);
   let lastBlurAt = $state<number | undefined>(undefined);
   const isFocused = useIsFocused();
-  const routeNames = useNavigationState(state => state.routes.map(route => route.name));
+  const routeNames = useNavigationState(state =>
+    state.routes.map(route => route.name),
+  );
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HooksDemo];
 
   useFocusEffect(() => {
@@ -30,23 +32,44 @@
   });
 </script>
 
-<SafeAreaView class="screen"
-  ><View class="section"
-    ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
-    ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: LINE_COLOR.introspection }}
-        ><Text class="hero-badge-text">HK</Text></View
-      ><View class="hero-copy"
-        ><Text class="hero-title">Hooks</Text
-        ><Text class="hero-body">useFocusEffect, useIsFocused, and useNavigationState — introspecting the navigator's own live state from inside a screen.</Text
-      ></View
-    ></View
-    ><Text testID="hooks-is-focused" class="info-text">{`useIsFocused(): ${isFocused.current}`}</Text
-    ><Text testID="hooks-focus-count" class="info-text">{`useFocusEffect focus count: ${focusCount}`}</Text
-    ><Text class="info-text">{lastBlurAt === undefined ? 'not blurred yet' : `last blurred at ${lastBlurAt}`}</Text
-    ><Text class="section-label">useNavigationState() · current route stack</Text
-    >{#each routeNames.current as name, index (`${name}-${index}`)}<Text class="list-row-text">{`${index}. ${name}`}</Text
-    >{/each}</View
-  ></SafeAreaView
->
+<SafeAreaView class="screen">
+  <View class="section">
+    <View class={`line-tag line-tag-${lineInfo.line}`}>
+      <Text class="line-tag-text">
+        {`${lineInfo.code} · ${lineInfo.label}`}
+      </Text>
+    </View>
+    <View class="hero-card">
+      <View
+        class="hero-badge"
+        style={{ backgroundColor: LINE_COLOR.introspection }}
+      >
+        <Text class="hero-badge-text">HK</Text>
+      </View>
+      <View class="hero-copy">
+        <Text class="hero-title">Hooks</Text>
+        <Text class="hero-body">
+          useFocusEffect, useIsFocused, and useNavigationState — introspecting
+          the navigator's own live state from inside a screen.
+        </Text>
+      </View>
+    </View>
+    <Text testID="hooks-is-focused" class="info-text">
+      {`useIsFocused(): ${isFocused.current}`}
+    </Text>
+    <Text testID="hooks-focus-count" class="info-text">
+      {`useFocusEffect focus count: ${focusCount}`}
+    </Text>
+    <Text class="info-text">
+      {lastBlurAt === undefined
+        ? 'not blurred yet'
+        : `last blurred at ${lastBlurAt}`}
+    </Text>
+    <Text class="section-label">
+      useNavigationState() · current route stack
+    </Text>
+    {#each routeNames.current as name, index (`${name}-${index}`)}
+      <Text class="list-row-text">{`${index}. ${name}`}</Text>
+    {/each}
+  </View>
+</SafeAreaView>

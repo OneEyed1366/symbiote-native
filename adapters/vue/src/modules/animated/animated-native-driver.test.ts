@@ -18,7 +18,8 @@ interface INativeCall {
   args: unknown[];
 }
 const nativeCalls: INativeCall[] = [];
-let lastStartCallback: ((result: { finished: boolean; value?: number }) => void) | null = null;
+let lastStartCallback:
+  ((result: { finished: boolean; value?: number }) => void) | null = null;
 const createdNodeTags = new Set<number>();
 
 function record(method: string): (...args: unknown[]) => void {
@@ -29,7 +30,9 @@ function record(method: string): (...args: unknown[]) => void {
 
 function assertNodeExists(tag: unknown, method: string): void {
   if (typeof tag !== 'number' || !createdNodeTags.has(tag)) {
-    throw new Error(`${method} referenced animated node ${String(tag)} before createAnimatedNode`);
+    throw new Error(
+      `${method} referenced animated node ${String(tag)} before createAnimatedNode`,
+    );
   }
 }
 
@@ -41,12 +44,18 @@ const fakeNativeAnimated = {
   connectAnimatedNodes(parentTag: number, childTag: number): void {
     assertNodeExists(parentTag, 'connectAnimatedNodes(parent)');
     assertNodeExists(childTag, 'connectAnimatedNodes(child)');
-    nativeCalls.push({ method: 'connectAnimatedNodes', args: [parentTag, childTag] });
+    nativeCalls.push({
+      method: 'connectAnimatedNodes',
+      args: [parentTag, childTag],
+    });
   },
   disconnectAnimatedNodes: record('disconnectAnimatedNodes'),
   connectAnimatedNodeToView(nodeTag: number, viewTag: number): void {
     assertNodeExists(nodeTag, 'connectAnimatedNodeToView');
-    nativeCalls.push({ method: 'connectAnimatedNodeToView', args: [nodeTag, viewTag] });
+    nativeCalls.push({
+      method: 'connectAnimatedNodeToView',
+      args: [nodeTag, viewTag],
+    });
   },
   disconnectAnimatedNodeFromView: record('disconnectAnimatedNodeFromView'),
   restoreDefaultValues: record('restoreDefaultValues'),
@@ -57,7 +66,10 @@ const fakeNativeAnimated = {
     config: Record<string, unknown>,
     endCallback: (result: { finished: boolean; value?: number }) => void,
   ): void {
-    nativeCalls.push({ method: 'startAnimatingNode', args: [animationId, nodeTag, config] });
+    nativeCalls.push({
+      method: 'startAnimatingNode',
+      args: [animationId, nodeTag, config],
+    });
     lastStartCallback = endCallback;
   },
   stopAnimation: record('stopAnimation'),
@@ -65,7 +77,9 @@ const fakeNativeAnimated = {
   setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
   flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
   extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-  startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
+  startListeningToAnimatedNodeValue: record(
+    'startListeningToAnimatedNodeValue',
+  ),
   stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
   getValue: record('getValue'),
   addAnimatedEventToView: record('addAnimatedEventToView'),
@@ -78,7 +92,8 @@ Object.assign(globalThis, {
 const fabric = installFabric();
 const ROOT_TAG = 47;
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function appView(): IFakeNode {
   return fabric.appRoot().children[0];
@@ -118,28 +133,37 @@ describe('Vue Animated native driver', () => {
     // the racing test below is contrasted against.
     it('mirrors the value graph into native and binds it to the committed view', async () => {
       const opacity = new Animated.Value(0);
-      const slide = opacity.interpolate({ inputRange: [0, 1], outputRange: [0, 100] });
+      const slide = opacity.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 100],
+      });
 
       mount(
         ROOT_TAG,
         defineComponent({
           setup: () => () =>
-            h(Animated.View, { style: { opacity, transform: [{ translateX: slide }] } }),
+            h(Animated.View, {
+              style: { opacity, transform: [{ translateX: slide }] },
+            }),
         }),
       );
       await tick();
       const viewTag = appView().tag;
 
       let finished = false;
-      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start(
-        result => {
-          finished = result.finished;
-        },
-      );
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(result => {
+        finished = result.finished;
+      });
 
       const created = callsOf('createAnimatedNode');
       const createdTypes = created.map(call => configType(call.args[1]));
-      expect(createdTypes).toEqual(expect.arrayContaining(['value', 'style', 'props']));
+      expect(createdTypes).toEqual(
+        expect.arrayContaining(['value', 'style', 'props']),
+      );
 
       expect(callsOf('connectAnimatedNodes').length).toBeGreaterThanOrEqual(2);
 
@@ -147,7 +171,9 @@ describe('Vue Animated native driver', () => {
       expect(connectView).toHaveLength(1);
       expect(connectView[0].args[1]).toBe(viewTag);
 
-      const valueCreate = created.find(call => configType(call.args[1]) === 'value');
+      const valueCreate = created.find(
+        call => configType(call.args[1]) === 'value',
+      );
       const valueTag = valueCreate?.args[0];
       const start = callsOf('startAnimatingNode');
       expect(start).toHaveLength(1);
@@ -176,7 +202,10 @@ describe('Vue Animated native driver', () => {
     // before the retry existed.
     it('binds a looping native pulse declared with an array style + onMounted start', async () => {
       const pulse = new Animated.Value(0);
-      const pulseScale = pulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.3, 1] });
+      const pulseScale = pulse.interpolate({
+        inputRange: [0, 0.5, 1],
+        outputRange: [1, 1.3, 1],
+      });
       const pulseOpacity = pulse.interpolate({
         inputRange: [0, 0.5, 1],
         outputRange: [0.4, 1, 0.4],
@@ -187,7 +216,11 @@ describe('Vue Animated native driver', () => {
         defineComponent({
           setup() {
             const loop = Animated.loop(
-              Animated.timing(pulse, { toValue: 1, duration: 1400, useNativeDriver: true }),
+              Animated.timing(pulse, {
+                toValue: 1,
+                duration: 1400,
+                useNativeDriver: true,
+              }),
             );
             onMounted(() => loop.start());
             return () =>
@@ -203,8 +236,12 @@ describe('Vue Animated native driver', () => {
       await tick();
       const viewTag = appView().tag;
 
-      const createdTypes = callsOf('createAnimatedNode').map(call => configType(call.args[1]));
-      expect(createdTypes).toEqual(expect.arrayContaining(['value', 'style', 'props']));
+      const createdTypes = callsOf('createAnimatedNode').map(call =>
+        configType(call.args[1]),
+      );
+      expect(createdTypes).toEqual(
+        expect.arrayContaining(['value', 'style', 'props']),
+      );
 
       const connectView = callsOf('connectAnimatedNodeToView');
       expect(connectView).toHaveLength(1);

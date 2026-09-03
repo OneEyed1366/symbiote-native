@@ -27,7 +27,12 @@
 // screen nested inside e.g. a Stack-screen-renders-a-Tab composition reach the enclosing Stack via
 // useNavigation().getParent().
 
-import { defineComponent, inject, provide, shallowRef } from '@vue/runtime-core';
+import {
+  defineComponent,
+  inject,
+  provide,
+  shallowRef,
+} from '@vue/runtime-core';
 import type { InjectionKey, ShallowRef } from '@vue/runtime-core';
 import type { INavigationEmitter, IRoute, IAnyNavigatorHandle } from '../core';
 export type { IAnyNavigatorHandle };
@@ -44,7 +49,9 @@ const NAVIGATION_SCOPE_KEY: InjectionKey<ShallowRef<INavigationScopeValue>> =
 
 // The setter half of the pair - writes the CURRENT route's scope onto the shared key. Called only
 // from NavigationScope's own setup below (never directly by app code).
-function provideNavigationScope(value: ShallowRef<INavigationScopeValue>): void {
+function provideNavigationScope(
+  value: ShallowRef<INavigationScopeValue>,
+): void {
   provide(NAVIGATION_SCOPE_KEY, value);
 }
 
@@ -52,7 +59,8 @@ function provideNavigationScope(value: ShallowRef<INavigationScopeValue>): void 
 // (stack.ts/tabs.ts/drawer.ts, reading the AMBIENT/parent scope on their own mount) calls this
 // directly; undefined simply means "no ancestor NavigationScope", which is a legitimate state (the
 // nesting root) rather than an error - callers that require one throw their own message.
-export function injectNavigationScope(): ShallowRef<INavigationScopeValue> | undefined {
+export function injectNavigationScope():
+  ShallowRef<INavigationScopeValue> | undefined {
   return inject(NAVIGATION_SCOPE_KEY, undefined);
 }
 
@@ -60,7 +68,9 @@ export function injectNavigationScope(): ShallowRef<INavigationScopeValue> | und
 // useIsFocused, useFocusEffect, useNavigationState) - they all called injectNavigationScope() and
 // threw the same shaped error, differing only in which hook name the message names. Centralized
 // here so a wording change lands once instead of five times.
-export function requireNavigationScope(hookName: string): ShallowRef<INavigationScopeValue> {
+export function requireNavigationScope(
+  hookName: string,
+): ShallowRef<INavigationScopeValue> {
   const scope = injectNavigationScope();
   if (scope === undefined) {
     throw new Error(
@@ -74,7 +84,9 @@ export function requireNavigationScope(hookName: string): ShallowRef<INavigation
 // declaration here, not stylistic - without it Vue would route the incoming `value` into `attrs`
 // instead of a tracked reactive `props` field, and the render closure's refresh below would
 // silently keep re-reading a stale initial snapshot.
-export const NavigationScope = defineComponent<{ value: INavigationScopeValue }>(
+export const NavigationScope = defineComponent<{
+  value: INavigationScopeValue;
+}>(
   (props, { slots }) => {
     const current = shallowRef(props.value);
     provideNavigationScope(current);

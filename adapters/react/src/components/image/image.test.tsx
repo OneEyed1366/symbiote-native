@@ -11,7 +11,7 @@
 // resolves to SOME descriptor; there is no input it rejects.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import {
   mount,
   unmount,
@@ -37,7 +37,9 @@ function imageNode(): IFakeNode {
 
 beforeEach(() => {
   fabric.reset();
-  setImageSourceResolver(source => (source === ASSET_ID ? RESOLVED_ASSET : source));
+  setImageSourceResolver(source =>
+    source === ASSET_ID ? RESOLVED_ASSET : source,
+  );
 });
 afterEach(() => {
   unmount(ROOT_TAG);
@@ -51,7 +53,9 @@ describe('Image (React lifecycle + descriptor bridge)', () => {
       // (covered in core) — it proves the three pieces the React adapter is responsible for
       // wiring together actually produce a committed Fabric node.
       mount(ROOT_TAG, <Image source={{ uri: 'http://x/y.png' }} />);
-      expect(fabric.appRoot().children.map(n => n.viewName)).toContain('RCTImageView');
+      expect(fabric.appRoot().children.map(n => n.viewName)).toContain(
+        'RCTImageView',
+      );
     });
 
     it('runs the installed source resolver on a require()-style number before it reaches native', () => {
@@ -60,7 +64,9 @@ describe('Image (React lifecycle + descriptor bridge)', () => {
       // just through core's own internal wiring.
       mount(ROOT_TAG, <Image source={ASSET_ID} />);
       const source = imageNode().props.source;
-      expect(Array.isArray(source) ? source[0] : undefined).toEqual(RESOLVED_ASSET);
+      expect(Array.isArray(source) ? source[0] : undefined).toEqual(
+        RESOLVED_ASSET,
+      );
     });
 
     it('fires onLoad from the captured native topLoad event', () => {
@@ -89,10 +95,20 @@ describe('Image (React lifecycle + descriptor bridge)', () => {
       // why: className is IImageProps' React-specific extension (not part of the shared
       // agnostic IImageBaseProps) — since it is not one of renderImage's typed transform fields
       // (source/src/srcSet/alt/width/height/...), it falls into passthrough and must resolve
-      // through the SAME registerStyles/routeProp path View and ImageBackground use, landing as
+      // through the SAME registerRules/routeProp path View and ImageBackground use, landing as
       // flattened style props on the image node, not a literal `className` prop.
-      registerStyles({ hero: { opacity: 0.75 } });
-      mount(ROOT_TAG, <Image source={{ uri: 'http://x/y.png' }} className="hero" />);
+      registerRules([
+        {
+          tokens: ['hero'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { opacity: 0.75 },
+        },
+      ]);
+      mount(
+        ROOT_TAG,
+        <Image source={{ uri: 'http://x/y.png' }} className="hero" />,
+      );
       expect(imageNode().props.opacity).toBe(0.75);
     });
   });

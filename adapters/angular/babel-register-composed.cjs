@@ -11,6 +11,8 @@
 // sync by the drift-protection test in babel-register-composed.test.ts.
 const PRIMITIVE_SELECTORS = new Set([
   'symbiote-view',
+  // Same RCTView as a plain view; the tag exists so the host-behavior registry can key on it.
+  'symbiote-pressable',
   'symbiote-text',
   'symbiote-image',
   'symbiote-scroll-view',
@@ -19,7 +21,15 @@ const PRIMITIVE_SELECTORS = new Set([
   'symbiote-horizontal-scroll-content',
   'symbiote-text-input',
   'symbiote-text-input-multiline',
+  // The COMPONENT path's pair. Only a lowering transform may emit the plain tags above — those
+  // carry the engine's TextInput machine, and this adapter's own component runs that state in
+  // its template. See `core/components/src/component-names/shared.ts`.
+  'symbiote-text-input-managed',
+  'symbiote-text-input-multiline-managed',
   'symbiote-switch',
+  // The component path's spelling — same native view, a tag the engine's Switch behavior does
+  // not carry. See `core/components/src/component-names/shared.ts`.
+  'symbiote-switch-managed',
   'symbiote-activity-indicator',
   'symbiote-safe-area-view',
   'symbiote-modal',
@@ -95,7 +105,8 @@ module.exports = function registerComposedPlugin({ types: t }) {
         programPath.traverse({
           CallExpression(path) {
             if (isNgDeclareComponentCall(path.node)) {
-              for (const selector of composedSelectorsFromCall(path.node)) selectors.add(selector);
+              for (const selector of composedSelectorsFromCall(path.node))
+                selectors.add(selector);
             }
           },
         });
@@ -103,14 +114,21 @@ module.exports = function registerComposedPlugin({ types: t }) {
 
         const statements = [...selectors].map(selector =>
           t.expressionStatement(
-            t.callExpression(t.identifier(HELPER_NAME), [t.stringLiteral(selector)]),
+            t.callExpression(t.identifier(HELPER_NAME), [
+              t.stringLiteral(selector),
+            ]),
           ),
         );
 
         if (!hasComposedImport(programPath.node)) {
           statements.unshift(
             t.importDeclaration(
-              [t.importSpecifier(t.identifier(HELPER_NAME), t.identifier(HELPER_NAME))],
+              [
+                t.importSpecifier(
+                  t.identifier(HELPER_NAME),
+                  t.identifier(HELPER_NAME),
+                ),
+              ],
               t.stringLiteral(IMPORT_SOURCE),
             ),
           );

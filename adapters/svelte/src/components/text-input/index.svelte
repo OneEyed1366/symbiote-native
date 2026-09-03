@@ -48,6 +48,10 @@
     setInputFocused,
     setInputBlurred,
     type ISymbioteEvent,
+    type ISymbioteNode,
+    type IMeasureOnSuccess,
+    type IMeasureInWindowOnSuccess,
+    type IMeasureLayoutOnSuccess,
   } from '@symbiote-native/engine';
   import { createDescriptorChildrenSync } from '../../descriptor-to-svelte';
   import { createAttachmentsSync } from '../../runes/attachments';
@@ -89,7 +93,9 @@
   // plain, direct property read on the raw `$props()` proxy. `source` is a closed interface (no
   // index signature), so `Object.keys` + bracket-indexing would need an `as` cast; `Object.entries`
   // falls onto TS's `entries(o: {}): [string, any][]` overload instead, which needs no cast.
-  function forwardProps(source: Omit<ITextInputProps, 'value'>): Record<string, unknown> {
+  function forwardProps(
+    source: Omit<ITextInputProps, 'value'>,
+  ): Record<string, unknown> {
     const resolved = resolveAccessibilityProps(source);
     const result: Record<string, unknown> = {};
     for (const [key, propValue] of Object.entries(resolved)) {
@@ -205,9 +211,17 @@
     if (engineNode === undefined) return;
     if (!shouldCommandText(lastNativeText, currentValue)) return;
     const selStart = rest.selection?.start ?? SELECTION_NONE;
-    const selEnd = rest.selection?.end ?? rest.selection?.start ?? SELECTION_NONE;
-    dlog(`TextInput setTextAndSelection count=${count} text=${JSON.stringify(currentValue)}`);
-    dispatchViewCommand(engineNode, 'setTextAndSelection', [count, currentValue, selStart, selEnd]);
+    const selEnd =
+      rest.selection?.end ?? rest.selection?.start ?? SELECTION_NONE;
+    dlog(
+      `TextInput setTextAndSelection count=${count} text=${JSON.stringify(currentValue)}`,
+    );
+    dispatchViewCommand(engineNode, 'setTextAndSelection', [
+      count,
+      currentValue,
+      selStart,
+      selEnd,
+    ]);
     lastNativeText = currentValue;
   });
 
@@ -217,7 +231,8 @@
   // controlled-write effect above relies on.
   $effect(() => {
     const engineNode = hostShim?.engineNode;
-    if (autoFocused || engineNode === undefined || rest.autoFocus !== true) return;
+    if (autoFocused || engineNode === undefined || rest.autoFocus !== true)
+      return;
     autoFocused = true;
     dlog('TextInput autoFocus -> focus command');
     dispatchViewCommand(engineNode, 'focus', []);
@@ -241,7 +256,12 @@
   export function clear(): void {
     const engineNode = hostShim?.engineNode;
     if (engineNode === undefined) return;
-    dispatchViewCommand(engineNode, 'setTextAndSelection', [mostRecentEventCount, '', 0, 0]);
+    dispatchViewCommand(engineNode, 'setTextAndSelection', [
+      mostRecentEventCount,
+      '',
+      0,
+      0,
+    ]);
     lastNativeText = '';
   }
 
@@ -259,6 +279,43 @@
       start,
       end,
     ]);
+  }
+
+  // The four host-ref methods, FORWARDED to the engine node rather than reimplemented.
+  //
+  // Without them a TextInput ref was poorer than any other host ref in the adapter: every other
+  // primitive hands back a node carrying measure/measureInWindow/measureLayout/setNativeProps, and
+  // this wrapper closed the node behind five methods of its own. The lowered path lost the opposite
+  // four, so the two paths were not "one narrowing the other" but two different surfaces.
+  // `ITextInputHandle` is the union of both halves, and `text-input.smoke.test.ts` derives what this
+  // component must expose from `buildTextInputHandle` — so a method added to core fails here rather
+  // than going missing on whichever path an app happened to take.
+  //
+  // Not typed as `satisfies ITextInputHandle`: these are instance-script exports, so the component's
+  // imperative surface is structurally invisible to the compiler — which is exactly why the test is
+  // the guard here and the type is the guard on React, Angular and Solid.
+  export function measure(callback: IMeasureOnSuccess): void {
+    hostShim?.engineNode?.measure(callback);
+  }
+
+  export function measureInWindow(callback: IMeasureInWindowOnSuccess): void {
+    hostShim?.engineNode?.measureInWindow(callback);
+  }
+
+  export function measureLayout(
+    relativeToNativeNode: ISymbioteNode | number,
+    onSuccess: IMeasureLayoutOnSuccess,
+    onFail?: () => void,
+  ): void {
+    hostShim?.engineNode?.measureLayout(
+      relativeToNativeNode,
+      onSuccess,
+      onFail,
+    );
+  }
+
+  export function setNativeProps(nativeProps: Record<string, unknown>): void {
+    hostShim?.engineNode?.setNativeProps(nativeProps);
   }
 
   const descriptor = $derived(
@@ -293,8 +350,23 @@
   });
 </script>
 
+<!--
+  The `-managed` tags, matching `renderTextInput`'s intrinsics. They resolve to the SAME native view
+  as the plain ones; the separate spelling is what keeps the host behavior off this node. The machine
+  is registered against `symbiote-text-input` / `…-multiline`, which only the LOWERING transform
+  emits, and this wrapper runs the same lifecycle itself (focus/blur mirror, event counter,
+  controlled write, autoFocus) — so sharing a tag would give one node two owners.
+
+  Written literally rather than as `<svelte:element this={descriptor.type}>` for the reason the
+  header records, which means this pair does NOT follow `render-text-input.ts` on its own: if those
+  intrinsics are renamed again, this file has to move with them. `text-input-tag.test.ts` is what
+  makes that a failing test instead of a silent double-owner.
+-->
 {#if isMultiline}
-  <symbiote-text-input-multiline p={descriptor.props} bind:this={hostShim} />
+  <symbiote-text-input-multiline-managed
+    p={descriptor.props}
+    bind:this={hostShim}
+  />
 {:else}
-  <symbiote-text-input p={descriptor.props} bind:this={hostShim} />
+  <symbiote-text-input-managed p={descriptor.props} bind:this={hostShim} />
 {/if}

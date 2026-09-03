@@ -1,10 +1,29 @@
 ---
 paths:
-  - "adapters/angular/src/**/*.ts"
-  - "packages/*/src/angular/**/*.ts"
+  - 'adapters/angular/src/**/*.ts'
+  - 'packages/*/src/angular/**/*.ts'
 ---
 
 # Angular adapter/renderer source — read `angular-adapter` first
+
+A new `@Component` here defaults to **CheckAlways** — Angular 22 assigns `LViewFlags.CheckAlways`
+unless the def is signal-based or OnPush (`view/construction.ts:263`), and a Global tick refreshes
+every CheckAlways view (`change_detection.ts:464`). The 15 primitives in `primitives/index.ts`
+(`ViewHost`/`TextHost`/…) are all CheckAlways today, so one tick walks the screen's whole primitive
+tree — the measured cause of Angular alone dropping the UI thread and starting at 250+ MB. Do not
+"fix" it by flipping OnPush component-by-component: `SymbioteStyleInputDirective` and the `ngDoCheck`
+polls exist because `[style]`/`class` never dirty a view, and CheckAlways is what currently covers
+that gap. Style/class get a signal path first. Full evidence and migration order: `angular-adapter` §21.
+
+`View`/`Text` (`primitives/index.ts`) carry a DUAL selector, `'symbiote-view, View'` /
+`'symbiote-text, Text'` — every flat-row primitive is still a real `@Component` (LView/TView/DI/
+`<ng-content>`), and a headless A/B lowering them to bare `symbiote-view`/`symbiote-text` custom
+elements (no `View`/`Text` in `imports`, `schemas: [CUSTOM_ELEMENTS_SCHEMA]`) measured a 33.2% cut
+on Create-1000 — bigger than the setProp-count fix, and visible on V8 (not just Hermes), so it is
+structural work, not an interpreter tax. `angular-adapter-change-detection` §19 has the mechanism
+(Angular's `CUSTOM_ELEMENTS_SCHEMA` only accepts a HYPHENATED tag,
+`.vendors/angular/.../dom_element_schema_registry.ts:400,422`) and the on-device next step, not yet
+run. Do not re-derive this from scratch — read §19 first.
 
 Any composed `@Component` used as a plain `<Tag>` (adapter-authored, app-authored, or
 navigation-package-authored) MUST be in `ANCHOR_HOST_COMPONENTS`, or it silently paints

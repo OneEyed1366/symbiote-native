@@ -1,4 +1,11 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { Magnetometer, type IMagnetometerMeasurement } from '../../../core';
 
 // Angular twin of React's `useMagnetometer` hook / Vue's `useMagnetometer` composable. Angular
@@ -23,7 +30,9 @@ export class MagnetometerService {
         if (updateIntervalMs !== undefined) {
           Magnetometer.setUpdateInterval(updateIntervalMs);
         }
-        const subscription = Magnetometer.addListener(next => measurement.set(next));
+        const subscription = Magnetometer.addListener(next =>
+          measurement.set(next),
+        );
         onCleanup(() => subscription.remove());
       },
       { injector: this.injector },

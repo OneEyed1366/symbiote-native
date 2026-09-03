@@ -32,13 +32,14 @@ const drawerLineTagLabel = `${drawerLineInfo.code} · ${drawerLineInfo.label}`;
           <View class="hero-copy">
             <Text class="hero-title">Drawer</Text>
             <Text class="hero-body">
-              A swipeable drawer sliding in from the right, driven by the navigator's own gesture
-              handler.
+              A swipeable drawer sliding in from the right, driven by the
+              navigator's own gesture handler.
             </Text>
           </View>
         </View>
         <Text class="info-text">
-          drawerPosition: right · drawerType: slide — swipe from the RIGHT edge, or use a button
+          drawerPosition: right · drawerType: slide — swipe from the RIGHT edge,
+          or use a button
         </Text>
         <ActionButton
           testID="drawer-open"
@@ -127,8 +128,18 @@ export class DrawerSettingsScreen {
       drawerType="slide"
       [drawerStyle]="drawerPanelStyle"
     >
-      <ng-template symbioteDrawerScreen name="Home" [component]="drawerHomeScreen" [options]="homeOptions"></ng-template>
-      <ng-template symbioteDrawerScreen name="Settings" [component]="drawerSettingsScreen" [options]="settingsOptions"></ng-template>
+      <ng-template
+        symbioteDrawerScreen
+        name="Home"
+        [component]="drawerHomeScreen"
+        [options]="homeOptions"
+      ></ng-template>
+      <ng-template
+        symbioteDrawerScreen
+        name="Settings"
+        [component]="drawerSettingsScreen"
+        [options]="settingsOptions"
+      ></ng-template>
       <ng-template #drawerContent let-ctx>
         <SafeAreaView testID="drawer-panel" class="section-tight drawer-panel">
           <Text class="section-label">Menu</Text>
@@ -138,7 +149,9 @@ export class DrawerSettingsScreen {
               class="menu-row"
               (press)="ctx.navigation.jumpTo(route.name)"
             >
-              <Text class="menu-row-label">{{ drawerLabelFor(ctx.descriptors, route) }}</Text>
+              <Text class="menu-row-label">{{
+                drawerLabelFor(ctx.descriptors, route)
+              }}</Text>
             </Pressable>
           }
         </SafeAreaView>
@@ -153,7 +166,10 @@ export class DrawerDemoScreen {
   readonly settingsOptions = { title: 'Settings', drawerLabel: 'Settings' };
   readonly drawerPanelStyle = { backgroundColor: '#13243a' };
 
-  drawerLabelFor(descriptors: IDrawerContentContext['$implicit']['descriptors'], route: IRoute<unknown>): string {
+  drawerLabelFor(
+    descriptors: IDrawerContentContext['$implicit']['descriptors'],
+    route: IRoute<unknown>,
+  ): string {
     return descriptors[route.key]?.options.drawerLabel ?? route.name;
   }
 }

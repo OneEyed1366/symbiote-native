@@ -13,7 +13,6 @@
 //    every one of its branches - a gap worth a core-level render-tabs test, not this file's job.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { join } from 'node:path';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 import type { ITabNavigatorHandle } from '../../core';
@@ -22,18 +21,24 @@ import {
   findAllLive,
   findLiveByTestId,
   outline,
+  rawTextsOutsideTextContainer,
   walkLive,
 } from '../fabric-tree.test-helper';
-import { createSvelteHarness, loadComponent } from '../svelte-compile.test-helper';
+import {
+  createSvelteHarness,
+  loadComponent,
+} from '../svelte-compile.test-helper';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
 const ROOT_TAG = 91_702;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let harness = createSvelteHarness('tabs');
 
@@ -117,11 +122,18 @@ function isTabHandle(value: unknown): value is ITabNavigatorHandle {
   return typeof value === 'object' && value !== null && 'jumpTo' in value;
 }
 
-async function mountTab(variant = 'default', tabAttributes = ''): Promise<ITabNavigatorHandle> {
+async function mountTab(
+  variant = 'default',
+  tabAttributes = '',
+): Promise<ITabNavigatorHandle> {
   const dir = __dirname;
   harness.compileSource(dir, 'feed-fixture', screenSource('feed'));
   harness.compileSource(dir, 'profile-fixture', screenSource('profile'));
-  const app = harness.compileSource(dir, `tab-app-${variant}`, appSource(tabAttributes));
+  const app = harness.compileSource(
+    dir,
+    `tab-app-${variant}`,
+    appSource(tabAttributes),
+  );
   const App = await loadComponent(app);
   let handle: unknown = null;
   mount(ROOT_TAG, App, {
@@ -131,12 +143,17 @@ async function mountTab(variant = 'default', tabAttributes = ''): Promise<ITabNa
   });
   await tick();
   await tick();
-  if (!isTabHandle(handle)) throw new Error('Tab did not expose a navigator handle');
+  if (!isTabHandle(handle))
+    throw new Error('Tab did not expose a navigator handle');
   return handle;
 }
 
 async function mountEmptyTab(): Promise<ITabNavigatorHandle> {
-  const app = harness.compileSource(__dirname, 'tab-app-empty', emptyAppSource());
+  const app = harness.compileSource(
+    __dirname,
+    'tab-app-empty',
+    emptyAppSource(),
+  );
   const App = await loadComponent(app);
   let handle: unknown = null;
   mount(ROOT_TAG, App, {
@@ -146,7 +163,8 @@ async function mountEmptyTab(): Promise<ITabNavigatorHandle> {
   });
   await tick();
   await tick();
-  if (!isTabHandle(handle)) throw new Error('Tab did not expose a navigator handle');
+  if (!isTabHandle(handle))
+    throw new Error('Tab did not expose a navigator handle');
   return handle;
 }
 
@@ -185,7 +203,11 @@ async function mountToggleTab(): Promise<{
 // the "paints the shared tab bar" outline test below asserts explicitly. Locating it structurally
 // (rather than assuming a fixed depth under fabric.appRoot()) keeps these helpers from picking up
 // the registry-host's own incidental whitespace text, which is not a tab-bar label at all.
-type INode = { viewName?: string; props?: Record<string, unknown>; children?: INode[] };
+type INode = {
+  viewName?: string;
+  props?: Record<string, unknown>;
+  children?: INode[];
+};
 function isNode(value: unknown): value is INode {
   return typeof value === 'object' && value !== null;
 }
@@ -210,7 +232,10 @@ function tabBarNode(): INode | undefined {
 function tabBarLabels(): string[] {
   const labels: string[] = [];
   walkLive(tabBarNode(), node => {
-    if (node.viewName === 'RCTRawText' && typeof node.props?.text === 'string') {
+    if (
+      node.viewName === 'RCTRawText' &&
+      typeof node.props?.text === 'string'
+    ) {
       labels.push(node.props.text);
     }
   });
@@ -235,8 +260,10 @@ function tabBarItemSelection(): boolean[] {
 
 function readScreenLabel(
   testID: string,
-): { name: string; focused: boolean; params: unknown; key: string } | undefined {
-  const label = findLiveByTestId(fabric.appRoot(), testID)?.props?.accessibilityLabel;
+):
+  { name: string; focused: boolean; params: unknown; key: string } | undefined {
+  const label = findLiveByTestId(fabric.appRoot(), testID)?.props
+    ?.accessibilityLabel;
   if (typeof label !== 'string') return undefined;
   const [name, focused, paramsJson, key] = label.split('|');
   if (
@@ -247,7 +274,12 @@ function readScreenLabel(
   ) {
     return undefined;
   }
-  return { name, focused: focused === 'true', params: JSON.parse(paramsJson), key };
+  return {
+    name,
+    focused: focused === 'true',
+    params: JSON.parse(paramsJson),
+    key,
+  };
 }
 
 describe('Tab (real compiled index.svelte)', () => {
@@ -316,7 +348,11 @@ describe('Tab (real compiled index.svelte)', () => {
     it('synthesizes focus on mount and moves it with the focused route', async () => {
       const handle = await mountTab();
       await tick();
-      expect(readScreenLabel('feed')).toMatchObject({ name: 'feed', focused: true, params: null });
+      expect(readScreenLabel('feed')).toMatchObject({
+        name: 'feed',
+        focused: true,
+        params: null,
+      });
 
       handle.jumpTo('profile');
       await tick();
@@ -337,7 +373,8 @@ describe('Tab (real compiled index.svelte)', () => {
       const handle = await mountTab();
       await tick();
       const feedKey = readScreenLabel('feed')?.key;
-      if (feedKey === undefined) throw new Error('feed route key was not observed');
+      if (feedKey === undefined)
+        throw new Error('feed route key was not observed');
 
       handle.setParams({ sort: 'trending' }, feedKey);
       await tick();
@@ -354,7 +391,9 @@ describe('Tab (real compiled index.svelte)', () => {
     // data-driven {#each}) - this must degrade to an empty bar and no content, never throw.
     it('renders an empty bar and no focused screen when no screens are registered', async () => {
       await mountEmptyTab();
-      expect(findAllLive(fabric.appRoot(), 'RCTView').length).toBeGreaterThan(0);
+      expect(findAllLive(fabric.appRoot(), 'RCTView').length).toBeGreaterThan(
+        0,
+      );
       expect(tabBarLabels()).toEqual([]);
     });
 
@@ -369,15 +408,19 @@ describe('Tab (real compiled index.svelte)', () => {
       expect(countLive(fabric.appRoot(), 'RCTView')).toBe(before);
     });
 
-    // why: a compiled-away whitespace text node between two sibling markers becomes a real
-    // RCTRawText in the committed tree, corrupting any paint-order assertion downstream - a
-    // build-time contract every navigator template (not just Tab's own root) must hold.
-    it('compiles every navigator template with no stray whitespace text nodes', () => {
-      const audit = createSvelteHarness('tabs-audit');
-      audit.compileFile(join(__dirname, 'index.svelte'));
-      audit.compileFile(join(__dirname, '../tab-screen.svelte'));
-      expect(audit.strayWhitespaceCount()).toBe(0);
-      audit.cleanup();
+    // why: the navigator templates are formatted normally, so Svelte emits a ' ' text node
+    // between sibling tags; only the shim's parent check keeps it out of Fabric
+    // (svelte-adapter-dom-shim §16b). One that got through would be a real RCTRawText under a
+    // view, corrupting every paint-order assertion above. Re-checked after a jumpTo, because
+    // the focused screen's subtree is rebuilt on each focus change.
+    it('commits no raw text outside a text container', async () => {
+      const handle = await mountTab('hygiene');
+      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
+
+      handle.jumpTo('profile');
+      await tick();
+      await tick();
+      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
     });
   });
 
@@ -409,7 +452,8 @@ describe('Tab (real compiled index.svelte)', () => {
       const { navigator, hideProfile } = await mountToggleTab();
       await tick();
       const feedKey = readScreenLabel('feed')?.key;
-      if (feedKey === undefined) throw new Error('feed route key was not observed');
+      if (feedKey === undefined)
+        throw new Error('feed route key was not observed');
       navigator.setParams({ sort: 'trending' }, feedKey);
       await tick();
       await tick();
@@ -442,7 +486,10 @@ describe('Tab (real compiled index.svelte)', () => {
 
       expect(tabBarLabels()).toEqual(['Feed']);
       expect(findLiveByTestId(fabric.appRoot(), 'profile')).toBeUndefined();
-      expect(readScreenLabel('feed')).toMatchObject({ name: 'feed', focused: true });
+      expect(readScreenLabel('feed')).toMatchObject({
+        name: 'feed',
+        focused: true,
+      });
     });
   });
 });

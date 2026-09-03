@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/react';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/react';
 import {
   getStringAsync,
   getUrlAsync,
@@ -20,7 +27,8 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 }
 
 function CapabilityBadge({ status }: { status: ICapabilityStatus }) {
-  const label = status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+  const label =
+    status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
     <View className={`status-badge status-badge-${status}`}>
       <Text className="status-badge-text">{label}</Text>
@@ -65,12 +73,14 @@ export function ClipboardScreen() {
   // actual value on mount (clipboardEvent starts null) and on every subsequent change event.
   useEffect(() => {
     let isMounted = true;
-    Promise.all([getStringAsync(), hasStringAsync()]).then(([text, hasText]) => {
-      if (isMounted) {
-        setClipboardText(text);
-        setHasString(toCapabilityStatus(hasText));
-      }
-    });
+    Promise.all([getStringAsync(), hasStringAsync()]).then(
+      ([text, hasText]) => {
+        if (isMounted) {
+          setClipboardText(text);
+          setHasString(toCapabilityStatus(hasText));
+        }
+      },
+    );
     return () => {
       isMounted = false;
     };
@@ -106,7 +116,11 @@ export function ClipboardScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="clipboard-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="clipboard-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -117,9 +131,10 @@ export function ClipboardScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Clipboard</Text>
             <Text className="hero-body">
-              @symbiote-native/clipboard — read/write clipboard text and URLs, plus a live
-              change-event subscription via useClipboard(). Copy something outside the app to see
-              the value below update on its own.
+              @symbiote-native/clipboard — read/write clipboard text and URLs,
+              plus a live change-event subscription via useClipboard(). Copy
+              something outside the app to see the value below update on its
+              own.
             </Text>
           </View>
         </View>
@@ -131,10 +146,16 @@ export function ClipboardScreen() {
           <View className="capability-row">
             <Text className="capability-label">Clipboard text</Text>
             <Text className="value-text">
-              {clipboardText === null ? 'checking…' : clipboardText || '(empty)'}
+              {clipboardText === null
+                ? 'checking…'
+                : clipboardText || '(empty)'}
             </Text>
           </View>
-          <CapabilityRow testID="clipboard-has-string" label="Has string" status={hasString} />
+          <CapabilityRow
+            testID="clipboard-has-string"
+            label="Has string"
+            status={hasString}
+          />
         </View>
 
         <View testID="clipboard-copy-card" className="feature-card">
@@ -149,7 +170,12 @@ export function ClipboardScreen() {
             placeholderTextColor="#41506a"
             className="text-input"
           />
-          <ActionButton testID="clipboard-copy-button" title="Copy text" onPress={handleCopy} color={lineColor} />
+          <ActionButton
+            testID="clipboard-copy-button"
+            title="Copy text"
+            onPress={handleCopy}
+            color={lineColor}
+          />
         </View>
 
         {Platform.OS === 'ios' && (
@@ -163,7 +189,11 @@ export function ClipboardScreen() {
                 {clipboardUrl === null ? 'checking…' : clipboardUrl || '(none)'}
               </Text>
             </View>
-            <CapabilityRow testID="clipboard-has-url" label="Has URL" status={hasUrl} />
+            <CapabilityRow
+              testID="clipboard-has-url"
+              label="Has URL"
+              status={hasUrl}
+            />
             <TextInput
               testID="clipboard-url-input"
               value={urlText}
@@ -172,7 +202,12 @@ export function ClipboardScreen() {
               placeholderTextColor="#41506a"
               className="text-input"
             />
-            <ActionButton testID="clipboard-set-url-button" title="Set URL" onPress={handleSetUrl} color={lineColor} />
+            <ActionButton
+              testID="clipboard-set-url-button"
+              title="Set URL"
+              onPress={handleSetUrl}
+              color={lineColor}
+            />
           </View>
         )}
       </ScrollView>

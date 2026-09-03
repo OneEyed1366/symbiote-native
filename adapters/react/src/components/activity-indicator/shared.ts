@@ -12,7 +12,10 @@
 // function that calls this hook, rather than exporting whatever a factory here returns (same
 // shape as switch/shared.ts's useSwitchLogic).
 
-import { renderActivityIndicator, resolveAccessibilityProps } from '@symbiote-native/components';
+import {
+  renderActivityIndicator,
+  resolveAccessibilityProps,
+} from '@symbiote-native/components';
 import type {
   IActivityIndicatorPlatform,
   IActivityIndicatorProps as IActivityIndicatorBaseProps,
@@ -25,7 +28,9 @@ export type { IActivityIndicatorPlatform } from '@symbiote-native/components';
 
 // className is React's own field, not part of the shared agnostic prop type; not destructured
 // below, so it falls into `...passthrough` and lands on the centering wrapper View, like `style`.
-export type IActivityIndicatorProps = IActivityIndicatorBaseProps & { className?: string };
+export type IActivityIndicatorProps = IActivityIndicatorBaseProps & {
+  className?: string;
+};
 
 export function useActivityIndicatorLogic(
   rawProps: IActivityIndicatorProps,

@@ -1,7 +1,7 @@
 // Exercises the plugin's actual host-override wiring against a fake tsserver host — real
 // integration (does VS Code load it) can't be driven headlessly, but this proves getScriptSnapshot
-// synthesizes the right literal-key .d.ts, the mtime-based cache invalidates on edit, and camelCasing
-// matches the runtime key parseCSS/generate-dts.ts produce.
+// synthesizes the right literal-key .d.ts, the mtime-based cache invalidates on edit, and its keys
+// still match the ones generate-dts produces for the same file.
 // The plugin itself is hand-written CommonJS at the package root (../typescript-plugin.cjs, not
 // under src/ — matches each adapter's metro-css-parser.cjs shim convention), so it's required here
 // rather than imported as a typed module.
@@ -16,13 +16,16 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import initPlugin from '../typescript-plugin.cjs';
+import { generateModuleDts } from './generate-dts/index.ts';
 
 type IFakeSnapshot = {
   getText(start: number, end: number): string;
   getLength(): number;
 };
 
-type IResolvedLiteral = { resolvedModule?: { resolvedFileName: string; extension: string } };
+type IResolvedLiteral = {
+  resolvedModule?: { resolvedFileName: string; extension: string };
+};
 type IResolveModuleNameLiterals = (
   literals: ReadonlyArray<{ text: string }>,
   containingFile: string,
@@ -47,9 +50,11 @@ function makeFakeInfo() {
       readFile: (fileName: string) =>
         fs.existsSync(fileName) ? fs.readFileSync(fileName, 'utf8') : undefined,
       fileExists: (fileName: string) => fs.existsSync(fileName),
-      getScriptSnapshot: (_fileName: string): IFakeSnapshot | undefined => undefined,
+      getScriptSnapshot: (_fileName: string): IFakeSnapshot | undefined =>
+        undefined,
       getScriptKind: (_fileName: string) => 0,
-      resolveModuleNameLiterals: undefined as IResolveModuleNameLiterals | undefined,
+      resolveModuleNameLiterals: undefined as
+        IResolveModuleNameLiterals | undefined,
     },
     languageService: {},
   };
@@ -73,7 +78,9 @@ describe('typescript-plugin — script kind / snapshot passthrough (Positive)', 
     const plugin = initPlugin({ typescript: makeFakeTypescript() });
     plugin.create(info);
 
-    expect(info.languageServiceHost.getScriptSnapshot('App.tsx')).toBeUndefined();
+    expect(
+      info.languageServiceHost.getScriptSnapshot('App.tsx'),
+    ).toBeUndefined();
   });
 });
 
@@ -81,19 +88,52 @@ describe('typescript-plugin', () => {
   it('synthesizes a literal-key .d.ts (no index signature) for a .module.css file', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'symbiote-ts-plugin-'));
     const cssPath = path.join(dir, 'Card.module.css');
-    fs.writeFileSync(cssPath, '.card { padding: 10px; }\n.section-tight { margin: 0; }');
+    fs.writeFileSync(
+      cssPath,
+      '.card { padding: 10px; }\n.section-tight { margin: 0; }',
+    );
 
     const info = makeFakeInfo();
     const plugin = initPlugin({ typescript: makeFakeTypescript() });
     plugin.create(info);
 
     const snapshot = info.languageServiceHost.getScriptSnapshot(cssPath);
-    if (!snapshot) throw new Error('expected a snapshot for a .module.css file');
+    if (!snapshot)
+      throw new Error('expected a snapshot for a .module.css file');
     const dts = snapshot.getText(0, snapshot.getLength());
 
     expect(dts).toContain('readonly card: string;');
-    expect(dts).toContain('readonly sectionTight: string;');
+    // Quoted and kebab, matching the export map `compileCssModule` actually emits. The plugin used
+    // to camelCase here; the editor then offered `sectionTight`, which is `undefined` at runtime,
+    // and rejected the real `styles['section-tight']` as a TS2339.
+    expect(dts).toContain('readonly "section-tight": string;');
+    expect(dts).not.toContain('sectionTight');
     expect(dts).not.toContain('[key: string]');
+  });
+
+  // The plugin re-implements class extraction with a regex, because getScriptSnapshot must be
+  // synchronous and the real compiler is async. That second implementation is free to drift, and
+  // did: it camelCased long after the export map stopped doing so, which makes the editor offer a
+  // key that is `undefined` at runtime AND reject the one that works. Pin the two together.
+  it('agrees with generateModuleDts on the keys it declares', async () => {
+    const css = '.card { padding: 10px; }\n.section-tight { margin: 0; }';
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'symbiote-ts-plugin-'));
+    const cssPath = path.join(dir, 'Card.module.css');
+    fs.writeFileSync(cssPath, css);
+
+    const info = makeFakeInfo();
+    const plugin = initPlugin({ typescript: makeFakeTypescript() });
+    plugin.create(info);
+    const snapshot = info.languageServiceHost.getScriptSnapshot(cssPath);
+    if (!snapshot)
+      throw new Error('expected a snapshot for a .module.css file');
+
+    const keysOf = (dts: string): string[] =>
+      [...dts.matchAll(/readonly (\S+):/g)].map(match => match[1]).sort();
+
+    expect(keysOf(snapshot.getText(0, snapshot.getLength()))).toEqual(
+      keysOf((await generateModuleDts(css, 'Card.module.css')) ?? ''),
+    );
   });
 
   it('invalidates its cache when the file changes on disk (mtime-keyed)', async () => {
@@ -107,14 +147,21 @@ describe('typescript-plugin', () => {
 
     const first = info.languageServiceHost.getScriptSnapshot(cssPath);
     if (!first) throw new Error('expected a snapshot for a .module.css file');
-    expect(first.getText(0, first.getLength())).toContain('readonly card: string;');
+    expect(first.getText(0, first.getLength())).toContain(
+      'readonly card: string;',
+    );
 
     await new Promise(resolve => setTimeout(resolve, 10));
-    fs.writeFileSync(cssPath, '.card { padding: 10px; }\n.title { color: red; }');
+    fs.writeFileSync(
+      cssPath,
+      '.card { padding: 10px; }\n.title { color: red; }',
+    );
 
     const second = info.languageServiceHost.getScriptSnapshot(cssPath);
     if (!second) throw new Error('expected a snapshot for a .module.css file');
-    expect(second.getText(0, second.getLength())).toContain('readonly title: string;');
+    expect(second.getText(0, second.getLength())).toContain(
+      'readonly title: string;',
+    );
   });
 
   // why: a class selector referenced only inside a CSS comment must not leak into the suggested
@@ -123,14 +170,18 @@ describe('typescript-plugin', () => {
   it('ignores a class selector that only appears inside a comment', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'symbiote-ts-plugin-'));
     const cssPath = path.join(dir, 'Card.module.css');
-    fs.writeFileSync(cssPath, '/* .disabled { display: none; } */\n.card { padding: 10px; }');
+    fs.writeFileSync(
+      cssPath,
+      '/* .disabled { display: none; } */\n.card { padding: 10px; }',
+    );
 
     const info = makeFakeInfo();
     const plugin = initPlugin({ typescript: makeFakeTypescript() });
     plugin.create(info);
 
     const snapshot = info.languageServiceHost.getScriptSnapshot(cssPath);
-    if (!snapshot) throw new Error('expected a snapshot for a .module.css file');
+    if (!snapshot)
+      throw new Error('expected a snapshot for a .module.css file');
     const dts = snapshot.getText(0, snapshot.getLength());
 
     expect(dts).toContain('readonly card: string;');
@@ -154,7 +205,8 @@ describe('typescript-plugin', () => {
     plugin.create(info);
 
     const snapshot = info.languageServiceHost.getScriptSnapshot(cssPath);
-    if (!snapshot) throw new Error('expected a snapshot for a .module.css file');
+    if (!snapshot)
+      throw new Error('expected a snapshot for a .module.css file');
     const dts = snapshot.getText(0, snapshot.getLength());
 
     expect(dts).toContain('Record<string, string>');
@@ -177,7 +229,8 @@ describe('typescript-plugin', () => {
 
     const literals = [{ text: './Card.module.css' }];
     const { resolveModuleNameLiterals } = info.languageServiceHost;
-    if (!resolveModuleNameLiterals) throw new Error('expected the plugin to install a resolver');
+    if (!resolveModuleNameLiterals)
+      throw new Error('expected the plugin to install a resolver');
     const result = resolveModuleNameLiterals(literals, containingFile);
 
     expect(result[0]?.resolvedModule?.resolvedFileName).toBe(cssPathPosix);
@@ -207,7 +260,8 @@ describe('typescript-plugin', () => {
 
     const literals = [{ text: '../styles/Card.module.css' }];
     const { resolveModuleNameLiterals } = info.languageServiceHost;
-    if (!resolveModuleNameLiterals) throw new Error('expected the plugin to install a resolver');
+    if (!resolveModuleNameLiterals)
+      throw new Error('expected the plugin to install a resolver');
     const result = resolveModuleNameLiterals(literals, containingFile);
 
     expect(result[0]?.resolvedModule?.resolvedFileName).toBe(cssPath);
@@ -222,14 +276,17 @@ describe('typescript-plugin', () => {
     const originalResult = [{ resolvedModule: undefined }];
 
     const info = makeFakeInfo();
-    info.languageServiceHost.resolveModuleNameLiterals = vi.fn(() => originalResult);
+    info.languageServiceHost.resolveModuleNameLiterals = vi.fn(
+      () => originalResult,
+    );
 
     const plugin = initPlugin({ typescript: makeFakeTypescript() });
     plugin.create(info);
 
     const literals = [{ text: './Missing.module.css' }];
     const { resolveModuleNameLiterals } = info.languageServiceHost;
-    if (!resolveModuleNameLiterals) throw new Error('expected the plugin to install a resolver');
+    if (!resolveModuleNameLiterals)
+      throw new Error('expected the plugin to install a resolver');
     const result = resolveModuleNameLiterals(literals, containingFile);
 
     expect(result[0]).toBe(originalResult[0]);
@@ -242,18 +299,23 @@ describe('typescript-plugin', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'symbiote-ts-plugin-'));
     const containingFile = path.join(dir, 'index.ts').replace(/\\/g, '/');
     const originalResult = [
-      { resolvedModule: { resolvedFileName: '/x/Helper.ts', extension: '.ts' } },
+      {
+        resolvedModule: { resolvedFileName: '/x/Helper.ts', extension: '.ts' },
+      },
     ];
 
     const info = makeFakeInfo();
-    info.languageServiceHost.resolveModuleNameLiterals = vi.fn(() => originalResult);
+    info.languageServiceHost.resolveModuleNameLiterals = vi.fn(
+      () => originalResult,
+    );
 
     const plugin = initPlugin({ typescript: makeFakeTypescript() });
     plugin.create(info);
 
     const literals = [{ text: './Helper' }];
     const { resolveModuleNameLiterals } = info.languageServiceHost;
-    if (!resolveModuleNameLiterals) throw new Error('expected the plugin to install a resolver');
+    if (!resolveModuleNameLiterals)
+      throw new Error('expected the plugin to install a resolver');
     const result = resolveModuleNameLiterals(literals, containingFile);
 
     expect(result[0]).toBe(originalResult[0]);

@@ -8,9 +8,10 @@ You need to style a native view and want the shortest path for your framework.
 ## Any adapter — a plain CSS class
 
 A standalone `.css`/`.module.css` file import (`className` on React,
-`class`/`[class]` on Vue/Angular) works identically on every adapter — this
-is what every current example app (`examples/react`, `examples/vue-sfc`,
-`examples/vue-tsx`, `examples/angular`) actually does:
+`class`/`[class]` on Vue/Angular/Svelte/Solid) works identically on every
+adapter — this is what every current example app (`examples/react`,
+`examples/vue-sfc`, `examples/vue-tsx`, `examples/angular`, `examples/svelte`,
+`examples/solid`) actually does:
 
 ```tsx
 import './App.css';
@@ -27,11 +28,13 @@ every adapter. Plain CSS, CSS Modules, plus optional SCSS/Sass, Less, and
 Stylus preprocessing (`<style lang="scss">`, `.module.scss`, …) — no
 pseudo-classes, no media queries, nothing that needs a DOM to match.
 
-## Vue also gets an inline SFC `<style>` block
+## Vue and Svelte also get an inline `<style>` block
 
-A Vue SFC `<style>` block (including `scoped`) compiles to the same native
-style objects at build time — no CSS ships in the bundle, no runtime CSS
-engine exists:
+A Vue SFC `<style>` block (including `scoped`) and a Svelte component's own
+`<style>` block both compile to the same native style objects at build time —
+no CSS ships in the bundle, no runtime CSS engine exists. Vue's scoping is
+opt-in via the `scoped` attribute; Svelte's is on by default, no attribute
+needed:
 
 ```vue
 <template>
@@ -39,6 +42,18 @@ engine exists:
 </template>
 
 <style scoped>
+.card {
+  padding: 16px;
+  border-radius: 12px;
+  background-color: #111827;
+}
+</style>
+```
+
+```svelte
+<View class="card"><Text>Native surface</Text></View>
+
+<style>
 .card {
   padding: 16px;
   border-radius: 12px;
@@ -102,8 +117,8 @@ for what each piece covers.
 ## Choose based on your adapter
 
 - Want CSS syntax → a standalone `.css`/`.module.css` file import works on
-  every adapter; Vue additionally supports an inline SFC `<style>` block,
-  which reads more like ordinary Vue.
+  every adapter; Vue and Svelte additionally support an inline `<style>`
+  block, which reads more like ordinary Vue or Svelte.
 - Want inline, type-checked style objects with no separate file →
   `StyleSheet.create` works identically on every adapter.
 

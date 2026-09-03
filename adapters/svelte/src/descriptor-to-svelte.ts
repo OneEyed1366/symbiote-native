@@ -20,21 +20,23 @@
 // never happens. If this ever fires for real, the render fn genuinely stopped being
 // shape-stable and needs its own fix, not a workaround here.
 
+import { createDescriptorShapeGuard } from '@symbiote-native/components';
 import type { IDescriptorChild } from '@symbiote-native/components';
 import { getShimDocument } from './dom-shim';
 import type { ShimElement, ShimText } from './dom-shim';
 
 type ICachedChild =
   | { readonly kind: 'text'; readonly shim: ShimText }
-  | { readonly kind: 'element'; readonly shim: ShimElement; readonly children: ICachedChild[] };
+  | {
+      readonly kind: 'element';
+      readonly shim: ShimElement;
+      readonly children: ICachedChild[];
+    };
 
-function shapeChangedMessage(detail: string): string {
-  return (
-    `descriptorToSvelte: Descriptor shape changed between renders (${detail}) — a ` +
-    `render-*.ts fn is expected to produce a CONSTANT tree shape (svelte-adapter-dom-shim ` +
-    `skill §15/§19); only prop values may vary between calls.`
-  );
-}
+// The predicates live in @symbiote-native/components, next to the Descriptor whose contract they
+// guard (skill §15/§19 for why this bridge depends on it at all). Solid's bridge had grown a
+// private copy of the same checks with different coverage; one owner ends that.
+const shape = createDescriptorShapeGuard('descriptorToSvelte');
 
 function buildChild(child: IDescriptorChild): ICachedChild {
   const document = getShimDocument();
@@ -52,20 +54,16 @@ function buildChild(child: IDescriptorChild): ICachedChild {
 }
 
 function syncChild(cached: ICachedChild, child: IDescriptorChild): void {
-  if (typeof child === 'string') {
-    if (cached.kind !== 'text') throw new Error(shapeChangedMessage('text/element'));
-    if (cached.shim.data !== child) cached.shim.data = child;
+  if (cached.kind === 'text') {
+    const text = shape.asText(child);
+    if (cached.shim.data !== text) cached.shim.data = text;
     return;
   }
-  if (cached.kind !== 'element' || cached.shim.tagName !== child.type) {
-    const was = cached.kind === 'element' ? cached.shim.tagName : 'text';
-    throw new Error(shapeChangedMessage(`${was} -> ${child.type}`));
-  }
-  cached.shim.p = child.props;
-  if (cached.children.length !== child.children.length) {
-    throw new Error(shapeChangedMessage('child count'));
-  }
-  cached.children.forEach((c, index) => syncChild(c, child.children[index]));
+  const element = shape.asElement(child);
+  shape.assertType(cached.shim.tagName, element.type);
+  cached.shim.p = element.props;
+  shape.assertChildCount(cached.children.length, element.children.length);
+  cached.children.forEach((c, index) => syncChild(c, element.children[index]));
 }
 
 export type IDescriptorChildrenMount = {
@@ -88,7 +86,7 @@ export function mountDescriptorChildren(
   });
   return {
     update(next: IDescriptorChild[]): void {
-      if (cached.length !== next.length) throw new Error(shapeChangedMessage('root child count'));
+      shape.assertChildCount(cached.length, next.length);
       cached.forEach((c, index) => syncChild(c, next[index]));
     },
   };

@@ -6,7 +6,14 @@ description: The Vue adapter public contract.
 Import app-facing APIs from `@symbiote-native/vue`:
 
 ```ts
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from '@symbiote-native/vue';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
 ```
 
 Vue drives the same engine as React, but its public API follows Vue conventions.
@@ -34,8 +41,9 @@ files.
 - Styles: `:style="styles.root"` with React Native-style objects. Most
   visual components — not just `View`/`Text` anymore — also accept
   `class`/`:class` for a registered class name, resolved through the same
-  style registry as a Vue SFC `<style>` block or a `.module.css` import; see
-  the [Styling guide](/docs/learn/styling/).
+  style registry as a Vue SFC `<style>` block, a Svelte component's own
+  `<style>` block, or a `.module.css` import; see the [Styling
+  guide](/docs/learn/styling/).
 - Attribute names: templates may use kebab-case; the adapter normalizes to
   camelCase.
 
@@ -199,14 +207,15 @@ const overlayTunnel = createTunnel(); // module-level singleton, importable from
 </template>
 ```
 
-`Teleport` only reaches a target in the *same* surface. `createTunnel` is for
+`Teleport` only reaches a target in the _same_ surface. `createTunnel` is for
 two independently `mount()`-ed surfaces that share no Fabric tree at all.
 `In` and `Out` are separate components — not composables, since a composable
 can't accept template markup — linked only by a small reactive store: `In`
 registers its slot content wherever it renders, `Out` reads the store and
 paints in whichever surface actually mounts it.
 
-React and Angular have the same primitive — see their own API references.
+React, Angular, Svelte, and Solid all have the same primitive — see their own
+API references.
 
 ## App entry point (`AppRegistry`)
 

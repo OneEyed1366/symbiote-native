@@ -12,7 +12,11 @@ import { Component, inject, type Signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/angular';
 import { installFabric } from '@symbiote-native/test-utils';
-import { CalendarIdentifier, Weekday, type Calendar } from '../../../core/types';
+import {
+  CalendarIdentifier,
+  Weekday,
+  type Calendar,
+} from '../../../core/types';
 import { CalendarsService } from './index';
 
 const FAKE_CALENDARS_INITIAL: Calendar[] = [
@@ -44,7 +48,8 @@ vi.mock('../../../core', () => ({
 
 const ROOT_TAG = 975;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedResult: Signal<Calendar[]> | undefined;
 let capturedListener: (() => void) | undefined;
@@ -94,7 +99,8 @@ describe('CalendarsService.connect', () => {
     mount(ROOT_TAG, CalendarsHost);
     await tick();
 
-    if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+    if (capturedListener === undefined)
+      throw new Error('addListener callback was not captured');
     getCalendarsMock.mockReturnValue(FAKE_CALENDARS_UPDATED);
     capturedListener();
 

@@ -35,7 +35,9 @@ beforeEach(async () => {
     },
   };
 
-  const registeredModules: Record<string, unknown> = { Vibration: fakeVibration };
+  const registeredModules: Record<string, unknown> = {
+    Vibration: fakeVibration,
+  };
   globalThis.__turboModuleProxy = <T>(name: string): T | null => {
     const module = registeredModules[name];
     return isPresent<T>(module) ? module : null;
@@ -144,7 +146,9 @@ describe('Vibration (no native module)', () => {
     globalThis.__turboModuleProxy = <T>(_name: string): T | null => null;
     const nullProxyVibration = createVibration({
       vibratePattern: () => {
-        throw new Error('vibratePattern must not run when the native module is absent');
+        throw new Error(
+          'vibratePattern must not run when the native module is absent',
+        );
       },
     });
     expect(() => {
@@ -158,7 +162,9 @@ describe('Vibration (no native module)', () => {
   // `platform.stopPattern?.()` must tolerate its absence rather than throw.
   it('cancel() without a platform stopPattern hook does not throw', () => {
     globalThis.__turboModuleProxy = <T>(_name: string): T | null => null;
-    const noHookVibration = createVibration({ vibratePattern: () => undefined });
+    const noHookVibration = createVibration({
+      vibratePattern: () => undefined,
+    });
     expect(() => noHookVibration.cancel()).not.toThrow();
   });
 });

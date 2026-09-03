@@ -1,6 +1,12 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/vue';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -12,9 +18,17 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   return value ? 'yes' : 'no';
 }
 
-function CapabilityRow(props: { testID: string; label: string; status: ICapabilityStatus }) {
+function CapabilityRow(props: {
+  testID: string;
+  label: string;
+  status: ICapabilityStatus;
+}) {
   const text =
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
     <View testID={props.testID} class="sms-row">
       <Text class="sms-row-label">{props.label}</Text>
@@ -74,7 +88,11 @@ export const SmsScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="sms-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="sms-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -85,18 +103,24 @@ export const SmsScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">SMS</Text>
               <Text class="hero-body">
-                @symbiote-native/sms — opens the system SMS composer prefilled with recipients and
-                a message. The user does the sending, so no permission is requested.
+                @symbiote-native/sms — opens the system SMS composer prefilled
+                with recipients and a message. The user does the sending, so no
+                permission is requested.
               </Text>
             </View>
           </View>
 
           <View testID="sms-capability-card" class="sms-card">
             <Text class="sms-card-title">Capabilities</Text>
-            <CapabilityRow testID="sms-available" label="Available" status={isAvailable.value} />
+            <CapabilityRow
+              testID="sms-available"
+              label="Available"
+              status={isAvailable.value}
+            />
             <Text class="sms-note">
-              NO on the iOS simulator, which ships no Messages app, and on Android devices without
-              telephony hardware. Send needs a real device.
+              NO on the iOS simulator, which ships no Messages app, and on
+              Android devices without telephony hardware. Send needs a real
+              device.
             </Text>
           </View>
 
@@ -139,9 +163,10 @@ export const SmsScreen = defineComponent(
               </Text>
             </View>
             <Text class="sms-note">
-              Android always reports unknown — reading the real outcome would need READ_SMS, which
-              Google restricts to default-SMS-app publishers. Treat it as "the composer closed".
-              iOS distinguishes sent from cancelled.
+              Android always reports unknown — reading the real outcome would
+              need READ_SMS, which Google restricts to default-SMS-app
+              publishers. Treat it as "the composer closed". iOS distinguishes
+              sent from cancelled.
             </Text>
           </View>
         </ScrollView>

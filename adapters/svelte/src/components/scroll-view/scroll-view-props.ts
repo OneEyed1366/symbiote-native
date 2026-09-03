@@ -14,8 +14,15 @@
 // the exported `ScrollViewStickyHeader` component directly around a section instead — see
 // sticky-header.svelte and index.svelte's header comment for the full reasoning.
 import type { Snippet } from 'svelte';
-import type { IStyleProp, ISymbioteEvent, IViewStyle } from '@symbiote-native/engine';
-import type { IAccessibilityProps, IAriaProps } from '@symbiote-native/components';
+import type {
+  IStyleProp,
+  ISymbioteEvent,
+  IViewStyle,
+} from '@symbiote-native/engine';
+import type {
+  IAccessibilityProps,
+  IAriaProps,
+} from '@symbiote-native/components';
 import type { IRefreshControlProps } from '../refresh-control-props';
 import type { ISvelteClassValue } from '../../class-value';
 
@@ -36,7 +43,12 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   bounces?: boolean;
   decelerationRate?: 'normal' | 'fast' | number;
   scrollEventThrottle?: number;
-  contentInset?: { top?: number; left?: number; bottom?: number; right?: number };
+  contentInset?: {
+    top?: number;
+    left?: number;
+    bottom?: number;
+    right?: number;
+  };
   contentOffset?: { x: number; y: number };
   // The REAL RefreshControl's own prop bag, minus `children` — ScrollView itself supplies that to
   // wire the platform-correct sibling (iOS) / wrap (Android) shape; see index.svelte's header
@@ -65,11 +77,17 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   alwaysBounceHorizontal?: boolean;
   alwaysBounceVertical?: boolean;
   centerContent?: boolean;
-  scrollIndicatorInsets?: { top?: number; left?: number; bottom?: number; right?: number };
+  scrollIndicatorInsets?: {
+    top?: number;
+    left?: number;
+    bottom?: number;
+    right?: number;
+  };
   indicatorStyle?: 'default' | 'black' | 'white';
   directionalLockEnabled?: boolean;
   automaticallyAdjustKeyboardInsets?: boolean;
-  contentInsetAdjustmentBehavior?: 'automatic' | 'scrollableAxes' | 'never' | 'always';
+  contentInsetAdjustmentBehavior?:
+    'automatic' | 'scrollableAxes' | 'never' | 'always';
   minimumZoomScale?: number;
   maximumZoomScale?: number;
   zoomScale?: number;

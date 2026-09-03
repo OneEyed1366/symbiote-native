@@ -26,12 +26,17 @@ const MEMORY_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
 function deviceTypeLabel(type: DeviceType | null): string {
   if (type === null) return 'unknown';
   switch (type) {
-    case DeviceType.PHONE: return 'Phone';
-    case DeviceType.TABLET: return 'Tablet';
-    case DeviceType.DESKTOP: return 'Desktop';
-    case DeviceType.TV: return 'TV';
+    case DeviceType.PHONE:
+      return 'Phone';
+    case DeviceType.TABLET:
+      return 'Tablet';
+    case DeviceType.DESKTOP:
+      return 'Desktop';
+    case DeviceType.TV:
+      return 'TV';
     case DeviceType.UNKNOWN:
-    default: return 'Unknown';
+    default:
+      return 'Unknown';
   }
 }
 
@@ -95,7 +100,11 @@ export const DeviceScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="device-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="device-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -106,9 +115,9 @@ export const DeviceScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Device</Text>
               <Text class="hero-body">
-                @symbiote-native/device — brand/model/OS constants, memory, and root/jailbreak
-                detection. Every export is a plain constant or a one-shot async call, no live
-                subscription.
+                @symbiote-native/device — brand/model/OS constants, memory, and
+                root/jailbreak detection. Every export is a plain constant or a
+                one-shot async call, no live subscription.
               </Text>
             </View>
           </View>
@@ -138,7 +147,10 @@ export const DeviceScreen = defineComponent(
               onPress={handleGetDeviceType}
               color={lineColor}
             />
-            <ValueRow label="Device type (async)" value={deviceTypeResult.value ?? 'checking…'} />
+            <ValueRow
+              label="Device type (async)"
+              value={deviceTypeResult.value ?? 'checking…'}
+            />
             <ActionButton
               testID="device-uptime-button"
               title="Get uptime"
@@ -147,7 +159,11 @@ export const DeviceScreen = defineComponent(
             />
             <ValueRow
               label="Uptime"
-              value={uptimeResult.value === null ? 'checking…' : `${uptimeResult.value}ms`}
+              value={
+                uptimeResult.value === null
+                  ? 'checking…'
+                  : `${uptimeResult.value}ms`
+              }
             />
             <ActionButton
               testID="device-rooted-button"
@@ -157,7 +173,13 @@ export const DeviceScreen = defineComponent(
             />
             <ValueRow
               label="Rooted / jailbroken"
-              value={isRootedResult.value === null ? 'checking…' : isRootedResult.value ? 'true' : 'false'}
+              value={
+                isRootedResult.value === null
+                  ? 'checking…'
+                  : isRootedResult.value
+                    ? 'true'
+                    : 'false'
+              }
             />
           </View>
         </ScrollView>

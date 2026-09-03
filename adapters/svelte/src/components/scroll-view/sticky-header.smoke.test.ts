@@ -14,20 +14,23 @@ import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
 const ROOT_TAG = 91_004;
 const COMPONENTS_DIR = join(__dirname, '..');
-// sticky-header.svelte renders a real <Animated.View> (AnimatedView.svelte) instead of a bare
+// sticky-header.svelte renders a real Animated.View (createAnimatedComponent(View)) instead of a bare
 // symbiote-view — same "no .svelte-aware loader, pre-compile + rewrite" treatment as
 // RefreshControl, compiled to a sibling of the real file so ITS OWN relative imports
 // ('./animated-props-runtime', '../../dom-shim') keep resolving unchanged.
-const MODULES_ANIMATED_DIR = join(COMPONENTS_DIR, '..', 'modules', 'animated');
-const ANIMATED_VIEW_OUT = join(MODULES_ANIMATED_DIR, '.smoke-sticky-animated-view.mjs');
-const REFRESH_CONTROL_OUT = join(COMPONENTS_DIR, '.smoke-sticky-refresh-control.mjs');
+const VIEW_OUT = join(COMPONENTS_DIR, '.smoke-sticky-view.mjs');
+const REFRESH_CONTROL_OUT = join(
+  COMPONENTS_DIR,
+  '.smoke-sticky-refresh-control.mjs',
+);
 const SCROLL_VIEW_OUT = join(__dirname, '.smoke-sticky-scroll-view.mjs');
 const STICKY_HEADER_OUT = join(__dirname, '.smoke-sticky-header.mjs');
 const PARENT_OUT = join(__dirname, '.smoke-sticky-parent.mjs');
@@ -38,7 +41,8 @@ const PARENT_OUT = join(__dirname, '.smoke-sticky-parent.mjs');
 const LAYOUT_PARENT_OUT = join(__dirname, '.smoke-sticky-layout-parent.mjs');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -46,7 +50,7 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(ANIMATED_VIEW_OUT, { force: true });
+  rmSync(VIEW_OUT, { force: true });
   rmSync(REFRESH_CONTROL_OUT, { force: true });
   rmSync(SCROLL_VIEW_OUT, { force: true });
   rmSync(STICKY_HEADER_OUT, { force: true });
@@ -54,18 +58,36 @@ afterEach(() => {
   rmSync(LAYOUT_PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
 
 function compileSharedModules(): void {
-  const refreshControlSource = readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8');
-  compileToFile(refreshControlSource, 'RefreshControl.svelte', REFRESH_CONTROL_OUT);
+  const refreshControlSource = readFileSync(
+    join(COMPONENTS_DIR, 'RefreshControl.svelte'),
+    'utf8',
+  );
+  compileToFile(
+    refreshControlSource,
+    'RefreshControl.svelte',
+    REFRESH_CONTROL_OUT,
+  );
 
-  const scrollViewSource = readFileSync(join(__dirname, 'index.svelte'), 'utf8');
+  const scrollViewSource = readFileSync(
+    join(__dirname, 'index.svelte'),
+    'utf8',
+  );
   const scrollViewCode = compile(scrollViewSource, {
     ...COMPILE_OPTIONS,
     filename: 'ScrollView.svelte',
@@ -75,19 +97,19 @@ function compileSharedModules(): void {
   );
   writeFileSync(SCROLL_VIEW_OUT, scrollViewCode);
 
-  const animatedViewSource = readFileSync(
-    join(MODULES_ANIMATED_DIR, 'AnimatedView.svelte'),
+  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
+  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
+
+  const stickyHeaderSource = readFileSync(
+    join(__dirname, 'sticky-header.svelte'),
     'utf8',
   );
-  compileToFile(animatedViewSource, 'AnimatedView.svelte', ANIMATED_VIEW_OUT);
-
-  const stickyHeaderSource = readFileSync(join(__dirname, 'sticky-header.svelte'), 'utf8');
   const stickyHeaderResult = compile(stickyHeaderSource, {
     ...COMPILE_OPTIONS,
     filename: 'ScrollViewStickyHeader.svelte',
   }).js.code.replace(
-    "from '../../modules/animated/AnimatedView.svelte'",
-    "from '../../modules/animated/.smoke-sticky-animated-view.mjs'",
+    "from '../View.svelte'",
+    "from '../.smoke-sticky-view.mjs'",
   );
   writeFileSync(STICKY_HEADER_OUT, stickyHeaderResult);
 }
@@ -173,7 +195,10 @@ describe('ScrollViewStickyHeader (real compiled, composed inside a real ScrollVi
       const stickyHost = fabric.find(
         node => node.viewName === 'RCTView' && node.props.zIndex === 10,
       );
-      expect(stickyHost, 'sticky header host painted with zIndex 10').toBeDefined();
+      expect(
+        stickyHost,
+        'sticky header host painted with zIndex 10',
+      ).toBeDefined();
       expect(stickyHost?.props.collapsable).toBe(false);
     });
 
@@ -198,8 +223,12 @@ describe('ScrollViewStickyHeader (real compiled, composed inside a real ScrollVi
       await tick();
       await tick();
 
-      const forwarded = (globalThis as { __stickyLayout?: unknown }).__stickyLayout;
-      expect(forwarded, 'the caller onLayout prop fired with the native event').toBeDefined();
+      const forwarded = (globalThis as { __stickyLayout?: unknown })
+        .__stickyLayout;
+      expect(
+        forwarded,
+        'the caller onLayout prop fired with the native event',
+      ).toBeDefined();
       expect(forwarded).toBe(payload);
     });
   });

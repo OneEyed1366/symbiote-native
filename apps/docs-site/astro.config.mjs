@@ -52,9 +52,9 @@ export default defineConfig({
           content: `
             try {
               var s = localStorage.getItem('symbiote');
-              var id = s === 'vue' || s === 'angular' || s === 'svelte' ? s : 'react';
+              var id = s === 'vue' || s === 'angular' || s === 'svelte' || s === 'solid' ? s : 'react';
               document.documentElement.dataset.symbiote = id;
-              var LABEL = { react: 'React', vue: 'Vue', angular: 'Angular', svelte: 'Svelte' };
+              var LABEL = { react: 'React', vue: 'Vue', angular: 'Angular', svelte: 'Svelte', solid: 'Solid' };
               localStorage.setItem('starlight-synced-tabs__framework', LABEL[id]);
             } catch (e) {}
           `,
@@ -82,8 +82,15 @@ export default defineConfig({
                 vue: ['#42d392', '#35a479'],
                 angular: ['#e40035', '#f6007b', '#9c0aab'],
                 svelte: ['#ff3e00', '#d63200'],
+                solid: ['#4a8bc2', '#2c4f7c'],
               };
-              var ID_BY_LABEL = { React: 'react', Vue: 'vue', Angular: 'angular', Svelte: 'svelte' };
+              var ID_BY_LABEL = {
+                React: 'react',
+                Vue: 'vue',
+                Angular: 'angular',
+                Svelte: 'svelte',
+                Solid: 'solid',
+              };
 
               function recolorFavicon() {
                 try {
@@ -150,6 +157,7 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Start here',
+          collapsed: true,
           items: [
             { label: 'What is SymbioteNative?', slug: 'docs' },
             { label: 'Quick start', slug: 'docs/quick-start' },
@@ -158,11 +166,13 @@ export default defineConfig({
         },
         {
           label: 'Learn',
+          collapsed: true,
           items: [
             { label: 'React guide', slug: 'docs/learn/react' },
             { label: 'Vue guide', slug: 'docs/learn/vue' },
             { label: 'Angular guide', slug: 'docs/learn/angular' },
             { label: 'Svelte guide', slug: 'docs/learn/svelte' },
+            { label: 'Solid guide', slug: 'docs/learn/solid' },
             { label: 'Styling', slug: 'docs/learn/styling' },
             { label: 'Animations', slug: 'docs/learn/animations' },
             { label: 'Events', slug: 'docs/learn/events' },
@@ -170,6 +180,7 @@ export default defineConfig({
         },
         {
           label: 'How-tos',
+          collapsed: true,
           items: [
             { label: 'Overview', slug: 'docs/howtos' },
             { label: 'Style a component', slug: 'docs/howtos/styling' },
@@ -190,10 +201,12 @@ export default defineConfig({
               slug: 'docs/howtos/svelte-refs-and-attachments',
             },
             { label: 'Catch render errors (Svelte)', slug: 'docs/howtos/error-boundaries' },
+            { label: 'Reactivity in Solid', slug: 'docs/howtos/solid-reactivity' },
           ],
         },
         {
           label: 'Navigation',
+          collapsed: true,
           items: [
             { label: 'Overview', slug: 'docs/navigation' },
             { label: 'Stack navigator', slug: 'docs/navigation/stack' },
@@ -206,10 +219,12 @@ export default defineConfig({
         },
         {
           label: 'Testing',
+          collapsed: true,
           items: [{ label: 'Vitest + Detox', slug: 'docs/testing' }],
         },
         {
           label: 'Examples',
+          collapsed: true,
           items: [
             { label: 'Overview', slug: 'docs/examples' },
             { label: 'Counter', slug: 'docs/examples/counter' },
@@ -219,18 +234,21 @@ export default defineConfig({
         },
         {
           label: 'API',
+          collapsed: true,
           items: [
             { label: 'Overview', slug: 'docs/api' },
             { label: 'React', slug: 'docs/api/react' },
             { label: 'Vue', slug: 'docs/api/vue' },
             { label: 'Angular', slug: 'docs/api/angular' },
             { label: 'Svelte', slug: 'docs/api/svelte' },
+            { label: 'Solid', slug: 'docs/api/solid' },
             { label: 'Components', slug: 'docs/api/components' },
             { label: 'Core', slug: 'docs/api/core' },
           ],
         },
         {
           label: 'Packages',
+          collapsed: true,
           items: [
             { label: 'Slider', slug: 'docs/packages/slider' },
             { label: 'Splash screen', slug: 'docs/packages/splash-screen' },
@@ -263,6 +281,7 @@ export default defineConfig({
         },
         {
           label: 'Project',
+          collapsed: true,
           items: [
             { label: 'Status', slug: 'docs/project/status' },
             { label: 'Roadmap', slug: 'docs/project/roadmap' },

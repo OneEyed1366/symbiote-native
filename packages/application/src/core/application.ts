@@ -1,7 +1,10 @@
 import { Platform, UnavailabilityError } from 'expo-modules-core';
 
 import { expoApplication } from './native-module';
-import type { ApplicationReleaseType, PushNotificationServiceEnvironment } from './types';
+import type {
+  ApplicationReleaseType,
+  PushNotificationServiceEnvironment,
+} from './types';
 
 const NATIVE_MODULE_NAME = 'expo-application';
 
@@ -20,21 +23,24 @@ export const nativeApplicationVersion: string | null =
  * the `Info.plist` value for `CFBundleVersion` (`ios.buildNumber` in the app config).
  * @example `"114"`
  */
-export const nativeBuildVersion: string | null = expoApplication.nativeBuildVersion ?? null;
+export const nativeBuildVersion: string | null =
+  expoApplication.nativeBuildVersion ?? null;
 
 /**
  * The human-readable name of the application, displayed with the app's icon on the device's
  * home screen.
  * @example `"Expo"`, `"Yelp"`, `"Instagram"`
  */
-export const applicationName: string | null = expoApplication.applicationName ?? null;
+export const applicationName: string | null =
+  expoApplication.applicationName ?? null;
 
 /**
  * The ID of the application. On Android, this is the application ID. On iOS, this is the
  * bundle ID.
  * @example `"com.cocoacasts.scribbles"`, `"com.apple.Pages"`
  */
-export const applicationId: string | null = expoApplication.applicationId ?? null;
+export const applicationId: string | null =
+  expoApplication.applicationId ?? null;
 
 /**
  * Gets the value of `Settings.Secure.ANDROID_ID` — a hexadecimal string unique to each
@@ -61,7 +67,10 @@ export function getAndroidId(): string {
  */
 export async function getInstallReferrerAsync(): Promise<string> {
   if (!expoApplication.getInstallReferrerAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getInstallReferrerAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'getInstallReferrerAsync',
+    );
   }
   return expoApplication.getInstallReferrerAsync();
 }
@@ -87,7 +96,10 @@ export async function getIosIdForVendorAsync(): Promise<string | null> {
  */
 export async function getIosApplicationReleaseTypeAsync(): Promise<ApplicationReleaseType> {
   if (!expoApplication.getApplicationReleaseTypeAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getApplicationReleaseTypeAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'getApplicationReleaseTypeAsync',
+    );
   }
   return expoApplication.getApplicationReleaseTypeAsync();
 }
@@ -100,7 +112,10 @@ export async function getIosApplicationReleaseTypeAsync(): Promise<ApplicationRe
  */
 export async function getIosPushNotificationServiceEnvironmentAsync(): Promise<PushNotificationServiceEnvironment> {
   if (!expoApplication.getPushNotificationServiceEnvironmentAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getPushNotificationServiceEnvironmentAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'getPushNotificationServiceEnvironmentAsync',
+    );
   }
   return expoApplication.getPushNotificationServiceEnvironmentAsync();
 }
@@ -114,7 +129,10 @@ export async function getIosPushNotificationServiceEnvironmentAsync(): Promise<P
  */
 export async function getInstallationTimeAsync(): Promise<Date> {
   if (!expoApplication.getInstallationTimeAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getInstallationTimeAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'getInstallationTimeAsync',
+    );
   }
   const installationTime = await expoApplication.getInstallationTimeAsync();
   return new Date(installationTime);

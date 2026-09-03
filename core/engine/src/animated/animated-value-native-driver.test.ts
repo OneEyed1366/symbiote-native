@@ -49,7 +49,10 @@ beforeEach(() => {
       config: INativeAnimationConfig,
       endCallback: (result: INativeEndResult) => void,
     ): void {
-      nativeCalls.push({ method: 'startAnimatingNode', args: [animationId, nodeTag, config] });
+      nativeCalls.push({
+        method: 'startAnimatingNode',
+        args: [animationId, nodeTag, config],
+      });
       deliverResult = endCallback;
     },
     stopAnimation: record('stopAnimation'),
@@ -57,8 +60,12 @@ beforeEach(() => {
     setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
     flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
     extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-    startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
-    stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
+    startListeningToAnimatedNodeValue: record(
+      'startListeningToAnimatedNodeValue',
+    ),
+    stopListeningToAnimatedNodeValue: record(
+      'stopListeningToAnimatedNodeValue',
+    ),
     getValue: record('getValue'),
     addAnimatedEventToView: record('addAnimatedEventToView'),
     removeAnimatedEventFromView: record('removeAnimatedEventFromView'),
@@ -76,10 +83,18 @@ describe('AnimatedValue.__startNativeAnimation — Positive', () => {
   it('makes the value native and starts the native animation on its own tag with the given id/config', () => {
     const value = new AnimatedValue(0);
 
-    value.__startNativeAnimation({ type: 'frames', frames: [0, 1] }, 7, () => {});
+    value.__startNativeAnimation(
+      { type: 'frames', frames: [0, 1] },
+      7,
+      () => {},
+    );
 
-    expect(nativeCalls.map(call => call.method)).toContain('createAnimatedNode');
-    const start = nativeCalls.find(call => call.method === 'startAnimatingNode');
+    expect(nativeCalls.map(call => call.method)).toContain(
+      'createAnimatedNode',
+    );
+    const start = nativeCalls.find(
+      call => call.method === 'startAnimatingNode',
+    );
     expect(start).toBeDefined();
     expect(start?.args[0]).toBe(7);
     expect(start?.args[1]).toBe(value.__getNativeTag());
@@ -94,9 +109,13 @@ describe('AnimatedValue.__startNativeAnimation — Positive', () => {
     const value = new AnimatedValue(0);
     let finished: boolean | undefined;
 
-    value.__startNativeAnimation({ type: 'frames', frames: [0, 1] }, 9, result => {
-      finished = result;
-    });
+    value.__startNativeAnimation(
+      { type: 'frames', frames: [0, 1] },
+      9,
+      result => {
+        finished = result;
+      },
+    );
     nativeCalls.length = 0; // only interested in what happens after native reports back
 
     deliverResult?.({ finished: true, value: 42 });
@@ -112,7 +131,11 @@ describe('AnimatedValue.__startNativeAnimation — Positive', () => {
   it('on native completion WITHOUT a value, reports finished but leaves the JS value untouched', () => {
     const value = new AnimatedValue(5);
 
-    value.__startNativeAnimation({ type: 'frames', frames: [0, 1] }, 11, () => {});
+    value.__startNativeAnimation(
+      { type: 'frames', frames: [0, 1] },
+      11,
+      () => {},
+    );
     deliverResult?.({ finished: false });
 
     expect(value.__getValue()).toBe(5);
@@ -125,12 +148,18 @@ describe('AnimatedValue.resetAnimation — native sync', () => {
   // invisible to every JS-driven test. setValue pushes for exactly this reason.
   it('pushes the starting value to native when the value is native-driven', () => {
     const value = new AnimatedValue(5);
-    value.__startNativeAnimation({ type: 'frames', frames: [0, 1] }, 7, () => {});
+    value.__startNativeAnimation(
+      { type: 'frames', frames: [0, 1] },
+      7,
+      () => {},
+    );
     nativeCalls.length = 0;
 
     value.resetAnimation();
 
-    const push = nativeCalls.find(call => call.method === 'setAnimatedNodeValue');
+    const push = nativeCalls.find(
+      call => call.method === 'setAnimatedNodeValue',
+    );
     expect(push).toBeDefined();
     expect(push?.args[0]).toBe(value.__getNativeTag());
     expect(push?.args[1]).toBe(5);
@@ -158,7 +187,9 @@ describe('AnimatedValue — native value-listener streaming (Positive)', () => {
 
     value.addListener(() => {});
 
-    expect(nativeCalls.map(call => call.method)).toContain('startListeningToAnimatedNodeValue');
+    expect(nativeCalls.map(call => call.method)).toContain(
+      'startListeningToAnimatedNodeValue',
+    );
   });
 
   // why: __makeNative must retroactively start streaming for listeners that were registered
@@ -171,7 +202,9 @@ describe('AnimatedValue — native value-listener streaming (Positive)', () => {
 
     value.__makeNative();
 
-    expect(nativeCalls.map(call => call.method)).toContain('startListeningToAnimatedNodeValue');
+    expect(nativeCalls.map(call => call.method)).toContain(
+      'startListeningToAnimatedNodeValue',
+    );
   });
 
   // why: removing the LAST listener must stop the native stream — an app that unsubscribes
@@ -184,7 +217,9 @@ describe('AnimatedValue — native value-listener streaming (Positive)', () => {
 
     value.removeListener(id);
 
-    expect(nativeCalls.map(call => call.method)).toContain('stopListeningToAnimatedNodeValue');
+    expect(nativeCalls.map(call => call.method)).toContain(
+      'stopListeningToAnimatedNodeValue',
+    );
   });
 
   // why: a non-native value must NEVER talk to the native module — addListener/removeListener

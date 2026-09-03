@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/react';
 import {
   AuthenticationType,
   SecurityLevel,
@@ -60,7 +66,8 @@ function securityLevelLabel(level: SecurityLevel): string {
 }
 
 function CapabilityBadge({ status }: { status: ICapabilityStatus }) {
-  const label = status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+  const label =
+    status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
     <View className={`auth-status-badge auth-status-badge-${status}`}>
       <Text className="auth-status-text">{label}</Text>
@@ -105,9 +112,14 @@ export function LocalAuthScreen() {
 
   const [hasHardware, setHasHardware] = useState<ICapabilityStatus>('checking');
   const [isEnrolled, setIsEnrolled] = useState<ICapabilityStatus>('checking');
-  const [enrolledLevel, setEnrolledLevel] = useState<SecurityLevel | null>(null);
-  const [supportedTypes, setSupportedTypes] = useState<AuthenticationType[] | null>(null);
-  const [authResult, setAuthResult] = useState<ILocalAuthenticationResult | null>(null);
+  const [enrolledLevel, setEnrolledLevel] = useState<SecurityLevel | null>(
+    null,
+  );
+  const [supportedTypes, setSupportedTypes] = useState<
+    AuthenticationType[] | null
+  >(null);
+  const [authResult, setAuthResult] =
+    useState<ILocalAuthenticationResult | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   useEffect(() => {
@@ -151,7 +163,11 @@ export function LocalAuthScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="local-auth-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="local-auth-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -162,9 +178,10 @@ export function LocalAuthScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Local auth</Text>
             <Text className="hero-body">
-              @symbiote-native/local-auth — FaceID/TouchID on iOS, the Fingerprint/Biometric API on
-              Android. A simulator with no enrolled biometrics reports "not enrolled"; a real
-              device with FaceID/TouchID/fingerprint set up is needed to see a live prompt.
+              @symbiote-native/local-auth — FaceID/TouchID on iOS, the
+              Fingerprint/Biometric API on Android. A simulator with no enrolled
+              biometrics reports "not enrolled"; a real device with
+              FaceID/TouchID/fingerprint set up is needed to see a live prompt.
             </Text>
           </View>
         </View>
@@ -173,11 +190,23 @@ export function LocalAuthScreen() {
           <View className="auth-card-header">
             <Text className="auth-card-title">Capabilities</Text>
           </View>
-          <CapabilityRow testID="local-auth-hardware" label="Hardware present" status={hasHardware} />
-          <CapabilityRow testID="local-auth-enrolled" label="Enrolled" status={isEnrolled} />
+          <CapabilityRow
+            testID="local-auth-hardware"
+            label="Hardware present"
+            status={hasHardware}
+          />
+          <CapabilityRow
+            testID="local-auth-enrolled"
+            label="Enrolled"
+            status={isEnrolled}
+          />
           <ValueRow
             label="Enrolled level"
-            value={enrolledLevel === null ? 'checking…' : securityLevelLabel(enrolledLevel)}
+            value={
+              enrolledLevel === null
+                ? 'checking…'
+                : securityLevelLabel(enrolledLevel)
+            }
           />
           <ValueRow
             label="Supported types"
@@ -196,7 +225,8 @@ export function LocalAuthScreen() {
             <Text className="auth-card-title">Authenticate</Text>
           </View>
           <Text className="info-text">
-            Prompts FaceID/TouchID on iOS, or the Biometric/Fingerprint dialog on Android.
+            Prompts FaceID/TouchID on iOS, or the Biometric/Fingerprint dialog
+            on Android.
           </Text>
           <ActionButton
             testID="local-auth-authenticate-button"

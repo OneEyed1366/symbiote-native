@@ -4,27 +4,17 @@
 // interpolation and drivers come from @symbiote-native/engine (framework-agnostic, JS-driven),
 // spread in verbatim.
 //
-// Unlike Vue/React, there is NO generic `createAnimatedComponent(Component)` here. Vue wraps an
-// arbitrary base component via `h(Component, reducedProps)`; React via `createElement(Component,
-// childProps)` — both are ordinary runtime function calls that work on any component reference.
-// Svelte has no equivalent: a compiled Svelte component is not a plain function you can invoke
-// generically with a fresh prop bag and get back something you can further compose — wrapping
-// one means literally writing `<Component {...props} bind:this={ref}>` inside another `.svelte`
-// file. So each of the four components below (View/Text/Image/ScrollView) is its own hand-
-// authored `.svelte` file sharing only the non-visual reconcile logic
-// (animated-props-runtime.ts). `Animated.createAnimatedComponent` is a genuine, documented scope
-// boundary, not an oversight — see this module's own report for the full reasoning. A consumer
-// wanting to animate their OWN custom component should follow the same four-file pattern (rebuild
-// an AnimatedProps leaf from its props, reconcile on every render into the component's own host
-// node/handle, expose that host node via bind:this) rather than reach for a generic wrapper that
-// does not exist on this adapter.
+// All six components come from ONE generic `createAnimatedComponent(Base)` — the same shape
+// React, Vue and Solid have — applied to the ordinary components. There is no hand-authored
+// `.svelte` file per animated component any more: an earlier revision of this header claimed a
+// generic wrap was impossible on Svelte, and that was simply wrong. See
+// create-animated-component.ts for how the wrap reaches the host node behind a base that exports
+// an imperative handle (ScrollView/FlatList/SectionList) versus one that exports nothing
+// (View/Text/Image), and for why it is plain TS rather than a parametrized `.svelte` file.
 //
-// Animated.FlatList / Animated.SectionList are also NOT implemented in this pass. Vue omits them
-// because it has no FlatList/SectionList base component at all; Svelte DOES have both, so this is
-// a narrower, more honest gap than Vue's — flagged as follow-up work, not silently dropped (see
-// the module's own report). Wrapping them would follow the exact same
-// wrap-the-real-component-via-its-exported-handle shape as AnimatedScrollView, once each exposes
-// (or is confirmed to need) an equivalent handle.
+// A consumer animating their OWN component wraps it the same way: `createAnimatedComponent(Mine)`
+// works as long as Mine either exports `getScrollNode()` or forwards `{@attach}` onto its host
+// tag, which every component in this adapter does.
 
 import {
   AnimatedValue,
@@ -51,11 +41,15 @@ import {
   forkEvent,
   unforkEvent,
 } from '@symbiote-native/engine';
-import AnimatedViewComponent from './AnimatedView.svelte';
-import AnimatedTextComponent from './AnimatedText.svelte';
-import AnimatedImageComponent from './AnimatedImage.svelte';
-import AnimatedScrollViewComponent from './AnimatedScrollView.svelte';
+import View from '../../components/View.svelte';
+import Text from '../../components/Text.svelte';
+import Image from '../../components/image/index.svelte';
+import ScrollView from '../../components/scroll-view/index.svelte';
+import FlatList from '../../components/flat-list/index.svelte';
+import SectionList from '../../components/section-list/index.svelte';
+import { createAnimatedComponent } from './create-animated-component';
 
+export { createAnimatedComponent } from './create-animated-component';
 export type { IAnimatedComponentProps } from './animated-component-props';
 
 // The live, JS-driven driver namespace (real frames). RN's AnimatedImplementation.
@@ -85,15 +79,21 @@ const liveDrivers = {
 
 // RN swaps the WHOLE driver namespace for the mock when the host reports isDisableAnimations
 // (reduced motion / test env): the mock keeps the same surface but jumps each animation to its
-// final value synchronously, no frames. The animated COMPONENTS (View/Text/Image/ScrollView) are
-// live in both branches; only the drivers/value/operators/events half is swapped, exactly like
+// final value synchronously, no frames. The animated COMPONENTS (View/Text/Image/ScrollView/
+// FlatList/SectionList) are live in both branches; only the drivers/value/operators/events half
+// is swapped, exactly like
 // RN spreading `...Animated` (impl or mock) over the same component references.
 const drivers = Platform.isDisableAnimations ? AnimatedMock : liveDrivers;
 
+// Wrapped eagerly, unlike Vue's lazy getters: nothing in the scroll/list chain imports THIS
+// module back (sticky-header builds its own Animated.View straight from the wrap), so there is
+// no half-evaluated cycle to dodge.
 export const Animated = {
-  View: AnimatedViewComponent,
-  Text: AnimatedTextComponent,
-  Image: AnimatedImageComponent,
-  ScrollView: AnimatedScrollViewComponent,
+  View: createAnimatedComponent(View),
+  Text: createAnimatedComponent(Text),
+  Image: createAnimatedComponent(Image),
+  ScrollView: createAnimatedComponent(ScrollView),
+  FlatList: createAnimatedComponent(FlatList),
+  SectionList: createAnimatedComponent(SectionList),
   ...drivers,
 };

@@ -37,7 +37,9 @@ const fakeNativeAnimated = {
   setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
   flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
   extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-  startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
+  startListeningToAnimatedNodeValue: record(
+    'startListeningToAnimatedNodeValue',
+  ),
   stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
   getValue: record('getValue'),
   addAnimatedEventToView: record('addAnimatedEventToView'),
@@ -63,7 +65,9 @@ function callsOf(method: string): INativeCall[] {
 function committedTranslateY(view: IFakeNode): number {
   const transform = Reflect.get(view.props, 'transform');
   if (!Array.isArray(transform)) {
-    throw new Error(`expected a transform array on the view, got ${JSON.stringify(view.props)}`);
+    throw new Error(
+      `expected a transform array on the view, got ${JSON.stringify(view.props)}`,
+    );
   }
   for (const entry of transform) {
     if (typeof entry === 'object' && entry !== null) {
@@ -71,7 +75,9 @@ function committedTranslateY(view: IFakeNode): number {
       if (typeof y === 'number') return y;
     }
   }
-  throw new Error(`no translateY in committed transform ${JSON.stringify(transform)}`);
+  throw new Error(
+    `no translateY in committed transform ${JSON.stringify(transform)}`,
+  );
 }
 
 beforeEach(() => {
@@ -94,11 +100,14 @@ describe('Animated.event', () => {
     expect(committedTranslateY(appView())).toBe(0);
 
     let listenerArg: unknown = null;
-    const handler = event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-      listener: arg => {
-        listenerArg = arg;
+    const handler = event(
+      [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+      {
+        listener: arg => {
+          listenerArg = arg;
+        },
       },
-    });
+    );
 
     const scrollEvent = { nativeEvent: { contentOffset: { y: 42 } } };
     handler(scrollEvent);
@@ -128,15 +137,17 @@ describe('Animated.event', () => {
     const [addedViewTag, addedEventName, addedMapping] = added[0].args;
     expect(addedViewTag).toBe(viewTag);
     expect(addedEventName).toBe('onScroll');
-    expect(typeof addedMapping === 'object' && addedMapping !== null).toBe(true);
+    expect(typeof addedMapping === 'object' && addedMapping !== null).toBe(
+      true,
+    );
 
     const nativeEventPath =
       typeof addedMapping === 'object' && addedMapping !== null
         ? Reflect.get(addedMapping, 'nativeEventPath')
         : undefined;
-    expect(Array.isArray(nativeEventPath) ? nativeEventPath.join('.') : undefined).toBe(
-      'contentOffset.y',
-    );
+    expect(
+      Array.isArray(nativeEventPath) ? nativeEventPath.join('.') : undefined,
+    ).toBe('contentOffset.y');
 
     const animatedValueTag =
       typeof addedMapping === 'object' && addedMapping !== null

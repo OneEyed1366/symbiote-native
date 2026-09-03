@@ -10,12 +10,22 @@
 
 import { act, createElement, createRef, useCallback, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/react';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/react';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
 import type { INavigatorHandle } from '../stack';
-import { useFocusEffect, useIsFocused, useNavigation, useNavigationState, useRoute } from './index';
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+  useNavigationState,
+  useRoute,
+} from './index';
 
 const ROOT_TAG = 513;
 const SCREEN_VIEW = 'RNSScreen';
@@ -46,12 +56,21 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
     },
   },
   [STACK_VIEW]: {
-    directEventTypes: { topFinishTransitioning: directEvent('onFinishTransitioning') },
+    directEventTypes: {
+      topFinishTransitioning: directEvent('onFinishTransitioning'),
+    },
     validAttributes: {},
   },
   [HEADER_CONFIG_VIEW]: {
-    directEventTypes: { topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem') },
-    validAttributes: { title: true, hidden: true, backTitle: true, backTitleVisible: true },
+    directEventTypes: {
+      topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem'),
+    },
+    validAttributes: {
+      title: true,
+      hidden: true,
+      backTitle: true,
+      backTitleVisible: true,
+    },
   },
 };
 
@@ -98,8 +117,14 @@ describe('navigation hooks', () => {
         createElement(
           Stack,
           { initialRouteName: 'Home' },
-          createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-          createElement(Stack.Screen, { name: 'Details', component: DetailsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Home',
+            component: TrackedHomeScreen,
+          }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: DetailsScreen,
+          }),
         ),
       );
       expect(latestIsFocused).toBe(false);
@@ -133,8 +158,14 @@ describe('navigation hooks', () => {
         createElement(
           Stack,
           { initialRouteName: 'Home' },
-          createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-          createElement(Stack.Screen, { name: 'Details', component: DetailsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Home',
+            component: TrackedHomeScreen,
+          }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: DetailsScreen,
+          }),
         ),
       );
       expect(events).toEqual([]);
@@ -162,7 +193,8 @@ describe('navigation hooks', () => {
         capturedName = route.name;
         capturedParams = route.params;
         useEffect(
-          () => navigation.addListener('focus', () => focusEvents.push('focus')),
+          () =>
+            navigation.addListener('focus', () => focusEvents.push('focus')),
           [navigation],
         );
         return createElement('symbiote-text', {}, 'details');
@@ -175,7 +207,10 @@ describe('navigation hooks', () => {
           Stack,
           { ref, initialRouteName: 'Home' },
           createElement(Stack.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Stack.Screen, { name: 'Details', component: TrackedDetailsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: TrackedDetailsScreen,
+          }),
         ),
       );
       act(() => ref.current?.push('Details', { id: 7 }));
@@ -203,8 +238,14 @@ describe('navigation hooks', () => {
         createElement(
           Stack,
           { ref, initialRouteName: 'Home' },
-          createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-          createElement(Stack.Screen, { name: 'Details', component: DetailsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Home',
+            component: TrackedHomeScreen,
+          }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: DetailsScreen,
+          }),
         ),
       );
       expect(routeCount).toBe(1);
@@ -235,7 +276,9 @@ describe('navigation hooks', () => {
 
       expect(() => {
         act(() => mount(ROOT_TAG, createElement(OrphanScreen)));
-      }).toThrow(/useRoute must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>/);
+      }).toThrow(
+        /useRoute must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>/,
+      );
     });
   });
 });

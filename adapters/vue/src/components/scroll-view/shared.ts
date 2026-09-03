@@ -54,7 +54,10 @@ import {
   type ISymbioteNode,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { wrapStickyHeaders, type IStickyHeaderComponentType } from './sticky-header';
+import {
+  wrapStickyHeaders,
+  type IStickyHeaderComponentType,
+} from './sticky-header';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 
 export type { IScrollViewHandle } from '@symbiote-native/components';
@@ -76,7 +79,12 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   bounces?: boolean;
   decelerationRate?: 'normal' | 'fast' | number;
   scrollEventThrottle?: number;
-  contentInset?: { top?: number; left?: number; bottom?: number; right?: number };
+  contentInset?: {
+    top?: number;
+    left?: number;
+    bottom?: number;
+    right?: number;
+  };
   contentOffset?: { x: number; y: number };
   // iOS renders it as a sibling before content; Android re-invokes its type to wrap the scroll view.
   refreshControl?: VNode;
@@ -110,11 +118,17 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   alwaysBounceHorizontal?: boolean;
   alwaysBounceVertical?: boolean;
   centerContent?: boolean;
-  scrollIndicatorInsets?: { top?: number; left?: number; bottom?: number; right?: number };
+  scrollIndicatorInsets?: {
+    top?: number;
+    left?: number;
+    bottom?: number;
+    right?: number;
+  };
   indicatorStyle?: 'default' | 'black' | 'white';
   directionalLockEnabled?: boolean;
   automaticallyAdjustKeyboardInsets?: boolean;
-  contentInsetAdjustmentBehavior?: 'automatic' | 'scrollableAxes' | 'never' | 'always';
+  contentInsetAdjustmentBehavior?:
+    'automatic' | 'scrollableAxes' | 'never' | 'always';
   minimumZoomScale?: number;
   maximumZoomScale?: number;
   zoomScale?: number;
@@ -184,18 +198,24 @@ function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
 // height, gap, …) would otherwise never reach the wrapper.
 const isClassNameProp = isClassNameValue;
 
-function asDecelerationRate(value: unknown): 'normal' | 'fast' | number | undefined {
+function asDecelerationRate(
+  value: unknown,
+): 'normal' | 'fast' | number | undefined {
   if (typeof value === 'number') return value;
   if (value === 'normal' || value === 'fast') return value;
   return undefined;
 }
 
 function isNumberArray(value: unknown): value is number[] {
-  return Array.isArray(value) && value.every(entry => typeof entry === 'number');
+  return (
+    Array.isArray(value) && value.every(entry => typeof entry === 'number')
+  );
 }
 
 function isComponent(value: unknown): value is Component {
-  return typeof value === 'function' || (typeof value === 'object' && value !== null);
+  return (
+    typeof value === 'function' || (typeof value === 'object' && value !== null)
+  );
 }
 
 // Prop/handler keys the lifecycle consumes itself; everything else forwards onto the scroll-view
@@ -296,8 +316,13 @@ export function createScrollView(platform: IScrollViewPlatform) {
         const attrs = normalizeVueAttrs(rawAttrs);
         const isHorizontal = attrs.horizontal === true;
         const userStyle = isStyleProp(attrs.style) ? attrs.style : undefined;
-        const classProp = isClassNameProp(attrs.class) ? attrs.class : undefined;
-        const layoutSplitStyle: IStyleProp<IViewStyle> = [resolveClassName(classProp), userStyle];
+        const classProp = isClassNameProp(attrs.class)
+          ? attrs.class
+          : undefined;
+        const layoutSplitStyle: IStyleProp<IViewStyle> = [
+          resolveClassName(classProp),
+          userStyle,
+        ];
         const contentContainerStyle =
           typeof attrs.contentContainerStyle === 'string'
             ? resolveClassName(attrs.contentContainerStyle)
@@ -310,13 +335,18 @@ export function createScrollView(platform: IScrollViewPlatform) {
           : undefined;
         const hasStickyHeaders =
           stickyHeaderIndices !== undefined && stickyHeaderIndices.length > 0;
-        const invertStickyHeaders = attrs.invertStickyHeaders === true ? true : undefined;
+        const invertStickyHeaders =
+          attrs.invertStickyHeaders === true ? true : undefined;
         const stickyHeaderComponent = isComponent(attrs.StickyHeaderComponent)
           ? attrs.StickyHeaderComponent
           : undefined;
 
-        const { scrollViewIntrinsic, contentIntrinsic, scrollViewBaseStyle, contentStyle } =
-          selectScrollIntrinsics(isHorizontal, contentContainerStyle);
+        const {
+          scrollViewIntrinsic,
+          contentIntrinsic,
+          scrollViewBaseStyle,
+          contentStyle,
+        } = selectScrollIntrinsics(isHorizontal, contentContainerStyle);
 
         // RN defaults nested scrolling ON (ScrollView.js `nestedScrollEnabled ?? true`);
         // horizontal forwards only when defined (load-bearing on iOS's RCTScrollView axis).
@@ -324,19 +354,26 @@ export function createScrollView(platform: IScrollViewPlatform) {
           ...resolveAccessibilityProps(forwardAttrs(attrs)),
         };
         outerProps.nestedScrollEnabled =
-          typeof attrs.nestedScrollEnabled === 'boolean' ? attrs.nestedScrollEnabled : true;
-        if (attrs.horizontal !== undefined) outerProps.horizontal = attrs.horizontal;
+          typeof attrs.nestedScrollEnabled === 'boolean'
+            ? attrs.nestedScrollEnabled
+            : true;
+        if (attrs.horizontal !== undefined)
+          outerProps.horizontal = attrs.horizontal;
         const decel = asDecelerationRate(attrs.decelerationRate);
-        if (decel !== undefined) outerProps.decelerationRate = resolveDecelerationRate(decel);
+        if (decel !== undefined)
+          outerProps.decelerationRate = resolveDecelerationRate(decel);
 
         // When sticky headers are active, the offset must reach the AnimatedValue (RN's
         // _scrollAnimatedValueAttachment). forwardAttrs already put the user's onScroll/onLayout/
         // scrollEventThrottle on outerProps; here we override per resolveScrollForwarding's
         // decisions (which path, throttle default, inverted capture).
-        const nativeStickyAvailable = hasStickyHeaders && isNativeAnimatedAvailable();
+        const nativeStickyAvailable =
+          hasStickyHeaders && isNativeAnimatedAvailable();
         nativeStickyWanted = nativeStickyAvailable;
         const userThrottle =
-          typeof attrs.scrollEventThrottle === 'number' ? attrs.scrollEventThrottle : undefined;
+          typeof attrs.scrollEventThrottle === 'number'
+            ? attrs.scrollEventThrottle
+            : undefined;
         const forwarding = resolveScrollForwarding({
           hasStickyHeaders,
           nativeStickyAvailable,
@@ -346,7 +383,9 @@ export function createScrollView(platform: IScrollViewPlatform) {
           snapToAlignment: attrs.snapToAlignment,
         });
         if (hasStickyHeaders) {
-          const userOnScroll = isHandler(attrs.onScroll) ? attrs.onScroll : undefined;
+          const userOnScroll = isHandler(attrs.onScroll)
+            ? attrs.onScroll
+            : undefined;
           if (forwarding.mode === 'sticky-js') {
             // JS fallback (no native module): correct, but lags a frame under fast scroll, which
             // the native path removes on a real host.
@@ -354,7 +393,10 @@ export function createScrollView(platform: IScrollViewPlatform) {
               [{ nativeEvent: { contentOffset: { y: scrollAnimatedValue } } }],
               userOnScroll === undefined
                 ? undefined
-                : { listener: (...args) => forwardScrollEvent(userOnScroll, args) },
+                : {
+                    listener: (...args) =>
+                      forwardScrollEvent(userOnScroll, args),
+                  },
             );
           }
           // Native path: the value is driven on the UI thread by the post-commit watch above, so
@@ -365,7 +407,9 @@ export function createScrollView(platform: IScrollViewPlatform) {
           // Capture the viewport height for inverted sticky headers (RN _handleLayout), then call
           // the user's handler.
           if (forwarding.capturesViewportHeight) {
-            const userOnLayout = isHandler(attrs.onLayout) ? attrs.onLayout : undefined;
+            const userOnLayout = isHandler(attrs.onLayout)
+              ? attrs.onLayout
+              : undefined;
             outerProps.onLayout = (event: ISymbioteEvent): void => {
               const height = readLayoutDimension(event, 'height');
               if (height !== undefined) viewportHeight.value = height;
@@ -381,7 +425,10 @@ export function createScrollView(platform: IScrollViewPlatform) {
         // `collapsable: false` keeps the layout-only content view as a real native view: Android
         // Fabric view-flattens it away otherwise, hoisting the cells as direct children of the
         // scroll view (which hosts exactly one) - an addViewAt crash. iOS never flattens.
-        const contentProps: Record<string, unknown> = { style: contentStyle, collapsable: false };
+        const contentProps: Record<string, unknown> = {
+          style: contentStyle,
+          collapsable: false,
+        };
         if (forwarding.collapsableChildren) {
           contentProps.collapsableChildren = false;
         }
@@ -420,7 +467,9 @@ export function createScrollView(platform: IScrollViewPlatform) {
           ref: setNodeRef,
         };
 
-        const refreshControl = isVNode(attrs.refreshControl) ? attrs.refreshControl : undefined;
+        const refreshControl = isVNode(attrs.refreshControl)
+          ? attrs.refreshControl
+          : undefined;
 
         return platform.assemble({
           scrollViewIntrinsic,

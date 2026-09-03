@@ -6,7 +6,14 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -91,9 +98,15 @@ function handleCoolDown(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="web-browser-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="web-browser-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -102,8 +115,9 @@ function handleCoolDown(): void {
         <View class="hero-copy">
           <Text class="hero-title">Web Browser</Text>
           <Text class="hero-body"
-            >@symbiote-native/web-browser — an in-app browser that keeps the user inside the app,
-            unlike Linking.openURL, plus the OAuth auth session built on it.</Text
+            >@symbiote-native/web-browser — an in-app browser that keeps the
+            user inside the app, unlike Linking.openURL, plus the OAuth auth
+            session built on it.</Text
           >
         </View>
       </View>
@@ -133,12 +147,14 @@ function handleCoolDown(): void {
         />
         <View class="web-browser-row">
           <Text class="web-browser-row-label">Last result</Text>
-          <Text testID="web-browser-result" class="web-browser-value-text">{{ lastResult }}</Text>
+          <Text testID="web-browser-result" class="web-browser-value-text">{{
+            lastResult
+          }}</Text>
         </View>
         <Text class="web-browser-note"
-          >iOS resolves once the browser closes (cancel, or dismiss when closed from code); Android
-          resolves opened as soon as the Custom Tab launches and never reports the close. Dismiss is
-          iOS-only.</Text
+          >iOS resolves once the browser closes (cancel, or dismiss when closed
+          from code); Android resolves opened as soon as the Custom Tab launches
+          and never reports the close. Dismiss is iOS-only.</Text
         >
       </View>
 
@@ -174,13 +190,15 @@ function handleCoolDown(): void {
         />
         <View class="web-browser-row">
           <Text class="web-browser-row-label">Service package</Text>
-          <Text testID="web-browser-service-package" class="web-browser-value-text">{{
-            servicePackage ?? '(not warmed up)'
-          }}</Text>
+          <Text
+            testID="web-browser-service-package"
+            class="web-browser-value-text"
+            >{{ servicePackage ?? '(not warmed up)' }}</Text
+          >
         </View>
         <Text class="web-browser-note"
-          >Android only. Listing the browsers throws on iOS, so this whole card is behind a
-          Platform.OS check.</Text
+          >Android only. Listing the browsers throws on iOS, so this whole card
+          is behind a Platform.OS check.</Text
         >
       </View>
     </ScrollView>

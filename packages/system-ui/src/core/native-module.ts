@@ -13,4 +13,6 @@ export type INativeSystemUIModule = {
   getBackgroundColorAsync(): Promise<ColorValue | null>;
 };
 
-export const expoSystemUI = requireNativeModule<INativeSystemUIModule>(EXPO_SYSTEM_UI_MODULE_NAME);
+export const expoSystemUI = requireNativeModule<INativeSystemUIModule>(
+  EXPO_SYSTEM_UI_MODULE_NAME,
+);

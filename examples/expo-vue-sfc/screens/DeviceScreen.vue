@@ -89,9 +89,15 @@ function handleCheckRooted(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="device-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="device-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -100,9 +106,10 @@ function handleCheckRooted(): void {
         <View class="hero-copy">
           <Text class="hero-title">Device</Text>
           <Text class="hero-body"
-            >@symbiote-native/device — physical device info: brand/model/OS constants, memory,
-            and best-effort root/jailbreak detection. A Simulator/emulator reports `isDevice` as
-            false and several fields as unavailable.</Text
+            >@symbiote-native/device — physical device info: brand/model/OS
+            constants, memory, and best-effort root/jailbreak detection. A
+            Simulator/emulator reports `isDevice` as false and several fields as
+            unavailable.</Text
           >
         </View>
       </View>
@@ -111,7 +118,9 @@ function handleCheckRooted(): void {
         <Text class="device-card-title">Info</Text>
         <View class="device-row">
           <Text class="device-row-label">Is device</Text>
-          <Text testID="device-is-device-value" class="device-value-text">{{ isDevice ? 'Yes' : 'No (simulator/emulator)' }}</Text>
+          <Text testID="device-is-device-value" class="device-value-text">{{
+            isDevice ? 'Yes' : 'No (simulator/emulator)'
+          }}</Text>
         </View>
         <View class="device-row">
           <Text class="device-row-label">Brand</Text>
@@ -127,11 +136,15 @@ function handleCheckRooted(): void {
         </View>
         <View class="device-row">
           <Text class="device-row-label">Device type</Text>
-          <Text class="device-value-text">{{ deviceTypeLabel(deviceType) }}</Text>
+          <Text class="device-value-text">{{
+            deviceTypeLabel(deviceType)
+          }}</Text>
         </View>
         <View class="device-row">
           <Text class="device-row-label">OS</Text>
-          <Text class="device-value-text">{{ `${osName ?? 'unknown'} ${osVersion ?? ''}` }}</Text>
+          <Text class="device-value-text">{{
+            `${osName ?? 'unknown'} ${osVersion ?? ''}`
+          }}</Text>
         </View>
         <View class="device-row">
           <Text class="device-row-label">Total memory</Text>
@@ -139,7 +152,9 @@ function handleCheckRooted(): void {
         </View>
         <View class="device-row">
           <Text class="device-row-label">Device name</Text>
-          <Text testID="device-name-value" class="device-value-text">{{ deviceName ?? 'unnamed device' }}</Text>
+          <Text testID="device-name-value" class="device-value-text">{{
+            deviceName ?? 'unnamed device'
+          }}</Text>
         </View>
       </View>
 
@@ -167,15 +182,21 @@ function handleCheckRooted(): void {
         </View>
         <View v-if="deviceTypeResult !== null" class="device-row">
           <Text class="device-row-label">Device type result</Text>
-          <Text testID="device-type-result-value" class="device-value-text">{{ deviceTypeResult }}</Text>
+          <Text testID="device-type-result-value" class="device-value-text">{{
+            deviceTypeResult
+          }}</Text>
         </View>
         <View v-if="uptimeResult !== null" class="device-row">
           <Text class="device-row-label">Uptime</Text>
-          <Text testID="device-uptime-result-value" class="device-value-text">{{ `${uptimeResult}ms` }}</Text>
+          <Text testID="device-uptime-result-value" class="device-value-text">{{
+            `${uptimeResult}ms`
+          }}</Text>
         </View>
         <View v-if="isRootedResult !== null" class="device-row">
           <Text class="device-row-label">Rooted/jailbroken</Text>
-          <Text testID="device-rooted-result-value" class="device-value-text">{{ isRootedResult ? 'true' : 'false' }}</Text>
+          <Text testID="device-rooted-result-value" class="device-value-text">{{
+            isRootedResult ? 'true' : 'false'
+          }}</Text>
         </View>
       </View>
     </ScrollView>

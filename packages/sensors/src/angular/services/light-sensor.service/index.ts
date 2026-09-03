@@ -1,4 +1,11 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { LightSensor, type ILightSensorMeasurement } from '../../../core';
 
 // Angular twin of React's `useLightSensor` hook / Vue's `useLightSensor` composable. Angular
@@ -23,7 +30,9 @@ export class LightSensorService {
         if (updateIntervalMs !== undefined) {
           LightSensor.setUpdateInterval(updateIntervalMs);
         }
-        const subscription = LightSensor.addListener(next => measurement.set(next));
+        const subscription = LightSensor.addListener(next =>
+          measurement.set(next),
+        );
         onCleanup(() => subscription.remove());
       },
       { injector: this.injector },

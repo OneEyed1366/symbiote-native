@@ -2,7 +2,7 @@
 // keyboard's way as it shows/hides. The inset math + the behavior → style/structure decision
 // live framework-agnostic in @symbiote-native/components (render-keyboard-avoiding-view), shared verbatim
 // with React/Vue; Angular supplies only the lifecycle: a plain inset field, ngOnInit subscribes to
-// the core Keyboard module (show / changeFrame / hide) and markForCheck pulls the OnPush view (the
+// the core Keyboard module (the host's show / hide pair) and markForCheck pulls the OnPush view (the
 // Angular twin of React's setState / Vue's reactive ref), ngOnDestroy tears the subscriptions down,
 // and the wrapper's onLayout measures the frame that feeds the next event's inset. The user
 // children nest under the wrapper (or, for 'position', an inner View) via <ng-content>. No native
@@ -26,8 +26,10 @@ import {
 } from '@angular/core';
 import {
   computeInset,
+  keyboardAvoidingEventNamesFor,
   readKeyboardFrame,
   readLayoutFrame,
+  readPrefersCrossFadeTransitions,
   resolveAccessibilityProps,
   resolveKeyboardAvoidingLayout,
   DEFAULT_VERTICAL_OFFSET,
@@ -40,7 +42,7 @@ import {
 } from '@symbiote-native/components';
 import {
   Keyboard,
-  KEYBOARD_EVENT,
+  Platform,
   dlog,
   isSymbioteEvent,
   type IEventSubscription,
@@ -60,7 +62,8 @@ export type { IKeyboardAvoidingBehavior } from '@symbiote-native/components';
 // Mirrors React's IKeyboardAvoidingViewProps minus children (Angular takes children via
 // <ng-content>), declared per-adapter over the shared accessibility base since a framework-specific
 // children field keeps it from being fully shared across adapters.
-export interface IAngularKeyboardAvoidingViewProps extends IAccessibilityProps, IAriaProps {
+export interface IAngularKeyboardAvoidingViewProps
+  extends IAccessibilityProps, IAriaProps {
   behavior?: IKeyboardAvoidingBehavior;
   enabled?: boolean;
   keyboardVerticalOffset?: number;
@@ -84,20 +87,24 @@ export type IAngularKeyboardAvoidingViewInputs = Omit<
 @Component({
   selector: 'KeyboardAvoidingView',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [ViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // The wrapper carries a11y + onLayout; 'position' ('nested') pushes the children in an inner
   // View by `bottom: inset`, the wrapper modes adjust the single wrapper directly. Only one @if
   // branch is instantiated, so each branch's <ng-content> projects the children unambiguously.
+  // `layout` stays a plain, unconditional template binding: unlike the four accessibility events
+  // below, this component READS its own onLayout internally (handleLayout measures the frame that
+  // feeds the next keyboard event's inset math — see keyboard-avoiding-view-rn-contract.md), so the
+  // gate must stay lit regardless of whether the app subscribes to the `layout` @Output(). Gating it
+  // on `.observed` would silently break the inset fixpoint correction the moment an app didn't
+  // listen to `layout`.
   template: `
     <symbiote-view
       [symbioteHostProps]="hostProps"
-      (accessibilityAction)="emit(accessibilityAction, $event)"
-      (accessibilityTap)="emit(accessibilityTap, $event)"
-      (magicTap)="emit(magicTap, $event)"
-      (accessibilityEscape)="emit(accessibilityEscape, $event)"
       (layout)="handleLayout($event)"
     >
       @if (isNested) {
@@ -110,7 +117,9 @@ export type IAngularKeyboardAvoidingViewInputs = Omit<
     </symbiote-view>
   `,
 })
-export class KeyboardAvoidingView implements IAngularKeyboardAvoidingViewInputs, OnInit, OnDestroy {
+export class KeyboardAvoidingView
+  implements IAngularKeyboardAvoidingViewInputs, OnInit, OnDestroy
+{
   @Input() behavior?: IKeyboardAvoidingBehavior;
   @Input() enabled?: boolean;
   @Input() keyboardVerticalOffset?: number;
@@ -135,8 +144,10 @@ export class KeyboardAvoidingView implements IAngularKeyboardAvoidingViewInputs,
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -168,6 +179,12 @@ export class KeyboardAvoidingView implements IAngularKeyboardAvoidingViewInputs,
   // keyboard event's inset math (React's frameRef / initialHeightRef, Vue's frame / initialHeight).
   private frame?: IMeasuredFrame;
   private initialHeight?: number;
+  // The iOS "Prefer Cross-Fade Transitions" setting, read once per mount. Deliberately a plain
+  // field and NOT markForCheck'd when the promise lands: it is a device setting that cannot change
+  // mid-session, and it feeds only the NEXT keyboard event's math — never the current render — so
+  // under zoneless CD there is nothing to repaint at resolve time. The keyboard event that does use
+  // it already calls markForCheck itself.
+  private prefersCrossFadeTransitions = false;
   private subscriptions: IEventSubscription[] = [];
 
   private readonly changeDetector = inject(ChangeDetectorRef);
@@ -177,11 +194,21 @@ export class KeyboardAvoidingView implements IAngularKeyboardAvoidingViewInputs,
   private readonly elementRef = inject(ElementRef);
 
   ngOnInit(): void {
+    // TWO events, picked per host, never three: iOS takes the will* pair so the view rides up with
+    // the keyboard animation, Android the did* pair. The change-frame notification is deliberately
+    // absent — with an undocked/split/floating iOS keyboard it fires BEFORE the hide, so listening
+    // to it applies a frame captured mid-dismissal (RN KeyboardAvoidingView.js's own comment).
+    const events = keyboardAvoidingEventNamesFor(Platform.OS);
     this.subscriptions = [
-      Keyboard.addListener(KEYBOARD_EVENT.didShow, payload => this.onShow(payload)),
-      Keyboard.addListener(KEYBOARD_EVENT.didChangeFrame, payload => this.onShow(payload)),
-      Keyboard.addListener(KEYBOARD_EVENT.didHide, () => this.onHide()),
+      Keyboard.addListener(events.show, payload => this.onShow(payload)),
+      Keyboard.addListener(events.hide, () => this.onHide()),
     ];
+    // The core wrapper, not AccessibilityInfo directly: the engine's iOS getter REJECTS on a
+    // native error (RN parity), and nobody awaits this read, so an unwrapped call would surface
+    // as an unhandled rejection. The wrapper answers false on a failed read.
+    void readPrefersCrossFadeTransitions().then(enabled => {
+      this.prefersCrossFadeTransitions = enabled;
+    });
   }
 
   ngOnDestroy(): void {
@@ -192,7 +219,17 @@ export class KeyboardAvoidingView implements IAngularKeyboardAvoidingViewInputs,
   private onShow(payload: unknown): void {
     const keyboard = readKeyboardFrame(payload);
     const offset = this.keyboardVerticalOffset ?? DEFAULT_VERTICAL_OFFSET;
-    const next = computeInset(this.frame, keyboard, offset);
+    const next = computeInset(this.frame, keyboard, offset, {
+      // Read off the field at event time, not captured when the subscription was built: `behavior`
+      // is an @Input that can change under a long-lived subscription, and a stale one keeps
+      // applying the old mode's math (it gates the previous-inset correction below).
+      behavior: this.behavior,
+      // The inset CURRENTLY applied (RN's this.state.bottom), read off the field at event time so
+      // 'height' mode's fixpoint correction sees the live value: that mode SHRINKS the wrapper by
+      // the inset, so the next onLayout reports a frame shorter by exactly that much.
+      previousInset: this.inset,
+      prefersCrossFadeTransitions: this.prefersCrossFadeTransitions,
+    });
     dlog(`KeyboardAvoidingView show -> inset ${next}`);
     this.inset = next;
     this.changeDetector.markForCheck();
@@ -211,7 +248,8 @@ export class KeyboardAvoidingView implements IAngularKeyboardAvoidingViewInputs,
     const measured = readLayoutFrame(event.nativeEvent.layout);
     if (measured !== undefined) {
       this.frame = measured;
-      if (this.initialHeight === undefined) this.initialHeight = measured.height;
+      if (this.initialHeight === undefined)
+        this.initialHeight = measured.height;
     }
     this.layout.emit(event);
   }
@@ -244,7 +282,9 @@ export class KeyboardAvoidingView implements IAngularKeyboardAvoidingViewInputs,
   }
 
   get innerStyle(): IStyleProp<IViewStyle> | undefined {
-    return this.resolvedLayout.kind === 'nested' ? this.resolvedLayout.innerStyle : undefined;
+    return this.resolvedLayout.kind === 'nested'
+      ? this.resolvedLayout.innerStyle
+      : undefined;
   }
 
   // The wrapper's full prop bag (style + identity + a11y) folded for `[symbioteHostProps]`,
@@ -258,14 +298,26 @@ export class KeyboardAvoidingView implements IAngularKeyboardAvoidingViewInputs,
       nativeID: this.nativeID,
       accessible: this.accessible,
       ...this.folded,
+      onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),
+      onAccessibilityTap: this.eventEmitterHandler(this.accessibilityTap),
+      onMagicTap: this.eventEmitterHandler(this.magicTap),
+      onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
     };
   }
 
   // Forward an engine event to the matching @Output(), narrowing the template's untyped $event
-  // first. The accessibility* Outputs ride the engine's structural event channel (Angular blocks
-  // [onX] property bindings; events flow through (event) only).
-  emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
+  // first.
+  private emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     if (isSymbioteEvent(event)) emitter.emit(event);
+  }
+
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`). `.observed`-gated, unlike `layout` above which
+  // this component needs unconditionally for its own internal frame measurement.
+  private eventEmitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): ((event: unknown) => void) | undefined {
+    return emitter.observed ? event => this.emit(emitter, event) : undefined;
   }
 
   // Fold the web aria-*/role aliases into the canonical accessibility* props once per render, so the
@@ -286,8 +338,10 @@ export class KeyboardAvoidingView implements IAngularKeyboardAvoidingViewInputs,
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

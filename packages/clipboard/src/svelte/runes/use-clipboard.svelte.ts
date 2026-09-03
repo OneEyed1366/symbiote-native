@@ -13,7 +13,11 @@
 // Returns a boxed getter object, NOT a bare `$state`: Svelte 5 reactivity is lexically scoped to
 // the declaring module, so a raw `let x = $state(...)` handed out of a plain function arrives
 // dead at the caller. `.current` is the Svelte equivalent of unwrapping Vue's `Ref` via `.value`.
-import { addClipboardListener, type EventSubscription, type IClipboardEvent } from '../../core';
+import {
+  addClipboardListener,
+  type EventSubscription,
+  type IClipboardEvent,
+} from '../../core';
 
 export function useClipboard(): { readonly current: IClipboardEvent | null } {
   let event = $state<IClipboardEvent | null>(null);

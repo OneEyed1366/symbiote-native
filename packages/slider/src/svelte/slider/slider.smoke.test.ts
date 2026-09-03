@@ -22,7 +22,8 @@ import { setNativeViewConfigSource } from '@symbiote-native/engine';
 // free) transform cannot parse — see index.svelte's header and native-view-bridge.ts's own.
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -43,7 +44,12 @@ const fakeColor = (value: unknown): string => `processed(${value})`;
 // processors — identical to what the Vue wrapper's own test injects.
 const RNC_SLIDER_VIEW_CONFIG = {
   bubblingEventTypes: {
-    topChange: { phasedRegistrationNames: { bubbled: 'onChange', captured: 'onChangeCapture' } },
+    topChange: {
+      phasedRegistrationNames: {
+        bubbled: 'onChange',
+        captured: 'onChangeCapture',
+      },
+    },
     topRNCSliderValueChange: {
       phasedRegistrationNames: {
         bubbled: 'onRNCSliderValueChange',
@@ -53,8 +59,12 @@ const RNC_SLIDER_VIEW_CONFIG = {
   },
   directEventTypes: {
     topRNCSliderSlidingStart: { registrationName: 'onRNCSliderSlidingStart' },
-    topRNCSliderSlidingComplete: { registrationName: 'onRNCSliderSlidingComplete' },
-    topRNCSliderAccessibilityAction: { registrationName: 'onRNCSliderAccessibilityAction' },
+    topRNCSliderSlidingComplete: {
+      registrationName: 'onRNCSliderSlidingComplete',
+    },
+    topRNCSliderAccessibilityAction: {
+      registrationName: 'onRNCSliderAccessibilityAction',
+    },
   },
   validAttributes: {
     value: true,
@@ -72,13 +82,24 @@ const RNC_SLIDER_VIEW_CONFIG = {
 };
 
 const fabric = installFabric();
-setNativeViewConfigSource(name => (name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined));
+setNativeViewConfigSource(name =>
+  name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined,
+);
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
@@ -167,7 +188,12 @@ describe('Slider (real compiled index.svelte)', () => {
       // why: WHY THE LEAF IS BRIDGED (this file's header) — 'RNCSlider' would parse as a Svelte
       // component reference if written as a literal tag, so the descriptor-children bridge must
       // be the thing that actually gets the native view onto the tree, under a real wrapper.
-      await mountSlider({ value: 0.5, minimumValue: 0, maximumValue: 1, step: 0.1 });
+      await mountSlider({
+        value: 0.5,
+        minimumValue: 0,
+        maximumValue: 1,
+        step: 0.1,
+      });
       const props = sliderNode().props;
       expect(props.value).toBe(0.5);
       expect(props.minimumValue).toBe(0);
@@ -226,11 +252,16 @@ describe('Slider (real compiled index.svelte)', () => {
       // and topRNCSliderValueChange (-> onRNCSliderValueChange) bubbling events (constants.ts) —
       // missing either rail would silently drop value updates on whichever host platform emits it.
       let changed: number | undefined;
-      await mountSlider({ value: 0.2, onValueChange: (value: number) => (changed = value) });
+      await mountSlider({
+        value: 0.2,
+        onValueChange: (value: number) => (changed = value),
+      });
       const node = sliderNode();
       fabric.fireEvent(node.instanceHandle, 'topChange', { value: 0.7 });
       expect(changed).toBe(0.7);
-      fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', { value: 0.42 });
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', {
+        value: 0.42,
+      });
       expect(changed).toBe(0.42);
     });
 
@@ -246,8 +277,12 @@ describe('Slider (real compiled index.svelte)', () => {
         onSlidingComplete: (value: number) => (completedAt = value),
       });
       const node = sliderNode();
-      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingStart', { value: 0.1 });
-      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingComplete', { value: 0.9 });
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingStart', {
+        value: 0.1,
+      });
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingComplete', {
+        value: 0.9,
+      });
       expect(startedAt).toBe(0.1);
       expect(completedAt).toBe(0.9);
     });
@@ -279,7 +314,9 @@ describe('Slider (real compiled index.svelte)', () => {
         step: 0.5,
         renderStepNumber: true,
       });
-      const container = fabric.find(n => n.props.testID === 'StepsIndicator-Container');
+      const container = fabric.find(
+        n => n.props.testID === 'StepsIndicator-Container',
+      );
       expect(container, 'a StepsIndicator container is painted').toBeDefined();
       // Still exactly one native leaf underneath the same wrapper.
       expect(sliderNode().props.value).toBe(0.5);
@@ -289,8 +326,15 @@ describe('Slider (real compiled index.svelte)', () => {
       // why: renderSlider()'s Descriptor shape genuinely varies (1 child vs. 2) as
       // renderStepNumber toggles — the bridge's own sync must rebuild cleanly on a child-count
       // change instead of assuming the fixed shape every OTHER component in this adapter has.
-      await mountSlider({ value: 0.5, minimumValue: 0, maximumValue: 1, step: 0.5 });
-      expect(fabric.find(n => n.props.testID === 'StepsIndicator-Container')).toBeUndefined();
+      await mountSlider({
+        value: 0.5,
+        minimumValue: 0,
+        maximumValue: 1,
+        step: 0.5,
+      });
+      expect(
+        fabric.find(n => n.props.testID === 'StepsIndicator-Container'),
+      ).toBeUndefined();
       unmount(ROOT_TAG);
       fabric.reset();
       await mountSlider({
@@ -300,7 +344,9 @@ describe('Slider (real compiled index.svelte)', () => {
         step: 0.5,
         renderStepNumber: true,
       });
-      expect(fabric.find(n => n.props.testID === 'StepsIndicator-Container')).toBeDefined();
+      expect(
+        fabric.find(n => n.props.testID === 'StepsIndicator-Container'),
+      ).toBeDefined();
       expect(sliderNode().props.value).toBe(0.5);
     });
 
@@ -317,7 +363,9 @@ describe('Slider (real compiled index.svelte)', () => {
       // computeStepOptions(0, 1, 0.25, resolution) with an explicit step yields 5 points
       // (0, 0.25, 0.5, 0.75, 1) — one marker per point.
       const markers = fabric.created.filter(
-        n => typeof n.props.testID === 'string' && n.props.testID.startsWith('marker-'),
+        n =>
+          typeof n.props.testID === 'string' &&
+          n.props.testID.startsWith('marker-'),
       );
       expect(markers).toHaveLength(5);
 
@@ -349,11 +397,15 @@ describe('Slider (real compiled index.svelte)', () => {
       // actually reports, on the SAME handleValueChange path onValueChange already fires from
       // (index.svelte's `value = next` right beside `onValueChange?.(next)`), never a per-frame
       // resync driven by anything else.
-      fabric.fireEvent(sliderNode().instanceHandle, 'topChange', { value: 0.7 });
+      fabric.fireEvent(sliderNode().instanceHandle, 'topChange', {
+        value: 0.7,
+      });
       await tick();
       expect(reported.at(-1)).toBe(0.7);
 
-      fabric.fireEvent(sliderNode().instanceHandle, 'topRNCSliderValueChange', { value: 0.45 });
+      fabric.fireEvent(sliderNode().instanceHandle, 'topRNCSliderValueChange', {
+        value: 0.45,
+      });
       await tick();
       expect(reported.at(-1)).toBe(0.45);
     });

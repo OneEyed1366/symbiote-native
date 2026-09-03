@@ -3,14 +3,15 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-standard-web-crypto`](https://github.com/expo/expo/tree/main/packages/expo-standard-web-crypto)
 — a partial W3C [Web Crypto API](https://www.w3.org/TR/WebCryptoAPI/) polyfill exposing
-`crypto.getRandomValues` — usable from **every** adapter, React, Vue, and Angular, not just React.
+`crypto.getRandomValues` — usable from **every** adapter, React, Vue, Svelte, Solid, and Angular,
+not just React.
 Unlike this repo's other Expo ports, this package needs **no native module of its own** — upstream
 is a ~15-line pure-JS shim that delegates straight to `expo-crypto`'s own `getRandomValues`; this
 port delegates to [`@symbiote-native/crypto`](../crypto)'s `getRandomValues` instead, since this
 repo already ships that native random source as a sibling package. Like `@symbiote-native/crypto`,
 every export here is a plain function/object with no per-instance state or event stream, so there
-is no hook/composable/service to wrap — the React, Vue, and Angular entry points are plain
-re-exports of the same `core`.
+is no hook/composable/service to wrap — the React, Vue, Svelte, Solid, and Angular entry points are
+plain re-exports of the same `core`.
 
 ## Install
 
@@ -28,20 +29,24 @@ No further native wiring is needed for this package itself — it has no native 
 ## Shape
 
 ```
-src/core/     web-crypto.ts — the Crypto class + webCrypto singleton (default export) and
-              polyfillWebCrypto(), delegating to @symbiote-native/crypto's getRandomValues.
-src/react/    @symbiote-native/standard-web-crypto/react   — export * from '../core'
-src/vue/      @symbiote-native/standard-web-crypto/vue     — export * from '../core'
+src/core/     web-crypto.ts — the Crypto class + webCrypto singleton (default export, also
+              re-exported as the named `webCrypto`) and polyfillWebCrypto(), delegating to
+              @symbiote-native/crypto's getRandomValues.
 src/angular/  @symbiote-native/standard-web-crypto/angular — export * from '../core'
 ```
 
-No per-adapter lifecycle wrapper exists because there's nothing to subscribe to or clean up —
-each adapter entry is a single-file re-export.
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/` —
+no physical per-framework file, since there's nothing to subscribe to or clean up. (The `webCrypto`
+named re-export used to live only in those three per-framework barrels; it now lives once in
+`src/core/index.ts` instead.) `./angular` stays a physical file/subpath since Angular ships
+through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 
 ```ts
-import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto';
 
 // Reach the polyfill (or a real globalThis.crypto, if one already exists) directly:
 const bytes = new Uint8Array(16);
@@ -53,12 +58,24 @@ polyfillWebCrypto();
 crypto.getRandomValues(bytes);
 ```
 
-The React/Vue/Angular entry points re-export the identical surface:
+The React/Vue/Svelte/Solid/Angular entry points re-export the identical surface:
 
 ```ts
-import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/react';
-import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/vue';
-import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/angular';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/react';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/vue';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/svelte';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/solid';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/angular';
 ```
 
 ## API
@@ -77,7 +94,7 @@ Plus the `IWebCrypto` type describing the shape above.
 ## Notes
 
 - **`webCrypto` is resolved once, at module-load time**: if `globalThis.crypto` already exists
-  (a real Web Crypto implementation), `webCrypto` *is* that object; otherwise it's this package's
+  (a real Web Crypto implementation), `webCrypto` _is_ that object; otherwise it's this package's
   own `Crypto` class instance backed by `@symbiote-native/crypto`. React Native has no reliable
   `window` global, so this port checks/defines `globalThis.crypto` rather than upstream's `window`.
 - **`getRandomValues` only accepts the integer TypedArrays `@symbiote-native/crypto` can hand to

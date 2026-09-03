@@ -6,7 +6,7 @@ import type { IRootTag } from './fabric';
 import { commitChildren } from './commit';
 import { dlog } from './debug';
 import { installEventHandler } from './events';
-import type { ISymbioteNode } from './node';
+import { markStructureDirty, type ISymbioteNode } from './node';
 import { registerSurface } from './surface-registry';
 
 export class SymbioteSurface {
@@ -57,9 +57,16 @@ export class SymbioteSurface {
     });
   }
 
+  // Splices `parent.children` directly instead of going through node.ts's removeChild, so it
+  // owes the same marks - otherwise a node pulled out of a subtree here leaves that subtree
+  // looking clean and the commit walk skips right over the hole, and commitTargeted would rebuild
+  // that parent's child set from a snapshot that still contains the removed node.
   private detach(child: ISymbioteNode): void {
     const parent = child.parent;
     if (parent) {
+      // Marks before the splice, like node.ts's own structural ops: the committed record may be
+      // aliasing `parent.children`, and this call is what copies it out of the way.
+      markStructureDirty(parent);
       const index = parent.children.indexOf(child);
       if (index >= 0) parent.children.splice(index, 1);
       child.parent = undefined;

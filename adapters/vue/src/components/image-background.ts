@@ -65,8 +65,12 @@ function asResizeMode(value: unknown): IResizeMode | undefined {
   return isResizeMode(value) ? value : undefined;
 }
 
-function asCrossOrigin(value: unknown): 'anonymous' | 'use-credentials' | undefined {
-  return value === 'anonymous' || value === 'use-credentials' ? value : undefined;
+function asCrossOrigin(
+  value: unknown,
+): 'anonymous' | 'use-credentials' | undefined {
+  return value === 'anonymous' || value === 'use-credentials'
+    ? value
+    : undefined;
 }
 
 function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
@@ -105,7 +109,10 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
   return result;
 }
 
-const ImageBackgroundComponent: FunctionalComponent = (_props, { attrs: rawAttrs, slots }) => {
+const ImageBackgroundComponent: FunctionalComponent = (
+  _props,
+  { attrs: rawAttrs, slots },
+) => {
   const attrs = normalizeVueAttrs(rawAttrs);
   const wrapper = renderImageBackground({
     style: isStyleProp(attrs.style) ? attrs.style : undefined,
@@ -134,10 +141,11 @@ const ImageBackgroundComponent: FunctionalComponent = (_props, { attrs: rawAttrs
 
   // wrapper = symbiote-view > [imageDescriptor]; the slot children paint AFTER the image (on top).
   const slotChildren = slots.default !== undefined ? slots.default() : [];
-  return h(wrapper.type, { ...wrapper.props, key: wrapper.key, class: attrs.class }, [
-    ...wrapper.children.map(toChildVNode),
-    ...slotChildren,
-  ]);
+  return h(
+    wrapper.type,
+    { ...wrapper.props, key: wrapper.key, class: attrs.class },
+    [...wrapper.children.map(toChildVNode), ...slotChildren],
+  );
 };
 ImageBackgroundComponent.displayName = 'ImageBackground';
 ImageBackgroundComponent.inheritAttrs = false;

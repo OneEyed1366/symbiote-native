@@ -1,5 +1,10 @@
 import { EventEmitter, computed, signal } from '@angular/core';
 import {
+  gateWanted,
+  injectGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../../gate-demand';
+import {
   imageStatics,
   renderImage,
   resolveAccessibilityProps,
@@ -150,15 +155,29 @@ function asNumber(value: unknown): number | undefined {
   return typeof value === 'number' ? value : undefined;
 }
 
-function asCrossOrigin(value: unknown): 'anonymous' | 'use-credentials' | undefined {
-  return value === 'anonymous' || value === 'use-credentials' ? value : undefined;
+function asCrossOrigin(
+  value: unknown,
+): 'anonymous' | 'use-credentials' | undefined {
+  return value === 'anonymous' || value === 'use-credentials'
+    ? value
+    : undefined;
 }
 
 function asStyle(value: unknown): IStyleProp<IViewStyle> | undefined {
   return typeof value === 'object' && value !== null ? value : undefined;
 }
 
-export function resolveImageProps(input: Record<string, unknown>): Record<string, unknown> {
+// Narrows a value out of the untyped animated prop bag. A runtime guard rather than a cast: the
+// bag is built at runtime from merged animated values, so nothing upstream has proven the shape.
+export function isImageEventCallback(
+  value: unknown,
+): value is (event: ISymbioteEvent) => void {
+  return typeof value === 'function';
+}
+
+export function resolveImageProps(
+  input: Record<string, unknown>,
+): Record<string, unknown> {
   const passthrough: IImagePassthroughProps = {
     resizeMethod: input['resizeMethod'] as IImageProps['resizeMethod'],
     blurRadius: asNumber(input['blurRadius']),
@@ -170,12 +189,21 @@ export function resolveImageProps(input: Record<string, unknown>): Record<string
         : undefined,
     testID: asString(input['testID']),
     nativeID: asString(input['nativeID']),
-    accessible: typeof input['accessible'] === 'boolean' ? input['accessible'] : undefined,
+    accessible:
+      typeof input['accessible'] === 'boolean'
+        ? input['accessible']
+        : undefined,
     accessibilityLabel: asString(input['accessibilityLabel']),
     accessibilityHint: asString(input['accessibilityHint']),
-    accessibilityRole: input['accessibilityRole'] as IAccessibilityProps['accessibilityRole'],
-    accessibilityState: input['accessibilityState'] as IAccessibilityProps['accessibilityState'],
-    accessibilityValue: input['accessibilityValue'] as IAccessibilityProps['accessibilityValue'],
+    accessibilityRole: input[
+      'accessibilityRole'
+    ] as IAccessibilityProps['accessibilityRole'],
+    accessibilityState: input[
+      'accessibilityState'
+    ] as IAccessibilityProps['accessibilityState'],
+    accessibilityValue: input[
+      'accessibilityValue'
+    ] as IAccessibilityProps['accessibilityValue'],
     accessibilityActions: input[
       'accessibilityActions'
     ] as IAccessibilityProps['accessibilityActions'],
@@ -213,26 +241,48 @@ export function resolveImageProps(input: Record<string, unknown>): Record<string
       typeof input['accessibilityShowsLargeContentViewer'] === 'boolean'
         ? input['accessibilityShowsLargeContentViewer']
         : undefined,
-    accessibilityLargeContentTitle: asString(input['accessibilityLargeContentTitle']),
+    accessibilityLargeContentTitle: asString(
+      input['accessibilityLargeContentTitle'],
+    ),
     role: input['role'] as IAriaProps['role'],
     'aria-label': asString(input['ariaLabel'] ?? input['aria-label']),
-    'aria-labelledby': asString(input['ariaLabelledBy'] ?? input['aria-labelledby']),
+    'aria-labelledby': asString(
+      input['ariaLabelledBy'] ?? input['aria-labelledby'],
+    ),
     'aria-live': input['ariaLive'] as IAriaProps['aria-live'],
-    'aria-hidden': typeof input['ariaHidden'] === 'boolean' ? input['ariaHidden'] : undefined,
-    'aria-busy': typeof input['ariaBusy'] === 'boolean' ? input['ariaBusy'] : undefined,
+    'aria-hidden':
+      typeof input['ariaHidden'] === 'boolean'
+        ? input['ariaHidden']
+        : undefined,
+    'aria-busy':
+      typeof input['ariaBusy'] === 'boolean' ? input['ariaBusy'] : undefined,
     'aria-checked': input['ariaChecked'] as IAriaProps['aria-checked'],
-    'aria-disabled': typeof input['ariaDisabled'] === 'boolean' ? input['ariaDisabled'] : undefined,
-    'aria-expanded': typeof input['ariaExpanded'] === 'boolean' ? input['ariaExpanded'] : undefined,
-    'aria-selected': typeof input['ariaSelected'] === 'boolean' ? input['ariaSelected'] : undefined,
-    'aria-modal': typeof input['ariaModal'] === 'boolean' ? input['ariaModal'] : undefined,
+    'aria-disabled':
+      typeof input['ariaDisabled'] === 'boolean'
+        ? input['ariaDisabled']
+        : undefined,
+    'aria-expanded':
+      typeof input['ariaExpanded'] === 'boolean'
+        ? input['ariaExpanded']
+        : undefined,
+    'aria-selected':
+      typeof input['ariaSelected'] === 'boolean'
+        ? input['ariaSelected']
+        : undefined,
+    'aria-modal':
+      typeof input['ariaModal'] === 'boolean' ? input['ariaModal'] : undefined,
     'aria-valuemax': asNumber(input['ariaValueMax']),
     'aria-valuemin': asNumber(input['ariaValueMin']),
     'aria-valuenow': asNumber(input['ariaValueNow']),
     'aria-valuetext': asString(input['ariaValueText']),
-    onAccessibilityAction: input['onAccessibilityAction'] as IImageProps['onLoad'],
+    onAccessibilityAction: input[
+      'onAccessibilityAction'
+    ] as IImageProps['onLoad'],
     onAccessibilityTap: input['onAccessibilityTap'] as IImageProps['onLoad'],
     onMagicTap: input['onMagicTap'] as IImageProps['onLoad'],
-    onAccessibilityEscape: input['onAccessibilityEscape'] as IImageProps['onLoad'],
+    onAccessibilityEscape: input[
+      'onAccessibilityEscape'
+    ] as IImageProps['onLoad'],
     onLoadStart: input['onLoadStart'] as IImageProps['onLoadStart'],
     onLoad: input['onLoad'] as IImageProps['onLoad'],
     onLoadEnd: input['onLoadEnd'] as IImageProps['onLoadEnd'],
@@ -345,28 +395,32 @@ export abstract class ImageBase {
   readonly progress = new EventEmitter<ISymbioteEvent>();
   readonly partialLoad = new EventEmitter<ISymbioteEvent>();
 
-  handleAccessibilityAction(event: Event): void {
-    if (!isSymbioteEvent(event)) return;
-    this.onAccessibilityAction?.(event);
-    this.accessibilityAction.emit(event);
-  }
+  // Null unless an adapter wrapper renders this Image in its own template — ImageBackground does.
+  // An app's own `<Image>` gets null and answers from its own `.observed`.
+  private readonly gateDemand = injectGateDemand();
 
-  handleAccessibilityTap(event: Event): void {
-    if (!isSymbioteEvent(event)) return;
-    this.onAccessibilityTap?.(event);
-    this.accessibilityTap.emit(event);
-  }
-
-  handleMagicTap(event: Event): void {
-    if (!isSymbioteEvent(event)) return;
-    this.onMagicTap?.(event);
-    this.magicTap.emit(event);
-  }
-
-  handleAccessibilityEscape(event: Event): void {
-    if (!isSymbioteEvent(event)) return;
-    this.onAccessibilityEscape?.(event);
-    this.accessibilityEscape.emit(event);
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`): native fires them only when the committed
+  // payload carries a FUNCTION at that key. A template `(accessibilityAction)="..."` binding on the
+  // intrinsic host lights the gate unconditionally; this reaches the app two ways — a plain
+  // `[onAccessibilityAction]` @Input callback, or the `accessibilityAction` @Output — and the gate
+  // must light only when at least one of the two is actually wired. Returned `undefined` means
+  // `setEventListener` never sees a function, so the gate stays dark.
+  protected gatedAccessibilityHandler(
+    name: IGatedAccessibilityEvent,
+    callback: ((event: ISymbioteEvent) => void) | undefined,
+  ): ((event: Event) => void) | undefined {
+    const emitter = this[name];
+    // A WRAPPER's binding is not a subscriber, and `.observed` cannot tell the two apart.
+    // ImageBackground renders this component and binds all four, so without the demand every
+    // Image inside one lit its gates. See `gate-demand.ts`.
+    if (!gateWanted(this.gateDemand, name, emitter) && callback === undefined)
+      return undefined;
+    return event => {
+      if (!isSymbioteEvent(event)) return;
+      callback?.(event);
+      emitter.emit(event);
+    };
   }
 
   handleLoadStart(event: Event): void {
@@ -442,8 +496,10 @@ export abstract class ImageBase {
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       ariaLabel: this.ariaLabel,
@@ -460,10 +516,19 @@ export abstract class ImageBase {
       ariaValueMin: this.ariaValueMin,
       ariaValueNow: this.ariaValueNow,
       ariaValueText: this.ariaValueText,
-      onAccessibilityAction: this.onAccessibilityAction,
-      onAccessibilityTap: this.onAccessibilityTap,
-      onMagicTap: this.onMagicTap,
-      onAccessibilityEscape: this.onAccessibilityEscape,
+      onAccessibilityAction: this.gatedAccessibilityHandler(
+        'accessibilityAction',
+        this.onAccessibilityAction,
+      ),
+      onAccessibilityTap: this.gatedAccessibilityHandler(
+        'accessibilityTap',
+        this.onAccessibilityTap,
+      ),
+      onMagicTap: this.gatedAccessibilityHandler('magicTap', this.onMagicTap),
+      onAccessibilityEscape: this.gatedAccessibilityHandler(
+        'accessibilityEscape',
+        this.onAccessibilityEscape,
+      ),
       onLoadStart: this.onLoadStart,
       onLoad: this.onLoad,
       onLoadEnd: this.onLoadEnd,

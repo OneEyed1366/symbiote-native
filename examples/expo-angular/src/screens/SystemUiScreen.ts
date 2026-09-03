@@ -1,6 +1,9 @@
 import { Component, signal } from '@angular/core';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
-import { getBackgroundColorAsync, setBackgroundColorAsync } from '@symbiote-native/system-ui/angular';
+import {
+  getBackgroundColorAsync,
+  setBackgroundColorAsync,
+} from '@symbiote-native/system-ui/angular';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -17,7 +20,11 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="system-ui-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="system-ui-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -28,8 +35,9 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           <View class="hero-copy">
             <Text class="hero-title">System UI</Text>
             <Text class="hero-body">
-              @symbiote-native/system-ui — get/set the root view's background color, the color
-              painted behind the RN surface before any content mounts.
+              @symbiote-native/system-ui — get/set the root view's background
+              color, the color painted behind the RN surface before any content
+              mounts.
             </Text>
           </View>
         </View>
@@ -38,7 +46,9 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           <Text class="capability-card-title">Root background color</Text>
           <View class="capability-row">
             <Text class="capability-label">Current color</Text>
-            <Text testID="system-ui-color-result" class="value-text">{{ colorLabel() }}</Text>
+            <Text testID="system-ui-color-result" class="value-text">{{
+              colorLabel()
+            }}</Text>
           </View>
           <View class="button-row">
             <ActionButton

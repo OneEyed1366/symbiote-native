@@ -151,13 +151,17 @@ describe('AnimatedValueXY — Negative (the throw IS the contract)', () => {
   // of silently coercing one axis. Reaching this needs no `as` cast: the mismatched pair is
   // valid per the declared type on its own.
   it('throws when x and y are a mismatched number/AnimatedValue pair', () => {
-    expect(() => new AnimatedValueXY({ x: 1, y: new AnimatedValue(2) })).toThrow(
+    expect(
+      () => new AnimatedValueXY({ x: 1, y: new AnimatedValue(2) }),
+    ).toThrow(
       'AnimatedValueXY must be initialized with an object of numbers or AnimatedValues.',
     );
   });
 
   it('throws the same way when the mismatch runs the other direction', () => {
-    expect(() => new AnimatedValueXY({ x: new AnimatedValue(1), y: 2 })).toThrow(
+    expect(
+      () => new AnimatedValueXY({ x: new AnimatedValue(1), y: 2 }),
+    ).toThrow(
       'AnimatedValueXY must be initialized with an object of numbers or AnimatedValues.',
     );
   });

@@ -13,12 +13,22 @@
 // unguarded, and the throw propagates straight out of this composable's setup body. The
 // React/Angular/Svelte sibling files prove both through their own lifecycles.
 
-import { effectScope, nextTick, ref, type EffectScope, type Ref } from '@vue/runtime-core';
+import {
+  effectScope,
+  nextTick,
+  ref,
+  type EffectScope,
+  type Ref,
+} from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hide } from 'react-native-bootsplash';
 import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import { useHideAnimation } from './index';
-import type { IHideAnimationConfig, IHideAnimationFailure, IManifest } from '../../../core';
+import type {
+  IHideAnimationConfig,
+  IHideAnimationFailure,
+  IManifest,
+} from '../../../core';
 
 vi.mock('react-native-bootsplash', () => ({
   hide: vi.fn(() => Promise.resolve()),
@@ -31,7 +41,9 @@ const FAKE_NATIVE_MODULE = {
   isVisible: () => true,
 };
 
-const registeredNativeModules: Record<string, unknown> = { RNBootSplash: FAKE_NATIVE_MODULE };
+const registeredNativeModules: Record<string, unknown> = {
+  RNBootSplash: FAKE_NATIVE_MODULE,
+};
 
 function isPresent<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
@@ -95,7 +107,9 @@ describe('useHideAnimation (Vue)', () => {
         ready: readyRef.value,
       });
 
-      const { value: result, stop } = runInScope(() => useHideAnimation(getConfig));
+      const { value: result, stop } = runInScope(() =>
+        useHideAnimation(getConfig),
+      );
 
       expect(hide).not.toHaveBeenCalled();
 
@@ -104,7 +118,10 @@ describe('useHideAnimation (Vue)', () => {
 
       expect(typeof result.value.logo.onLoadEnd).toBe('function');
       result.value.logo.onLoadEnd?.();
-      expect(hide, 'layout + logo alone must not hide (ready still false)').not.toHaveBeenCalled();
+      expect(
+        hide,
+        'layout + logo alone must not hide (ready still false)',
+      ).not.toHaveBeenCalled();
 
       readyRef.value = true;
       await nextTick();
@@ -126,7 +143,9 @@ describe('useHideAnimation (Vue)', () => {
         ready: readyRef.value,
       });
 
-      const { value: result, stop } = runInScope(() => useHideAnimation(getConfig));
+      const { value: result, stop } = runInScope(() =>
+        useHideAnimation(getConfig),
+      );
 
       result.value.container.onLayout();
       result.value.logo.onLoadEnd?.();
@@ -155,7 +174,9 @@ describe('useHideAnimation (Vue)', () => {
         ready: true,
       });
 
-      const { value: result, stop } = runInScope(() => useHideAnimation(getConfig));
+      const { value: result, stop } = runInScope(() =>
+        useHideAnimation(getConfig),
+      );
       const { container, logo, brand } = result.value;
 
       expect(asViewStyle(container.style).backgroundColor).toBe('#ffffff');
@@ -189,7 +210,9 @@ describe('useHideAnimation (Vue)', () => {
         ready: true,
       });
 
-      const { value: result, stop } = runInScope(() => useHideAnimation(getConfig));
+      const { value: result, stop } = runInScope(() =>
+        useHideAnimation(getConfig),
+      );
       const { logo, brand } = result.value;
 
       expect(logo.source).toBe(-1);
@@ -204,7 +227,9 @@ describe('useHideAnimation (Vue)', () => {
       // why: getHideAnimationConstants() is the ONLY source of darkModeEnabled — the
       // composable must thread it through to computeHideAnimationStyles so a dark-mode
       // device shows manifest.darkBackground / darkLogo instead of the light-mode assets.
-      FAKE_NATIVE_MODULE.getConstants.mockReturnValueOnce({ darkModeEnabled: true });
+      FAKE_NATIVE_MODULE.getConstants.mockReturnValueOnce({
+        darkModeEnabled: true,
+      });
       const getConfig = (): IHideAnimationConfig => ({
         manifest: { ...MANIFEST, darkBackground: '#000000' },
         logo: 1,
@@ -213,9 +238,13 @@ describe('useHideAnimation (Vue)', () => {
         ready: true,
       });
 
-      const { value: result, stop } = runInScope(() => useHideAnimation(getConfig));
+      const { value: result, stop } = runInScope(() =>
+        useHideAnimation(getConfig),
+      );
 
-      expect(asViewStyle(result.value.container.style).backgroundColor).toBe('#000000');
+      expect(asViewStyle(result.value.container.style).backgroundColor).toBe(
+        '#000000',
+      );
       expect(result.value.logo.source).toBe(2);
 
       stop();
@@ -233,7 +262,9 @@ describe('useHideAnimation (Vue)', () => {
         ready: readyRef.value,
       });
 
-      const { value: result, stop } = runInScope(() => useHideAnimation(getConfig));
+      const { value: result, stop } = runInScope(() =>
+        useHideAnimation(getConfig),
+      );
 
       // Force several recomputes of the returned computed.
       void result.value;
@@ -265,7 +296,9 @@ describe('useHideAnimation (Vue)', () => {
         onError: failure => failures.push(failure),
       });
 
-      const { value: result, stop } = runInScope(() => useHideAnimation(getConfig));
+      const { value: result, stop } = runInScope(() =>
+        useHideAnimation(getConfig),
+      );
 
       result.value.container.onLayout();
       await vi.waitFor(() => expect(animate).toHaveBeenCalledTimes(1));
@@ -291,7 +324,9 @@ describe('useHideAnimation (Vue)', () => {
         ready: true,
       });
 
-      expect(() => runInScope(() => useHideAnimation(getConfig))).toThrow(/RNBootSplash/);
+      expect(() => runInScope(() => useHideAnimation(getConfig))).toThrow(
+        /RNBootSplash/,
+      );
 
       registeredNativeModules.RNBootSplash = FAKE_NATIVE_MODULE;
     });

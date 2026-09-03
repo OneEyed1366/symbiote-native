@@ -6,7 +6,12 @@
 // so ../register never loads headless - Drawer needs no react-native-screens ViewConfig at all.
 
 import '@angular/compiler';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, ViewChild, type Signal } from '@angular/core';
+import {
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  ViewChild,
+  type Signal,
+} from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   Animated,
@@ -22,7 +27,8 @@ import { DrawerScreenDirective } from '../drawer-screen.directive';
 import { injectIsFocused } from '../injectors/inject-is-focused';
 
 const ROOT_TAG = 5122;
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 // Drawer reads the screen width off WindowDimensionsService (isSwipeStartInEdge) - headless has
 // no DeviceInfo native module, so seed a concrete width once; every mount in this file reads this
@@ -112,7 +118,9 @@ function drawerRootNode(): IFakeNode {
 // Animated.timing. Mirrors react/drawer.test.tsx's identical helper.
 function overlayNode(): IFakeNode | undefined {
   return findInTree(
-    node_ => node_.props.pointerEvents === 'auto' || node_.props.pointerEvents === 'none',
+    node_ =>
+      node_.props.pointerEvents === 'auto' ||
+      node_.props.pointerEvents === 'none',
   );
 }
 
@@ -231,7 +239,8 @@ let capturedHost: DrawerTestHost | undefined;
       ></ng-template>
       <ng-template #drawerContent let-ctx>
         <symbiote-text
-          >{{ ctx.state.routes.length }} routes, focused index {{ ctx.state.index }}</symbiote-text
+          >{{ ctx.state.routes.length }} routes, focused index
+          {{ ctx.state.index }}</symbiote-text
         >
       </ng-template>
     </Drawer>
@@ -271,9 +280,13 @@ describe('Angular Drawer navigator', () => {
     // (deep-link) without the panel appearing over it.
     it('mounts closed, with the initial route focused', async () => {
       await mountDrawer();
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'settings'),
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+      ).toBeDefined();
+      expect(
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === 'settings',
+        ),
       ).toBeUndefined();
       expect(isOpenByOverlay()).toBe(false);
     });
@@ -288,7 +301,9 @@ describe('Angular Drawer navigator', () => {
       handle.jumpTo('Settings');
       await tick();
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'settings'),
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === 'settings',
+        ),
       ).toBeDefined();
       expect(
         findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
@@ -350,7 +365,9 @@ describe('Angular Drawer navigator', () => {
       await mountDrawer();
       expect(
         findInTree(
-          n => n.viewName === 'RCTRawText' && n.props.text === '2 routes, focused index 0',
+          n =>
+            n.viewName === 'RCTRawText' &&
+            n.props.text === '2 routes, focused index 0',
         ),
       ).toBeDefined();
     });
@@ -420,9 +437,13 @@ describe('Angular Drawer navigator', () => {
       const handle = await mountDrawer();
       handle.jumpTo('does-not-exist');
       await tick();
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'settings'),
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+      ).toBeDefined();
+      expect(
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === 'settings',
+        ),
       ).toBeUndefined();
     });
   });

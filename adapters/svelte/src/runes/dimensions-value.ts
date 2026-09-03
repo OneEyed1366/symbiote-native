@@ -22,9 +22,14 @@ export interface IReactiveValue<TValue> {
   readonly current: TValue;
 }
 
-export function createDimensionsValue<TValue>(read: () => TValue): IReactiveValue<TValue> {
+export function createDimensionsValue<TValue>(
+  read: () => TValue,
+): IReactiveValue<TValue> {
   const subscribe = createSubscriber(update => {
-    const subscription: IEventSubscription = Dimensions.addEventListener('change', update);
+    const subscription: IEventSubscription = Dimensions.addEventListener(
+      'change',
+      update,
+    );
     return () => subscription.remove();
   });
 

@@ -1,4 +1,11 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { addClipboardListener, type IClipboardEvent } from '../../../core';
 
 // Angular twin of React's `useClipboard` hook and Vue's `useClipboard` composable. Angular has

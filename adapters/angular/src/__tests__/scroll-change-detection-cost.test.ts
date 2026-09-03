@@ -18,7 +18,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
-import { ScrollViewHost, TextHost as Text, SymbioteHostPropsDirective } from '../primitives';
+import {
+  ScrollViewHost,
+  TextHost as Text,
+  SymbioteHostPropsDirective,
+} from '../primitives';
 import { registerComposedComponent } from '../anchor-host-registry';
 
 const ROOT_TAG = 981;
@@ -31,7 +35,8 @@ registerComposedComponent('signal-child');
 
 const fabric = installFabric();
 
-const flush = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const flush = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function handleFor(testID: string): unknown {
   const node = fabric.find((n: IFakeNode) => n.props.testID === testID);
@@ -70,9 +75,16 @@ let mountedSibling: ScrollCostSibling | undefined;
 @Component({
   selector: 'scroll-cost-root',
   standalone: true,
-  imports: [ScrollViewHost, Text, SymbioteHostPropsDirective, ScrollCostSibling],
+  imports: [
+    ScrollViewHost,
+    Text,
+    SymbioteHostPropsDirective,
+    ScrollCostSibling,
+  ],
   template: `
-    <symbiote-scroll-view [symbioteHostProps]="scrollHostProps"></symbiote-scroll-view>
+    <symbiote-scroll-view
+      [symbioteHostProps]="scrollHostProps"
+    ></symbiote-scroll-view>
     <Text [symbioteHostProps]="ownProbeProps">{{ ownLabel }}</Text>
     <scroll-cost-sibling></scroll-cost-sibling>
   `,
@@ -102,12 +114,14 @@ class ScrollCostRoot {
 }
 
 function root(): ScrollCostRoot {
-  if (mountedRoot === undefined) throw new Error('root component was never constructed');
+  if (mountedRoot === undefined)
+    throw new Error('root component was never constructed');
   return mountedRoot;
 }
 
 function sibling(): ScrollCostSibling {
-  if (mountedSibling === undefined) throw new Error('sibling component was never constructed');
+  if (mountedSibling === undefined)
+    throw new Error('sibling component was never constructed');
   return mountedSibling;
 }
 
@@ -120,7 +134,9 @@ let mountedScreen: ScrollCostScreen | undefined;
   selector: 'scroll-cost-inner',
   standalone: true,
   imports: [ScrollViewHost, SymbioteHostPropsDirective],
-  template: `<symbiote-scroll-view [symbioteHostProps]="scrollHostProps"></symbiote-scroll-view>`,
+  template: `<symbiote-scroll-view
+    [symbioteHostProps]="scrollHostProps"
+  ></symbiote-scroll-view>`,
 })
 class ScrollCostInner {
   scrollEvents = 0;
@@ -168,7 +184,8 @@ class ScrollCostScreen {
 }
 
 function screen(): ScrollCostScreen {
-  if (mountedScreen === undefined) throw new Error('screen component was never constructed');
+  if (mountedScreen === undefined)
+    throw new Error('screen component was never constructed');
   return mountedScreen;
 }
 
@@ -235,12 +252,14 @@ class SignalScreen {
 }
 
 function signalScreen(): SignalScreen {
-  if (mountedSignalScreen === undefined) throw new Error('signal screen was never constructed');
+  if (mountedSignalScreen === undefined)
+    throw new Error('signal screen was never constructed');
   return mountedSignalScreen;
 }
 
 function signalChild(): SignalChild {
-  if (mountedSignalChild === undefined) throw new Error('signal child was never constructed');
+  if (mountedSignalChild === undefined)
+    throw new Error('signal child was never constructed');
   return mountedSignalChild;
 }
 
@@ -265,7 +284,10 @@ describe('cost of a native scroll event in Angular change detection', () => {
       await flush();
     }
 
-    expect(root().scrollEvents, 'every scroll event must reach the handler').toBe(SCROLL_BURST);
+    expect(
+      root().scrollEvents,
+      'every scroll event must reach the handler',
+    ).toBe(SCROLL_BURST);
     // The number this file exists to surface — printed, not asserted, so a shift in cost is
     // visible in the run output without pinning an exact figure the tree would fight.
     console.log(
@@ -327,8 +349,13 @@ describe('cost of a native scroll event in Angular change detection', () => {
       await flush();
     }
 
-    expect(screen().templateReads - screenBefore, 'no listener -> no tick').toBe(0);
-    expect(screen().rowReads - rowsBefore, 'no listener -> no row re-run').toBe(0);
+    expect(
+      screen().templateReads - screenBefore,
+      'no listener -> no tick',
+    ).toBe(0);
+    expect(screen().rowReads - rowsBefore, 'no listener -> no row re-run').toBe(
+      0,
+    );
   });
 
   // why: the fix, measured before any production code moves. Angular has TWO ways to say "this
@@ -362,6 +389,9 @@ describe('cost of a native scroll event in Angular change detection', () => {
       signalScreen().templateReads - screenBefore,
       'but the ancestor screen template is only traversed, never re-executed',
     ).toBe(0);
-    expect(signalScreen().rowReads - rowsBefore, 'and its @for rows stay untouched').toBe(0);
+    expect(
+      signalScreen().rowReads - rowsBefore,
+      'and its @for rows stay untouched',
+    ).toBe(0);
   });
 });

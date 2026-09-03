@@ -1,0 +1,43 @@
+/*
+ * JsFrameRateMeter's own chrome. BenchmarkScreen's half lives in ../screens/BenchmarkScreen.css,
+ * per this app's one-stylesheet-per-component split. The accent tinting each metric value is a
+ * per-call-site color and stays inline, exactly like the other demo components.
+ *
+ * Literal hex, not var(--…): a custom property resolves only inside the file declaring it
+ * (App.css), so a var() here would ship as a literal string and never paint. This canary's palette
+ * — #0b1020 ground, #151c33 card, #7f8db3 dim type — is App.css's; the geometry (gaps, radii,
+ * font sizes) is copied verbatim from examples/react so the meter reads the same on every canary.
+ */
+
+.bench-meter {
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: #151c33;
+}
+
+.bench-meter-row {
+  flex-direction: row;
+  gap: 12px;
+}
+
+.bench-metric {
+  flex: 1;
+  align-items: center;
+  gap: 2px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-radius: 12px;
+  background-color: #0b1020;
+}
+
+.bench-metric-value {
+  font-size: 26px;
+  font-weight: bold;
+}
+
+.bench-metric-label {
+  color: #7f8db3;
+  font-size: 11px;
+  letter-spacing: 1px;
+}

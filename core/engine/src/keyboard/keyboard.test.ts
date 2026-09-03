@@ -68,7 +68,10 @@ beforeEach(async () => {
       config: { duration: number; update?: { type?: unknown } },
       onSuccess: () => void,
     ): void => {
-      layoutAnimationCalls.push({ duration: config.duration, updateType: config.update?.type });
+      layoutAnimationCalls.push({
+        duration: config.duration,
+        updateType: config.update?.type,
+      });
       onSuccess();
     },
   };
@@ -81,14 +84,18 @@ beforeEach(async () => {
     const module = registeredModules[name];
     return isPresent<T>(module) ? module : null;
   };
-  globalThis.RN$registerCallableModule = (name: string, factory: () => IDeviceHub): void => {
+  globalThis.RN$registerCallableModule = (
+    name: string,
+    factory: () => IDeviceHub,
+  ): void => {
     if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   };
 
   vi.resetModules();
   ({ Keyboard } = await import('./index'));
   ({ createElement, createSurface } = await import('@symbiote-native/engine'));
-  ({ currentlyFocusedInput, setInputFocused } = await import('../text-input-state'));
+  ({ currentlyFocusedInput, setInputFocused } =
+    await import('../text-input-state'));
 });
 
 afterEach(() => {
@@ -164,7 +171,9 @@ describe('Keyboard', () => {
     // why: removeAllListeners for an event type nobody ever subscribed to (e.g. an
     // app that calls it defensively on unmount) must not throw on the missing set.
     it('removeAllListeners is a no-op for an event type with no subscriptions', () => {
-      expect(() => Keyboard.removeAllListeners('keyboardWillHide')).not.toThrow();
+      expect(() =>
+        Keyboard.removeAllListeners('keyboardWillHide'),
+      ).not.toThrow();
     });
   });
 
@@ -174,7 +183,9 @@ describe('Keyboard', () => {
     // (through coerceType) to LayoutAnimation.configureNext, reaching native.
     it('configures the next commit with the keyboard event duration and coerced easing type', () => {
       Keyboard.scheduleLayoutAnimation(showEvent);
-      expect(layoutAnimationCalls).toEqual([{ duration: 250, updateType: 'keyboard' }]);
+      expect(layoutAnimationCalls).toEqual([
+        { duration: 250, updateType: 'keyboard' },
+      ]);
     });
 
     // why: a zero-duration event is documented as a no-op (an instant keyboard
@@ -198,7 +209,9 @@ describe('Keyboard', () => {
 
       Keyboard.dismiss();
 
-      expect(fabric.commands.map(command => command.commandName)).toEqual(['blur']);
+      expect(fabric.commands.map(command => command.commandName)).toEqual([
+        'blur',
+      ]);
       expect(currentlyFocusedInput()).toBeNull();
     });
 

@@ -9,7 +9,11 @@ import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount, View } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
-import { CalendarIdentifier, Weekday, type Calendar } from '../../../core/types';
+import {
+  CalendarIdentifier,
+  Weekday,
+  type Calendar,
+} from '../../../core/types';
 import { useCalendars } from './index';
 
 const FAKE_CALENDARS_INITIAL: Calendar[] = [
@@ -83,7 +87,9 @@ describe('useCalendars', () => {
     getCalendars.mockReturnValue(FAKE_CALENDARS_UPDATED);
     invalidate();
 
-    await vi.waitFor(() => expect(results[results.length - 1]).toEqual(FAKE_CALENDARS_UPDATED));
+    await vi.waitFor(() =>
+      expect(results[results.length - 1]).toEqual(FAKE_CALENDARS_UPDATED),
+    );
   });
 
   it('unsubscribes from the native listener on unmount', () => {

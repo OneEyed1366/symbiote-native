@@ -2,7 +2,11 @@
 // use-accelerometer.svelte.ts's shape exactly. See its header for why this lives in `runes/` with
 // a `.svelte.ts` extension, returns a boxed getter object, and takes a plain `updateIntervalMs`
 // rather than a getter.
-import { Magnetometer, type EventSubscription, type IMagnetometerMeasurement } from '../../core';
+import {
+  Magnetometer,
+  type EventSubscription,
+  type IMagnetometerMeasurement,
+} from '../../core';
 
 export function useMagnetometer(updateIntervalMs?: number): {
   readonly current: IMagnetometerMeasurement | null;

@@ -11,7 +11,10 @@
 // this file's own engine import is already vitest-correct, no platform-selection subtlety here.
 
 import { useEffect, type FC } from 'react';
-import { applyStatusBarProps, statusBarImperative } from '@symbiote-native/engine';
+import {
+  applyStatusBarProps,
+  statusBarImperative,
+} from '@symbiote-native/engine';
 import type { IStatusBarComponent, IStatusBarProps } from './shared';
 export type { IStatusBarProps, IStatusBarStyle } from './shared';
 

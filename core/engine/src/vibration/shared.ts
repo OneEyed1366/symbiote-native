@@ -45,20 +45,28 @@ export interface IVibrationStatic {
 // JS state on cancel (Android's pattern is native, so it has nothing to stop). The
 // single-number path and the native cancel call itself are shared, not part of this.
 export interface IVibrationPlatform {
-  vibratePattern(module: INativeVibration, pattern: number[], repeat: boolean): void;
+  vibratePattern(
+    module: INativeVibration,
+    pattern: number[],
+    repeat: boolean,
+  ): void;
   stopPattern?(): void;
 }
 
 // Build a platform's Vibration from its array-pattern strategy. Each call owns its own
 // lazy module cache, so importing both platform builds in a smoke keeps them independent.
 // On a real host only one platform file is ever bundled.
-export function createVibration(platform: IVibrationPlatform): IVibrationStatic {
+export function createVibration(
+  platform: IVibrationPlatform,
+): IVibrationStatic {
   let vibrationModule: INativeVibration | null | undefined;
 
   function getModule(): INativeVibration | null {
     if (vibrationModule === undefined) {
       vibrationModule = getNativeModule<INativeVibration>(VIBRATION_MODULE);
-      dlog(`Vibration: Vibration module ${vibrationModule ? 'resolved' : 'NOT resolved (null)'}`);
+      dlog(
+        `Vibration: Vibration module ${vibrationModule ? 'resolved' : 'NOT resolved (null)'}`,
+      );
     }
     return vibrationModule;
   }
@@ -67,7 +75,10 @@ export function createVibration(platform: IVibrationPlatform): IVibrationStatic 
     // Trigger a vibration. A number is a single buzz of that many ms; an array is a
     // pattern delegated to the platform strategy. Degrades to a no-op (logged) when the
     // module is absent; a missing optional native module must never throw on a device.
-    vibrate(pattern: number | number[] = DEFAULT_VIBRATION_LENGTH, repeat = false): void {
+    vibrate(
+      pattern: number | number[] = DEFAULT_VIBRATION_LENGTH,
+      repeat = false,
+    ): void {
       const module = getModule();
       if (module === null) {
         dlog('Vibration.vibrate -> Vibration native module unavailable, no-op');

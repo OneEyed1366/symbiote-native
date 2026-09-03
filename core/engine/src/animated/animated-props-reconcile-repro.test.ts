@@ -43,8 +43,12 @@ beforeEach(() => {
     setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
     flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
     extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-    startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
-    stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
+    startListeningToAnimatedNodeValue: record(
+      'startListeningToAnimatedNodeValue',
+    ),
+    stopListeningToAnimatedNodeValue: record(
+      'stopListeningToAnimatedNodeValue',
+    ),
     getValue: record('getValue'),
     addAnimatedEventToView: record('addAnimatedEventToView'),
     removeAnimatedEventFromView: record('removeAnimatedEventFromView'),
@@ -80,7 +84,10 @@ describe('AnimatedProps reconcile-every-render over a shared long-lived interpol
     // came before detach). A children array that keeps growing IS the leak the crash was.
     it('does not grow the interpolation node children array across repeated reconciles', () => {
       const scroll = new AnimatedValue(0);
-      const translateY = scroll.interpolate({ inputRange: [-1, 0], outputRange: [0, 0] });
+      const translateY = scroll.interpolate({
+        inputRange: [-1, 0],
+        outputRange: [0, 0],
+      });
 
       let attached: AnimatedProps | null = null;
       for (let i = 0; i < 20; i++) {
@@ -96,7 +103,10 @@ describe('AnimatedProps reconcile-every-render over a shared long-lived interpol
     // is the direct, observable symptom of the same leak the children-array count proves above.
     it('costs a constant, non-growing number of native calls per reconcile once steady-state', () => {
       const scroll = new AnimatedValue(0);
-      const translateY = scroll.interpolate({ inputRange: [-1, 0], outputRange: [0, 0] });
+      const translateY = scroll.interpolate({
+        inputRange: [-1, 0],
+        outputRange: [0, 0],
+      });
 
       let attached: AnimatedProps | null = null;
       // Warm up: the first couple of cycles cost more (first-ever native creation of the shared

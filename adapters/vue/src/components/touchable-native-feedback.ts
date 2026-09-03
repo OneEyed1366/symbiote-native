@@ -14,7 +14,7 @@ import {
   type INativeFeedbackBackground,
 } from '@symbiote-native/components';
 import { dlog } from '@symbiote-native/engine';
-import { View } from '../components';
+import { HOST_VIEW } from '../components';
 import {
   Pressable,
   emitPressableEvents,
@@ -61,7 +61,10 @@ function asBackground(value: unknown): INativeFeedbackBackground | undefined {
       return {
         type: 'ThemeAttrAndroid',
         attribute: value.attribute,
-        rippleRadius: typeof value.rippleRadius === 'number' ? value.rippleRadius : undefined,
+        rippleRadius:
+          typeof value.rippleRadius === 'number'
+            ? value.rippleRadius
+            : undefined,
       };
     }
     return undefined;
@@ -71,13 +74,17 @@ function asBackground(value: unknown): INativeFeedbackBackground | undefined {
       type: 'RippleAndroid',
       color: typeof value.color === 'string' ? value.color : null,
       borderless: value.borderless === true,
-      rippleRadius: typeof value.rippleRadius === 'number' ? value.rippleRadius : undefined,
+      rippleRadius:
+        typeof value.rippleRadius === 'number' ? value.rippleRadius : undefined,
     };
   }
   return undefined;
 }
 
-const TouchableNativeFeedbackImpl = defineComponent<ITouchableNativeFeedbackProps, IPressableEmits>(
+const TouchableNativeFeedbackImpl = defineComponent<
+  ITouchableNativeFeedbackProps,
+  IPressableEmits
+>(
   (_props, { slots, attrs: rawAttrs, emit }) => {
     return () => {
       const attrs = normalizeVueAttrs(rawAttrs);
@@ -85,14 +92,22 @@ const TouchableNativeFeedbackImpl = defineComponent<ITouchableNativeFeedbackProp
       // RN defaults a missing background to SelectableBackground() so the touchable always shows
       // feedback; mirror that here.
       const resolved = asBackground(attrs.background) ?? selectableBackground();
-      dlog(`TouchableNativeFeedback render ${resolved.type} useForeground ${useForeground}`);
+      dlog(
+        `TouchableNativeFeedback render ${resolved.type} useForeground ${useForeground}`,
+      );
 
       const nativeProps = backgroundProps(resolved, useForeground);
-      const children: VNode[] = slots.default !== undefined ? slots.default() : [];
-      const feedback = h(View, nativeProps, () => children);
+      const children: VNode[] =
+        slots.default !== undefined ? slots.default() : [];
+      // The intrinsic tag, not our <View> component — see the note at HOST_VIEW.
+      const feedback = h(HOST_VIEW, nativeProps, children);
       return h(
         Pressable,
-        { ...forwardAttrs(attrs), ...emitPressableEvents(emit) },
+        {
+          ...forwardAttrs(attrs),
+          ...emitPressableEvents(emit),
+          __minPressDuration: 0,
+        },
         { default: () => [feedback] },
       );
     };
@@ -106,9 +121,12 @@ const TouchableNativeFeedbackImpl = defineComponent<ITouchableNativeFeedbackProp
 
 // The static factories live on the component value so callers reach TouchableNativeFeedback.Ripple(…)
 // exactly like RN. Object.assign onto the defineComponent return (a plain object) keeps the typing.
-export const TouchableNativeFeedback = Object.assign(TouchableNativeFeedbackImpl, {
-  SelectableBackground: selectableBackground,
-  SelectableBackgroundBorderless: selectableBackgroundBorderless,
-  Ripple: rippleBackground,
-  canUseNativeForeground,
-});
+export const TouchableNativeFeedback = Object.assign(
+  TouchableNativeFeedbackImpl,
+  {
+    SelectableBackground: selectableBackground,
+    SelectableBackgroundBorderless: selectableBackgroundBorderless,
+    Ripple: rippleBackground,
+    canUseNativeForeground,
+  },
+);

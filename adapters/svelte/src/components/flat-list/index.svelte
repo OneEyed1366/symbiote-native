@@ -23,10 +23,16 @@
     type ISeparators,
     type IViewableItemsChangedInfo,
   } from '@symbiote-native/components';
-  import { resolveClassName, type ISymbioteNode } from '@symbiote-native/engine';
+  import {
+    resolveClassName,
+    type ISymbioteNode,
+  } from '@symbiote-native/engine';
   import VirtualizedList from '../virtualized-list/index.svelte';
   import { pickAccessibilityProps } from '../virtualized-list/virtualized-list-props';
-  import type { IVirtualizedListHandle, IScrollViewHandle } from '../virtualized-list/virtualized-list-props';
+  import type {
+    IVirtualizedListHandle,
+    IScrollViewHandle,
+  } from '../virtualized-list/virtualized-list-props';
   import type { IFlatListProps as IProps } from './flat-list-props';
   import { pickAttachmentProps } from '../../runes/attachments';
 
@@ -37,7 +43,9 @@
   // scrollHandle over its ShimElement).
   let inner = $state.raw<IVirtualizedListHandle | null>(null);
 
-  const numColumns = $derived(typeof props.numColumns === 'number' ? props.numColumns : SINGLE_COLUMN);
+  const numColumns = $derived(
+    typeof props.numColumns === 'number' ? props.numColumns : SINGLE_COLUMN,
+  );
   const rows = $derived.by((): IRow<ItemT>[] =>
     numColumns > SINGLE_COLUMN ? chunkIntoRows(props.data, numColumns) : [],
   );
@@ -56,7 +64,9 @@
   }
 
   function isStyleLike(value: unknown): boolean {
-    return Array.isArray(value) || (typeof value === 'object' && value !== null);
+    return (
+      Array.isArray(value) || (typeof value === 'object' && value !== null)
+    );
   }
 
   const rowStyle = $derived.by(() => [
@@ -70,7 +80,9 @@
 
   // The divider between rows shows real items (last of the row above, first of the row below), so
   // the user's `separator` snippet, typed on ItemT, sees items rather than the IRow wrapper.
-  function rowSeparatorProps(entryProps: ISeparatorProps<IRow<ItemT>>): ISeparatorProps<ItemT> {
+  function rowSeparatorProps(
+    entryProps: ISeparatorProps<IRow<ItemT>>,
+  ): ISeparatorProps<ItemT> {
     return {
       ...entryProps,
       leadingItem: lastItemOfRow(entryProps.leadingItem),
@@ -87,8 +99,12 @@
   const rowViewabilityPairs = $derived(
     props.viewabilityConfigCallbackPairs?.map(pair => ({
       viewabilityConfig: pair.viewabilityConfig,
-      onViewableItemsChanged: (rowInfo: IViewableItemsChangedInfo<IRow<ItemT>>): void => {
-        pair.onViewableItemsChanged(expandRowViewability(rowInfo, props.keyExtractor));
+      onViewableItemsChanged: (
+        rowInfo: IViewableItemsChangedInfo<IRow<ItemT>>,
+      ): void => {
+        pair.onViewableItemsChanged(
+          expandRowViewability(rowInfo, props.keyExtractor),
+        );
       },
     })),
   );
@@ -100,7 +116,10 @@
   const accessibilityProps = $derived(pickAccessibilityProps(props));
 
   // ---- imperative handle: delegate straight through to the inner VirtualizedList instance. ----
-  export function scrollToOffset(params: { offset: number; animated?: boolean }): void {
+  export function scrollToOffset(params: {
+    offset: number;
+    animated?: boolean;
+  }): void {
     inner?.scrollToOffset(params);
   }
   export function scrollToIndex(params: {
@@ -111,7 +130,11 @@
   }): void {
     inner?.scrollToIndex(params);
   }
-  export function scrollToItem(params: { item: unknown; animated?: boolean; viewPosition?: number }): void {
+  export function scrollToItem(params: {
+    item: unknown;
+    animated?: boolean;
+    viewPosition?: number;
+  }): void {
     inner?.scrollToItem(params);
   }
   export function scrollToEnd(params?: { animated?: boolean }): void {
@@ -141,11 +164,23 @@
   const attachments = $derived(pickAttachmentProps(props));
 </script>
 
-{#snippet rowItem({ item: row, index, separators }: { item: IRow<ItemT>; index: number; separators: ISeparators })}
+{#snippet rowItem({
+  item: row,
+  index,
+  separators,
+}: {
+  item: IRow<ItemT>;
+  index: number;
+  separators: ISeparators;
+})}
   <symbiote-view p={{ style: rowStyle }}>
     {#each row.items as rowItem, column (props.keyExtractor ? props.keyExtractor(rowItem, row.startIndex + column) : String(row.startIndex + column))}
       <symbiote-view p={{ style: { flex: 1 } }}>
-        {@render props.item({ item: rowItem, index: row.startIndex + column, separators })}
+        {@render props.item({
+          item: rowItem,
+          index: row.startIndex + column,
+          separators,
+        })}
       </symbiote-view>
     {/each}
   </symbiote-view>

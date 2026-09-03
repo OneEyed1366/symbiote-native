@@ -5,6 +5,20 @@ import { describe, expect, it } from 'vitest';
 
 const readSource = (path: string): string => readFileSync(path, 'utf8');
 
+// Both sides are stripped of whitespace before comparing. The product rule these fences encode
+// is "this binding / declaration exists at all", and both Angular templates and TS declarations
+// wrap freely without changing meaning — prettier turns
+// `[x]="y"` into `[x]="\n  y\n"` and `class A extends B` into `class A\n  extends B` the moment
+// the line passes printWidth. Comparing the literal text made a reformat fail the fence while the
+// binding it guards was still there (measured 2026-08-18, when the repo moved to 80 columns:
+// AnimatedImage's declaration and Button's accessibilityRespondsToUserInteraction binding both
+// broke this way). Stripping keeps the guard and drops the coupling to layout.
+const withoutSpacing = (code: string): string => code.replace(/\s+/g, '');
+
+const expectSourceToDeclare = (source: string, snippet: string): void => {
+  expect(withoutSpacing(source)).toContain(withoutSpacing(snippet));
+};
+
 // This file asserts on literal SOURCE TEXT, not runtime behavior. That's a deliberate choice,
 // not test-after laziness: per angular-adapter §10/§16/§21, an Angular template binding like
 // `[accessibilityLabel]="x"` or `[symbioteHostProps]="hostProps"` can drop silently — vitest,
@@ -25,13 +39,24 @@ describe('Angular adapter gap regressions', () => {
   // foldedAccessibility, or forgets one of the @Input()s entirely, an app passing
   // accessibilityLabel/ariaBusy to <VirtualizedList> silently loses it one layer down.
   it('VirtualizedList exposes accessibility and aria inputs and forwards them to ScrollView', () => {
-    const source = readSource('adapters/angular/src/components/virtualized-list/index.ts');
+    const source = readSource(
+      'adapters/angular/src/components/virtualized-list/index.ts',
+    );
 
-    expect(source).toContain('@Input() accessibilityLabel?: string');
-    expect(source).toContain('@Input() ariaBusy?: boolean');
-    expect(source).toContain('[accessibilityLabel]="foldedAccessibility().accessibilityLabel"');
-    expect(source).toContain('[accessibilityState]="foldedAccessibility().accessibilityState"');
-    expect(source).toContain('[accessibilityRole]="foldedAccessibility().accessibilityRole"');
+    expectSourceToDeclare(source, '@Input() accessibilityLabel?: string');
+    expectSourceToDeclare(source, '@Input() ariaBusy?: boolean');
+    expectSourceToDeclare(
+      source,
+      '[accessibilityLabel]="foldedAccessibility().accessibilityLabel"',
+    );
+    expectSourceToDeclare(
+      source,
+      '[accessibilityState]="foldedAccessibility().accessibilityState"',
+    );
+    expectSourceToDeclare(
+      source,
+      '[accessibilityRole]="foldedAccessibility().accessibilityRole"',
+    );
   });
 
   // why: angular-adapter §0/§6 — Angular has NO runtime component synthesis under AOT/Metro, so
@@ -42,28 +67,46 @@ describe('Angular adapter gap regressions', () => {
   // "why" documentation for the runtime-HOC non-goal stays in the source (a maintainer reading
   // the error message needs the real explanation, not a bare "not supported").
   it('Animated namespace exposes AOT-safe built-in entries and documents runtime HOC as a non-goal', () => {
-    const animatedSource = readSource('adapters/angular/src/modules/animated/index.ts');
+    const animatedSource = readSource(
+      'adapters/angular/src/modules/animated/index.ts',
+    );
     const componentSource = readSource(
       'adapters/angular/src/modules/animated/create-animated-component.ts',
     );
 
-    expect(componentSource).toContain('export const AnimatedFlatList');
-    expect(componentSource).toContain('export const AnimatedSectionList');
-    expect(componentSource).toContain('if (base === View) return AnimatedView');
-    expect(componentSource).toContain('if (base === Text) return AnimatedText');
-    expect(componentSource).toContain('if (base === Image) return AnimatedImage');
-    expect(componentSource).toContain('if (base === ScrollView) return AnimatedScrollView');
-    expect(componentSource).toContain('Angular cannot synthesize a component at runtime');
-    expect(componentSource).toContain('no JIT under AOT/Metro');
-    expect(componentSource).toContain(
+    expectSourceToDeclare(componentSource, 'export const AnimatedFlatList');
+    expectSourceToDeclare(componentSource, 'export const AnimatedSectionList');
+    expectSourceToDeclare(
+      componentSource,
+      'if (base === View) return AnimatedView',
+    );
+    expectSourceToDeclare(
+      componentSource,
+      'if (base === Text) return AnimatedText',
+    );
+    expectSourceToDeclare(
+      componentSource,
+      'if (base === Image) return AnimatedImage',
+    );
+    expectSourceToDeclare(
+      componentSource,
+      'if (base === ScrollView) return AnimatedScrollView',
+    );
+    expectSourceToDeclare(
+      componentSource,
+      'Angular cannot synthesize a component at runtime',
+    );
+    expectSourceToDeclare(componentSource, 'no JIT under AOT/Metro');
+    expectSourceToDeclare(
+      componentSource,
       'Author an explicit standalone @Component extending AnimatedComponentBase',
     );
-    expect(animatedSource).toContain('View: AnimatedView');
-    expect(animatedSource).toContain('Text: AnimatedText');
-    expect(animatedSource).toContain('Image: AnimatedImage');
-    expect(animatedSource).toContain('ScrollView: AnimatedScrollView');
-    expect(animatedSource).toContain('FlatList: AnimatedFlatList');
-    expect(animatedSource).toContain('SectionList: AnimatedSectionList');
+    expectSourceToDeclare(animatedSource, 'View: AnimatedView');
+    expectSourceToDeclare(animatedSource, 'Text: AnimatedText');
+    expectSourceToDeclare(animatedSource, 'Image: AnimatedImage');
+    expectSourceToDeclare(animatedSource, 'ScrollView: AnimatedScrollView');
+    expectSourceToDeclare(animatedSource, 'FlatList: AnimatedFlatList');
+    expectSourceToDeclare(animatedSource, 'SectionList: AnimatedSectionList');
   });
 
   // why: AnimatedImage must reuse the SAME prop-resolution/inputs/outputs surface plain Image
@@ -72,14 +115,22 @@ describe('Angular adapter gap regressions', () => {
   // resolved VALUES this wiring produces are exercised at runtime by
   // angular-imports.test.ts's "resolves AnimatedImage props through the composed Image path".
   it('AnimatedImage uses composed Image props and normalized load events', () => {
-    const source = readSource('adapters/angular/src/modules/animated/create-animated-component.ts');
+    const source = readSource(
+      'adapters/angular/src/modules/animated/create-animated-component.ts',
+    );
 
-    expect(source).toContain('export class AnimatedImage extends ImageBase');
-    expect(source).toContain('inputs: ANIMATED_IMAGE_INPUTS');
-    expect(source).toContain('outputs: IMAGE_OUTPUTS');
-    expect(source).toContain('const resolved = resolveImageProps(reduced)');
-    expect(source).toContain('(load)="handleLoad($event)"');
-    expect(source).toContain('(error)="handleError($event)"');
+    expectSourceToDeclare(
+      source,
+      'export class AnimatedImage extends ImageBase',
+    );
+    expectSourceToDeclare(source, 'inputs: ANIMATED_IMAGE_INPUTS');
+    expectSourceToDeclare(source, 'outputs: IMAGE_OUTPUTS');
+    expectSourceToDeclare(
+      source,
+      'const resolved = resolveImageProps(reduced)',
+    );
+    expectSourceToDeclare(source, '(load)="handleLoad($event)"');
+    expectSourceToDeclare(source, '(error)="handleError($event)"');
   });
 
   // why: guards the OTHER direction of the previous test — that plain Image's own imageProps
@@ -87,12 +138,20 @@ describe('Angular adapter gap regressions', () => {
   // components can never structurally drift apart into two different prop-resolution rules.
   // `imageProps` is a memoized computed() over the overridable buildImageProps(), not a getter.
   it('Image prop resolution is shared with AnimatedImage', () => {
-    const imageSource = readSource('adapters/angular/src/components/image/shared.ts');
+    const imageSource = readSource(
+      'adapters/angular/src/components/image/shared.ts',
+    );
 
-    expect(imageSource).toContain('export function resolveImageProps');
-    expect(imageSource).toContain('readonly imageProps = computed<Record<string, unknown>>');
-    expect(imageSource).toContain('return this.buildImageProps()');
-    expect(imageSource).toContain('return resolveImageProps(this.imageInputProps)');
+    expectSourceToDeclare(imageSource, 'export function resolveImageProps');
+    expectSourceToDeclare(
+      imageSource,
+      'readonly imageProps = computed<Record<string, unknown>>',
+    );
+    expectSourceToDeclare(imageSource, 'return this.buildImageProps()');
+    expectSourceToDeclare(
+      imageSource,
+      'return resolveImageProps(this.imageInputProps)',
+    );
   });
 
   // why: RN's real Button surface includes the FULL accessibility + TV-focus prop set
@@ -105,9 +164,15 @@ describe('Angular adapter gap regressions', () => {
   // Button/Touchable/Pressable that's accessible-by-eye but broken for assistive tech or TV
   // remote navigation, with no compiler signal (see the file-level comment above).
   it('Button forwards its full accessibility and TV-focus surface through TouchableOpacity', () => {
-    const buttonSource = readSource('adapters/angular/src/components/button.ts');
-    const touchableSource = readSource('adapters/angular/src/components/touchable/index.ts');
-    const pressableSource = readSource('adapters/angular/src/components/pressable/index.ts');
+    const buttonSource = readSource(
+      'adapters/angular/src/components/button.ts',
+    );
+    const touchableSource = readSource(
+      'adapters/angular/src/components/touchable/index.ts',
+    );
+    const pressableSource = readSource(
+      'adapters/angular/src/components/pressable/index.ts',
+    );
 
     for (const binding of [
       '[accessible]="true"',
@@ -138,7 +203,7 @@ describe('Angular adapter gap regressions', () => {
       '[nextFocusRight]="nextFocusRight"',
       '[nextFocusUp]="nextFocusUp"',
     ]) {
-      expect(buttonSource).toContain(binding);
+      expectSourceToDeclare(buttonSource, binding);
     }
 
     for (const binding of [
@@ -170,7 +235,7 @@ describe('Angular adapter gap regressions', () => {
       '[nextFocusRight]="nextFocusRight"',
       '[nextFocusUp]="nextFocusUp"',
     ]) {
-      expect(touchableSource).toContain(binding);
+      expectSourceToDeclare(touchableSource, binding);
     }
 
     // Pressable forwards its resolved props through the shared SymbioteHostPropsDirective
@@ -179,10 +244,22 @@ describe('Angular adapter gap regressions', () => {
     // reads from actually assembles `accessible` / the folded accessibility bag / TV-focus.
     // `hostProps` is a computed(), hence the call parens — the binding text changed shape but
     // the contract did not.
-    expect(pressableSource).toContain('[symbioteHostProps]="hostProps()"');
-    expect(pressableSource).toContain('accessible: this.accessible');
-    expect(pressableSource).toContain('...this.foldedAccessibility');
-    expect(pressableSource).toContain('hasTVPreferredFocus: this.hasTVPreferredFocus');
-    expect(pressableSource).toContain('(accessibilityAction)="emit(accessibilityAction, $event)"');
+    expectSourceToDeclare(pressableSource, '[symbioteHostProps]="hostProps()"');
+    expectSourceToDeclare(pressableSource, 'accessible: this.accessible');
+    expectSourceToDeclare(pressableSource, '...this.foldedAccessibility');
+    expectSourceToDeclare(
+      pressableSource,
+      'hasTVPreferredFocus: this.hasTVPreferredFocus',
+    );
+    // The four accessibility gate events moved OFF the template and into this same bag
+    // (2026-09-01, `.claude/rules/fabric-boolean-event-gates.md`) — a template binding here bound
+    // unconditionally on every instance, lighting the Fabric gate whether or not an app ever
+    // subscribed. The handler takes the event NAME rather than the emitter (2026-09-02) because
+    // the gate is no longer decided by `.observed` alone: a wrapper rendering this Pressable is
+    // itself a subscriber, so an injected demand answers for it (`gate-demand.ts`).
+    expectSourceToDeclare(
+      pressableSource,
+      "onAccessibilityAction: this.accessibilityEmitterHandler('accessibilityAction',)",
+    );
   });
 });

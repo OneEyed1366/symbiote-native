@@ -12,4 +12,7 @@ export class BarometerSensor extends DeviceSensor<IBarometerMeasurement> {}
 
 const BAROMETER_DID_UPDATE_EVENT_NAME = 'barometerDidUpdate';
 
-export const Barometer = new BarometerSensor(exponentBarometer, BAROMETER_DID_UPDATE_EVENT_NAME);
+export const Barometer = new BarometerSensor(
+  exponentBarometer,
+  BAROMETER_DID_UPDATE_EVENT_NAME,
+);

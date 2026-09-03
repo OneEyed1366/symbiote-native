@@ -6,10 +6,16 @@ const FAKE_NATIVE_APPLICATION = {
   applicationName: 'Canary',
   applicationId: 'com.symbiote.canary',
   androidId: 'dd96dec43fb81c97',
-  getInstallReferrerAsync: vi.fn(async () => 'utm_source=google-play&utm_medium=organic'),
-  getIosIdForVendorAsync: vi.fn(async () => '68753A44-4D6F-1226-9C60-0050E4C00067'),
+  getInstallReferrerAsync: vi.fn(
+    async () => 'utm_source=google-play&utm_medium=organic',
+  ),
+  getIosIdForVendorAsync: vi.fn(
+    async () => '68753A44-4D6F-1226-9C60-0050E4C00067',
+  ),
   getApplicationReleaseTypeAsync: vi.fn(async () => 5),
-  getPushNotificationServiceEnvironmentAsync: vi.fn(async () => 'production' as const),
+  getPushNotificationServiceEnvironmentAsync: vi.fn(
+    async () => 'production' as const,
+  ),
   getInstallationTimeAsync: vi.fn(async () => 1_563_473_306_121),
   getLastUpdateTimeAsync: vi.fn(async () => 1_563_484_816_887),
 };
@@ -75,7 +81,10 @@ describe('constants (eager native reads, null fallback)', () => {
       // miss.
       vi.resetModules();
       vi.doMock('./native-module', () => ({
-        expoApplication: { ...FAKE_NATIVE_APPLICATION, nativeApplicationVersion: undefined },
+        expoApplication: {
+          ...FAKE_NATIVE_APPLICATION,
+          nativeApplicationVersion: undefined,
+        },
       }));
 
       const fresh = await import('./application');
@@ -100,7 +109,9 @@ describe('getAndroidId', () => {
       // why: androidId is an Android-only concept (Settings.Secure.ANDROID_ID) — surfacing it on
       // iOS would misrepresent a value that platform never produces.
       fakePlatform.OS = 'ios';
-      expect(() => getAndroidId()).toThrow('androidId is not available on expo-application');
+      expect(() => getAndroidId()).toThrow(
+        'androidId is not available on expo-application',
+      );
     });
 
     it('throws an UnavailabilityError-shaped error on android when the native value is absent', () => {
@@ -110,7 +121,9 @@ describe('getAndroidId', () => {
       // @ts-expect-error -- simulating a platform where the native module has no such value
       FAKE_NATIVE_APPLICATION.androidId = undefined;
 
-      expect(() => getAndroidId()).toThrow('androidId is not available on expo-application');
+      expect(() => getAndroidId()).toThrow(
+        'androidId is not available on expo-application',
+      );
 
       FAKE_NATIVE_APPLICATION.androidId = native;
     });
@@ -144,7 +157,9 @@ describe('getInstallReferrerAsync', () => {
 describe('getIosIdForVendorAsync', () => {
   describe('Positive', () => {
     it('delegates to the native module', async () => {
-      await expect(getIosIdForVendorAsync()).resolves.toBe('68753A44-4D6F-1226-9C60-0050E4C00067');
+      await expect(getIosIdForVendorAsync()).resolves.toBe(
+        '68753A44-4D6F-1226-9C60-0050E4C00067',
+      );
     });
   });
 
@@ -174,7 +189,8 @@ describe('getIosApplicationReleaseTypeAsync', () => {
 
   describe('Negative', () => {
     it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
-      const { getApplicationReleaseTypeAsync: native } = FAKE_NATIVE_APPLICATION;
+      const { getApplicationReleaseTypeAsync: native } =
+        FAKE_NATIVE_APPLICATION;
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_APPLICATION.getApplicationReleaseTypeAsync = undefined;
 
@@ -190,7 +206,9 @@ describe('getIosApplicationReleaseTypeAsync', () => {
 describe('getIosPushNotificationServiceEnvironmentAsync', () => {
   describe('Positive', () => {
     it('delegates to the native module', async () => {
-      await expect(getIosPushNotificationServiceEnvironmentAsync()).resolves.toBe('production');
+      await expect(
+        getIosPushNotificationServiceEnvironmentAsync(),
+      ).resolves.toBe('production');
     });
   });
 
@@ -198,15 +216,20 @@ describe('getIosPushNotificationServiceEnvironmentAsync', () => {
     it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
       // why: Android has no APN concept at all, and the simulator has no push entitlement either
       // — both must surface as "not available" rather than a silent null the caller can't act on.
-      const { getPushNotificationServiceEnvironmentAsync: native } = FAKE_NATIVE_APPLICATION;
+      const { getPushNotificationServiceEnvironmentAsync: native } =
+        FAKE_NATIVE_APPLICATION;
       // @ts-expect-error -- simulating a platform where the native module has no such method
-      FAKE_NATIVE_APPLICATION.getPushNotificationServiceEnvironmentAsync = undefined;
+      FAKE_NATIVE_APPLICATION.getPushNotificationServiceEnvironmentAsync =
+        undefined;
 
-      await expect(getIosPushNotificationServiceEnvironmentAsync()).rejects.toThrow(
+      await expect(
+        getIosPushNotificationServiceEnvironmentAsync(),
+      ).rejects.toThrow(
         'getPushNotificationServiceEnvironmentAsync is not available on expo-application',
       );
 
-      FAKE_NATIVE_APPLICATION.getPushNotificationServiceEnvironmentAsync = native;
+      FAKE_NATIVE_APPLICATION.getPushNotificationServiceEnvironmentAsync =
+        native;
     });
   });
 });
@@ -216,7 +239,9 @@ describe('getInstallationTimeAsync', () => {
     it('wraps the native epoch-ms number into a Date', async () => {
       // why: upstream reports install time as a raw epoch-ms number — the wrapper's whole job is
       // reshaping that into a `Date` so callers get a real date object, not a magic number.
-      await expect(getInstallationTimeAsync()).resolves.toEqual(new Date(1_563_473_306_121));
+      await expect(getInstallationTimeAsync()).resolves.toEqual(
+        new Date(1_563_473_306_121),
+      );
     });
   });
 
@@ -238,7 +263,9 @@ describe('getInstallationTimeAsync', () => {
 describe('getLastUpdateTimeAsync', () => {
   describe('Positive', () => {
     it('wraps the native epoch-ms number into a Date', async () => {
-      await expect(getLastUpdateTimeAsync()).resolves.toEqual(new Date(1_563_484_816_887));
+      await expect(getLastUpdateTimeAsync()).resolves.toEqual(
+        new Date(1_563_484_816_887),
+      );
     });
   });
 

@@ -38,6 +38,13 @@ interface IChipHandlers {
 // it works at runtime via the engine's generic prop router. The established fix (see
 // adapters/angular/src/components/pressable/index.ts's `[symbioteHostProps]` usage) is to bundle
 // such props into one object and bind it through `[symbioteHostProps]`, a REAL declared @Input.
+// The grabbed chip's ring. It used to be '#dd0031' — the SAME value as .chip's own
+// background-color, so  drew a red ring on a red fill and the whole
+// responder-negotiation demo looked dead. A pale tint of the chip's own hue reads instantly
+// without introducing a colour the palette does not have; the React, Svelte and Vue twins all
+// pick their tint the same way.
+const CHIP_ACTIVE_BORDER = '#ffb3c1';
+
 @Component({
   selector: 'ResponderDemo',
   standalone: true,
@@ -65,7 +72,7 @@ interface IChipHandlers {
               class="chip"
               [style]="{
                 borderColor:
-                  activeChip === chip.index ? '#dd0031' : 'transparent',
+                  activeChip === chip.index ? chipActiveBorder : 'transparent',
                 transform: [
                   { translateX: activeChip === chip.index ? chipDx : 0 },
                 ],
@@ -80,6 +87,7 @@ interface IChipHandlers {
   `,
 })
 export class ResponderDemo {
+  readonly chipActiveBorder = CHIP_ACTIVE_BORDER;
   activeChip: number | null = null;
   chipDx = 0;
   rowDx = 0;

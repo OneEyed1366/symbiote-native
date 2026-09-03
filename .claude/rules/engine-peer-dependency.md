@@ -7,12 +7,20 @@ paths:
 
 # `@symbiote-native/engine` MUST be a peerDependency, never a regular dependency
 
-Every adapter (`react`/`vue`/`angular`) and every package that imports engine internals
-(`isSymbioteNode`, `dispatchViewCommand`, the commit mirror, …) declares
-`"@symbiote-native/engine": ">=0.1.0"` under `peerDependencies` (plus `"workspace:*"` under
-`devDependencies` for local pnpm-workspace dev/test) — mirroring the existing `react`/
-`react-native` singleton-peer treatment (`<react_native_is_an_explicit_top_level_peer>` in
-CLAUDE.md). NEVER move it back to a plain `dependencies` entry.
+Every adapter and every package that imports engine internals (`isSymbioteNode`,
+`dispatchViewCommand`, the commit mirror, …) declares
+`"@symbiote-native/engine": "workspace:^"` under `peerDependencies` (plus
+`"workspace:*"` under `devDependencies` for local pnpm-workspace dev/test) — mirroring the
+existing `react`/`react-native` singleton-peer treatment
+(`<react_native_is_an_explicit_top_level_peer>` in CLAUDE.md). NEVER move it back to a plain
+`dependencies` entry.
+
+`workspace:^` is a publish-time contract, not a workspace-only leak: `pnpm pack` rewrites it to
+`^<the engine's current workspace version>` in the tarball. That keeps the lower bound advancing
+when an adapter starts importing a newer engine API and caps compatibility at the current major
+(or current minor while the package is `0.x`). A hand-written unbounded range such as `>=0.1.7`
+is forbidden: it can remain syntactically satisfied long after the old engine has stopped
+exporting everything the newer adapter imports.
 
 ## Why: engine holds module-scope singleton state
 
@@ -72,3 +80,24 @@ singleton.
 Full incident writeup, the `mobile-mcp` live-repro method (device tap vs. imperative-ref tap
 diverging), and the throwaway `node_modules` diagnostic-patch technique used to confirm it:
 `.changeset/engine-peer-dependency-singleton.md`.
+
+## The `workspace:*` devDependency is not optional bookkeeping — without it nothing commits
+
+The parenthetical above ("plus `workspace:*` under `devDependencies` for local dev/test") reads like
+tidiness. It is load-bearing. A `@symbiote-native/*` peer with no matching devDependency sends pnpm
+to the public registry for a package that only exists in this workspace:
+
+```
+packages/web-browser: ERR_PNPM_FETCH_404
+GET https://registry.npmjs.org/@symbiote-native%2Fsolid: Not Found
+```
+
+`optional: true` in `peerDependenciesMeta` does NOT prevent this — it suppresses auto-install, not
+workspace resolution. And `.husky/pre-commit` runs a dependency-status check that shells out to
+`pnpm install`, so a manifest in this state blocks **every commit in the repo**, not just its own
+package's build. Measured 2026-08-21 while adding `./solid` entries to twelve companion packages.
+
+Add both halves in the same edit, then `pnpm install --lockfile-only` and commit `pnpm-lock.yaml`
+alongside the manifests. `packages/battery/package.json` is the reference shape: every framework it
+declares as a peer also appears in `devDependencies` (`@symbiote-native/<fw>: workspace:*` and the
+framework itself at `catalog:`).

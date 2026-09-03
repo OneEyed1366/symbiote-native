@@ -29,7 +29,8 @@
   //
   // Native-Animated-driven, like React's ScrollViewStickyHeader.js: the pinned translateY rides
   // as the raw AnimatedInterpolation node in style.transform on a real Animated.View
-  // (AnimatedView.svelte), whose `__makeNative()` connects it straight to the native shadow tree,
+  // (createAnimatedComponent(View)), whose `__makeNative()` connects it straight to the native
+  // shadow tree,
   // so once native the pin tracks scroll on the UI thread with zero JS per frame - the
   // interpolation's own .addListener() below only drives the separate debounced
   // `passthroughAnimatedPropExplicitValues` (RN's own hit-testing sync).
@@ -51,8 +52,15 @@
   // why ScrollView/VirtualizedList force `nativeStickyAvailable = false`: the correct bootstrap
   // path, not a workaround.
   import type { IStickyHeaderComponentProps } from './sticky-header-props';
+  import View from '../View.svelte';
+  import { createAnimatedComponent } from '../../modules/animated/create-animated-component';
 
   export type { IStickyHeaderComponentProps };
+
+  // Wrapped here, not imported from modules/animated: that barrel imports ScrollView, which
+  // imports this file, so naming it would close a module cycle. Module scope, so every header
+  // instance shares one component identity.
+  const AnimatedView = createAnimatedComponent(View);
 
   // Diagnostic-only: a module-scope counter so every instance across every ScrollViewStickyHeader
   // in a device log is individually identifiable (see the mount/unmount dlog calls below).
@@ -70,8 +78,13 @@
     type IStickyEffect,
     type IStickyReducerInputs,
   } from '@symbiote-native/components';
-  import { AnimatedValue, Platform, dlog, type AnimatedInterpolation, type ISymbioteEvent } from '@symbiote-native/engine';
-  import AnimatedView from '../../modules/animated/AnimatedView.svelte';
+  import {
+    AnimatedValue,
+    Platform,
+    dlog,
+    type AnimatedInterpolation,
+    type ISymbioteEvent,
+  } from '@symbiote-native/engine';
   import {
     SCROLL_VIEW_STICKY_CONTEXT_KEY,
     type IScrollViewStickyContext,
@@ -91,18 +104,26 @@
   // Resolve the scroll wiring from the parent ScrollView's context when not given explicitly.
   // A fresh standalone AnimatedValue is the fallback for a header used outside a ScrollView
   // (never sticks, but never crashes either).
-  const stickyContext = getContext<IScrollViewStickyContext | undefined>(SCROLL_VIEW_STICKY_CONTEXT_KEY);
+  const stickyContext = getContext<IScrollViewStickyContext | undefined>(
+    SCROLL_VIEW_STICKY_CONTEXT_KEY,
+  );
   $effect(() => {
     if (stickyContext === undefined && scrollAnimatedValueProp === undefined) {
-      dlog('ScrollViewStickyHeader used outside a ScrollView — sticky positioning is a no-op');
+      dlog(
+        'ScrollViewStickyHeader used outside a ScrollView — sticky positioning is a no-op',
+      );
     }
   });
   // svelte-ignore state_referenced_locally -- captured ONCE by identity; it does not change
   // after mount, so re-deriving it would be wrong.
   const scrollAnimatedValue =
-    scrollAnimatedValueProp ?? stickyContext?.scrollAnimatedValue ?? new AnimatedValue(0);
+    scrollAnimatedValueProp ??
+    stickyContext?.scrollAnimatedValue ??
+    new AnimatedValue(0);
   const inverted = $derived(invertedProp ?? stickyContext?.getInverted());
-  const scrollViewHeight = $derived(scrollViewHeightProp ?? stickyContext?.getViewportHeight());
+  const scrollViewHeight = $derived(
+    scrollViewHeightProp ?? stickyContext?.getViewportHeight(),
+  );
 
   // The one folded state cell (RN's scattered useState/useRef collapsed into IStickyHeaderState),
   // mutated in place by reduceSticky. Named `stickyState`, not `state`: a local binding literally
@@ -115,7 +136,10 @@
   // The interpolation node currently bound into style.transform — held by IDENTITY ($state.raw),
   // rebuilt on every 'rebuild-interpolation' effect.
   let animatedTranslateY = $state.raw<AnimatedInterpolation>(
-    scrollAnimatedValue.interpolate({ inputRange: [-1, 0], outputRange: [0, 0] }),
+    scrollAnimatedValue.interpolate({
+      inputRange: [-1, 0],
+      outputRange: [0, 0],
+    }),
   );
   let listenerId: string | undefined;
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -139,14 +163,18 @@
           // Detach the old listener, build a fresh interpolation onto the shared scroll value, and
           // wire the settled-value listener (drives ONLY the debounced hit-testing passthrough
           // below — the visible pin rides the native AnimatedProps connection in the markup).
-          if (listenerId !== undefined) animatedTranslateY.removeListener(listenerId);
+          if (listenerId !== undefined)
+            animatedTranslateY.removeListener(listenerId);
           const next = scrollAnimatedValue.interpolate({
             inputRange: effect.inputRange,
             outputRange: effect.outputRange,
           });
-          listenerId = next.addListener(({ value }: { value: number | string }): void => {
-            if (typeof value === 'number') dispatch({ kind: 'animated-tick', value });
-          });
+          listenerId = next.addListener(
+            ({ value }: { value: number | string }): void => {
+              if (typeof value === 'number')
+                dispatch({ kind: 'animated-tick', value });
+            },
+          );
           animatedTranslateY = next;
           break;
         }
@@ -160,7 +188,9 @@
         case 'apply-passthrough':
           // The actual committed translateY — a freeze at a huge/wrong number here is the
           // visible-disappearance symptom to watch for.
-          dlog(`ScrollViewStickyHeader[y=${stickyState.layoutY}] apply-passthrough translateY=${effect.translateY}`);
+          dlog(
+            `ScrollViewStickyHeader[y=${stickyState.layoutY}] apply-passthrough translateY=${effect.translateY}`,
+          );
           version += 1;
           break;
         case 'record-header-y':
@@ -192,8 +222,11 @@
   // Detach the listener + clear the debounce on unmount.
   $effect(() => {
     return (): void => {
-      dlog(`ScrollViewStickyHeader#${instanceId}[y=${stickyState.layoutY}] unmount`);
-      if (listenerId !== undefined) animatedTranslateY.removeListener(listenerId);
+      dlog(
+        `ScrollViewStickyHeader#${instanceId}[y=${stickyState.layoutY}] unmount`,
+      );
+      if (listenerId !== undefined)
+        animatedTranslateY.removeListener(listenerId);
       if (debounceTimer !== undefined) clearTimeout(debounceTimer);
     };
   });
@@ -213,7 +246,7 @@
 
   // The EXPLICIT debounced translateY overrides the committed transform for hit-testing, while
   // `animatedTranslateY` (in the markup below) does the smooth native-driven pin — per RN
-  // ScrollViewStickyHeader.js, and AnimatedView.svelte's own passthroughAnimatedPropExplicitValues
+  // ScrollViewStickyHeader.js, and createAnimatedComponent's own passthroughAnimatedPropExplicitValues
   // contract (readPassthroughStyle).
   const passthroughAnimatedPropExplicitValues = $derived.by(() => {
     void version;

@@ -20,13 +20,15 @@ vi.mock('../../../core', () => ({
   DeviceMotion: {
     addListener: (listener: (measurement: IDeviceMotionMeasurement) => void) =>
       addListenerMock(listener),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
 const ROOT_TAG = 942;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 const MEASUREMENT: IDeviceMotionMeasurement = {
   acceleration: { x: 0.1, y: 0.2, z: 0.3, timestamp: 123 },
@@ -38,7 +40,8 @@ const MEASUREMENT: IDeviceMotionMeasurement = {
 };
 
 let capturedResult: Signal<IDeviceMotionMeasurement | null> | undefined;
-let capturedListener: ((measurement: IDeviceMotionMeasurement) => void) | undefined;
+let capturedListener:
+  ((measurement: IDeviceMotionMeasurement) => void) | undefined;
 
 @Component({
   selector: 'symbiote-device-motion-host',
@@ -116,7 +119,8 @@ describe('DeviceMotionService.connect', () => {
       mount(ROOT_TAG, DeviceMotionHost);
       await tick();
 
-      if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+      if (capturedListener === undefined)
+        throw new Error('addListener callback was not captured');
       capturedListener(MEASUREMENT);
 
       expect(capturedResult?.()).toEqual(MEASUREMENT);

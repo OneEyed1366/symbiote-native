@@ -6,11 +6,9 @@
 // the one thing each adapter supplies; everything else (registry bookkeeping, sections, the
 // host-registrar bridge, headless tasks) is byte-identical across adapters and lives here once.
 //
-// The catch: the native Fabric host invokes RN's AppRegistry (a registered callable module) by
-// app key, and it can't see ours. So registerComponent must also hand its runnable to RN's
-// registrar. Reached the same way shared reaches processColor: a dependency-injected seam
-// (setHostRegistrar), so the core stays react-native-free and the app glue wires the host once
-// at startup.
+// The catch: native invokes RN's registered callable AppRegistry for both surface runnables and
+// headless tasks; it cannot see this local registry. `setHostRegistrar` mirrors those native-facing
+// registrations there while the core remains react-native-free.
 
 import { getNativeModule } from '../native-modules';
 import { dlog } from '../debug';
@@ -47,11 +45,17 @@ export type ITaskCanceller = () => void;
 // Lazy provider of a task canceller, paired with a registered task.
 export type ITaskCancelProvider = () => ITaskCanceller;
 
-// The host's runnable registrar, RN's own AppRegistry. Injected by the app glue
-// so the adapter never imports react-native; native drives RN's AppRegistry, which
-// must hold our runnable under the app key for the surface to find it.
+// RN's own AppRegistry, injected by adapter bootstrap. Native drives this registrar for surface
+// runnables and headless tasks; the engine keeps only the framework-independent mirror.
 export interface IHostRegistrar {
   registerRunnable(appKey: string, run: IRunnable): string;
+  // Android starts headless work through RN's native-callable AppRegistry, not this local object.
+  // Bootstrap injects RN's AppRegistry here so the same task providers reach native too.
+  registerCancellableHeadlessTask?(
+    taskKey: string,
+    taskProvider: ITaskProvider,
+    taskCancelProvider: ITaskCancelProvider,
+  ): void;
   // Native unmount of a surface by rootTag. RN routes this through RendererProxy's
   // `unmountComponentAtNodeAndRemoveContainer` (AppRegistryImpl.js:212); the host
   // owns the container teardown, so we delegate when wired and no-op headless.
@@ -71,12 +75,18 @@ interface INativeHeadlessJsTaskSupport {
 const HEADLESS_TASK_MODULE = 'HeadlessJsTaskSupport';
 
 export interface IAppRegistry<TComponentProvider, TWrapperComponentProvider> {
-  registerComponent(appKey: string, componentProvider: TComponentProvider): string;
+  registerComponent(
+    appKey: string,
+    componentProvider: TComponentProvider,
+  ): string;
   registerRunnable(appKey: string, run: IRunnable): string;
   // Registers an app as a section, mirroring RN's `registerSection`
   // (AppRegistryImpl.js:115). Same path as a component, additionally tracked under
   // the section keys.
-  registerSection(appKey: string, componentProvider: TComponentProvider): string;
+  registerSection(
+    appKey: string,
+    componentProvider: TComponentProvider,
+  ): string;
   runApplication(appKey: string, appParameters: IAppParameters): void;
   // Tears down a mounted surface by rootTag, delegating to the host registrar
   // (RN routes through RendererProxy, AppRegistryImpl.js:212). No-op headless.
@@ -110,7 +120,10 @@ export interface IAppRegistry<TComponentProvider, TWrapperComponentProvider> {
   cancelHeadlessTask(taskId: number, taskKey: string): void;
 }
 
-export interface ICreateAppRegistryResult<TComponentProvider, TWrapperComponentProvider> {
+export interface ICreateAppRegistryResult<
+  TComponentProvider,
+  TWrapperComponentProvider,
+> {
   AppRegistry: IAppRegistry<TComponentProvider, TWrapperComponentProvider>;
   setHostRegistrar(registrar: IHostRegistrar): void;
 }
@@ -121,7 +134,10 @@ export interface ICreateAppRegistryResult<TComponentProvider, TWrapperComponentP
 // run, mirroring AppRegistryImpl.js reading it live inside the runnable it returns), it returns
 // the IRunnable that actually mounts the app for a rootTag — e.g. React's createElement + mount,
 // Vue's createApp(component, props).mount(surface), Angular's createComponent + setInput.
-export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>(
+export function createAppRegistry<
+  TComponentProvider,
+  TWrapperComponentProvider,
+>(
   runnableFor: (
     componentProvider: TComponentProvider,
     getWrapperComponentProvider: () => TWrapperComponentProvider | undefined,
@@ -149,13 +165,20 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
   // protocol, mirroring RN's `startHeadlessTask` (AppRegistryImpl.js:255). Native
   // is the only caller; it must be told when the task settles so the OS can release
   // the wakelock. Headless (no native module) → we just run the task.
-  function runHeadlessTask(taskId: number, taskKey: string, data: unknown): void {
-    const native = getNativeModule<INativeHeadlessJsTaskSupport>(HEADLESS_TASK_MODULE);
+  function runHeadlessTask(
+    taskId: number,
+    taskKey: string,
+    data: unknown,
+  ): void {
+    const native =
+      getNativeModule<INativeHeadlessJsTaskSupport>(HEADLESS_TASK_MODULE);
     dlog(`AppRegistry.startHeadlessTask: ${taskKey} (taskId=${taskId})`);
 
     const provider = taskProviders.get(taskKey);
     if (provider === undefined) {
-      dlog(`AppRegistry.startHeadlessTask: no task registered for key "${taskKey}"`);
+      dlog(
+        `AppRegistry.startHeadlessTask: no task registered for key "${taskKey}"`,
+      );
       native?.notifyTaskFinished?.(taskId);
       return;
     }
@@ -165,7 +188,9 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
         native?.notifyTaskFinished?.(taskId);
       })
       .catch((reason: unknown) => {
-        dlog(`AppRegistry.startHeadlessTask: "${taskKey}" failed: ${String(reason)}`);
+        dlog(
+          `AppRegistry.startHeadlessTask: "${taskKey}" failed: ${String(reason)}`,
+        );
         // RN asks native whether a retry was scheduled; if not, finish the task.
         // Without the native module there is nothing to notify.
         const retry = native?.notifyTaskRetry?.(taskId);
@@ -179,7 +204,10 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
       });
   }
 
-  const AppRegistry: IAppRegistry<TComponentProvider, TWrapperComponentProvider> = {
+  const AppRegistry: IAppRegistry<
+    TComponentProvider,
+    TWrapperComponentProvider
+  > = {
     registerComponent(appKey, componentProvider) {
       return register(
         appKey,
@@ -209,7 +237,9 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
     },
 
     unmountApplicationComponentAtRootTag(rootTag) {
-      dlog(`AppRegistry.unmountApplicationComponentAtRootTag: rootTag ${String(rootTag)}`);
+      dlog(
+        `AppRegistry.unmountApplicationComponentAtRootTag: rootTag ${String(rootTag)}`,
+      );
       hostRegistrar?.unmountAtRootTag?.(rootTag);
     },
 
@@ -241,15 +271,26 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
     },
 
     registerHeadlessTask(taskKey, taskProvider) {
-      AppRegistry.registerCancellableHeadlessTask(taskKey, taskProvider, () => () => {});
+      AppRegistry.registerCancellableHeadlessTask(
+        taskKey,
+        taskProvider,
+        () => () => {},
+      );
     },
 
     registerCancellableHeadlessTask(taskKey, taskProvider, taskCancelProvider) {
       if (taskProviders.has(taskKey)) {
-        dlog(`AppRegistry: headless task registered multiple times for key "${taskKey}"`);
+        dlog(
+          `AppRegistry: headless task registered multiple times for key "${taskKey}"`,
+        );
       }
       taskProviders.set(taskKey, taskProvider);
       taskCancelProviders.set(taskKey, taskCancelProvider);
+      hostRegistrar?.registerCancellableHeadlessTask?.(
+        taskKey,
+        taskProvider,
+        taskCancelProvider,
+      );
     },
 
     startHeadlessTask(taskId, taskKey, data) {
@@ -260,7 +301,9 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
       dlog(`AppRegistry.cancelHeadlessTask: ${taskKey} (taskId=${taskId})`);
       const cancelProvider = taskCancelProviders.get(taskKey);
       if (cancelProvider === undefined) {
-        dlog(`AppRegistry.cancelHeadlessTask: no canceller registered for key "${taskKey}"`);
+        dlog(
+          `AppRegistry.cancelHeadlessTask: no canceller registered for key "${taskKey}"`,
+        );
         return;
       }
       cancelProvider()();
@@ -270,7 +313,21 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
   return {
     AppRegistry,
     setHostRegistrar(registrar) {
+      if (hostRegistrar === registrar) return;
       hostRegistrar = registrar;
+      // Headless tasks are commonly registered before adapter bootstrap attaches RN's callable
+      // AppRegistry. Replay only this missing native-facing registry; app runnables retain their
+      // existing register-after-bootstrap contract.
+      for (const [taskKey, taskProvider] of taskProviders) {
+        const taskCancelProvider = taskCancelProviders.get(taskKey);
+        if (taskCancelProvider !== undefined) {
+          registrar.registerCancellableHeadlessTask?.(
+            taskKey,
+            taskProvider,
+            taskCancelProvider,
+          );
+        }
+      }
     },
   };
 }

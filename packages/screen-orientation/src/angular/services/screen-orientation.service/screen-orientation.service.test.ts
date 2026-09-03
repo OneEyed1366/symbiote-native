@@ -20,8 +20,9 @@ const getOrientationAsyncMock = vi.fn(async () => 1);
 const getOrientationLockAsyncMock = vi.fn(async () => 0);
 
 vi.mock('../../../core', () => ({
-  addOrientationChangeListener: (listener: (event: IOrientationChangeEvent) => void) =>
-    addListenerMock(listener),
+  addOrientationChangeListener: (
+    listener: (event: IOrientationChangeEvent) => void,
+  ) => addListenerMock(listener),
   getOrientationAsync: () => getOrientationAsyncMock(),
   getOrientationLockAsync: () => getOrientationLockAsyncMock(),
   Orientation: { UNKNOWN: 0, PORTRAIT_UP: 1 },
@@ -30,7 +31,8 @@ vi.mock('../../../core', () => ({
 
 const ROOT_TAG = 974;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedResult: Signal<IScreenOrientationState> | undefined;
 let capturedListener: ((event: IOrientationChangeEvent) => void) | undefined;
@@ -95,8 +97,12 @@ describe('ScreenOrientationService.connect', () => {
     mount(ROOT_TAG, ScreenOrientationHost);
     await tick();
 
-    if (capturedListener === undefined) throw new Error('addListener callback was not captured');
-    capturedListener({ orientationLock: 5, orientationInfo: { orientation: 3 } });
+    if (capturedListener === undefined)
+      throw new Error('addListener callback was not captured');
+    capturedListener({
+      orientationLock: 5,
+      orientationInfo: { orientation: 3 },
+    });
 
     expect(capturedResult?.()).toEqual({ orientation: 3, orientationLock: 5 });
   });

@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/react';
 import {
   BrightnessMode,
   addBrightnessListener,
@@ -18,7 +24,8 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 type ICapabilityStatus = 'checking' | 'yes' | 'no';
 
 function CapabilityBadge({ status }: { status: ICapabilityStatus }) {
-  const label = status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+  const label =
+    status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
     <View className={`status-badge status-badge-${status}`}>
       <Text className="status-badge-text">{label}</Text>
@@ -56,8 +63,11 @@ export function BrightnessScreen() {
   const lineColor = LINE_COLOR[lineInfo.line];
 
   const [brightness, setBrightness] = useState<number | null>(null);
-  const [systemMode, setSystemMode] = useState<BrightnessMode>(BrightnessMode.UNKNOWN);
-  const [isUsingSystem, setIsUsingSystem] = useState<ICapabilityStatus>('checking');
+  const [systemMode, setSystemMode] = useState<BrightnessMode>(
+    BrightnessMode.UNKNOWN,
+  );
+  const [isUsingSystem, setIsUsingSystem] =
+    useState<ICapabilityStatus>('checking');
   const [permissionStatus, requestPermission] = usePermissions();
 
   useEffect(() => {
@@ -79,37 +89,52 @@ export function BrightnessScreen() {
       return;
     }
     let isMounted = true;
-    Promise.all([getSystemBrightnessModeAsync(), isUsingSystemBrightnessAsync()]).then(
-      ([mode, usingSystem]) => {
-        if (isMounted) {
-          setSystemMode(mode);
-          setIsUsingSystem(usingSystem ? 'yes' : 'no');
-        }
-      },
-    );
+    Promise.all([
+      getSystemBrightnessModeAsync(),
+      isUsingSystemBrightnessAsync(),
+    ]).then(([mode, usingSystem]) => {
+      if (isMounted) {
+        setSystemMode(mode);
+        setIsUsingSystem(usingSystem ? 'yes' : 'no');
+      }
+    });
     return () => {
       isMounted = false;
     };
   }, []);
 
   const handleSetBrightness = useCallback((value: number) => {
-    setBrightnessAsync(value).then(() => getBrightnessAsync().then(setBrightness));
+    setBrightnessAsync(value).then(() =>
+      getBrightnessAsync().then(setBrightness),
+    );
   }, []);
 
   const handleSetSystemMode = useCallback((mode: BrightnessMode) => {
-    setSystemBrightnessModeAsync(mode).then(() => getSystemBrightnessModeAsync().then(setSystemMode));
+    setSystemBrightnessModeAsync(mode).then(() =>
+      getSystemBrightnessModeAsync().then(setSystemMode),
+    );
   }, []);
 
   const handleRestoreSystem = useCallback(() => {
-    restoreSystemBrightnessAsync().then(() => isUsingSystemBrightnessAsync().then(value => setIsUsingSystem(value ? 'yes' : 'no')));
+    restoreSystemBrightnessAsync().then(() =>
+      isUsingSystemBrightnessAsync().then(value =>
+        setIsUsingSystem(value ? 'yes' : 'no'),
+      ),
+    );
   }, []);
 
-  const brightnessLabel = brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`;
-  const permissionLabel = permissionStatus === null ? 'checking…' : permissionStatus.status;
+  const brightnessLabel =
+    brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`;
+  const permissionLabel =
+    permissionStatus === null ? 'checking…' : permissionStatus.status;
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="brightness-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="brightness-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -120,9 +145,10 @@ export function BrightnessScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Brightness</Text>
             <Text className="hero-body">
-              @symbiote-native/brightness — screen brightness get/set, Android system-brightness
-              mode, and an iOS-only live listener. Requires SYSTEM_BRIGHTNESS permission on
-              Android before setting the system-wide value.
+              @symbiote-native/brightness — screen brightness get/set, Android
+              system-brightness mode, and an iOS-only live listener. Requires
+              SYSTEM_BRIGHTNESS permission on Android before setting the
+              system-wide value.
             </Text>
           </View>
         </View>
@@ -151,11 +177,15 @@ export function BrightnessScreen() {
         {Platform.OS === 'android' && (
           <View testID="brightness-system-card" className="feature-card">
             <View className="feature-card-header">
-              <Text className="feature-card-title">System brightness (Android only)</Text>
+              <Text className="feature-card-title">
+                System brightness (Android only)
+              </Text>
             </View>
             <View className="capability-row">
               <Text className="capability-label">Mode</Text>
-              <Text className="value-text">{brightnessModeLabel(systemMode)}</Text>
+              <Text className="value-text">
+                {brightnessModeLabel(systemMode)}
+              </Text>
             </View>
             <View className="capability-row" testID="brightness-using-system">
               <Text className="capability-label">Using system value</Text>

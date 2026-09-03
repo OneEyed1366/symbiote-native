@@ -56,10 +56,12 @@ import {
   INVERTED_Y_STYLE,
   buildListPlan,
   buildViewabilityPairs,
+  computeWindow,
   createInitialListState,
   isSeparatorGapInRange,
   listEffectSignature,
   readLayoutLength,
+  readLayoutOffset,
   readScrollOffset,
   reduceList,
   resolveAccessibilityProps,
@@ -87,9 +89,14 @@ import {
   type ISymbioteNode,
   type IViewStyle,
 } from '@symbiote-native/engine';
+import { countAngular } from '../../diagnostics';
 import { ScrollView } from '../scroll-view';
 import { RefreshControl } from '../refresh-control';
-import { anchorHostStyle, SymbioteStyleInputDirective, ViewHost } from '../../primitives';
+import {
+  anchorHostStyle,
+  SymbioteStyleInputDirective,
+  ViewHost,
+} from '../../primitives';
 import {
   VListEmptyDirective,
   VListFooterDirective,
@@ -120,13 +127,21 @@ export {
   VListItemDirective,
   VListSeparatorDirective,
 } from './directives';
+import {
+  gateWanted,
+  injectGateDemandAbove,
+  provideGateDemand,
+  type IGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../../gate-demand';
 export type { IVListItemContext, IVListSeparatorContext } from './directives';
 
 // The Angular VirtualizedList prop surface. Mirrors React/Vue's IVirtualizedListProps MINUS the
 // element-returning props (renderItem, ListHeader/Footer/Empty Component, ItemSeparatorComponent):
 // those are the per-adapter children/render fields and become `<ng-template>` directives in Angular.
 // Everything agnostic is the SAME surface.
-export interface IVirtualizedListProps<ItemT> extends IAccessibilityProps, IAriaProps {
+export interface IVirtualizedListProps<ItemT>
+  extends IAccessibilityProps, IAriaProps {
   data: unknown;
   getItem: (data: unknown, index: number) => ItemT;
   getItemCount: (data: unknown) => number;
@@ -205,7 +220,10 @@ interface IWindowCell<ItemT> {
 @Component({
   selector: 'VirtualizedList',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  viewProviders: [provideGateDemand(() => VirtualizedList)],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [ScrollView, RefreshControl, VListOutletDirective, ViewHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -224,12 +242,20 @@ interface IWindowCell<ItemT> {
       [accessibilityValue]="foldedAccessibility().accessibilityValue"
       [accessibilityActions]="foldedAccessibility().accessibilityActions"
       [accessibilityLabelledBy]="foldedAccessibility().accessibilityLabelledBy"
-      [importantForAccessibility]="foldedAccessibility().importantForAccessibility"
+      [importantForAccessibility]="
+        foldedAccessibility().importantForAccessibility
+      "
       [accessibilityLiveRegion]="foldedAccessibility().accessibilityLiveRegion"
       [screenReaderFocusable]="foldedAccessibility().screenReaderFocusable"
-      [accessibilityViewIsModal]="foldedAccessibility().accessibilityViewIsModal"
-      [accessibilityElementsHidden]="foldedAccessibility().accessibilityElementsHidden"
-      [accessibilityIgnoresInvertColors]="foldedAccessibility().accessibilityIgnoresInvertColors"
+      [accessibilityViewIsModal]="
+        foldedAccessibility().accessibilityViewIsModal
+      "
+      [accessibilityElementsHidden]="
+        foldedAccessibility().accessibilityElementsHidden
+      "
+      [accessibilityIgnoresInvertColors]="
+        foldedAccessibility().accessibilityIgnoresInvertColors
+      "
       [accessibilityLanguage]="foldedAccessibility().accessibilityLanguage"
       [accessibilityRespondsToUserInteraction]="
         foldedAccessibility().accessibilityRespondsToUserInteraction
@@ -237,7 +263,9 @@ interface IWindowCell<ItemT> {
       [accessibilityShowsLargeContentViewer]="
         foldedAccessibility().accessibilityShowsLargeContentViewer
       "
-      [accessibilityLargeContentTitle]="foldedAccessibility().accessibilityLargeContentTitle"
+      [accessibilityLargeContentTitle]="
+        foldedAccessibility().accessibilityLargeContentTitle
+      "
       (accessibilityAction)="accessibilityActionTick($event)"
       (accessibilityTap)="accessibilityTapTick($event)"
       (magicTap)="magicTapTick($event)"
@@ -293,21 +321,29 @@ interface IWindowCell<ItemT> {
         @if (gapSpacerStyle !== null) {
           <symbiote-view [style]="gapSpacerStyle"></symbiote-view>
         }
+        <!-- The separator sits INSIDE the measuring view, as RN's own cell renderer places it
+             (VirtualizedListCellRenderer.js:218-221). As a sibling it is an extra flex child, so
+             the chrome between two cells is gap + separator + gap while a spacer collapsing that
+             region replaces it with a single gap — every cell below the leading spacer then lands
+             short by (separator + gap) and the content jumps by that much whenever the window's
+             first index moves. Measured at exactly 17px on device 2026-08-19; see
+             .claude/rules/list-geometry-feedback-loop.md. -->
         @for (cell of windowCells; track cell.key) {
-          <symbiote-view (layout)="handleCellLayout(cell.measure, $event)" [style]="cellStyle">
+          <symbiote-view
+            (layout)="handleCellLayout(cell.measure, $event)"
+            [style]="cellStyle"
+          >
             <ng-container
               [vListOutlet]="itemDir?.templateRef"
               [vListOutletContext]="cell.context"
             ></ng-container>
-          </symbiote-view>
-          @if (cell.separatorContext !== undefined) {
-            <symbiote-view>
+            @if (cell.separatorContext !== undefined) {
               <ng-container
                 [vListOutlet]="separatorDir?.templateRef"
                 [vListOutletContext]="cell.separatorContext"
               ></ng-container>
-            </symbiote-view>
-          }
+            }
+          </symbiote-view>
         }
         @if (trailingSpacerStyle !== null) {
           <symbiote-view [style]="trailingSpacerStyle"></symbiote-view>
@@ -334,10 +370,16 @@ export class VirtualizedList<ItemT = unknown>
   // The list's edge/viewability/failure events as real Angular events: `(endReached)="…"`, not
   // `[onEndReached]="…"`. See handleRefresh/accessibility*Tick below for how the still-callback-
   // shaped ScrollView/RefreshControl @Input()s are fed from these.
-  @Output() readonly endReached = new EventEmitter<{ distanceFromEnd: number }>();
-  @Output() readonly startReached = new EventEmitter<{ distanceFromStart: number }>();
+  @Output() readonly endReached = new EventEmitter<{
+    distanceFromEnd: number;
+  }>();
+  @Output() readonly startReached = new EventEmitter<{
+    distanceFromStart: number;
+  }>();
   @Output() readonly refresh = new EventEmitter<void>();
-  @Output() readonly viewableItemsChanged = new EventEmitter<IViewableItemsChangedInfo<ItemT>>();
+  @Output() readonly viewableItemsChanged = new EventEmitter<
+    IViewableItemsChangedInfo<ItemT>
+  >();
   @Output() readonly scrollToIndexFailed = new EventEmitter<{
     index: number;
     highestMeasuredFrameIndex: number;
@@ -347,6 +389,16 @@ export class VirtualizedList<ItemT = unknown>
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
+
+  // This wrapper binds the four gated accessibility events on the component it renders, which
+  // Angular forces to be unconditional and which would light that component's gates on every
+  // instance. It answers for them instead — see `gate-demand.ts`.
+  private readonly gateDemandAbove = injectGateDemandAbove();
+
+  wantsGate(name: IGatedAccessibilityEvent): boolean {
+    return gateWanted(this.gateDemandAbove, name, this[name]);
+  }
+
   @Input({ required: true }) data!: unknown;
   @Input({ required: true }) getItem!: (data: unknown, index: number) => ItemT;
   @Input({ required: true }) getItemCount!: (data: unknown) => number;
@@ -371,7 +423,8 @@ export class VirtualizedList<ItemT = unknown>
   // (no wrapper) falls back to this component's own `.observed`, unchanged from before.
   @Input() refreshRequested?: boolean;
   @Input() viewabilityConfig?: IViewabilityConfig;
-  @Input() viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<ItemT>[];
+  @Input()
+  viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<ItemT>[];
   @Input() initialNumToRender?: number;
   @Input() initialScrollIndex?: number;
   @Input() maxToRenderPerBatch?: number;
@@ -402,8 +455,10 @@ export class VirtualizedList<ItemT = unknown>
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -435,7 +490,8 @@ export class VirtualizedList<ItemT = unknown>
   @ContentChild(VListHeaderDirective) headerDir?: VListHeaderDirective;
   @ContentChild(VListFooterDirective) footerDir?: VListFooterDirective;
   @ContentChild(VListEmptyDirective) emptyDir?: VListEmptyDirective;
-  @ContentChild(VListSeparatorDirective) separatorDir?: VListSeparatorDirective<ItemT>;
+  @ContentChild(VListSeparatorDirective)
+  separatorDir?: VListSeparatorDirective<ItemT>;
 
   // The composed inner scroll view. Its instance IS an IScrollViewHandle (scrollTo / scrollToEnd /
   // flashScrollIndicators / getScrollNode), so the imperative handle delegates straight to it.
@@ -462,7 +518,8 @@ export class VirtualizedList<ItemT = unknown>
   resolvedStyle: IViewStyle | undefined = undefined;
   resolvedContentContainerStyle: IStyleProp<IViewStyle> | undefined = undefined;
   resolvedMaintainVisibleContentPosition:
-    { minIndexForVisible: number; autoscrollToTopThreshold?: number } | undefined = undefined;
+    | { minIndexForVisible: number; autoscrollToTopThreshold?: number }
+    | undefined = undefined;
   // The offset we are imperatively driving native to before the scroll handle attaches (rides down
   // as contentOffset). A fresh object identity each push so the commit re-applies a repeated value.
   commandedOffset: { x: number; y: number } | undefined = undefined;
@@ -471,20 +528,41 @@ export class VirtualizedList<ItemT = unknown>
   // measured lengths, committed window, edge/viewability dedup, MVCP anchor — all in IListState,
   // driven by the shared reduceList. `renderVersion` bumps whenever a transition changes render
   // state, so ngDoCheck's recompute-dedup can detect it (listState is a plain object, not tracked).
-  private readonly listState: IListState<ItemT> = createInitialListState<ItemT>();
+  private readonly listState: IListState<ItemT> =
+    createInitialListState<ItemT>();
   private renderVersion = EMPTY_OFFSET;
 
-  private readonly cellMeasures = new Map<number, (event: ISymbioteEvent) => void>();
-  private readonly separatorOverrides = new Map<number, Partial<ISeparatorProps<unknown>>>();
+  private readonly cellMeasures = new Map<
+    number,
+    (event: ISymbioteEvent) => void
+  >();
+  // A cell's context object is the ONLY thing its stamped view reads, and VListOutletDirective
+  // refreshes that view whenever the object's IDENTITY changes. recomputeView runs on every frame
+  // the window moves, so minting a fresh context per cell made a four-row slide cost a refresh of
+  // EVERY cell in the window. MEASURED on PATH B geometry (544 entries, 320px viewport, RN
+  // defaults), per fling frame: 233-cell window, 4 cells genuinely entering, 228 outlet updates —
+  // each one a copyContextFields plus a markForCheck that walks to the root. Solid, same geometry,
+  // same shared reducer, same engine output: 4. Handing back the SAME object for a cell whose item
+  // and index did not move keeps `[vListOutletContext]` reference-equal, so ngOnChanges never fires
+  // for it. The fast adapters get this by construction — Solid's <For> is keyed on the cell KEY
+  // strings precisely so "the plan's freshly-built cell objects" cannot rebuild every row
+  // (adapters/solid/src/components/virtualized-list/shared.tsx, the cellKeys memo).
+  private cellContexts = new Map<string, IVListItemContext<ItemT>>();
+  private nextCellContexts = new Map<string, IVListItemContext<ItemT>>();
+  // Everything a cell's CONTENT can depend on that is not its own item identity. RN's contract for
+  // "re-render the cells, the data object itself did not change" is extraData; without it here an
+  // extraData flip would reuse every context and repaint nothing.
+  private cellContextEpoch: unknown[] | undefined = undefined;
+  private readonly separatorOverrides = new Map<
+    number,
+    Partial<ISeparatorProps<unknown>>
+  >();
   // The adapter-owned debounce (minimumViewTime) and incremental-fill timers; the reducer only
   // hands back a delay.
   private viewableTimer: ReturnType<typeof setTimeout> | null = null;
   private batchTimer: ReturnType<typeof setTimeout> | null = null;
   // Dedupes the after-commit effects: they run only when the windowing signature changed.
   private lastEffectSignature = '';
-  // Dedupes dispatch's markForCheck against the RENDERED window (see dispatch below). Distinct from
-  // lastEffectSignature, which gates the batch-fill timer and deliberately includes scrollOffset.
-  private lastRenderSignature = '';
   // Dedupes ngDoCheck's own recompute. WITHOUT this, recomputeView() unconditionally rebuilds
   // windowCells (and each cell's `separators` handle — fresh closures every call) on EVERY CD pass,
   // including ones triggered by something else entirely in the app. A fresh context object flows
@@ -543,8 +621,10 @@ export class VirtualizedList<ItemT = unknown>
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,
@@ -584,7 +664,9 @@ export class VirtualizedList<ItemT = unknown>
     return this.maxToRenderPerBatch ?? DEFAULT_MAX_TO_RENDER_PER_BATCH;
   }
   private get updateCellsBatchingPeriodValue(): number {
-    return this.updateCellsBatchingPeriod ?? DEFAULT_UPDATE_CELLS_BATCHING_PERIOD;
+    return (
+      this.updateCellsBatchingPeriod ?? DEFAULT_UPDATE_CELLS_BATCHING_PERIOD
+    );
   }
   private get onEndReachedThresholdValue(): number {
     return this.onEndReachedThreshold ?? DEFAULT_END_REACHED_THRESHOLD;
@@ -597,6 +679,7 @@ export class VirtualizedList<ItemT = unknown>
   // flow through it, which an @Output() can't carry), so this is a stable arrow field passed
   // straight to [onScroll]. onLayout is a real @Output() now, bound via (layout)="onLayoutTick($event)".
   onScrollTick = (event: ISymbioteEvent): void => {
+    countAngular('scrollTicks');
     const offset = readScrollOffset(event, this.isHorizontal);
     if (offset === undefined) return;
     dlog(`Angular VirtualizedList onScroll offset=${offset}`);
@@ -663,7 +746,8 @@ export class VirtualizedList<ItemT = unknown>
       onStartReachedActive: this.startReached.observed,
       viewabilityPairs: buildViewabilityPairs(
         this.viewableItemsChanged.observed
-          ? (info: IViewableItemsChangedInfo<ItemT>): void => this.viewableItemsChanged.emit(info)
+          ? (info: IViewableItemsChangedInfo<ItemT>): void =>
+              this.viewableItemsChanged.emit(info)
           : undefined,
         this.viewabilityConfig,
         this.viewabilityConfigCallbackPairs,
@@ -681,23 +765,58 @@ export class VirtualizedList<ItemT = unknown>
     this.runEffects(result.effects, inputs);
     if (!result.changed) return;
     this.renderVersion += 1;
-    // The reducer reports `changed` for EVERY scroll offset - it has to, since the offset feeds
-    // end-reached distance, viewability and the batch-fill timer, all handled above in runEffects.
-    // The TEMPLATE reads none of those; it reads the window. Marking on the offset repainted the
-    // whole ancestor chain 60 times a second on a sticky screen for a window that had not moved.
-    const signature = this.renderSignature();
-    if (signature === this.lastRenderSignature) return;
-    this.lastRenderSignature = signature;
+    if (this.isWindowSettled(action)) return;
+    countAngular('listMarks');
     this.cdr.markForCheck();
   }
 
-  // The window, not the offset: exactly the metrics recomputeView turns into cells and spacers.
-  private renderSignature(): string {
+  // The reducer reports `changed` for EVERY scroll offset - it has to, since the offset feeds
+  // end-reached distance, viewability and the batch-fill timer, all handled by runEffects. The
+  // TEMPLATE reads none of those; it reads the window. Marking on the offset repainted the whole
+  // ancestor chain 60 times a second on a sticky screen for a window that had not moved.
+  //
+  // So the question here is "would a render leave the window exactly where it is", and it is asked
+  // of the state as it is NOW. It must NOT be answered by comparing the last-rendered window with
+  // the one before it: that window was derived from the PREVIOUS scroll offset, so once two
+  // consecutive derives agree the comparison reads "settled" for every offset that ever follows -
+  // no mark, no CD, no ngDoCheck, no refresh-metrics, so the window can never move again and the
+  // list goes permanently deaf mid-scroll (device: examples/angular Benchmark sticky path B froze
+  // at exactly the window the first viewport asked for, blank below it).
+  //
+  // computeWindow re-run over the CACHED offset table answers it directly. Two scans, no
+  // allocation - buildOffsets, the O(count) allocating half, still runs once per render only. It is
+  // the same function the render will use, so this cannot drift away from the window it predicts.
+  private isWindowSettled(action: IListAction<ItemT>): boolean {
+    // A measurement rewrites the very offset table the prediction reads, so it has no cached
+    // geometry to answer from.
+    if (action.kind === 'measure') return false;
     const m = this.listState.metrics;
-    return `${m.first}|${m.last}|${m.count}|${m.total}`;
+    // Mid-fill: the committed window is still climbing toward target one batch step per render, and
+    // only a render advances it. Skipping the mark here is what stalls the incremental fill.
+    if (m.first !== m.target.first || m.last !== m.target.last) return false;
+    const next = computeWindow(
+      m.count,
+      m.offsets,
+      m.lengths,
+      this.listState.scrollOffset,
+      this.listState.viewportLength,
+      this.windowSizeValue,
+      this.initialNumToRenderValue,
+    );
+    const isSettled =
+      next.first === m.target.first && next.last === m.target.last;
+    if (!isSettled)
+      dlog(
+        `Angular VirtualizedList window moves [${m.first}, ${m.last}] -> ` +
+          `[${next.first}, ${next.last}] at offset ${this.listState.scrollOffset}`,
+      );
+    return isSettled;
   }
 
-  private runEffects(effects: IListEffect<ItemT>[], inputs: IListReducerInputs<ItemT>): void {
+  private runEffects(
+    effects: IListEffect<ItemT>[],
+    inputs: IListReducerInputs<ItemT>,
+  ): void {
     for (const effect of effects) {
       switch (effect.kind) {
         case 'scroll-to':
@@ -707,7 +826,9 @@ export class VirtualizedList<ItemT = unknown>
           this.endReached.emit({ distanceFromEnd: effect.distanceFromEnd });
           break;
         case 'fire-start-reached':
-          this.startReached.emit({ distanceFromStart: effect.distanceFromStart });
+          this.startReached.emit({
+            distanceFromStart: effect.distanceFromStart,
+          });
           break;
         case 'fire-scroll-to-index-failed':
           this.scrollToIndexFailed.emit({
@@ -765,6 +886,7 @@ export class VirtualizedList<ItemT = unknown>
   // grows exactly one step per meaningful CD. The projected templates (ContentChild) are resolved
   // from the second CD on; the first paint (count/viewport still 0) corrects on the layout-driven CD.
   ngDoCheck(): void {
+    countAngular('listChecks');
     const recomputeInputs: unknown[] = [
       this.data,
       this.extraData,
@@ -800,6 +922,7 @@ export class VirtualizedList<ItemT = unknown>
       return;
     }
     // The single derive-per-CD: recompute the window off the current state before the view reads it.
+    countAngular('listRecomputes');
     reduceList(this.listState, { kind: 'refresh-metrics' }, this.buildInputs());
     this.recomputeView();
   }
@@ -824,7 +947,9 @@ export class VirtualizedList<ItemT = unknown>
     const hasHeader = this.headerDir !== undefined;
     const hasSeparators = this.separatorDir !== undefined;
     const stickySet =
-      this.stickyHeaderIndices !== undefined ? new Set(this.stickyHeaderIndices) : undefined;
+      this.stickyHeaderIndices !== undefined
+        ? new Set(this.stickyHeaderIndices)
+        : undefined;
 
     this.resolvedContentContainerStyle = this.isHorizontal
       ? [this.contentContainerStyle, { width: m.total }]
@@ -846,17 +971,40 @@ export class VirtualizedList<ItemT = unknown>
         : {
             ...this.maintainVisibleContentPosition,
             minIndexForVisible:
-              this.maintainVisibleContentPosition.minIndexForVisible + (hasHeader ? 1 : 0),
+              this.maintainVisibleContentPosition.minIndexForVisible +
+              (hasHeader ? 1 : 0),
           };
 
+    // A change in anything a cell's content reads other than its own item invalidates every cached
+    // context: identity reuse is only sound while the reused object still describes the cell.
+    const epoch: unknown[] = [
+      this.data,
+      this.extraData,
+      this.getItem,
+      this.keyExtractor,
+    ];
+    const previousEpoch = this.cellContextEpoch;
+    this.cellContextEpoch = epoch;
+    if (
+      previousEpoch === undefined ||
+      previousEpoch.length !== epoch.length ||
+      !previousEpoch.every((value, index) => value === epoch[index])
+    ) {
+      this.cellContexts.clear();
+    }
+
     if (m.count === FIRST_INDEX) {
+      this.cellContexts.clear();
+      this.nextCellContexts.clear();
       this.windowCells = [];
       this.forcedStickyCell = null;
       this.leadingSpacerStyle = null;
       this.gapSpacerStyle = null;
       this.trailingSpacerStyle = null;
       this.renderedStickyIndices = undefined;
-      dlog(`Angular VirtualizedList empty (viewport=${this.listState.viewportLength})`);
+      dlog(
+        `Angular VirtualizedList empty (viewport=${this.listState.viewportLength})`,
+      );
       return;
     }
 
@@ -870,13 +1018,17 @@ export class VirtualizedList<ItemT = unknown>
       keyFor: this.keyFor,
       stickyIndices: stickySet,
       hasHeader,
-      hasSeparators,
     });
     this.leadingSpacerStyle =
-      plan.leadingExtent > EMPTY_OFFSET ? this.spacerStyle(plan.leadingExtent) : null;
-    this.gapSpacerStyle = plan.gapExtent > EMPTY_OFFSET ? this.spacerStyle(plan.gapExtent) : null;
+      plan.leadingExtent > EMPTY_OFFSET
+        ? this.spacerStyle(plan.leadingExtent)
+        : null;
+    this.gapSpacerStyle =
+      plan.gapExtent > EMPTY_OFFSET ? this.spacerStyle(plan.gapExtent) : null;
     this.trailingSpacerStyle =
-      plan.trailingExtent > EMPTY_OFFSET ? this.spacerStyle(plan.trailingExtent) : null;
+      plan.trailingExtent > EMPTY_OFFSET
+        ? this.spacerStyle(plan.trailingExtent)
+        : null;
     this.renderedStickyIndices =
       stickySet !== undefined && plan.stickyChildPositions.length > 0
         ? plan.stickyChildPositions
@@ -890,15 +1042,30 @@ export class VirtualizedList<ItemT = unknown>
 
     this.forcedStickyCell =
       plan.forcedStickyCell !== undefined
-        ? this.buildWindowCell(plan.forcedStickyCell.index, plan.forcedStickyCell.key, false)
+        ? this.buildWindowCell(
+            plan.forcedStickyCell.index,
+            plan.forcedStickyCell.key,
+            false,
+          )
         : null;
 
     const cells: IWindowCell<ItemT>[] = [];
     for (const planned of plan.cells) {
-      const includeSeparator = hasSeparators && planned.index < m.last;
-      cells.push(this.buildWindowCell(planned.index, planned.key, includeSeparator));
+      // RN gates the separator on the last index of the DATA, not of the WINDOW
+      // (VirtualizedList.js:793 `const end = getItemCount(data) - 1`), and now that the separator
+      // lives INSIDE the measuring wrapper that distinction is load-bearing: gating on the window
+      // would make a cell's own measured height change as the window slides past it. Device-measured
+      // 2026-08-19 as a run of cells all shifting by exactly the divider's 1px.
+      const includeSeparator = hasSeparators && planned.index < m.count - 1;
+      cells.push(
+        this.buildWindowCell(planned.index, planned.key, includeSeparator),
+      );
     }
     this.windowCells = cells;
+    // Swap, don't prune: a cell that left the window is simply absent from the pass that just ran,
+    // so the old map is the garbage and the new one is exactly the live set.
+    this.cellContexts = this.nextCellContexts;
+    this.nextCellContexts = new Map<string, IVListItemContext<ItemT>>();
 
     dlog(
       `Angular VirtualizedList window [${m.first}, ${m.last}] of ${m.count} ` +
@@ -914,21 +1081,45 @@ export class VirtualizedList<ItemT = unknown>
     includeSeparator: boolean,
   ): IWindowCell<ItemT> {
     const item = this.getItem(this.data, index);
+    return {
+      key,
+      index,
+      context: this.contextFor(key, index, item),
+      measure: this.cellMeasure(index),
+      separatorContext: includeSeparator
+        ? this.buildSeparatorContext(index, item)
+        : undefined,
+    };
+  }
+
+  // The context for one cell, reused by identity when the cell did not move. See cellContexts.
+  private contextFor(
+    key: string,
+    index: number,
+    item: ItemT,
+  ): IVListItemContext<ItemT> {
+    const cached = this.cellContexts.get(key);
+    if (
+      cached !== undefined &&
+      cached.$implicit === item &&
+      cached.index === index
+    ) {
+      this.nextCellContexts.set(key, cached);
+      return cached;
+    }
     const context: IVListItemContext<ItemT> = {
       $implicit: item,
       index,
       separators: this.makeSeparators(index),
     };
-    return {
-      key,
-      index,
-      context,
-      measure: this.cellMeasure(index),
-      separatorContext: includeSeparator ? this.buildSeparatorContext(index, item) : undefined,
-    };
+    this.nextCellContexts.set(key, context);
+    return context;
   }
 
-  private buildSeparatorContext(index: number, item: ItemT): IVListSeparatorContext<ItemT> {
+  private buildSeparatorContext(
+    index: number,
+    item: ItemT,
+  ): IVListSeparatorContext<ItemT> {
     const overrides = this.separatorOverrides.get(index);
     const highlighted = overrides?.highlighted ?? false;
     const context: IVListSeparatorContext<ItemT> = {
@@ -941,7 +1132,12 @@ export class VirtualizedList<ItemT = unknown>
     // arbitrary separator props); the typed fields above stay authoritative.
     if (overrides !== undefined) {
       for (const key of Object.keys(overrides)) {
-        if (key === 'highlighted' || key === 'leadingItem' || key === 'trailingItem') continue;
+        if (
+          key === 'highlighted' ||
+          key === 'leadingItem' ||
+          key === 'trailingItem'
+        )
+          continue;
         context[key] = overrides[key];
       }
     }
@@ -958,10 +1154,13 @@ export class VirtualizedList<ItemT = unknown>
     const measure = (event: ISymbioteEvent): void => {
       const length = readLayoutLength(event, this.isHorizontal);
       if (length === undefined) return;
-      dlog(`Angular VirtualizedList cell ${index} measured length=${length}`);
+      const offset = readLayoutOffset(event, this.isHorizontal);
+      dlog(
+        `Angular VirtualizedList cell ${index} measured length=${length} offset=${offset ?? 'none'}`,
+      );
       // The reducer guards a fixed getItemLayout and a repeated length; a no-op leaves state and the
       // view untouched (dispatch marks for check only when something changed).
-      this.dispatch({ kind: 'measure', index, length });
+      this.dispatch({ kind: 'measure', index, length, offset });
     };
     this.cellMeasures.set(index, measure);
     return measure;
@@ -969,18 +1168,29 @@ export class VirtualizedList<ItemT = unknown>
 
   // Per-cell onLayout rides the engine's structural (layout) event channel — Angular forbids an
   // [onLayout] property binding (NG8002). $event arrives untyped, narrowed before reaching measure.
-  handleCellLayout(measure: (event: ISymbioteEvent) => void, event: unknown): void {
+  handleCellLayout(
+    measure: (event: ISymbioteEvent) => void,
+    event: unknown,
+  ): void {
     if (this.isSymbioteEvent(event)) measure(event);
   }
 
   private isSymbioteEvent(value: unknown): value is ISymbioteEvent {
-    return typeof value === 'object' && value !== null && 'nativeEvent' in value;
+    return (
+      typeof value === 'object' && value !== null && 'nativeEvent' in value
+    );
   }
 
-  private mergeSeparator(gapIndex: number, patch: Partial<ISeparatorProps<unknown>>): void {
+  private mergeSeparator(
+    gapIndex: number,
+    patch: Partial<ISeparatorProps<unknown>>,
+  ): void {
     const count = this.listState.metrics.count;
     if (!isSeparatorGapInRange(gapIndex, count)) return;
-    this.separatorOverrides.set(gapIndex, { ...this.separatorOverrides.get(gapIndex), ...patch });
+    this.separatorOverrides.set(gapIndex, {
+      ...this.separatorOverrides.get(gapIndex),
+      ...patch,
+    });
     this.cdr.markForCheck();
   }
 
@@ -996,7 +1206,10 @@ export class VirtualizedList<ItemT = unknown>
         this.mergeSeparator(index - 1, { highlighted: false });
         this.mergeSeparator(index, { highlighted: false });
       },
-      updateProps: (select: 'leading' | 'trailing', newProps: Record<string, unknown>): void => {
+      updateProps: (
+        select: 'leading' | 'trailing',
+        newProps: Record<string, unknown>,
+      ): void => {
         this.mergeSeparator(select === 'leading' ? index - 1 : index, newProps);
       },
     };
@@ -1029,7 +1242,11 @@ export class VirtualizedList<ItemT = unknown>
     });
   }
 
-  scrollToItem(params: { item: unknown; animated?: boolean; viewPosition?: number }): void {
+  scrollToItem(params: {
+    item: unknown;
+    animated?: boolean;
+    viewPosition?: number;
+  }): void {
     this.dispatch({
       kind: 'scroll-to-item',
       item: params.item,
@@ -1039,7 +1256,10 @@ export class VirtualizedList<ItemT = unknown>
   }
 
   scrollToEnd(params?: { animated?: boolean }): void {
-    this.dispatch({ kind: 'scroll-to-end', animated: params?.animated ?? true });
+    this.dispatch({
+      kind: 'scroll-to-end',
+      animated: params?.animated ?? true,
+    });
   }
 
   flashScrollIndicators(): void {

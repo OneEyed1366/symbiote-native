@@ -23,7 +23,8 @@ import { mount, unmount } from './render';
 
 // RN sets both before any app code runs (setUpGlobals.js / setUpNavigator.js); a bare vitest
 // sandbox has neither, and svelte's init_operations() reads both at first mount.
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -32,7 +33,8 @@ const ROOT_TAG = 91_301;
 const TMP_DIR = join(__dirname, '../build/__await_smoke__');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -46,7 +48,10 @@ afterEach(() => {
 
 let compileCounter = 0;
 
-async function compileComponent(source: string, name: string): Promise<Component> {
+async function compileComponent(
+  source: string,
+  name: string,
+): Promise<Component> {
   const result = compile(source, {
     generate: 'client',
     filename: `${name}.svelte`,
@@ -62,7 +67,9 @@ async function compileComponent(source: string, name: string): Promise<Component
   }
   const component: unknown = mod.default;
   if (typeof component !== 'function') {
-    throw new Error(`compiled ${name}.svelte default export is not a component`);
+    throw new Error(
+      `compiled ${name}.svelte default export is not a component`,
+    );
   }
   return component;
 }
@@ -131,7 +138,9 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       // Exactly the pending branch — not pending PLUS an anchor-turned-RCTRawText, and not both
       // branches at once.
       expect(testIds()).toEqual(['pending']);
-      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "loading"))');
+      expect(fabric.serialize(appChildren())).toBe(
+        'RCTView(RCTText(RCTRawText "loading"))',
+      );
 
       gate.resolve('ready');
       await tick();
@@ -139,7 +148,9 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
 
       // The pending subtree must be GONE, not merely followed by the then subtree.
       expect(testIds()).toEqual(['then']);
-      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "ready"))');
+      expect(fabric.serialize(appChildren())).toBe(
+        'RCTView(RCTText(RCTRawText "ready"))',
+      );
     });
 
     // why: the short form has no pending snippet at all, so the block must contribute a real engine
@@ -167,7 +178,9 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       await tick();
 
       expect(testIds()).toEqual(['then']);
-      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "late"))');
+      expect(fabric.serialize(appChildren())).toBe(
+        'RCTView(RCTText(RCTRawText "late"))',
+      );
     });
 
     // why: the re-entrancy case — the first promise's `.then` still fires after it was replaced,
@@ -191,7 +204,10 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
 
       const first = deferred();
       const second = deferred();
-      const control: { initial: Promise<string>; swap: (next: Promise<string>) => void } = {
+      const control: {
+        initial: Promise<string>;
+        swap: (next: Promise<string>) => void;
+      } = {
         initial: first.promise,
         swap: () => {},
       };
@@ -214,7 +230,9 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       await tick();
       await tick();
       expect(testIds()).toEqual(['then']);
-      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "fresh"))');
+      expect(fabric.serialize(appChildren())).toBe(
+        'RCTView(RCTText(RCTRawText "fresh"))',
+      );
     });
 
     // why: three sibling {#await} blocks inside one keyed {#each}, resolving OUT of order. Each
@@ -297,7 +315,9 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       await tick();
 
       expect(testIds()).toEqual(['catch']);
-      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "nope"))');
+      expect(fabric.serialize(appChildren())).toBe(
+        'RCTView(RCTText(RCTRawText "nope"))',
+      );
     });
   });
 });

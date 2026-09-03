@@ -60,7 +60,8 @@ type IHostProps = Record<string, unknown>;
 // via <ng-content>), declared per-adapter over the shared accessibility base since the framework-specific
 // children slot keeps it from being fully shared across adapters. Read the React reference for the
 // native prop names.
-export interface IAngularRefreshControlProps extends IAccessibilityProps, IAriaProps {
+export interface IAngularRefreshControlProps
+  extends IAccessibilityProps, IAriaProps {
   refreshing: boolean;
   // RN's onRefresh is `() => void | Promise<void>`, the handler may be async; the promise is
   // fire-and-forget (native already starts refreshing on the gesture).
@@ -97,7 +98,9 @@ export type IAngularRefreshControlInputs = Omit<
 @Component({
   selector: 'RefreshControl',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [RefreshControlHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -106,17 +109,18 @@ export type IAngularRefreshControlInputs = Omit<
       #host
       [symbioteHostProps]="hostProps()"
       (refresh)="handleRefresh()"
-      (accessibilityAction)="emit(accessibilityAction, $event)"
-      (accessibilityTap)="emit(accessibilityTap, $event)"
-      (magicTap)="emit(magicTap, $event)"
-      (accessibilityEscape)="emit(accessibilityEscape, $event)"
     >
       <ng-content></ng-content>
     </symbiote-refresh-control>
   `,
 })
 export class RefreshControl
-  implements IAngularRefreshControlInputs, OnInit, OnChanges, DoCheck, AfterViewInit
+  implements
+    IAngularRefreshControlInputs,
+    OnInit,
+    OnChanges,
+    DoCheck,
+    AfterViewInit
 {
   // Controlled prop the parent owns; required to match the React reference surface.
   @Input({ required: true }) refreshing!: boolean;
@@ -142,8 +146,10 @@ export class RefreshControl
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -218,7 +224,9 @@ export class RefreshControl
       this.lastNativeRefreshing = this.refreshing;
       return;
     }
-    this.syncNativeRefreshing(this.refreshNativeNode ?? this.host?.nativeElement);
+    this.syncNativeRefreshing(
+      this.refreshNativeNode ?? this.host?.nativeElement,
+    );
   }
 
   // Native starts the spinner before JS runs. Mirror RN's RefreshControl controlled-component
@@ -240,8 +248,17 @@ export class RefreshControl
 
   // Forward an engine event to the matching @Output(), narrowing the template's untyped $event
   // first. The accessibility* events arrive on the engine's structural event channel.
-  emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
+  private emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     if (isSymbioteEvent(event)) emitter.emit(event);
+  }
+
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`): a template binding here lit the gate on every
+  // instance whether or not an app ever subscribed. `.observed`-gated, mirroring Pressable's.
+  private eventEmitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): ((event: unknown) => void) | undefined {
+    return emitter.observed ? event => this.emit(emitter, event) : undefined;
   }
 
   // The anchor's class-derived style is NOT an @Input: `class="..."`/`[ngClass]` at the use site
@@ -282,6 +299,10 @@ export class RefreshControl
       nativeID: this.nativeID,
       accessible: this.accessible,
       ...this.folded,
+      onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),
+      onAccessibilityTap: this.eventEmitterHandler(this.accessibilityTap),
+      onMagicTap: this.eventEmitterHandler(this.magicTap),
+      onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
     };
   });
 
@@ -303,8 +324,10 @@ export class RefreshControl
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

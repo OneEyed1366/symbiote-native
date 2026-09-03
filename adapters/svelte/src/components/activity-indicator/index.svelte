@@ -12,7 +12,10 @@
 </script>
 
 <script lang="ts">
-  import { renderActivityIndicator, resolveAccessibilityProps } from '@symbiote-native/components';
+  import {
+    renderActivityIndicator,
+    resolveAccessibilityProps,
+  } from '@symbiote-native/components';
   import { PLATFORM } from './activity-indicator-platform';
   import { createDescriptorChildrenSync } from '../../descriptor-to-svelte';
   import { createAttachmentsSync } from '../../runes/attachments';
@@ -36,7 +39,10 @@
         size,
         color,
         style,
-        passthrough: { ...resolveAccessibilityProps(passthrough), class: className },
+        passthrough: {
+          ...resolveAccessibilityProps(passthrough),
+          class: className,
+        },
       },
       PLATFORM,
     ),

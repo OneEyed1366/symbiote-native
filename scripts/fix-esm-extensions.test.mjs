@@ -1,17 +1,23 @@
-// Run: `node --test scripts/fix-esm-extensions.test.mjs`. Uses node:test so it stays self-contained
-// in scripts/ (the vitest config only globs core/adapters/packages) with zero extra dependency.
+// Runs under root `pnpm test:node` discovery. Uses node:test so it stays self-contained in
+// scripts/ (Vitest owns the TypeScript/component suites) with zero extra dependency.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { rewriteEsmSpecifiers, fixEsmExtensions } from './fix-esm-extensions.mjs';
+import {
+  rewriteEsmSpecifiers,
+  fixEsmExtensions,
+} from './fix-esm-extensions.mjs';
 
 // A resolver stand-in: every relative spec gains `.js` unless it's the sentinel unresolved one.
-const addJs = (spec) => (spec === './missing' ? null : spec + '.js');
+const addJs = spec => (spec === './missing' ? null : spec + '.js');
 
 test('rewrites a real static import specifier', () => {
-  const { code, importsFixed, unresolved } = rewriteEsmSpecifiers(`import { x } from './x';`, addJs);
+  const { code, importsFixed, unresolved } = rewriteEsmSpecifiers(
+    `import { x } from './x';`,
+    addJs,
+  );
   assert.equal(code, `import { x } from './x.js';`);
   assert.equal(importsFixed, 1);
   assert.deepEqual(unresolved, []);
@@ -23,7 +29,10 @@ test('rewrites a real re-export specifier', () => {
 });
 
 test('rewrites a real dynamic import specifier', () => {
-  const { code, importsFixed } = rewriteEsmSpecifiers(`const m = import('./y');`, addJs);
+  const { code, importsFixed } = rewriteEsmSpecifiers(
+    `const m = import('./y');`,
+    addJs,
+  );
   assert.equal(code, `const m = import('./y.js');`);
   assert.equal(importsFixed, 1);
 });
@@ -57,7 +66,7 @@ test('leaves a specifier inside a double-quoted string untouched (emitted JS-as-
 });
 
 test('leaves a specifier inside a template literal untouched', () => {
-  const src = 'const emitted = `export { a } from \'./missing\'`;';
+  const src = "const emitted = `export { a } from './missing'`;";
   const { code, unresolved } = rewriteEsmSpecifiers(src, addJs);
   assert.equal(code, src);
   assert.deepEqual(unresolved, []);
@@ -71,7 +80,10 @@ test('leaves a specifier inside an escaped single-quoted string untouched', () =
 });
 
 test('reports a genuinely unresolved real import and leaves it in place', () => {
-  const { code, importsFixed, unresolved } = rewriteEsmSpecifiers(`import { z } from './missing';`, addJs);
+  const { code, importsFixed, unresolved } = rewriteEsmSpecifiers(
+    `import { z } from './missing';`,
+    addJs,
+  );
   assert.equal(code, `import { z } from './missing';`);
   assert.equal(importsFixed, 0);
   assert.deepEqual(unresolved, ['./missing']);
@@ -87,7 +99,10 @@ test('a quote inside a regex literal does not desync the scanner', () => {
 test('a // inside a string URL is not treated as a comment', () => {
   const src = `const u = 'https://example.com/a'; export { m } from './m';`;
   const { code } = rewriteEsmSpecifiers(src, addJs);
-  assert.equal(code, `const u = 'https://example.com/a'; export { m } from './m.js';`);
+  assert.equal(
+    code,
+    `const u = 'https://example.com/a'; export { m } from './m.js';`,
+  );
 });
 
 test('division is not mistaken for a regex', () => {
@@ -107,12 +122,83 @@ test('a bare (non-relative) import is left alone', () => {
   assert.deepEqual(unresolved, []);
 });
 
+// A side-effect import has no `from` and no parenthesis, so it is a third specifier position and
+// was silently left extensionless until 2026-08-23. Real case: `adapters/vue/src/index.ts`'s
+// `import './register';`, which cannot be written as a re-export without going lazy under Metro's
+// inlineRequires. Metro resolves an extensionless specifier; Node ESM does not.
+test('a bare side-effect import gets its extension', () => {
+  const { code, importsFixed, unresolved } = rewriteEsmSpecifiers(
+    `import './register';`,
+    spec => `${spec}.js`,
+  );
+  assert.equal(code, `import './register.js';`);
+  assert.equal(importsFixed, 1);
+  assert.deepEqual(unresolved, []);
+});
+
+// The word `import` inside a STRING must not make the next specifier look like a bare import — the
+// scanner's code-only mirror is what keeps that apart, and this pins it.
+test('the word import inside a string does not create a false position', () => {
+  const src = `const doc = 'import ';\nconst path = './register';`;
+  const { code, importsFixed } = rewriteEsmSpecifiers(src, () => {
+    throw new Error('resolve must not be called outside a specifier position');
+  });
+  assert.equal(code, src);
+  assert.equal(importsFixed, 0);
+});
+
 test('an already-extensioned specifier is skipped via the resolver', () => {
   // Mirrors fixEsmExtensions' EXT_RE guard: `.js`/`.json` specifiers resolve to 'skip'.
-  const skipExt = (spec) => (/\.(js|json)$/.test(spec) ? 'skip' : spec + '.js');
-  const { code, importsFixed } = rewriteEsmSpecifiers(`import a from './a.js';\nimport b from './b.json';`, skipExt);
+  const skipExt = spec => (/\.(js|json)$/.test(spec) ? 'skip' : spec + '.js');
+  const { code, importsFixed } = rewriteEsmSpecifiers(
+    `import a from './a.js';\nimport b from './b.json';`,
+    skipExt,
+  );
   assert.equal(code, `import a from './a.js';\nimport b from './b.json';`);
   assert.equal(importsFixed, 0);
+});
+
+// adapters/solid builds with `jsx: 'preserve'`, so tsc emits `.jsx` beside `.js` and both are real
+// emitted output. Without .jsx support a `build/index.js` importing a `.tsx`-derived sibling reports
+// UNRESOLVED and fails the publish gate — invisible in-repo, since in-repo resolution goes through
+// Metro/Vitest against src/, never build/.
+test('fixEsmExtensions resolves and scans .jsx output (jsx: preserve packages)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fix-esm-jsx-'));
+  try {
+    fs.writeFileSync(
+      path.join(dir, 'View.jsx'),
+      `export { helper } from './helper';`,
+    );
+    fs.writeFileSync(path.join(dir, 'helper.js'), 'export const helper = 1;');
+    fs.mkdirSync(path.join(dir, 'sub'));
+    fs.writeFileSync(path.join(dir, 'sub', 'index.jsx'), 'export const s = 1;');
+
+    fs.writeFileSync(
+      path.join(dir, 'entry.js'),
+      [
+        `export { View } from './View';`, // → ./View.jsx (a .jsx-only target)
+        `import { s } from './sub';`, // → ./sub/index.jsx (dir with only a .jsx index)
+        `import v from './View.jsx';`, // → skipped, already extensioned (EXT_RE covers jsx)
+      ].join('\n'),
+    );
+
+    const { importsFixed, unresolved } = fixEsmExtensions(dir);
+
+    const entry = fs.readFileSync(path.join(dir, 'entry.js'), 'utf8');
+    assert.match(entry, /from '\.\/View\.jsx'/);
+    assert.match(entry, /from '\.\/sub\/index\.jsx'/);
+
+    // The .jsx file itself is scanned, not just resolved to.
+    assert.match(
+      fs.readFileSync(path.join(dir, 'View.jsx'), 'utf8'),
+      /from '\.\/helper\.js'/,
+    );
+
+    assert.equal(importsFixed, 3); // View + sub in entry.js, helper in View.jsx
+    assert.deepEqual(unresolved, []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // --- fs-level pipeline: exercises resolveSpecifier, platform-sibling skip, dir/index resolution ---

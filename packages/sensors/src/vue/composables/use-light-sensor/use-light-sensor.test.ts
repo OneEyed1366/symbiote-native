@@ -31,7 +31,8 @@ vi.mock('../../../core', () => ({
   LightSensor: {
     addListener: (listener: IListener) => addListenerMock(listener),
     removeAllListeners: vi.fn(),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
@@ -47,7 +48,9 @@ beforeEach(() => {
 
 afterEach(() => unmount(ROOT_TAG));
 
-function mountLightSensor(updateIntervalMs?: number): Ref<ILightSensorMeasurement | null> {
+function mountLightSensor(
+  updateIntervalMs?: number,
+): Ref<ILightSensorMeasurement | null> {
   let measurement: Ref<ILightSensorMeasurement | null> | undefined;
   mount(
     ROOT_TAG,
@@ -78,7 +81,10 @@ describe('useLightSensor (Vue)', () => {
       // why: the composable's whole job is bridging the native event stream into Vue
       // reactivity — a fired event that never reaches the ref would make it useless.
       const measurement = mountLightSensor();
-      const reading: ILightSensorMeasurement = { illuminance: 42, timestamp: 123 };
+      const reading: ILightSensorMeasurement = {
+        illuminance: 42,
+        timestamp: 123,
+      };
 
       registeredListener?.(reading);
 
@@ -90,7 +96,10 @@ describe('useLightSensor (Vue)', () => {
       // stale illuminance value behind after the light level actually changes.
       const measurement = mountLightSensor();
       const first: ILightSensorMeasurement = { illuminance: 42, timestamp: 1 };
-      const second: ILightSensorMeasurement = { illuminance: 900, timestamp: 2 };
+      const second: ILightSensorMeasurement = {
+        illuminance: 900,
+        timestamp: 2,
+      };
 
       registeredListener?.(first);
       expect(measurement.value).toEqual(first);

@@ -12,7 +12,13 @@
 // through the exit transition. The native exit-animation timing is what's deferred, not the
 // callback contract.
 
-import { createElement, useEffect, useReducer, type FC, type ReactNode } from 'react';
+import {
+  createElement,
+  useEffect,
+  useReducer,
+  type FC,
+  type ReactNode,
+} from 'react';
 import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
   createInitialModalState,
@@ -90,7 +96,11 @@ export const Modal: FC<IModalProps> = rawProps => {
   // The iOS keep-alive: the effect runs AFTER this render, so a visible→hidden transition keeps the
   // node mounted for one frame (state.isRendered still true here) before the next render unmounts it,
   // the same shape as RN's componentDidUpdate setState (see state/modal.ts).
-  const [state, dispatch] = useReducer(modalReducer, visible === true, createInitialModalState);
+  const [state, dispatch] = useReducer(
+    modalReducer,
+    visible === true,
+    createInitialModalState,
+  );
   useEffect(() => {
     dispatch(visible === true ? { type: 'show' } : { type: 'hide' });
   }, [visible]);
@@ -122,6 +132,10 @@ export const Modal: FC<IModalProps> = rawProps => {
   return createElement(
     root.type,
     { key: root.key, ...root.props },
-    createElement(container.type, { key: container.key, ...container.props, className }, children),
+    createElement(
+      container.type,
+      { key: container.key, ...container.props, className },
+      children,
+    ),
   );
 };

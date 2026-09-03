@@ -43,7 +43,9 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.ScreenOrientation];
 const lineColor = LINE_COLOR[lineInfo.line];
 
 const screenOrientation = useScreenOrientation();
-const orientationText = computed(() => ORIENTATION_LABEL[screenOrientation.value.orientation]);
+const orientationText = computed(
+  () => ORIENTATION_LABEL[screenOrientation.value.orientation],
+);
 const orientationLockText = computed(
   () => ORIENTATION_LOCK_LABEL[screenOrientation.value.orientationLock],
 );
@@ -63,9 +65,15 @@ function handleUnlock(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="screen-orientation-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="screen-orientation-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -74,29 +82,39 @@ function handleUnlock(): void {
         <View class="hero-copy">
           <Text class="hero-title">Screen Orientation</Text>
           <Text class="hero-body"
-            >@symbiote-native/screen-orientation — live orientation state plus lock/unlock
-            controls.</Text
+            >@symbiote-native/screen-orientation — live orientation state plus
+            lock/unlock controls.</Text
           >
         </View>
       </View>
 
-      <View testID="screen-orientation-state-card" class="screen-orientation-card">
+      <View
+        testID="screen-orientation-state-card"
+        class="screen-orientation-card"
+      >
         <Text class="screen-orientation-card-title">Current state</Text>
         <View class="screen-orientation-row">
           <Text class="screen-orientation-row-label">Orientation</Text>
-          <Text testID="screen-orientation-value" class="screen-orientation-value-text">{{
-            orientationText
-          }}</Text>
+          <Text
+            testID="screen-orientation-value"
+            class="screen-orientation-value-text"
+            >{{ orientationText }}</Text
+          >
         </View>
         <View class="screen-orientation-row">
           <Text class="screen-orientation-row-label">Orientation lock</Text>
-          <Text testID="screen-orientation-lock-value" class="screen-orientation-value-text">{{
-            orientationLockText
-          }}</Text>
+          <Text
+            testID="screen-orientation-lock-value"
+            class="screen-orientation-value-text"
+            >{{ orientationLockText }}</Text
+          >
         </View>
       </View>
 
-      <View testID="screen-orientation-actions-card" class="screen-orientation-card">
+      <View
+        testID="screen-orientation-actions-card"
+        class="screen-orientation-card"
+      >
         <Text class="screen-orientation-card-title">Lock controls</Text>
         <View class="button-row">
           <ActionButton

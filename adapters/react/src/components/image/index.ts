@@ -57,7 +57,10 @@ const ImageComponent: FC<IImageProps> = rawProps => {
 
 export type IImageWithStatics = FC<IImageProps> & IImageStatics;
 
-export const Image: IImageWithStatics = Object.assign(ImageComponent, imageStatics);
+export const Image: IImageWithStatics = Object.assign(
+  ImageComponent,
+  imageStatics,
+);
 
 export { setImageSourceResolver } from '@symbiote-native/components';
 export type {

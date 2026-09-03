@@ -7,12 +7,17 @@ export type { IActivityIndicatorProps } from './shared';
 @Component({
   selector: 'ActivityIndicator',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   imports: [DescriptorOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<symbiote-descriptor-outlet [node]="descriptor" />`,
 })
 export class ActivityIndicator extends ActivityIndicatorBase {
   protected readonly defaultColor = null;
-  protected override readonly nativeExtras = { styleAttr: 'Normal', indeterminate: true };
+  protected override readonly nativeExtras = {
+    styleAttr: 'Normal',
+    indeterminate: true,
+  };
 }

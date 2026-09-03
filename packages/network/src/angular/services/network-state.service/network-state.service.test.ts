@@ -15,7 +15,11 @@ import { mount, unmount } from '@symbiote-native/angular';
 import { installFabric } from '@symbiote-native/test-utils';
 import { NetworkStateService } from './index';
 
-type INetworkState = { type?: string; isConnected?: boolean; isInternetReachable?: boolean };
+type INetworkState = {
+  type?: string;
+  isConnected?: boolean;
+  isInternetReachable?: boolean;
+};
 
 const addListenerMock = vi.fn();
 const removeMock = vi.fn();
@@ -26,13 +30,15 @@ const getNetworkStateAsyncMock = vi.fn(async () => ({
 }));
 
 vi.mock('../../../core', () => ({
-  addNetworkStateListener: (listener: (event: INetworkState) => void) => addListenerMock(listener),
+  addNetworkStateListener: (listener: (event: INetworkState) => void) =>
+    addListenerMock(listener),
   getNetworkStateAsync: () => getNetworkStateAsyncMock(),
 }));
 
 const ROOT_TAG = 973;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedResult: Signal<INetworkState> | undefined;
 let capturedListener: ((event: INetworkState) => void) | undefined;
@@ -99,8 +105,13 @@ describe('NetworkStateService.connect — lifecycle (mount seeds + subscribes, e
     mount(ROOT_TAG, NetworkStateHost);
     await tick();
 
-    if (capturedListener === undefined) throw new Error('addListener callback was not captured');
-    capturedListener({ type: 'CELLULAR', isConnected: true, isInternetReachable: false });
+    if (capturedListener === undefined)
+      throw new Error('addListener callback was not captured');
+    capturedListener({
+      type: 'CELLULAR',
+      isConnected: true,
+      isInternetReachable: false,
+    });
 
     expect(capturedResult?.()?.type).toBe('CELLULAR');
   });

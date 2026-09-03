@@ -4,7 +4,11 @@
 // unlike useAccelerometer there is no interval param to apply at subscribe time.
 
 import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
-import { watchStepCount, type EventSubscription, type IPedometerResult } from '../../../core';
+import {
+  watchStepCount,
+  type EventSubscription,
+  type IPedometerResult,
+} from '../../../core';
 
 export function usePedometer(): Ref<IPedometerResult | null> {
   // A plain ref: the value is a POJO result, not an engine node, so no shallowRef needed.

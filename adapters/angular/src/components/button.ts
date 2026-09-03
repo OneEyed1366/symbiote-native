@@ -33,9 +33,21 @@ import {
   type IAriaProps,
   type IButtonProps as ICoreButtonProps,
 } from '@symbiote-native/components';
-import type { ISymbioteEvent, ITextStyle, IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  ISymbioteEvent,
+  ITextStyle,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import { anchorStyleProp, TextHost } from '../primitives';
 import { TouchableOpacity } from './touchable';
+import {
+  gateWanted,
+  injectGateDemandAbove,
+  provideGateDemand,
+  type IGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../gate-demand';
 
 export type IButtonProps = Omit<
   ICoreButtonProps,
@@ -49,6 +61,7 @@ export type IButtonProps = Omit<
 @Component({
   selector: 'Button',
   standalone: true,
+  viewProviders: [provideGateDemand(() => Button)],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [TouchableOpacity, TextHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -81,8 +94,12 @@ export type IButtonProps = Omit<
       [accessibilityElementsHidden]="accessibilityElementsHidden"
       [accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"
       [accessibilityLanguage]="accessibilityLanguage"
-      [accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"
-      [accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"
+      [accessibilityRespondsToUserInteraction]="
+        accessibilityRespondsToUserInteraction
+      "
+      [accessibilityShowsLargeContentViewer]="
+        accessibilityShowsLargeContentViewer
+      "
       [accessibilityLargeContentTitle]="accessibilityLargeContentTitle"
       (accessibilityAction)="accessibilityAction.emit($event)"
       (accessibilityTap)="accessibilityTap.emit($event)"
@@ -121,6 +138,15 @@ export class Button implements IButtonProps, DoCheck {
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
 
+  // This wrapper binds the four gated accessibility events on the component it renders, which
+  // Angular forces to be unconditional and which would light that component's gates on every
+  // instance. It answers for them instead — see `gate-demand.ts`.
+  private readonly gateDemandAbove = injectGateDemandAbove();
+
+  wantsGate(name: IGatedAccessibilityEvent): boolean {
+    return gateWanted(this.gateDemandAbove, name, this[name]);
+  }
+
   // Button-owned props: title is the Text child, color/disabled fold into the label style, and
   // touchSoundDisabled re-maps onto TouchableOpacity.
   @Input() title = '';
@@ -149,8 +175,10 @@ export class Button implements IButtonProps, DoCheck {
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -195,7 +223,9 @@ export class Button implements IButtonProps, DoCheck {
   // ngDoCheck runs during the PARENT's refresh even when this view is skipped; the signal write is
   // what marks this view. The anchor returns the same props.style reference until a commit changes
   // it, so Object.is makes an unchanged poll free.
-  private readonly anchorStyleValue = signal<IStyleProp<IViewStyle> | undefined>(undefined);
+  private readonly anchorStyleValue = signal<
+    IStyleProp<IViewStyle> | undefined
+  >(undefined);
 
   ngDoCheck(): void {
     this.anchorStyleValue.set(anchorStyleProp<IViewStyle>(this.elementRef));

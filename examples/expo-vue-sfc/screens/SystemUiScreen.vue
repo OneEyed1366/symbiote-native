@@ -6,7 +6,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
-import { getBackgroundColorAsync, setBackgroundColorAsync } from '@symbiote-native/system-ui/vue';
+import {
+  getBackgroundColorAsync,
+  setBackgroundColorAsync,
+} from '@symbiote-native/system-ui/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -43,9 +46,15 @@ onMounted(() => {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="system-ui-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="system-ui-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -54,7 +63,8 @@ onMounted(() => {
         <View class="hero-copy">
           <Text class="hero-title">System UI</Text>
           <Text class="hero-body"
-            >@symbiote-native/system-ui — sets and reads the root view's background color.</Text
+            >@symbiote-native/system-ui — sets and reads the root view's
+            background color.</Text
           >
         </View>
       </View>
@@ -63,14 +73,31 @@ onMounted(() => {
         <Text class="system-ui-card-title">Background color</Text>
         <View class="system-ui-row">
           <Text class="system-ui-row-label">Current</Text>
-          <Text testID="system-ui-background-color-value" class="system-ui-value-text">{{
-            backgroundColor ?? 'not set'
-          }}</Text>
+          <Text
+            testID="system-ui-background-color-value"
+            class="system-ui-value-text"
+            >{{ backgroundColor ?? 'not set' }}</Text
+          >
         </View>
         <View class="button-row">
-          <ActionButton testID="system-ui-set-red-button" title="Red" :onPress="handleSetRed" :color="RED" />
-          <ActionButton testID="system-ui-set-blue-button" title="Blue" :onPress="handleSetBlue" :color="BLUE" />
-          <ActionButton testID="system-ui-reset-button" title="Reset" :onPress="handleReset" :color="lineColor" />
+          <ActionButton
+            testID="system-ui-set-red-button"
+            title="Red"
+            :onPress="handleSetRed"
+            :color="RED"
+          />
+          <ActionButton
+            testID="system-ui-set-blue-button"
+            title="Blue"
+            :onPress="handleSetBlue"
+            :color="BLUE"
+          />
+          <ActionButton
+            testID="system-ui-reset-button"
+            title="Reset"
+            :onPress="handleReset"
+            :color="lineColor"
+          />
         </View>
       </View>
     </ScrollView>

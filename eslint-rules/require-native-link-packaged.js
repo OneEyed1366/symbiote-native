@@ -3,7 +3,11 @@ import { dirname, join } from 'node:path';
 
 const MANIFEST = 'native-link.json';
 const EXPO_RUNTIME = 'expo-modules-core';
-const DEPENDENCY_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies'];
+const DEPENDENCY_SECTIONS = [
+  'dependencies',
+  'devDependencies',
+  'peerDependencies',
+];
 
 function memberOf(objectNode, name) {
   if (!objectNode || objectNode.type !== 'Object') return undefined;
@@ -23,7 +27,8 @@ function dependencyNames(root) {
     const member = memberOf(root, section);
     if (!member || member.value.type !== 'Object') continue;
     for (const dep of member.value.members) {
-      if (!names.has(dep.name.value)) names.set(dep.name.value, { section, node: dep });
+      if (!names.has(dep.name.value))
+        names.set(dep.name.value, { section, node: dep });
     }
   }
   return names;
@@ -34,7 +39,8 @@ export default {
     type: 'problem',
     languages: ['json/json'],
     docs: {
-      description: 'keep an expo wrapper package linkable once installed from npm',
+      description:
+        'keep an expo wrapper package linkable once installed from npm',
       recommended: true,
     },
     messages: {
@@ -61,7 +67,10 @@ export default {
         // Having the manifest in the repo proves nothing: `files` gates what npm packs, and five
         // published tarballs reached the registry without it, silently unregistered.
         const filesMember = memberOf(root, 'files');
-        if (existsSync(join(dir, MANIFEST)) && !stringElements(filesMember).includes(MANIFEST)) {
+        if (
+          existsSync(join(dir, MANIFEST)) &&
+          !stringElements(filesMember).includes(MANIFEST)
+        ) {
           context.report({
             loc: (filesMember ?? root).loc,
             messageId: 'manifestNotPackaged',

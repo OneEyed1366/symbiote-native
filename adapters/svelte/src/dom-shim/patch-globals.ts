@@ -25,7 +25,7 @@
 // `customElements` IS patched, unlike the three above — see its own comment below.
 
 import { dlog } from '@symbiote-native/engine';
-import { ShimElement } from './element';
+import { ShimElement, ShimElementBase } from './element';
 import { ShimText } from './text';
 import { ShimComment } from './comment';
 import { ShimDocumentFragment } from './document-fragment';
@@ -76,7 +76,9 @@ export function patchGlobals(): void {
     customElements: g.customElements,
   };
   g.Node = ShimNode;
-  g.Element = ShimElement;
+  // ShimElementBase, NOT ShimElement: `get_setters` stops AT `Element.prototype`, so pointing this
+  // at the class that owns `p` hides `p` from every `set_attributes` caller. See element.ts.
+  g.Element = ShimElementBase;
   // Svelte's mandatory paths never distinguish HTMLElement/SVGElement from Element (we have
   // no `<svg>` primitives), so both alias the same class — real, extensible prototypes either
   // way, which is all `init_operations()` requires (§3a).

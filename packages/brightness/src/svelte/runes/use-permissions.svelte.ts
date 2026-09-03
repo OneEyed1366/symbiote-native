@@ -19,7 +19,11 @@
 // same reason as `status`) instead of escaping as an unhandled rejection: a null status with a
 // non-null error is how a consumer tells "the fetch failed" from "not fetched yet".
 // get()/request() still reject to their direct caller — only the automatic call is made safe.
-import { getPermissionsAsync, requestPermissionsAsync, type PermissionResponse } from '../../core';
+import {
+  getPermissionsAsync,
+  requestPermissionsAsync,
+  type PermissionResponse,
+} from '../../core';
 
 export function usePermissions(): {
   readonly status: PermissionResponse | null;

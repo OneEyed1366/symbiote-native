@@ -1,7 +1,10 @@
 import { UnavailabilityError } from 'expo-modules-core';
 
 import { expoSecureStore } from './native-module';
-import type { IKeychainAccessibilityConstant, ISecureStoreOptions } from './types';
+import type {
+  IKeychainAccessibilityConstant,
+  ISecureStoreOptions,
+} from './types';
 
 const NATIVE_MODULE_NAME = 'expo-secure-store';
 
@@ -22,7 +25,8 @@ export const AFTER_FIRST_UNLOCK: IKeychainAccessibilityConstant | undefined =
  * from a backup.
  * @platform ios
  */
-export const AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: IKeychainAccessibilityConstant | undefined =
+export const AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY:
+  IKeychainAccessibilityConstant | undefined =
   expoSecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY;
 
 /**
@@ -30,7 +34,8 @@ export const AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: IKeychainAccessibilityConstant
  * @deprecated Use a level that offers some user protection, such as `AFTER_FIRST_UNLOCK`.
  * @platform ios
  */
-export const ALWAYS: IKeychainAccessibilityConstant | undefined = expoSecureStore.ALWAYS;
+export const ALWAYS: IKeychainAccessibilityConstant | undefined =
+  expoSecureStore.ALWAYS;
 
 /**
  * Like `ALWAYS`, except the entry does not migrate to a new device when restoring from a backup.
@@ -38,7 +43,8 @@ export const ALWAYS: IKeychainAccessibilityConstant | undefined = expoSecureStor
  * `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`.
  * @platform ios
  */
-export const ALWAYS_THIS_DEVICE_ONLY: IKeychainAccessibilityConstant | undefined =
+export const ALWAYS_THIS_DEVICE_ONLY:
+  IKeychainAccessibilityConstant | undefined =
   expoSecureStore.ALWAYS_THIS_DEVICE_ONLY;
 
 /**
@@ -46,7 +52,8 @@ export const ALWAYS_THIS_DEVICE_ONLY: IKeychainAccessibilityConstant | undefined
  * entry at all. Removing the passcode deletes the entry.
  * @platform ios
  */
-export const WHEN_PASSCODE_SET_THIS_DEVICE_ONLY: IKeychainAccessibilityConstant | undefined =
+export const WHEN_PASSCODE_SET_THIS_DEVICE_ONLY:
+  IKeychainAccessibilityConstant | undefined =
   expoSecureStore.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY;
 
 /**
@@ -61,7 +68,8 @@ export const WHEN_UNLOCKED: IKeychainAccessibilityConstant | undefined =
  * backup.
  * @platform ios
  */
-export const WHEN_UNLOCKED_THIS_DEVICE_ONLY: IKeychainAccessibilityConstant | undefined =
+export const WHEN_UNLOCKED_THIS_DEVICE_ONLY:
+  IKeychainAccessibilityConstant | undefined =
   expoSecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY;
 
 /**
@@ -97,7 +105,10 @@ export async function getItemAsync(
  * > Blocks the JavaScript thread. With `requireAuthentication` on, the app stays unresponsive
  * > until the user authenticates.
  */
-export function getItem(key: string, options: ISecureStoreOptions = {}): string | null {
+export function getItem(
+  key: string,
+  options: ISecureStoreOptions = {},
+): string | null {
   ensureValidKey(key);
   if (!expoSecureStore.getValueWithKeySync) {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getItem');
@@ -128,7 +139,11 @@ export async function setItemAsync(
  * > Blocks the JavaScript thread. With `requireAuthentication` on, the app stays unresponsive
  * > until the user authenticates.
  */
-export function setItem(key: string, value: string, options: ISecureStoreOptions = {}): void {
+export function setItem(
+  key: string,
+  value: string,
+  options: ISecureStoreOptions = {},
+): void {
   ensureValidKey(key);
   ensureValidValue(value);
   if (!expoSecureStore.setValueWithKeySync) {
@@ -155,7 +170,10 @@ export async function deleteItemAsync(
  */
 export function canUseBiometricAuthentication(): boolean {
   if (!expoSecureStore.canUseBiometricAuthentication) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'canUseBiometricAuthentication');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'canUseBiometricAuthentication',
+    );
   }
   return expoSecureStore.canUseBiometricAuthentication();
 }

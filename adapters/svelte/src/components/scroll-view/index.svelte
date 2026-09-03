@@ -85,7 +85,8 @@
   }: IScrollViewProps = $props();
 
   $effect(() => {
-    if (stickyHeaderIndices === undefined || stickyHeaderIndices.length === 0) return;
+    if (stickyHeaderIndices === undefined || stickyHeaderIndices.length === 0)
+      return;
     dlog(
       'ScrollView.stickyHeaderIndices is not auto-honored on Svelte (no index-wrap mechanism — ' +
         'see scroll-view-props.ts KNOWN GAP); compose ScrollViewStickyHeader manually instead',
@@ -103,7 +104,11 @@
   // Plain exported functions on the instance script are what a parent's `bind:this={ref}` sees —
   // the Svelte mechanism for exposing an imperative handle, the twin of React's
   // useImperativeHandle / Vue's expose().
-  export function scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void {
+  export function scrollTo(options?: {
+    x?: number;
+    y?: number;
+    animated?: boolean;
+  }): void {
     handle.scrollTo(options);
   }
   export function scrollToEnd(options?: { animated?: boolean }): void {
@@ -117,7 +122,9 @@
   }
 
   const isHorizontal = $derived(horizontal === true);
-  const hasStickyHeaders = $derived(stickyHeaderIndices !== undefined && stickyHeaderIndices.length > 0);
+  const hasStickyHeaders = $derived(
+    stickyHeaderIndices !== undefined && stickyHeaderIndices.length > 0,
+  );
   const shouldWrapRefreshControl = $derived(
     PLATFORM.refreshControlMode === 'wrap' && refreshControl !== undefined,
   );
@@ -131,7 +138,9 @@
   // style and collapse it to nothing — e.g. App.svelte's `class="screen"` (flex:1) on the
   // top-level ScrollView, which left the wrapper with no height for its content to grow into.
   const layoutSplit = $derived(
-    shouldWrapRefreshControl ? splitLayoutProps([resolveSvelteClass(className), style]) : undefined,
+    shouldWrapRefreshControl
+      ? splitLayoutProps([resolveSvelteClass(className), style])
+      : undefined,
   );
 
   // A single AnimatedValue tracks the scroll offset (RN's _scrollAnimatedValue), allocated once
@@ -161,7 +170,9 @@
   // it solely `if (isFabric)`). Forcing the JS path to keep that listener alive only gives up the
   // native driver, putting the pin on the JS thread — drift on iOS, outright failure on Android
   // (commit debounce 15ms vs iOS's 64ms — render-scroll-sticky.ts).
-  const nativeStickyAvailable = $derived(hasStickyHeaders && isNativeAnimatedAvailable());
+  const nativeStickyAvailable = $derived(
+    hasStickyHeaders && isNativeAnimatedAvailable(),
+  );
 
   // Native sticky-scroll attach (RN attachNativeEvent / _updateAnimatedNodeAttachment) — NOT used
   // for sticky headers (see the comment above); kept for other native-event-attach consumers.
@@ -178,7 +189,9 @@
       : contentContainerStyle,
   );
 
-  const intrinsics = $derived(selectScrollIntrinsics(isHorizontal, resolvedContentContainerStyle));
+  const intrinsics = $derived(
+    selectScrollIntrinsics(isHorizontal, resolvedContentContainerStyle),
+  );
 
   const forwarding = $derived(
     resolveScrollForwarding({
@@ -186,7 +199,8 @@
       nativeStickyAvailable,
       invertStickyHeaders,
       scrollEventThrottle,
-      maintainVisibleContentPosition: passthrough.maintainVisibleContentPosition,
+      maintainVisibleContentPosition:
+        passthrough.maintainVisibleContentPosition,
       snapToAlignment: passthrough.snapToAlignment,
     }),
   );
@@ -220,7 +234,10 @@
       [{ nativeEvent: { contentOffset: { y: scrollAnimatedValue } } }],
       onScroll === undefined
         ? undefined
-        : { listener: (...args: unknown[]) => forwardScrollEvent(onScroll, args) },
+        : {
+            listener: (...args: unknown[]) =>
+              forwardScrollEvent(onScroll, args),
+          },
     );
   });
 
@@ -243,7 +260,9 @@
       // layoutSplit already folded className's resolved value into inner/outer above — forwarding
       // the raw class here too would re-apply its LAYOUT half onto the inner scroll view a second
       // time (on top of the wrapper).
-      ...(className !== undefined && layoutSplit === undefined ? { class: className } : {}),
+      ...(className !== undefined && layoutSplit === undefined
+        ? { class: className }
+        : {}),
       style: scrollStyle,
       onScroll: resolvedScrollHandler,
       onLayout: handleScrollLayout,
@@ -260,7 +279,9 @@
     style: intrinsics.contentStyle,
     collapsable: false,
     ...(forwarding.collapsableChildren ? { collapsableChildren: false } : {}),
-    ...(onContentSizeChange !== undefined ? { onLayout: handleContentLayout } : {}),
+    ...(onContentSizeChange !== undefined
+      ? { onLayout: handleContentLayout }
+      : {}),
   }));
   // See View.svelte's note on `{@attach}`.
   const syncAttachments = createAttachmentsSync();
@@ -270,29 +291,41 @@
 </script>
 
 {#snippet scrollBody()}
-  <!-- Packed edge-to-edge against the next block deliberately (svelte-adapter-dom-shim §16):
-       whitespace BETWEEN two sibling blocks survives clean_nodes as a single-space text node,
-       which here becomes a real RCTRawText child of a scroll view — an invalid Fabric child that
-       fails silently. Do not reformat this join. -->
+  <!-- The gap between these two sibling blocks survives clean_nodes as a ' ' text node, but
+       the shim drops a whitespace-only node whose parent takes no raw text, so it never
+       reaches Fabric (dom-shim/text.ts, svelte-adapter-dom-shim §16b). -->
   {#if !shouldWrapRefreshControl && refreshControl !== undefined}
     <RefreshControl {...refreshControl} />
-  {/if}{#if isHorizontal}
-    <symbiote-horizontal-scroll-content p={contentBag}>{@render children?.()}</symbiote-horizontal-scroll-content>
+  {/if}
+  {#if isHorizontal}
+    <symbiote-horizontal-scroll-content p={contentBag}>
+      {@render children?.()}
+    </symbiote-horizontal-scroll-content>
   {:else}
-    <symbiote-scroll-content p={contentBag}>{@render children?.()}</symbiote-scroll-content>
+    <symbiote-scroll-content p={contentBag}>
+      {@render children?.()}
+    </symbiote-scroll-content>
   {/if}
 {/snippet}
 
 {#if shouldWrapRefreshControl && refreshControl !== undefined}
   <RefreshControl {...refreshControl} style={layoutSplit?.outer}>
     {#if isHorizontal}
-      <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
+      <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>
+        {@render scrollBody()}
+      </symbiote-horizontal-scroll-view>
     {:else}
-      <symbiote-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-scroll-view>
+      <symbiote-scroll-view p={outerBag} bind:this={hostShim}>
+        {@render scrollBody()}
+      </symbiote-scroll-view>
     {/if}
   </RefreshControl>
 {:else if isHorizontal}
-  <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
+  <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>
+    {@render scrollBody()}
+  </symbiote-horizontal-scroll-view>
 {:else}
-  <symbiote-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-scroll-view>
+  <symbiote-scroll-view p={outerBag} bind:this={hostShim}>
+    {@render scrollBody()}
+  </symbiote-scroll-view>
 {/if}

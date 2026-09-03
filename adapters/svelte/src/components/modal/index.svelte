@@ -53,7 +53,10 @@
   // isVisible=false with isRendered still true before this effect flips it) but isn't observable
   // as its own committed Fabric frame the way React's per-render synchronous commit makes it.
   $effect(() => {
-    state = modalReducer(state, isVisible ? { type: 'show' } : { type: 'hide' });
+    state = modalReducer(
+      state,
+      isVisible ? { type: 'show' } : { type: 'hide' },
+    );
   });
 
   $effect(() => {

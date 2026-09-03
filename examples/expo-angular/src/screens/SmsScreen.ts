@@ -1,5 +1,11 @@
 import { Component, signal } from '@angular/core';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/angular';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/angular';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/angular';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -22,7 +28,11 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   imports: [ActionButton, SafeAreaView, ScrollView, Text, TextInput, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="sms-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="sms-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -33,8 +43,9 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           <View class="hero-copy">
             <Text class="hero-title">SMS</Text>
             <Text class="hero-body">
-              @symbiote-native/sms — opens the system SMS composer prefilled with recipients and a
-              message. Sending stays the user's call; the app only drafts.
+              @symbiote-native/sms — opens the system SMS composer prefilled
+              with recipients and a message. Sending stays the user's call; the
+              app only drafts.
             </Text>
           </View>
         </View>
@@ -44,12 +55,14 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           <View testID="sms-available" class="sms-row">
             <Text class="sms-row-label">Available</Text>
             <View [class]="statusBadgeClass(isAvailable())">
-              <Text class="sms-status-text">{{ statusLabel(isAvailable()) }}</Text>
+              <Text class="sms-status-text">{{
+                statusLabel(isAvailable())
+              }}</Text>
             </View>
           </View>
           <Text class="sms-note">
-            NO on the iOS simulator — it ships no Messages app — and on Android devices without
-            telephony hardware. A real iPhone answers YES.
+            NO on the iOS simulator — it ships no Messages app — and on Android
+            devices without telephony hardware. A real iPhone answers YES.
           </Text>
         </View>
 
@@ -83,12 +96,14 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           <Text class="sms-card-title">Last result</Text>
           <View class="sms-row">
             <Text class="sms-row-label">Status</Text>
-            <Text testID="sms-result" class="sms-value-text">{{ lastResult() }}</Text>
+            <Text testID="sms-result" class="sms-value-text">{{
+              lastResult()
+            }}</Text>
           </View>
           <Text class="sms-note">
-            Android always reports unknown: reading the real outcome needs the READ_SMS permission
-            Google restricts to default-SMS-app publishers. Only iOS distinguishes sent from
-            cancelled.
+            Android always reports unknown: reading the real outcome needs the
+            READ_SMS permission Google restricts to default-SMS-app publishers.
+            Only iOS distinguishes sent from cancelled.
           </Text>
         </View>
       </ScrollView>
@@ -109,7 +124,9 @@ export class SmsScreen {
   readonly lastResult = signal('idle');
 
   constructor() {
-    isAvailableAsync().then(available => this.isAvailable.set(toCapabilityStatus(available)));
+    isAvailableAsync().then(available =>
+      this.isAvailable.set(toCapabilityStatus(available)),
+    );
   }
 
   handleSend(): void {
@@ -134,6 +151,10 @@ export class SmsScreen {
   }
 
   statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+    return status === 'checking'
+      ? 'CHECKING…'
+      : status === 'yes'
+        ? 'YES'
+        : 'NO';
   }
 }

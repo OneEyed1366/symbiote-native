@@ -12,7 +12,7 @@
 // it here is what surfaces the diagnosis in `svelte-check` and in the editor's language server,
 // which run the preprocessor pipeline but never Metro.
 //
-// `scopedStyles()` compiles a component's own <style> block into registerStyles() output and
+// `scopedStyles()` compiles a component's own <style> block into registerRules() output and
 // scopes every class in that component's markup. Metro's transformer runs it itself, so the
 // bundle is correct either way; registering it HERE is what stops svelte-check and the editor
 // from reporting `css_unused_selector` on every rule in a scoped block (Svelte's own scoping
@@ -20,11 +20,29 @@
 // only other components — see the preprocessor's own header). Order matters: the guard throws on
 // a construct that cannot work at all, so it runs before anything rewrites the source it reports
 // offsets against.
+//
+// `collapseTextWhitespace()` collapses whitespace inside a Text node the way a browser or Vue's
+// compiler would — Svelte doesn't, so a sentence wrapped across source lines for readability
+// otherwise ships a literal newline into the native text content (svelte-adapter-dom-shim skill
+// §16/§29/§30). Metro runs it too, so the bundle is correct either way; registering it here is
+// what surfaces the fix in svelte-check and the editor.
 import { forbidWebOnlyConstructs } from '@symbiote-native/svelte/preprocessor';
 import { scopedStyles } from '@symbiote-native/svelte/scoped-styles';
+import { collapseTextWhitespace } from '@symbiote-native/svelte/collapse-text-whitespace';
+// `lowerHostPrimitives()` rewrites <View>/<Text> to their intrinsic tags so a primitive stops
+// costing a Svelte component boundary — which Svelte pays in ANCHOR NODES, 12 per benchmark row
+// (skill §32). MUST come last, and after scopedStyles: it turns `class="x"` into a bag
+// expression the style scoper can no longer find. Metro runs the same chain, so the bundle is
+// correct either way; registering it here is what keeps svelte-check seeing the same source.
+import { lowerHostPrimitives } from '@symbiote-native/svelte/lower-host-primitives';
 
 export default {
-  preprocess: [forbidWebOnlyConstructs(), scopedStyles()],
+  preprocess: [
+    forbidWebOnlyConstructs(),
+    scopedStyles(),
+    collapseTextWhitespace(),
+    lowerHostPrimitives(),
+  ],
   compilerOptions: {
     fragments: 'tree',
     css: 'external',

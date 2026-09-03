@@ -6,7 +6,8 @@ module.exports = {
     platforms: {
       android: {
         sourceDir: './android',
-        packageImportPath: 'import com.symbiote.android.SymbioteAndroidPackage;',
+        packageImportPath:
+          'import com.symbiote.android.SymbioteAndroidPackage;',
         packageInstance: 'new SymbioteAndroidPackage()',
       },
       ios: null,

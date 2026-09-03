@@ -5,7 +5,7 @@
 import '@angular/compiler';
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -81,7 +81,14 @@ describe('Switch (android)', () => {
   // the iOS fix (switch.test.ts) does not transitively cover Android, since each platform build is
   // a distinct component class with its own anchor.
   it('resolves a class= on the Switch use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ card: { backgroundColor: 'red' } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'red' },
+      },
+    ]);
 
     mount(ROOT_TAG, AndroidSwitchClassHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -95,11 +102,20 @@ describe('Switch (android)', () => {
   // addClass. Without index.android.ts's ngDoCheck poll of the anchor style the bag would keep the
   // class it was built with, and a `[class.x]` that flips after mount would never repaint.
   it('picks up a class toggled after mount, with no @Input change', async () => {
-    registerStyles({ dark: { backgroundColor: 'black' } });
+    registerRules([
+      {
+        tokens: ['dark'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'black' },
+      },
+    ]);
 
     mount(ROOT_TAG, AndroidSwitchToggleHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
-    expect(committedNode('switch-toggle')?.props.backgroundColor).toBeUndefined();
+    expect(
+      committedNode('switch-toggle')?.props.backgroundColor,
+    ).toBeUndefined();
 
     toggleFixture?.enableDark();
     await new Promise<void>(resolve => setTimeout(resolve, 0));

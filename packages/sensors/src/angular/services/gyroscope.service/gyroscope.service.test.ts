@@ -20,18 +20,26 @@ vi.mock('../../../core', () => ({
   Gyroscope: {
     addListener: (listener: (measurement: IGyroscopeMeasurement) => void) =>
       addListenerMock(listener),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
 const ROOT_TAG = 942;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
-const MEASUREMENT: IGyroscopeMeasurement = { x: 0.1, y: 0.2, z: 0.3, timestamp: 123 };
+const MEASUREMENT: IGyroscopeMeasurement = {
+  x: 0.1,
+  y: 0.2,
+  z: 0.3,
+  timestamp: 123,
+};
 
 let capturedResult: Signal<IGyroscopeMeasurement | null> | undefined;
-let capturedListener: ((measurement: IGyroscopeMeasurement) => void) | undefined;
+let capturedListener:
+  ((measurement: IGyroscopeMeasurement) => void) | undefined;
 
 @Component({
   selector: 'symbiote-gyroscope-host',
@@ -107,7 +115,8 @@ describe('GyroscopeService.connect', () => {
       mount(ROOT_TAG, GyroscopeHost);
       await tick();
 
-      if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+      if (capturedListener === undefined)
+        throw new Error('addListener callback was not captured');
       capturedListener(MEASUREMENT);
 
       expect(capturedResult?.()).toEqual(MEASUREMENT);

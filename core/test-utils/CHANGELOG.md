@@ -1,5 +1,36 @@
 # @symbiote-native/test-utils
 
+## 0.3.0
+
+### Minor Changes
+
+- [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - An oracle for lowering, and a settle that does not measure machine speed.
+
+  `lowering-equivalence` mounts a primitive as a component and as a bare intrinsic with the same
+  props and requires the two committed trees to match by key name. Committed rather than retained,
+  since anchors are exactly what lowering removes. It guards the two false greens that would
+  otherwise make it decorative — both arms taking the same path (caught by the retained node count,
+  which lowering must change) and both arms empty before `completeRoot`.
+
+  `fake-fabric` counts `appendChild` and `cloneNode` alongside `createNode`, so a benchmark arm can
+  show a tree is structurally identical before any timing is read.
+
+  `waitForQuiet` now settles on wall time as well as consecutive ticks, and `advanceMs` observes for
+  a duration. A tick count cannot express "no work arrived", only "the queue drained N times", and
+  how much wall time that spans is a property of the machine: a list committing one deferred batch
+  30-60 ticks in was declared quiet on an idle machine and caught under load, reading as free-running
+  change detection.
+
+## 0.2.0
+
+### Minor Changes
+
+- 3acd869: Add Solid.js as a supported framework: a new `@symbiote-native/solid` adapter reaching full
+  component/runtime parity with the other four adapters, plus a `./solid` export subpath on every
+  companion package. Engine and shared-component packages gained portal/tunnel, retained-tree
+  census, and profiling infrastructure that the new adapter (and the others' portal/tunnel work
+  landing alongside it) build on.
+
 ## 0.1.6
 
 ### Patch Changes

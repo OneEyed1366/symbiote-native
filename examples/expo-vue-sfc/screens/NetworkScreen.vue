@@ -7,7 +7,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
-import { NetworkStateType, getIpAddressAsync, isAirplaneModeEnabledAsync } from '@symbiote-native/network';
+import {
+  NetworkStateType,
+  getIpAddressAsync,
+  isAirplaneModeEnabledAsync,
+} from '@symbiote-native/network';
 import { useNetworkState } from '@symbiote-native/network/vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -49,17 +53,25 @@ const isAirplaneMode = ref<boolean | null>(null);
 watch(
   networkState,
   () => {
-    void Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(([ip, airplaneMode]) => {
-      ipAddress.value = ip;
-      isAirplaneMode.value = airplaneMode;
-    });
+    void Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
+      ([ip, airplaneMode]) => {
+        ipAddress.value = ip;
+        isAirplaneMode.value = airplaneMode;
+      },
+    );
   },
   { immediate: true },
 );
 
-const networkTypeText = computed(() => networkTypeLabel(networkState.value.type));
+const networkTypeText = computed(() =>
+  networkTypeLabel(networkState.value.type),
+);
 const isConnectedText = computed(() =>
-  networkState.value.isConnected === undefined ? 'checking…' : networkState.value.isConnected ? 'Yes' : 'No',
+  networkState.value.isConnected === undefined
+    ? 'checking…'
+    : networkState.value.isConnected
+      ? 'Yes'
+      : 'No',
 );
 const isInternetReachableText = computed(() =>
   networkState.value.isInternetReachable === undefined
@@ -68,17 +80,29 @@ const isInternetReachableText = computed(() =>
       ? 'Yes'
       : 'No',
 );
-const ipAddressText = computed(() => (ipAddress.value === null ? 'checking…' : ipAddress.value));
+const ipAddressText = computed(() =>
+  ipAddress.value === null ? 'checking…' : ipAddress.value,
+);
 const airplaneModeText = computed(() =>
-  isAirplaneMode.value === null ? 'checking…' : isAirplaneMode.value ? 'On' : 'Off',
+  isAirplaneMode.value === null
+    ? 'checking…'
+    : isAirplaneMode.value
+      ? 'On'
+      : 'Off',
 );
 </script>
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="network-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="network-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -87,9 +111,10 @@ const airplaneModeText = computed(() =>
         <View class="hero-copy">
           <Text class="hero-title">Network</Text>
           <Text class="hero-body"
-            >@symbiote-native/network — live network state via useNetworkState(), plus the
-            device's IP address and airplane-mode check. Toggle Wi-Fi or airplane mode on the
-            device to see the live card update on its own.</Text
+            >@symbiote-native/network — live network state via
+            useNetworkState(), plus the device's IP address and airplane-mode
+            check. Toggle Wi-Fi or airplane mode on the device to see the live
+            card update on its own.</Text
           >
         </View>
       </View>
@@ -98,15 +123,21 @@ const airplaneModeText = computed(() =>
         <Text class="network-card-title">Live network state</Text>
         <View class="network-row">
           <Text class="network-row-label">Type</Text>
-          <Text testID="network-type-value" class="network-value-text">{{ networkTypeText }}</Text>
+          <Text testID="network-type-value" class="network-value-text">{{
+            networkTypeText
+          }}</Text>
         </View>
         <View class="network-row">
           <Text class="network-row-label">Connected</Text>
-          <Text testID="network-connected-value" class="network-value-text">{{ isConnectedText }}</Text>
+          <Text testID="network-connected-value" class="network-value-text">{{
+            isConnectedText
+          }}</Text>
         </View>
         <View class="network-row">
           <Text class="network-row-label">Internet reachable</Text>
-          <Text testID="network-reachable-value" class="network-value-text">{{ isInternetReachableText }}</Text>
+          <Text testID="network-reachable-value" class="network-value-text">{{
+            isInternetReachableText
+          }}</Text>
         </View>
       </View>
 
@@ -114,11 +145,15 @@ const airplaneModeText = computed(() =>
         <Text class="network-card-title">Device info</Text>
         <View class="network-row">
           <Text class="network-row-label">IP address</Text>
-          <Text testID="network-ip-value" class="network-value-text">{{ ipAddressText }}</Text>
+          <Text testID="network-ip-value" class="network-value-text">{{
+            ipAddressText
+          }}</Text>
         </View>
         <View class="network-row">
           <Text class="network-row-label">Airplane mode</Text>
-          <Text testID="network-airplane-value" class="network-value-text">{{ airplaneModeText }}</Text>
+          <Text testID="network-airplane-value" class="network-value-text">{{
+            airplaneModeText
+          }}</Text>
         </View>
       </View>
     </ScrollView>

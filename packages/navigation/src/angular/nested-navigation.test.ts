@@ -13,9 +13,19 @@
 // `undefined` return (first test below), asserted directly rather than a caught error.
 
 import '@angular/compiler';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, Input, ViewChild, type Type } from '@angular/core';
+import {
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  Input,
+  ViewChild,
+  type Type,
+} from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/angular';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/angular';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from './stack';
@@ -49,7 +59,8 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -58,7 +69,10 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   const found: string[] = [];
   const collect = (list: readonly IFakeNode[]): void => {
     for (const node of list) {
-      if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string') {
+      if (
+        node.viewName === 'RCTRawText' &&
+        typeof node.props.text === 'string'
+      ) {
         found.push(node.props.text);
       }
       collect(node.children);
@@ -121,7 +135,11 @@ class NestedTabHomeScreenComponent {
   imports: [Tab, TabScreenDirective],
   template: `
     <Tab initialRouteName="TabHome">
-      <ng-template symbioteTabScreen name="TabHome" [component]="tabHomeComponent"></ng-template>
+      <ng-template
+        symbioteTabScreen
+        name="TabHome"
+        [component]="tabHomeComponent"
+      ></ng-template>
     </Tab>
   `,
 })
@@ -137,8 +155,16 @@ let capturedHost: NestedTestHost | undefined;
   imports: [Stack, ScreenDirective],
   template: `
     <Stack #nav initialRouteName="Root">
-      <ng-template symbioteScreen name="Root" [component]="rootComponent"></ng-template>
-      <ng-template symbioteScreen name="Details" [component]="detailsComponent"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Root"
+        [component]="rootComponent"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Details"
+        [component]="detailsComponent"
+      ></ng-template>
     </Stack>
   `,
 })

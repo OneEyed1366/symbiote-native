@@ -19,22 +19,32 @@
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
 </script>
 
-<ScrollView class="screen" contentContainerStyle="section"
-  ><View class={`line-tag line-tag-${lineInfo.line}`}
-    ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
-  ><View class="hero-card"
-    ><View class="hero-badge" style={{ backgroundColor: LINE_COLOR.presentation }}
-      ><Text class="hero-badge-text">SH</Text></View
-    ><View class="hero-copy"
-      ><Text class="hero-title">Sheet presentation</Text
-      ><Text class="hero-body">Pushed with stackPresentation: formSheet and three detents — drag the grabber between 30%, 60%, and full height.</Text
-    ></View
-  ></View
-  ><Text class="info-text">stackPresentation: formSheet · detents 30% / 60% / 100% · drag the grabber</Text
-  ><ActionButton
+<ScrollView class="screen" contentContainerStyle="section">
+  <View class={`line-tag line-tag-${lineInfo.line}`}>
+    <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
+  </View>
+  <View class="hero-card">
+    <View
+      class="hero-badge"
+      style={{ backgroundColor: LINE_COLOR.presentation }}
+    >
+      <Text class="hero-badge-text">SH</Text>
+    </View>
+    <View class="hero-copy">
+      <Text class="hero-title">Sheet presentation</Text>
+      <Text class="hero-body">
+        Pushed with stackPresentation: formSheet and three detents — drag the
+        grabber between 30%, 60%, and full height.
+      </Text>
+    </View>
+  </View>
+  <Text class="info-text">
+    stackPresentation: formSheet · detents 30% / 60% / 100% · drag the grabber
+  </Text>
+  <ActionButton
     testID="sheet-dismiss"
     title="Dismiss"
     onPress={() => navigation.current.pop()}
     color={LINE_COLOR.presentation}
-  /></ScrollView
->
+  />
+</ScrollView>

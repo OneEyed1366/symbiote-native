@@ -6,7 +6,13 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/vue';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
@@ -44,7 +50,9 @@ onMounted(() => {
     isAvailable.value = toCapabilityStatus(available);
     // canUseBiometricAuthentication throws when the native module is missing entirely, so it only
     // runs once availability has come back positive.
-    canUseBiometrics.value = available ? toCapabilityStatus(canUseBiometricAuthentication()) : 'no';
+    canUseBiometrics.value = available
+      ? toCapabilityStatus(canUseBiometricAuthentication())
+      : 'no';
   });
 });
 
@@ -95,9 +103,15 @@ function handleDelete(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="secure-store-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="secure-store-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -106,8 +120,9 @@ function handleDelete(): void {
         <View class="hero-copy">
           <Text class="hero-title">Secure Store</Text>
           <Text class="hero-body"
-            >@symbiote-native/secure-store — encrypted key/value storage in the iOS Keychain and
-            the Android Keystore. Save a value, kill the app, relaunch, and read it back.</Text
+            >@symbiote-native/secure-store — encrypted key/value storage in the
+            iOS Keychain and the Android Keystore. Save a value, kill the app,
+            relaunch, and read it back.</Text
           >
         </View>
       </View>
@@ -116,14 +131,22 @@ function handleDelete(): void {
         <Text class="secure-store-card-title">Capabilities</Text>
         <View testID="secure-store-available" class="secure-store-row">
           <Text class="secure-store-row-label">Available</Text>
-          <View :class="`secure-store-status-badge secure-store-status-badge-${isAvailable}`">
-            <Text class="secure-store-status-text">{{ toBadgeText(isAvailable) }}</Text>
+          <View
+            :class="`secure-store-status-badge secure-store-status-badge-${isAvailable}`"
+          >
+            <Text class="secure-store-status-text">{{
+              toBadgeText(isAvailable)
+            }}</Text>
           </View>
         </View>
         <View testID="secure-store-biometrics" class="secure-store-row">
           <Text class="secure-store-row-label">Biometrics usable</Text>
-          <View :class="`secure-store-status-badge secure-store-status-badge-${canUseBiometrics}`">
-            <Text class="secure-store-status-text">{{ toBadgeText(canUseBiometrics) }}</Text>
+          <View
+            :class="`secure-store-status-badge secure-store-status-badge-${canUseBiometrics}`"
+          >
+            <Text class="secure-store-status-text">{{
+              toBadgeText(canUseBiometrics)
+            }}</Text>
           </View>
         </View>
       </View>
@@ -138,7 +161,9 @@ function handleDelete(): void {
         </View>
         <View class="secure-store-row">
           <Text class="secure-store-row-label">Last result</Text>
-          <Text testID="secure-store-result" class="secure-store-value-text">{{ lastResult }}</Text>
+          <Text testID="secure-store-result" class="secure-store-value-text">{{
+            lastResult
+          }}</Text>
         </View>
       </View>
 

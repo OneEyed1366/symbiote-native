@@ -14,7 +14,11 @@ export {
   computeActivityState,
   isTopRoute,
 } from './navigator-state';
-export type { IRoute, INavigatorState, INavigatorAction } from './navigator-state';
+export type {
+  IRoute,
+  INavigatorState,
+  INavigatorAction,
+} from './navigator-state';
 
 // Drops history entries whose `<Stack.Screen>` marker has unregistered - see
 // stack-router-state.ts's header for why the Stack's history needs this and the Tab's projection
@@ -50,7 +54,11 @@ export type {
   ISearchBarViewProps,
 } from './navigator-props';
 
-export { resolveHeaderConfigView, resolveScreenView, resolveSearchBarView } from './screen-options';
+export {
+  resolveHeaderConfigView,
+  resolveScreenView,
+  resolveSearchBarView,
+} from './screen-options';
 
 export { buildSearchBarHandle } from './search-bar-commands';
 export type { ISearchBarCommands } from './search-bar-commands';
@@ -70,7 +78,10 @@ export {
 } from './render-stack';
 export type { IScreenRenderPlanInput, IScreenRenderPlan } from './render-stack';
 
-export { serializeNavigatorState, deserializeNavigatorState } from './state-persistence';
+export {
+  serializeNavigatorState,
+  deserializeNavigatorState,
+} from './state-persistence';
 
 export {
   createNavigationEmitter,
@@ -120,7 +131,10 @@ export {
   drawerRouterReducer,
   focusedDrawerRoute,
 } from './drawer-router-state';
-export type { IDrawerRouterState, IDrawerRouterAction } from './drawer-router-state';
+export type {
+  IDrawerRouterState,
+  IDrawerRouterAction,
+} from './drawer-router-state';
 
 export type {
   IDrawerType,

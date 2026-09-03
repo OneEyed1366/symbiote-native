@@ -1,5 +1,11 @@
 import { Component, inject, signal } from '@angular/core';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   BatteryLevelService,
   BatteryState,
@@ -46,7 +52,11 @@ function formatBatteryState(state: BatteryState): string {
   imports: [SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="battery-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="battery-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -57,9 +67,9 @@ function formatBatteryState(state: BatteryState): string {
           <View class="hero-copy">
             <Text class="hero-title">Battery</Text>
             <Text class="hero-body">
-              @symbiote-native/battery — live battery level, charging state, and Low Power/Power
-              Saver mode. The iOS Simulator reports the battery API as unavailable; a real device
-              is needed to see live values.
+              @symbiote-native/battery — live battery level, charging state, and
+              Low Power/Power Saver mode. The iOS Simulator reports the battery
+              API as unavailable; a real device is needed to see live values.
             </Text>
           </View>
         </View>
@@ -77,7 +87,9 @@ function formatBatteryState(state: BatteryState): string {
           <View testID="battery-low-power-mode" class="capability-row">
             <Text class="capability-label">Low power mode</Text>
             <View [class]="statusBadgeClass(lowPowerModeStatus())">
-              <Text class="status-badge-text">{{ statusLabel(lowPowerModeStatus()) }}</Text>
+              <Text class="status-badge-text">{{
+                statusLabel(lowPowerModeStatus())
+              }}</Text>
             </View>
           </View>
         </View>
@@ -87,14 +99,18 @@ function formatBatteryState(state: BatteryState): string {
           <View testID="battery-available" class="capability-row">
             <Text class="capability-label">Available</Text>
             <View [class]="statusBadgeClass(isAvailable())">
-              <Text class="status-badge-text">{{ statusLabel(isAvailable()) }}</Text>
+              <Text class="status-badge-text">{{
+                statusLabel(isAvailable())
+              }}</Text>
             </View>
           </View>
           @if (Platform.OS === 'android') {
             <View testID="battery-optimization" class="capability-row">
               <Text class="capability-label">Battery optimization enabled</Text>
               <View [class]="statusBadgeClass(batteryOptimizationEnabled())">
-                <Text class="status-badge-text">{{ statusLabel(batteryOptimizationEnabled()) }}</Text>
+                <Text class="status-badge-text">{{
+                  statusLabel(batteryOptimizationEnabled())
+                }}</Text>
               </View>
             </View>
           }
@@ -121,7 +137,9 @@ export class BatteryScreen {
   readonly batteryOptimizationEnabled = signal<ICapabilityStatus>('checking');
 
   constructor() {
-    isAvailableAsync().then(value => this.isAvailable.set(toCapabilityStatus(value)));
+    isAvailableAsync().then(value =>
+      this.isAvailable.set(toCapabilityStatus(value)),
+    );
     if (Platform.OS === 'android') {
       isBatteryOptimizationEnabledAsync().then(value =>
         this.batteryOptimizationEnabled.set(toCapabilityStatus(value)),
@@ -147,6 +165,10 @@ export class BatteryScreen {
   }
 
   statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+    return status === 'checking'
+      ? 'CHECKING…'
+      : status === 'yes'
+        ? 'YES'
+        : 'NO';
   }
 }

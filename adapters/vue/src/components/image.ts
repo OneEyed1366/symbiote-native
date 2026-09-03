@@ -20,7 +20,11 @@ import {
   type IImageStatics,
   type IResizeMode,
 } from '@symbiote-native/components';
-import type { IClassNameValue, IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  IClassNameValue,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import { descriptorToVue } from '../descriptor-to-vue';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
@@ -65,8 +69,12 @@ function asResizeMode(value: unknown): IResizeMode | undefined {
   return isResizeMode(value) ? value : undefined;
 }
 
-function asCrossOrigin(value: unknown): 'anonymous' | 'use-credentials' | undefined {
-  return value === 'anonymous' || value === 'use-credentials' ? value : undefined;
+function asCrossOrigin(
+  value: unknown,
+): 'anonymous' | 'use-credentials' | undefined {
+  return value === 'anonymous' || value === 'use-credentials'
+    ? value
+    : undefined;
 }
 
 function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
@@ -99,7 +107,10 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
   return result;
 }
 
-const ImageComponent: FunctionalComponent<IImageProps> = (_props, { attrs: rawAttrs }) => {
+const ImageComponent: FunctionalComponent<IImageProps> = (
+  _props,
+  { attrs: rawAttrs },
+) => {
   const attrs = normalizeVueAttrs(rawAttrs);
   return descriptorToVue(
     renderImage({
@@ -124,7 +135,5 @@ ImageComponent.displayName = 'Image';
 ImageComponent.inheritAttrs = false;
 
 // Statics attached like RN (Image.getSize/prefetch/...), shared verbatim with React.
-export const Image: FunctionalComponent<IImageProps> & IImageStatics = Object.assign(
-  ImageComponent,
-  imageStatics,
-);
+export const Image: FunctionalComponent<IImageProps> & IImageStatics =
+  Object.assign(ImageComponent, imageStatics);

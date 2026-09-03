@@ -12,15 +12,25 @@
 // on iOS), unstable_pressDelay, and pressRetentionOffset (the drift region), all handled by the
 // shared machine; here we only wire its host + render the View.
 
-import { createElement, useMemo, useRef, useState, type FC, type ReactNode } from 'react';
+import {
+  createElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FC,
+  type ReactNode,
+} from 'react';
 import {
   createPressHandlers,
   createPressRuntime,
+  disposePressRuntime,
   rippleProps,
   buildPressableListeners,
   resolveDisabledAccessibilityState,
   noteHoverNoop,
   DEFAULT_DELAY_LONG_PRESS_MS,
+  DEFAULT_MIN_PRESS_DURATION_MS,
   type IPressHost,
   type IPressState,
   type IPressHandler,
@@ -29,6 +39,7 @@ import {
 } from '@symbiote-native/components';
 import { View } from '../../components';
 import type { IHostInstance } from '../../host-instance';
+import { flushExternalUpdate } from '../../host-config';
 import type {
   IAccessibilityProps,
   IAccessibilityStateValue,
@@ -36,9 +47,13 @@ import type {
 } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 
-export type { IPressState, IPressableAndroidRippleConfig } from '@symbiote-native/components';
+export type {
+  IPressState,
+  IPressableAndroidRippleConfig,
+} from '@symbiote-native/components';
 
-type IPressableStyle = IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
+type IPressableStyle =
+  IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
 type IChildrenProp = ReactNode | ((state: IPressState) => ReactNode);
 
 export interface IPressableProps extends IAccessibilityProps, IAriaProps {
@@ -78,6 +93,11 @@ export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   children?: IChildrenProp;
 }
 
+interface IConfiguredPressableProps extends IPressableProps {
+  /** @internal Touchable* mirrors RN's Pressability minPressDuration: 0 override. */
+  __minPressDuration?: number;
+}
+
 function resolveStyle(
   style: IPressableStyle | undefined,
   state: IPressState,
@@ -86,12 +106,15 @@ function resolveStyle(
   return style;
 }
 
-function resolveChildren(children: IChildrenProp | undefined, state: IPressState): ReactNode {
+function resolveChildren(
+  children: IChildrenProp | undefined,
+  state: IPressState,
+): ReactNode {
   if (typeof children === 'function') return children(state);
   return children;
 }
 
-export const Pressable: FC<IPressableProps> = props => {
+const PressableImpl: FC<IConfiguredPressableProps> = props => {
   const {
     onPress,
     onPressIn,
@@ -104,6 +127,7 @@ export const Pressable: FC<IPressableProps> = props => {
     hitSlop,
     pressRetentionOffset,
     unstable_pressDelay = 0,
+    __minPressDuration = DEFAULT_MIN_PRESS_DURATION_MS,
     android_ripple,
     android_disableSound,
     onHoverIn,
@@ -136,11 +160,21 @@ export const Pressable: FC<IPressableProps> = props => {
         return callback => view.measure(callback);
       },
       schedule: (callback, ms) => {
-        const id = setTimeout(callback, ms);
+        const id = setTimeout(() => flushExternalUpdate(callback), ms);
         return () => clearTimeout(id);
       },
+      now: Date.now,
     }),
     [],
+  );
+
+  // This renderer tears insertion effects down during host updates, so use the stable passive
+  // unmount seam to cancel delayed press-in, long-press and press-out callbacks.
+  useEffect(
+    () => () => {
+      disposePressRuntime(runtime);
+    },
+    [runtime],
   );
 
   const handlers = useMemo(
@@ -154,6 +188,7 @@ export const Pressable: FC<IPressableProps> = props => {
           onLongPress,
           delayLongPress,
           unstable_pressDelay,
+          minPressDuration: __minPressDuration,
           hitSlop,
           pressRetentionOffset,
         },
@@ -168,6 +203,7 @@ export const Pressable: FC<IPressableProps> = props => {
       onLongPress,
       delayLongPress,
       unstable_pressDelay,
+      __minPressDuration,
       hitSlop,
       pressRetentionOffset,
       runtime,
@@ -194,15 +230,26 @@ export const Pressable: FC<IPressableProps> = props => {
     testID,
   };
   // Forward the Android tap-sound suppressor under RN's own key; inert on iOS.
-  if (android_disableSound !== undefined) viewProps.android_disableSound = android_disableSound;
-  Object.assign(viewProps, buildPressableListeners(handlers, { disabled, cancelable }));
+  if (android_disableSound !== undefined)
+    viewProps.android_disableSound = android_disableSound;
+  Object.assign(
+    viewProps,
+    buildPressableListeners(handlers, { disabled, cancelable }),
+  );
 
   // android_ripple rides a dedicated inner View (the Pressable's own View only forwards a fixed
   // prop set), mirroring touchable-native-feedback. On iOS the ripple prop is undefined, so the
   // child renders unwrapped, no extra node.
-  const ripple = android_ripple !== undefined ? rippleProps(android_ripple) : undefined;
+  const ripple =
+    android_ripple !== undefined ? rippleProps(android_ripple) : undefined;
   const content = resolveChildren(children, state);
-  const inner = ripple !== undefined ? createElement(View, ripple, content) : content;
+  const inner =
+    ripple !== undefined ? createElement(View, ripple, content) : content;
 
   return createElement(View, viewProps, inner);
 };
+
+export const Pressable: FC<IPressableProps> = PressableImpl;
+// Relative-only composition seam; it is deliberately absent from the adapter barrel.
+export const TouchablePressable: FC<IPressableProps> = props =>
+  createElement(PressableImpl, { ...props, __minPressDuration: 0 });

@@ -5,7 +5,11 @@
 
 import type { FC, ReactElement, RefObject } from 'react';
 import type { IRoute } from '../core';
-import type { ISearchBarCommands, ISearchBarOptions, IScreenOptions } from '../core';
+import type {
+  ISearchBarCommands,
+  ISearchBarOptions,
+  IScreenOptions,
+} from '../core';
 import type { INavigatorHandle } from '../core';
 
 // The imperative ref (focus/blur/clearText/setText/cancelSearch/toggleCancelButton) carries a
@@ -17,7 +21,10 @@ export type IReactSearchBarOptions = ISearchBarOptions & {
   ref?: RefObject<ISearchBarCommands | null>;
 };
 
-export type IReactScreenOptions = Omit<IScreenOptions, 'headerSearchBarOptions'> & {
+export type IReactScreenOptions = Omit<
+  IScreenOptions,
+  'headerSearchBarOptions'
+> & {
   headerSearchBarOptions?: IReactSearchBarOptions;
 };
 
@@ -30,7 +37,9 @@ export type IScreenOptionsArgs = {
   navigation: INavigatorHandle;
 };
 
-export type IScreenOptionsResolver = (args: IScreenOptionsArgs) => IReactScreenOptions;
+export type IScreenOptionsResolver = (
+  args: IScreenOptionsArgs,
+) => IReactScreenOptions;
 
 export type IScreenProps = {
   name: string;

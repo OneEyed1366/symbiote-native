@@ -11,7 +11,7 @@ import {
   createElement,
   flattenStyle,
   getExplicitStyle,
-  registerStyles,
+  registerRules,
   routeProp,
 } from '../index';
 
@@ -25,7 +25,14 @@ afterEach(() => clearGlobalStyles());
 // file's scope is specifically node.ts's [classStyle, explicitStyle] merge/precedence logic.
 describe('routeProp class/className + style merge', () => {
   it('resolves a class name against the shared style registry', () => {
-    registerStyles({ card: { padding: 10 } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10 },
+      },
+    ]);
     const node = createElement('RCTView');
 
     routeProp(node, 'class', 'card');
@@ -37,7 +44,14 @@ describe('routeProp class/className + style merge', () => {
   // the SAME registry entry, or the same CSS class would style a Vue node differently than a
   // React one.
   it('resolves className identically to class (React idiom, same registry)', () => {
-    registerStyles({ card: { padding: 10 } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10 },
+      },
+    ]);
     const node = createElement('RCTView');
 
     routeProp(node, 'className', 'card');
@@ -49,30 +63,57 @@ describe('routeProp class/className + style merge', () => {
   // over a class-derived style regardless of call order, since Vue/Angular fire class and style
   // as two separate calls that can land in either order across a re-render.
   it('lets an explicit style win over class-derived style, class set first', () => {
-    registerStyles({ card: { padding: 10, backgroundColor: 'red' } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10, backgroundColor: 'red' },
+      },
+    ]);
     const node = createElement('RCTView');
 
     routeProp(node, 'class', 'card');
     routeProp(node, 'style', { backgroundColor: 'blue' });
 
-    expect(flattenStyle(node.props.style)).toEqual({ padding: 10, backgroundColor: 'blue' });
+    expect(flattenStyle(node.props.style)).toEqual({
+      padding: 10,
+      backgroundColor: 'blue',
+    });
   });
 
   it('lets an explicit style win over class-derived style, style set first', () => {
-    registerStyles({ card: { padding: 10, backgroundColor: 'red' } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10, backgroundColor: 'red' },
+      },
+    ]);
     const node = createElement('RCTView');
 
     routeProp(node, 'style', { backgroundColor: 'blue' });
     routeProp(node, 'class', 'card');
 
-    expect(flattenStyle(node.props.style)).toEqual({ padding: 10, backgroundColor: 'blue' });
+    expect(flattenStyle(node.props.style)).toEqual({
+      padding: 10,
+      backgroundColor: 'blue',
+    });
   });
 
   // why: the two halves are tracked independently in a WeakMap so either can update without
   // clobbering the other — removing the class must re-derive the merge from the SURVIVING
   // explicit half, not leave a stale class contribution behind.
   it('recomputes the merge when the class is later removed', () => {
-    registerStyles({ card: { padding: 10 } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10 },
+      },
+    ]);
     const node = createElement('RCTView');
 
     routeProp(node, 'class', 'card');
@@ -86,7 +127,14 @@ describe('routeProp class/className + style merge', () => {
   // explicit half specifically, not onto node.props.style directly (which may already be the
   // [classStyle, explicitStyle] tuple) — getExplicitStyle is that seam.
   it('exposes the explicit style half via getExplicitStyle, unaffected by class', () => {
-    registerStyles({ card: { padding: 10 } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10 },
+      },
+    ]);
     const node = createElement('RCTView');
 
     routeProp(node, 'style', { backgroundColor: 'blue' });

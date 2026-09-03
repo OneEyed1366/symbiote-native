@@ -3,7 +3,7 @@
   // render-only). Reuses the shared logic verbatim (switchReducer / valueFromChange /
   // shouldSnapBack, exactly like React's useReducer + Vue's ref-based reducer wiring) and
   // calls renderSwitch() itself for the prop assembly — its Descriptor is always exactly one
-  // `symbiote-switch` node with zero children (core/components/src/view/render-switch.ts). Root
+  // `symbiote-switch-managed` node with zero children (core/components/src/view/render-switch.ts). Root
   // stays a literal tag (bind:this needs a known tag); `createDescriptorChildrenSync` is still
   // wired for its (always-empty) children, matching every other category-1 component uniformly
   // — the same reason React still routes a childless Switch through descriptorToReact rather
@@ -27,7 +27,11 @@
     valueFromChange,
     renderSwitch,
   } from '@symbiote-native/components';
-  import { dispatchViewCommand, dlog, type ISymbioteEvent } from '@symbiote-native/engine';
+  import {
+    dispatchViewCommand,
+    dlog,
+    type ISymbioteEvent,
+  } from '@symbiote-native/engine';
   import { PLATFORM } from './switch-platform';
   import { createDescriptorChildrenSync } from '../../descriptor-to-svelte';
   import { createAttachmentsSync } from '../../runes/attachments';
@@ -67,7 +71,10 @@
     // accept/reject control via the snap-back effect below — see TextInput's identical
     // mechanism (text-input/index.svelte) for why echoing unconditionally would break that.
     if (onValueChange === undefined) value = next;
-    switchState = switchReducer(switchState, { type: 'native-reported', value: next });
+    switchState = switchReducer(switchState, {
+      type: 'native-reported',
+      value: next,
+    });
   }
 
   // Snap-back: when native reported a value the parent rejected (the value prop did not
@@ -102,7 +109,11 @@
         thumbColor,
         ios_backgroundColor,
         style,
-        passthrough: { ...passthrough, class: className, onChange: handleChange },
+        passthrough: {
+          ...passthrough,
+          class: className,
+          onChange: handleChange,
+        },
       },
       PLATFORM,
     ),
@@ -120,4 +131,4 @@
   });
 </script>
 
-<symbiote-switch p={descriptor.props} bind:this={hostShim} />
+<symbiote-switch-managed p={descriptor.props} bind:this={hostShim} />

@@ -18,7 +18,11 @@ import { isStyleFile } from './preprocessors/index.ts';
 import { isCssModuleFile } from './metro-css-module/index.ts';
 import { generateModuleDts } from './generate-dts/index.ts';
 
-const SKIPPED_DIR_NAMES: ReadonlySet<string> = new Set(['node_modules', 'build', '.git']);
+const SKIPPED_DIR_NAMES: ReadonlySet<string> = new Set([
+  'node_modules',
+  'build',
+  '.git',
+]);
 
 async function collectModuleStyleFiles(root: string): Promise<string[]> {
   const stat = await fs.stat(root);
@@ -29,7 +33,8 @@ async function collectModuleStyleFiles(root: string): Promise<string[]> {
   const entries = await fs.readdir(root, { withFileTypes: true });
   const found: string[] = [];
   for (const entry of entries) {
-    if (entry.name.startsWith('.') || SKIPPED_DIR_NAMES.has(entry.name)) continue;
+    if (entry.name.startsWith('.') || SKIPPED_DIR_NAMES.has(entry.name))
+      continue;
     const fullPath = path.join(root, entry.name);
     if (entry.isDirectory()) {
       found.push(...(await collectModuleStyleFiles(fullPath)));
@@ -65,7 +70,9 @@ async function generateAll(roots: readonly string[]): Promise<number> {
 // editor's autocomplete stays live while a `.module.css` file is being edited, without requiring
 // Metro or any other dev server to be running.
 async function watch(roots: readonly string[]): Promise<void> {
-  console.log(`css-dts: watching ${roots.join(', ')} for changes (ctrl-c to stop)`);
+  console.log(
+    `css-dts: watching ${roots.join(', ')} for changes (ctrl-c to stop)`,
+  );
   let pending: ReturnType<typeof setTimeout> | undefined;
   const regenerate = (): void => {
     clearTimeout(pending);
@@ -101,7 +108,9 @@ async function main(): Promise<void> {
 
   const fileCount = await generateAll(targets);
   if (fileCount === 0) {
-    console.log('css-dts: no .module.css (or .module.scss/.less/.styl) files found');
+    console.log(
+      'css-dts: no .module.css (or .module.scss/.less/.styl) files found',
+    );
   }
 }
 

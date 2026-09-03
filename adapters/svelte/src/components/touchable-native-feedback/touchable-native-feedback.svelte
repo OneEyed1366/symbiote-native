@@ -13,7 +13,10 @@
 </script>
 
 <script lang="ts">
-  import { backgroundProps, selectableBackground } from '@symbiote-native/components';
+  import {
+    backgroundProps,
+    selectableBackground,
+  } from '@symbiote-native/components';
   import { dlog } from '@symbiote-native/engine';
   import Pressable from '../pressable/index.svelte';
 
@@ -29,13 +32,15 @@
   const resolved = $derived(background ?? selectableBackground());
 
   $effect(() => {
-    dlog(`TouchableNativeFeedback render ${resolved.type} useForeground ${useForeground}`);
+    dlog(
+      `TouchableNativeFeedback render ${resolved.type} useForeground ${useForeground}`,
+    );
   });
 
   const nativeProps = $derived(backgroundProps(resolved, useForeground));
 </script>
 
-<Pressable {...rest}>
+<Pressable __minPressDuration={0} {...rest}>
   {#snippet children()}
     <symbiote-view p={nativeProps}>
       {@render content?.()}

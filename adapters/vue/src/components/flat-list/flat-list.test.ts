@@ -17,9 +17,19 @@
 // No Negative group: FlatList's public props have no throwing path — a malformed `data` (non-array)
 // degrades to an empty list, it never rejects.
 
-import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  ref,
+  type FunctionalComponent,
+} from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FlatList, mount, unmount, type IFlatListHandle } from '@symbiote-native/vue';
+import {
+  FlatList,
+  mount,
+  unmount,
+  type IFlatListHandle,
+} from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // FlatList is a GENERIC component (its setup is `<ItemT,>(props, ctx)`), so its value is a generic
@@ -28,7 +38,9 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 // tests, not type tests, so drive the component through a loose functional-component handle.
 // (Sanctioned cast — generic-component limitation, test-only; the type surface is proven in the
 // JSX example.)
-const FlatListHost = FlatList as unknown as FunctionalComponent<Record<string, unknown>>;
+const FlatListHost = FlatList as unknown as FunctionalComponent<
+  Record<string, unknown>
+>;
 
 type ICommandCall = {
   name: string;
@@ -55,7 +67,8 @@ slot.dispatchCommand = (_node, name, args) => {
   commands.push({ name, args });
 };
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -89,13 +102,17 @@ function findCreated(viewName: string): IFakeNode {
 function rowsWithFlexDirection(): IFakeNode[] {
   const rows: IFakeNode[] = [];
   walk(fabric.committed, node => {
-    if (node.viewName === 'RCTView' && node.props.flexDirection === 'row') rows.push(node);
+    if (node.viewName === 'RCTView' && node.props.flexDirection === 'row')
+      rows.push(node);
   });
   return rows;
 }
 
 function rowsOf(count: number): IRow[] {
-  return Array.from({ length: count }, (_unused, index) => ({ id: index, label: `row-${index}` }));
+  return Array.from({ length: count }, (_unused, index) => ({
+    id: index,
+    label: `row-${index}`,
+  }));
 }
 
 describe('Vue FlatList on the engine', () => {
@@ -120,7 +137,11 @@ describe('Vue FlatList on the engine', () => {
                   index,
                 }),
               },
-              { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+              {
+                item: ({ item }: { item: IRow }) => [
+                  h('symbiote-text', {}, item.label),
+                ],
+              },
             ),
         }),
       );
@@ -133,7 +154,9 @@ describe('Vue FlatList on the engine', () => {
 
       const labels = collectRowLabels();
       expect(labels.size, 'item rows committed').toBeGreaterThan(0);
-      expect(labels.size, 'window far smaller than the full data').toBeLessThan(WINDOW_CEILING);
+      expect(labels.size, 'window far smaller than the full data').toBeLessThan(
+        WINDOW_CEILING,
+      );
       expect(labels.has('row-0')).toBe(true);
       expect(labels.has('row-900')).toBe(false);
     });
@@ -149,16 +172,28 @@ describe('Vue FlatList on the engine', () => {
           setup: () => () =>
             h(
               FlatListHost,
-              { data, numColumns: 2, keyExtractor: (item: IRow) => `k-${item.id}` },
-              { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+              {
+                data,
+                numColumns: 2,
+                keyExtractor: (item: IRow) => `k-${item.id}`,
+              },
+              {
+                item: ({ item }: { item: IRow }) => [
+                  h('symbiote-text', {}, item.label),
+                ],
+              },
             ),
         }),
       );
       await tick();
 
       const rows = rowsWithFlexDirection();
-      expect(rows.length, 'three flex-row rows for 6 items in 2 columns').toBe(3);
-      expect(rows[0].children.length, 'a full row holds two column cells').toBe(2);
+      expect(rows.length, 'three flex-row rows for 6 items in 2 columns').toBe(
+        3,
+      );
+      expect(rows[0].children.length, 'a full row holds two column cells').toBe(
+        2,
+      );
       // Every item still renders, just regrouped into rows.
       expect(collectRowLabels().size).toBe(6);
     });
@@ -185,9 +220,11 @@ describe('Vue FlatList on the engine', () => {
               },
               {
                 item: ({ item }: { item: IRow }) => [
-                  h('symbiote-view', { style: { width: ITEM_WIDTH, height: 40 } }, [
-                    h('symbiote-text', {}, item.label),
-                  ]),
+                  h(
+                    'symbiote-view',
+                    { style: { width: ITEM_WIDTH, height: 40 } },
+                    [h('symbiote-text', {}, item.label)],
+                  ),
                 ],
               },
             ),
@@ -219,7 +256,11 @@ describe('Vue FlatList on the engine', () => {
                 onRefresh: () => undefined,
                 keyExtractor: (item: IRow) => `k-${item.id}`,
               },
-              { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+              {
+                item: ({ item }: { item: IRow }) => [
+                  h('symbiote-text', {}, item.label),
+                ],
+              },
             ),
         }),
       );
@@ -238,8 +279,16 @@ describe('Vue FlatList on the engine', () => {
           setup: () => () =>
             h(
               FlatListHost,
-              { data, refreshing: false, keyExtractor: (item: IRow) => `k-${item.id}` },
-              { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+              {
+                data,
+                refreshing: false,
+                keyExtractor: (item: IRow) => `k-${item.id}`,
+              },
+              {
+                item: ({ item }: { item: IRow }) => [
+                  h('symbiote-text', {}, item.label),
+                ],
+              },
             ),
         }),
       );
@@ -273,7 +322,11 @@ describe('Vue FlatList on the engine', () => {
                   index,
                 }),
               },
-              { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+              {
+                item: ({ item }: { item: IRow }) => [
+                  h('symbiote-text', {}, item.label),
+                ],
+              },
             ),
         }),
       );

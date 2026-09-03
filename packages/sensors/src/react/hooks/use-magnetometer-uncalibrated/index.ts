@@ -1,12 +1,16 @@
 // React lifecycle wiring over the framework-agnostic MagnetometerUncalibrated singleton
 // (core/) — mirrors the lifecycle-bucket naming convention of adapters/react/src/hooks.
 import { useEffect, useState } from 'react';
-import { MagnetometerUncalibrated, type IMagnetometerUncalibratedMeasurement } from '../../../core';
+import {
+  MagnetometerUncalibrated,
+  type IMagnetometerUncalibratedMeasurement,
+} from '../../../core';
 
 export function useMagnetometerUncalibrated(
   updateIntervalMs?: number,
 ): IMagnetometerUncalibratedMeasurement | null {
-  const [measurement, setMeasurement] = useState<IMagnetometerUncalibratedMeasurement | null>(null);
+  const [measurement, setMeasurement] =
+    useState<IMagnetometerUncalibratedMeasurement | null>(null);
 
   useEffect(() => {
     // Re-subscribing on interval change keeps the native update rate in sync with the

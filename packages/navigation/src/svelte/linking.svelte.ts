@@ -34,7 +34,10 @@ export function useLinkingIntegration(
 
     let cancelled = false;
 
-    const applyRoute = (url: string, dispatch: (name: string, params?: unknown) => void): void => {
+    const applyRoute = (
+      url: string,
+      dispatch: (name: string, params?: unknown) => void,
+    ): void => {
       const route = resolveRouteFromUrl(config, url);
       if (route === null) {
         dlog(`useLinkingIntegration: no route resolved for "${url}"`);
@@ -53,10 +56,13 @@ export function useLinkingIntegration(
         dlog(`useLinkingIntegration: getInitialURL failed: ${String(error)}`);
       });
 
-    const subscription: IEventSubscription = Linking.addEventListener('url', (event: IUrlEvent) => {
-      dlog(`useLinkingIntegration: url event "${event.url}"`);
-      applyRoute(event.url, handle.push);
-    });
+    const subscription: IEventSubscription = Linking.addEventListener(
+      'url',
+      (event: IUrlEvent) => {
+        dlog(`useLinkingIntegration: url event "${event.url}"`);
+        applyRoute(event.url, handle.push);
+      },
+    );
 
     return () => {
       cancelled = true;

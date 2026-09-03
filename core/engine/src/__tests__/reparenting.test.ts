@@ -30,7 +30,9 @@ describe('Fabric family reparenting', () => {
     surface.commit();
 
     const firstMoved = fabric.find(node => node.props.testID === 'moved');
-    const firstMovedChild = fabric.find(node => node.props.testID === 'movedChild');
+    const firstMovedChild = fabric.find(
+      node => node.props.testID === 'movedChild',
+    );
     expect(firstMoved).toBeDefined();
     expect(firstMovedChild).toBeDefined();
 
@@ -47,7 +49,9 @@ describe('Fabric family reparenting', () => {
     // why: reconcile() recreates a reparented node with forceFreshFamily=true for its OWN
     // subtree too (line 259's recursive call) — the moved node's child must get a fresh
     // identity right along with it, not stay pinned to the stale family the parent just left.
-    const secondMovedChild = fabric.find(node => node.props.testID === 'movedChild');
+    const secondMovedChild = fabric.find(
+      node => node.props.testID === 'movedChild',
+    );
     expect(secondMovedChild).toBeDefined();
     expect(secondMovedChild?.tag).not.toBe(firstMovedChild?.tag);
   });

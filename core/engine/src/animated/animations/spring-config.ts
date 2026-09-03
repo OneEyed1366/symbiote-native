@@ -26,8 +26,15 @@ export function fromOrigamiTensionAndFriction(
   };
 }
 
-export function fromBouncinessAndSpeed(bounciness: number, speed: number): ISpringConfigValues {
-  function normalize(value: number, startValue: number, endValue: number): number {
+export function fromBouncinessAndSpeed(
+  bounciness: number,
+  speed: number,
+): ISpringConfigValues {
+  function normalize(
+    value: number,
+    startValue: number,
+    endValue: number,
+  ): number {
     return (value - startValue) / (endValue - startValue);
   }
 
@@ -39,7 +46,11 @@ export function fromBouncinessAndSpeed(bounciness: number, speed: number): ISpri
     return t * end + (1 - t) * start;
   }
 
-  function quadraticOutInterpolation(t: number, start: number, end: number): number {
+  function quadraticOutInterpolation(
+    t: number,
+    start: number,
+    end: number,
+  ): number {
     return linearInterpolation(2 * t - t * t, start, end);
   }
 
@@ -52,7 +63,12 @@ export function fromBouncinessAndSpeed(bounciness: number, speed: number): ISpri
   }
 
   function b3Friction3(x: number): number {
-    return 0.00000045 * Math.pow(x, 3) - 0.000332 * Math.pow(x, 2) + 0.1078 * x + 5.84;
+    return (
+      0.00000045 * Math.pow(x, 3) -
+      0.000332 * Math.pow(x, 2) +
+      0.1078 * x +
+      5.84
+    );
   }
 
   function b3Nobounce(tension: number): number {
@@ -65,7 +81,11 @@ export function fromBouncinessAndSpeed(bounciness: number, speed: number): ISpri
   b = projectNormal(b, 0, 0.8);
   const s = normalize(speed / 1.7, 0, 20);
   const bouncyTension = projectNormal(s, 0.5, 200);
-  const bouncyFriction = quadraticOutInterpolation(b, b3Nobounce(bouncyTension), 0.01);
+  const bouncyFriction = quadraticOutInterpolation(
+    b,
+    b3Nobounce(bouncyTension),
+    0.01,
+  );
 
   return {
     stiffness: stiffnessFromOrigamiValue(bouncyTension),

@@ -10,8 +10,18 @@
 
 import { dlog } from '../debug';
 import { getNativeModule } from '../native-modules';
-import { validateContent, shareActions, SHARED_ACTION, DISMISSED_ACTION } from './shared';
-import type { IShareContent, IShareOptions, IShareAction, IShareStatic } from './shared';
+import {
+  validateContent,
+  shareActions,
+  SHARED_ACTION,
+  DISMISSED_ACTION,
+} from './shared';
+import type {
+  IShareContent,
+  IShareOptions,
+  IShareAction,
+  IShareStatic,
+} from './shared';
 
 export type { IShareContent, IShareOptions, IShareAction } from './shared';
 
@@ -43,7 +53,10 @@ export const Share: IShareStatic = {
   // Open the Android share dialog for `content`. Resolves with the user's action
   // (Android always resolves sharedAction); rejects on invalid content, an unexpected
   // native result, or a missing module (explicit reject, never a hung Promise).
-  share(content: IShareContent, options: IShareOptions = {}): Promise<IShareAction> {
+  share(
+    content: IShareContent,
+    options: IShareOptions = {},
+  ): Promise<IShareAction> {
     const invalid = validateContent(content);
     if (invalid !== null) {
       dlog(`Share.share -> invalid content: ${invalid.message}`);
@@ -53,11 +66,14 @@ export const Share: IShareStatic = {
     const shareModule = getNativeModule<IShareModuleAndroid>(SHARE_MODULE);
     if (shareModule === null) {
       dlog(`Share: "${SHARE_MODULE}" unresolved`);
-      return Promise.reject(new Error('Share: ShareModule native module unavailable'));
+      return Promise.reject(
+        new Error('Share: ShareModule native module unavailable'),
+      );
     }
     const newContent = {
       title: content.title,
-      message: typeof content.message === 'string' ? content.message : undefined,
+      message:
+        typeof content.message === 'string' ? content.message : undefined,
     };
     return shareModule.share(newContent, options.dialogTitle).then(result => {
       if (!isShareResult(result)) {
@@ -66,7 +82,8 @@ export const Share: IShareStatic = {
       }
       dlog(`Share.share -> android action=${result.action}`);
       return {
-        action: result.action === DISMISSED_ACTION ? DISMISSED_ACTION : SHARED_ACTION,
+        action:
+          result.action === DISMISSED_ACTION ? DISMISSED_ACTION : SHARED_ACTION,
         activityType: null,
       };
     });

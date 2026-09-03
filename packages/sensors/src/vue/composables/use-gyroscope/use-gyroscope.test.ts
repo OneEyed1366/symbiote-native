@@ -31,7 +31,8 @@ vi.mock('../../../core', () => ({
   Gyroscope: {
     addListener: (listener: IListener) => addListenerMock(listener),
     removeAllListeners: vi.fn(),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
@@ -47,7 +48,9 @@ beforeEach(() => {
 
 afterEach(() => unmount(ROOT_TAG));
 
-function mountGyroscope(updateIntervalMs?: number): Ref<IGyroscopeMeasurement | null> {
+function mountGyroscope(
+  updateIntervalMs?: number,
+): Ref<IGyroscopeMeasurement | null> {
   let measurement: Ref<IGyroscopeMeasurement | null> | undefined;
   mount(
     ROOT_TAG,
@@ -78,7 +81,12 @@ describe('useGyroscope (Vue)', () => {
       // why: the composable's whole job is bridging the native event stream into Vue
       // reactivity — a fired event that never reaches the ref would make it useless.
       const measurement = mountGyroscope();
-      const reading: IGyroscopeMeasurement = { x: 0.1, y: 0.2, z: 0.9, timestamp: 123 };
+      const reading: IGyroscopeMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.9,
+        timestamp: 123,
+      };
 
       registeredListener?.(reading);
 
@@ -89,7 +97,12 @@ describe('useGyroscope (Vue)', () => {
       // why: each native event is a full snapshot, not a delta — merging would leave stale
       // axis values behind after a real reading changes.
       const measurement = mountGyroscope();
-      const first: IGyroscopeMeasurement = { x: 0.1, y: 0.2, z: 0.3, timestamp: 1 };
+      const first: IGyroscopeMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.3,
+        timestamp: 1,
+      };
       const second: IGyroscopeMeasurement = { x: 9, y: 9, z: 9, timestamp: 2 };
 
       registeredListener?.(first);
