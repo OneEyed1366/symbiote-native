@@ -6,7 +6,6 @@
 
 import {
   attachNativeEvent,
-  dispatchViewCommand,
   dlog,
   flattenStyle,
   isSymbioteEvent,
@@ -105,11 +104,14 @@ export function forwardScrollEvent(
   if (isSymbioteEvent(first)) handler(first);
 }
 
-// The imperative handle is identical across platforms: every method dispatches a view
-// command on the SAME scroll-view node; only the surrounding element assembly diverges
-// (iOS sibling RefreshControl vs Android wrap). So it is built once here and both platform
-// files back it with their scroll node getter. Commands and arg order mirror RN's
-// ScrollViewCommands: scrollTo [x, y, animated], scrollToEnd [animated], flashScrollIndicators [].
+// The imperative handle is identical across platforms — only the surrounding element assembly
+// diverges (iOS sibling RefreshControl vs Android wrap) — so it is built once here and both
+// platform files back it with their scroll node getter.
+//
+// It DELEGATES to the node's own methods rather than dispatching commands itself. The commands and
+// their defaults live on `ISymbioteNode` because a LOWERED ScrollView hands the app its engine
+// node directly, with no wrapper to build a handle: two implementations would let `scrollTo()` with
+// no argument mean one thing through a ref and another through a tag, and nothing would report it.
 //
 // `getNode` is a LAZY getter (React `() => ref.current`, Vue `() => nodeRef.value`), read on
 // every call, NOT the node captured once. The node is null at mount and only set after the
@@ -118,28 +120,9 @@ export function buildScrollViewHandle(
   getNode: () => ISymbioteNode | null,
 ): IScrollViewHandle {
   return {
-    scrollTo: (options): void => {
-      const node = getNode();
-      if (node === null) return;
-      const x = options?.x ?? 0;
-      const y = options?.y ?? 0;
-      const animated = options?.animated ?? true;
-      dlog(`ScrollView.scrollTo x=${x} y=${y} animated=${animated}`);
-      dispatchViewCommand(node, 'scrollTo', [x, y, animated]);
-    },
-    scrollToEnd: (options): void => {
-      const node = getNode();
-      if (node === null) return;
-      const animated = options?.animated ?? true;
-      dlog(`ScrollView.scrollToEnd animated=${animated}`);
-      dispatchViewCommand(node, 'scrollToEnd', [animated]);
-    },
-    flashScrollIndicators: (): void => {
-      const node = getNode();
-      if (node === null) return;
-      dlog('ScrollView.flashScrollIndicators');
-      dispatchViewCommand(node, 'flashScrollIndicators', []);
-    },
+    scrollTo: (options): void => getNode()?.scrollTo(options),
+    scrollToEnd: (options): void => getNode()?.scrollToEnd(options),
+    flashScrollIndicators: (): void => getNode()?.flashScrollIndicators(),
     getScrollNode: (): ISymbioteNode | null => getNode(),
   };
 }

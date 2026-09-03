@@ -232,10 +232,32 @@ export interface ISymbioteNode {
   setNativeProps(nativeProps: Record<string, unknown>): void;
   focus(): void;
   blur(): void;
+  // The scroll commands, on every node for the same reason `focus`/`blur` are: a lowered primitive
+  // hands the app its engine NODE, so anything the wrapper's imperative handle offered has to be
+  // reachable from here or the surface silently shrinks when a primitive stops being a component.
+  //
+  // ON THE SHARED PROTOTYPE, not per-tag, and that is a trade rather than an oversight. The
+  // browser's shape is per-tag — `HTMLVideoElement.play` is not on `HTMLElement` — and it is
+  // reachable here too, by registering one subclass per tag so `createElement` can construct with
+  // the right prototype. It was not taken: that gives the commit walk N node shapes where it has
+  // one today, and every call site in `reconcile`/`fabricProps` that is monomorphic on
+  // `SymbioteNode` becomes polymorphic. The cost is unmeasured, the benefit is type hygiene, and
+  // this file's own history says the prototype question is decided by measurement (see the
+  // toPublicInstance note above). Revisit with numbers, not with taste.
+  //
+  // Harmless where meaningless: `focus()` on a View already dispatches a command native ignores,
+  // and RN's own host component carries the same universal surface.
+  scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void;
+  scrollToEnd(options?: { animated?: boolean }): void;
+  flashScrollIndicators(): void;
 }
 
 const FOCUS_COMMAND = 'focus';
 const BLUR_COMMAND = 'blur';
+// Names and arg order mirror RN's ScrollViewCommands.
+const SCROLL_TO_COMMAND = 'scrollTo';
+const SCROLL_TO_END_COMMAND = 'scrollToEnd';
+const FLASH_SCROLL_INDICATORS_COMMAND = 'flashScrollIndicators';
 
 // The one shape every retained node has. A class, not an object literal, for two reasons: the six
 // imperative methods live on the shared prototype instead of being allocated per node (see
@@ -331,6 +353,28 @@ class SymbioteNode implements ISymbioteNode {
 
   blur(): void {
     dispatchViewCommand(this, BLUR_COMMAND, []);
+  }
+
+  // The defaults live HERE and nowhere else. `buildScrollViewHandle`
+  // (`@symbiote-native/components`) used to own them and now delegates, so the wrapper's handle and
+  // a lowered element's node cannot drift on what `scrollTo()` with no argument means.
+  scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void {
+    const x = options?.x ?? 0;
+    const y = options?.y ?? 0;
+    const animated = options?.animated ?? true;
+    dlog(`ScrollView.scrollTo x=${x} y=${y} animated=${animated}`);
+    dispatchViewCommand(this, SCROLL_TO_COMMAND, [x, y, animated]);
+  }
+
+  scrollToEnd(options?: { animated?: boolean }): void {
+    const animated = options?.animated ?? true;
+    dlog(`ScrollView.scrollToEnd animated=${animated}`);
+    dispatchViewCommand(this, SCROLL_TO_END_COMMAND, [animated]);
+  }
+
+  flashScrollIndicators(): void {
+    dlog('ScrollView.flashScrollIndicators');
+    dispatchViewCommand(this, FLASH_SCROLL_INDICATORS_COMMAND, []);
   }
 }
 
