@@ -92,6 +92,19 @@ const SLOT_PROPS: Readonly<Record<string, string>> = {
 // `IHostBehavior.slotDerived` for why nothing else makes that happen.
 const SLOT_DERIVED = ['maintainVisibleContentPosition', 'snapToAlignment'];
 
+// A `<RefreshControl>` written among the app's children belongs beside the content view, not
+// inside it (RN iOS: `{refreshControl}{contentContainer}`). Resolved through `descriptorFor` so it
+// is whatever the platform's name table says — `PullToRefreshView` on iOS.
+//
+// ANDROID IS NOT THIS SHAPE and is not done. An Android ScrollView takes exactly one child, so RN
+// inverts the tree there: `AndroidSwipeRefreshLayout` WRAPS the scroll view
+// (`ScrollView.js:1856`), with `splitLayoutProps` sending the layout half of the style to the
+// wrapper. A claim cannot express that — the refresh control is not a child at all — so it needs a
+// node that goes ABOVE the owner, and the owner has no parent yet when its children arrive. Until
+// that is designed, a lowered ScrollView is iOS-only, which costs nothing today because no adapter
+// registers this behavior.
+const CLAIMED_CHILDREN = [descriptorFor('symbiote-refresh-control').component];
+
 // The OWNER's fold: the per-axis base style UNDER the app's (so an explicit `flexDirection` still
 // wins), and `decelerationRate` resolved from RN's two words to the platform's friction constant.
 // The resolution has to happen here rather than in an adapter because a lowered element has no
@@ -228,6 +241,7 @@ function scrollBehavior(
     ownedListeners: ['contentSizeChange'],
     slotProps: SLOT_PROPS,
     slotDerived: SLOT_DERIVED,
+    claimedChildren: CLAIMED_CHILDREN,
     buildStructure: buildContent(contentIntrinsic, rowStyle),
     foldPayload: ownerFold(base),
     // No timer and no listener taken here: the one listener this behavior installs is prop-driven,

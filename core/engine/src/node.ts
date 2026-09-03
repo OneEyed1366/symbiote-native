@@ -26,6 +26,7 @@ import { dlog } from './debug';
 import {
   appListenerFor,
   attachHostBehavior,
+  claimsChild,
   hasHostBehaviors,
   markDetachCandidate,
   notifyOwnedListenerChange,
@@ -1187,21 +1188,56 @@ function detach(child: ISymbioteNode): void {
 // Reads a field that is `undefined` on every node in every app that registers no composed
 // primitive, so the cost is one load and one branch — deliberately NOT behind `hasHostBehaviors()`,
 // which would be a second read to save nothing.
-function slotOf(parent: ISymbioteNode): ISymbioteNode {
-  return parent.childHost ?? parent;
+// Which node a child actually lands on. See `ISymbioteNode.childHost`: the adapter always names the
+// OWNER, and a node whose behavior built an internal subtree redirects the app's children into it —
+// unless the behavior CLAIMS this particular child, which keeps it on the owner (`claimedChildren`).
+//
+// SINGLE HOP, not a loop, and the field's own comment says why — a chain would put a walk on the
+// engine's hottest path to express a depth no primitive has. A behavior needing depth points
+// `childHost` at the innermost node itself.
+//
+// Reads a field that is `undefined` on every node in every app that registers no composed
+// primitive, so the cost is one load and one branch — deliberately NOT behind `hasHostBehaviors()`,
+// which would be a second read to save nothing. The claim check sits BEHIND that branch, so only a
+// slot-bearing node ever pays the registry probe.
+function hostFor(parent: ISymbioteNode, child: ISymbioteNode): ISymbioteNode {
+  const slot = parent.childHost;
+  if (slot === undefined) return parent;
+  return claimsChild(parent, child.component) ? parent : slot;
+}
+
+// Where the child goes in its host's list.
+//
+// A host that STILL has a slot at this point is an owner taking a CLAIMED child, and that child
+// goes before the slot whatever the framework asked for. RN renders `{refreshControl}{content}` in
+// that order, and the node a framework names as `beforeChild` lives inside the slot, so `indexOf`
+// could not find it here anyway.
+function indexFor(
+  host: ISymbioteNode,
+  beforeChild: ISymbioteNode | undefined,
+): number {
+  const slot = host.childHost;
+  if (slot !== undefined) return host.children.indexOf(slot);
+  if (beforeChild === undefined) return host.children.length;
+  const index = host.children.indexOf(beforeChild);
+  return index < 0 ? host.children.length : index;
 }
 
 export function appendChild(
   requestedParent: ISymbioteNode,
   child: ISymbioteNode,
 ): void {
-  const parent = slotOf(requestedParent);
+  const parent = hostFor(requestedParent, child);
   // A node the sweep tore down can be put back — Svelte parks live subtrees offscreen across
   // commits. A WeakSet miss for anything freshly built, so the create path pays nothing.
   if (hasHostBehaviors()) reattachHostBehaviors(child);
   detach(child);
   markStructureDirty(parent);
   child.parent = parent;
+  if (parent.childHost !== undefined) {
+    parent.children.splice(indexFor(parent, undefined), 0, child);
+    return;
+  }
   parent.children.push(child);
 }
 
@@ -1210,13 +1246,12 @@ export function insertBefore(
   child: ISymbioteNode,
   beforeChild: ISymbioteNode,
 ): void {
-  const parent = slotOf(requestedParent);
+  const parent = hostFor(requestedParent, child);
   if (hasHostBehaviors()) reattachHostBehaviors(child);
   detach(child);
   markStructureDirty(parent);
   child.parent = parent;
-  const index = parent.children.indexOf(beforeChild);
-  parent.children.splice(index < 0 ? parent.children.length : index, 0, child);
+  parent.children.splice(indexFor(parent, beforeChild), 0, child);
 }
 
 // Removal only NOMINATES a behavior for teardown; the commit sweep decides. A framework may spell
@@ -1230,7 +1265,7 @@ export function removeChild(
   // appended to, which is the OWNER, while the child actually lives in the slot. Without this the
   // `indexOf` misses, the splice no-ops, and the child stays committed under the slot forever
   // while the framework believes it is gone — a leak with nothing red anywhere.
-  const parent = slotOf(requestedParent);
+  const parent = hostFor(requestedParent, child);
   if (hasHostBehaviors()) markDetachCandidate(child);
   markStructureDirty(parent);
   const index = parent.children.indexOf(child);

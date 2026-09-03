@@ -98,6 +98,18 @@ export interface IHostBehavior {
   // path in practice, and `node.childHost` turns away every node that has no slot before the
   // registry is touched at all.
   readonly slotDerived?: readonly string[];
+  // Children that stay on the OWNER instead of going into the slot, by FABRIC component name.
+  //
+  // The child twin of `slotProps`: a ScrollView's RefreshControl is a sibling of the content view,
+  // not one of its children, and RN's iOS branch renders `{refreshControl}{contentContainer}` in
+  // that order. `appendChild` puts a claimed child before the slot for exactly that reason.
+  //
+  // BY FABRIC NAME, unlike the registry itself, and the difference is that a claim is per-PARENT.
+  // Keying the registry that way would attach the press machine to every plain `View`, because a
+  // Pressable resolves to `RCTView` like any other; a claim is only consulted for children of one
+  // owner, so `PullToRefreshView` / `AndroidSwipeRefreshLayout` is unambiguous there and the node
+  // needs no field carrying its intrinsic tag.
+  readonly claimedChildren?: readonly string[];
   // Builds the primitive's OWN internal subtree, once, and returns the node the app's children
   // belong under — or undefined when they belong directly on the host.
   //
@@ -255,6 +267,11 @@ export function notifyOwnedListenerChange(
   wired: boolean,
 ): void {
   attached.get(node)?.onOwnedListenerChange?.(node, name, wired);
+}
+
+// Does this owner keep a child of that Fabric component beside its slot? See `claimedChildren`.
+export function claimsChild(node: ISymbioteNode, component: string): boolean {
+  return attached.get(node)?.claimedChildren?.includes(component) === true;
 }
 
 // Does this owner key feed the slot's payload? See `slotDerived`. Same `node.childHost` gate as

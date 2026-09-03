@@ -17,6 +17,8 @@ import {
   clearHostBehaviors,
   createElement,
   createSurface,
+  insertBefore,
+  removeChild,
   routeProp,
   type ISymbioteEvent,
   type ISymbioteNode,
@@ -376,5 +378,78 @@ describe('onContentSizeChange is synthesized from the content view layout', () =
     // that disappeared. Asserting absence here would be asserting a thing the platform cannot do.
     expect(commit().slot.props.onLayout).toBeNull();
     expect(slot.listeners?.get('layout')).toBeUndefined();
+  });
+});
+
+describe('a RefreshControl child is claimed by the owner', () => {
+  const REFRESH = descriptorFor('symbiote-refresh-control').component;
+  const CONTENT = descriptorFor('symbiote-scroll-content').component;
+
+  function refreshNode(): ISymbioteNode {
+    return createElement(REFRESH, false, 'symbiote-refresh-control');
+  }
+
+  // The app writes it among the children, because that is what a tag-only surface leaves it: the
+  // prop carrying an element existed only because JSX had no way to MARK one.
+  it('sits beside the content view, not inside it', () => {
+    const { node, commit } = mountScroll(SCROLL_VIEW_TAG);
+    appendChild(node, refreshNode());
+    appendChild(node, createElement('RCTImageView'));
+
+    // RN's iOS branch renders `{refreshControl}{contentContainer}`, in that order.
+    expect(fabric.serialize([commit().owner as never])).toBe(
+      `RCTScrollView(${REFRESH}${CONTENT}(RCTImageView))`,
+    );
+  });
+
+  // The control that says the claim is a claim and not "children stop being redirected". Without
+  // it a broken `hostFor` that always returns the owner passes the case above.
+  it('leaves an unclaimed child in the slot', () => {
+    const { node, commit } = mountScroll(SCROLL_VIEW_TAG);
+    appendChild(node, createElement('RCTImageView'));
+
+    expect(fabric.serialize([commit().owner as never])).toBe(
+      `RCTScrollView(${CONTENT}(RCTImageView))`,
+    );
+  });
+
+  // Source order is not delivery order: a framework may mount the rows first and the control on a
+  // later pass. The position is the OWNER's rule, never the caller's.
+  it('goes before the content view even when it arrives last', () => {
+    const { node, commit } = mountScroll(SCROLL_VIEW_TAG);
+    appendChild(node, createElement('RCTImageView'));
+    appendChild(node, refreshNode());
+
+    expect(fabric.serialize([commit().owner as never])).toBe(
+      `RCTScrollView(${REFRESH}${CONTENT}(RCTImageView))`,
+    );
+  });
+
+  // `insertBefore` names a node the framework can see, and every row it can see lives in the SLOT
+  // — so `indexOf` on the owner's own list misses and a naive fallback appends past the content.
+  it('lands before the content view when the anchor is a row inside the slot', () => {
+    const { node, commit } = mountScroll(SCROLL_VIEW_TAG);
+    const row = createElement('RCTImageView');
+    appendChild(node, row);
+    insertBefore(node, refreshNode(), row);
+
+    expect(fabric.serialize([commit().owner as never])).toBe(
+      `RCTScrollView(${REFRESH}${CONTENT}(RCTImageView))`,
+    );
+  });
+
+  // The removal twin. The adapter names the owner, and the claimed child really is there — but a
+  // `removeChild` that redirected to the slot would splice nothing and leave it committed forever.
+  it('is removed from the owner the adapter named', () => {
+    const { node, commit } = mountScroll(SCROLL_VIEW_TAG);
+    const refresh = refreshNode();
+    appendChild(node, refresh);
+    appendChild(node, createElement('RCTImageView'));
+    commit();
+
+    removeChild(node, refresh);
+    expect(fabric.serialize([commit().owner as never])).toBe(
+      `RCTScrollView(${CONTENT}(RCTImageView))`,
+    );
   });
 });
