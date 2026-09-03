@@ -688,6 +688,36 @@ there is no shared half to extract     five adapters build the tree, and the sha
 So the last hot primitive is not lowerable, and the reason is structural rather than unbuilt. That
 closes the question rather than deferring it.
 
+**SUPERSEDED 2026-09-03 — the verdict was right and its enabling condition has since been removed.**
+Both escapes this section prices as too expensive were built, and the two aggravating factors it
+names are answered by name:
+
+```
+"a behavior that CREATES a node"                 IHostBehavior.buildStructure + node.childHost
+"a fold cannot route a prop onto a node          IHostBehavior.slotProps — owner prop name -> slot
+ that does not exist"                            prop name, applied in routeProp
+"there is no shared half to extract"             core/components/src/behaviors/scroll-view.ts
+                                                 builds the pair from selectScrollIntrinsics
+```
+
+`buildStructure` runs once at attach and returns the node the app's children belong under;
+`appendChild`/`insertBefore`/`removeChild` redirect through `childHost`, so the adapter keeps naming
+the OWNER and never learns a slot exists. `contentContainerStyle` reaches the content node as its
+`style` through `slotProps`, and the two style precedences the wrapper composes — base UNDER the
+app's on the scroll node, `flexDirection:'row'` OVER it on the content node — are `payloadFold`s on
+either side. Each half is break-tested independently.
+
+The third escape it lists, a `-managed` split, is NOT needed and must not be reintroduced: that
+split exists only to keep two owners apart while a wrapper and a lowered element both emit a tag.
+Tag-only has one path (`component-names/shared.ts` says so at the pair's own declaration).
+
+**The method half is the durable one, and it is this file's own lesson turned on itself: a
+structural verdict is only as structural as the seams that existed when it was taken.** "Not
+lowerable, structurally" and "not lowerable with what the engine can express today" read identically
+in prose and expire differently. Write which one is meant, and name the seam whose absence decides
+it — this section did name both, which is the only reason the supersession is checkable rather than
+a re-litigation.
+
 **Passing the app's children through is not a disqualification; manufacturing a container is.** The
 first version of this rule said "returns a tree", which over-rejects `SafeAreaView`,
 `InputAccessoryView` and every future primitive that takes children — all of them emit ONE element

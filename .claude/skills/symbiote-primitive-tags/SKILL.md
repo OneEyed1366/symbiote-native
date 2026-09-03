@@ -1989,3 +1989,79 @@ therefore reads wrong if taken as lowered-is-worse. The two paths diverge in opp
 and Solid's wrapper does the same thing as Vue's for the same reason (`buildHost(multiline)` inside
 a memo, taking the value as an ARGUMENT). Both were shown by their own sessions rather than
 asserted, and both hold because of how THOSE wrappers are written — not because of the framework.
+
+## ScrollView, and what the two new engine seams changed (2026-09-03)
+
+`.claude/rules/host-primitive-tier.md` closed ScrollView as **structurally** not lowerable on
+2026-09-01. That verdict was correct on its date and its enabling condition is gone: both escapes it
+priced as too expensive now exist, and the supersession is recorded at the section itself.
+
+```
+IHostBehavior.buildStructure(node) -> slot   builds the primitive's own subtree once at attach,
+node.childHost                               returns the node app children belong under;
+                                             appendChild/insertBefore/removeChild redirect there
+IHostBehavior.slotProps                      owner prop name -> slot prop name, applied in routeProp
+```
+
+The wrapper's two style arrays are reproduced by `payloadFold`s on either side, with OPPOSITE
+precedence — base UNDER the app's on the scroll node, `flexDirection:'row'` OVER it on the content
+node. That is why `slotProps` is a pure RENAME: a redirect that also composed would have to pick one
+order for both.
+
+Also landed, both prerequisites rather than ScrollView work: React's host config now passes the
+intrinsic tag to `createElement` (it was the only adapter that did not, so no behavior could attach
+there at all), and `scrollTo`/`scrollToEnd`/`flashScrollIndicators` are node methods beside
+`focus`/`blur`, with `buildScrollViewHandle` delegating so a ref and a tag cannot disagree on what
+`scrollTo()` with no argument means.
+
+### No `-managed` split. It is a two-path artifact and this is tag-only
+
+The split keeps two owners off one node while a wrapper and a lowered element both emit a tag. There
+is no second owner here, and `component-names/shared.ts` says so at the pair's own declaration
+("DELETE THIS PAIR when the wrappers stop owning that state"). Reintroducing it means keeping the
+wrapper, which is the two-path world this initiative is leaving.
+
+The same correction applies to "refuse per call site". **Tag-only has no fallback**: a prop the tag
+does not handle is not a slower path, it is a prop that silently does nothing. Every prop must work
+before the swap.
+
+### Sequencing, and the one thing that is safe to do incrementally
+
+The BEHAVIOR can grow in pieces because nothing registers it yet — `registerScrollViewBehavior()`
+is called only by tests, deliberately, since `symbiote-scroll-view` is still the wrappers' own tag.
+Only the tag swap is atomic.
+
+```
+3a  no child marking needed   decelerationRate, scrollEventThrottle, collapsableChildren,
+                              onContentSizeChange synthesis, onScroll modes
+4   named slot + child tags   <RefreshControl> and <StickyHeader> as marked children
+5   swap + delete wrappers    one cut, five adapters
+```
+
+Sticky and refreshControl belong to 4 by nature, not by size: both ARE the marked-child work. The
+prop carrying an element exists in both cases only because the API had no way to MARK an element —
+`stickyHeaderIndices` is an index list precisely because JSX cannot say "this child is sticky".
+
+### OPEN, and it blocks 3a: a slot prop DERIVED from owner props
+
+`collapsableChildren` on the content node is `maintainVisibleContentPosition !== undefined ||
+snapToAlignment !== undefined` — owner props, computed, landing on the slot. Neither seam covers it:
+
+- `slotProps` renames a value, it does not compute one.
+- a fold on the slot could close over the owner and read `owner.props`, but **an owner-prop write
+  does not dirty the slot** (`markDirty` bubbles UP), so the slot is skipped by `reconcile` and its
+  payload never rebuilds.
+- `afterCommit` could `setProp` the slot, at the cost of a two-pass mount for that key.
+
+Whichever is chosen widens a seam, so decide it before writing 3a rather than during. The shape that
+keeps folds pure is a declared `slotDerived` name set that makes `routeProp` mark the slot dirty
+when one of those owner keys is written — one field, read only on slot-bearing nodes.
+
+### The per-adapter half, unchanged by any of this
+
+Solid and Svelte need a renamer entry (their compilers decide host-vs-component by CASE). Angular
+needs a non-rendering directive with the selector AND removal from `anchor-host-registry` — its
+three blockers on marked children (anchor per composed component, `ng-content` deferral with
+`parent === null`, and the hand-rolled `ScrollViewProjectionController`) are all consequences of
+ScrollView and RefreshControl still being components, so they are expected to dissolve with the
+swap. Expected, not measured.
