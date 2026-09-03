@@ -151,11 +151,29 @@ const reconciler = createReconciler<
   shouldSetTextContent: () => false,
 
   createInstance(type, props, _container, hostContext) {
-    const descriptor = descriptorFor(resolveIntrinsicTag(type, props));
+    // The INTRINSIC tag, kept in a binding rather than inlined, because it is needed twice: once
+    // to resolve the Fabric view name and once to hand the engine below. The host-behavior
+    // registry is keyed by TAG and never by Fabric name — `symbiote-pressable` and a plain `View`
+    // both resolve to `RCTView`, so keying by the resolved name would put a press machine on every
+    // view in the app (`core/engine/src/host-behavior.ts`).
+    const tag = resolveIntrinsicTag(type, props);
+    const descriptor = descriptorFor(tag);
     if (hostContext.isInsideText && !descriptor.isText) {
       throw new Error(`<${type}> can't be nested inside <Text>`);
     }
-    const node = createElement(descriptor.component, descriptor.isText);
+    // The third argument is what makes a host behavior reachable AT ALL on this adapter. Dropping
+    // it degrades silently: `createElement`'s default is `tag = component`, so the lookup runs
+    // against `RCTView` / `RCTImageView`, matches nothing, and every behavior simply never
+    // attaches — no throw, no log, and no test goes red, because React ships no `register` entry
+    // today and so has never had a behavior to lose. That absence is exactly what hid this: the
+    // other four adapters all pass it (vue `renderer/index.ts`, svelte `dom-shim/element.ts`,
+    // solid `renderer.ts`, angular `renderer/index.ts`), and React is the one that did not.
+    //
+    // Inert on landing and deliberately so — nothing registers a behavior under a tag React emits.
+    // The `-managed` split is what keeps it inert once something does: React's TextInput and
+    // Switch wrappers emit `symbiote-text-input-managed` / `symbiote-switch-managed`, so a machine
+    // registered on the lowered tag cannot also attach to a wrapper-built node and run twice.
+    const node = createElement(descriptor.component, descriptor.isText, tag);
     applyProps(node, foldHostBag(type, props));
     return node;
   },
