@@ -24,11 +24,14 @@ import {
 } from './style-registry';
 import { dlog } from './debug';
 import {
+  appListenerFor,
   attachHostBehavior,
   hasHostBehaviors,
   markDetachCandidate,
+  notifyOwnedListenerChange,
   ownsListener,
   reattachHostBehaviors,
+  slotDerivesFrom,
   slotPropNameFor,
   stashAppListener,
   type IPayloadFold,
@@ -645,6 +648,13 @@ export function setProp(
   // activeStyle, on* — return before reaching here and none of them can carry an alias, so every
   // `role` / `aria-*` write in the engine passes through this line.
   if (!node.hasAriaAlias && isAriaAliasKey(key)) node.hasAriaAlias = true;
+  // A composed primitive's slot can carry a value DERIVED from an owner prop, and `markPropsDirty`
+  // bubbles up — so the slot never learns. Here rather than in `routeProp` because this is the one
+  // choke point every writer passes (a structural adapter's `setProperty` does not go through
+  // routeProp), and past the identity guard so a re-render writing an unchanged value costs the
+  // slot nothing. See `IHostBehavior.slotDerived`.
+  if (node.childHost !== undefined && slotDerivesFrom(node, key))
+    markPropsDirty(node.childHost);
   propStats.writes += 1;
   markPropsDirty(node);
 }
@@ -712,7 +722,13 @@ export function setEventListener(
   // reached the node; lowering removes the mediator. Gated on the boolean first, so an app with no
   // behavior registered pays one read.
   if (hasHostBehaviors() && ownsListener(node, name)) {
+    // The PRESENCE only, never the identity: listeners deliberately do not notify (a framework
+    // hands a fresh closure nearly every render — see `markDirty`'s note on why that must stay
+    // free). A flip is a mount-time event, not a per-render one.
+    const wasWired = appListenerFor(node, name) !== undefined;
     stashAppListener(node, name, isHandler ? value : undefined);
+    if (wasWired !== isHandler)
+      notifyOwnedListenerChange(node, name, isHandler);
     const flagged = GATED_EVENT_PROPS.get(name);
     if (flagged !== undefined)
       setProp(node, flagged, isHandler ? true : undefined);

@@ -1,5 +1,14 @@
-// ScrollView's host behavior — the first STRUCTURE-only behavior, and the pilot for
-// `IHostBehavior.buildStructure` + `ISymbioteNode.childHost`.
+// ScrollView's host behavior — the pilot for `IHostBehavior.buildStructure` + `childHost`, and now
+// for `slotDerived` as well.
+//
+// WHAT IS AND IS NOT HERE. Structure, the two style compositions, `decelerationRate` resolution,
+// `collapsableChildren`, and the synthesized `onContentSizeChange` are all wired. The STICKY half is
+// not: `scrollEventThrottle`'s 1/16 defaults and `resolveScrollForwarding`'s `sticky-native` /
+// `sticky-js` modes only mean something once a sticky header is a marked CHILD rather than an index
+// into a children array a lowered element does not have. Resolving the throttle on its own would buy
+// a per-frame scroll event with nothing reading it, so it waits for that step rather than landing
+// half-wired. `onScroll` needs nothing either way — `scroll` is a real Fabric event and routes on
+// its own.
 //
 // WHAT A COMPOSED PRIMITIVE COSTS TODAY. Every adapter's ScrollView wrapper builds the same two
 // nodes: `selectScrollIntrinsics` picks a scroll intrinsic and a content intrinsic, and the
@@ -46,10 +55,14 @@
 // builds a node owns what that node carries.
 import {
   appendChild,
+  appListenerFor,
   createElement,
+  dlog,
   registerHostBehavior,
+  setEventListener,
   type IHostBehavior,
   type IPayloadFold,
+  type ISymbioteEvent,
   type ISymbioteNode,
   type IViewStyle,
 } from '@symbiote-native/engine';
@@ -57,8 +70,13 @@ import {
 import { descriptorFor } from '../component-names';
 import type { ISymbioteIntrinsic } from '../component-names/shared';
 import {
+  didContentSizeChange,
+  preservesContentChildren,
+  readLayoutDimension,
+  resolveDecelerationRate,
   SCROLL_VIEW_BASE_HORIZONTAL,
   SCROLL_VIEW_BASE_VERTICAL,
+  type IContentSize,
 } from '../view/render-scroll-view';
 
 export const SCROLL_VIEW_TAG = 'symbiote-scroll-view';
@@ -70,20 +88,57 @@ const SLOT_PROPS: Readonly<Record<string, string>> = {
   contentContainerStyle: 'style',
 };
 
-// Composes a base style on one side or the other of whatever `style` the node already carries.
-// `under` is the owner's order (an explicit value wins); `over` is the slot's (the row direction
-// wins). Returns its input by identity when there is nothing to add, the contract IPayloadFold
-// states and the folds beside this one keep.
-function composeStyle(base: IViewStyle, under: boolean): IPayloadFold {
-  return props => ({
-    ...props,
-    style: under ? [base, props.style] : [props.style, base],
-  });
+// Owner props the SLOT's payload reads. Declared so a write to one dirties the slot — see
+// `IHostBehavior.slotDerived` for why nothing else makes that happen.
+const SLOT_DERIVED = ['maintainVisibleContentPosition', 'snapToAlignment'];
+
+// The OWNER's fold: the per-axis base style UNDER the app's (so an explicit `flexDirection` still
+// wins), and `decelerationRate` resolved from RN's two words to the platform's friction constant.
+// The resolution has to happen here rather than in an adapter because a lowered element has no
+// wrapper to do it, and 'normal'/'fast' reach Fabric as strings it cannot read.
+function ownerFold(base: IViewStyle): IPayloadFold {
+  return props => {
+    const next: Record<string, unknown> = {
+      ...props,
+      style: [base, props.style],
+    };
+    const rate = props.decelerationRate;
+    if (rate === 'normal' || rate === 'fast' || typeof rate === 'number')
+      next.decelerationRate = resolveDecelerationRate(rate);
+    return next;
+  };
+}
+
+// The SLOT's fold. Two halves with different sources, which is why it takes the owner:
+//
+//   rowStyle             a CONSTANT, horizontal only, composed OVER the app's contentContainerStyle
+//                        (the wrapper writes `[contentContainerStyle, {flexDirection:'row'}]`)
+//   collapsableChildren  DERIVED from props that stay on the OWNER, so it is read back off it
+//
+// Written only when false, matching every wrapper — RN sends `collapsableChildren={!preserveChildren}`
+// and therefore an explicit `true`, which is the native default anyway.
+function contentFold(
+  owner: ISymbioteNode,
+  rowStyle: IViewStyle | undefined,
+): IPayloadFold {
+  return props => {
+    const preserve = preservesContentChildren(
+      owner.props.maintainVisibleContentPosition,
+      owner.props.snapToAlignment,
+    );
+    // The identity return IPayloadFold's contract asks for: a vertical content view with neither
+    // prop set has nothing to add, which is the common case.
+    if (rowStyle === undefined && !preserve) return props;
+    const next: Record<string, unknown> = { ...props };
+    if (rowStyle !== undefined) next.style = [props.style, rowStyle];
+    if (preserve) next.collapsableChildren = false;
+    return next;
+  };
 }
 
 function buildContent(
   contentIntrinsic: ISymbioteIntrinsic,
-  contentFold: IPayloadFold | undefined,
+  rowStyle: IViewStyle | undefined,
 ) {
   return (node: ISymbioteNode): ISymbioteNode => {
     const descriptor = descriptorFor(contentIntrinsic);
@@ -96,7 +151,7 @@ function buildContent(
     // collapse a view that only groups children, and a collapsed content node takes the scroll
     // metrics with it.
     content.props = { collapsable: false };
-    content.payloadFold = contentFold;
+    content.payloadFold = contentFold(node, rowStyle);
     // Lands directly on the owner, because `node.childHost` is still undefined here: the engine
     // assigns it from what this returns. That ordering is why `buildStructure` RETURNS the slot
     // instead of setting the field itself — a behavior that set it first would redirect its own
@@ -106,21 +161,84 @@ function buildContent(
   };
 }
 
+// The last size each owner reported, so a layout pass that did not change the content size does not
+// fire the app's handler — RN dedupes the same way (`_handleContentOnLayout`). Off the node: this
+// exists only for the ScrollViews an app wired a handler to.
+const lastContentSize = new WeakMap<ISymbioteNode, IContentSize>();
+
+// RN synthesizes onContentSizeChange from the CONTENT view's own onLayout — there is no native
+// content-size event (ScrollView.js:1675 `contentSizeChangeProps`). The wrapper wired that by
+// rendering an `onLayout` onto its inner node; a lowered element has no inner node of its own, so
+// the behavior installs it on the slot it built.
+//
+// The app's callback takes `(width, height)`, not an event, which is why `contentSizeChange` is an
+// OWNED listener: `setEventListener` wraps an ordinary listener as `(event) => handler(event)` and
+// would call a two-number handler with one event. Owned names are stashed raw instead.
+function contentSizeListener(owner: ISymbioteNode) {
+  return (event: ISymbioteEvent): void => {
+    const handler = appListenerFor(owner, 'contentSizeChange');
+    if (typeof handler !== 'function') return;
+    const width = readLayoutDimension(event, 'width');
+    const height = readLayoutDimension(event, 'height');
+    if (width === undefined || height === undefined) return;
+    if (
+      !didContentSizeChange(lastContentSize.get(owner) ?? null, {
+        width,
+        height,
+      })
+    )
+      return;
+    lastContentSize.set(owner, { width, height });
+    dlog(`ScrollView onContentSizeChange ${width}x${height}`);
+    handler(width, height);
+  };
+}
+
+// RN installs the content `onLayout` only when the app passed `onContentSizeChange`, and so does
+// every wrapper — `onLayout` is a gated event, so wiring it unconditionally would put `onLayout:
+// true` in the payload of every lowered ScrollView's content node and buy a native event nobody
+// reads. A lowering that changes the committed surface in EITHER direction is a bug, so the wiring
+// has to follow the prop.
+//
+// It follows the LISTENER rather than a commit, which is what `onOwnedListenerChange` is for: a
+// listener flip changes no payload by itself, so the commit after it is a no-op and a post-commit
+// hook would never fire. Measured on exactly this — the wire worked (mount commits for other
+// reasons) and the UNWIRE silently did not.
+function syncContentSizeWiring(
+  owner: ISymbioteNode,
+  _name: string,
+  wired: boolean,
+): void {
+  const slot = owner.childHost;
+  if (slot === undefined) return;
+  if (wired) {
+    setEventListener(slot, 'layout', contentSizeListener(owner));
+  } else {
+    lastContentSize.delete(owner);
+    setEventListener(slot, 'layout', undefined);
+  }
+}
+
 function scrollBehavior(
   contentIntrinsic: ISymbioteIntrinsic,
   base: IViewStyle,
-  contentFold: IPayloadFold | undefined,
+  rowStyle: IViewStyle | undefined,
 ): IHostBehavior {
   return {
+    ownedListeners: ['contentSizeChange'],
     slotProps: SLOT_PROPS,
-    buildStructure: buildContent(contentIntrinsic, contentFold),
-    foldPayload: composeStyle(base, true),
-    // Structure and style only: there is no machine, no timer and no listener, so there is nothing
-    // to take and nothing to release. Written as explicit no-ops rather than by widening
-    // `attach`/`detach` to optional — a behavior that FORGOT its runtime and one that has none must
-    // not be spelled the same way.
+    slotDerived: SLOT_DERIVED,
+    buildStructure: buildContent(contentIntrinsic, rowStyle),
+    foldPayload: ownerFold(base),
+    // No timer and no listener taken here: the one listener this behavior installs is prop-driven,
+    // so it is wired from `afterCommit` and released the same way. Written as an explicit no-op
+    // rather than by widening `attach` to optional — a behavior that FORGOT its runtime and one
+    // that has none must not be spelled the same way.
     attach() {},
-    detach() {},
+    onOwnedListenerChange: syncContentSizeWiring,
+    detach(node) {
+      lastContentSize.delete(node);
+    },
   };
 }
 
@@ -138,9 +256,9 @@ export function registerScrollViewBehavior(): void {
     scrollBehavior(
       'symbiote-horizontal-scroll-content',
       SCROLL_VIEW_BASE_HORIZONTAL,
-      // OVER the app's contentContainerStyle, matching the wrapper's
-      // `[contentContainerStyle, {flexDirection:'row'}]`.
-      composeStyle({ flexDirection: 'row' }, false),
+      {
+        flexDirection: 'row',
+      },
     ),
   );
 }

@@ -82,6 +82,22 @@ export interface IHostBehavior {
   // `contentContainerStyle` (the wrapper writes `[contentContainerStyle, {flexDirection:'row'}]`),
   // and precedence is a property of the fold, not of the routing.
   readonly slotProps?: Readonly<Record<string, string>>;
+  // Owner prop names the SLOT's payload is derived from. Writing one marks the slot's props dirty.
+  //
+  // The third case in the owner/slot family, and the one neither of the other two can express. A
+  // slot prop is either a RENAME of an owner prop (`slotProps`) or a CONSTANT (the slot's own
+  // `payloadFold`); `collapsableChildren` is neither — it is `maintainVisibleContentPosition !==
+  // undefined || snapToAlignment !== undefined`, computed from props that stay on the owner. So the
+  // slot's fold reads the owner, and this is what makes it re-run: `markPropsDirty` bubbles UP, so
+  // an owner write reaches every ancestor and never the slot, and `reconcile` skips a subtree whose
+  // root is not dirty. Without it the derived value is correct at mount and frozen forever after.
+  //
+  // Names rather than a hook, for the reason `ownedListeners` is names: the fold stays pure and the
+  // engine keeps deciding when payloads are built. Read from `setProp`, PAST its identity guard, so
+  // a re-render writing the same value dirties nothing — the guard is what keeps this off the hot
+  // path in practice, and `node.childHost` turns away every node that has no slot before the
+  // registry is touched at all.
+  readonly slotDerived?: readonly string[];
   // Builds the primitive's OWN internal subtree, once, and returns the node the app's children
   // belong under — or undefined when they belong directly on the host.
   //
@@ -124,6 +140,24 @@ export interface IHostBehavior {
   // hand from `attach` — `animated/event.ts` does — but it then owes its own cancel in `detach`, and
   // forgetting that leaks a waiter pointed at a dead node. This exists to remove that footgun.
   attachAfterCommit?(node: ISymbioteNode): void;
+  // Runs when the app WIRES or UNWIRES one of `ownedListeners`, never on a re-render that hands the
+  // same name a fresh closure. `wired` is the new state.
+  //
+  // WHY NOT `afterCommit`, which is where this obviously belongs. A behavior can owe payload work to
+  // a listener's mere presence — ScrollView puts `onLayout` on its content view only when the app
+  // passed `onContentSizeChange`, exactly as RN and every wrapper do, because `onLayout` is a gated
+  // event and wiring it unconditionally buys a native event nobody reads. But a listener flip
+  // changes no payload BY ITSELF, so the commit that follows it is a no-op, and `commitContainer`
+  // returns above `runPostCommitHooks` on a no-op (`engine-mutations-must-mark-dirty.md`). The hook
+  // that would react is precisely the one that never runs.
+  //
+  // Synchronous, so the write lands before the FIRST commit rather than a commit later — the
+  // wrapper it is reproducing has no two-pass mount either.
+  onOwnedListenerChange?(
+    node: ISymbioteNode,
+    name: string,
+    wired: boolean,
+  ): void;
   // Runs after EVERY commit while the node is attached, not just the first.
   //
   // WHY IT IS NOT `attachAfterCommit` REPEATED. `Pressable`'s machine is driven entirely by events,
@@ -211,6 +245,22 @@ export function slotPropNameFor(
   key: string,
 ): string | undefined {
   return attached.get(node)?.slotProps?.[key];
+}
+
+// Called from `setEventListener` on a PRESENCE flip of an owned name, and only there — the caller
+// has already established that this node owns the name, so the WeakMap probe is one it just paid.
+export function notifyOwnedListenerChange(
+  node: ISymbioteNode,
+  name: string,
+  wired: boolean,
+): void {
+  attached.get(node)?.onOwnedListenerChange?.(node, name, wired);
+}
+
+// Does this owner key feed the slot's payload? See `slotDerived`. Same `node.childHost` gate as
+// above keeps the WeakMap probe off every node that has no slot.
+export function slotDerivesFrom(node: ISymbioteNode, key: string): boolean {
+  return attached.get(node)?.slotDerived?.includes(key) === true;
 }
 
 // The app's listeners for names a behavior owns, per node. Not on the node: this exists only for

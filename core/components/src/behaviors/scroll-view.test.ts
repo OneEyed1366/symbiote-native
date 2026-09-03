@@ -18,11 +18,15 @@ import {
   createElement,
   createSurface,
   routeProp,
+  type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../component-names';
-import { selectScrollIntrinsics } from '../view/render-scroll-view';
+import {
+  resolveDecelerationRate,
+  selectScrollIntrinsics,
+} from '../view/render-scroll-view';
 import {
   HORIZONTAL_SCROLL_VIEW_TAG,
   registerScrollViewBehavior,
@@ -194,5 +198,183 @@ describe('style precedence, which is opposite on the two nodes', () => {
     // Nothing composes a direction onto a vertical content node — the wrapper's contentStyle for
     // vertical is `contentContainerStyle` alone.
     expect(slot.props.flexDirection).toBeUndefined();
+  });
+});
+
+// Mounts a lowered ScrollView and hands back a re-commit, so a test can write a prop AFTER the
+// first commit and read what the second one published. Reads out of `fabric.committed` rather than
+// `fabric.find`, which searches `created` and so returns a node's own pre-clone self on any update
+// (`.claude/rules/test-harness-false-greens.md`).
+function mountScroll(
+  tag: string,
+  props: Readonly<Record<string, unknown>> = {},
+): {
+  node: ISymbioteNode;
+  slot: ISymbioteNode;
+  commit: () => { owner: IFakeNode; slot: IFakeNode };
+} {
+  const surface = createSurface((nextRootTag += 1));
+  const root = createElement('RCTView');
+  surface.appendChild(root);
+  const node = scrollNode(tag);
+  for (const key of Object.keys(props)) routeProp(node, key, props[key]);
+  appendChild(root, node);
+
+  const commit = (): { owner: IFakeNode; slot: IFakeNode } => {
+    surface.commit();
+    const latest = fabric.committed[fabric.committed.length - 1];
+    const owner = latest?.children[0]?.children[0];
+    const slot = owner?.children[0];
+    if (owner === undefined || slot === undefined)
+      throw new Error('the scroll view never committed its two nodes');
+    return { owner, slot };
+  };
+
+  const slot = node.childHost;
+  if (slot === undefined) throw new Error('buildStructure produced no slot');
+  return { node, slot, commit };
+}
+
+function layoutEvent(
+  node: ISymbioteNode,
+  width: number,
+  height: number,
+): ISymbioteEvent {
+  return {
+    type: 'layout',
+    target: node,
+    currentTarget: node,
+    nativeEvent: { layout: { x: 0, y: 0, width, height } },
+    stopPropagation: () => {},
+  };
+}
+
+describe('decelerationRate reaches Fabric as a number', () => {
+  // RN's two words resolve to DIFFERENT friction constants per platform, and a wrapper is what did
+  // that resolution. A lowered element has none, so the string would reach Fabric unread and the
+  // scroll would keep the native default with nothing red.
+  it.each(['normal', 'fast'] as const)('resolves %s', word => {
+    const { commit } = mountScroll(SCROLL_VIEW_TAG, { decelerationRate: word });
+    expect(commit().owner.props.decelerationRate).toBe(
+      resolveDecelerationRate(word),
+    );
+  });
+
+  it('passes a numeric rate through untouched', () => {
+    const { commit } = mountScroll(SCROLL_VIEW_TAG, { decelerationRate: 0.5 });
+    expect(commit().owner.props.decelerationRate).toBe(0.5);
+  });
+
+  it('invents no rate when the app set none', () => {
+    const { commit } = mountScroll(SCROLL_VIEW_TAG);
+    expect(Object.hasOwn(commit().owner.props, 'decelerationRate')).toBe(false);
+  });
+});
+
+describe('collapsableChildren is derived from props that stay on the owner', () => {
+  it('writes no key when neither anchor prop is set', () => {
+    const { commit } = mountScroll(SCROLL_VIEW_TAG);
+    expect(Object.hasOwn(commit().slot.props, 'collapsableChildren')).toBe(
+      false,
+    );
+  });
+
+  it.each(['maintainVisibleContentPosition', 'snapToAlignment'])(
+    '%s lands on the OWNER and turns off flattening on the SLOT',
+    key => {
+      const { commit } = mountScroll(SCROLL_VIEW_TAG, {
+        [key]: key === 'snapToAlignment' ? 'start' : { minIndexForVisible: 0 },
+      });
+      const { owner, slot } = commit();
+
+      // The prop itself is the scroll view's — only the DERIVED value crosses to the slot.
+      expect(owner.props[key]).toBeDefined();
+      expect(slot.props.collapsableChildren).toBe(false);
+      expect(Object.hasOwn(owner.props, 'collapsableChildren')).toBe(false);
+    },
+  );
+
+  // The reason `slotDerived` exists. `markPropsDirty` bubbles UP, so an owner write reaches every
+  // ancestor and never the slot, and `reconcile` skips a subtree whose root is clean — without the
+  // declaration this second commit publishes nothing and the value is frozen at its mount answer.
+  it('re-derives after a write that lands AFTER the first commit', () => {
+    const { node, commit } = mountScroll(SCROLL_VIEW_TAG);
+    expect(Object.hasOwn(commit().slot.props, 'collapsableChildren')).toBe(
+      false,
+    );
+
+    routeProp(node, 'maintainVisibleContentPosition', {
+      minIndexForVisible: 0,
+    });
+    expect(commit().slot.props.collapsableChildren).toBe(false);
+  });
+
+  // The other half of the same guard: a re-render writing the SAME value must not dirty the slot,
+  // or every ScrollView render clones its content node. `setProp`'s identity guard is what stops
+  // it, which is why the mark is read past it and not in `routeProp`.
+  it('an unchanged rewrite dirties nothing', () => {
+    const anchor = { minIndexForVisible: 0 };
+    const { node, slot, commit } = mountScroll(SCROLL_VIEW_TAG, {
+      maintainVisibleContentPosition: anchor,
+    });
+    commit();
+    expect(slot.propsDirty).toBe(false);
+
+    routeProp(node, 'maintainVisibleContentPosition', anchor);
+    expect(slot.propsDirty).toBe(false);
+  });
+});
+
+describe('onContentSizeChange is synthesized from the content view layout', () => {
+  it('wires nothing when the app passed no handler', () => {
+    const { slot, commit } = mountScroll(SCROLL_VIEW_TAG);
+    // `onLayout` is a GATED event: wiring it unconditionally would put the flag in every lowered
+    // ScrollView's payload and buy a native event nobody reads.
+    expect(Object.hasOwn(commit().slot.props, 'onLayout')).toBe(false);
+    expect(slot.listeners?.get('layout')).toBeUndefined();
+  });
+
+  it('wires the slot layout and reports positional width/height', () => {
+    const seen: Array<readonly [unknown, unknown]> = [];
+    const { slot, commit } = mountScroll(SCROLL_VIEW_TAG, {
+      onContentSizeChange: (width: unknown, height: unknown) => {
+        seen.push([width, height]);
+      },
+    });
+    // ONE commit. The wiring follows the LISTENER and is synchronous, so the gate flag is on the
+    // slot before the first commit — the wrapper has no two-pass mount either.
+    expect(commit().slot.props.onLayout).toBe(true);
+
+    const listener = slot.listeners?.get('layout');
+    if (listener === undefined)
+      throw new Error('no layout listener on the slot');
+
+    listener(layoutEvent(slot, 320, 900));
+    // RN's contract is positional, NOT a {width, height} object.
+    expect(seen).toEqual([[320, 900]]);
+
+    // Deduped exactly as RN dedupes: a layout pass that did not change the size is not a content
+    // size change.
+    listener(layoutEvent(slot, 320, 900));
+    expect(seen).toHaveLength(1);
+
+    listener(layoutEvent(slot, 320, 1200));
+    expect(seen).toEqual([
+      [320, 900],
+      [320, 1200],
+    ]);
+  });
+
+  it('unwires when the app drops the handler', () => {
+    const { node, slot, commit } = mountScroll(SCROLL_VIEW_TAG, {
+      onContentSizeChange: () => {},
+    });
+    expect(commit().slot.props.onLayout).toBe(true);
+
+    routeProp(node, 'onContentSizeChange', undefined);
+    // NULL, not absent: Fabric has no prop removal, so `diffProps` sends an explicit null for a key
+    // that disappeared. Asserting absence here would be asserting a thing the platform cannot do.
+    expect(commit().slot.props.onLayout).toBeNull();
+    expect(slot.listeners?.get('layout')).toBeUndefined();
   });
 });

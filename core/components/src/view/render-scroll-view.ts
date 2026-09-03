@@ -151,15 +151,32 @@ export interface IScrollForwarding {
   collapsableChildren: boolean;
 }
 
+// maintainVisibleContentPosition (and Android snapToAlignment) anchor against MOUNTED cell views;
+// Android Fabric view-flattens layout-only cells away, so RN keeps them as real views with
+// collapsableChildren={false} on the content container (ScrollView.js:1731 `preserveChildren`).
+// No-op on iOS.
+//
+// Named and exported rather than inlined because the LOWERED path needs the same answer from a
+// different place — the host behavior's slot fold, which has the owner's raw props and none of the
+// sticky inputs `resolveScrollForwarding` also takes. A second inline copy would be invisible to
+// `tests/lowered-primitive-fold-parity.test.ts`, whose oracle is shared value IMPORTS.
+export function preservesContentChildren(
+  maintainVisibleContentPosition: unknown,
+  snapToAlignment: unknown,
+): boolean {
+  return (
+    maintainVisibleContentPosition !== undefined ||
+    snapToAlignment !== undefined
+  );
+}
+
 export function resolveScrollForwarding(
   inputs: IScrollForwardingInputs,
 ): IScrollForwarding {
-  // maintainVisibleContentPosition (and Android snapToAlignment) anchor against MOUNTED cell views;
-  // Android Fabric view-flattens layout-only cells away, so RN keeps them as real views with
-  // collapsableChildren={false} on the content container (ScrollView.js preserveChildren). No-op on iOS.
-  const collapsableChildren =
-    inputs.maintainVisibleContentPosition !== undefined ||
-    inputs.snapToAlignment !== undefined;
+  const collapsableChildren = preservesContentChildren(
+    inputs.maintainVisibleContentPosition,
+    inputs.snapToAlignment,
+  );
   if (!inputs.hasStickyHeaders) {
     return {
       mode: 'plain',
