@@ -64,6 +64,29 @@ export interface IHostBehavior {
   // on. The component wrapper used to mediate that pair by destructuring the app's callbacks out
   // before they reached the node; lowering removes the mediator, and this replaces it.
   readonly ownedListeners?: readonly string[];
+  // Builds the primitive's OWN internal subtree, once, and returns the node the app's children
+  // belong under — or undefined when they belong directly on the host.
+  //
+  // WHY IT EXISTS. `foldPayload` gave a lowered primitive its wrapper's prop mapping; this gives it
+  // the wrapper's COMPOSITION. A ScrollView is a scroll view wrapping a content view, an
+  // ImageBackground is a view holding an absolutely-filled image; in a component that second node
+  // is built by the wrapper's body, and the wrapper's body is exactly the per-instance cost
+  // lowering deletes. Until this seam existed a composed primitive could not be lowered at all,
+  // whatever its props did — which is why the tier audit reads "state the template never reads" and
+  // still leaves the composed primitives out.
+  //
+  // RUNS BEFORE `attach`, so a machine can see its own slot. It is the node's shape, not its
+  // runtime, and `attach`'s "the node has its component and nothing else" is about PROPS.
+  //
+  // RUNS EXACTLY ONCE, at `attachHostBehavior` — never from `reattachSubtree`. A parked subtree
+  // comes back with its internal children intact (they are ordinary `node.children` and travel
+  // with it), so rebuilding would duplicate them, and the slot's IDENTITY would change under app
+  // children still pointing at the old one. `attach` is re-runnable because a machine must restart;
+  // structure is not, because it never stopped.
+  //
+  // Builds through the ordinary mutation API — `createElement` + `appendChild` — so the internal
+  // nodes are engine nodes like any other and the commit walk needs to know nothing about them.
+  buildStructure?(node: ISymbioteNode): ISymbioteNode | undefined;
   // Runs at createElement, before any prop is routed — the node has its component and nothing
   // else. Put the per-node runtime here (timers, flags, a listener installed via
   // setEventListener); read props at event time, not now.
@@ -202,6 +225,12 @@ export function attachHostBehavior(node: ISymbioteNode, tag: string): void {
   // A field rather than a lookup at payload-build time: `fabricProps` runs per node per commit and
   // must not pay a Map probe to discover that almost nothing has a fold.
   node.payloadFold = behavior.foldPayload;
+  // Shape before runtime: `attach` may want to read `node.childHost`, and nothing in `attach`'s
+  // contract depends on the node being childless. Deliberately NOT repeated in `reattachSubtree` —
+  // see `buildStructure`.
+  if (behavior.buildStructure !== undefined) {
+    node.childHost = behavior.buildStructure(node);
+  }
   behavior.attach(node);
   if (behavior.attachAfterCommit !== undefined) awaitingCommit.add(node);
   if (behavior.afterCommit !== undefined) committedEachTime.add(node);
