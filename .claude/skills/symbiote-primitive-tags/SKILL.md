@@ -11,8 +11,8 @@ description: >-
   (`export const View: 'symbiote-view' = 'symbiote-view'`), when planning or reviewing an adapter's
   lowering transform, or when asking why a primitive is still a wrapper. Holds the measured
   per-adapter feasibility matrix (React/Vue/Angular need no plugin; Solid and Svelte do, for
-  different reasons), why the `symbiote-` hyphen is load-bearing in the internal tag while the
-  public name drops it, the three categories of component (native-backed / composition /
+  different reasons), why the `symbiote-` hyphen WAS believed load-bearing in the internal tag and
+  why that was superseded 2026-09-03 (re-measured on our own compiler configs, not stock ones), the three categories of component (native-backed / composition /
   framework-element-typed) and which can ever be tags, what a wrapper's prop folds must do before
   it can be deleted, and the four open engine and adapter items that block the remaining eight
   primitives. Trigger on: 'primitive as a tag', 'intrinsic element', 'drop the wrapper',
@@ -423,6 +423,9 @@ would read as a promise the next refactor cannot keep.
 
 ## Dropping the `symbiote-` prefix: safe for the PUBLIC name, fatal for the internal tag
 
+> **The "fatal" half is SUPERSEDED — see the subsection at the end of this section (2026-09-03).**
+> Kept in full because the METHOD failure is the reusable part.
+
 Two different names are involved, and conflating them is the trap. The public name is what a
 developer types; the internal tag is what the compiler and the engine see. Only the second is
 constrained — and it is constrained hard, because `view`, `text`, `image` and `switch` are all real
@@ -444,6 +447,8 @@ Two independent failures from one rename. The tag lands in the SVG namespace, an
 the custom-element codegen path — so `set_custom_element_data` is replaced by attribute writes,
 which stringify. The whole flat-bag strategy (`svelte-adapter-dom-shim`: ONE object prop that must
 land as a PROPERTY set) breaks silently. **The hyphen is load-bearing, not cosmetic.**
+**-- SUPERSEDED 2026-09-03: on OUR configs the bag still lands as a property. See the subsection
+at the end of this section before acting on this paragraph.**
 
 **The capital letter is what makes the public name safe**: the SVG collision fires only on the
 lowercase spelling. `<View>` / `<Text>` / `<Image>` / `<Switch>` are a component to Svelte and Solid
@@ -460,7 +465,59 @@ angular            selector, unconstrained
 
 So: drop the prefix from the public API, keep it in the internal alphabet. Anyone "simplifying"
 this by making the tags plain lowercase gets an SVG namespace and stringified props, on device,
-with every test green.
+with every test green. **-- FALSE on our configs; read the subsection immediately below before
+quoting this sentence.**
+
+### SUPERSEDED 2026-09-03 — re-measured on OUR configs, and both failures disappear
+
+The table above is stock-compiler output. Re-run through the pipelines this repo actually ships —
+`adapters/solid/babel-preset.cjs` (`generate: 'universal'`) and
+`adapters/svelte/metro-svelte-transformer.cjs`'s `COMPILER_OPTIONS` (`fragments: 'tree'`) — the
+hyphenless lowercase form is not blocked on either:
+
+```
+solid    <symbiote-view p={{a:1}}/>   _$createElement("symbiote-view"); _$setProp(el,"p",{a:1})
+         <view          p={{a:1}}/>   _$createElement("view");          _$setProp(el,"p",{a:1})
+         <text> <image> <switch>      same, verbatim.   <View/> -> _$createComponent(View, …)
+
+svelte   <symbiote-view p={p}/>       from_tree([['symbiote-view']], 2)  set_custom_element_data
+         <view          p={p}/>       from_tree([['view']],          4)  set_attribute
+         <stacklayout   p={p}/>       from_tree([['stacklayout']],   4)  set_attribute
+```
+
+Solid's `_$template` line in that table (the one wrapping `<svg><view …`) is the DOM generator. Universal mode emits calls into our
+renderer and builds no template string at all, so there is no HTML parser and therefore no
+namespace to switch. The SVG half of the finding does not reach us.
+
+Svelte's codegen genuinely differs — and the COMMITTED tree does not. Mounted through the real
+`mount()` against `installFabric()`:
+
+```
+symbiote-view   RCTView       { testID: "probe", nativeID: "x" }
+view            view          { testID: "probe", nativeID: "x" }
+stacklayout     stacklayout   { testID: "probe", nativeID: "x" }
+```
+
+The bag lands as a PROPERTY on all three. `set_attribute` (svelte `dom/elements/attributes.js:204`)
+routes a NON-STRING value to `element[attr] = value` whenever `get_setters(element)` finds the
+setter; `p` is a getter/setter pair on `ShimElement.prototype` (`element.ts:86,90`); and
+`patch-globals.ts:79` sets `g.Element = ShimElementBase` — an empty class BELOW `ShimElement` —
+exactly so `get_setters`, which stops at `Element.prototype`, still reaches it. The shim's own
+comment says so. **`stacklayout` behaving identically to `view` is what proves the discriminator
+was the HYPHEN and never the SVG word**; the original entry fused two mechanisms into one clause.
+
+**What this does NOT clear.** Svelte swaps `importNode` for `cloneNode` (flag 2 -> 4), and this
+skill elsewhere calls `importNode` the primary clone path that must be watched — one probe is not
+that suite. The engine's tag->component table knows only `symbiote-*`, so a hyphenless tag commits
+`viewName: "view"`. React, Vue and Angular were not in this pass; React additionally augments
+`declare module 'react'`, so a lowercase `view` collides with `@types/react`'s SVG entry (TS2717)
+until React moves to its own `jsxImportSource`, which Solid already has
+(`adapters/solid/src/jsx-runtime.ts`).
+
+**And the method, which outlives the verdict: the superseded numbers were taken on the compilers'
+STOCK configuration, not on ours, and nothing in the record said which.** A single generator flag
+deleted the whole mechanism the finding was named after. When a finding is about a compiler, record
+the options it was compiled with, or the next reader inherits a fact about somebody else's build.
 
 ## The React arm was BUILT, 2026-09-01 — what it cost and what it uncovered
 
