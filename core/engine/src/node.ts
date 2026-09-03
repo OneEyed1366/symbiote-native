@@ -29,6 +29,7 @@ import {
   markDetachCandidate,
   ownsListener,
   reattachHostBehaviors,
+  slotPropNameFor,
   stashAppListener,
   type IPayloadFold,
 } from './host-behavior';
@@ -980,6 +981,22 @@ export function routeProp(
   value: unknown,
 ): void {
   if (REACT_JSX_DEV_PROPS.has(key)) return;
+  // The prop twin of the child redirect in `appendChild`. A composed primitive's owner is written
+  // with props that belong to its internal slot — `contentContainerStyle` on a ScrollView styles
+  // the content view — and the adapter names the OWNER for a prop for the same reason it names the
+  // owner for a child: that is where the app wrote it.
+  //
+  // Gated on the FIELD, so a node with no slot pays one load and one branch and never touches the
+  // registry. The redirected write recurses into the slot's own `routeProp`, which is single-hop
+  // by construction: a slot has no slot of its own (`childHost` is documented single-hop, and
+  // `buildStructure` is what would have to nest one).
+  if (node.childHost !== undefined) {
+    const slotKey = slotPropNameFor(node, key);
+    if (slotKey !== undefined) {
+      routeProp(node.childHost, slotKey, value);
+      return;
+    }
+  }
   if (CLASS_PROP_KEYS.has(key)) {
     const parts = stylePartsOf(node);
     // Canonicalised HERE so the stored value is what everything downstream keys on: an all-string

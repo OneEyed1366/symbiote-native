@@ -26,36 +26,64 @@
 // the scroll tags is the NEXT step and is not this one; until then `registerScrollViewBehavior()`
 // is called only by tests, which is what exercises it.
 //
-// WHAT THIS DOES NOT DO YET, stated rather than left to be discovered on a device. The wrapper puts
-// STYLE on both nodes — `scrollViewBaseStyle` on the scroll node, and `contentStyle`
-// (`contentContainerStyle`, plus `flexDirection: 'row'` when horizontal) on the content node. The
-// first is an owner prop and `foldPayload` can already express it. The second cannot be expressed
-// by anything that exists: `contentContainerStyle` is written on the OWNER by the app and belongs
-// on the SLOT, and there is no prop redirect to match the child redirect below. That seam —
-// owner-prop -> slot-prop — is the next thing this pilot proves is needed, and the invariant half
-// (`flexDirection: 'row'`) is applied here only because it is a constant of the tag, not a fold of
-// a prop. A ScrollView is NOT lowerable until that seam exists; nothing here claims otherwise.
+// STYLE, on both nodes, and the precedence is the part that is easy to get silently wrong. The
+// wrapper composes exactly two arrays, and this reproduces both:
+//
+//   owner    [scrollViewBaseStyle, style]                  base UNDER the app's, so an explicit
+//                                                          flexDirection still wins
+//   slot     [contentContainerStyle, {flexDirection:'row'}] row OVER the app's, on horizontal only
+//
+// Which is why the two halves use different seams rather than one. `contentContainerStyle` is
+// written by the app on the OWNER and belongs to the slot, so it travels through `slotProps` — a
+// pure RENAME (`contentContainerStyle` -> the slot's `style`) that goes through the slot's own
+// `routeProp` and inherits style merging, class merging and the already-published guard. The
+// CONSTANT half is a `payloadFold`, because a fold is where precedence can be expressed: the
+// owner's puts the base first, the slot's puts the row direction last. A redirect that also tried
+// to compose would have to pick one order for both.
+//
+// The slot's fold is assigned to the node inside `buildStructure`, not declared on the behavior:
+// `IHostBehavior.foldPayload` is the OWNER's, wired by `attachHostBehavior`, and a behavior that
+// builds a node owns what that node carries.
 import {
   appendChild,
   createElement,
   registerHostBehavior,
   type IHostBehavior,
+  type IPayloadFold,
   type ISymbioteNode,
+  type IViewStyle,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../component-names';
 import type { ISymbioteIntrinsic } from '../component-names/shared';
+import {
+  SCROLL_VIEW_BASE_HORIZONTAL,
+  SCROLL_VIEW_BASE_VERTICAL,
+} from '../view/render-scroll-view';
 
 export const SCROLL_VIEW_TAG = 'symbiote-scroll-view';
 export const HORIZONTAL_SCROLL_VIEW_TAG = 'symbiote-horizontal-scroll-view';
 
-// The invariant half of `selectScrollIntrinsics`'s `contentStyle`. The variable half is
-// `contentContainerStyle` and is deliberately absent — see the header.
-const HORIZONTAL_CONTENT_STYLE = { flexDirection: 'row' } as const;
+// The app writes it on the ScrollView; it styles the content view. One entry, and it is the whole
+// reason `slotProps` exists.
+const SLOT_PROPS: Readonly<Record<string, string>> = {
+  contentContainerStyle: 'style',
+};
+
+// Composes a base style on one side or the other of whatever `style` the node already carries.
+// `under` is the owner's order (an explicit value wins); `over` is the slot's (the row direction
+// wins). Returns its input by identity when there is nothing to add, the contract IPayloadFold
+// states and the folds beside this one keep.
+function composeStyle(base: IViewStyle, under: boolean): IPayloadFold {
+  return props => ({
+    ...props,
+    style: under ? [base, props.style] : [props.style, base],
+  });
+}
 
 function buildContent(
   contentIntrinsic: ISymbioteIntrinsic,
-  style: Record<string, unknown> | undefined,
+  contentFold: IPayloadFold | undefined,
 ) {
   return (node: ISymbioteNode): ISymbioteNode => {
     const descriptor = descriptorFor(contentIntrinsic);
@@ -64,7 +92,11 @@ function buildContent(
       descriptor.isText,
       contentIntrinsic,
     );
-    if (style !== undefined) content.props = { ...style };
+    // The wrapper sets it on every content node, both axes (react's `contentProps`). Yoga may
+    // collapse a view that only groups children, and a collapsed content node takes the scroll
+    // metrics with it.
+    content.props = { collapsable: false };
+    content.payloadFold = contentFold;
     // Lands directly on the owner, because `node.childHost` is still undefined here: the engine
     // assigns it from what this returns. That ordering is why `buildStructure` RETURNS the slot
     // instead of setting the field itself — a behavior that set it first would redirect its own
@@ -76,14 +108,17 @@ function buildContent(
 
 function scrollBehavior(
   contentIntrinsic: ISymbioteIntrinsic,
-  contentStyle: Record<string, unknown> | undefined,
+  base: IViewStyle,
+  contentFold: IPayloadFold | undefined,
 ): IHostBehavior {
   return {
-    buildStructure: buildContent(contentIntrinsic, contentStyle),
-    // Structure-only: there is no machine, no timer and no listener, so there is nothing to take
-    // and nothing to release. Written as explicit no-ops rather than by widening `attach`/`detach`
-    // to optional — a behavior that FORGOT its runtime and one that has none must not be spelled
-    // the same way.
+    slotProps: SLOT_PROPS,
+    buildStructure: buildContent(contentIntrinsic, contentFold),
+    foldPayload: composeStyle(base, true),
+    // Structure and style only: there is no machine, no timer and no listener, so there is nothing
+    // to take and nothing to release. Written as explicit no-ops rather than by widening
+    // `attach`/`detach` to optional — a behavior that FORGOT its runtime and one that has none must
+    // not be spelled the same way.
     attach() {},
     detach() {},
   };
@@ -92,12 +127,20 @@ function scrollBehavior(
 export function registerScrollViewBehavior(): void {
   registerHostBehavior(
     SCROLL_VIEW_TAG,
-    scrollBehavior('symbiote-scroll-content', undefined),
+    scrollBehavior(
+      'symbiote-scroll-content',
+      SCROLL_VIEW_BASE_VERTICAL,
+      undefined,
+    ),
   );
   registerHostBehavior(
     HORIZONTAL_SCROLL_VIEW_TAG,
-    scrollBehavior('symbiote-horizontal-scroll-content', {
-      ...HORIZONTAL_CONTENT_STYLE,
-    }),
+    scrollBehavior(
+      'symbiote-horizontal-scroll-content',
+      SCROLL_VIEW_BASE_HORIZONTAL,
+      // OVER the app's contentContainerStyle, matching the wrapper's
+      // `[contentContainerStyle, {flexDirection:'row'}]`.
+      composeStyle({ flexDirection: 'row' }, false),
+    ),
   );
 }
