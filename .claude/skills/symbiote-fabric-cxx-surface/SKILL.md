@@ -555,30 +555,55 @@ Two consequences worth stating before anyone plans the work:
   it into "add the log now, consume it later" would be exactly the dishonest split
   `<adapters_reach_full_feature_parity>` forbids elsewhere. Land it whole or not at all.
 
-### And then the SCOPE was measured, and it is far narrower than "replace the walk"
+### The SCOPE was measured — and the FIRST measurement was read wrong. Both versions are here
 
-Measured 2026-09-05, before writing any of it: `node.children` and `node.parent` were replaced with
-counting accessors on every node of a real tree, and a real commit was run through the real path.
-The question was how coupled the commit actually is to the skeleton — the thing step 2 exists to
-remove — rather than how coupled it feels.
+**CORRECTED 2026-09-05, within the hour, after the project owner pushed back on the conclusion.**
+The first probe counted `node.children` / `node.parent` only, and the result was reported as
+"`commitTargeted` is ALREADY skeleton-free". That is false, and the way it is false is the useful
+part.
+
+**The engine holds the structure TWICE.** `IMirror` (node.ts) carries
+`children: readonly ISymbioteNode[]` and `parent: ISymbioteNode | undefined` — a SECOND child order
+and parent link, over the same node objects:
 
 ```
-                                  node.children   node.parent
-create 800 nodes                       2402            1
-general commit, ONE prop changed        209            0
-TARGETED commit (commitTargeted)          1            0
-create 800 + 200 anchors               2803            1
+DESIRED     node.children   / node.parent      written by adapters, the retained tree
+COMMITTED   record.children / record.parent    what Fabric holds, the mirror
 ```
 
-Two results, and both cut work away:
+`commitTargeted` does not read the first because it navigates the second (`ancestor = record.parent`,
+`for (const child of record.children)`). Reading one copy instead of the other is not reading
+neither. Counting both:
 
-- **`commitTargeted` is ALREADY skeleton-free.** One read, and it is `hasPendingChild` — the
-  buffer's own helper, not the tree. The drain-shaped path exists, works, and needs no retained
-  tree. Step 2 is not "build a drain"; a drain is already here for the prop-only case.
-- **Every `node.children` read in the general commit is inside `renderableChildren`** — the anchor
-  flatten plus the empty-raw-text drop, and nothing else. The single `node.parent` read is
-  `sweepDroppedEdits`'s own liveness test. So the commit's ENTIRE skeleton dependency is one
-  function, and 209 reads for one prop change in an 801-node tree is already near the floor.
+```
+                                  d.kids   d.par   c.kids   c.par     total
+create 800 nodes                    2402       1        0       0      2403
+general commit, ONE prop changed     209       0        3     204       416
+TARGETED commit                        1       0        2       5         8
+```
+
+And even the 8 UNDERSTATES it: the probe counts structure FIELDS, while `commitTargeted`'s
+sibling-handle loop reaches each sibling through `committedOf(child)` — a `committed` read, which
+the probe deliberately does not count. So that path still does O(siblings) work per branch node; it
+is simply not visible in this column.
+
+Two things survive from the first reading and one does not:
+
+- **STILL TRUE: every `node.children` read in the general commit is inside `renderableChildren`** —
+  the anchor flatten plus the empty-raw-text drop, and nothing else. The single `node.parent` read
+  is `sweepDroppedEdits`'s own liveness test.
+- **STILL TRUE: the targeted path is far cheaper in structure reads, 8 against 416**, because it
+  goes change -> root instead of root -> change.
+- **FALSE: that it needs no tree.** It navigates the mirror, and it only manages that by REFUSING
+  everything structural — any pending structural change bails it to the general path. A fast lane
+  that declines the hard cases is not a drain that works.
+
+**So "only a buffer remains" means removing BOTH copies, and they have different answers.** The
+desired copy goes when the buffer carries the ops (insert/remove with position), because the drain
+can then derive the new order from the committed copy plus the ops. The committed copy goes only
+when something else can answer "what are this node's children right now" — which is `getChildNodes`
+in §1a, i.e. exactly what the JSI navigation probe measures. Removing one without the other just
+moves the reading.
 
 **So step 2 is: make the renderable child list incremental rather than re-derived.** The mirror
 already stores it (`record.children`), so a node whose renderable list cannot have changed can reuse
