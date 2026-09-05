@@ -181,6 +181,84 @@ API, which carries no stability guarantee (§3 — `cloneTree` has only test cal
 not violate `<native_core_is_untouched>` (nothing is forked or patched) but it is a standing
 maintenance obligation on every RN bump.
 
+## 6a. The family layer, `cloneMultiple`, and why NO patch is needed
+
+Measured 2026-09-05, and it supersedes §6's framing: the extension seam is PUBLIC and RN uses it
+itself, so "patch ReactCommon" was never the question.
+
+**`ShadowNodeFamily` carries the parent chain.** `core/ShadowNodeFamily.cpp`, `getAncestors`:
+
+```cpp
+auto family = this;
+while ((family != nullptr) && family != ancestorFamily) {
+  families.push_back(family);
+  family = family->parent_.lock().get();   // parent is ON THE FAMILY, stable across clones
+}
+```
+
+Phase 1 climbs to the root in O(depth) with no search. **Phase 2 then walks DOWN and linearly
+scans each level's children to match a family** — so `getAncestors` is O(depth x siblings), the
+same asymptotics as our JS walk. Moving it to C++ is a CONSTANT-factor win (pointer compares, no
+JSI crossings), not an algorithmic one. Do not sell it as the latter.
+
+**`ShadowNode::cloneMultiple(families, callback)`** (`core/ShadowNode.cpp:442`) takes a SET of
+families, builds a `childrenCount` map and makes ONE recursive pass over the union of the paths.
+That is the drain of an edit queue, already written. It is not dead code:
+`animationbackend/AnimationBackend.cpp:176` and `AnimationBackendCommitHook.cpp:39` use it for
+per-frame updates — RN's own hottest path. That production caller makes it markedly more stable
+than `cloneTree`, which has only test callers (§3).
+
+**The seam is public.** `uimanager/UIManager.h:101-102`:
+
+```cpp
+void registerCommitHook(UIManagerCommitHook &commitHook);
+void unregisterCommitHook(UIManagerCommitHook &commitHook);
+```
+
+and `uimanager/UIManagerCommitHook.h` says in its own header comment: *"Implementing a commit
+hook allows to observe and alter Shadow Tree commits."* `shadowTreeWillCommit` hands you the old
+root, the new root, and the right to return your own.
+
+So a no-patch design exists: our native module takes `shadowNode->getFamily()` (public), hands JS
+an opaque family handle, receives an edit queue in ONE JSI call, and applies it with
+`cloneMultiple` inside a registered commit hook. Nothing forked, nothing patched.
+
+### The floor is NOT zero — name it before designing
+
+To say "change prop X on node N" the adapter must NAME N. The irreducible JS-side state is:
+
+```
+one family handle per node    — and it can live on the framework's OWN object (VNode, block),
+                                so no engine object is allocated at all
+the root's child list         — one array, to have something to commit
+viewName per node             — only for our RCTText <-> RCTVirtualText rule
+```
+
+That is a mirror of the tree collapsing into an ADDRESS BOOK: no children arrays, no parent
+pointers, no props snapshot. It is exactly what a browser variable holding an element is. It is
+not zero, and a plan that promises zero is wrong.
+
+### "Read native" is the wrong principle even once we CAN
+
+Inside our own C++ module we could read anything. We must not. Marshalling children back over JSI
+per commit is O(n) where holding one handle is O(1) — strictly worse than today. The design that
+wins is **hold addresses, send edits, never read**; adopting "read the tree" as a principle
+designs the API backwards and produces a third tree instead of none.
+
+Closest thing to a real read that exists, and it solves a different problem:
+`UIManager::getNewestCloneOfShadowNode(const ShadowNode&)` is public and resolves a STALE handle
+to the current clone.
+
+### What the hook cannot do
+
+Create nodes. `createNode` stays per-node from JS and mounting still goes through
+`completeSurface`. **So this whole route leaves the CREATE path untouched — and create-shaped rows
+are exactly where we sit at parity with stock (React 1.03x, Angular 1.43x), while the rows it does
+speed up (Select / Swap / Remove / Partial) are ones we already win by 10-15x.** The native module
+is therefore an ARCHITECTURAL move (the record collapses to an address book, a class of
+JS-vs-framework divergence bugs disappears), not a performance one. Decide which goal is being
+bought before costing it.
+
 ## 7. There are TWO diffs today. One is ours and removable; the other is not
 
 ```
