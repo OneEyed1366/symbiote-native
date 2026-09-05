@@ -32,8 +32,32 @@ const pendingPath = new Set<ISymbioteNode>();
 // the above, which is also raised by a descendant's change bubbling up.
 const pendingProps = new Set<ISymbioteNode>();
 
-// "This node's CHILD LIST changed." Raised on the parent, never on the moved child.
-const pendingStructure = new Set<ISymbioteNode>();
+// "This node's CHILD LIST changed", and — since 2026-09-05 — WHAT changed, in order.
+//
+// The value is the ordered op log for that parent, or `null` for a change no sequence of child ops
+// describes (see `recordStructureEdit`). Membership alone answers `hasPendingStructure`, so the log
+// is not a second record beside a Set: it IS the record, which is what keeps it from being an
+// unread symbol (`symbiote-fabric-cxx-surface` §8 — "an ordered op log that nothing drains").
+//
+// Two things read it. The commit REPLAYS it onto the committed renderable list instead of
+// re-deriving that list from `node.children`, which is what takes the last structural read out of
+// the walk. And item 8's native drain re-applies it inside a retried commit lambda to rebase a
+// `pendingRoot_` (§7b, §5) — a buffer holding only "which nodes were touched" has nothing to
+// re-apply, which is why the log is required under BOTH design branches and not only this one.
+const pendingStructure = new Map<ISymbioteNode, IEditOp[] | null>();
+
+/**
+ * One child-list operation, at the level the adapter issued it.
+ *
+ * `before === undefined` on an insert means APPEND, which is what every framework's
+ * `insertBefore(…, null)` means and what `linkBefore` already does with a `beforeChild` it cannot
+ * find. A remove carries no position: replay finds the child by identity, exactly as `unlink` does.
+ */
+export interface IEditOp {
+  readonly child: ISymbioteNode;
+  readonly before: ISymbioteNode | undefined;
+  readonly remove: boolean;
+}
 
 /**
  * Record that `node` or something beneath it needs work, bubbling to the root.
@@ -66,26 +90,82 @@ export function recordPropEdit(node: ISymbioteNode): void {
 }
 
 /**
- * Record that `parent`'s child list changed.
+ * De-alias the committed child list from the live one, ONCE per parent per cycle.
  *
- * MUST be called BEFORE the list is mutated, and that ordering is load-bearing rather than
- * stylistic: `reconcile` stores the reconciled child list in the committed record BY REFERENCE, so
- * for a parent holding no anchors the record ALIASES `parent.children`. This call is the last
- * moment the committed list can still be read, and taking the copy here means it is taken once per
- * changed parent per cycle instead of once per node per commit.
+ * `reconcile` stores the reconciled child list in the committed record BY REFERENCE, so for a
+ * parent holding no skipped children the record ALIASES `parent.children`. The first structural
+ * change of a cycle is the last moment that list can still be read as the COMMITTED one, and both
+ * readers need it intact: the commit diffs against it, and the replay below uses it as the base.
  *
  * The identity test keeps it honest: a record whose `children` is not `parent.children` either
  * already holds this cycle's copy or holds the private array `renderableChildren` built to flatten
  * anchors away, and nobody mutates either.
+ *
+ * MEASURED 2026-09-05 and it is why this moved behind a "first op of the cycle" gate. It used to
+ * run on EVERY structural mutation, so appending 1 000 rows read `parent.children` 2 001 times to
+ * answer an identity question that can only be true once. Gating it on the map entry being absent
+ * makes it once per parent per cycle: 2 001 -> 2 on the same append.
+ */
+function snapshotCommittedChildren(parent: ISymbioteNode): void {
+  const record = parent.committed;
+  if (record === undefined) return;
+  const kids = childrenOf(parent);
+  if (record.children === kids) record.children = kids.slice();
+}
+
+/**
+ * Record that `parent`'s child list changed in a way NO sequence of child ops describes.
+ *
+ * The unreplayable form, and the honest default: it says the list moved and refuses to say how, so
+ * the commit re-derives from `node.children` exactly as it always did. Three callers need it and
+ * each has a reason the ops cannot express —
+ *
+ *   the anchor climb        an edit under an anchor changes the RENDERABLE list of the node above
+ *                           it, at a position no op names (`markStructureDirty`, node.ts)
+ *   a skipped-ness flip     a child leaves or joins the renderable list with no child op at all
+ *                           (`markPresenceIfFlipped`, node.ts)
+ *   replaceChildren         a surface hands its whole top-level list over at once (commitChildren)
+ *
+ * MUST be called BEFORE the list is mutated, for `snapshotCommittedChildren`'s reason above.
  */
 export function recordStructureEdit(parent: ISymbioteNode): void {
-  const record = parent.committed;
-  const kids = childrenOf(parent);
-  if (record !== undefined && record.children === kids) {
-    record.children = kids.slice();
-  }
-  pendingStructure.add(parent);
+  if (!pendingStructure.has(parent)) snapshotCommittedChildren(parent);
+  pendingStructure.set(parent, null);
   recordSubtreeEdit(parent);
+}
+
+/**
+ * Record ONE child-list operation on `parent`, in issue order.
+ *
+ * Appends to the parent's log, unless the log has already been poisoned to `null` by an
+ * unreplayable change this cycle — in which case there is nothing to append to and nothing that
+ * would read it. MUST be called BEFORE the list is mutated, same as above.
+ */
+export function recordChildOp(
+  parent: ISymbioteNode,
+  child: ISymbioteNode,
+  before: ISymbioteNode | undefined,
+  remove: boolean,
+): void {
+  const existing = pendingStructure.get(parent);
+  if (existing === undefined) {
+    snapshotCommittedChildren(parent);
+    pendingStructure.set(parent, [{ child, before, remove }]);
+  } else if (existing !== null) {
+    existing.push({ child, before, remove });
+  }
+  recordSubtreeEdit(parent);
+}
+
+/**
+ * This parent's ordered op log, `null` when the change is unreplayable, `undefined` when its
+ * structure is not pending at all. Read by the commit; see the `pendingStructure` comment for the
+ * second reader this exists for.
+ */
+export function pendingChildOps(
+  parent: ISymbioteNode,
+): readonly IEditOp[] | null | undefined {
+  return pendingStructure.get(parent);
 }
 
 /**
@@ -99,7 +179,10 @@ export function recordStructureEdit(parent: ISymbioteNode): void {
 export function recordNewNode(node: ISymbioteNode): void {
   pendingPath.add(node);
   pendingProps.add(node);
-  pendingStructure.add(node);
+  // An EMPTY log, not `null`: a node that has never committed starts from no children at all, so
+  // its whole child list is whatever ops arrive after this — replayable from empty by construction,
+  // which is what lets the create path stop reading `node.children`.
+  pendingStructure.set(node, []);
 }
 
 /** Whether this node or anything beneath it has pending work. */
@@ -199,11 +282,18 @@ export function pendingEditCount(): {
   path: number;
   props: number;
   structure: number;
+  ops: number;
 } {
+  let ops = 0;
+  for (const log of pendingStructure.values()) if (log !== null) ops += log.length;
   return {
     path: pendingPath.size,
     props: pendingProps.size,
     structure: pendingStructure.size,
+    // Entries alone cannot see the leak the op log introduced: a node the commit never reconciles
+    // keeps ONE map entry however many ops accumulate inside it, so `structure` stays flat while the
+    // array behind it grows for the life of the process. An anchor is exactly that node.
+    ops,
   };
 }
 

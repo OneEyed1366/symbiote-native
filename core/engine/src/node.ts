@@ -17,6 +17,7 @@ import { isAriaAliasKey } from './accessibility-props';
 import { childrenOf, linkAppend, linkBefore, parentOf, unlink } from './tree';
 import {
   nominateDroppedEdits,
+  recordChildOp,
   recordNewNode,
   recordPropEdit,
   recordStructureEdit,
@@ -485,6 +486,12 @@ function markPresenceIfFlipped(node: ISymbioteNode, wasSkipped: boolean): void {
   if (isSkippedAtCommit(node) === wasSkipped) return;
   const parent = parentOf(node);
   if (parent !== undefined) markStructureDirty(parent);
+  // And when the node is coming BACK — an anchor that stops being one, an empty raw text that gains
+  // content — its own child list has to be re-derived rather than replayed. The commit truncates a
+  // skipped node's op log every time it drops it (`flattenRenderable`, commit.ts), because a node
+  // it never reconciles would otherwise accumulate ops forever; so the log this node carries is not
+  // its whole history and must not be replayed from an empty base.
+  if (wasSkipped) recordStructureEdit(node);
 }
 
 // The three mark* names are the MUTATION-SIDE vocabulary and they stay: every adapter-facing write
@@ -529,11 +536,55 @@ export function markPropsDirty(node: ISymbioteNode): void {
 // direct parent — and is guarded by `anchor-structure-attribution.test.ts`.
 export function markStructureDirty(parent: ISymbioteNode): void {
   recordStructureEdit(parent);
+  markRenderableAncestor(parent);
+}
+
+/**
+ * The anchor climb, split out so the OP-recording twin below can share it.
+ *
+ * An anchor never becomes a Fabric view, so an edit inside one changes the renderable child list of
+ * the first non-anchor node above it — at a position no child op names, since the op is about the
+ * anchor's list and the ancestor's is the flattened one. So the ancestor is marked UNREPLAYABLE and
+ * re-derives, which is what `symbiote-fabric-cxx-surface` §8 means by "a JS drain handles anchors
+ * exactly as the walk does today".
+ */
+function markRenderableAncestor(parent: ISymbioteNode): void {
   let ancestor: ISymbioteNode | undefined = parent;
   while (ancestor !== undefined && isAnchor(ancestor)) {
     ancestor = parentOf(ancestor);
     if (ancestor !== undefined) recordStructureEdit(ancestor);
   }
+}
+
+/**
+ * The structural mark for an op the buffer can REPLAY: this child, at this position, in or out.
+ *
+ * Same contract as `markStructureDirty` — called before the list moves, climbs past anchors — and
+ * it differs in exactly one way: the parent's own record gains an ordered entry instead of being
+ * poisoned to "changed, somehow". That entry is what lets the commit rebuild the parent's renderable
+ * list from the committed one rather than re-deriving it from `node.children`, and what a native
+ * drain would re-apply to rebase a `pendingRoot_` (`symbiote-fabric-cxx-surface` §7b).
+ */
+function markChildOp(
+  parent: ISymbioteNode,
+  child: ISymbioteNode,
+  before: ISymbioteNode | undefined,
+  remove: boolean,
+): void {
+  recordChildOp(parent, child, before, remove);
+  markRenderableAncestor(parent);
+}
+
+/**
+ * `markChildOp`'s remove form, exported for `surface.ts` — which splices a parent's child list
+ * directly on its own detach path and owes the same record. Not a general entry point: every other
+ * caller goes through the mutation API below.
+ */
+export function markChildRemoved(
+  parent: ISymbioteNode,
+  child: ISymbioteNode,
+): void {
+  markChildOp(parent, child, undefined, true);
 }
 
 // How many prop writes actually landed, and how many the no-op guard below turned away.
@@ -1105,7 +1156,7 @@ function detach(child: ISymbioteNode): void {
   // Nominate, do not drop: this is reached from appendChild/insertBefore, so the node is about to
   // be re-parented and its pending entries must survive. `sweepDroppedEdits` decides at commit.
   nominateDroppedEdits(child);
-  markStructureDirty(parent);
+  markChildOp(parent, child, undefined, true);
   unlink(parent, child);
 }
 
@@ -1114,7 +1165,7 @@ export function appendChild(parent: ISymbioteNode, child: ISymbioteNode): void {
   // commits. A WeakSet miss for anything freshly built, so the create path pays nothing.
   if (hasHostBehaviors()) reattachHostBehaviors(child);
   detach(child);
-  markStructureDirty(parent);
+  markChildOp(parent, child, undefined, false);
   linkAppend(parent, child);
 }
 
@@ -1125,7 +1176,7 @@ export function insertBefore(
 ): void {
   if (hasHostBehaviors()) reattachHostBehaviors(child);
   detach(child);
-  markStructureDirty(parent);
+  markChildOp(parent, child, beforeChild, false);
   linkBefore(parent, child, beforeChild);
 }
 
@@ -1138,7 +1189,7 @@ export function removeChild(parent: ISymbioteNode, child: ISymbioteNode): void {
   // is gated on any existing at all, while EVERY removed node holds buffer entries (`recordNewNode`
   // seeds all three) and every one of them is a leak if nothing sweeps.
   nominateDroppedEdits(child);
-  markStructureDirty(parent);
+  markChildOp(parent, child, undefined, true);
   unlink(parent, child);
 }
 

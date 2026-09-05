@@ -6,7 +6,7 @@ import type { IRootTag } from './fabric';
 import { commitChildren } from './commit';
 import { dlog } from './debug';
 import { installEventHandler } from './events';
-import { markStructureDirty, type ISymbioteNode } from './node';
+import { markChildRemoved, type ISymbioteNode } from './node';
 import { nominateDroppedEdits } from './edit-buffer';
 import { parentOf, unlink, unlinkFromParent } from './tree';
 
@@ -74,8 +74,10 @@ export class SymbioteSurface {
     nominateDroppedEdits(child);
     if (parent) {
       // Marks before the splice, like node.ts's own structural ops: the committed record may be
-      // aliasing `parent.children`, and this call is what copies it out of the way.
-      markStructureDirty(parent);
+      // aliasing `parent.children`, and this call is what copies it out of the way. Records the
+      // REMOVE as an op rather than an opaque "changed", so a parent losing a top-level child to a
+      // surface re-list stays on the replay path instead of forcing a re-derive.
+      markChildRemoved(parent, child);
       unlink(parent, child);
       return;
     }

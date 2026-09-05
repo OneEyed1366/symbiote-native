@@ -37,12 +37,14 @@ import {
   type ISymbioteNode,
 } from './node';
 import {
+  type IEditOp,
   clearPendingProps,
   clearPendingStructure,
   clearPendingWork,
   hasPendingChild,
   hasPendingProps,
   hasPendingStructure,
+  pendingChildOps,
   hasPendingWork,
   sweepDroppedEdits,
 } from './edit-buffer';
@@ -109,6 +111,10 @@ const profile = {
   // walk still pays for a list it could have read. On a Select of one row in a thousand the two
   // used to be 0 and 1 046.
   childListsReused: 0,
+  // Visited nodes that REBUILT their renderable list by replaying this cycle's ops onto the
+  // committed one, rather than re-deriving it from `node.children`. Read beside `childScans`: the
+  // three together say what share of the walk still reads the desired tree at all.
+  childListsReplayed: 0,
 };
 
 // What `renderableChildren` costs, accumulated over the same window as `profile`. Anchors are the
@@ -282,6 +288,62 @@ function takeSkipped(): readonly ISymbioteNode[] {
   return skippedScratch.length === 0 ? NO_SKIPPED : skippedScratch.slice();
 }
 
+/**
+ * Rebuild a node's RENDERABLE child list from the committed one plus this cycle's ops, or return
+ * `undefined` when the ops cannot express the change.
+ *
+ * This is the drain half of the edit buffer: the adapter already said what it did, in order, so the
+ * list is REPLAYED rather than re-derived from `node.children`. For a node that has never committed
+ * the base is empty and the log is its whole child list, which is what takes the last structural
+ * read out of the create path.
+ *
+ * ── THE PRECONDITION, and it is ONE fact, not a list ─────────────────────────────────────────────
+ *
+ * The base is the RENDERABLE list and the ops are in DESIRED space, so a replay is only sound while
+ * THE TWO ARE THE SAME LIST — that is, while this parent holds no skipped child. The caller checks
+ * that (`committed.skipped` empty, or no record at all, which is a node that has never committed),
+ * and this function checks the half the caller cannot: a child arriving THIS cycle that is itself
+ * skipped, which would put an anchor into a renderable list.
+ *
+ * Under that precondition every step matches its mutation-side twin exactly: `out.indexOf` answers
+ * what `parent.children.indexOf` answered, a `before` the list does not hold appends — which is
+ * what `linkBefore` does with a `beforeChild` it cannot find, and what every framework's
+ * `insertBefore(…, null)` means — and the ops replay in issue order, so an intermediate state is
+ * reproduced rather than approximated.
+ *
+ * FOUND BY THE FUZZER, ORACLE 1, before this precondition existed. The refusal used to be per-op
+ * (`op.child` or `op.before` skipped) and that is NOT enough: with an anchor among the parent's
+ * children, a `before` naming one of the anchor's FLATTENED grandchildren is absent from
+ * `parent.children` — so `linkBefore` appends — and present in the renderable base — so the replay
+ * inserted in the middle. Two lists, one index, silently different trees. The per-op check could
+ * not see it because neither node in the op is skipped; the ANCHOR is, and it is not in the op.
+ *
+ * Two hazards a reader will look for are handled elsewhere and deliberately not here. A
+ * skipped-ness FLIP mid-cycle poisons the parent's log to `null` (`markPresenceIfFlipped`,
+ * node.ts), so `isSkippedAtCommit` reading the node's state at COMMIT time cannot disagree with
+ * what it was at op time. And an edit UNDER an anchor poisons the renderable ancestor's log the
+ * same way (`markRenderableAncestor`).
+ */
+function replayChildOps(
+  base: readonly ISymbioteNode[],
+  ops: readonly IEditOp[],
+): ISymbioteNode[] | undefined {
+  const out = base.slice();
+  for (const op of ops) {
+    if (isSkippedAtCommit(op.child)) return undefined;
+    const index = out.indexOf(op.child);
+    if (index >= 0) out.splice(index, 1);
+    if (op.remove) continue;
+    if (op.before === undefined) {
+      out.push(op.child);
+      continue;
+    }
+    const at = out.indexOf(op.before);
+    out.splice(at < 0 ? out.length : at, 0, op.child);
+  }
+  return out;
+}
+
 function flattenRenderable(node: ISymbioteNode): readonly ISymbioteNode[] {
   // Anchor nodes (Vue fragment/v-if/v-for placeholders, Angular component hosts that should
   // not paint) live in the retained tree for sibling ordering but never become Fabric views.
@@ -318,6 +380,13 @@ function flattenRenderable(node: ISymbioteNode): readonly ISymbioteNode[] {
       // changed.
       skippedScratch.push(child);
       clearPendingWork(child);
+      // AND its structural log, which nothing else would ever consume: a skipped node is never
+      // reconciled, so `clearPendingStructure` is never reached for it and its ops would accumulate
+      // for the life of the process. On an adapter that mounts an anchor per composed component
+      // (Angular) that is an unbounded array per anchor. Safe to drop because a node that stops
+      // being skipped poisons its OWN log in the same breath (`markPresenceIfFlipped`, node.ts), so
+      // it re-derives rather than replaying a log this line truncated.
+      clearPendingStructure(child);
       // AND drop its committed record, because a skipped node has no Fabric presence and its old
       // handle is now orphaned. Keeping it is what lets a stale FAMILY come back: `committed.parent`
       // holds the RETAINED node, which survives its own Fabric re-creation, so a node skipped
@@ -434,6 +503,8 @@ function reconcile(
   // create and the update path. Anything that reads that snapshot afterwards is reading a current
   // one until the next structural op records against this node again.
   const structureChanged = hasPendingStructure(node);
+  // Read BEFORE the clear, which consumes it.
+  const childOps = pendingChildOps(node);
   clearPendingStructure(node);
 
   const childInText = node.isText || hasTextAncestor;
@@ -469,9 +540,48 @@ function reconcile(
   // nothing to reuse and the flatten is needed anyway.
   let kids: readonly ISymbioteNode[];
   let skipped: readonly ISymbioteNode[];
-  if (recreating || structureChanged || committed === undefined) {
-    kids = renderableChildren(node);
-    skipped = takeSkipped();
+  // The one thing a reused or replayed list still owes, and the reason the record carries `skipped`
+  // at all. A node the walk drops has no commit of its own, so the ONLY code that ever drained its
+  // buffer entry is the flatten we are about to skip — and an anchor accumulates one from any mark
+  // that bubbles through it. Left standing it swallows every later mark from its subtree, which is
+  // the silent stale-UI class this whole file is careful about. Empty for every node holding no
+  // anchor and no empty raw text, so the common case is one length read.
+  const drainSkipped = (list: readonly ISymbioteNode[]): void => {
+    for (const child of list) clearPendingWork(child);
+  };
+  // `!recreating` is deliberate and was briefly missing. A node being re-created CAN reuse its list
+  // safely — the children are the same nodes and each gets `forceFreshFamily` — but doing so is a
+  // separate, unmeasured behaviour change that this one does not need, and it moved an Angular
+  // counter test (`benchmark-row-shape.test.ts`, composedFlattens 2 -> 1) that measures what an
+  // anchor costs the walk. Keeping the condition keeps this change to the thing it is for.
+  if (!recreating && !structureChanged && committed !== undefined) {
+    profile.childListsReused += 1;
+    kids = committed.children;
+    skipped = committed.skipped;
+    drainSkipped(skipped);
+  } else {
+    // The precondition `replayChildOps` cannot check for itself: this parent's renderable list and
+    // its desired list must be the SAME list, which they are exactly while it holds no skipped
+    // child. A node with no record has never committed and holds none by construction.
+    const replayable =
+      childOps !== undefined &&
+      childOps !== null &&
+      (committed === undefined || committed.skipped.length === 0);
+    const replayed = replayable
+      ? replayChildOps(committed?.children ?? NO_SKIPPED, childOps)
+      : undefined;
+    if (replayed !== undefined) {
+      profile.childListsReplayed += 1;
+      kids = replayed;
+      // Unchanged by construction: any op touching a skipped node makes the replay refuse, and any
+      // skipped-ness FLIP poisons the log, so a replayed list has exactly the skipped children the
+      // record already named. A node with no record has none — an anchor child would have refused.
+      skipped = committed?.skipped ?? NO_SKIPPED;
+      drainSkipped(skipped);
+    } else {
+      kids = renderableChildren(node);
+      skipped = takeSkipped();
+    }
     // Written HERE and not with the rest of the record below, and the reason is a real failure
     // rather than tidiness. The update path returns early for a node whose children and props both
     // came back unchanged — and a node can gain a skipped child while its RENDERABLE list stays
@@ -480,17 +590,6 @@ function reconcile(
     // that did not name the anchor, and the anchor's buffer entry was never drained again.
     // Reported by the fuzzer as ORACLE 4 in five steps within a minute of the reuse landing.
     if (!recreating && committed !== undefined) committed.skipped = skipped;
-  } else {
-    profile.childListsReused += 1;
-    kids = committed.children;
-    skipped = committed.skipped;
-    // The one thing the reuse still owes, and the reason the record carries `skipped` at all. A
-    // node the walk drops has no commit of its own, so the ONLY code that ever drained its buffer
-    // entry was the flatten we just skipped — and an anchor accumulates one from any mark that
-    // bubbles through it. Left standing it swallows every later mark from its subtree, which is the
-    // silent stale-UI class this whole file is careful about. Empty for every node holding no
-    // anchor and no empty raw text, so the common case is one length read.
-    for (const child of skipped) clearPendingWork(child);
   }
 
   if (recreating) {
@@ -867,6 +966,8 @@ export interface ICommitProfile {
   propsReused: number;
   /** Visited nodes that read their renderable child list off the record instead of re-deriving it. */
   childListsReused: number;
+  /** Visited nodes that rebuilt it by replaying the edit buffer's ops onto the committed list. */
+  childListsReplayed: number;
   propWrites: number;
   propNoops: number;
   childScans: number;
@@ -885,6 +986,7 @@ export function readCommitProfile(): ICommitProfile {
     propsBuilt: profile.propsBuilt,
     propsReused: profile.propsReused,
     childListsReused: profile.childListsReused,
+    childListsReplayed: profile.childListsReplayed,
     propWrites: props.writes,
     propNoops: props.noops,
     childScans: childScan.scans,
@@ -899,6 +1001,7 @@ export function readCommitProfile(): ICommitProfile {
   profile.propsBuilt = 0;
   profile.propsReused = 0;
   profile.childListsReused = 0;
+  profile.childListsReplayed = 0;
   childScan.scans = 0;
   childScan.probed = 0;
   childScan.flattens = 0;

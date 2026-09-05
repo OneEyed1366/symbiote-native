@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
+  createAnchor,
   createElement,
   createSurface,
   readCommitProfile,
@@ -81,5 +82,84 @@ describe('a Select-shaped commit reads the child list instead of re-deriving it'
     // re-deriving one), and it is the reason the assertion above is about `childScans` rather than
     // about time. The JS saving on this shape is a rounding error; what moved is what the walk
     // READS.
+  });
+});
+
+describe('a create builds its child lists from the op log, not from node.children', () => {
+  // The acceptance criterion `symbiote-fabric-cxx-surface` §8 states for item 4b, asserted through
+  // the counters rather than through the seam, because the counters are what a device run reads
+  // too. `childScans` is the flatten actually running; `childListsReplayed` is the op log serving
+  // the list instead.
+  //
+  // MEASURED at the tree.ts seam on the same shapes, and this is the number the item is FOR:
+  //
+  //             childrenOf() calls per commit      before 4b   after 4b
+  //   create 1000 rows, no anchors                     2005          4
+  //   append 1000 rows, no anchors                     4006          6
+  //
+  // The append row is the mutation side rather than the walk: `recordStructureEdit` used to read
+  // `parent.children` on EVERY structural mutation to answer a copy-on-write identity question that
+  // can only be true once. Gated to the first op of the cycle, that is 2 001 -> 2.
+  function buildRows(
+    list: ReturnType<typeof createElement>,
+    count: number,
+    from: number,
+    anchored: boolean,
+  ): void {
+    for (let index = from; index < from + count; index += 1) {
+      const row = createElement('RCTView');
+      setProp(row, 'testID', `row-${index}`);
+      appendChild(row, createElement('RCTView'));
+      if (anchored) {
+        const anchor = createAnchor();
+        appendChild(anchor, createElement('RCTView'));
+        appendChild(row, anchor);
+      }
+      appendChild(list, row);
+    }
+  }
+
+  it('replays every node of a flat create except the container', () => {
+    const surface = createSurface(7302);
+    const list = createElement('RCTView');
+    buildRows(list, ROWS, 0, false);
+    surface.appendChild(list);
+    readCommitProfile();
+    surface.commit();
+
+    const profile = readCommitProfile();
+    const line = `scans=${profile.childScans} replayed=${profile.childListsReplayed}`;
+    // The ONE scan is the synthetic container: `commitChildren` hands its whole top-level list over
+    // at once, which no sequence of child ops describes, so its log is poisoned and it re-derives.
+    expect(profile.childScans, line).toBe(1);
+    expect(profile.childListsReplayed, line).toBe(2 * ROWS + 1);
+  });
+
+  it('REFUSES to replay a parent holding an anchor, and says so in the counters', () => {
+    // The negative half, and it is not a wart — it is `symbiote-fabric-cxx-surface` §8's own
+    // prediction that a JS drain "handles anchors exactly as the walk does today", which is what
+    // item 5 exists to change. A parent whose renderable list is not its desired list cannot have a
+    // desired-space op replayed onto it: the fuzzer found that as ORACLE 1 when the refusal was
+    // per-op instead of per-parent (an insert positioned before an anchor's FLATTENED grandchild
+    // appends in one list and inserts mid-way in the other).
+    //
+    // So the row asserts the split rather than a win: the rows re-derive, everything below them
+    // still replays. Angular mounts an anchor per composed component and is the adapter this
+    // describes.
+    const surface = createSurface(7303);
+    const list = createElement('RCTView');
+    buildRows(list, ROWS, 0, true);
+    surface.appendChild(list);
+    readCommitProfile();
+    surface.commit();
+
+    const profile = readCommitProfile();
+    const line = `scans=${profile.childScans} replayed=${profile.childListsReplayed}`;
+    // TWO per row, not one: the row refuses, and the flatten then RECURSES into the anchor to hoist
+    // its children, which is a scan of its own. Plus the container. The first version of this row
+    // expected `ROWS + 1` and the count said 2001 — worth keeping as the arithmetic, because a
+    // reader pricing anchors will make the same omission.
+    expect(profile.childScans, line).toBe(2 * ROWS + 1);
+    expect(profile.childListsReplayed, line).toBe(2 * ROWS + 1);
   });
 });

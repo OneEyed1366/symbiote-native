@@ -31,6 +31,7 @@ import { describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
+  createAnchor,
   createElement,
   createSurface,
   removeChild,
@@ -143,5 +144,39 @@ describe('the edit buffer drains', () => {
     // harness that mounted nothing (`.claude/rules/test-harness-false-greens.md` §13).
     surface.commit();
     expect(moved.committed?.props.testID).toBe('moved-and-written');
+  });
+});
+
+describe('the op log does not grow for a node the commit never reconciles', () => {
+  // The leak the op log introduces and the one thing arm C of its break-test could not see: a
+  // SKIPPED node is never reconciled, so `clearPendingStructure` is never reached for it through
+  // the normal path, and its ops accumulate for the life of the process. `structure` counts map
+  // ENTRIES, so it stays flat at 1 while the array behind it grows — which is why this asserts
+  // `ops` instead, added to `pendingEditCount` for exactly this row.
+  //
+  // An anchor is that node, and an adapter that mounts one per composed component (Angular) has
+  // one per component. `renderableChildren` truncates the log every time it drops the anchor;
+  // removing that line leaves the fuzzer green and this row red, which is the split that makes
+  // both worth keeping (`.claude/rules/test-harness-false-greens.md` §28).
+  it('truncates a SKIPPED node log at every commit that drops it', () => {
+    const surface = createSurface(9401);
+    const parent = createElement('RCTView');
+    const anchor = createAnchor();
+    appendChild(parent, anchor);
+    surface.appendChild(parent);
+    surface.commit();
+
+    const counts: number[] = [];
+    for (let round = 0; round < 20; round += 1) {
+      const child = createElement('RCTView');
+      appendChild(anchor, child);
+      removeChild(anchor, child);
+      surface.commit();
+      counts.push(pendingEditCount().ops);
+    }
+
+    // Flat, not merely small: two rounds' worth of growth would already be a leak, and a bound like
+    // `< 100` would pass on one.
+    expect(new Set(counts).size, `ops per round: ${counts.join(',')}`).toBe(1);
   });
 });

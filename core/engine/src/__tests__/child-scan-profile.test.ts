@@ -44,9 +44,18 @@ beforeEach(() => {
 
 describe('renderableChildren scan counters', () => {
   describe('Positive', () => {
-    // why: the no-anchor case is the one that must stay free. A parent whose children are all
-    // renderable takes the early return: it is scanned, but never flattened, and allocates nothing.
-    it('counts a clean parent as a scan and not as a flatten', () => {
+    // why: the no-anchor case is the one that must stay free, and as of 2026-09-05 it is free in a
+    // stronger sense than this case used to assert. It read "every reconciled node scans its
+    // children exactly once" and required `childScans >= 3`, which was a true description of the
+    // walk and is now a description of the thing the edit buffer's op log removed: a node with no
+    // skipped children REPLAYS its list from the ops the adapter issued and never scans at all.
+    //
+    // Re-aimed at the property rather than at a new fixed number, because a number here is the same
+    // debt payable next time the derivation moves (`.claude/rules/test-harness-false-greens.md`
+    // §23b). The ONE surviving scan is the synthetic container: `commitChildren` hands its whole
+    // top-level list over at once, which no sequence of child ops describes, so its log is poisoned
+    // to `null` and it re-derives. Everything below it replays.
+    it('replays a clean parent instead of scanning it', () => {
       const parent = view('clean-parent');
       appendChild(parent, view('clean-a'));
       appendChild(parent, view('clean-b'));
@@ -57,12 +66,12 @@ describe('renderableChildren scan counters', () => {
       expect(profile.childFlattens, 'no anchor, no flatten').toBe(0);
       expect(
         profile.childScans,
-        'every reconciled node scans its children exactly once',
-      ).toBeGreaterThanOrEqual(3);
+        'only the container, whose whole list arrives at once, re-derives',
+      ).toBe(1);
       expect(
-        profile.childScanProbed,
-        'a clean parent probes all of its children before returning them',
-      ).toBeGreaterThanOrEqual(2);
+        profile.childListsReplayed,
+        'the parent and both leaves build their lists from the op log',
+      ).toBe(3);
     });
 
     // why: THE number. One anchor anywhere in a wide child list defeats the probe for the whole
