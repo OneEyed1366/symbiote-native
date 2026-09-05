@@ -338,9 +338,51 @@ work.
 commit-only and `ShadowTree::commit` is a retried transaction (§5). That is RN's constraint, not
 ours — everything else on this list was ours.
 
-### The address — DECIDED: only the buffer stays ours, and the address rides on the adapter
+### CORRECTED 2026-09-05, before any code was written: the address must be NAVIGABLE
 
-The record collapses into TWO things with different lifetimes, and conflating them breaks the
+The section below was written as "only the buffer stays ours". **That is wrong, and it was caught
+by reading the five adapters' renderer seams rather than by reasoning.** Four of five frameworks'
+OFFICIAL renderer contracts require a navigable host tree:
+
+```
+solid     getParentNode / getFirstChild / getNextSibling   adapters/solid/src/renderer.ts (nodeOps)
+vue       parentNode / nextSibling                         adapters/vue/src/renderer/index.ts:175,179
+angular   parentNode / nextSibling                         adapters/angular/src/renderer/index.ts:346,350
+svelte    parentNode + firstChild/nextSibling as REAL
+          PROTOTYPE GETTERS                                adapters/svelte/src/dom-shim/shim-node.ts:67,193-202
+react     none — React navigates its own fibers            adapters/react/src/host-config.ts
+```
+
+In a browser the DOM answers those. Fabric cannot (§1: no read of structure exists). So **the
+retained tree is not a drawing we invented — it is the DOM that Fabric does not ship**, and
+deleting it does not respect the frameworks' engineering, it breaks the very seams that
+engineering is expressed through. Solid's own nodeOps comment says the runtime "re-derives
+positions through these two lookups".
+
+React is the outlier precisely because it keeps fibers, which is why a React-only intuition about
+this ("the tree is redundant") does not survive contact with the other four.
+
+**What survives of the goal, and what does not:**
+
+```
+adapters stop seeing OUR node type      SURVIVES — the host is opaque AND navigable, i.e. DOM-shaped
+deleting the WALK                        SURVIVES ENTIRELY — orthogonal to navigation; this was always
+                                         the real win (VISITED 1046 for two changed nodes)
+"only a buffer on our side"              DEAD. A navigable node stays, plus the buffer.
+a fully native address (step 2)          NARROWED. C++ can answer parent (family->parent_) but child
+                                         navigation would be a per-call JSI read — the thing §6a says
+                                         never to do. The navigable structure likely stays in JS.
+```
+
+So the target is: **the engine is the DOM Fabric lacks — a navigable retained host — plus a
+lossless edit buffer.** Adapters see a DOM-shaped opaque interface
+(`parentOf` / `firstChildOf` / `nextSiblingOf` alongside `edit` / `insert` / `remove` / `move` /
+`flush`). That is a closer expression of "give each framework the host it expects" than the
+buffer-only design was.
+
+### The address — the address rides on the adapter, and it is navigable
+
+The record collapses from a MIRROR into a navigable node plus a buffer — two things with different lifetimes, and conflating them breaks the
 design on the first frame:
 
 ```
