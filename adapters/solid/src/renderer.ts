@@ -24,14 +24,19 @@ import {
   createElement as createEngineElement,
   createRawText,
   dlog,
+  firstChildOf,
   insertBefore,
+  isRawTextNode,
+  isTextContainer,
+  nextSiblingOf,
+  parentOf,
   removeChild as removeEngineChild,
   routeProp,
   setNodePressed,
   setProp as setEngineProp,
   setText as setEngineText,
+  textOf,
   toPublicInstance,
-  RAW_TEXT_COMPONENT,
   SymbioteSurface,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -48,7 +53,7 @@ function isSurface(node: IHostNode): node is SymbioteSurface {
 }
 
 function isRawText(node: IHostNode): boolean {
-  return !isSurface(node) && node.component === RAW_TEXT_COMPONENT;
+  return !isSurface(node) && isRawTextNode(node);
 }
 
 // One active surface per process. This is FORCED here, not chosen: the compiled-JSX contract above
@@ -77,11 +82,6 @@ function requestCommit(): void {
     return;
   }
   activeSurface.requestCommit();
-}
-
-function siblingsOf(node: ISymbioteNode): readonly ISymbioteNode[] {
-  if (node.parent !== undefined) return node.parent.children;
-  return activeSurface?.children ?? [];
 }
 
 // Hoisted out of nodeOps and exported because descriptor-to-solid.ts needs the same text-update
@@ -174,7 +174,7 @@ function foldTextValue(
   key: string,
   value: unknown,
 ): unknown {
-  if (!node.isText) return value;
+  if (!isTextContainer(node)) return value;
   const fold = TEXT_FOLDS.get(key);
   return fold === undefined ? value : fold(value);
 }
@@ -270,13 +270,13 @@ const nodeOps: RendererOptions<IHostNode> = {
     const before =
       anchor !== undefined && !isSurface(anchor) ? anchor : undefined;
 
-    if (isRawText(node) && (isSurface(parent) || !parent.isText)) {
+    if (isRawText(node) && (isSurface(parent) || !isTextContainer(parent))) {
       // Fabric has no bare-text host: RCTRawText is only valid as a <Text> child. Reached by a
       // dynamic expression that resolves to a string outside a <Text>, e.g.
       // `<symbiote-view>{label()}</symbiote-view>`. Failing loudly at mount beats building an
       // invalid tree that crashes deeper in native with a far less legible error.
       throw new Error(
-        `Text string "${String(node.props.text)}" must be rendered inside a <Text>`,
+        `Text string "${textOf(node) ?? ''}" must be rendered inside a <Text>`,
       );
     }
 
@@ -295,7 +295,7 @@ const nodeOps: RendererOptions<IHostNode> = {
 
   getParentNode(node) {
     if (isSurface(node)) return undefined;
-    return node.parent ?? activeSurface;
+    return parentOf(node) ?? activeSurface;
   },
 
   // Anchors are NOT filtered out of this or getNextSibling, deliberately. solid-js/universal keeps
@@ -305,14 +305,14 @@ const nodeOps: RendererOptions<IHostNode> = {
   // desyncs that record from the real tree. Anchors are invisible to FABRIC — the commit walk skips
   // them — not to tree traversal.
   getFirstChild(node) {
-    return node.children[0];
+    return isSurface(node) ? node.children[0] : firstChildOf(node);
   },
 
   getNextSibling(node) {
     if (isSurface(node)) return undefined;
-    const siblings = siblingsOf(node);
-    const index = siblings.indexOf(node);
-    return index >= 0 ? siblings[index + 1] : undefined;
+    // The surface is handed over because a TOP-LEVEL node has no parent to read a sibling list
+    // from — the surface owns that list. The engine returns undefined rather than guessing.
+    return nextSiblingOf(node, activeSurface);
   },
 };
 
