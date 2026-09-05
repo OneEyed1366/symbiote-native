@@ -555,6 +555,51 @@ Two consequences worth stating before anyone plans the work:
   it into "add the log now, consume it later" would be exactly the dishonest split
   `<adapters_reach_full_feature_parity>` forbids elsewhere. Land it whole or not at all.
 
+### And then the SCOPE was measured, and it is far narrower than "replace the walk"
+
+Measured 2026-09-05, before writing any of it: `node.children` and `node.parent` were replaced with
+counting accessors on every node of a real tree, and a real commit was run through the real path.
+The question was how coupled the commit actually is to the skeleton — the thing step 2 exists to
+remove — rather than how coupled it feels.
+
+```
+                                  node.children   node.parent
+create 800 nodes                       2402            1
+general commit, ONE prop changed        209            0
+TARGETED commit (commitTargeted)          1            0
+create 800 + 200 anchors               2803            1
+```
+
+Two results, and both cut work away:
+
+- **`commitTargeted` is ALREADY skeleton-free.** One read, and it is `hasPendingChild` — the
+  buffer's own helper, not the tree. The drain-shaped path exists, works, and needs no retained
+  tree. Step 2 is not "build a drain"; a drain is already here for the prop-only case.
+- **Every `node.children` read in the general commit is inside `renderableChildren`** — the anchor
+  flatten plus the empty-raw-text drop, and nothing else. The single `node.parent` read is
+  `sweepDroppedEdits`'s own liveness test. So the commit's ENTIRE skeleton dependency is one
+  function, and 209 reads for one prop change in an 801-node tree is already near the floor.
+
+**So step 2 is: make the renderable child list incremental rather than re-derived.** The mirror
+already stores it (`record.children`), so a node whose renderable list cannot have changed can reuse
+that record and never touch `node.children`. What makes that sound is the ATTRIBUTION being right —
+`hasPendingStructure(node)` must be true whenever this node's renderable list could differ. Two
+holes in that were found the same day and both are now fixed and guarded:
+
+```
+an edit under an ANCHOR      recorded on the anchor, not on the renderable ancestor
+an empty-string setText      changes the parent's renderable list with no structural op at all
+```
+
+Both were live bugs before they were design constraints, and the second was found by the fuzzer one
+value after its generator learned to write `''`. Do not attempt the incremental reuse until any
+third member of that family is ruled out — the failure mode is a node that silently stops reaching
+Fabric, which is the same class the whole buffer is careful about.
+
+Do NOT re-derive this coupling by reading the code. Re-run the accessor probe: it is ~120 lines,
+takes a minute, and it is the difference between "the commit walks the tree" (the intuition, and
+wrong in the way that matters) and "the commit reads one function's worth of the tree".
+
 ## 7b. Where the PENDING tree lives — searched exhaustively, 2026-09-05
 
 The question that decides whether navigation can be answered by native: does C++ retain a
