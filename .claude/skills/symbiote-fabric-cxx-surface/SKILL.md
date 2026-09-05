@@ -338,6 +338,52 @@ work.
 commit-only and `ShadowTree::commit` is a retried transaction (§5). That is RN's constraint, not
 ours — everything else on this list was ours.
 
+### The address — DECIDED: only the buffer stays ours, and the address rides on the adapter
+
+The record collapses into TWO things with different lifetimes, and conflating them breaks the
+design on the first frame:
+
+```
+edit buffer    lives from a write until flush()      self-clearing on drain
+address        lives as long as the node             released only on removeChild / unmount
+```
+
+Clearing addresses with the buffer leaves the next command with nothing to name.
+
+The address is stamped onto the object the ADAPTER already holds, so nothing tree-shaped remains
+on our side. Honest limit on "only the buffer is ours": the address is still an object WE
+allocate and hand over — one opaque handle per node instead of a tree node. It stops being ours
+by ownership, not by existing.
+
+**Where it lives is a PER-ADAPTER fact and must not enter the shared contract**
+(`adapter-parity-audit`, "a fact that varies PER ADAPTER must not enter the shared spec"). Shared:
+the buffer, the commands, `flush()`. Per-adapter: which object carries the field.
+
+#### The three ways the address is actually lost
+
+- **The framework recreates the object.** Vue mints a NEW VNode every render; only what Vue
+  carries forward survives (`n2.el = n1.el`). So stamp the object returned from `createElement`,
+  never the vnode. Verify this per adapter rather than assuming — each renderer decides what it
+  carries across a patch.
+- **The host object gets wrapped.** Vue `reactive()` / deep `ref` yields a Proxy and identity is
+  gone — the documented classic (`vue-adapter-reactivity`), today caught because `committedOf` is
+  a guarded function and not a bare property read. **An equivalent guard must survive this
+  redesign**, or the failure turns silent.
+- **A keyed remount.** The framework calls `createElement` again for a node it considers "the
+  same"; the old address must be released or a family handle leaks on the C++ side.
+
+#### The requirement, stated so it can be tested
+
+```
+mint     createElement -> address     exactly ONE place
+release  removeChild / unmount        exactly ONE place
+guard    edit(x) with a non-address   throws or logs — NEVER a silent no-op
+```
+
+The last line is from this repo's own history: a silent no-op presents as "works on React, dead
+on Vue" and costs days. Each adapter owes one test — "the address survives a re-render" — because
+the mechanism that would break it is that adapter's own.
+
 ### Order — the contract ships BEFORE any C++
 
 1. **Introduce the contract in JS.** The edit queue IS its implementation. Adapters stop seeing
