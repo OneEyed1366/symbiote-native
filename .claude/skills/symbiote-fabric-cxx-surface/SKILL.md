@@ -52,7 +52,13 @@ Promise · timeStamp
 `core/engine/src/fabric.ts` binds 14 of these. **The gap is real and worth knowing** — earlier
 sessions asserted the 14 were "the surface". They are not.
 
-**But no name reads STRUCTURE.** There is no `getChildren`, no `getProps`, no `getParent`. The
+**CORRECTED 2026-09-05 — read §1a before quoting the next paragraph.** `nativeFabricUIManager`
+has no structural read, and that is what the paragraph below establishes. It does NOT mean React
+Native has none: a SEPARATE TurboModule, `NativeDOM`, exposes `getChildNodes` / `getParentNode` /
+`getElementById` / `isConnected`. Stating "no read of structure exists" without that qualifier was
+wrong for three days of this investigation.
+
+**No name on THIS binding reads STRUCTURE.** There is no `getChildren`, no `getProps`, no `getParent`. The
 read-looking names are something else:
 
 - `getBoundingClientRect` / `getRelativeLayoutMetrics` / `measure*` — geometry of the MOUNTED
@@ -64,6 +70,44 @@ So the turn-one conclusion stands: to build the next commit you need the current
 ordered child handles of every ancestor, and the previous props, and **none of it can be asked
 of C++**. That is why a JS-side record exists — for React (`ReactFiberConfigFabric`) exactly as
 for us.
+
+## 1a. `NativeDOM` — RN DID build the browser paradigm, but only its READ half
+
+`src/private/webapis/dom/nodes/specs/NativeDOM.js`, a TurboModule separate from
+`nativeFabricUIManager`:
+
+```
+getChildNodes(ref) -> ReadonlyArray<InstanceHandle>     Node.prototype.childNodes
+getParentNode(ref) -> ?InstanceHandle                   Node.prototype.parentNode
+getElementById(rootTag, id) -> ?InstanceHandle          Document.prototype.getElementById
+isConnected(ref) -> boolean                             Node.prototype.isConnected
+```
+
+RN's own comments cite MDN for each. So "we cannot read the tree" is false, and the intuition
+that RN set out to put the browser on top of native is literally correct.
+
+**Three facts bound what it is good for, and all three are from the source:**
+
+- **It reads the CURRENT REVISION.** The spec text: *"If a version of the given shadow node is
+  present in the current revision of an active shadow tree, it returns an array of instance
+  handles of its children. Otherwise, it returns an empty array."* A node created but not
+  committed, or moved but not committed, answers empty/null.
+- **The class is called `ReadOnlyNode`**, and it has NO mutation methods — no `appendChild`, no
+  `insertBefore`, no `setAttribute`. Only `childNodes` / `firstChild` / `nextSibling` /
+  `parentNode` / `isConnected`.
+- **React's own renderer never calls it.** `grep -rl "getChildNodes|getParentNode"
+  Libraries/Renderer/` returns nothing. The only consumers are `ReadOnlyNode.js`,
+  `ReadOnlyElement.js` and `internals/Traversal.js` — the app-facing DOM API.
+
+**The inference this supports, and it explains the whole shape of the problem.** React needs no
+host navigation because it keeps fibers (our `adapters/react/src/host-config.ts` has none either).
+So Fabric could ship a commit-only host: its one client never asked the host where anything was.
+The DOM reads arrived later, for app code. The other four frameworks' renderer seams DO ask, which
+is why they strain against a host built for a client that does not.
+
+Consequence for us: `getChildNodes` is legitimate for app-facing use (a `ref.childNodes` we could
+expose on all five adapters) and unusable for RECONCILIATION, because a reconciler navigates the
+tree it is mid-way through building.
 
 ## 2. A clone is NOT a deep copy — `ChildrenAreShared`
 
@@ -241,9 +285,11 @@ not zero, and a plan that promises zero is wrong.
 ### "Read native" is the wrong principle even once we CAN
 
 Inside our own C++ module we could read anything. We must not. Marshalling children back over JSI
-per commit is O(n) where holding one handle is O(1) — strictly worse than today. The design that
-wins is **hold addresses, send edits, never read**; adopting "read the tree" as a principle
-designs the API backwards and produces a third tree instead of none.
+per commit is O(n) where holding one handle is O(1) — strictly worse than today. The rule, NARROWED 2026-09-05 after it was challenged and found over-broad: **never read native
+for state the buffer has already changed.** Reading committed facts is legitimate and we already
+do it — `measure`, `measureInWindow`, `getBoundingClientRect`, and (§1a) `getChildNodes` for
+app-facing use. The boundary is not "native", it is "has my buffer changed what I am asking
+about".
 
 Closest thing to a real read that exists, and it solves a different problem:
 `UIManager::getNewestCloneOfShadowNode(const ShadowNode&)` is public and resolves a STALE handle
@@ -437,7 +483,73 @@ The API an adapter sees is IDENTICAL under both, so step 2 changes no adapter co
 decouples the architectural goal from a standing C++ maintenance obligation: the goal is reached
 at step 1, and native becomes an optimisation under the same seam rather than a precondition.
 
+## 7b. Where the PENDING tree lives — searched exhaustively, 2026-09-05
+
+The question that decides whether navigation can be answered by native: does C++ retain a
+not-yet-committed tree between commits? Every plausible hiding place, checked:
+
+```
+ShadowTree private state          currentRevision_, currentReactRevision_,
+                                  reactRevisionToBePromoted_, mutexes, mountingCoordinator_    no
+LazyShadowTreeRevisionConsistency capturedRootShadowNodesForConsistency_ — FROZEN COMMITTED
+Manager                           roots, lockRevisions()/unlockRevisions(). The opposite of
+                                  pending: it pins the past so reads stay consistent            no
+AnimationBackend                  animatedPropsRegistry_ — a registry of EDITS; commits
+                                  immediately (AnimationBackend.cpp:170)                        no — it is a command buffer
+cloneTree / cloneMultiple         return a new root                                             YES, but see below
+React's own renderer              createChildSet -> appendChildToSet ->
+                                  completeRoot(tag, newChildren)  ReactFabric-dev.js:15963      builds it IN JS, from fibers
+grep pending|staging|inProgress|
+uncommitted over mounting/        zero hits                                                     —
+```
+
+**`cloneMultiple` does produce a tree before commit — as a LOCAL VALUE inside one transaction.**
+`tryCommit` builds it, runs Yoga on it, then publishes or discards it on retry. It is not a
+staging area that accumulates edits between commits. Between commits a surface has exactly one
+tree in C++: the committed one.
+
+And the decisive precedent: **RN's own client builds the pending tree in JS.** In persistent mode
+the tree-under-construction belongs to the committer by contract, which is why `completeRoot`
+takes a finished child set.
+
+### Correction: `getShadowTreeRegistry()` IS public
+
+`uimanager/UIManager.h:211` — `const ShadowTreeRegistry &getShadowTreeRegistry() const;`. An
+earlier note here said the registry was private and unreachable; that was wrong. A native module
+can visit any surface's `ShadowTree` and commit arbitrary transactions with no patch, exactly as
+`AnimationBackend.cpp:170` does.
+
+### So there are TWO viable designs, both correct, both patch-free
+
+```
+(1) JS skeleton    parent + children + address in JS; buffer drains into the clone-bubble
+(2) C++ pendingRoot our own native module retains pendingRoot_ per surface, applies each command
+                    with cloneMultiple, answers navigation from it, commits on flush
+```
+
+(2) is what leaves ONLY the buffer on the JS side, and it is the chosen direction (2026-09-05).
+
+**Its cost is a per-call JSI crossing plus a family->node resolution** whose phase 2 linearly
+scans each level's children (§6a). Arithmetic on this repo's own measured constant (~1.5 us per
+crossing): Solid's `cleanChildren` on 1 000 children is ~1 000 crossings ~= 1.5 ms plus 1 000
+resolutions, against microseconds for a JS array read. **That is arithmetic, not a benchmark** —
+and pricing it is step 0 below, because it sizes the whole design.
+
+**The retry semantics force the buffer to remain the source of truth.** `ShadowTree::commit` may
+re-run its lambda against a fresher root (§5), and another writer (an animation commit, a state
+update) can land in between — so a `pendingRoot_` built against an older root must be REBASED. The
+only way to rebase is to re-apply the command log inside the lambda. `pendingRoot_` is therefore a
+memo of the buffer, never a replacement for it, which is consistent with "only the buffer is
+ours".
+
 ## 8. Open, in priority order
+
+**Step 0, before any native code: price a JSI navigation round-trip on a device.** `NativeDOM`
+already ships `getChildNodes` / `getParentNode` (§1a), so the crossing + family resolution can be
+measured today from JS with zero native work. That single constant decides whether design (2) is
+viable at all, and no headless run can produce it (`symbiote-perf-measurement`: headless has
+mis-sized every native-bound prediction so far, in both directions).
+
 
 1. **Edit queue instead of the walk.** Pure engine, no native work. An adapter mutation records
    the edit; commit drains it. `VISITED` should collapse to the number of touched nodes.
