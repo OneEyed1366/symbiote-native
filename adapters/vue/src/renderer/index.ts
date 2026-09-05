@@ -9,14 +9,19 @@ import {
   createAnchor,
   createElement,
   createRawText,
+  childrenOf,
   dlog,
   insertBefore,
+  isRawTextNode,
+  isTextContainer,
+  nextSiblingOf,
+  parentOf,
   removeChild,
   routeProp,
   setProp,
   setText,
+  textOf,
   toPublicInstance,
-  RAW_TEXT_COMPONENT,
   SymbioteSurface,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -33,7 +38,7 @@ function isSurface(parent: IHostElement): parent is SymbioteSurface {
 }
 
 function isRawText(node: ISymbioteNode): boolean {
-  return node.component === RAW_TEXT_COMPONENT;
+  return isRawTextNode(node);
 }
 
 // RN's Text.js applies two defaults on the way to native (core/components/src/text-props.ts:
@@ -68,7 +73,7 @@ const PROP_ALIASES: ReadonlyMap<string, string> = new Map([['id', 'nativeID']]);
 // explicit undefined alike, and only a literal `false` opts out of allowFontScaling. Reached
 // only when a value is already undefined, so it costs nothing on the hot path.
 function textDefaultFor(node: ISymbioteNode, key: string): unknown {
-  return node.isText ? TEXT_DEFAULTS.get(key) : undefined;
+  return isTextContainer(node) ? TEXT_DEFAULTS.get(key) : undefined;
 }
 
 // One renderer per mounted surface: the options close over the surface so every mutation
@@ -129,27 +134,28 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       // this instead of insert() when an element's children collapse to a single string, so
       // without the check a raw text lands under a non-Text parent - an invalid Fabric tree
       // built silently, which is worse than the throw insert() would have given.
-      if (!el.isText) {
+      if (!isTextContainer(el)) {
         throw new Error(
           `Text string "${text}" must be rendered inside a <Text>`,
         );
       }
       // An RCTText carries its string as a single raw-text child. Reuse a lone existing
       // one to avoid churn; otherwise replace all children with a fresh raw-text node.
-      const [first] = el.children;
-      if (el.children.length === 1 && first !== undefined && isRawText(first)) {
+      const existing = childrenOf(el);
+      const [first] = existing;
+      if (existing.length === 1 && first !== undefined && isRawText(first)) {
         setText(first, text);
       } else {
-        for (const child of el.children.slice()) removeChild(el, child);
+        for (const child of existing.slice()) removeChild(el, child);
         appendChild(el, createRawText(text));
       }
       surface.requestCommit();
     },
 
     insert(child, parent, anchor) {
-      if (isRawText(child) && (isSurface(parent) || !parent.isText)) {
+      if (isRawText(child) && (isSurface(parent) || !isTextContainer(parent))) {
         throw new Error(
-          `Text string "${String(child.props.text)}" must be rendered inside a <Text>`,
+          `Text string "${textOf(child) ?? ''}" must be rendered inside a <Text>`,
         );
       }
       if (isSurface(parent)) {
@@ -166,21 +172,20 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
     remove(child) {
       // A top-level node has no parent (it lives in surface.children); everything else
       // detaches from its retained parent.
-      const parent = child.parent;
+      const parent = parentOf(child);
       if (parent !== undefined) removeChild(parent, child);
       else surface.removeChild(child);
       surface.requestCommit();
     },
 
     parentNode(node) {
-      return node.parent ?? surface;
+      return parentOf(node) ?? surface;
     },
 
     nextSibling(node) {
-      const siblings =
-        node.parent !== undefined ? node.parent.children : surface.children;
-      const index = siblings.indexOf(node);
-      return index >= 0 ? (siblings[index + 1] ?? null) : null;
+      // `?? null` because Vue's RendererOptions types the miss as null, not undefined; the
+      // engine answers undefined uniformly and the surface fallback lives there now.
+      return nextSiblingOf(node, surface) ?? null;
     },
 
     patchProp(el, key, _prev, next) {

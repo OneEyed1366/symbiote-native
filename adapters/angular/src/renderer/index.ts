@@ -10,18 +10,23 @@ import {
   createAnchor,
   createElement,
   createRawText,
+  componentOf,
   dlog,
   getExplicitStyle,
   insertBefore,
   isDebug,
+  isRawTextNode,
   isSymbioteNode,
+  isTextContainer,
+  nextSiblingOf,
+  parentOf,
   removeChild,
   routeProp,
   setEventListener,
   setProp,
   setText,
+  textOf,
   toPublicInstance,
-  RAW_TEXT_COMPONENT,
   SymbioteSurface,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -50,7 +55,7 @@ function isSurface(parent: IHostElement): parent is SymbioteSurface {
 }
 
 function isRawText(node: ISymbioteNode): boolean {
-  return node.component === RAW_TEXT_COMPONENT;
+  return isRawTextNode(node);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -86,7 +91,7 @@ function seedTextDefaults(node: ISymbioteNode): void {
 // `foldHostBag` folds every Text default when called this way (not just `key`), because its
 // contract is "fold a whole bag" — the extra key computed alongside `key` is simply unread here.
 function textDefaultFor(el: IHostElement, key: string): unknown {
-  if (isSurface(el) || !el.isText) return undefined;
+  if (isSurface(el) || !isTextContainer(el)) return undefined;
   return foldHostBag('symbiote-text', { [key]: undefined })[key];
 }
 
@@ -135,8 +140,8 @@ function describeHost(node: IHostElement | null | undefined): string {
   if (isSurface(node)) return 'surface';
   const anchorId = anchorDebugIds.get(node);
   return anchorId !== undefined
-    ? `${node.component}#${anchorId}`
-    : node.component;
+    ? `${componentOf(node)}#${anchorId}`
+    : componentOf(node);
 }
 
 const PRIMITIVE_SELECTOR_ALIAS: Record<string, string> = {
@@ -157,9 +162,9 @@ const PRIMITIVE_SELECTOR_ALIAS: Record<string, string> = {
 // reference rather than wrapped in an arrow. The wrapper was allocated on EVERY removed node:
 // 10 000 closures on a Clear whose engine window is 0.1 ms.
 function assertTextPlacement(child: ISymbioteNode, parent: IHostElement): void {
-  if (isRawText(child) && (isSurface(parent) || !parent.isText)) {
+  if (isRawText(child) && (isSurface(parent) || !isTextContainer(parent))) {
     throw new Error(
-      `Text string "${String(child.props.text)}" must be rendered inside a <Text>`,
+      `Text string "${textOf(child) ?? ''}" must be rendered inside a <Text>`,
     );
   }
 }
@@ -317,13 +322,15 @@ export class SymbioteRenderer implements Renderer2 {
     if (isDebug()) {
       const angularParent = _parent !== null ? describeHost(_parent) : 'null';
       const retainedParent =
-        oldChild.parent !== undefined ? describeHost(oldChild.parent) : 'none';
+        parentOf(oldChild) !== undefined
+          ? describeHost(parentOf(oldChild))
+          : 'none';
       dlog(
         `Angular renderer removeChild angularParent=${angularParent} retainedParent=${retainedParent} child=${describeHost(oldChild)} viaProjection=${wasProjected}`,
       );
     }
     if (!wasProjected) {
-      const parent = oldChild.parent;
+      const parent = parentOf(oldChild);
       if (parent !== undefined) removeChild(parent, oldChild);
       else this.surface.removeChild(oldChild);
     }
@@ -344,14 +351,13 @@ export class SymbioteRenderer implements Renderer2 {
   // does `inject(ViewContainerRef)`, e.g. VListOutletDirective) forwards this null straight into
   // insertBefore without checking it; without that guard it crashed on-device.
   parentNode(node: IHostNode): IHostElement | null {
-    return node.parent ?? null;
+    return parentOf(node) ?? null;
   }
 
   nextSibling(node: IHostNode): IHostNode | null {
-    const siblings =
-      node.parent !== undefined ? node.parent.children : this.surface.children;
-    const index = siblings.indexOf(node);
-    return index >= 0 ? (siblings[index + 1] ?? null) : null;
+    // `?? null` because Renderer2 types the miss as null; the engine answers undefined
+    // uniformly and owns the top-level fallback through the surface it is handed.
+    return nextSiblingOf(node, this.surface) ?? null;
   }
 
   // locateHostElement always routes createComponent's `hostElement` THROUGH here as
