@@ -512,6 +512,49 @@ loses a prop written in the same tick.
 Anyone building the second cut inherits that shape: **a buffer keyed on node identity owes a
 liveness answer, and removal is not one.**
 
+### Step 2's shape is DECIDED BY `fabricProps`, and it rules out the obvious design
+
+The natural reading of "the buffer carries the edits" is: `setProp` writes `{key, value}` into the
+buffer, the commit hands that straight to `cloneNodeWithNewProps`, and `diffProps` disappears —
+one of the two diffs §7 names as ours and removable. **That design is wrong, and the reason is
+structural rather than a detail to work around.**
+
+`fabricProps` (`core/engine/src/fabric-props.ts`) is a WHOLE-BAG fold, three times over, and each
+fold can rewrite keys nobody wrote:
+
+```
+foldAriaProps        aria-checked  ->  accessibilityState      gated on node.hasAriaAlias
+node.payloadFold     readOnly      ->  editable                lowered primitives only
+foldTextInputValue   value         ->  text                    the two TextInput views
+addStyle             class         ->  ~20 flattened style keys
+```
+
+So a raw edit does not map to a payload edit, and the mapping is not even per-key: writing one
+`class` moves twenty payload keys, and writing `aria-checked` moves a key the adapter never named.
+
+**And folding at WRITE time is not merely more expensive, it is incorrect.** The aria fold's own
+comment says why: `aria-checked` has to be folded against a sibling `accessibilityState`, and
+`routeProp` sees one key at a time. `fabricProps` is deliberately "THE ONE POINT WHERE THE WHOLE
+BAG IS KNOWN ON EVERY PATH". A fold needs the settled bag, so it cannot move to the mutation site,
+and therefore the buffer cannot hold Fabric-level pairs.
+
+What survives: **the buffer holds the adapter's OPERATIONS in order** — create / insert / remove /
+setProp / setText, at the level the adapter issued them — and the fold runs at DRAIN time, where
+the bag is settled, exactly as it does today. That is still the shape a native drain consumes,
+because the payload crossing to C++ has to be folded first either way and the fold is our policy
+layer, not something C++ can take over.
+
+Two consequences worth stating before anyone plans the work:
+
+- **`diffProps` does NOT go away with step 2.** It is downstream of the fold, so knowing which raw
+  keys changed does not tell you which payload keys changed. Removing it is a separate question and
+  may have no answer.
+- **Step 2 is ONE change, not a series of safe slices.** An ordered op log that nothing drains is a
+  reachable symbol with no consumer — the shape `.claude/rules/adapter-parity-audit.md` records as
+  the quietest failure here — and the log only pays off when the drain REPLACES the walk. Splitting
+  it into "add the log now, consume it later" would be exactly the dishonest split
+  `<adapters_reach_full_feature_parity>` forbids elsewhere. Land it whole or not at all.
+
 ## 7b. Where the PENDING tree lives — searched exhaustively, 2026-09-05
 
 The question that decides whether navigation can be answered by native: does C++ retain a
