@@ -275,6 +275,80 @@ two changed nodes on a 1 000-row Select).
 So the target is not "remove the record" (impossible — §1) and not "let Fabric diff for us"
 (it already does). It is: **keep the record, delete the WALK.**
 
+## 7a. "Commands instead of a diff" — the ingress can, the egress never can
+
+A recurring proposal, and it conflates two stages. **We do not send a diff today**: we send a
+TREE, and C++ computes the diff. So the question splits:
+
+```
+ingress   what JS hands native          today: a new tree      as commands: YES, and no patch
+egress    what the mounting layer eats  mutations from a diff  as commands: NEVER
+```
+
+The ingress is §6a: buffer commands in our own module, apply them with `cloneMultiple` inside a
+registered commit hook. Public API throughout.
+
+**The egress cannot be commands, and the reason is Yoga, not API taste.** `mounting/ShadowTree.cpp:409`,
+inside `tryCommit`:
+
+```cpp
+newRootShadowNode->layoutIfNeeded(&affectedLayoutableNodes);
+```
+
+Layout runs INSIDE the commit, on the NEW root, before the revision is published. And
+`mounting/ShadowView.cpp:36-52` — the equality the differ decides mutations by — includes
+`layoutMetrics` in its `std::tie`.
+
+So the differ compares not what you CHANGED but what RESULTED after Yoga. One command
+(`opacity = 0.5` on one node) can produce fourteen `Update` mutations because fourteen siblings
+got new frames. **A command list formed in JS could not have named them — those frames did not
+exist yet.**
+
+The differ is therefore not bookkeeping we duplicate. It is where Yoga's output enters. Patching
+it away means reimplementing incremental layout reconciliation — taking on RN's hardest layer in
+the name of removing ours.
+
+## 9. The target contract — DECIDED 2026-09-05, implementation order deliberately staged
+
+The goal is architectural, not performance (§6a's last paragraph): adapters must drive a HOST,
+never our record. Whether the engine keeps a per-node handle internally is an implementation
+detail the adapter never sees. Those two were conflated for several rounds of discussion; they
+are not the same requirement, and only the first is the goal.
+
+The seam an adapter sees:
+
+```
+attach(frameworkObject) -> address        an address, not our node type
+edit(address, key, value)                 O(1) at the call site
+insert / remove / move(parent, child, i)  O(1) at the call site
+flush()                                   transaction boundary
+```
+
+This is the DOM's shape (`el.setAttribute`, `parent.insertBefore`). The adapter uses its own
+structure, its own scheduler, its own batching; the engine never diffs, never searches, never
+decides what changed — it was told.
+
+**Why the seam is the fix rather than the problem.** An adapter already speaks this way today:
+`setProp(node, 'color', 'red')` names the node and the key exactly. The engine then erases that
+precision into a boolean (`propsDirty`) and rediscovers it by walking — `VISITED 1046` for two
+changed nodes. The defect is a LOSSY seam, not the existence of one. Making it lossless is the
+work.
+
+**`flush()` stays, and it is the one place the contract cannot be browser-shaped.** The host is
+commit-only and `ShadowTree::commit` is a retried transaction (§5). That is RN's constraint, not
+ours — everything else on this list was ours.
+
+### Order — the contract ships BEFORE any C++
+
+1. **Introduce the contract in JS.** The edit queue IS its implementation. Adapters stop seeing
+   the retained tree; the architectural goal lands with zero native work.
+2. **Optionally swap the implementation to native later** — `cloneMultiple` in a commit hook, on
+   the batch step 1 already produces.
+
+The API an adapter sees is IDENTICAL under both, so step 2 changes no adapter code. This is what
+decouples the architectural goal from a standing C++ maintenance obligation: the goal is reached
+at step 1, and native becomes an optimisation under the same seam rather than a precondition.
+
 ## 8. Open, in priority order
 
 1. **Edit queue instead of the walk.** Pure engine, no native work. An adapter mutation records
