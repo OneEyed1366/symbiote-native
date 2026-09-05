@@ -10,7 +10,12 @@
 // commit mirror); this only unwraps the Solid-shaped inputs onto it. An uncommitted or unknown input
 // has no tag yet and surfaces as null.
 
-import { getNativeTag, isSymbioteNode, dlog } from '@symbiote-native/engine';
+import {
+  componentOf,
+  getNativeTag,
+  isSymbioteNode,
+  dlog,
+} from '@symbiote-native/engine';
 
 // The public instance a Solid host ref hands back: the engine node itself. Re-exported from the
 // engine so a call site reads in parity with the React and Vue adapters.
@@ -33,7 +38,7 @@ export function findNodeHandle(componentOrHandle: unknown): number | null {
   if (typeof candidate === 'number') return candidate;
   if (isSymbioteNode(candidate)) {
     const tag = getNativeTag(candidate) ?? null;
-    dlog(`findNodeHandle: component=${candidate.component} tag=${tag}`);
+    dlog(`findNodeHandle: component=${componentOf(candidate)} tag=${tag}`);
     return tag;
   }
   dlog('findNodeHandle: input did not resolve to a symbiote host node');
