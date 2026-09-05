@@ -47,6 +47,7 @@ import {
   sweepDroppedEdits,
 } from './edit-buffer';
 import { dlog, isDebug } from './debug';
+import { childrenOf, replaceChildren } from './tree';
 import { flattenStyle } from './style';
 import { nextTag } from './tags';
 import { registerPostCommit, runPostCommitHooks } from './post-commit';
@@ -270,19 +271,20 @@ function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
   // see the childScan declaration for what the five counters mean and what they were built to
   // settle.
   childScan.scans += 1;
-  const total = node.children.length;
+  const kids = childrenOf(node);
+  const total = kids.length;
   let index = 0;
-  while (index < total && !isSkippedAtCommit(node.children[index])) index += 1;
+  while (index < total && !isSkippedAtCommit(kids[index])) index += 1;
   // The defeating child was examined too, so it counts.
   childScan.probed += index === total ? total : index + 1;
-  if (index === total) return node.children;
+  if (index === total) return kids;
 
   childScan.flattens += 1;
   childScan.flattenProbed += total;
   if (total > childScan.widest) childScan.widest = total;
 
   const children: ISymbioteNode[] = [];
-  for (const child of node.children) {
+  for (const child of kids) {
     if (isSkippedAtCommit(child)) {
       // A skipped child is flattened away here and never reaches reconcile, so this is the only
       // place that can drain its buffer entry. Leaving it recorded would be a silent stale-UI bug:
@@ -333,7 +335,7 @@ function logScrollChildren(
   // goes first: with logging off this is one property read instead of two string scans per node.
   if (!isDebug()) return;
   if (!viewName.includes('Scroll') || viewName.includes('Content')) return;
-  const kids = node.children.map(child => {
+  const kids = childrenOf(node).map(child => {
     const committed = committedOf(child);
     return `${committed?.viewName ?? child.component}#${committed?.tag ?? 'NEW'}`;
   });
@@ -668,7 +670,7 @@ export function commitChildren(
   // The wrapper holds the surface's top-level children; reconcile walks from it so the
   // whole tree, synthetic root included, goes through the same clone-on-write path.
   const container = rootContainerFor(rootTag);
-  container.children = children.slice();
+  replaceChildren(container, children);
   markStructureDirty(container);
   commitContainer(rootTag);
 }
@@ -695,12 +697,12 @@ function commitContainer(rootTag: IRootTag): void {
   // that `removeChild` unlinked is now either back under a parent (a framework spelling a move as
   // remove-then-reinsert) or gone for good. Costs one Set-size read until an app registers its
   // first host behavior. See host-behavior.ts for why removal cannot answer this itself.
-  sweepDetachedBehaviors(container.children);
+  sweepDetachedBehaviors(childrenOf(container));
   // The buffer's half of the same question, and it runs unconditionally where the behavior sweep
   // above is gated: every node holds buffer entries, so a node that left for good and is never
   // walked again would be pinned by the buffer forever. Same nominate-then-decide shape, same
   // liveness test, deliberately the same tick.
-  sweepDroppedEdits(container.children);
+  sweepDroppedEdits(childrenOf(container));
 
   stats.created = 0;
   stats.cloneProps = 0;
@@ -710,7 +712,7 @@ function commitContainer(rootTag: IRootTag): void {
   // but `reconciled` never does, the stall is inside reconcile (a JS loop/cycle in the
   // tree walk); if `start` itself never prints, the stall is upstream: React's commit
   // phase or the mutation ops before we are even called.
-  dlog(`commit root=${rootTag} start children=${container.children.length}`);
+  dlog(`commit root=${rootTag} start children=${childrenOf(container).length}`);
   const walkStart = performance.now();
   const result = reconcile(slot, container, rootTag, false, undefined, false);
   const walkMs = performance.now() - walkStart;

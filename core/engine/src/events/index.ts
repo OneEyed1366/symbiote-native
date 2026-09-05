@@ -16,6 +16,7 @@ import {
   type ISymbioteNode,
 } from '../node';
 import { registeredNativeEvent } from '../registry';
+import { parentOf } from '../tree';
 import {
   attachTouchHistory,
   recordTouchTrack,
@@ -198,7 +199,11 @@ function hasListenerInPath(
   target: ISymbioteNode,
   listenerName: string,
 ): boolean {
-  for (let node: ISymbioteNode | undefined = target; node; node = node.parent) {
+  for (
+    let node: ISymbioteNode | undefined = target;
+    node;
+    node = parentOf(node)
+  ) {
     if (node.listeners?.has(listenerName) === true) return true;
   }
   return false;
@@ -226,7 +231,7 @@ function callOwnListener(
 // the two-phase walk indexes both ways (capture reads it reversed).
 function pathToRoot(from: ISymbioteNode): ISymbioteNode[] {
   const path: ISymbioteNode[] = [];
-  for (let node: ISymbioteNode | undefined = from; node; node = node.parent)
+  for (let node: ISymbioteNode | undefined = from; node; node = parentOf(node))
     path.push(node);
   return path;
 }
@@ -235,7 +240,8 @@ function pathToRoot(from: ISymbioteNode): ISymbioteNode[] {
 // climb to their lowest common ancestor.
 function depthOf(node: ISymbioteNode): number {
   let depth = 0;
-  for (let n: ISymbioteNode | undefined = node.parent; n; n = n.parent) depth++;
+  for (let n: ISymbioteNode | undefined = parentOf(node); n; n = parentOf(n))
+    depth++;
   return depth;
 }
 
@@ -251,17 +257,17 @@ function lowestCommonAncestor(
   let na: ISymbioteNode | undefined = a;
   let nb: ISymbioteNode | undefined = b;
   while (na && da > db) {
-    na = na.parent;
+    na = parentOf(na);
     da--;
   }
   while (nb && db > da) {
-    nb = nb.parent;
+    nb = parentOf(nb);
     db--;
   }
   while (na && nb) {
     if (na === nb) return na;
-    na = na.parent;
-    nb = nb.parent;
+    na = parentOf(na);
+    nb = parentOf(nb);
   }
   return undefined;
 }
@@ -600,7 +606,7 @@ function endsWithin(endTarget: ISymbioteNode, start: ISymbioteNode): boolean {
   let node: ISymbioteNode | undefined = endTarget;
   while (node) {
     if (node === start) return true;
-    node = node.parent;
+    node = parentOf(node);
   }
   return false;
 }
@@ -668,7 +674,7 @@ function bubble(
       listener(event);
       if (stopped) return;
     }
-    node = node.parent;
+    node = parentOf(node);
   }
 }
 

@@ -27,6 +27,7 @@
 // `registerHostBehavior` emits a `dlog` precisely so `DEBUG=1` answers "did my registration run at
 // all" before anyone starts debugging the behavior itself.
 
+import { childrenOf, parentOf } from './tree';
 import { dlog } from './debug';
 import type { ISymbioteNode } from './node';
 
@@ -288,7 +289,7 @@ export function sweepDetachedBehaviors(
   // check alone would report a live node as gone.
   const seen = new Set<ISymbioteNode>();
   for (const node of detachCandidates) {
-    if (node.parent !== undefined || topLevel.includes(node)) continue;
+    if (parentOf(node) !== undefined || topLevel.includes(node)) continue;
     detachSubtree(node, seen);
   }
   detachCandidates.clear();
@@ -320,7 +321,7 @@ function detachSubtree(node: ISymbioteNode, seen: Set<ISymbioteNode>): void {
   committedEachTime.delete(node);
   // The map, not the registry: by here only the Fabric name is left on the node.
   attached.get(node)?.detach(node);
-  for (const child of node.children) detachSubtree(child, seen);
+  for (const child of childrenOf(node)) detachSubtree(child, seen);
 }
 
 // Re-arms a node the sweep tore down but that the framework put back. Called from appendChild and
@@ -343,7 +344,7 @@ function reattachSubtree(node: ISymbioteNode): void {
     if (behavior?.attachAfterCommit !== undefined) awaitingCommit.add(node);
     if (behavior?.afterCommit !== undefined) committedEachTime.add(node);
   }
-  for (const child of node.children) reattachSubtree(child);
+  for (const child of childrenOf(node)) reattachSubtree(child);
 }
 
 // Test-only. A registry is module state, so a suite that registers a behavior leaks it into every

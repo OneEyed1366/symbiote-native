@@ -14,6 +14,7 @@ import type {
   IMeasureLayoutOnSuccess,
 } from './fabric';
 import { isAriaAliasKey } from './accessibility-props';
+import { childrenOf, linkAppend, linkBefore, parentOf, unlink } from './tree';
 import {
   nominateDroppedEdits,
   recordNewNode,
@@ -481,7 +482,7 @@ export function markStructureDirty(parent: ISymbioteNode): void {
   recordStructureEdit(parent);
   let ancestor: ISymbioteNode | undefined = parent;
   while (ancestor !== undefined && isAnchor(ancestor)) {
-    ancestor = ancestor.parent;
+    ancestor = parentOf(ancestor);
     if (ancestor !== undefined) recordStructureEdit(ancestor);
   }
 }
@@ -1044,15 +1045,13 @@ export function setText(node: ISymbioteNode, text: string): void {
 // Each marks BEFORE touching `parent.children`, never after: the committed record may be aliasing
 // that array, and markStructureDirty is what copies it out of the way. See there.
 function detach(child: ISymbioteNode): void {
-  const parent = child.parent;
+  const parent = parentOf(child);
   if (!parent) return;
   // Nominate, do not drop: this is reached from appendChild/insertBefore, so the node is about to
   // be re-parented and its pending entries must survive. `sweepDroppedEdits` decides at commit.
   nominateDroppedEdits(child);
   markStructureDirty(parent);
-  const index = parent.children.indexOf(child);
-  if (index >= 0) parent.children.splice(index, 1);
-  child.parent = undefined;
+  unlink(parent, child);
 }
 
 export function appendChild(parent: ISymbioteNode, child: ISymbioteNode): void {
@@ -1061,8 +1060,7 @@ export function appendChild(parent: ISymbioteNode, child: ISymbioteNode): void {
   if (hasHostBehaviors()) reattachHostBehaviors(child);
   detach(child);
   markStructureDirty(parent);
-  child.parent = parent;
-  parent.children.push(child);
+  linkAppend(parent, child);
 }
 
 export function insertBefore(
@@ -1073,9 +1071,7 @@ export function insertBefore(
   if (hasHostBehaviors()) reattachHostBehaviors(child);
   detach(child);
   markStructureDirty(parent);
-  child.parent = parent;
-  const index = parent.children.indexOf(beforeChild);
-  parent.children.splice(index < 0 ? parent.children.length : index, 0, child);
+  linkBefore(parent, child, beforeChild);
 }
 
 // Removal only NOMINATES a behavior for teardown; the commit sweep decides. A framework may spell
@@ -1088,9 +1084,7 @@ export function removeChild(parent: ISymbioteNode, child: ISymbioteNode): void {
   // seeds all three) and every one of them is a leak if nothing sweeps.
   nominateDroppedEdits(child);
   markStructureDirty(parent);
-  const index = parent.children.indexOf(child);
-  if (index >= 0) parent.children.splice(index, 1);
-  child.parent = undefined;
+  unlink(parent, child);
 }
 
 // A structural census of a retained tree: how many nodes it holds, how many of those the commit
@@ -1137,9 +1131,10 @@ export function censusRetainedTree(
     if (isAnchor(node)) census.anchors += 1;
     else if (isEmptyRawText(node)) census.emptyRawTexts += 1;
     else census.renderable += 1;
-    if (node.children.some(child => isAnchor(child) || isEmptyRawText(child)))
-      census.flattenWidths.push(node.children.length);
-    for (const child of node.children) stack.push(child);
+    const kids = childrenOf(node);
+    if (kids.some(child => isAnchor(child) || isEmptyRawText(child)))
+      census.flattenWidths.push(kids.length);
+    for (const child of kids) stack.push(child);
   }
   census.flattenWidths.sort((left, right) => right - left);
   return census;

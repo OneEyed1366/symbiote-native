@@ -22,6 +22,7 @@
 // a top-level node deliberately carries `parent === undefined`.
 
 import type { ISymbioteNode } from './node';
+import { childrenOf, parentOf } from './tree';
 
 // "This node, or something under it, has pending work." The subtree question the commit walk asks
 // before descending, and the one `commitTargeted` asks before taking its short route.
@@ -47,7 +48,7 @@ export function recordSubtreeEdit(node: ISymbioteNode): void {
   let current: ISymbioteNode | undefined = node;
   while (current !== undefined && !pendingPath.has(current)) {
     pendingPath.add(current);
-    current = current.parent;
+    current = parentOf(current);
   }
 }
 
@@ -79,8 +80,9 @@ export function recordPropEdit(node: ISymbioteNode): void {
  */
 export function recordStructureEdit(parent: ISymbioteNode): void {
   const record = parent.committed;
-  if (record !== undefined && record.children === parent.children) {
-    record.children = parent.children.slice();
+  const kids = childrenOf(parent);
+  if (record !== undefined && record.children === kids) {
+    record.children = kids.slice();
   }
   pendingStructure.add(parent);
   recordSubtreeEdit(parent);
@@ -117,7 +119,7 @@ export function hasPendingStructure(node: ISymbioteNode): boolean {
 
 /** Whether any direct child of `node` carries pending work — `commitTargeted`'s descendant bail. */
 export function hasPendingChild(node: ISymbioteNode): boolean {
-  return node.children.some(child => pendingPath.has(child));
+  return childrenOf(node).some(child => pendingPath.has(child));
 }
 
 /**
@@ -175,7 +177,7 @@ export function nominateDroppedEdits(node: ISymbioteNode): void {
 export function sweepDroppedEdits(topLevel: readonly ISymbioteNode[]): void {
   if (droppedCandidates.size === 0) return;
   for (const node of droppedCandidates) {
-    if (node.parent !== undefined || topLevel.includes(node)) continue;
+    if (parentOf(node) !== undefined || topLevel.includes(node)) continue;
     dropSubtree(node);
   }
   droppedCandidates.clear();
@@ -185,7 +187,7 @@ function dropSubtree(node: ISymbioteNode): void {
   pendingPath.delete(node);
   pendingProps.delete(node);
   pendingStructure.delete(node);
-  for (const child of node.children) dropSubtree(child);
+  for (const child of childrenOf(node)) dropSubtree(child);
 }
 
 /**

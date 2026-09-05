@@ -19,11 +19,15 @@
 // and §7b.
 //
 // So these accessors exist to give adapters the navigation their seams require WITHOUT handing them
-// the node's fields. Today every seam reads `node.parent` / `node.children` directly (8 reads in
+// the node's fields. Since 2026-09-05 these delegate to `tree.ts`, the engine's ONE structural
+// seam, so the adapter-facing accessors and the engine's own reads share a single backing and a
+// single swap. The historical note: every seam used to read `node.parent` / `node.children`
+// directly (8 reads in
 // Solid's renderer, 12 in Vue's, 13 in Angular's), which couples each adapter to the retained
 // tree's shape and blocks any change to it. Routing them here is what makes the representation
 // ours to change — the whole point of the contract in that skill's §9.
 
+import { childrenOf, parentOf } from './tree';
 import { RAW_TEXT_COMPONENT, type ISymbioteNode } from './node';
 import type { SymbioteSurface } from './surface';
 
@@ -33,9 +37,7 @@ import type { SymbioteSurface } from './surface';
  * A top-level node deliberately carries `parent === undefined` (surface.ts sets it), so this
  * answering `undefined` is not the same question as "is this node attached".
  */
-export function parentOf(node: ISymbioteNode): ISymbioteNode | undefined {
-  return node.parent;
-}
+export { parentOf } from './tree';
 
 /**
  * The node's children, INCLUDING anchors.
@@ -45,13 +47,11 @@ export function parentOf(node: ISymbioteNode): ISymbioteNode | undefined {
  * solid-js/universal keeps its own record of what it inserted and re-derives positions through
  * these lookups, so a node it placed must be a node it can find.
  */
-export function childrenOf(node: ISymbioteNode): readonly ISymbioteNode[] {
-  return node.children;
-}
+export { childrenOf } from './tree';
 
 /** The first child, anchors included, or `undefined` for a leaf. */
 export function firstChildOf(node: ISymbioteNode): ISymbioteNode | undefined {
-  return node.children[0];
+  return childrenOf(node)[0];
 }
 
 /**
@@ -66,7 +66,9 @@ export function nextSiblingOf(
   surface?: SymbioteSurface,
 ): ISymbioteNode | undefined {
   const siblings =
-    node.parent !== undefined ? node.parent.children : surface?.children;
+    parentOf(node) !== undefined
+      ? childrenOf(parentOf(node) as ISymbioteNode)
+      : surface?.children;
   if (siblings === undefined) return undefined;
   const index = siblings.indexOf(node);
   return index < 0 ? undefined : siblings[index + 1];

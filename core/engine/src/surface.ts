@@ -8,6 +8,7 @@ import { dlog } from './debug';
 import { installEventHandler } from './events';
 import { markStructureDirty, type ISymbioteNode } from './node';
 import { nominateDroppedEdits } from './edit-buffer';
+import { parentOf, unlink, unlinkFromParent } from './tree';
 
 export class SymbioteSurface {
   readonly rootTag: IRootTag;
@@ -20,13 +21,13 @@ export class SymbioteSurface {
 
   appendChild(child: ISymbioteNode): void {
     this.detach(child);
-    child.parent = undefined;
+    unlinkFromParent(child);
     this.children.push(child);
   }
 
   insertBefore(child: ISymbioteNode, beforeChild: ISymbioteNode): void {
     this.detach(child);
-    child.parent = undefined;
+    unlinkFromParent(child);
     const index = this.children.indexOf(beforeChild);
     this.children.splice(index < 0 ? this.children.length : index, 0, child);
   }
@@ -67,7 +68,7 @@ export class SymbioteSurface {
   // looking clean and the commit walk skips right over the hole, and commitTargeted would rebuild
   // that parent's child set from a snapshot that still contains the removed node.
   private detach(child: ISymbioteNode): void {
-    const parent = child.parent;
+    const parent = parentOf(child);
     // Nominates on BOTH branches, and only nominates: this is reached from appendChild /
     // insertBefore, so the node is usually about to be re-listed. See sweepDroppedEdits.
     nominateDroppedEdits(child);
@@ -75,9 +76,7 @@ export class SymbioteSurface {
       // Marks before the splice, like node.ts's own structural ops: the committed record may be
       // aliasing `parent.children`, and this call is what copies it out of the way.
       markStructureDirty(parent);
-      const index = parent.children.indexOf(child);
-      if (index >= 0) parent.children.splice(index, 1);
-      child.parent = undefined;
+      unlink(parent, child);
       return;
     }
     const topIndex = this.children.indexOf(child);
