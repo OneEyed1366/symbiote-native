@@ -291,6 +291,20 @@ function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
       // an empty raw text back into real content - and the real parent never learns anything
       // changed.
       clearPendingWork(child);
+      // AND drop its committed record, because a skipped node has no Fabric presence and its old
+      // handle is now orphaned. Keeping it is what lets a stale FAMILY come back: `committed.parent`
+      // holds the RETAINED node, which survives its own Fabric re-creation, so a node skipped
+      // across a commit that re-created its parent later reads `committed.parent === renderableParent`
+      // and takes the UPDATE path — adopting a handle whose family belongs to the parent's previous
+      // Fabric node. Fabric refuses that in C++ (`ShadowNode` families cannot be reparented), so on
+      // a device it is a native abort rather than a misrender.
+      //
+      // Unconditional rather than "only when the parent was re-created": the skipped node is not
+      // visited during that commit, so there is no moment at which it could be told. The cost is one
+      // `createNode` when an empty text becomes non-empty again, which is rare and is the safe
+      // direction. Found by the fuzzer one value after its generator learned to write '' — see
+      // `skipped-node-family.test.ts` for the ten-step reproduction it shrank to.
+      child.committed = undefined;
       if (isAnchor(child)) children.push(...renderableChildren(child));
     } else children.push(child);
   }

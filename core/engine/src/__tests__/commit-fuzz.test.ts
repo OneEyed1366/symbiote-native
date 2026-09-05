@@ -372,18 +372,28 @@ function runProgram(steps: readonly IStep[]): string | undefined {
   const surface = createSurface(nextRootTag);
   const pool: ISymbioteNode[] = [];
 
-  for (let index = 0; index < steps.length; index += 1) {
-    const step = steps[index];
-    if (step === undefined) continue;
-    applyStep(step, pool, surface);
-    if (step.kind !== 'commit') continue;
-    surface.commit();
-    const violation = findViolation(fabric, surface);
-    if (violation !== undefined) return `at step ${index}\n${violation}`;
-  }
+  // A THROW is a violation, not a crash to let escape. The fake slot enforces real Fabric
+  // invariants the oracles cannot express — `assertSameFamily` is the sharp one, since a clone
+  // keeps its family and reparenting one aborts NATIVELY rather than misrendering. Letting it
+  // propagate fails the test with a stack and no reproduction, because the shrinker never runs.
+  // Measured 2026-09-05: widening the generator by ONE value (an empty text) produced exactly
+  // that on unmodified code, and the throw WAS the finding.
+  try {
+    for (let index = 0; index < steps.length; index += 1) {
+      const step = steps[index];
+      if (step === undefined) continue;
+      applyStep(step, pool, surface);
+      if (step.kind !== 'commit') continue;
+      surface.commit();
+      const violation = findViolation(fabric, surface);
+      if (violation !== undefined) return `at step ${index}\n${violation}`;
+    }
 
-  // A final commit, so a program whose last step was a mutation is still checked.
-  surface.commit();
+    // A final commit, so a program whose last step was a mutation is still checked.
+    surface.commit();
+  } catch (error) {
+    return `THREW\n  ${error instanceof Error ? error.message : String(error)}`;
+  }
   const violation = findViolation(fabric, surface);
   return violation === undefined
     ? undefined
@@ -489,7 +499,13 @@ function applyStep(
         step.a,
       );
       if (node === undefined) return;
-      setText(node, `t${step.value}`);
+      // The EMPTY string is generated deliberately, not as an edge case for its own sake: an empty
+      // RCTRawText is SKIPPED at commit (`isSkippedAtCommit`), so writing '' or writing over it
+      // changes the parent's RENDERABLE child list without any structural op happening anywhere.
+      // That is the same attribution hazard anchors have, reached through a prop write, and the
+      // generator could not express it — every value was `t0`..`t999`, never ''. Found while
+      // measuring the commit's skeleton reads, 2026-09-05.
+      setText(node, step.value % 5 === 0 ? '' : `t${step.value}`);
       return;
     }
   }
@@ -556,22 +572,33 @@ function describeProgram(steps: readonly IStep[]): string {
 const SEED_COUNT = Number(process.env.SYMBIOTE_FUZZ_SEEDS ?? '40');
 const STEP_COUNT = Number(process.env.SYMBIOTE_FUZZ_STEPS ?? '60');
 
+// Scaled to the workload, because this loop is MEANT to be cranked up and vitest's 5s default
+// turns a deep run into a red that reads as a defect. Measured 2026-09-05: 5000 x 250 is 1.25M
+// steps and takes ~10s, which the default rejects — and the failure text says "Test timed out",
+// not "the engine is wrong", so it costs a reader a round to tell them apart. Generous rather than
+// tight: the number exists to keep a hang from wedging CI, not to police speed.
+const FUZZ_TIMEOUT_MS = Math.max(30_000, SEED_COUNT * STEP_COUNT * 0.2);
+
 describe('commit fuzz — four oracles over a seeded mutation program', () => {
-  it(`holds over ${SEED_COUNT} programs of ${STEP_COUNT} steps`, () => {
-    const failures: string[] = [];
-    for (let seed = 1; seed <= SEED_COUNT; seed += 1) {
-      const program = generateProgram(seed, STEP_COUNT);
-      if (runProgram(program) === undefined) continue;
-      const minimal = shrink(program);
-      failures.push(
-        `seed ${seed} — shrunk from ${STEP_COUNT} to ${minimal.steps.length} steps\n` +
-          `${describeProgram(minimal.steps)}\n${minimal.violation}`,
-      );
-      // One reproduction is what a reader acts on; twenty is a wall.
-      break;
-    }
-    expect(failures.join('\n\n')).toBe('');
-  });
+  it(
+    `holds over ${SEED_COUNT} programs of ${STEP_COUNT} steps`,
+    () => {
+      const failures: string[] = [];
+      for (let seed = 1; seed <= SEED_COUNT; seed += 1) {
+        const program = generateProgram(seed, STEP_COUNT);
+        if (runProgram(program) === undefined) continue;
+        const minimal = shrink(program);
+        failures.push(
+          `seed ${seed} — shrunk from ${STEP_COUNT} to ${minimal.steps.length} steps\n` +
+            `${describeProgram(minimal.steps)}\n${minimal.violation}`,
+        );
+        // One reproduction is what a reader acts on; twenty is a wall.
+        break;
+      }
+      expect(failures.join('\n\n')).toBe('');
+    },
+    FUZZ_TIMEOUT_MS,
+  );
 
   // ── BREAK ARMS ────────────────────────────────────────────────────────────────────────────────
   // Each reproduces a defect one oracle exists for, WITHOUT touching the engine — so these run in
