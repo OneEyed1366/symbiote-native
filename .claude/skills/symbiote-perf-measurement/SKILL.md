@@ -2331,7 +2331,19 @@ Generalise it as: **when the thing you are optimising is invisible to every runt
 test belongs on the source, not on the behaviour** — and check that the behavioural test you were
 about to write can actually fail before trusting it.
 
-## A "touched-set instead of the walk" rewrite was measured and DECLINED — the residual is protocol
+## A "touched-set" rewrite: the SPEED case is dead, the ARCHITECTURAL case is not — do not conflate
+
+**Corrected 2026-09-05, same day, after the first version of this section got it wrong.** It was
+written as "measured and DECLINED", which took a performance measurement and used it to close an
+item that was on the list for two reasons. The numbers below are sound and the conclusion drawn
+from them was not: the buffer exists so the adapter's knowledge reaches the engine intact, and a
+microsecond count cannot speak to that. Kept here in full, because the measurement is exactly the
+right INPUT TO SCOPING — it says do not sell the buffer as a speed win and do not over-engineer it
+for O(k) — and because the substitution it demonstrates is worth recognising:
+
+**a measurement can only decide the question it measured.** An item justified on two grounds needs
+both answered; measuring the cheaper one and reporting a verdict on the whole is how architectural
+work gets closed by a benchmark that was never about it.
 
 Recurring proposal, and it sounds obviously right: the commit walk visits every child of a dirty
 parent (`VISITED 1046` for two changed nodes on a 1 000-row list), so replace the boolean dirty
@@ -2361,9 +2373,13 @@ told us what changed and we go looking for it again". Half true — the visits a
 array rebuild beside them is protocol-mandated. **The number is large and the time is not**, which
 is exactly why a count is not a cost.
 
-What survives as worth doing, unmeasured and smaller: cache the child-handle ARRAY on the mirror so
-a dirty parent stops allocating a fresh N-element array per commit. Contained, no structural risk,
-and the bench above measures it directly.
+What the numbers legitimately constrain: expect the buffer to be **performance-neutral**, and hold
+it to that rather than to a win. A wide flat parent must still hand `cloneNodeWithNewChildren` all N
+handles, so `VISITED`/`WRITES`/FABRIC counters should come out byte-identical — which makes them a
+correctness oracle for the change rather than a scoreboard.
+
+Separately, and genuinely small: caching the child-handle ARRAY on the mirror stops a dirty parent
+allocating a fresh N-element array per commit. Contained, and the bench above measures it directly.
 
 ## `flush()` "moving to the adapters" was already done — under two other names
 
