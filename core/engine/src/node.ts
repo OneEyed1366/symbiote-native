@@ -461,8 +461,29 @@ export function markPropsDirty(node: ISymbioteNode): void {
 //
 // Every caller must reach here BEFORE mutating `parent.children`. That ordering is load-bearing
 // rather than stylistic, and `recordStructureEdit` is where the copy-on-write it protects lives.
+//
+// AND against the nearest RENDERABLE ancestor, when the parent is an anchor. An anchor never
+// becomes a Fabric view: `renderableChildren` (commit.ts) flattens it away and its children take
+// its place in the child list of the first non-anchor ancestor above it. So an append under an
+// anchor changes THAT node's committed child list, and recording only against the anchor leaves the
+// one node whose snapshot actually went stale looking untouched.
+//
+// The walk is a loop rather than one step because anchors nest — Angular mounts one per composed
+// component, so an anchor's parent is very often another anchor.
+//
+// What it costs to omit, measured 2026-09-05 on the path that READS this record: `commitTargeted`
+// bails on `hasPendingStructure`, so without this it rebuilt the ancestor's child set from a
+// snapshot missing the new node and committed a tree the retained tree does not describe. The node
+// reached Fabric only if some later commit happened to walk the tree, and never at all if nothing
+// else asked for one. Predates the edit buffer — `markStructureDirty` has always been called on the
+// direct parent — and is guarded by `anchor-structure-attribution.test.ts`.
 export function markStructureDirty(parent: ISymbioteNode): void {
   recordStructureEdit(parent);
+  let ancestor: ISymbioteNode | undefined = parent;
+  while (ancestor !== undefined && isAnchor(ancestor)) {
+    ancestor = ancestor.parent;
+    if (ancestor !== undefined) recordStructureEdit(ancestor);
+  }
 }
 
 // How many prop writes actually landed, and how many the no-op guard below turned away.
