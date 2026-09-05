@@ -14,7 +14,11 @@ description: >-
   can exist; and Differentiator::calculateShadowViewMutations, which means Fabric ALREADY does
   the granular native update. Also: why patching RN's C++ is expensive (prebuilt
   React.xcframework) and why the viable route is ADDING a JSI host object from our own native
-  module, with its cost. Trigger on 'why do we keep a shadow tree', 'read the tree from C++',
+  module, with its cost. **AND §8 IS THE WORK ORDER for removing the engine's JS shadow tree —
+  what has landed, what is next, and what each item is blocked on. Read it before starting or
+  planning any of that work; do not re-derive the sequence.** Trigger on 'work order', 'what is
+  next on the skeleton', 'remove the shadow tree', 'edit buffer', 'drain the buffer',
+  'why do we keep a shadow tree', 'read the tree from C++',
   'commit directly to Fabric', 'patch ReactCommon', 'setNativeProps', 'cloneTree',
   'ShadowNodeFamily', 'granular update', 'clone-bubble', 'O(siblings)', or any proposal to
   replace the engine with direct native calls.
@@ -31,6 +35,12 @@ npm pack react-native@0.86.0 && tar -xzf react-native-0.86.0.tgz
 ```
 
 Paths below are relative to `package/ReactCommon/react/renderer/`.
+
+**Sections are in measurement order, not reading order, and their numbers are load-bearing — nine
+files outside this skill cite `§9` by number, so nothing here may be renumbered.** If you came for
+the plan rather than for the C++: **§8, at the END of this file, is the WORK ORDER** — what has
+landed, what is next, and what each item waits on. §9 is the contract it implements. Everything
+before them is the evidence both rest on.
 
 ## 1. The JSI surface — 34 names, and not one reads the tree
 
@@ -354,6 +364,100 @@ The differ is therefore not bookkeeping we duplicate. It is where Yoga's output 
 it away means reimplementing incremental layout reconciliation — taking on RN's hardest layer in
 the name of removing ours.
 
+## 7b. Where the PENDING tree lives — searched exhaustively, 2026-09-05
+
+The question that decides whether navigation can be answered by native: does C++ retain a
+not-yet-committed tree between commits? Every plausible hiding place, checked:
+
+```
+ShadowTree private state          currentRevision_, currentReactRevision_,
+                                  reactRevisionToBePromoted_, mutexes, mountingCoordinator_    no
+LazyShadowTreeRevisionConsistency capturedRootShadowNodesForConsistency_ — FROZEN COMMITTED
+Manager                           roots, lockRevisions()/unlockRevisions(). The opposite of
+                                  pending: it pins the past so reads stay consistent            no
+AnimationBackend                  animatedPropsRegistry_ — a registry of EDITS; commits
+                                  immediately (AnimationBackend.cpp:170)                        no — it is a command buffer
+cloneTree / cloneMultiple         return a new root                                             YES, but see below
+React's own renderer              createChildSet -> appendChildToSet ->
+                                  completeRoot(tag, newChildren)  ReactFabric-dev.js:15963      builds it IN JS, from fibers
+grep pending|staging|inProgress|
+uncommitted over mounting/        zero hits                                                     —
+```
+
+**`cloneMultiple` does produce a tree before commit — as a LOCAL VALUE inside one transaction.**
+`tryCommit` builds it, runs Yoga on it, then publishes or discards it on retry. It is not a
+staging area that accumulates edits between commits. Between commits a surface has exactly one
+tree in C++: the committed one.
+
+And the decisive precedent: **RN's own client builds the pending tree in JS.** In persistent mode
+the tree-under-construction belongs to the committer by contract, which is why `completeRoot`
+takes a finished child set.
+
+### Correction: `getShadowTreeRegistry()` IS public
+
+`uimanager/UIManager.h:211` — `const ShadowTreeRegistry &getShadowTreeRegistry() const;`. An
+earlier note here said the registry was private and unreachable; that was wrong. A native module
+can visit any surface's `ShadowTree` and commit arbitrary transactions with no patch, exactly as
+`AnimationBackend.cpp:170` does.
+
+### So there are TWO viable designs, both correct, both patch-free
+
+```
+(1) JS skeleton    parent + children + address in JS; buffer drains into the clone-bubble
+(2) C++ pendingRoot our own native module retains pendingRoot_ per surface, applies each command
+                    with cloneMultiple, answers navigation from it, commits on flush
+```
+
+(2) is what leaves ONLY the buffer on the JS side, and it is the chosen direction (2026-09-05).
+
+### This CONTRADICTS §9's correction, and the contradiction is resolved by step 0 — read both
+
+Both were written on 2026-09-05 and they do not agree. Recorded rather than silently reconciled,
+because a reader will otherwise quote whichever half suits the instruction in front of them — which
+is exactly what nearly happened on 2026-09-05, when a session building the seam took §7b's "chosen
+direction" and wrote a design §6a rules out.
+
+```
+§9 CORRECTED   "only a buffer on our side" is DEAD; a navigable node stays.
+               "the navigable structure LIKELY stays in JS"           -> design (1)
+§7b            design (2) "is the chosen direction"                   -> design (2)
+```
+
+**They are not equally weighted, and the tie-break is in §8 rather than in either section.** §9's
+correction hedges on cost, not on capability — "likely", and its stated reason is that child
+navigation would be a per-call JSI read. §8's item 0 says the crossing constant is what decides
+between the two branches at all, and it has NOT been run. So §9 is design (1) CONDITIONAL on step 0 coming back expensive, and
+§7b is design (2) conditional on it coming back cheap. Neither is a standing decision; both are
+branches off one unmeasured number, and the number is still unmeasured.
+
+**What is NOT conditional, and holds under either branch:**
+
+- The buffer must carry the OPERATIONS, not merely which nodes were touched. Under (1) the drain
+  needs them to derive the new child order; under (2) `pendingRoot_` must be REBASED by re-applying
+  the command log inside a retried commit lambda (§5), so it is a memo of the buffer and useless
+  without one. Same requirement, two different reasons.
+- `NativeDOM` is not the mechanism for either. It is app-facing (§1a) and per-commit child reads are
+  strictly worse than a handle (§6a). A design naming it has taken a wrong turn.
+- The floor is not zero (§6a): a family handle per node, the root's child list, and `viewName` per
+  node survive both branches. The handle can ride on the framework's own object, so nothing
+  TREE-SHAPED stays ours — but "ours by ownership" and "does not exist" are different claims and only
+  the first is available.
+
+So the next decision is not "which design", it is "run step 0".
+
+**Its cost is a per-call JSI crossing plus a family->node resolution** whose phase 2 linearly
+scans each level's children (§6a). Arithmetic on this repo's own measured constant (~1.5 us per
+crossing): Solid's `cleanChildren` on 1 000 children is ~1 000 crossings ~= 1.5 ms plus 1 000
+resolutions, against microseconds for a JS array read. **That is arithmetic, not a benchmark** —
+and pricing it is step 0 below, because it sizes the whole design.
+
+**The retry semantics force the buffer to remain the source of truth.** `ShadowTree::commit` may
+re-run its lambda against a fresher root (§5), and another writer (an animation commit, a state
+update) can land in between — so a `pendingRoot_` built against an older root must be REBASED. The
+only way to rebase is to re-apply the command log inside the lambda. `pendingRoot_` is therefore a
+memo of the buffer, never a replacement for it, which is consistent with "only the buffer is
+ours".
+
 ## 9. The target contract — DECIDED 2026-09-05, implementation order deliberately staged
 
 The goal is architectural, not performance (§6a's last paragraph): adapters must drive a HOST,
@@ -625,116 +729,167 @@ Do NOT re-derive this coupling by reading the code. Re-run the accessor probe: i
 takes a minute, and it is the difference between "the commit walks the tree" (the intuition, and
 wrong in the way that matters) and "the commit reads one function's worth of the tree".
 
-## 7b. Where the PENDING tree lives — searched exhaustively, 2026-09-05
+### What else LANDED 2026-09-05, and which of it is a TOOL rather than a cut
 
-The question that decides whether navigation can be answered by native: does C++ retain a
-not-yet-committed tree between commits? Every plausible hiding place, checked:
-
-```
-ShadowTree private state          currentRevision_, currentReactRevision_,
-                                  reactRevisionToBePromoted_, mutexes, mountingCoordinator_    no
-LazyShadowTreeRevisionConsistency capturedRootShadowNodesForConsistency_ — FROZEN COMMITTED
-Manager                           roots, lockRevisions()/unlockRevisions(). The opposite of
-                                  pending: it pins the past so reads stay consistent            no
-AnimationBackend                  animatedPropsRegistry_ — a registry of EDITS; commits
-                                  immediately (AnimationBackend.cpp:170)                        no — it is a command buffer
-cloneTree / cloneMultiple         return a new root                                             YES, but see below
-React's own renderer              createChildSet -> appendChildToSet ->
-                                  completeRoot(tag, newChildren)  ReactFabric-dev.js:15963      builds it IN JS, from fibers
-grep pending|staging|inProgress|
-uncommitted over mounting/        zero hits                                                     —
-```
-
-**`cloneMultiple` does produce a tree before commit — as a LOCAL VALUE inside one transaction.**
-`tryCommit` builds it, runs Yoga on it, then publishes or discards it on retry. It is not a
-staging area that accumulates edits between commits. Between commits a surface has exactly one
-tree in C++: the committed one.
-
-And the decisive precedent: **RN's own client builds the pending tree in JS.** In persistent mode
-the tree-under-construction belongs to the committer by contract, which is why `completeRoot`
-takes a finished child set.
-
-### Correction: `getShadowTreeRegistry()` IS public
-
-`uimanager/UIManager.h:211` — `const ShadowTreeRegistry &getShadowTreeRegistry() const;`. An
-earlier note here said the registry was private and unreachable; that was wrong. A native module
-can visit any surface's `ShadowTree` and commit arbitrary transactions with no patch, exactly as
-`AnimationBackend.cpp:170` does.
-
-### So there are TWO viable designs, both correct, both patch-free
+The buffer above (`42415a3`) is one of FIVE code changes that shipped this day, and only two of
+the five move the design. Of the other three, two are fixes to live bugs and one is an instrument
+— separating them is the point of this entry, because a session that reads "five commits toward
+the drain" will over-count how far the work got. The two fixes were also found by DIFFERENT means,
+which is worth keeping straight: the loop found one of them, and the other came from asking a
+design question of the code.
 
 ```
-(1) JS skeleton    parent + children + address in JS; buffer drains into the clone-bubble
-(2) C++ pendingRoot our own native module retains pendingRoot_ per surface, applies each command
-                    with cloneMultiple, answers navigation from it, commits on flush
+42415a3  the edit buffer                  a CUT      step 1 of §9's order
+c293e48  the verification loop            a TOOL     four oracles, shrinking, calibrated
+9d0ead2  anchor structural attribution    a FIX      found by DESIGN — no test had the shape
+cc059c0  a skipped node's stale family    a FIX      found by the LOOP; a native abort on device
+7b43358  core/engine/src/tree.ts          a CUT      the one seam the desired copy leaves through
 ```
 
-(2) is what leaves ONLY the buffer on the JS side, and it is the chosen direction (2026-09-05).
+**The loop (`core/engine/src/__tests__/commit-fuzz.test.ts`) is the reason any of this is
+checkable.** It generates a random mutation PROGRAM — the program is data, so a failure prints as
+a reproducible list of steps rather than as a stack — runs it against the engine, and after every
+commit asks four questions: the committed structure equals what the desired tree says it should
+be; every committed node's props equal what `fabricProps` would build for it right now; the fake
+Fabric's own tree agrees with the mirror; and nothing reachable is still pending. It then SHRINKS
+a failing program to the shortest prefix that still fails.
 
-### This CONTRADICTS §9's correction, and the contradiction is resolved by step 0 — read both
+Two properties of it are worth copying rather than re-deriving, and both cost a round to get right:
 
-Both were written on 2026-09-05 and they do not agree. Recorded rather than silently reconciled,
-because a reader will otherwise quote whichever half suits the instruction in front of them — which
-is exactly what nearly happened on 2026-09-05, when a session building the seam took §7b's "chosen
-direction" and wrote a design §6a rules out.
+- **The oracles were CALIBRATED, not assumed.** Four real engine injuries were introduced one at a
+  time and the loop was asked which oracle spoke and after how many steps. That is what caught
+  oracle 1 reading `testID` — it subsumed oracle 2, so a missed PROP mark reported as a STRUCTURE
+  failure and oracle 2 could never fire. Oracle 1 is now structural only (view name and child
+  order), and the same injury reports ORACLE 2. Two oracles where the earlier one subsumes the
+  later leave the later one permanently unwitnessed, which is
+  `.claude/rules/verify-the-deciding-side.md`'s earlier-guard trap inside a harness.
+- **ORACLE 3 is witnessed by NO injury reachable from these programs, and the file says so.** It
+  compares the fake slot's tree against the mirror, and every injury that can desynchronise them
+  also trips an earlier oracle. It stays because it is the only oracle that would catch the mirror
+  and the slot disagreeing, which is exactly what a native drain could introduce — but it is
+  recorded as unwitnessed rather than counted as coverage.
+
+**Both bugs were pre-existing and both were silent, and only the second came from the loop.**
+
+The anchor one was found by asking which node CARRIES the record while designing the drain. No
+test had the shape, and the loop cannot reach it either: the general commit re-derives
+`renderableChildren` on every node it visits, so it repairs itself and never notices.
+`markStructureDirty(anchor)` named a node the commit never looks at, while the node whose
+committed child list actually went stale looked untouched — and only `commitTargeted`, which
+deliberately does NOT re-derive, committed a tree the retained tree does not describe. Its
+reachable spelling is `setNativeProps` / `setNodePressed`, i.e. a native-event write, after which
+nothing else asks for a commit — so the append was not one commit late but indefinitely late.
+**A self-repairing walk hides an attribution bug from every oracle that reads the walk's output**,
+which is precisely why the drain has to be designed against attribution rather than validated
+against the walk.
+
+The second one the loop did find. A node that became SKIPPED at commit — a raw text whose content
+went to `''`, the one thing `isSkippedAtCommit` drops entirely — kept its committed record, so on
+RETURNING it took the update path and re-appended a handle whose Fabric family belongs to its
+parent's PREVIOUS Fabric node. On a device that is not a stale pixel: Fabric enforces in C++ that a
+family cannot be reparented, so it is a native abort. It surfaced one value after the generator
+learned to write `''` one time in five, which is the whole argument for a generator that emits
+boring values as well as interesting ones — every value before that was `t0`..`t999`, and the
+hazard was simply not expressible.
+
+**And the throw that carried it came from the fake slot's own `assertSameFamily`, not from any
+oracle.** A harness that treats only a failed expectation as a violation never SHRINKS such a
+program, so the red arrives as a stack instead of as a ten-step reproduction. The runner now
+counts a throw as a violation for exactly that reason — worth copying into any differential loop:
+the invariants your subject asserts for itself are oracles too, and they are the ones a shrinker
+is most likely to be denied.
+
+**`tree.ts` (`7b43358`) is a SEAM, not a replacement**, and its own header states that at length.
+Every read and write of the desired structure now goes through seven functions in one file; the
+backing is still the two fields, and nothing observable changed. It exists because the swap is
+otherwise a 57-site edit with no guard — and `tests/engine-structure-seam.test.ts` holds it with a
+type-aware audit rather than a grep, because `.parent` is also a field on the animated graph and
+on an event, and a textual census over `core/engine/src` reports 93 matches where the truth is 25.
+That test carries a sentinel arm (the seam's own sites must always be found, so a moved barrel
+cannot produce a green run that examined nothing) and a synthetic break-test (a probe file is
+written, the audit is required to flag it, the file is removed).
+
+**The committed copy is deliberately NOT guarded yet**, and the first version of that test's header
+gave the wrong reason — it named `NativeDOM` as the replacement, which §1a and §6a rule out
+between them. The route §7b chose is our own module's `pendingRoot_`, a different mechanism. It
+gets its own seam and its own guard when that cut happens; asserting it now would be a rule nobody
+can satisfy and would hide which half is actually done.
+
+## 8. THE WORK ORDER — read this before starting anything in this file
+
+Status as of 2026-09-05, end of session. Every item names what it depends on, and the ones marked
+LANDED name the commit so a reader can diff rather than re-derive.
 
 ```
-§9 CORRECTED   "only a buffer on our side" is DEAD; a navigable node stays.
-               "the navigable structure LIKELY stays in JS"           -> design (1)
-§7b            design (2) "is the chosen direction"                   -> design (2)
+                                                              status      blocked on
+0   price a JSI navigation round-trip on a device             NOT RUN     a device
+1   the seam: structure reachable through ONE module          LANDED      —
+2   the edit buffer holds WHICH nodes were touched            LANDED      —
+3   a verification loop that can catch a silent regression    LANDED      —
+4   the buffer holds the OPERATIONS, and the commit drains    NEXT        nothing
+    them instead of walking
+5   anchors stop being NODES and become POSITIONS             AFTER 4     4, and only if the
+                                                                          native branch is taken
+6   setNativeProps arm for prop-only rows                     OPEN        —
+7   the address rides on the framework's own object           AFTER 4     —
+8   our own JSI host object (pendingRoot_ + cloneMultiple)    OPEN        0, and a measured
+                                                                          residual after 4-7
 ```
 
-**They are not equally weighted, and the tie-break is in §8 rather than in either section.** §9's
-correction hedges on cost, not on capability — "likely", and its stated reason is that child
-navigation would be a per-call JSI read. §8 Step 0 says the crossing constant "decides whether
-design (2) is viable AT ALL". So §9 is design (1) CONDITIONAL on step 0 coming back expensive, and
-§7b is design (2) conditional on it coming back cheap. Neither is a standing decision; both are
-branches off one unmeasured number, and the number is still unmeasured.
+**Why 4 is next and not 5 or 8.** It is the only item BOTH design branches require, for two
+different reasons (§7b): under a JS skeleton the drain needs the ops to derive the new child
+order; under a C++ `pendingRoot_` the memo must be REBASED by re-applying the command log inside
+a retried commit lambda, so a buffer holding only "which nodes were touched" has nothing to
+re-apply. It also needs no device and no native code, which no other remaining item can say.
 
-**What is NOT conditional, and holds under either branch:**
+**Why 0 is listed first and is still not the next thing to do.** It decides between the two
+branches (§7b), and until it is run neither branch may be built as though chosen. But item 4 is
+common to both, so the queue is not blocked on a device — start there and run 0 whenever a device
+is free. `NativeDOM` already ships `getChildNodes` / `getParentNode` (§1a), so the crossing can be
+measured from JS with zero native work; `examples/react/screens/JsiNavigationCostScreen.tsx`
+exists for exactly this.
 
-- The buffer must carry the OPERATIONS, not merely which nodes were touched. Under (1) the drain
-  needs them to derive the new child order; under (2) `pendingRoot_` must be REBASED by re-applying
-  the command log inside a retried commit lambda (§5), so it is a memo of the buffer and useless
-  without one. Same requirement, two different reasons.
-- `NativeDOM` is not the mechanism for either. It is app-facing (§1a) and per-commit child reads are
-  strictly worse than a handle (§6a). A design naming it has taken a wrong turn.
-- The floor is not zero (§6a): a family handle per node, the root's child list, and `viewName` per
-  node survive both branches. The handle can ride on the framework's own object, so nothing
-  TREE-SHAPED stays ours — but "ours by ownership" and "does not exist" are different claims and only
-  the first is available.
+**Item 5 is NOT a prerequisite for 4, and reading it as one costs the wrong week.** An anchor has
+no Fabric node, so no native structure can hold one — that makes it a blocker for the NATIVE
+branch (item 8) and irrelevant to a JS drain, which handles anchors exactly as the walk does
+today. The temptation is to fix the visible obstacle first; the obstacle is only visible from a
+branch nobody has chosen yet.
 
-So the next decision is not "which design", it is "run step 0".
+**Item 6 is independent of all of it** and is the cheapest measurable win on the board: already
+bound, zero native work, compare against the clone-bubble on `Select` / `Partial update`. Honour
+§4's stickiness rule and gate it per key — a key ever written through `setNativeProps` must
+ALWAYS be written that way.
 
-**Its cost is a per-call JSI crossing plus a family->node resolution** whose phase 2 linearly
-scans each level's children (§6a). Arithmetic on this repo's own measured constant (~1.5 us per
-crossing): Solid's `cleanChildren` on 1 000 children is ~1 000 crossings ~= 1.5 ms plus 1 000
-resolutions, against microseconds for a JS array read. **That is arithmetic, not a benchmark** —
-and pricing it is step 0 below, because it sizes the whole design.
+### What 4 actually is, so it is not mis-scoped
 
-**The retry semantics force the buffer to remain the source of truth.** `ShadowTree::commit` may
-re-run its lambda against a fresher root (§5), and another writer (an animation commit, a state
-update) can land in between — so a `pendingRoot_` built against an older root must be REBASED. The
-only way to rebase is to re-apply the command log inside the lambda. `pendingRoot_` is therefore a
-memo of the buffer, never a replacement for it, which is consistent with "only the buffer is
-ours".
+The buffer records the adapter's OPERATIONS in order — create / insert / remove / setProp /
+setText, at the level the adapter issued them — and the drain runs the fold at DRAIN time. Not
+Fabric-level key/value pairs: §9's "Step 2's shape" proves that design wrong from `fabricProps`,
+which is a whole-bag fold three times over and cannot move to the mutation site.
 
-## 8. Open, in priority order
+It is ONE change, not a series of slices. An ordered op log that nothing drains is a reachable
+symbol with no consumer, and the log only pays off when the drain REPLACES the walk. The safe way
+to land it whole is a second implementation beside `reconcile`, verified differentially against it
+over the fuzzer's programs, and switched over only when the Fabric call sequences agree.
 
-**Step 0, before any native code: price a JSI navigation round-trip on a device.** `NativeDOM`
-already ships `getChildNodes` / `getParentNode` (§1a), so the crossing + family resolution can be
-measured today from JS with zero native work. That single constant decides whether design (2) is
-viable at all, and no headless run can produce it (`symbiote-perf-measurement`: headless has
-mis-sized every native-bound prediction so far, in both directions).
+`diffProps` does NOT go away with it — that diff is downstream of the fold, so knowing which raw
+keys changed does not tell you which payload keys changed. Removing it is a separate question and
+may have no answer.
 
+### The two attribution holes that must stay closed, and how to look for a third
 
-1. **Edit queue instead of the walk.** Pure engine, no native work. An adapter mutation records
-   the edit; commit drains it. `VISITED` should collapse to the number of touched nodes.
-   Measure on the tags branch — the engine's share of a frame is ~20% today and rises to ~33%
-   once component wrappers are gone (arithmetic on measured numbers, not a measurement).
-2. **`setNativeProps` arm for prop-only rows.** Already bound, zero native work. Compare against
-   the clone-bubble on `Select` / `Partial update`. Honour the §4 stickiness rule and gate it
-   per key.
-3. **Mirror fields on the framework's own object** (VNode, block) so no engine object is
-   allocated per node. Saves allocation, not the walk — sequence it after 1.
-4. **Own JSI host object** (§6) only if 1-3 leave a measured residual that needs it.
+Item 4's correctness rests on one property: `hasPendingStructure(node)` is true whenever that
+node's RENDERABLE child list could differ from its committed snapshot. Two ways that was false
+were found and fixed on 2026-09-05, both live bugs before they were design constraints:
+
+```
+an edit under an ANCHOR      recorded on the anchor, not on the renderable ancestor above it
+an empty-string setText      flips whether a raw text is SKIPPED, so it changes the parent's
+                             renderable list with no structural op anywhere
+```
+
+The shape they share is that a node's presence in its parent's renderable list is decided by
+something other than a structural op on that parent. Before building the incremental derivation,
+enumerate what else `isSkippedAtCommit` and `renderableChildren` consult — a third member of that
+family produces a node that silently stops reaching Fabric, which is the class the whole buffer is
+careful about.
