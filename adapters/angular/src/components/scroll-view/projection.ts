@@ -2,8 +2,11 @@ import {
   AnimatedProps,
   type AnimatedValue,
   dlog,
+  childrenOf,
+  componentOf,
   isDebug,
   isAnchor,
+  parentOf,
   reduceProps,
   routeProp,
   whenCommitted,
@@ -95,15 +98,23 @@ function directNode(record: IProjectedRecord): ISymbioteNode {
 
 function isProjectedRefreshControl(node: ISymbioteNode): boolean {
   if (
-    node.component === 'PullToRefreshView' ||
-    node.component === 'AndroidSwipeRefreshLayout'
+    componentOf(node) === 'PullToRefreshView' ||
+    componentOf(node) === 'AndroidSwipeRefreshLayout'
   ) {
     return true;
   }
   // Angular public <RefreshControl> is an anchor host whose real native refresh node lives inside
   // its component view. Projection filtering must recognize that anchor, otherwise iOS re-renders
   // a RefreshControl sibling and also leaves the projected one inside the scroll content.
-  return isAnchor(node) && node.children.some(isProjectedRefreshControl);
+  return isAnchor(node) && childrenOf(node).some(isProjectedRefreshControl);
+}
+
+// Diagnostic-only: the component name at an index, or 'none' past the end. A helper rather than an
+// inline `list[i]?.component` because the engine's accessor takes a node, so optional chaining has
+// to move from the property to the lookup.
+function describeAt(list: readonly ISymbioteNode[], index: number): string {
+  const node = list[index];
+  return node === undefined ? 'none' : componentOf(node);
 }
 
 // The SECOND Angular sticky effect-runner (auto-projected children can't be arbitrary Angular
@@ -394,12 +405,12 @@ export class ScrollViewProjectionController {
 
   bindContentNode(node: ISymbioteNode): void {
     dlog(
-      `Angular ScrollView projection bindContentNode node=${node.component} preExistingChildren=${node.children.length} recordsBefore=${this.records.length}`,
+      `Angular ScrollView projection bindContentNode node=${componentOf(node)} preExistingChildren=${childrenOf(node).length} recordsBefore=${this.records.length}`,
     );
     this.contentNode = node;
     contentProjection.set(node, this);
-    if (this.records.length === 0 && node.children.length > 0) {
-      for (const child of [...node.children]) {
+    if (this.records.length === 0 && childrenOf(node).length > 0) {
+      for (const child of [...childrenOf(node)]) {
         this.records.push({
           child,
           wrapper: undefined,
@@ -418,7 +429,7 @@ export class ScrollViewProjectionController {
     insert: IInsert,
   ): void {
     dlog(
-      `Angular ScrollView projection appendProjectedChild parent=${parent.component} child=${child.component} recordsBefore=${this.records.length}`,
+      `Angular ScrollView projection appendProjectedChild parent=${componentOf(parent)} child=${componentOf(child)} recordsBefore=${this.records.length}`,
     );
     const existing = this.records.find(record => record.child === child);
     if (existing !== undefined)
@@ -442,7 +453,7 @@ export class ScrollViewProjectionController {
     insert: IInsert,
   ): void {
     dlog(
-      `Angular ScrollView projection insertProjectedChild parent=${parent.component} child=${child.component} before=${beforeChild ? `${beforeChild.component}` : 'null'} recordsBefore=${this.records.length}`,
+      `Angular ScrollView projection insertProjectedChild parent=${componentOf(parent)} child=${componentOf(child)} before=${beforeChild ? `${componentOf(beforeChild)}` : 'null'} recordsBefore=${this.records.length}`,
     );
     const existing = this.records.find(record => record.child === child);
     if (existing !== undefined)
@@ -468,7 +479,7 @@ export class ScrollViewProjectionController {
       dlog(
         () =>
           `STICKY[proj#${this.instanceId}] ORDER insert-before anchor NOT a record ` +
-          `child=${child.component} before=${beforeChild.component} -> APPENDED to end`,
+          `child=${componentOf(child)} before=${componentOf(beforeChild)} -> APPENDED to end`,
       );
     }
     const index =
@@ -491,7 +502,8 @@ export class ScrollViewProjectionController {
     const direct = directNode(record);
     // The wrapper, when there is one, is the node actually parented to the content — detach
     // whichever of the two carries the link, so a wrapped child never leaves its wrapper behind.
-    if (direct.parent !== undefined) remove(direct.parent, direct);
+    const directParent = parentOf(direct);
+    if (directParent !== undefined) remove(directParent, direct);
     this.records.splice(this.records.indexOf(record), 1);
     this.scheduleReconcile();
     return true;
@@ -536,8 +548,8 @@ export class ScrollViewProjectionController {
     const before =
       beforeRecord === undefined ? undefined : directNode(beforeRecord);
     dlog(
-      `STICKY[proj#${this.instanceId}] insertRecord child=${record.child.component} ` +
-        `before=${before ? before.component : 'append'} parentIsContentNode=${parent === this.contentNode}`,
+      `STICKY[proj#${this.instanceId}] insertRecord child=${componentOf(record.child)} ` +
+        `before=${before ? componentOf(before) : 'append'} parentIsContentNode=${parent === this.contentNode}`,
     );
     if (before === undefined) insert(parent, record.child);
     else insert(parent, record.child, before);
@@ -556,7 +568,7 @@ export class ScrollViewProjectionController {
     dlog(
       () =>
         `STICKY[proj#${this.instanceId}] reconcile#${seq} records=${this.records.length} ` +
-        `children=${this.contentNode?.children.length} sticky=${JSON.stringify(this.config.stickyHeaderIndices ?? [])}`,
+        `children=${this.contentNode === undefined ? 'none' : childrenOf(this.contentNode).length} sticky=${JSON.stringify(this.config.stickyHeaderIndices ?? [])}`,
     );
     const stickyIndices = new Set(this.config.stickyHeaderIndices ?? []);
     if (
@@ -607,13 +619,14 @@ export class ScrollViewProjectionController {
     // of correcting itself. Guarded by isDebug because it walks both lists.
     if (!isDebug()) return;
     const expected = this.records.map(record => directNode(record));
-    const painted = this.contentNode?.children ?? [];
+    const painted =
+      this.contentNode === undefined ? [] : childrenOf(this.contentNode);
     const at = expected.findIndex((node, index) => node !== painted[index]);
     if (at >= 0 || expected.length !== painted.length) {
       dlog(
         `STICKY[proj#${this.instanceId}] ORDER DIVERGED at ${at} ` +
           `records=${expected.length} painted=${painted.length} ` +
-          `expected=${expected[at]?.component ?? 'none'} painted=${painted[at]?.component ?? 'none'}`,
+          `expected=${describeAt(expected, at)} painted=${describeAt(painted, at)}`,
       );
     }
   }
@@ -625,7 +638,7 @@ export class ScrollViewProjectionController {
     record.sticky?.destroy();
     projectedOwners.delete(record.child);
     const direct = directNode(record);
-    if (direct.parent === this.contentNode)
+    if (parentOf(direct) === this.contentNode)
       removeChild(this.contentNode, direct);
     const index = this.records.indexOf(record);
     if (index !== -1) this.records.splice(index, 1);
@@ -662,7 +675,7 @@ export class ScrollViewProjectionController {
     record.sticky = new StickyProjectionWrapper(this, childIndex, wrapper);
     record.stickyIndex = childIndex;
     dlog(
-      `STICKY[proj#${this.instanceId}] WRAP child=${record.child.component} paintIndex=${childIndex}`,
+      `STICKY[proj#${this.instanceId}] WRAP child=${componentOf(record.child)} paintIndex=${childIndex}`,
     );
   }
 
@@ -677,7 +690,7 @@ export class ScrollViewProjectionController {
       index += 1
     ) {
       const node = directNode(this.records[index]);
-      if (node.parent === this.contentNode) return node;
+      if (parentOf(node) === this.contentNode) return node;
     }
     return undefined;
   }
@@ -685,7 +698,7 @@ export class ScrollViewProjectionController {
   private unwrapRecord(record: IProjectedRecord): void {
     if (this.contentNode === undefined || record.wrapper === undefined) return;
     dlog(
-      `STICKY[proj#${this.instanceId}] UNWRAP child=${record.child.component}`,
+      `STICKY[proj#${this.instanceId}] UNWRAP child=${componentOf(record.child)}`,
     );
     record.sticky?.destroy();
     record.sticky = undefined;

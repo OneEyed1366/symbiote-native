@@ -25,7 +25,7 @@ export {
   RAW_TEXT_COMPONENT,
   debugNodeId,
 } from './node';
-// Host navigation — the DOM half Fabric does not ship. Adapters route their seam's
+// Host access — the DOM read half Fabric does not ship. Adapters route their seam's
 // parentNode/nextSibling/firstChild through these instead of reading a node's fields, which is
 // what keeps the retained tree's shape ours to change (symbiote-fabric-cxx-surface §9).
 export {
@@ -37,7 +37,8 @@ export {
   isRawTextNode,
   componentOf,
   textOf,
-} from './navigation';
+  propOf,
+} from './host-access';
 export { isEventFor } from './view-config';
 export { registerComponent, setNativeViewConfigSource } from './registry';
 // Real cross-package consumer: core/components' KeyboardAvoidingView render narrows

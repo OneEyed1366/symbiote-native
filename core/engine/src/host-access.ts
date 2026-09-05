@@ -1,4 +1,9 @@
-// Host navigation — the half of a DOM that Fabric does not ship.
+// Host access — the READ half of a DOM, which Fabric does not ship.
+//
+// Mostly navigation, plus the two value reads a seam needs (`textOf`, `propOf`). Named for the
+// whole rather than for navigation alone: this is the surface an adapter is allowed to ask a node
+// about, and keeping value reads out of it would only push them back to raw field access, which is
+// the thing being removed.
 //
 // Four of five framework renderer seams navigate the host on their hot paths, and it is their
 // contract, not our choice: Solid's nodeOps declare getParentNode / getFirstChild / getNextSibling,
@@ -114,4 +119,21 @@ export function textOf(node: ISymbioteNode): string | undefined {
   if (node.component !== RAW_TEXT_COMPONENT) return undefined;
   const text = node.props.text;
   return typeof text === 'string' ? text : undefined;
+}
+
+/**
+ * The value currently standing on a prop, `undefined` if none is set.
+ *
+ * The one accessor here that reads a VALUE rather than the tree, and it earns its place from a
+ * real caller: Vue's `v-model` shim has to compose with whatever `onValueChange` the author
+ * already bound, so it must read the standing handler before writing its own. Without this the
+ * shim reaches for `el.props`, which is the last field read keeping a non-seam file coupled to the
+ * node's shape.
+ *
+ * Deliberately NOT a general property bag escape hatch: it answers what is on the node, which for
+ * `style` after a class merge is the `[classStyle, explicitStyle]` ARRAY rather than the author's
+ * object. `getExplicitStyle` exists for that question and this is not a substitute for it.
+ */
+export function propOf(node: ISymbioteNode, key: string): unknown {
+  return node.props[key];
 }

@@ -21,7 +21,7 @@ import {
   isTextContainer,
   nextSiblingOf,
   parentOf,
-} from './navigation';
+} from './host-access';
 
 describe('engine host navigation', () => {
   it('reports the parent of a parented node and undefined for a top-level one', () => {

@@ -10,6 +10,7 @@
 // (getNativeTag, keyed on the raw node in the commit mirror); this only adapts the
 // Svelte-shaped input (a ShimElement) onto it.
 import {
+  componentOf,
   getNativeTag,
   isSymbioteNode,
   toPublicInstance,
@@ -59,7 +60,7 @@ export function findNodeHandle(
   const node = componentOrHandle.engineNode;
   if (node !== undefined && isSymbioteNode(node)) {
     const tag = getNativeTag(node) ?? null;
-    dlog(`findNodeHandle: component=${node.component} tag=${tag}`);
+    dlog(`findNodeHandle: component=${componentOf(node)} tag=${tag}`);
     return tag;
   }
   dlog('findNodeHandle: hostShim not live yet (engineNode undefined)');
