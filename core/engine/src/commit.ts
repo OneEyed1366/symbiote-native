@@ -36,6 +36,16 @@ import {
   type IMirror,
   type ISymbioteNode,
 } from './node';
+import {
+  clearPendingProps,
+  clearPendingStructure,
+  clearPendingWork,
+  hasPendingChild,
+  hasPendingProps,
+  hasPendingStructure,
+  hasPendingWork,
+  sweepDroppedEdits,
+} from './edit-buffer';
 import { dlog, isDebug } from './debug';
 import { flattenStyle } from './style';
 import { nextTag } from './tags';
@@ -275,11 +285,12 @@ function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
   for (const child of node.children) {
     if (isSkippedAtCommit(child)) {
       // A skipped child is flattened away here and never reaches reconcile, so this is the only
-      // place that can clear its dirty flag. Leaving it set would be a silent stale-UI bug:
-      // markDirty stops at the first dirty ancestor, so a permanently-dirty skipped node swallows
-      // every later mark - from an anchor's subtree, or from the setText that turns an empty raw
-      // text back into real content - and the real parent never learns anything changed.
-      child.dirty = false;
+      // place that can drain its buffer entry. Leaving it recorded would be a silent stale-UI bug:
+      // markDirty stops at the first already-recorded ancestor, so a permanently-pending skipped
+      // node swallows every later mark - from an anchor's subtree, or from the setText that turns
+      // an empty raw text back into real content - and the real parent never learns anything
+      // changed.
+      clearPendingWork(child);
       if (isAnchor(child)) children.push(...renderableChildren(child));
     } else children.push(child);
   }
@@ -358,11 +369,11 @@ function reconcile(
   // Nothing under here changed: hand back the committed handle without rebuilding this node's
   // Fabric props or descending into it at all. The walk below costs ~13 us/node on device, and an
   // untouched sibling subtree would pay it on every commit. `committed.parent` is re-checked rather
-  // than trusted to the flag because a MOVED node can still be legitimately clean (see node.ts's
+  // than trusted to the buffer because a MOVED node can still be legitimately clean (see node.ts's
   // structural ops), and a reparent must fall through to the fresh-family path below.
   if (
     !forceFreshFamily &&
-    !node.dirty &&
+    !hasPendingWork(node) &&
     committed !== undefined &&
     committed.parent === renderableParent &&
     committed.viewName === viewName
@@ -371,15 +382,17 @@ function reconcile(
     warnIfStale(node, committed, 'subtree');
     return { handle: committed.handle, changed: false };
   }
-  node.dirty = false;
-  // Read before clearing. The create path below ignores it - a node Fabric has never seen needs its
-  // whole payload built regardless - so this only ever gates the update path.
-  const ownPropsChanged = node.propsDirty;
-  node.propsDirty = false;
-  // Cleared here because this call is what re-snapshots `committed.children` below, on both the
+  // The drain: this node's entries are consumed here, and this is the point the buffer exists to
+  // reach. Everything below reads the RECORD taken above, never the buffer again.
+  clearPendingWork(node);
+  // Read before consuming. The create path below ignores it - a node Fabric has never seen needs
+  // its whole payload built regardless - so this only ever gates the update path.
+  const ownPropsChanged = hasPendingProps(node);
+  clearPendingProps(node);
+  // Consumed here because this call is what re-snapshots `committed.children` below, on both the
   // create and the update path. Anything that reads that snapshot afterwards is reading a current
-  // one until the next structural op raises the flag again.
-  node.structureDirty = false;
+  // one until the next structural op records against this node again.
+  clearPendingStructure(node);
 
   const childInText = node.isText || hasTextAncestor;
   const kids = renderableChildren(node);
@@ -669,6 +682,11 @@ function commitContainer(rootTag: IRootTag): void {
   // remove-then-reinsert) or gone for good. Costs one Set-size read until an app registers its
   // first host behavior. See host-behavior.ts for why removal cannot answer this itself.
   sweepDetachedBehaviors(container.children);
+  // The buffer's half of the same question, and it runs unconditionally where the behavior sweep
+  // above is gated: every node holds buffer entries, so a node that left for good and is never
+  // walked again would be pinned by the buffer forever. Same nominate-then-decide shape, same
+  // liveness test, deliberately the same tick.
+  sweepDroppedEdits(container.children);
 
   stats.created = 0;
   stats.cloneProps = 0;
@@ -861,7 +879,7 @@ function commitTargeted(nodes: ReadonlySet<ISymbioteNode>): boolean {
   // This is not hypothetical tidiness: an earlier version validated the ancestor chain up front but
   // resolved SIBLING handles inside the clone loop, so a bail half-way had already re-pointed a
   // node's committed record at a clone that was never handed to completeRoot, and had already
-  // cleared its dirty flags - so the general-path fallback then skipped the node as clean and
+  // drained its buffer entries - so the general-path fallback then skipped the node as clean and
   // committed an orphan handle. The fallback test in animated-commit-cost.test.ts is what caught it.
   const writes: ILeafWrite[] = [];
   for (const node of nodes) {
@@ -869,24 +887,25 @@ function commitTargeted(nodes: ReadonlySet<ISymbioteNode>): boolean {
     if (record === undefined) return false;
     // The node's own children must be the ones Fabric holds: this path never descends, so a
     // pending structural change below would be published as if it had not happened.
-    if (node.structureDirty) return false;
-    // THE TWIN OF THE CHECK ABOVE, and the one that was missing. `dirty` is a SUBTREE flag — it
-    // means "this node or something under it needs work" — while this path clears it as if it were
-    // a self flag. Clearing it over a dirty descendant strands that descendant permanently: the
-    // general commit reconciles from the root, finds a clean chain, and never descends again.
+    if (hasPendingStructure(node)) return false;
+    // THE TWIN OF THE CHECK ABOVE, and the one that was missing. `pendingPath` is a SUBTREE
+    // record — it means "this node or something under it needs work" — while this path drains it as
+    // if it were a self record. Draining it over a pending descendant strands that descendant
+    // permanently: the general commit reconciles from the root, finds a clean chain, and never
+    // descends again.
     //
     // Direct children are enough, and that is not an approximation. `markDirty` walks up from the
-    // dirtied node and STOPS at the first already-dirty ancestor; in this scenario that ancestor is
-    // this node, so the chain from any dirty descendant up to here is fully marked — which makes a
-    // dirty direct child a certainty whenever a dirty descendant exists. So the check is O(children)
-    // rather than a subtree walk, on a path that runs once per animation frame.
+    // dirtied node and STOPS at the first already-recorded ancestor; in this scenario that ancestor
+    // is this node, so the chain from any pending descendant up to here is fully recorded — which
+    // makes a pending direct child a certainty whenever a pending descendant exists. So the check
+    // is O(children) rather than a subtree walk, on a path that runs once per animation frame.
     //
     // Reproduced 2026-08-24 by a peer's flag dump after tier-2 made a press ask for its own commit:
     // press the node, dirty its child in the same tick, and the child never commits again. Vue and
     // Solid did not show it because their schedulers rewrite the prop on the node itself and
     // re-dirty the chain — an accident of those schedulers, not a property of this contract.
-    if (node.children.some(child => child.dirty)) {
-      dlog('commit targeted: dirty descendant, using the general path');
+    if (hasPendingChild(node)) {
+      dlog('commit targeted: pending descendant, using the general path');
       return false;
     }
 
@@ -900,8 +919,8 @@ function commitTargeted(nodes: ReadonlySet<ISymbioteNode>): boolean {
       // reach the same conclusion, after walking the tree to get here. Dropping it from the batch
       // is safe even if a LATER node bails the whole thing — its props genuinely match Fabric, so
       // the general commit skipping it as clean publishes the same tree.
-      node.dirty = false;
-      node.propsDirty = false;
+      clearPendingWork(node);
+      clearPendingProps(node);
       dlog(`commit targeted tag=${record.tag} no-op (props identical)`);
       continue;
     }
@@ -926,7 +945,7 @@ function commitTargeted(nodes: ReadonlySet<ISymbioteNode>): boolean {
       // publishes the OLD structure, with no error anywhere. Caught by the fallback row in
       // animated-commit-cost.test.ts, which appends a sibling and then animates: without this check
       // the new sibling never reached Fabric and every other assertion still passed.
-      if (ancestor.structureDirty) {
+      if (hasPendingStructure(ancestor)) {
         dlog(
           'commit targeted: ancestor child list moved on, using the general path',
         );
@@ -991,8 +1010,8 @@ function commitTargeted(nodes: ReadonlySet<ISymbioteNode>): boolean {
     stats.cloneProps += 1;
     write.record.handle = handle;
     write.record.props = write.props;
-    write.node.dirty = false;
-    write.node.propsDirty = false;
+    clearPendingWork(write.node);
+    clearPendingProps(write.node);
     cloned.set(write.node, handle);
   }
 

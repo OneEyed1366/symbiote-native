@@ -14,6 +14,13 @@ import type {
   IMeasureLayoutOnSuccess,
 } from './fabric';
 import { isAriaAliasKey } from './accessibility-props';
+import {
+  nominateDroppedEdits,
+  recordNewNode,
+  recordPropEdit,
+  recordStructureEdit,
+  recordSubtreeEdit,
+} from './edit-buffer';
 import { isEventFor } from './view-config';
 import {
   canonicalClassName,
@@ -97,26 +104,14 @@ export interface ISymbioteNode {
   listeners: Map<string, IListener> | undefined;
   children: ISymbioteNode[];
   parent: ISymbioteNode | undefined;
-  // "This node's own props changed, or something below it did." Read by the commit walk
-  // (commit.ts) to skip an untouched subtree wholesale. See markDirty.
-  dirty: boolean;
-  // "THIS node's own props changed since its last commit" - strictly narrower than `dirty`, which
-  // is also set by a descendant's change bubbling up. The pair splits a question the walk used to
-  // answer by brute force: `dirty` says whether to DESCEND, `propsDirty` says whether this node's
-  // own Fabric payload can possibly differ from what the mirror holds.
-  //
-  // The case it exists for is every node on the clone-bubble path. A changed leaf forces each
-  // ancestor up to the root to re-clone (a persistent parent points at specific child handles), so
-  // those ancestors are `dirty` and must be visited - but their OWN props did not change, and
-  // reconcile used to prove that by rebuilding the whole Fabric payload with fabricProps() and
-  // deep-comparing it against the mirror. That is a fresh object plus a recursive walk per
-  // ancestor per commit, to rediscover something the mutation API already knew: nobody wrote a
-  // prop here. On an ordinary update the bubble path is MOST of the visited nodes.
-  //
-  // A stale `true` is harmless (one slow path, same output); a wrongly-cleared `false` is the
-  // silent-stale-UI failure mode. So every write path errs toward marking - see markPropsDirty -
-  // and skipped nodes are deliberately NOT cleared in renderableChildren the way `dirty` is.
-  propsDirty: boolean;
+  // The three questions a commit asks about a node — "descend?", "did its own payload change?",
+  // "did its child list change?" — used to be three boolean FIELDS here. They now live in the
+  // pending-edit buffer (`edit-buffer.ts`), which is the whole point rather than a refactor: a node
+  // is meant to carry an ADDRESS and nothing the framework did not already allocate, and a walk
+  // over flags cannot be handed to a native module where a drained buffer can
+  // (`symbiote-fabric-cxx-surface` §9). Read them with hasPendingWork / hasPendingProps /
+  // hasPendingStructure; the rationale for each moved to the buffer beside its set.
+
   // "A `role` or `aria-*` key has been written here at least once." The gate for the aria fold
   // (`accessibility-props.ts`), which `fabricProps` runs on the way to the payload so a LOWERED
   // element gets it too - it has no component wrapper to run it in.
@@ -141,22 +136,6 @@ export interface ISymbioteNode {
   // wrapper has already folded in its own body. Double-folding is the hazard. A behavior attaches
   // to the LOWERED tag alone, so it is the discriminator that already exists.
   payloadFold: IPayloadFold | undefined;
-  // "THIS node's own CHILD LIST changed since its last commit" - the third question the single
-  // `dirty` flag used to blur together with the other two. `dirty` says whether to descend,
-  // `propsDirty` whether this node's own payload can differ, `structureDirty` whether its committed
-  // child order can differ.
-  //
-  // It exists because a committed record's `children` is a SNAPSHOT taken at the last commit, and
-  // anything reading that snapshot instead of `node.children` is reading the past. commitTargeted
-  // (commit.ts) does exactly that - rebuilding an ancestor's child set from committed handles is
-  // the whole reason it is cheap - so it must refuse to run when the snapshot is stale, and this
-  // flag is the only O(1) way to know. A length check misses a reorder; comparing the arrays is the
-  // O(children) scan the fast path exists to avoid.
-  //
-  // Raised by every structural op on the PARENT (appendChild / insertBefore / removeChild / detach,
-  // plus the surface's own splice and the container's child assignment), and cleared by reconcile
-  // on the node whose children it just committed.
-  structureDirty: boolean;
   // What Fabric currently holds for this node - `undefined` until its first commit. The retained
   // node carries the DESIRED state (props/children); this carries the COMMITTED state the reconcile
   // walk diffs against and the handle every imperative call is aimed at.
@@ -227,10 +206,7 @@ class SymbioteNode implements ISymbioteNode {
   declare listeners: Map<string, IListener> | undefined;
   declare children: ISymbioteNode[];
   declare parent: ISymbioteNode | undefined;
-  declare dirty: boolean;
-  declare propsDirty: boolean;
   declare hasAriaAlias: boolean;
-  declare structureDirty: boolean;
   declare committed: IMirror | undefined;
   declare styleParts: IClassStyleParts | undefined;
   declare payloadFold: IPayloadFold | undefined;
@@ -247,11 +223,6 @@ class SymbioteNode implements ISymbioteNode {
     this.listeners = undefined;
     this.children = [];
     this.parent = undefined;
-    // A node that has never committed must never take a fast path built on "the mirror already
-    // agrees with me", so all three flags start raised - including for createRawText, whose props
-    // are assigned here rather than through setText.
-    this.dirty = true;
-    this.propsDirty = true;
     // Assigned here, not lazily on first use: every slot present from the constructor keeps one
     // hidden class for every node. Adding it on demand buys a shape transition per aria-bearing
     // node, which is the opposite of what this field is for.
@@ -262,12 +233,19 @@ class SymbioteNode implements ISymbioteNode {
     // never fire, which the break-test caught by staying green with it removed. If a construction
     // path is ever added that passes real props, this line owes that probe back.
     this.hasAriaAlias = false;
-    this.structureDirty = true;
     this.committed = undefined;
     this.styleParts = undefined;
     // Assigned here for the same hidden-class reason as `hasAriaAlias` above; `attachHostBehavior`
     // overwrites it a few lines later for the rare node that has a behavior.
     this.payloadFold = undefined;
+    // A node that has never committed must never take a fast path built on "the mirror already
+    // agrees with me", so all three questions start answered YES — including for createRawText,
+    // whose props are assigned here rather than through setText.
+    //
+    // LAST in the constructor, not beside the field assignments it replaces: `recordSubtreeEdit`
+    // walks `parent` and `recordStructureEdit` reads `committed`, so both need this object fully
+    // shaped. Recording earlier reads slots that are still holes.
+    recordNewNode(this);
   }
 
   measure(callback: IMeasureOnSuccess): void {
@@ -459,48 +437,32 @@ export function setNodeComponent(node: ISymbioteNode, component: string): void {
   markPropsDirty(node);
 }
 
+// The three mark* names are the MUTATION-SIDE vocabulary and they stay: every adapter-facing write
+// path in this file calls them, and the rules that govern those paths are written in their terms
+// (`.claude/rules/engine-mutations-must-mark-dirty.md`). What changed underneath is only WHERE the
+// record lands — a set in `edit-buffer.ts` rather than a boolean on the node. Behaviour is
+// identical, deliberately: the bubble, its early exit, and the ordering constraints below are
+// preserved verbatim there, so this could not be the source of a behaviour change.
 export function markDirty(node: ISymbioteNode): void {
-  let current: ISymbioteNode | undefined = node;
-  while (current !== undefined && !current.dirty) {
-    current.dirty = true;
-    current = current.parent;
-  }
+  recordSubtreeEdit(node);
 }
 
-// The prop-write twin of markDirty: raises this node's OWN props flag and then bubbles the subtree
-// flag as usual. Every path that writes `node.props` must come through here - setProp and setText
-// below, setNativeProps in commit.ts (which writes the record directly and so owes its own mark).
-//
-// Note the two flags are raised INDEPENDENTLY rather than one implying the other. markDirty stops
-// at the first already-dirty ancestor, so a node dirtied a moment ago by a child's change would
-// otherwise have its own prop write silently dropped: the walk would exit before setting anything
-// here. Setting propsDirty first, unconditionally, is what makes that ordering safe.
+// The prop-write twin of markDirty: records this node's OWN prop edit and then bubbles the subtree
+// question as usual. Every path that writes `node.props` must come through here - setProp and
+// setText below, setNativeProps in commit.ts (which writes the record directly and so owes its own
+// mark). Why the two are recorded independently rather than one implying the other: see
+// `recordPropEdit`.
 export function markPropsDirty(node: ISymbioteNode): void {
-  node.propsDirty = true;
-  markDirty(node);
+  recordPropEdit(node);
 }
 
-// The structural twin. Raised on the PARENT whose child list changed - never on the moved child,
-// for the same reason markDirty is not (see the structural ops below).
+// The structural twin. Recorded against the PARENT whose child list changed - never against the
+// moved child, for the same reason markDirty is not (see the structural ops below).
 //
-// Every caller must reach here BEFORE mutating `parent.children`, and that ordering is now
-// load-bearing rather than stylistic. reconcile stores the reconciled child list in the committed
-// record BY REFERENCE, so for a parent holding no anchors the record ALIASES `parent.children`;
-// this call is the last moment the committed list can still be read. Taking the copy here means it
-// is taken once per parent per commit->mutation cycle, and only for parents that actually change,
-// instead of once per node per commit - 9 002 arrays on a 1 000-row create, all but a handful
-// allocated only to be discarded unread.
-//
-// The identity test is what keeps it honest: a record whose `children` is NOT `parent.children`
-// either already holds a copy (this cycle's first structural op ran) or holds the private array
-// renderableChildren built to flatten anchors away, which nobody mutates. Neither needs saving.
+// Every caller must reach here BEFORE mutating `parent.children`. That ordering is load-bearing
+// rather than stylistic, and `recordStructureEdit` is where the copy-on-write it protects lives.
 export function markStructureDirty(parent: ISymbioteNode): void {
-  const record = parent.committed;
-  if (record !== undefined && record.children === parent.children) {
-    record.children = parent.children.slice();
-  }
-  parent.structureDirty = true;
-  markDirty(parent);
+  recordStructureEdit(parent);
 }
 
 // How many prop writes actually landed, and how many the no-op guard below turned away.
@@ -1063,6 +1025,9 @@ export function setText(node: ISymbioteNode, text: string): void {
 function detach(child: ISymbioteNode): void {
   const parent = child.parent;
   if (!parent) return;
+  // Nominate, do not drop: this is reached from appendChild/insertBefore, so the node is about to
+  // be re-parented and its pending entries must survive. `sweepDroppedEdits` decides at commit.
+  nominateDroppedEdits(child);
   markStructureDirty(parent);
   const index = parent.children.indexOf(child);
   if (index >= 0) parent.children.splice(index, 1);
@@ -1097,6 +1062,10 @@ export function insertBefore(
 // that comes back alive in the same batch — see host-behavior.ts's markDetachCandidate.
 export function removeChild(parent: ISymbioteNode, child: ISymbioteNode): void {
   if (hasHostBehaviors()) markDetachCandidate(child);
+  // Unconditional, unlike the behavior nomination one line above: a behavior is rare and its sweep
+  // is gated on any existing at all, while EVERY removed node holds buffer entries (`recordNewNode`
+  // seeds all three) and every one of them is a leak if nothing sweeps.
+  nominateDroppedEdits(child);
   markStructureDirty(parent);
   const index = parent.children.indexOf(child);
   if (index >= 0) parent.children.splice(index, 1);

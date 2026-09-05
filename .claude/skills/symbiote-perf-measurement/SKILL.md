@@ -172,7 +172,10 @@ Cold mount pays ~3-6% (read off `min`, see below).
 Two changes landed together on `core/engine`, and they are worth reading side by side because one
 of them is the cautionary tale and the other is the result.
 
-**`propsDirty` (the clone-bubble fast lane).** `dirty` answered two questions; splitting off "did
+**`propsDirty` (the clone-bubble fast lane).** Named as it was when measured; since 2026-09-05 the
+question is `hasPendingProps` in `core/engine/src/edit-buffer.ts` and the field is gone. The
+measurement below is unaffected — the swap preserved the mechanics exactly — but do not grep for
+the identifier. `dirty` answered two questions; splitting off "did
 THIS node's own props change" lets reconcile reuse the committed payload by reference instead of
 rebuilding it with `fabricProps()` and deep-comparing. Real work removed — and far less of it than
 intended:
@@ -335,7 +338,7 @@ What makes this a design task rather than a one-liner, and what to settle before
   not know about the animated props. Our `setNativeProps` writes `node.props`, so our retained tree
   stays truthful — what would go stale is `node.committed.props` versus what Fabric actually holds.
   That is precisely the condition `warnIfStale` reports as `DIRTY-MISS`. Decide explicitly whether a
-  direct write updates the committed record, marks `propsDirty`, or neither; each choice trades a
+  direct write updates the committed record, calls `markPropsDirty`, or neither; each choice trades a
   redundant re-send against a stale mirror, and the wrong one is silent.
 - **The synchronous contract.** A caller today reads the committed result on the next line and
   `dirty-marking.test.ts` does exactly that. Whatever replaces the commit must keep that observable

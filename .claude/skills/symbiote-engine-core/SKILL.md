@@ -76,13 +76,24 @@ directly and routes only `[prop]` bindings through `routeProp`.
 
 ## 3. Node identity — the rule that bites every adapter
 
-`ISymbioteNode` (`node.ts`) is a branded plain object: `{ component, isText,
-props, listeners, children, parent, dirty, propsDirty, structureDirty, committed }`.
+`ISymbioteNode` (`node.ts`) is a branded object: `{ component, isText, props, listeners, children,
+parent, hasAriaAlias, payloadFold, committed, styleParts }`.
 
-The three flags answer three different questions, and blurring them is what the split fixed:
-`dirty` = descend into this subtree; `propsDirty` = this node's own payload can differ;
-`structureDirty` = this node's own CHILD LIST can differ from the committed snapshot. The last
-one is a correctness precondition, not an optimisation — see `commitTargeted` in §4a.
+The three questions the commit asks about a node answer three different things, and blurring them
+is what the split fixed: **descend into this subtree** (`hasPendingWork`); **this node's own
+payload can differ** (`hasPendingProps`); **this node's own CHILD LIST can differ from the
+committed snapshot** (`hasPendingStructure`). The last one is a correctness precondition, not an
+optimisation — see `commitTargeted` in §4a.
+
+**Since 2026-09-05 those are not FIELDS.** They were `dirty` / `propsDirty` / `structureDirty` on
+every node; they are now three `Set`s in `core/engine/src/edit-buffer.ts`. Mechanics identical —
+same bubble, same early exit, same ordering constraints — and the mutation-side names
+(`markDirty` / `markPropsDirty` / `markStructureDirty`) are unchanged, so every rule written in
+that vocabulary still reads correctly. What changes is that the record is now a THING the engine
+holds rather than a property of the tree, which is the shape a native drain can consume
+(`symbiote-fabric-cxx-surface` §9). One new obligation comes with it and it is real: a `Set` pins
+a node that a boolean would have let die, so every path cutting a parent link owes
+`nominateDroppedEdits`, swept at commit — see `.claude/rules/engine-mutations-must-mark-dirty.md`.
 
 The `committed` field IS the mirror of what Fabric holds for this node — handle, reactTag,
 rootTag, the flat props last sent, the child identities last committed, the
@@ -208,7 +219,7 @@ gap widens with app size because what it removes is the sibling scan.
 whole design:**
 
 - the node and every ancestor must already be committed;
-- **`structureDirty` must be false on the node AND on every ancestor.** A committed record's
+- **`hasPendingStructure` must be false on the node AND on every ancestor.** A committed record's
   `children` is a SNAPSHOT from the last commit. Rebuilding an ancestor's child set from that
   snapshot is exactly why this route is cheap, and exactly why a stale snapshot silently publishes
   the OLD structure — a row added since the last commit simply never reaches Fabric, with nothing
@@ -581,8 +592,10 @@ of React - stripped from release) and the Hermes sampling profiler in React Nati
 ## Reference
 
 - Mutation API + node shape: `core/engine/src/node.ts` (read this first).
-- The committed record (`IMirror`), its guarded accessor (`committedOf`), and the
-  `dirty` / `propsDirty` pair: `core/engine/src/node.ts`.
+- The committed record (`IMirror`) and its guarded accessor (`committedOf`):
+  `core/engine/src/node.ts`.
+- The pending-edit buffer that replaced the `dirty` / `propsDirty` / `structureDirty` fields, and
+  the drop sweep it owes: `core/engine/src/edit-buffer.ts`.
 - Clone-on-write commit, `commitChildren`, the imperative bridge, and
   `whenCommitted`: `core/engine/src/commit.ts`.
 - Surface + commit strategies (`commit` / `requestCommit`): `core/engine/src/surface.ts`.

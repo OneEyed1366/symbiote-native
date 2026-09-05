@@ -7,10 +7,36 @@ paths:
 
 # A new mutation entry point owes a `markDirty` — forget it and the screen goes stale silently
 
-`reconcile` skips any subtree whose root is not `dirty`. So ANY new code that writes
+`reconcile` skips any subtree whose root has no pending work. So ANY new code that writes
 `node.props`, `node.children`, or reparents a node must call `markDirty` — otherwise the
 change never reaches Fabric: no crash, no error, nothing to grep for. Add a row to
 `core/engine/src/__tests__/dirty-marking.test.ts` proving the new mutator survives a commit.
+
+## The record moved off the node into a BUFFER (2026-09-05) — every rule below is unchanged
+
+`dirty`, `propsDirty` and `structureDirty` are no longer fields on `ISymbioteNode`. The three
+questions now live as three `Set`s in `core/engine/src/edit-buffer.ts`, read with `hasPendingWork`
+/ `hasPendingProps` / `hasPendingStructure` and consumed with the matching `clearPending*`. The
+`markDirty` / `markPropsDirty` / `markStructureDirty` names are UNCHANGED and are still the
+mutation-side vocabulary every rule here is written in — nothing below needs re-reading, and a new
+mutator still calls exactly the same function.
+
+Why, since the behaviour is identical by construction: a node is meant to carry an ADDRESS and
+nothing the framework did not already allocate, and a walk over per-node flags cannot be handed to
+a native module where a drained buffer can (`symbiote-fabric-cxx-surface` §9). This is step one of
+two — the buffer currently holds WHICH nodes were touched, not WHAT the edit was.
+
+**The one genuinely new obligation, and it has no equivalent in the flag era: a removal must
+NOMINATE.** A boolean died with its node; a `Set` pins it. So `nominateDroppedEdits(child)` is owed
+by every path that cuts a parent link — `node.ts`'s `detach` and `removeChild`, `surface.ts`'s
+`detach`, `removeChild` and `clear` — and `sweepDroppedEdits` decides at commit which nominees
+really left. Forget it and `Clear` on a thousand ten-node rows pins ten thousand nodes for the life
+of the process, with byte-identical Fabric output and every test in the repo green.
+
+It cannot be done at removal instead, for the same reason `sweepDetachedBehaviors` exists one file
+over: an adapter spells a MOVE as remove-then-reinsert, and dropping a moved child's entries loses
+a prop written in the same tick — the silent-stale-UI failure this whole file guards. Covered by
+`core/engine/src/__tests__/edit-buffer.test.ts`, whose header records which break reddens which row.
 
 ## Structural ops must mark BEFORE they mutate, not after (2026-08-23)
 

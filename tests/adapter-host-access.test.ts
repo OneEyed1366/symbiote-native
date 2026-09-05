@@ -39,10 +39,11 @@ const PRIVATE_FIELDS = new Set([
   'isText',
   'listeners',
   'committed',
-  'dirty',
-  'propsDirty',
-  'structureDirty',
 ]);
+// `dirty` / `propsDirty` / `structureDirty` used to be listed here. They are no longer FIELDS —
+// the commit's three questions live in `core/engine/src/edit-buffer.ts` — so an adapter naming one
+// is a tsc error rather than a violation this audit could report. Do not re-add them: a name in
+// this set that no type carries is a rule that can never fire, which reads as coverage.
 
 const OPTIONS: ts.CompilerOptions = {
   target: ts.ScriptTarget.ESNext,
@@ -125,7 +126,9 @@ describe('adapters reach an engine node only through host-access', () => {
     const adapterSources = program
       .getSourceFiles()
       .filter(source =>
-        path.relative(REPO_ROOT, source.fileName).startsWith('adapters' + path.sep),
+        path
+          .relative(REPO_ROOT, source.fileName)
+          .startsWith('adapters' + path.sep),
       );
     expect(adapterSources.length).toBeGreaterThan(100);
   });

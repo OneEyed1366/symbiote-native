@@ -483,6 +483,35 @@ The API an adapter sees is IDENTICAL under both, so step 2 changes no adapter co
 decouples the architectural goal from a standing C++ maintenance obligation: the goal is reached
 at step 1, and native becomes an optimisation under the same seam rather than a precondition.
 
+### Step 1, first cut — LANDED 2026-09-05: `core/engine/src/edit-buffer.ts`
+
+The three per-node booleans that recorded what the adapter had touched — `dirty`, `propsDirty`,
+`structureDirty` — are gone from `ISymbioteNode` and are now three `Set`s in the buffer, read
+through `hasPendingWork` / `hasPendingProps` / `hasPendingStructure` and consumed through
+`clearPending*`. Mechanics are IDENTICAL by construction (same bubble, same early exit, same
+mark-before-mutate ordering), so this cut cannot be the cause of a behaviour change, and the whole
+suite reads the same: 5574 passed, plus the one pre-existing `core/css-parser` golden-corpus
+snapshot.
+
+**State the boundary honestly, because the name promises more than the cut delivers.** The buffer
+today holds WHICH nodes were touched, not WHAT the edit was. That is enough to take the record off
+the node — every field removed from `ISymbioteNode` is a step toward "an address plus whatever the
+framework already allocated" — and it is NOT yet the thing a native drain consumes. Carrying the
+edits themselves (key, value, index) is the second cut, and only then is there something to hand
+to `cloneMultiple`.
+
+**The one cost the swap introduces, and it has no equivalent in the flag era.** A boolean died with
+its node; a `Set` PINS it. Without a sweep, `Clear` on a thousand ten-node rows leaks ten thousand
+nodes for the life of the process, with byte-identical Fabric output and every test green — a leak
+no oracle in this repo can see. So every path that cuts a parent link nominates
+(`nominateDroppedEdits`) and `sweepDroppedEdits` decides at commit which nominees really left.
+Nominate-then-decide rather than drop-at-removal, for the reason `sweepDetachedBehaviors` next door
+already has: an adapter spells a MOVE as remove-then-reinsert, and dropping a moved child's entries
+loses a prop written in the same tick.
+
+Anyone building the second cut inherits that shape: **a buffer keyed on node identity owes a
+liveness answer, and removal is not one.**
+
 ## 7b. Where the PENDING tree lives — searched exhaustively, 2026-09-05
 
 The question that decides whether navigation can be answered by native: does C++ retain a
