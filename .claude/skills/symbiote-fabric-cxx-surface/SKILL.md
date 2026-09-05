@@ -4,10 +4,11 @@ description: >-
   What Fabric's C++ ACTUALLY exposes to JS and what it does internally, measured from
   react-native@0.86.0 sources. Read BEFORE proposing to remove the engine's retained tree, to
   "read the shadow tree back from C++", to patch or fork ReactCommon, to commit "directly into
-  RN's internals", or before optimising the clone-bubble in commit.ts. Holds: the full 34-name
-  JSI surface of nativeFabricUIManager vs the 14 we bind; the proof that NO read of structure
-  exists (and what compareDocumentPosition / findNodeAtPoint / getBoundingClientRect actually
-  are); ShadowNode::cloneTree + ShadowNodeFamily — the O(depth) PATH CLONE that already exists in
+  RN's internals", or before optimising the clone-bubble in commit.ts. Holds: the full 35-name
+  JSI surface of nativeFabricUIManager vs the 14 we bind; the proof that no read C++ exposes
+  answers about an UNCOMMITTED tree — findShadowNodeByTag_DEPRECATED does read the committed one,
+  O(n) per call (and what compareDocumentPosition / findNodeAtPoint / getBoundingClientRect
+  actually are); ShadowNode::cloneTree + ShadowNodeFamily — the O(depth) PATH CLONE that already exists in
   C++ and is reachable from JS through setNativeProps, with its three hard limits (props-only,
   STICKY family override, _DEPRECATED); ChildrenAreShared, which proves a clone is not a deep
   copy; ShadowTree::commit's optimistic-retry transaction, which is WHY no in-place mutation API
@@ -26,15 +27,21 @@ description: >-
 
 # What Fabric's C++ exposes, and what it does on its own
 
-Every claim here was read out of `react-native@0.86.0` on 2026-09-05. The sources are NOT in a
-fresh clone (`.vendors/` is gitignored and empty). Reproduce with:
+Every claim here was read out of `react-native@0.86.0`, first on 2026-09-05 and re-verified
+against the sources the same day (see the corrections marked RE-MEASURED / CORRECTED below —
+three C++ facts and one grep result were wrong).
+
+**The `npm pack` step this section used to prescribe is unnecessary: the C++ ships in the npm
+package, so an ordinary `pnpm install` already puts it on disk.**
 
 ```bash
-npm pack react-native@0.86.0 && tar -xzf react-native-0.86.0.tgz
-# C++ lives in package/ReactCommon/react/renderer/**  (471 .cpp files, full source, not headers-only)
+ls node_modules/react-native/ReactCommon/react/renderer   # 274 .cpp here, 471 across ReactCommon
+                                                          # full source, not headers-only
 ```
 
-Paths below are relative to `package/ReactCommon/react/renderer/`.
+Paths below are relative to `node_modules/react-native/ReactCommon/react/renderer/`. Where a claim
+cites `Libraries/` or `src/`, that is JS and the root is `node_modules/react-native/`.
+`.vendors/react-native` is gitignored and empty, and nothing here needs it.
 
 **Sections are in measurement order, not reading order, and their numbers are load-bearing — nine
 files outside this skill cite `§9` by number, so nothing here may be renumbered.** If you came for
@@ -42,9 +49,51 @@ the plan rather than for the C++: **§8, at the END of this file, is the WORK OR
 landed, what is next, and what each item waits on. §9 is the contract it implements. Everything
 before them is the evidence both rest on.
 
-## 1. The JSI surface — 34 names, and not one reads the tree
+## Re-verification, 2026-09-05 — what a second pass over the sources moved
 
-`uimanager/UIManagerBinding.cpp` exposes:
+Everything below was read a second time, straight out of `node_modules/react-native`. Recorded as
+a table because the useful part is the RATIO: most of the file survived unchanged, and the four
+that did not were all found the same way — by running the probe instead of quoting its result.
+
+```
+CHANGED
+  §1   the name list          5 names were not on the binding, 6 real ones missing. 34 -> 35
+  §1   "not one reads"        findShadowNodeByTag_DEPRECATED does. Conclusion survives, wording did not
+  §3   cloneTree's callers    THREE production callers, not zero. §6 and §6a both quoted the zero
+  §4   sticky semantics       two merges, not one. Declarative wins when the bag NAMES the key
+  §7b  "zero hits"            not zero — and the hits strengthen the section
+  intro  npm pack             unnecessary; the C++ ships in the npm package
+
+UNCHANGED, re-read line by line
+  the 14 we bind · ChildrenAreShared @285 · cloneTree @373 · setNativeProps @568 -> UIManager:438
+  the sticky merge @152-155 · getAncestors' two phases · cloneMultiple @442 + both callers
+  registerCommitHook UIManager.h:101-102 and public · UIManagerCommitHook's header comment
+  getShadowTreeRegistry @211 public · getNewestCloneOfShadowNode @110 public
+  layoutIfNeeded @409 inside tryCommit · layoutMetrics inside ShadowView::operator==
+  Differentiator @1641 · NativeDOM's spec text verbatim · React's renderer never calls it
+  ReactFabric-dev.js:15963 · MountingCoordinator holds committed revisions only
+```
+
+**Two of the four errors came from one grep habit**, and it is the one
+`.claude/rules/verify-the-deciding-side.md` already names: a pattern that cannot match every
+candidate reports unanimity rather than a miss. `methodName == "[A-Za-z]+"` silently drops the six
+underscored names — including the one that reads the tree — and a caller census that stops at the
+first screen reports whatever sorts first, which put `mounting/tests/` ahead of `uimanager/`.
+**Count the candidates and count the matches; a survey that does not account for every candidate
+has not run.**
+
+The third came from the opposite habit: §4's sticky rule was a one-line summary of a two-merge
+function, and the summary predicted the wrong behaviour for exactly the case our own `diffProps`
+does not produce. **A mechanism compressed to a slogan is a mechanism nobody re-reads.**
+
+None of it moved an item or a dependency in §8.
+
+## 1. The JSI surface — 35 names, and ONE of them reads the tree
+
+**RE-MEASURED 2026-09-05 against the sources, and the previous list was wrong in BOTH directions —
+five names that are not on the binding, six real ones missing.** The list below is the complete
+dispatch of `UIManagerBinding::get` (`uimanager/UIManagerBinding.cpp:184`, ending in a fallthrough
+`return jsi::Value::undefined()` at :1221), so it is exhaustive by construction:
 
 ```
 appendChild · appendChildToSet · createChildSet · createNode · completeRoot
@@ -55,12 +104,64 @@ measure · measureInWindow · measureLayout · measureInstance
 getBoundingClientRect · getRelativeLayoutMetrics · findNodeAtPoint · compareDocumentPosition
 applyViewTransitionName · cancelViewTransitionName · restoreViewTransitionName
 createViewTransitionInstance · startViewTransition · startViewTransitionReadyFinished
-suspendOnActiveViewTransition · readyExecutor · finishedExecutor · finishedResolve
-Promise · timeStamp
+suspendOnActiveViewTransition
+findShadowNodeByTag_DEPRECATED                                        <- reads the tree, see below
+unstable_getCurrentEventPriority · unstable_DefaultEventPriority
+unstable_DiscreteEventPriority · unstable_ContinuousEventPriority
+unstable_IdleEventPriority
 ```
 
-`core/engine/src/fabric.ts` binds 14 of these. **The gap is real and worth knowing** — earlier
-sessions asserted the 14 were "the surface". They are not.
+Reproduce it, and note that the naive pattern is what produced the wrong list:
+
+```bash
+grep -oE 'methodName == "[A-Za-z_]+"' UIManagerBinding.cpp | sort -u | wc -l   # 35
+grep -oE 'methodName == "[A-Za-z]+"'  UIManagerBinding.cpp | sort -u | wc -l   # 29 — drops every
+                                                                               # underscored name
+```
+
+**The five that were on the old list and are NOT names on the binding**, all from a grep that
+swept up every `forAscii` and every quoted string in the file:
+
+```
+readyExecutor · finishedExecutor · finishedResolve   jsi::Function NAMES for Promise executors
+                                                     created INSIDE startViewTransition's body
+Promise                                              runtime.global().getPropertyAsFunction(…)
+timeStamp                                            a key set on an EVENT payload object (:150)
+```
+
+`core/engine/src/fabric.ts` binds **14** — createNode, cloneNodeWithNewProps,
+cloneNodeWithNewChildren, cloneNodeWithNewChildrenAndProps, createChildSet, appendChild,
+appendChildToSet, completeRoot, registerEventHandler, dispatchCommand, sendAccessibilityEvent,
+measure, measureInWindow, measureLayout. (`supportsCloneWithChildren` on `IFabricSlot` is our own
+arity probe, not a host name.) **The gap is real and worth knowing** — earlier sessions asserted
+the 14 were "the surface". They are not.
+
+### `findShadowNodeByTag_DEPRECATED` — the read this skill said did not exist
+
+**CORRECTED 2026-09-05. The claim below used to read "not one name reads the tree", and it was the
+sentence the whole first turn rested on.** `UIManagerBinding.cpp:795` dispatches to
+`UIManager::findShadowNodeByTag_DEPRECATED` (`UIManager.cpp:528`), which does this:
+
+```cpp
+shadowTreeRegistry_.enumerate([&](const ShadowTree& shadowTree, bool& stop) {
+  rootShadowNodeHolder = shadowTree.getCurrentRevision().rootShadowNode;   // current revision
+  ...
+  shadowNode = findShadowNodeByTagRecursively(child, tag);                 // full recursive walk
+});
+```
+
+and the binding returns `valueFromShadowNode(runtime, shadowNode)` — a real node out of the
+committed tree, from `nativeFabricUIManager` itself, with no `NativeDOM` involved.
+
+**It changes nothing about the conclusion, and the reasons are the same two §1a gives for
+`NativeDOM`, plus a third that is worse.** It reads the CURRENT REVISION, so a node created or
+moved but not committed is invisible. It gives you a NODE, not navigation — no children, no
+parent, no props diff. And it is an O(n) recursive search of every registered surface PER CALL,
+where the thing it would replace is an O(1) property read.
+
+So the honest statement is not "C++ exposes no read" but **"every read C++ exposes answers about
+the COMMITTED past, and a reconciler navigates the tree it is mid-way through building."** That
+distinction is the load-bearing one, and it survives both this name and §1a.
 
 **CORRECTED 2026-09-05 — read §1a before quoting the next paragraph.** `nativeFabricUIManager`
 has no structural read, and that is what the paragraph below establishes. It does NOT mean React
@@ -68,18 +169,19 @@ Native has none: a SEPARATE TurboModule, `NativeDOM`, exposes `getChildNodes` / 
 `getElementById` / `isConnected`. Stating "no read of structure exists" without that qualifier was
 wrong for three days of this investigation.
 
-**No name on THIS binding reads STRUCTURE.** There is no `getChildren`, no `getProps`, no `getParent`. The
-read-looking names are something else:
+**No name on this binding NAVIGATES structure**, the one above included. There is no
+`getChildren`, no `getProps`, no `getParent`. The other read-looking names are something else
+again:
 
 - `getBoundingClientRect` / `getRelativeLayoutMetrics` / `measure*` — geometry of the MOUNTED
   tree, callback- or value-based, not structure.
 - `compareDocumentPosition` — a computed RELATION between two nodes you already hold.
 - `findNodeAtPoint` — hit-testing, takes a point, returns an instance handle you gave.
 
-So the turn-one conclusion stands: to build the next commit you need the current handle, the
-ordered child handles of every ancestor, and the previous props, and **none of it can be asked
-of C++**. That is why a JS-side record exists — for React (`ReactFiberConfigFabric`) exactly as
-for us.
+So the turn-one conclusion stands, with its reason restated: to build the next commit you need the
+current handle, the ordered child handles of every ancestor, and the previous props **as they are
+mid-edit**, and nothing C++ exposes answers about a tree that has not been committed. That is why
+a JS-side record exists — for React (`ReactFiberConfigFabric`) exactly as for us.
 
 ## 1a. `NativeDOM` — RN DID build the browser paradigm, but only its READ half
 
@@ -103,8 +205,15 @@ that RN set out to put the browser on top of native is literally correct.
   handles of its children. Otherwise, it returns an empty array."* A node created but not
   committed, or moved but not committed, answers empty/null.
 - **The class is called `ReadOnlyNode`**, and it has NO mutation methods — no `appendChild`, no
-  `insertBefore`, no `setAttribute`. Only `childNodes` / `firstChild` / `nextSibling` /
-  `parentNode` / `isConnected`.
+  `insertBefore`, no `setAttribute`. Its read surface is wider than the four names above
+  (`firstChild`, `lastChild`, `nextSibling`, `previousSibling`, `parentElement`, `contains`,
+  `getRootNode`, `hasChildNodes`, `textContent`, `nodeName`/`nodeType`/`nodeValue`), and every one
+  of them is a getter.
+- **The TurboModule is not purely a read API, though its STRUCTURAL half is.** `NativeDOM` also
+  carries `setNativeProps`, `setPointerCapture`, `releasePointerCapture` and `linkRootNode` — 21
+  names in all. None of them inserts, removes or reorders a node, which is the claim that
+  matters; "only its READ half" in this section's title is true of structure and not of the
+  module.
 - **React's own renderer never calls it.** `grep -rl "getChildNodes|getParentNode"
   Libraries/Renderer/` returns nothing. The only consumers are `ReadOnlyNode.js`,
   `ReadOnlyElement.js` and `internals/Traversal.js` — the app-facing DOM API.
@@ -159,9 +268,26 @@ Two facts that matter more than the function itself:
 - C++ can walk ancestors and re-clone ONLY the path, given a family. That is the "change the
   propeller without rebuilding the plane" operation, and it is already written.
 
-In 0.86 `cloneTree` is called from production code only via §4; every other caller is a unit
-test (`mounting/tests/StateReconciliationTest.cpp`). **Its signature therefore has no stability
-guarantee** — relevant to §6.
+**CORRECTED 2026-09-05 — this section used to say `cloneTree` has only test callers, and that was
+measured with a grep that read the test files first and stopped.** It has THREE production callers
+in 0.86, and one of them is core machinery:
+
+```
+uimanager/UIManager.cpp:465          setNativeProps_DEPRECATED   the §4 path
+uimanager/UIManager.cpp:401          updateState                 EVERY native state update
+components/text/ParagraphShadowNode.cpp:399                       laying out inline attachments
+```
+
+`UIManager::updateState` is how a ScrollView's content offset, a TextInput's state and a
+Paragraph's measurement reach the tree, so this is not a corner. **Two claims that were built on
+the false version have to go with it**: that the signature "has no stability guarantee" (§6 quoted
+it), and §6a's ranking of `cloneMultiple` as "markedly more stable than `cloneTree`". Both are now
+production APIs on RN's own hot paths, which if anything strengthens §6a's case rather than
+weakening it.
+
+The general shape, and it is this repo's own rule pointed at a grep: **a caller census that stops
+at the first screen of hits reports whatever sorts first**, and `mounting/tests/` sorts before
+`uimanager/`.
 
 ## 4. `setNativeProps` is that path clone, exposed to JS — with three hard limits
 
@@ -188,14 +314,40 @@ The limits, all from the source:
 - **Props only.** No structural equivalent exists. Insert / remove / reorder has one door,
   `completeRoot` → `UIManager::completeSurface` (`uimanager/UIManager.cpp:186`), which replaces
   the ROOT's child list wholesale.
-- **STICKY, and this is the sharpest trap.** `family.nativeProps_DEPRECATED` accumulates on the
-  family, and `UIManager::cloneNode:152-155` merges it OVER the declarative props:
-  `mergeDynamicProps(rawProps /*source*/, family.nativeProps_DEPRECATED /*patch*/, Override)`.
-  A key once written through `setNativeProps` wins forever after, and there is no clear API.
-  Hence the `_DEPRECATED` suffix, and hence React's 48 ms forced-resync hack
+- **STICKY — and RE-READ 2026-09-05, because the mechanism is subtler than "it wins forever" and
+  the difference decides how the rule is stated.** `family.nativeProps_DEPRECATED` accumulates on
+  the family, and `UIManager::cloneNode` (`UIManager.cpp:108`) runs TWO merges on every
+  declarative clone of a family that has ever seen a `setNativeProps`:
+
+  ```cpp
+  // :138  refresh the sticky patch from the declarative bag — Ignore ADDS NOTHING
+  family.nativeProps_DEPRECATED = mergeDynamicProps(*family.nativeProps_DEPRECATED /*source*/,
+                                                    rawProps /*patch*/, NullValueStrategy::Ignore);
+  // :152  then let the sticky patch override the declarative bag
+  auto finalProps = mergeDynamicProps(rawProps /*source*/,
+                                      *family.nativeProps_DEPRECATED /*patch*/, Override);
+  ```
+
+  `Ignore` is documented in `core/DynamicPropsUtilities.h` as "in case key is missing in source,
+  value from patch will be ignored", and the implementation is a `continue` on
+  `source.find(key) == end`. So for a key K that `setNativeProps` has written:
+
+  ```
+  the declarative bag NAMES K    sticky[K] := declarative, then final[K] = sticky[K]   DECLARATIVE WINS
+  the declarative bag OMITS K    sticky[K] stands,        then final[K] = sticky[K]    STICKY WINS, forever
+  ```
+
+  **And the second row is OUR normal case, which is what makes this load-bearing rather than
+  academic.** `diffProps` (`core/engine/src/commit.ts`) sends a MINIMAL DIFF — only keys whose
+  value changed, plus removed keys as `null` — because re-sending an unchanged key re-invokes its
+  native setter. So an unchanged declarative value is ABSENT from every clone payload, and a key
+  `setNativeProps` once wrote is shadowed until something changes it declaratively. There is no
+  clear API. Hence the `_DEPRECATED` suffix, and hence React's 48 ms forced-resync hack
   (`symbiote-engine-core` §9).
-  **The rule this implies for us: a key ever written via `setNativeProps` must ALWAYS be written
-  via `setNativeProps`.** Mixing the two channels for one key is the bug.
+
+  **The rule is unchanged and its reason is sharper: a key ever written via `setNativeProps` must
+  ALWAYS be written via `setNativeProps`.** The bug is not the two channels fighting — they do not
+  fight, the sticky patch simply wins whenever our diff has nothing to say about the key.
 - Our position is better than React's: the engine is its own source of truth and can keep the
   mirror in step. React's fiber cannot — that asymmetry is why the API is deprecated for React
   and may still be right for us.
@@ -205,7 +357,7 @@ The limits, all from the source:
 `mounting/ShadowTree.cpp`, `ShadowTree::commit`:
 
 ```cpp
-while (true) {
+while (true) {                                        // the non-flagged branch
   attempts++;
   auto status = tryCommit(transaction, commitOptions);
   if (status != CommitStatus::Failed) return status;
@@ -213,7 +365,11 @@ while (true) {
 }
 ```
 
-The transaction lambda **may run several times**, re-based on a fresher revision. This is what
+Re-read 2026-09-05: there are now TWO branches, and the retry is in both. Under
+`ReactNativeFeatureFlags::preventShadowTreeCommitExhaustion()` the loop is BOUNDED
+(`MAX_COMMIT_ATTEMPTS_BEFORE_LOCKING`) and then takes `revisionMutexRecursive_` for one final
+`tryCommit`; without the flag it is the unbounded loop above. Either way the transaction lambda
+**may run several times**, re-based on a fresher revision. This is what
 makes background-thread commit and off-thread Yoga layout safe, and it is why the API takes
 "give me a new root" rather than "mutate this node". A mutable API is not a missing feature; it
 is incompatible with the concurrency model. Previously argued here from first principles — now
@@ -231,9 +387,11 @@ install our own JSI host object exposing what is missing — a non-deprecated fa
 clone, and a structural equivalent.
 
 Cost, stated honestly: C++ on two platforms inside our package, coupled to RN's INTERNAL C++
-API, which carries no stability guarantee (§3 — `cloneTree` has only test callers). This does
-not violate `<native_core_is_untouched>` (nothing is forked or patched) but it is a standing
-maintenance obligation on every RN bump.
+API, which carries no published stability guarantee. **The parenthetical that used to sit here —
+"§3, `cloneTree` has only test callers" — was false and is corrected in §3**: both `cloneTree` and
+`cloneMultiple` are on RN's own production paths, so the exposure is smaller than this section
+first claimed. It still does not violate `<native_core_is_untouched>` (nothing is forked or
+patched), and it is still a standing maintenance obligation on every RN bump.
 
 ## 6a. The family layer, `cloneMultiple`, and why NO patch is needed
 
@@ -259,8 +417,10 @@ JSI crossings), not an algorithmic one. Do not sell it as the latter.
 families, builds a `childrenCount` map and makes ONE recursive pass over the union of the paths.
 That is the drain of an edit queue, already written. It is not dead code:
 `animationbackend/AnimationBackend.cpp:176` and `AnimationBackendCommitHook.cpp:39` use it for
-per-frame updates — RN's own hottest path. That production caller makes it markedly more stable
-than `cloneTree`, which has only test callers (§3).
+per-frame updates — RN's own hottest path. **The comparison that used to close this paragraph —
+that this makes it "markedly more stable than `cloneTree`, which has only test callers" — is
+WITHDRAWN, see §3.** `cloneTree` has three production callers, `UIManager::updateState` among
+them. Both are production APIs and neither is the more exposed of the two.
 
 **The seam is public.** `uimanager/UIManager.h:101-102`:
 
@@ -352,8 +512,9 @@ newRootShadowNode->layoutIfNeeded(&affectedLayoutableNodes);
 ```
 
 Layout runs INSIDE the commit, on the NEW root, before the revision is published. And
-`mounting/ShadowView.cpp:36-52` — the equality the differ decides mutations by — includes
-`layoutMetrics` in its `std::tie`.
+`ShadowView::operator==` (`mounting/ShadowView.cpp:34`) — the equality the differ decides
+mutations by — has `layoutMetrics` inside its `std::tie`, beside `props`, `state` and
+`eventEmitter`.
 
 So the differ compares not what you CHANGED but what RESULTED after Yoga. One command
 (`opacity = 0.5` on one node) can produce fourteen `Update` mutations because fourteen siblings
@@ -381,8 +542,20 @@ cloneTree / cloneMultiple         return a new root                             
 React's own renderer              createChildSet -> appendChildToSet ->
                                   completeRoot(tag, newChildren)  ReactFabric-dev.js:15963      builds it IN JS, from fibers
 grep pending|staging|inProgress|
-uncommitted over mounting/        zero hits                                                     —
+uncommitted over mounting/        MountingCoordinator::hasPendingTransactions, lastRevision_
+                                  — POST-commit, see below                                      no
 ```
+
+**CORRECTED 2026-09-05: that last row read "zero hits" and it is not zero.** `mounting/` does
+contain `hasPendingTransactions`, `hasPendingTransactionsOverride_` and `lastRevision_`
+(`MountingCoordinator.{h,cpp}`) — and reading them makes the section's conclusion STRONGER rather
+than weaker, which is why the wrong evidence was worth correcting rather than deleting. Both
+`baseRevision_` and `lastRevision_` are typed `ShadowTreeRevision`, i.e. already-committed trees,
+and the header says what "pending" means here: *"transactions waiting to be consumed and mounted
+on the host platform"*. So the one thing in the mounting layer that carries the word is
+DOWNSTREAM of commit — a committed revision awaiting mount — which is the mirror image of the
+pending tree this search was for. A grep reported as zero when it is not zero is the more
+dangerous half: it reads as a search that covered the space.
 
 **`cloneMultiple` does produce a tree before commit — as a LOCAL VALUE inside one transaction.**
 `tryCommit` builds it, runs Yoga on it, then publishes or discards it on retry. It is not a
@@ -855,10 +1028,20 @@ branch (item 8) and irrelevant to a JS drain, which handles anchors exactly as t
 today. The temptation is to fix the visible obstacle first; the obstacle is only visible from a
 branch nobody has chosen yet.
 
-**Item 6 is independent of all of it** and is the cheapest measurable win on the board: already
-bound, zero native work, compare against the clone-bubble on `Select` / `Partial update`. Honour
-§4's stickiness rule and gate it per key — a key ever written through `setNativeProps` must
-ALWAYS be written that way.
+**Item 6 is independent of all of it** and is the cheapest measurable win on the board — the host
+API is already there, it needs no native work, and it is read against the clone-bubble on
+`Select` / `Partial update`. It is also the item whose hazard this skill understated until
+2026-09-05: honour §4's stickiness rule and gate it PER KEY, because our clone payload is a
+minimal DIFF and an unchanged declarative value is therefore absent from it, so the sticky patch
+wins by default rather than losing a fight. A key ever written through `setNativeProps` must
+ALWAYS be written that way. Read §4's two-merge table before implementing — the one-line version
+("setNativeProps wins forever") predicts the wrong behaviour for a key the diff does name.
+
+**Neither this nor anything else in the 2026-09-05 re-verification moved an item or a
+dependency.** Three C++ facts changed (§1's name list and the read that does exist, §3's caller
+census, §4's merge semantics) and one grep result was wrong (§7b); item 0 gained a second
+candidate read, `findShadowNodeByTag_DEPRECATED`, which is strictly worse than `getChildNodes`
+(O(n) per call over every surface) and so does not need pricing of its own.
 
 ### What 4 actually is, so it is not mis-scoped
 
