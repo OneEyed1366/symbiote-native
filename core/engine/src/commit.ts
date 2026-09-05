@@ -104,6 +104,11 @@ const profile = {
   nodesVisited: 0,
   propsBuilt: 0,
   propsReused: 0,
+  // Visited nodes that took their renderable child list straight from the record instead of
+  // re-deriving it. Read as a RATIO against `childScans` below: together they say what share of the
+  // walk still pays for a list it could have read. On a Select of one row in a thousand the two
+  // used to be 0 and 1 046.
+  childListsReused: 0,
 };
 
 // What `renderableChildren` costs, accumulated over the same window as `profile`. Anchors are the
@@ -258,7 +263,26 @@ function isSkippedAtCommit(node: ISymbioteNode): boolean {
   return isAnchor(node) || isEmptyRawText(node);
 }
 
+// Filled by the flatten below and read by its ONE caller, immediately, before any recursion into
+// the children it just produced. A module scratch rather than a returned pair or an out-parameter
+// because this runs once per structurally-changed node per commit — 9 002 times on a 1 000-row
+// create — and both alternatives allocate on the path that has none today. The flatten recurses
+// (anchors nest), and accumulating into one array across that recursion is exactly what is wanted:
+// an anchor's own skipped children are the outer node's to drain too.
+const skippedScratch: ISymbioteNode[] = [];
+const NO_SKIPPED: readonly ISymbioteNode[] = [];
+
 function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
+  skippedScratch.length = 0;
+  return flattenRenderable(node);
+}
+
+/** What `renderableChildren` dropped on its last call. Valid only until the next one. */
+function takeSkipped(): readonly ISymbioteNode[] {
+  return skippedScratch.length === 0 ? NO_SKIPPED : skippedScratch.slice();
+}
+
+function flattenRenderable(node: ISymbioteNode): readonly ISymbioteNode[] {
   // Anchor nodes (Vue fragment/v-if/v-for placeholders, Angular component hosts that should
   // not paint) live in the retained tree for sibling ordering but never become Fabric views.
   // When an anchor owns children, flatten them into the parent's renderable list: this lets a
@@ -292,6 +316,7 @@ function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
       // node swallows every later mark - from an anchor's subtree, or from the setText that turns
       // an empty raw text back into real content - and the real parent never learns anything
       // changed.
+      skippedScratch.push(child);
       clearPendingWork(child);
       // AND drop its committed record, because a skipped node has no Fabric presence and its old
       // handle is now orphaned. Keeping it is what lets a stale FAMILY come back: `committed.parent`
@@ -307,7 +332,7 @@ function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
       // direction. Found by the fuzzer one value after its generator learned to write '' — see
       // `skipped-node-family.test.ts` for the ten-step reproduction it shrank to.
       child.committed = undefined;
-      if (isAnchor(child)) children.push(...renderableChildren(child));
+      if (isAnchor(child)) children.push(...flattenRenderable(child));
     } else children.push(child);
   }
   return children;
@@ -408,23 +433,67 @@ function reconcile(
   // Consumed here because this call is what re-snapshots `committed.children` below, on both the
   // create and the update path. Anything that reads that snapshot afterwards is reading a current
   // one until the next structural op records against this node again.
+  const structureChanged = hasPendingStructure(node);
   clearPendingStructure(node);
 
   const childInText = node.isText || hasTextAncestor;
-  const kids = renderableChildren(node);
 
   // First mount, or the view kind flipped (RCTText <-> RCTVirtualText when a
   // <Text> moves in or out of another <Text>): a different native component
   // can't be cloned across, so create a fresh node from scratch.
   const parentChanged =
     committed !== undefined && committed.parent !== renderableParent;
-
-  if (
+  const recreating =
     forceFreshFamily ||
     committed === undefined ||
     committed.viewName !== viewName ||
-    parentChanged
-  ) {
+    parentChanged;
+
+  // ── THE DRAIN: the renderable child list is READ from the record, not re-derived ──────────────
+  //
+  // `renderableChildren` used to run on EVERY visited node — 1 046 scans to publish two changed
+  // nodes on a 1 000-row Select, of which 1 043 rebuilt a list that could not have moved. The
+  // record already holds that list, so a node whose structure nothing recorded reuses it by
+  // reference: no scan, no allocation, and `node.children` is never read at all. That last clause
+  // is the architectural half — it is the first place the commit consumes the buffer's record
+  // instead of re-deriving one (`symbiote-fabric-cxx-surface` §9, step 2).
+  //
+  // Correct exactly because of the property ORACLE 5 asserts over generated programs
+  // (`commit-fuzz.test.ts`): `hasPendingStructure(node)` is true whenever this node's renderable
+  // list could differ from the snapshot. Three ways it could go stale without a structural op were
+  // found and closed before this landed — an edit under an anchor, and a skipped-ness flip through
+  // either `setText` or `setNodeComponent`. A fourth would be a node that silently stops reaching
+  // Fabric, which is why the oracle is a fuzz invariant rather than a comment.
+  //
+  // A node being RE-CREATED re-derives regardless: its children are all re-created too, so there is
+  // nothing to reuse and the flatten is needed anyway.
+  let kids: readonly ISymbioteNode[];
+  let skipped: readonly ISymbioteNode[];
+  if (recreating || structureChanged || committed === undefined) {
+    kids = renderableChildren(node);
+    skipped = takeSkipped();
+    // Written HERE and not with the rest of the record below, and the reason is a real failure
+    // rather than tidiness. The update path returns early for a node whose children and props both
+    // came back unchanged — and a node can gain a skipped child while its RENDERABLE list stays
+    // identical, which is exactly what happens the first time an anchor is appended to a childless
+    // parent. That early return then skipped the write, the next commit reused a `skipped` list
+    // that did not name the anchor, and the anchor's buffer entry was never drained again.
+    // Reported by the fuzzer as ORACLE 4 in five steps within a minute of the reuse landing.
+    if (!recreating && committed !== undefined) committed.skipped = skipped;
+  } else {
+    profile.childListsReused += 1;
+    kids = committed.children;
+    skipped = committed.skipped;
+    // The one thing the reuse still owes, and the reason the record carries `skipped` at all. A
+    // node the walk drops has no commit of its own, so the ONLY code that ever drained its buffer
+    // entry was the flatten we just skipped — and an anchor accumulates one from any mark that
+    // bubbles through it. Left standing it swallows every later mark from its subtree, which is the
+    // silent stale-UI class this whole file is careful about. Empty for every node holding no
+    // anchor and no empty raw text, so the common case is one length read.
+    for (const child of skipped) clearPendingWork(child);
+  }
+
+  if (recreating) {
     stats.created += 1;
     // Full payload: there is no committed props object to reuse, whatever propsDirty said.
     const props = fabricProps(node);
@@ -511,6 +580,7 @@ function reconcile(
       rootTag,
       props,
       children: kids,
+      skipped,
       viewName,
       parent: renderableParent,
       owner: node,
@@ -795,6 +865,8 @@ export interface ICommitProfile {
   propsBuilt: number;
   /** Update-path nodes that re-cloned for a child but reused the committed payload by reference. */
   propsReused: number;
+  /** Visited nodes that read their renderable child list off the record instead of re-deriving it. */
+  childListsReused: number;
   propWrites: number;
   propNoops: number;
   childScans: number;
@@ -812,6 +884,7 @@ export function readCommitProfile(): ICommitProfile {
     nodesVisited: profile.nodesVisited,
     propsBuilt: profile.propsBuilt,
     propsReused: profile.propsReused,
+    childListsReused: profile.childListsReused,
     propWrites: props.writes,
     propNoops: props.noops,
     childScans: childScan.scans,
@@ -825,6 +898,7 @@ export function readCommitProfile(): ICommitProfile {
   profile.nodesVisited = 0;
   profile.propsBuilt = 0;
   profile.propsReused = 0;
+  profile.childListsReused = 0;
   childScan.scans = 0;
   childScan.probed = 0;
   childScan.flattens = 0;

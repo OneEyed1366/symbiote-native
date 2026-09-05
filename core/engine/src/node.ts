@@ -290,7 +290,18 @@ export interface IMirror {
   tag: number;
   rootTag: IRootTag;
   props: IFabricProps;
+  // The RENDERABLE child list this node last committed — anchors flattened away, empty raw texts
+  // dropped (`renderableChildren`, commit.ts). Stored BY REFERENCE, so for a node holding no
+  // skipped children it IS `node.children` until the next structural op copies it aside
+  // (`recordStructureEdit`).
   children: readonly ISymbioteNode[];
+  // The children the same derivation DROPPED — the anchors and empty raw texts that `children`
+  // flattened or skipped. Empty for almost every node, and stored for one reason: a commit that
+  // REUSES `children` instead of re-deriving it never walks the child list, so it has no other way
+  // to reach a skipped node whose buffer entry needs draining. Leaving one recorded is the silent
+  // stale-UI bug — `markDirty` stops at the first already-recorded ancestor, so a permanently
+  // pending skipped node swallows every later mark from its subtree.
+  skipped: readonly ISymbioteNode[];
   viewName: string;
   parent: ISymbioteNode | undefined;
   // Back-reference to the node this record was written on, read by committedOf below and by
