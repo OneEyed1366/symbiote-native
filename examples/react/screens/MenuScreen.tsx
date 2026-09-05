@@ -77,6 +77,11 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     route: ROUTE_NAME.Benchmark,
     hint: 'js-framework-benchmark ops + JS-thread FPS',
   },
+  {
+    label: 'JSI navigation cost',
+    route: ROUTE_NAME.JsiNavigationCost,
+    hint: 'prices one host-navigation query across the JSI boundary',
+  },
 ];
 
 /**
