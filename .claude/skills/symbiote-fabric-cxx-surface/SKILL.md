@@ -999,8 +999,10 @@ LANDED name the commit so a reader can diff rather than re-derive.
 1   the seam: structure reachable through ONE module          LANDED      —
 2   the edit buffer holds WHICH nodes were touched            LANDED      —
 3   a verification loop that can catch a silent regression    LANDED      —
-4   the buffer holds the OPERATIONS, and the commit drains    NEXT        nothing
-    them instead of walking
+4a  the commit consumes the record for its child list         LANDED      —
+4b  the ordered op log, drained by the CREATE path            NEXT        nothing
+4c  node.children / node.parent deleted outright              AFTER 4b    4b, and a non-JS base
+                                                                          for the desired order
 5   anchors stop being NODES and become POSITIONS             AFTER 4     4, and only if the
                                                                           native branch is taken
 6   setNativeProps arm for prop-only rows                     OPEN        —
@@ -1014,6 +1016,11 @@ different reasons (§7b): under a JS skeleton the drain needs the ops to derive 
 order; under a C++ `pendingRoot_` the memo must be REBASED by re-applying the command log inside
 a retried commit lambda, so a buffer holding only "which nodes were touched" has nothing to
 re-apply. It also needs no device and no native code, which no other remaining item can say.
+
+**Read "What 4 actually is" BELOW before planning it — the item was re-scoped 2026-09-05 after its
+first cut landed and the cost model was measured, and two of its stated premises were wrong about
+where the desired tree is read.** Its 4a is done; 4b is the piece both branches require and is what
+NEXT means here.
 
 **Why 0 is listed first and is still not the next thing to do.** It decides between the two
 branches (§7b), and until it is run neither branch may be built as though chosen. But item 4 is
@@ -1058,6 +1065,66 @@ over the fuzzer's programs, and switched over only when the Fabric call sequence
 `diffProps` does NOT go away with it — that diff is downstream of the fold, so knowing which raw
 keys changed does not tell you which payload keys changed. Removing it is a separate question and
 may have no answer.
+
+### RE-SCOPED 2026-09-05 after the first two cuts landed and the cost model was MEASURED
+
+Two things in the paragraphs above are wrong about WHERE the desired tree is actually read, and both
+would send the next session at the wrong half. Corrected by counting at the `tree.ts` seam rather
+than by reading `reconcile`.
+
+**The walk was never re-deriving a child list per visited node.** `reconcile`'s early exit returns
+BEFORE the child block, so a Select of one row in a thousand ran `renderableChildren` three times,
+not 1 046. Making the list incremental (the cut named "step 2" in §9, landed as
+`perf(engine): the commit READS its renderable child list off the record`) takes that 3 to 1:
+
+```
+                    before   after
+childScans             3       1     the survivor is the synthetic container, marked at every entry
+childListsReused       0       2
+childrenOf() calls     7       5     counted at the seam, on the same commit
+nodesVisited        1003    1003     unchanged
+```
+
+**And the five that remain are ALL the container's entry bookkeeping** — `markStructureDirty`'s
+copy-on-write check, the two sweeps, the `dlog`, the container's own re-derive. None is inside the
+walk. So on an UPDATE the commit already touches no desired structure at all, and the remaining
+`node.children` reads live entirely on the CREATE path, where the walk enumerates what to build
+(~2 400 on an 800-node create, per §9's own accessor probe).
+
+**So the op log's real consumer is the CREATE path, not the update walk**, and that reverses the
+priority the paragraph above implies. It also makes the acceptance criterion sharp and cheap:
+`childrenOf` on a 1 000-row create should go to ~0.
+
+**The bottom-up rewrite is priced and it is NOT the answer on its own.** `commitTargeted` already
+is a bottom-up drain, so the A/B exists without writing anything: same tree, same change, both
+flushed synchronously, it beats the top-down walk by **1.17x** while visiting 3 nodes instead of
+1 003. Both must hand Fabric the full thousand-handle child list — Fabric's protocol, which §6a
+already says JS cannot remove — so the 1 000 skipped visits buy 15%. And that 15% is measured
+against a fake slot whose `adoptChildren` copies the array, so it prices the double as much as the
+engine: a bound, not a result. (The first run of that A/B read 0.14x, because the targeted arm was
+`await tick()` per iteration and the timer was the measurement.)
+
+**The consequence for the item's remaining half, and it is the uncomfortable one.** Deleting
+`node.children` needs something else to answer "what are this node's desired children, in order".
+The mirror cannot: `record.children` is the RENDERABLE list, and `record.skipped` loses where the
+skipped nodes sat relative to the renderable ones. Giving the record a desired list too is not
+removing the skeleton, it is renaming it — the desired copy only truly goes when the record itself
+is native (item 8), which is what §9's "the committed copy goes only when something else can answer"
+already says from the other side.
+
+So item 4 splits honestly into:
+
+```
+4a  the commit consumes the record instead of re-deriving it     LANDED, measured above
+4b  the ordered op log, consumed by the CREATE path so a create
+    stops reading node.children                                  NEXT, acceptance: childrenOf ~0
+4c  node.children / node.parent deleted outright                 needs 4b AND a base for the
+                                                                 order that is not another JS array
+```
+
+4b is the piece §7b calls mandatory under both branches (it is the command log a `pendingRoot_`
+rebase re-applies). 4c is where the two branches genuinely diverge, and it is blocked on item 0 in
+a way 4b is not.
 
 ### The two attribution holes that must stay closed, and how to look for a third
 
