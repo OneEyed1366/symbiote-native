@@ -7,6 +7,11 @@ import {
   type IHostInstance,
 } from '@symbiote-native/react';
 import { getNativeNode } from '@symbiote-native/engine';
+// Typed by ./native-dom.d.ts — the module is Flow source at a private RN path. The deep import is
+// deliberate and cannot be avoided: NativeDOM is not re-exported from react-native's top level,
+// and calling it IS what this screen measures.
+// eslint-disable-next-line @react-native/no-deep-imports
+import NativeDOM from 'react-native/src/private/webapis/dom/nodes/specs/NativeDOM';
 import { ActionButton } from '../components/ActionButton';
 
 // Prices ONE navigation query across the JSI boundary, which is the constant that decides whether
@@ -35,21 +40,6 @@ import { ActionButton } from '../components/ActionButton';
 // Read the MIN, not the mean: these are small samples and GC makes the mean useless (the
 // `symbiote-perf-measurement` rule for create-shaped rows applies to any allocation-bearing loop).
 
-// The Flow spec module, typed locally rather than imported as types: `react-native/src/*` is
-// exported (RN's package.json `exports` carries "./src/*") but ships as Flow, which TypeScript
-// cannot read. A local interface keeps the call sites typed without a cast at each one.
-interface INativeDOM {
-  getChildNodes(reference: object): readonly object[];
-  getParentNode(reference: object): object | null;
-}
-
-// `TurboModuleRegistry.get`, not `getEnforcing` — RN's own spec file says so, so this is null on a
-// host that does not carry the module rather than a throw. The screen reports that instead of
-// printing a zero, which would read as "free".
-const NativeDOM: INativeDOM | null =
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('react-native/src/private/webapis/dom/nodes/specs/NativeDOM')
-    ?.default ?? null;
 
 // Swept rather than fixed, because the two calls scale differently and the difference is the
 // finding: getParentNode is one edge, getChildNodes materialises an array of N handles. If the
@@ -66,7 +56,11 @@ interface IArmResult {
   getParentNodeUs: number;
 }
 
-function minOf(run: () => void, iterations: number, warmups: number): number {
+function minOf(
+  run: () => unknown,
+  iterations: number,
+  warmups: number,
+): number {
   for (let i = 0; i < warmups; i += 1) run();
   let best = Infinity;
   for (let i = 0; i < iterations; i += 1) {
@@ -85,7 +79,8 @@ export function JsiNavigationCostScreen() {
   const [note, setNote] = useState<string>('');
 
   const measure = useCallback(() => {
-    if (NativeDOM === null) {
+    const dom = NativeDOM;
+    if (dom === null) {
       setNote(
         'NativeDOM is not installed on this host — nothing measured. The module is fetched with ' +
           'TurboModuleRegistry.get (not getEnforcing), so absence is silent by design.',
@@ -113,38 +108,22 @@ export function JsiNavigationCostScreen() {
       // engine's own field read, which is at least this cheap — it is the scale marker the two JSI
       // arms are read against.
       const floorArray = new Array<number>(childCount).fill(0);
-      let sink = 0;
-      const jsFieldUs = minOf(
-        () => {
-          sink += floorArray[0];
-        },
-        ITERATIONS,
-        WARMUPS,
-      );
-      if (sink === Number.MIN_SAFE_INTEGER) setNote(''); // keep `sink` observable
+      const jsFieldUs = minOf(() => floorArray[0], ITERATIONS, WARMUPS);
 
       const reference = handle as unknown as object;
       const getChildNodesUs = minOf(
-        () => {
-          NativeDOM.getChildNodes(reference);
-        },
+        () => dom.getChildNodes(reference),
         ITERATIONS,
         WARMUPS,
       );
 
       // Measured on a CHILD, since a parent lookup from the root would answer null and skip the
       // work this is meant to price.
-      const firstChild = NativeDOM.getChildNodes(reference)[0];
+      const firstChild = dom.getChildNodes(reference)[0];
       const getParentNodeUs =
         firstChild === undefined
           ? NaN
-          : minOf(
-              () => {
-                NativeDOM.getParentNode(firstChild);
-              },
-              ITERATIONS,
-              WARMUPS,
-            );
+          : minOf(() => dom.getParentNode(firstChild), ITERATIONS, WARMUPS);
 
       next.push({ childCount, jsFieldUs, getChildNodesUs, getParentNodeUs });
     }
@@ -160,12 +139,10 @@ export function JsiNavigationCostScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1622' }}>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <Text style={{ color: '#e6eef8', fontSize: 16, fontWeight: '600' }}>
-          JSI navigation cost
-        </Text>
-        <Text style={{ color: '#8fa6c0', fontSize: 13 }}>
+    <SafeAreaView className="jsi-screen">
+      <ScrollView contentContainerStyle="jsi-content">
+        <Text className="jsi-title">JSI navigation cost</Text>
+        <Text className="jsi-lede">
           One navigation query across the JSI boundary, against the committed tree. Decides whether
           the pending tree can live in C++ (design 2) or must stay a JS skeleton (design 1).
         </Text>
@@ -173,32 +150,26 @@ export function JsiNavigationCostScreen() {
         <ActionButton title="Measure" onPress={measure} color="#4ea1ff" testID="jsi-cost-measure" />
 
         {note === '' ? null : (
-          <Text style={{ color: '#c9b458', fontSize: 12 }}>{note}</Text>
+          <Text className="jsi-note">{note}</Text>
         )}
 
         {results.map(result => (
           <View
             key={result.childCount}
-            style={{
-              borderColor: '#1c3a52',
-              borderWidth: 1,
-              borderRadius: 8,
-              padding: 12,
-              gap: 4,
-            }}
+            className="jsi-card"
           >
-            <Text style={{ color: '#e6eef8', fontWeight: '600' }}>
+            <Text className="jsi-card-title">
               {result.childCount} children
             </Text>
-            <Text style={{ color: '#8fa6c0', fontSize: 12 }}>
+            <Text className="jsi-floor">
               JS field read (floor): {result.jsFieldUs.toFixed(3)} us
             </Text>
-            <Text style={{ color: '#e6eef8', fontSize: 12 }}>
+            <Text className="jsi-arm">
               getChildNodes: {result.getChildNodesUs.toFixed(3)} us/call — projection over{' '}
               {result.childCount}:{' '}
               {((result.getChildNodesUs * result.childCount) / 1000).toFixed(2)} ms
             </Text>
-            <Text style={{ color: '#e6eef8', fontSize: 12 }}>
+            <Text className="jsi-arm">
               getParentNode: {result.getParentNodeUs.toFixed(3)} us/call — projection over{' '}
               {result.childCount}:{' '}
               {((result.getParentNodeUs * result.childCount) / 1000).toFixed(2)} ms
@@ -214,10 +185,10 @@ export function JsiNavigationCostScreen() {
             ref={host => {
               hostRefs.current.set(childCount, host);
             }}
-            style={{ height: 1, overflow: 'hidden' }}
+            className="jsi-specimen"
           >
             {Array.from({ length: childCount }, (_unused, index) => (
-              <View key={index} style={{ width: 1, height: 1 }} />
+              <View key={index} className="jsi-specimen-child" />
             ))}
           </View>
         ))}

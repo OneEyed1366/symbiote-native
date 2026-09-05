@@ -1073,3 +1073,61 @@
   color: #e8ecf1;
   font-size: 12px;
 }
+
+/* --- JSI navigation cost -------------------------------------------------------------------
+   The probe that prices one host-navigation query across the JSI boundary. Styled like the
+   benchmark stop (same Performance line) because it answers the same kind of question: a number
+   that decides an engine design, not a feature demo. */
+.jsi-screen {
+  flex: 1;
+  background-color: var(--ink);
+}
+.jsi-content {
+  padding: 16px;
+  gap: 12px;
+}
+.jsi-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: 600;
+}
+.jsi-lede {
+  color: var(--chalk);
+  font-size: 13px;
+}
+/* Reserved for the "nothing was measured" states — a null NativeDOM, or a parent with no
+   committed handle yet. Tinted off the Performance line rather than red: neither is a failure,
+   both are "ask again in a frame" or "this host does not carry the module". */
+.jsi-note {
+  color: var(--line-performance);
+  font-size: 12px;
+}
+.jsi-card {
+  border-color: #1c3a52;
+  border-width: 1px;
+  border-radius: 8px;
+  padding: 12px;
+  gap: 4px;
+}
+.jsi-card-title {
+  color: var(--chalk-bright);
+  font-weight: 600;
+}
+.jsi-floor {
+  color: var(--mist);
+  font-size: 12px;
+}
+.jsi-arm {
+  color: var(--chalk);
+  font-size: 12px;
+}
+/* The measured parents. Collapsed to a hairline: what is priced is the JSI boundary, so the
+   children must exist in the committed tree without costing a screenful of layout. */
+.jsi-specimen {
+  height: 1px;
+  overflow: hidden;
+}
+.jsi-specimen-child {
+  width: 1px;
+  height: 1px;
+}
