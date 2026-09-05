@@ -1000,11 +1000,11 @@ LANDED name the commit so a reader can diff rather than re-derive.
 2   the edit buffer holds WHICH nodes were touched            LANDED      —
 3   a verification loop that can catch a silent regression    LANDED      —
 4a  the commit consumes the record for its child list         LANDED      —
-4b  the ordered op log, drained by the CREATE path            NEXT        nothing
-4c  node.children / node.parent deleted outright              AFTER 4b    4b, and a non-JS base
-                                                                          for the desired order
-5   anchors stop being NODES and become POSITIONS             AFTER 4     4, and only if the
-                                                                          native branch is taken
+4b  the ordered op log, replayed by the commit                LANDED      —
+4c  node.children / node.parent deleted outright              OPEN        a non-JS base for the
+                                                                          desired order — see below
+5   anchors stop being NODES and become POSITIONS             NEXT        nothing; it is what
+                                                                          unblocks 4b on Angular
 6   setNativeProps arm for prop-only rows                     OPEN        —
 7   the address rides on the framework's own object           AFTER 4     —
 8   our own JSI host object (pendingRoot_ + cloneMultiple)    OPEN        0, and a measured
@@ -1029,11 +1029,18 @@ is free. `NativeDOM` already ships `getChildNodes` / `getParentNode` (§1a), so 
 measured from JS with zero native work; `examples/react/screens/JsiNavigationCostScreen.tsx`
 exists for exactly this.
 
-**Item 5 is NOT a prerequisite for 4, and reading it as one costs the wrong week.** An anchor has
-no Fabric node, so no native structure can hold one — that makes it a blocker for the NATIVE
-branch (item 8) and irrelevant to a JS drain, which handles anchors exactly as the walk does
-today. The temptation is to fix the visible obstacle first; the obstacle is only visible from a
-branch nobody has chosen yet.
+**Item 5 was NOT a prerequisite for 4, and is now the thing 4b is waiting on — CORRECTED
+2026-09-05 by measuring it.** The paragraph here read: an anchor has no Fabric node, so no native
+structure can hold one, which makes it a blocker for the NATIVE branch and irrelevant to a JS
+drain, "which handles anchors exactly as the walk does today". Every clause is still true and the
+conclusion no longer follows. "Handles them as the walk does" is exactly the cost: 4b's replay
+refuses on any parent holding a skipped child, so an adapter that mounts an anchor per composed
+component gets none of it (`childrenOf` 2005 -> 2004 against 2005 -> 4). Item 5 needs no device and
+no native code, and it is what makes the landed work reach Angular at all.
+
+The reasoning error worth not repeating: the paragraph asked whether item 5 BLOCKS item 4, got the
+right answer, and never asked what item 4 is worth WITHOUT it. A prerequisite and a multiplier are
+different questions and only the first was checked.
 
 **Item 6 is independent of all of it** and is the cheapest measurable win on the board — the host
 API is already there, it needs no native work, and it is read against the clone-bubble on
@@ -1116,15 +1123,62 @@ So item 4 splits honestly into:
 
 ```
 4a  the commit consumes the record instead of re-deriving it     LANDED, measured above
-4b  the ordered op log, consumed by the CREATE path so a create
-    stops reading node.children                                  NEXT, acceptance: childrenOf ~0
-4c  node.children / node.parent deleted outright                 needs 4b AND a base for the
-                                                                 order that is not another JS array
+4b  the ordered op log, replayed by the commit                   LANDED, measured below
+4c  node.children / node.parent deleted outright                 needs a base for the order that
+                                                                 is not another JS array
 ```
 
-4b is the piece §7b calls mandatory under both branches (it is the command log a `pendingRoot_`
-rebase re-applies). 4c is where the two branches genuinely diverge, and it is blocked on item 0 in
-a way 4b is not.
+### 4b LANDED — the numbers, and the one adapter it does not help
+
+`pendingStructure` is a Map from parent to its ORDERED ops, and the commit replays them onto the
+committed renderable list rather than re-deriving from `node.children`. Counted at the `tree.ts`
+seam:
+
+```
+                    childrenOf() calls per commit     before      after
+create 1000 rows, no anchors                            2005          4
+append 1000 rows, no anchors                            4006          6
+select one row of a thousand                               5          5
+create 1000 rows, ONE ANCHOR PER ROW                    2005       2004
+```
+
+A create no longer reads the desired tree at all — the four that remain are the synthetic
+container's entry bookkeeping. The append row is the MUTATION side, not the walk: the copy-on-write
+identity check ran on every structural mutation to answer a question that can only be true once,
+and is now gated to the first op of a cycle (2 001 -> 2).
+
+**The last row is the finding, and it makes item 5 the next thing rather than a someday.** A replay
+is sound only while a parent's RENDERABLE list and its DESIRED list are the same list — that is,
+while it holds no skipped child. An anchor breaks that, so Angular's shape re-derives exactly as
+before and gains ~nothing. The precondition is not conservatism: found by the fuzzer as ORACLE 1
+when the refusal was per-OP instead of per-PARENT, because a `before` naming an anchor's FLATTENED
+grandchild is absent from the desired list (so `linkBefore` appends) and present in the renderable
+one (so the replay inserted mid-way). Neither node in that op is skipped; the anchor is, and it is
+not in the op.
+
+So **item 5 is no longer "only if the native branch is taken"** — it is what makes 4b work for the
+one adapter that mounts an anchor per component, and it needs no device.
+
+### The leak the log introduces, because the next log will introduce it too
+
+A SKIPPED node is never reconciled, so `clearPendingStructure` is never reached for it: its ops
+accumulate for the life of the process, one unbounded array per anchor. Two changes close it and
+they only work as a pair — `renderableChildren` truncates the log when it drops the node, and a
+node that STOPS being skipped poisons its own log so it re-derives rather than replaying from a
+false empty base.
+
+Worth stating as a property rather than as an incident: **any per-node buffer entry needs an answer
+for the nodes the commit never visits.** The buffer already owed one for REMOVED nodes
+(`sweepDroppedEdits`); skipped nodes are the second class, and they are not removed — they are in
+the tree and permanently unvisited.
+
+### 4c is blocked on a fact, not on effort
+
+The mirror cannot answer "this node's desired children, in order": `record.children` is the
+RENDERABLE list and `record.skipped` loses where the skipped nodes sat between them. Giving the
+record a desired list is renaming the skeleton, not removing it. So the desired copy goes only when
+the record itself is native, which is what §9 already says from the other side — 4c is where the
+two branches genuinely diverge and it is blocked on item 0 in a way 4a and 4b were not.
 
 ### The two attribution holes that must stay closed, and how to look for a third
 
