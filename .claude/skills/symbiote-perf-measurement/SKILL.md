@@ -2330,3 +2330,56 @@ hand pass had missed.
 Generalise it as: **when the thing you are optimising is invisible to every runtime observer, the
 test belongs on the source, not on the behaviour** — and check that the behavioural test you were
 about to write can actually fail before trusting it.
+
+## A "touched-set instead of the walk" rewrite was measured and DECLINED — the residual is protocol
+
+Recurring proposal, and it sounds obviously right: the commit walk visits every child of a dirty
+parent (`VISITED 1046` for two changed nodes on a 1 000-row list), so replace the boolean dirty
+marks with a set of touched nodes and visit only those. Measured 2026-09-05 with `pnpm bench`
+BEFORE writing any of it, and the numbers say do not.
+
+```
+1 prop, 10 005 nodes across 244 sections   min 0.0124 ms
+1 prop, 10 000 nodes FLAT                  min 0.5990 ms      48x
+select row (1000 flat rows)                min 0.0526 ms
+no-op commit, 9 761 nodes                  min 0.0004 ms
+```
+
+Dirty marking already delivers wherever a win exists: at the SAME node count a bushy tree is 48x
+faster than a flat one, and a no-op commit is essentially free. What is left is one shape — a single
+wide FLAT parent — and there the O(n) is **Fabric's protocol, not our walk**. A parent whose child
+set changed must re-specify ALL N child handles to `cloneNodeWithNewChildren`; no dirty structure of
+any kind removes that. `reconcile.bench.ts`'s own header said so and it was worth re-reading rather
+than re-deriving.
+
+So a touched-set can only remove the per-clean-child `reconcile` CALL, not the O(n) beside it: about
+50 ns per visit, so ~25 us on a 1 000-row Select against a device wall time of 5.5-8 ms for that
+row. Not worth a rewrite of the commit path.
+
+**And it corrects a framing this branch had been using.** `VISITED 1046` was quoted as "the adapter
+told us what changed and we go looking for it again". Half true — the visits are cheap, and the
+array rebuild beside them is protocol-mandated. **The number is large and the time is not**, which
+is exactly why a count is not a cost.
+
+What survives as worth doing, unmeasured and smaller: cache the child-handle ARRAY on the mirror so
+a dirty parent stops allocating a fresh N-element array per commit. Contained, no structural risk,
+and the bench above measures it directly.
+
+## `flush()` "moving to the adapters" was already done — under two other names
+
+Same session, same shape: a design item that turned out to describe the existing state. The
+contract's `flush()` is meant to put the transaction boundary in the framework's hands rather than
+the engine's. It already is — the engine offers two strategies and every adapter picks per call
+site:
+
+```
+react     1 .commit()                        sync, from resetAfterCommit
+vue       8 .requestCommit()                 microtask-coalesced
+svelte   11 .requestCommit()
+solid     3 .commit()   1 .requestCommit()
+angular   3 .commit()  12 .requestCommit()
+```
+
+The engine never imposed one. What is missing is only the NAME — `flush()` as the contract's verb
+instead of `commit`/`requestCommit` — which is an API-surfacing task, not a behavioural change.
+Do not scope it as one.
