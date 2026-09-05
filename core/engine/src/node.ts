@@ -431,11 +431,49 @@ export function isEmptyRawText(node: ISymbioteNode): boolean {
  */
 export function setNodeComponent(node: ISymbioteNode, component: string): void {
   if (node.component === component) return;
+  const wasSkipped = isSkippedAtCommit(node);
   node.component = component;
   // `dirty` alone is not enough: the walk's reuse test also requires the node be visited at all,
   // and a node whose own props did not change this tick is exactly the case that would be skipped.
   markDirty(node);
   markPropsDirty(node);
+  markPresenceIfFlipped(node, wasSkipped);
+}
+
+// Whether the commit walk drops this node instead of committing it — an anchor, or a raw text with
+// no characters. Duplicated from `renderableChildren`'s own `isSkippedAtCommit` (commit.ts) on
+// purpose: importing it here would close a cycle (commit.ts imports this module), and the rule is
+// two one-line predicates that already live in this file. `presence-attribution.test.ts` asserts
+// the two agree, so the copy cannot drift.
+function isSkippedAtCommit(node: ISymbioteNode): boolean {
+  return isAnchor(node) || isEmptyRawText(node);
+}
+
+/**
+ * Record a structural edit when a node's PRESENCE in its parent's renderable child list flipped.
+ *
+ * The third and fourth members of the family `markStructureDirty`'s anchor walk opened. A node is
+ * dropped from that list by `isSkippedAtCommit`, which reads `node.component` and — for a raw
+ * text — `node.props.text`. Both are writable after the node has committed, so `setText` and
+ * `setNodeComponent` can add a node to a parent's renderable list or take one out of it WITHOUT
+ * touching any child list. Before this, neither recorded anything anywhere.
+ *
+ * Compares BEFORE against AFTER rather than testing the current state, and that is the whole
+ * function: a check on the post-write state alone catches the leaving direction and misses the
+ * returning one, because a node that just became non-empty answers "not skipped" and attributes
+ * nothing. `skipped-presence-attribution.test.ts` carries a row for each direction for that reason.
+ *
+ * Routed through `markStructureDirty(parent)` rather than `recordStructureEdit` so the anchor climb
+ * applies here too: a raw text emptying inside an anchor changes the renderable list of the node
+ * ABOVE the anchor, not the anchor's.
+ *
+ * A node with no parent needs nothing: a surface's top-level children reach Fabric through
+ * `commitChildren`, which marks the synthetic container's structure unconditionally at every entry.
+ */
+function markPresenceIfFlipped(node: ISymbioteNode, wasSkipped: boolean): void {
+  if (isSkippedAtCommit(node) === wasSkipped) return;
+  const parent = parentOf(node);
+  if (parent !== undefined) markStructureDirty(parent);
 }
 
 // The three mark* names are the MUTATION-SIDE vocabulary and they stay: every adapter-facing write
@@ -1033,9 +1071,15 @@ export function setText(node: ISymbioteNode, text: string): void {
     propStats.noops += 1;
     return;
   }
+  const wasSkipped = isSkippedAtCommit(node);
   node.props.text = text;
   propStats.writes += 1;
   markPropsDirty(node);
+  // A write to or from '' takes this node out of its parent's renderable child list or puts it
+  // back, which is a structural change to the PARENT that nothing else here would record. Only the
+  // emptiness matters, never the text — `'a' -> 'b'` records nothing, and the negative control in
+  // `skipped-presence-attribution.test.ts` is what keeps it that way.
+  markPresenceIfFlipped(node, wasSkipped);
 }
 
 // Structural ops mark the PARENT chain (both the old and the new one), never the moved child:

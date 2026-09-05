@@ -1,7 +1,7 @@
 // A property test over the commit path: drive a SEEDED random mutation program into the retained
-// tree, commit, and assert FOUR invariants after every commit. On failure it SHRINKS the program to
-// a minimal one that still fails and prints it, so a red run hands you a reproduction rather than a
-// seed number.
+// tree, commit, and assert FIVE invariants — four after every commit and one BEFORE it. On failure
+// it SHRINKS the program to a minimal one that still fails and prints it, so a red run hands you a
+// reproduction rather than a seed number.
 //
 // Why this exists rather than more unit tests. The commit is guarded by the pending-edit buffer, and
 // its failure mode is SILENT: a mutation whose mark is missed leaves the commit skipping a subtree
@@ -26,6 +26,11 @@
 //   4 DRAIN       no node reachable from the surface still carries pending work. Catches the buffer
 //                 growing without bound — invisible to 1-3, which all read committed output, and
 //                 that output is byte-identical whether an entry was consumed or merely ignored.
+//   5 ATTRIBUTION whenever a node's RENDERABLE child list differs from the snapshot its mirror
+//                 holds, `hasPendingStructure(node)` is true. Runs BEFORE the commit, because the
+//                 commit consumes the record it asks about. Nothing else here can see this class:
+//                 today's walk re-derives the renderable list on every node it visits and so
+//                 repairs itself, which is why every hole in it has been silent (see below).
 //
 // Oracles 2 and 3 share `fabricProps` with the implementation, deliberately and with a stated
 // limit: they cannot see a bug INSIDE that function (`.claude/rules/test-harness-false-greens.md`
@@ -46,10 +51,23 @@
 // four were injected into the engine itself and found by GENERATED programs, at 300 seeds x 120
 // steps, with the shrinker reporting the reproduction:
 //
-//   markStructureDirty stops bubbling        ORACLE 1    120 steps -> 3
-//   recordPropEdit forgets pendingProps      ORACLE 2    120 steps -> 3
-//   reconcile never drains pendingPath       ORACLE 4    120 steps -> 1
-//   renderableChildren drops its drain       ORACLE 4    120 steps -> 1
+//   markStructureDirty stops bubbling past anchors     ORACLE 5    120 steps -> 5
+//   setText does not attribute an emptiness flip       ORACLE 5    120 steps -> 4
+//   setNodeComponent does not attribute a flip         ORACLE 5    120 steps -> 4
+//   recordPropEdit forgets pendingProps                ORACLE 2    120 steps -> 3
+//   reconcile never drains pendingPath                 ORACLE 4    120 steps -> 1
+//   renderableChildren drops its drain                 ORACLE 4    120 steps -> 1
+//   renderableChildren stops flattening anchors        ORACLE 1    120 steps -> 1
+//
+// RE-CALIBRATED 2026-09-05 when oracle 5 landed, and the first row is why it had to be. The anchor
+// injury used to report ORACLE 1 and now reports ORACLE 5 — a more precise answer (it names the
+// RECORD that went stale rather than the tree that came out of it), and a strictly earlier one,
+// since oracle 5 runs before the commit. **Oracle 1 is NOT left unwitnessed by that**, which was the
+// thing to check rather than assume: the last row is a structural injury oracle 5 cannot see at all
+// — the record is correct and the WALK emits the wrong tree — and it still reports ORACLE 1 in one
+// step. Two oracles where the earlier subsumes the later leave the later unverified
+// (`.claude/rules/test-harness-false-greens.md` §20); these two overlap on one injury and separate
+// on another, so neither is standing on nothing.
 //
 // **ORACLE 3 is NOT witnessed by any injury reachable from these programs, and that is recorded
 // rather than papered over.** The current commit writes the mirror from the same value it hands the
@@ -75,6 +93,7 @@ import {
   isAnchor,
   markDirty,
   removeChild,
+  setNodeComponent,
   setProp,
   setText,
   RAW_TEXT_COMPONENT,
@@ -83,7 +102,7 @@ import {
   type ISymbioteNode,
 } from '../node';
 import { fabricProps } from '../fabric-props';
-import { hasPendingWork } from '../edit-buffer';
+import { hasPendingStructure, hasPendingWork } from '../edit-buffer';
 import { createSurface, type SymbioteSurface } from '../surface';
 
 // mulberry32 — a seeded PRNG, so a failure names a seed that reproduces it exactly. `Math.random`
@@ -120,6 +139,7 @@ type IStepKind =
   | 'move'
   | 'setProp'
   | 'setText'
+  | 'swapComponent'
   | 'commit';
 
 interface IStep {
@@ -144,6 +164,11 @@ const KINDS: readonly IStepKind[] = [
   'setProp',
   'setProp',
   'setText',
+  // Reaches `setNodeComponent`, which can flip a node's SKIPPED-ness and so change its parent's
+  // renderable child list with no structural op anywhere — the fourth member of the family oracle 5
+  // exists for. Weighted low: it is a rare production call (`resolveIntrinsicTag`'s single/multiline
+  // swap) and a high weight would crowd out the ops the other oracles need.
+  'swapComponent',
   // Commit is a STEP, not a coin flip between steps, so the shrinker can delete commits too — a
   // failure that needs three commits shrinks to exactly three.
   'commit',
@@ -336,6 +361,59 @@ function findUndrainedNode(surface: SymbioteSurface): string | undefined {
   return undefined;
 }
 
+/**
+ * ORACLE 5 — PRE-COMMIT, and the only one that is not about committed output.
+ *
+ * The property `symbiote-fabric-cxx-surface` §8 says the buffer drain rests on: whenever a node's
+ * RENDERABLE child list differs from the snapshot its mirror holds, `hasPendingStructure(node)` must
+ * be true. Today's walk does not need it — it re-derives `renderableChildren` on every node it
+ * visits and so repairs itself — which is exactly why every hole in it has been silent, and why the
+ * hole is only reachable from a path that TRUSTS the snapshot (`commitTargeted` today, the drain
+ * next).
+ *
+ * So this oracle asserts a property of the RECORD rather than of the tree, and it must run BEFORE
+ * the commit consumes the record. That is also why it is not in `findViolation` with the other
+ * four: after a commit the answer is trivially yes, and a check that cannot fail is not a check.
+ *
+ * Two exemptions, both narrow and both stated so a future reader can tell them from a hole:
+ *   - a node with no mirror has never committed, so there is no snapshot to disagree with;
+ *   - a node the walk SKIPS has no mirror of its own by construction (`renderableChildren` drops
+ *     the record when it skips one), so it never reaches the first branch.
+ *
+ * The renderable list is recomputed here from `node.children` independently, for the same reason
+ * oracle 1 restates the flattening rules rather than calling the engine's own: sharing the function
+ * would make a bug inside it invisible to the oracle built to catch it.
+ */
+function findUnrecordedStructuralChange(
+  surface: SymbioteSurface,
+): string | undefined {
+  const renderable = (node: ISymbioteNode): ISymbioteNode[] => {
+    const out: ISymbioteNode[] = [];
+    for (const child of node.children) {
+      if (isAnchor(child)) out.push(...renderable(child));
+      else if (!isSkippedAtCommit(child)) out.push(child);
+    }
+    return out;
+  };
+  for (const node of reachable(surface)) {
+    const record = node.committed;
+    if (record === undefined) continue;
+    const now = renderable(node);
+    const snapshot = record.children;
+    const same =
+      now.length === snapshot.length &&
+      now.every((child, index) => child === snapshot[index]);
+    if (same || hasPendingStructure(node)) continue;
+    return (
+      `${record.viewName}#${record.tag}: its renderable child list moved on but nothing recorded ` +
+      `a structural edit against it.\n  snapshot=[${snapshot
+        .map(child => child.component)
+        .join(',')}]\n  now     =[${now.map(child => child.component).join(',')}]`
+    );
+  }
+  return undefined;
+}
+
 /** All four, in the order that makes a failure most readable: structure first, then payloads. */
 function findViolation(
   recorder: ReturnType<typeof installFabric>,
@@ -384,11 +462,21 @@ function runProgram(steps: readonly IStep[]): string | undefined {
       if (step === undefined) continue;
       applyStep(step, pool, surface);
       if (step.kind !== 'commit') continue;
+      // Oracle 5 asks about the RECORD, so it runs while the record still exists — the commit on
+      // the next line consumes it and makes the question unanswerable.
+      const unrecorded = findUnrecordedStructuralChange(surface);
+      if (unrecorded !== undefined) {
+        return `at step ${index}\nORACLE 5 (attribution)\n  ${unrecorded}`;
+      }
       surface.commit();
       const violation = findViolation(fabric, surface);
       if (violation !== undefined) return `at step ${index}\n${violation}`;
     }
 
+    const finalUnrecorded = findUnrecordedStructuralChange(surface);
+    if (finalUnrecorded !== undefined) {
+      return `before the final commit\nORACLE 5 (attribution)\n  ${finalUnrecorded}`;
+    }
     // A final commit, so a program whose last step was a mutation is still checked.
     surface.commit();
   } catch (error) {
@@ -493,6 +581,46 @@ function applyStep(
       setProp(node, 'testID', `id${step.value}`);
       return;
     }
+    // Swap a node's component, sometimes to one the commit walk SKIPS. `b` picks the direction so a
+    // program can flip a node out of its parent's renderable list and back again.
+    //
+    // TEXT CONTAINERS ARE EXCLUDED, and the exclusion is a finding rather than a convenience. The
+    // first run of this step reported an ORACLE 1 failure in three shrunk steps: a `<Text>` inside a
+    // `<Text>` swapped to `RCTImageView` still committed as `RCTVirtualText`. That is the engine
+    // behaving to contract — `isText` is `readonly` on `ISymbioteNode` and on the class, set once by
+    // `createElement`, and `viewNameFor` reads it rather than the component name (commit.ts says so
+    // where it prices `commitTargeted`). So a component swap that crosses the text boundary is not
+    // something the engine can express, and a generator that issues one is testing the harness.
+    //
+    // Worth knowing rather than only excluding: `setNodeComponent`'s one production caller is
+    // `resolveIntrinsicTag`, whose swaps (TextInput single <-> multiline) are both non-text. A
+    // future primitive whose `intrinsicWhen` crossed that boundary would commit the wrong view name
+    // silently — the reason this note is here and not just a filter.
+    case 'swapComponent': {
+      const node = at(
+        pool.filter(candidate => !candidate.isText),
+        step.a,
+      );
+      if (node === undefined) return;
+      if (step.b >= 0.34) {
+        setNodeComponent(node, step.b < 0.67 ? 'RCTView' : 'RCTImageView');
+        return;
+      }
+      // A raw text may not take children (see `containers` above) and always carries a STRING
+      // `text`, so the swap only takes a childless node and seeds the prop the same statement — the
+      // shape any caller doing this deliberately would use.
+      //
+      // The second finding of this step's first run, and the reason for both halves. Swapping a node
+      // WITH children to a raw text left the whole subtree undrained: `renderableChildren` drops an
+      // empty raw text outright rather than flattening it the way it flattens an anchor, so its
+      // children are never visited and keep their buffer entries forever (ORACLE 4, four steps).
+      // Unreachable from a legal tree — nothing else in this generator gives a raw text children,
+      // and no adapter can — so the tree was invalid, not the engine.
+      if (node.children.length > 0) return;
+      setNodeComponent(node, RAW_TEXT_COMPONENT);
+      setText(node, step.value % 5 === 0 ? '' : `t${step.value}`);
+      return;
+    }
     case 'setText': {
       const node = at(
         pool.filter(candidate => candidate.component === RAW_TEXT_COMPONENT),
@@ -579,7 +707,7 @@ const STEP_COUNT = Number(process.env.SYMBIOTE_FUZZ_STEPS ?? '60');
 // tight: the number exists to keep a hang from wedging CI, not to police speed.
 const FUZZ_TIMEOUT_MS = Math.max(30_000, SEED_COUNT * STEP_COUNT * 0.2);
 
-describe('commit fuzz — four oracles over a seeded mutation program', () => {
+describe('commit fuzz — five oracles over a seeded mutation program', () => {
   it(
     `holds over ${SEED_COUNT} programs of ${STEP_COUNT} steps`,
     () => {
