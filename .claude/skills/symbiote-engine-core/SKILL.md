@@ -565,6 +565,14 @@ setNativeProps_is_a_real_fabric_path := {
 }
 ```
 
+**Read `symbiote-fabric-cxx-surface` before acting on anything in this section.** Measured from
+RN 0.86's own C++ on 2026-09-05: the JSI surface is 34 names (we bind 14), none of which reads
+structure; `ShadowNode::cloneTree` + `ShadowNodeFamily` are an O(depth) PATH CLONE that already
+exists in C++ and is reachable from JS via `setNativeProps` (props-only, and the family patch is
+STICKY); `ShadowTree::commit` is a retried transaction, which is why no in-place mutation API can
+exist; and `Differentiator::calculateShadowViewMutations` means Fabric ALREADY does the granular
+native update, so our commit WALK is the only redundant diff in the system.
+
 Open, unmeasured: React's SHARE of a frame in our stack. Everything about whether a compiled
 edit-list ("million-style blocks") is worth building hangs on it, and no number exists yet.
 Instruments that give it directly: React's `<Profiler>` `actualDuration` (needs a profiling build
