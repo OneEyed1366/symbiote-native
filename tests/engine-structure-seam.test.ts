@@ -16,11 +16,13 @@
 //   DESIRED    node.children / node.parent        57 sites across 7 files   -> now 14, all in tree.ts
 //   COMMITTED  record.children / record.parent    11 sites across 2 files   -> unchanged, see below
 //
-// COMMITTED IS DELIBERATELY NOT GUARDED YET. It is the OTHER copy of the structure and it is
-// replaced by a different thing — `NativeDOM.getChildNodes` / `getParentNode` rather than the
-// buffer, because C++ can answer the committed shape and can never answer the pending one. It gets
-// its own seam and its own guard when that cut happens; asserting it here now would be a rule
-// nobody can satisfy, and one that hides which half is actually done.
+// COMMITTED IS DELIBERATELY NOT GUARDED YET, and the reason recorded here first was WRONG — see
+// `tree.ts`'s header. It is not replaced by RN's `NativeDOM`: that API reads the current revision
+// only and `symbiote-fabric-cxx-surface` §6a states that marshalling children over JSI per commit
+// is O(n) against O(1) for holding a handle, i.e. strictly worse than today. The route the skill
+// chose (§7b, design 2) is our OWN native module's `pendingRoot_`, which is a different mechanism.
+// It gets its own seam and its own guard when that cut happens; asserting it here now would be a
+// rule nobody can satisfy, and one that hides which half is actually done.
 
 import fs from 'node:fs';
 import path from 'node:path';

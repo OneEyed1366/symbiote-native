@@ -6,18 +6,32 @@
 // The engine holds the tree shape TWICE, and both copies are on the way out
 // (`symbiote-fabric-cxx-surface` §9):
 //
-//   DESIRED     node.children / node.parent        this module        -> replaced by the edit buffer
-//   COMMITTED   record.children / record.parent    the IMirror        -> replaced by NativeDOM's
-//                                                                        getChildNodes / getParentNode
+//   DESIRED     node.children / node.parent        this module
+//   COMMITTED   record.children / record.parent    the IMirror
 //
-// They are replaced by DIFFERENT things, and that is forced rather than chosen. `NativeDOM` reads
-// the CURRENT REVISION only (its own spec: a node not present in an active shadow tree answers
-// empty), so C++ can answer the committed shape and can NEVER answer the pending one — a reconciler
-// navigates the tree it is midway through building. The pending delta therefore has to live in the
-// buffer, and the committed base in C++. Neither alone is sufficient; together they are complete:
+// ── CORRECTED 2026-09-05 against `symbiote-fabric-cxx-surface`, which had already ruled out the
+// design this header first named. Recorded because the wrong one is the intuitive one. ────────────
 //
-//   parentOf(node)    = the buffer's pending parent for it, else getParentNode(node)
-//   childrenOf(node)  = getChildNodes(node) with this tick's ops for that parent replayed
+// The first version said the committed copy is replaced by RN's `NativeDOM.getChildNodes` /
+// `getParentNode`. It is NOT, on two counts the skill states outright:
+//
+//   §1a  NativeDOM reads the CURRENT REVISION only, and the skill's own conclusion is that it is
+//        "unusable for RECONCILIATION, because a reconciler navigates the tree it is mid-way
+//        through building".
+//   §6a  "Marshalling children back over JSI per commit is O(n) where holding one handle is O(1) —
+//        strictly worse than today." Reading children over the wire per commit is the ONE thing
+//        that section tells you never to do.
+//
+// The route the skill actually chose (§7b, design 2) is OUR OWN native module retaining a
+// `pendingRoot_` per surface and answering navigation from it — not RN's read-only DOM API. Those
+// are different mechanisms and only the second is on the table.
+//
+// AND THE BUFFER STAYS THE SOURCE OF TRUTH EVEN THEN, which is what makes the ops half mandatory
+// rather than an optimisation. `ShadowTree::commit` is a RETRIED transaction (§5): a `pendingRoot_`
+// built against an older root must be rebased when another writer lands first, and the only way to
+// rebase is to re-apply the command log inside the lambda. So `pendingRoot_` is a MEMO of the
+// buffer, never a replacement for it — and a buffer that holds only WHICH nodes were touched has
+// nothing to re-apply.
 //
 // ── WHAT THIS CUT DOES, AND WHAT IT DOES NOT ─────────────────────────────────────────────────────
 //
@@ -31,11 +45,10 @@
 //
 // ── THE RESIDUE THIS CUT MAKES VISIBLE: ANCHORS ──────────────────────────────────────────────────
 //
-// An anchor has no Fabric node — it is flattened away at commit and never committed — so
-// `getChildNodes` will never return one and `getParentNode` on one answers null. It is purely ours.
-// So the committed backing cannot hold anchors at all, and they are the one part of the desired
-// structure with nowhere to go: not to C++, and not to a per-tick buffer either, because an adapter
-// holds an anchor across commits and appends to it later.
+// An anchor never becomes a Fabric node — it is flattened away at commit — so no native structure,
+// ours or RN's, can hold one. It is purely ours, and it is the one part of the desired structure
+// with nowhere to go: not into a C++ `pendingRoot_`, and not into a per-tick buffer either, because
+// an adapter holds an anchor across commits and appends to it later.
 //
 // That is the open question this seam is meant to surface early rather than discover mid-swap. The
 // shape that resolves it is to stop treating an anchor as a NODE and start treating it as a

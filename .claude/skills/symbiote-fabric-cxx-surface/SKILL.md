@@ -671,6 +671,41 @@ can visit any surface's `ShadowTree` and commit arbitrary transactions with no p
 
 (2) is what leaves ONLY the buffer on the JS side, and it is the chosen direction (2026-09-05).
 
+### This CONTRADICTS §9's correction, and the contradiction is resolved by step 0 — read both
+
+Both were written on 2026-09-05 and they do not agree. Recorded rather than silently reconciled,
+because a reader will otherwise quote whichever half suits the instruction in front of them — which
+is exactly what nearly happened on 2026-09-05, when a session building the seam took §7b's "chosen
+direction" and wrote a design §6a rules out.
+
+```
+§9 CORRECTED   "only a buffer on our side" is DEAD; a navigable node stays.
+               "the navigable structure LIKELY stays in JS"           -> design (1)
+§7b            design (2) "is the chosen direction"                   -> design (2)
+```
+
+**They are not equally weighted, and the tie-break is in §8 rather than in either section.** §9's
+correction hedges on cost, not on capability — "likely", and its stated reason is that child
+navigation would be a per-call JSI read. §8 Step 0 says the crossing constant "decides whether
+design (2) is viable AT ALL". So §9 is design (1) CONDITIONAL on step 0 coming back expensive, and
+§7b is design (2) conditional on it coming back cheap. Neither is a standing decision; both are
+branches off one unmeasured number, and the number is still unmeasured.
+
+**What is NOT conditional, and holds under either branch:**
+
+- The buffer must carry the OPERATIONS, not merely which nodes were touched. Under (1) the drain
+  needs them to derive the new child order; under (2) `pendingRoot_` must be REBASED by re-applying
+  the command log inside a retried commit lambda (§5), so it is a memo of the buffer and useless
+  without one. Same requirement, two different reasons.
+- `NativeDOM` is not the mechanism for either. It is app-facing (§1a) and per-commit child reads are
+  strictly worse than a handle (§6a). A design naming it has taken a wrong turn.
+- The floor is not zero (§6a): a family handle per node, the root's child list, and `viewName` per
+  node survive both branches. The handle can ride on the framework's own object, so nothing
+  TREE-SHAPED stays ours — but "ours by ownership" and "does not exist" are different claims and only
+  the first is available.
+
+So the next decision is not "which design", it is "run step 0".
+
 **Its cost is a per-call JSI crossing plus a family->node resolution** whose phase 2 linearly
 scans each level's children (§6a). Arithmetic on this repo's own measured constant (~1.5 us per
 crossing): Solid's `cleanChildren` on 1 000 children is ~1 000 crossings ~= 1.5 ms plus 1 000
