@@ -31,6 +31,7 @@ import { readFileSync } from 'node:fs';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  childrenOf,
   clearGlobalStyles,
   isAnchor,
   readCommitProfile,
@@ -348,7 +349,9 @@ function countEngineNodes(roots: readonly ISymbioteNode[]): {
     if (node === undefined) break;
     total += 1;
     if (isAnchor(node)) anchors += 1;
-    for (const child of node.children) stack.push(child);
+    // Through the engine's accessor: a node's desired children are derived from its published
+    // record plus its op log, so there is no `children` field.
+    for (const child of childrenOf(node)) stack.push(child);
   }
   return { total, anchors };
 }

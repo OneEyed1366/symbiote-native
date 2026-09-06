@@ -28,9 +28,10 @@ import {
   isAnchor,
   isEmptyRawText,
   committedOf,
+  markChildAppended,
+  markChildRemoved,
   markDirty,
   markPropsDirty,
-  markStructureDirty,
   takePropStats,
   VIRTUAL_TEXT_COMPONENT,
   type IContribution,
@@ -45,11 +46,11 @@ import {
   hasPendingChild,
   hasPendingProps,
   hasPendingStructure,
-  pendingChildOps,
+  renderableChildOps,
   hasPendingWork,
 } from './edit-buffer';
 import { dlog, isDebug } from './debug';
-import { childrenOf, replaceChildren } from './tree';
+import { childrenOf } from './tree';
 import { flattenStyle } from './style';
 import { nextTag } from './tags';
 import { registerPostCommit, runPostCommitHooks } from './post-commit';
@@ -287,10 +288,25 @@ const NO_SKIPPED: readonly ISymbioteNode[] = [];
 // as `skippedScratch` — written by the recursion, read by the one caller immediately after.
 let hoistedScratch = false;
 
-function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
+/**
+ * `kids` is the node's desired children, and it is a PARAMETER rather than a `childrenOf` call for a
+ * reason that only appeared when the desired list became a derivation: `reconcile` consumes this
+ * node's op log at its entry, so by the time the derive path runs, asking again would get the
+ * published base with this cycle's ops already dropped. The caller reads the list BEFORE the drain
+ * and hands it down. Every nested anchor below is a different node whose log is untouched, so the
+ * recursion reads those for itself.
+ *
+ * Cost of getting it wrong, measured 2026-09-06: 33 red tests, all of them a removed child still
+ * committing or an inserted one missing — the shape of a lost mutation, with the mutation perfectly
+ * recorded and simply read too late.
+ */
+function renderableChildren(
+  node: ISymbioteNode,
+  kids: readonly ISymbioteNode[],
+): readonly ISymbioteNode[] {
   skippedScratch.length = 0;
   hoistedScratch = false;
-  return flattenRenderable(node);
+  return flattenRenderable(node, kids);
 }
 
 /** What `renderableChildren` dropped on its last call. Valid only until the next one. */
@@ -323,11 +339,16 @@ interface IFlattened {
  * naming only the outer one leaves the inner one pending forever — which swallows every later mark
  * from its subtree.
  */
-function flattenPure(node: ISymbioteNode): IFlattened {
+function flattenPure(
+  node: ISymbioteNode,
+  // The node's desired children, defaulting to asking. A caller that has already consumed this
+  // node's op log must pass the list it read BEFORE that — see `renderableChildren` for why.
+  from: readonly ISymbioteNode[] = childrenOf(node),
+): IFlattened {
   const renderable: ISymbioteNode[] = [];
   const skipped: ISymbioteNode[] = [];
   let hoists = false;
-  const kids = childrenOf(node);
+  const kids = from;
   // Counted as a scan, because it IS one — this reads a child list, and the whole point of these
   // counters is what the commit READS. It is a much smaller read than the one it replaces (an
   // anchor's own children, not the parent's whole list), and pricing it honestly is what lets the
@@ -406,8 +427,9 @@ function flattenContribution(node: ISymbioteNode): IContribution {
   //
   // It does NOT publish, which is the right direction: the log this node still holds has not been
   // consumed, so leaving it is what lets the next cycle resolve it properly.
-  if (contributionsInFlight.has(node)) return flattenPure(node);
-  const ops = pendingChildOps(node);
+  if (contributionsInFlight.has(node))
+    return { ...flattenPure(node), desired: childrenOf(node) };
+  const ops = renderableChildOps(node);
   const base = node.contributed;
   const replayable =
     ops !== null &&
@@ -420,6 +442,8 @@ function flattenContribution(node: ISymbioteNode): IContribution {
       childScan.contributionsReplayed += 1;
       return base;
     }
+    // Read BEFORE the replay, which publishes and therefore drains the log this needs.
+    const desired = childrenOf(node);
     contributionsInFlight.add(node);
     const replayed = replayChildOps(
       base?.renderable ?? NO_SKIPPED,
@@ -434,6 +458,7 @@ function flattenContribution(node: ISymbioteNode): IContribution {
         renderable: replayed.children,
         skipped: replayed.skipped,
         hoists: replayed.hoists,
+        desired,
       });
     }
   }
@@ -462,7 +487,12 @@ function flattenContribution(node: ISymbioteNode): IContribution {
     skipped.push(...inner.skipped);
   }
   contributionsInFlight.delete(node);
-  return publishContribution(node, { renderable, skipped, hoists });
+  return publishContribution(node, {
+    renderable,
+    skipped,
+    hoists,
+    desired: kids,
+  });
 }
 
 /**
@@ -474,7 +504,7 @@ function flattenContribution(node: ISymbioteNode): IContribution {
  * is in the record this line writes, so the next cycle replays onto it instead of re-deriving.
  */
 /**
- * The three lines every skipped child owes, wherever it is dropped from a renderable list.
+ * What every skipped child owes, wherever it is dropped from a renderable list.
  *
  * `clearPendingWork` because the walk will never visit this node again, so nothing else would ever
  * drain its path entry — and `markDirty` stops at the first already-recorded ancestor, so one left
@@ -483,16 +513,35 @@ function flattenContribution(node: ISymbioteNode): IContribution {
  * back across a parent re-creation, which Fabric refuses in C++ as a native abort rather than a
  * misrender (`skipped-node-family.test.ts`).
  *
- * The structural log is the one that is NOT cleared for an anchor, and that is the change item 5's
- * residual brought. It used to be TRUNCATED here — discarded to stop an unvisited node accumulating
- * ops forever. It is now CONSUMED instead, by `publishContribution`, so discarding it here would
- * throw away ops whose effect has not reached any record. Everything else that is skipped is
- * childless (an empty raw text), so for those the clear is exact.
+ * ── AND IT MUST PUBLISH BEFORE IT DROPS ─────────────────────────────────────────────────────────
+ *
+ * `committed` is where a node's DESIRED children live (`childrenOf`, tree.ts), so dropping it
+ * without publishing them somewhere loses the whole subtree of any node that becomes skipped. An
+ * ANCHOR is already covered — `flattenContribution` published its contribution a moment ago, desired
+ * list included — but everything else skipped is not, and "everything else" is not the harmless set
+ * it reads as: an empty raw text is skipped, `setNodeComponent` can turn a node holding children
+ * into one, and an ANCHOR holding children can become one directly, where
+ * `markPresenceIfFlipped` sees no change in skipped-ness and correctly does nothing.
+ *
+ * FOUND BY THE FUZZER'S ORACLE 6, which is the only oracle that could: the node is hidden, so
+ * nothing about the committed tree changes and every other oracle is satisfied. The reproduction
+ * needed a per-STEP check to localise at all — asked only at commits, it reported the divergence
+ * wherever the next commit fell and shrank to 103 steps naming nothing.
  */
 function hideSkippedChild(child: ISymbioteNode): void {
   clearPendingWork(child);
+  if (!isAnchor(child)) {
+    // A skipped non-anchor contributes NOTHING to its parent's renderable list — an empty raw text
+    // paints nothing and hoists nothing — so the only field of this record that carries information
+    // is `desired`. Read before the drop below, which is what it is rescuing it from.
+    publishContribution(child, {
+      renderable: NO_SKIPPED,
+      skipped: NO_SKIPPED,
+      hoists: false,
+      desired: childrenOf(child),
+    });
+  }
   child.committed = undefined;
-  if (!isAnchor(child)) clearPendingStructure(child);
 }
 
 function publishContribution(
@@ -649,36 +698,6 @@ function replayChildOps(
   };
 }
 
-/**
- * A node's DESIRED child list, replayed from the one it last committed plus this cycle's ops.
- *
- * The plain twin of `replayChildOps`: no anchors, no contributions, no refusals — it is `linkAppend`
- * / `linkBefore` / `unlink` (tree.ts) applied in issue order, and it must stay a line-for-line mirror
- * of those three or the two answers drift. In particular a `before` the list does not hold APPENDS,
- * which is what `linkBefore`'s `index < 0` does and what every framework's `insertBefore(…, null)`
- * means; and the pre-remove matches `appendChild`'s own `detach`, which the adapter API performs
- * before every insert.
- *
- * Unlike the renderable replay this one can never refuse. It works in desired space, where an op
- * says exactly what it did — the refusals over there all exist because the renderable list is a
- * DIFFERENT list from the one the ops are written against.
- */
-function replayDesired(
-  base: readonly ISymbioteNode[],
-  ops: readonly IEditOp[],
-): ISymbioteNode[] {
-  const out = base.slice();
-  for (const op of ops) {
-    const at = out.indexOf(op.child);
-    if (at >= 0) out.splice(at, 1);
-    if (op.remove) continue;
-    const before = op.before ?? undefined;
-    const found = before === undefined ? -1 : out.indexOf(before);
-    out.splice(found < 0 ? out.length : found, 0, op.child);
-  }
-  return out;
-}
-
 // ── THE DIFFERENTIAL: a replayed list, checked against a derived one ────────────────────────────
 //
 // `replayChildOps` and `flattenRenderable` are two implementations of one answer, and the whole
@@ -721,13 +740,17 @@ function verifyReplay(
   replayed: IReplayed,
   base: readonly ISymbioteNode[],
   ops: readonly IEditOp[],
+  // The node's desired children as they stood BEFORE `reconcile` drained its log. Asking again here
+  // would read the published base with this cycle's ops already gone, so the differential would be
+  // comparing the replay against the state it started from and would pass on anything.
+  desired: readonly ISymbioteNode[],
 ): void {
   if (!verifyReplayOn) return;
   // The verification must not move the instrument. `flattenPure` counts as a scan, so a run with
   // the differential on would report reads the production path never performs — and every counter
   // assertion in the suite would then be measuring the checker.
   const before = { ...childScan };
-  const truth = flattenPure(node);
+  const truth = flattenPure(node, desired);
   Object.assign(childScan, before);
   const skippedAgrees =
     truth.skipped.length === replayed.skipped.length &&
@@ -766,49 +789,16 @@ function verifyReplay(
   );
 }
 
-/**
- * The desired list the record now carries, checked against the one the tree still holds.
- *
- * Same switch and the same purpose as `verifyReplay` above, one layer down. `IMirror.desired` is
- * built beside `node.children` and consumed by nothing yet — deliberately, because a derivation that
- * REPLACES the field has to be shown to agree with it first, over the fuzzer's programs, before the
- * field can go (`symbiote-fabric-cxx-surface` §8, "the safe way to land it whole").
- *
- * Delete this check when `childrenOf` reads the derivation: at that point the two sides are the same
- * expression and the comparison is a tautology.
- */
-function verifyDesired(
-  node: ISymbioteNode,
-  desired: readonly ISymbioteNode[],
-  base: readonly ISymbioteNode[],
-  ops: readonly IEditOp[] | null | undefined,
-): void {
-  if (!verifyReplayOn) return;
-  const truth = childrenOf(node);
-  if (sameNodes(truth, desired)) return;
-  const describe = (list: readonly ISymbioteNode[]): string =>
-    `[${list.map(debugNodeId).join(',')}]`;
-  throw new Error(
-    `desired diverged at ${debugNodeId(node)}: ` +
-      `record=${describe(desired)} tree=${describe(truth)} ` +
-      `base=${describe(base)} ops=${
-        ops == null
-          ? String(ops)
-          : `[${ops
-              .map(
-                op =>
-                  `${op.remove ? '-' : '+'}${debugNodeId(op.child)}${
-                    op.before === undefined || op.before === null
-                      ? ''
-                      : `@${debugNodeId(op.before)}`
-                  }`,
-              )
-              .join(',')}]`
-      }`,
-  );
-}
+// `verifyDesired` stood here while `IMirror.desired` was built BESIDE `node.children` and read by
+// nothing — the staged landing §8 prescribes, so a derivation that replaces a field is shown to
+// agree with it before the field goes. It went with the field: `childrenOf` IS the derivation now,
+// so the two sides of that comparison are one expression. What verifies it instead is the fuzzer's
+// ORACLE 6, against a model the executor keeps from the mutations it issues.
 
-function flattenRenderable(node: ISymbioteNode): readonly ISymbioteNode[] {
+function flattenRenderable(
+  node: ISymbioteNode,
+  from: readonly ISymbioteNode[],
+): readonly ISymbioteNode[] {
   // Anchor nodes (Vue fragment/v-if/v-for placeholders, Angular component hosts that should
   // not paint) live in the retained tree for sibling ordering but never become Fabric views.
   // When an anchor owns children, flatten them into the parent's renderable list: this lets a
@@ -821,7 +811,7 @@ function flattenRenderable(node: ISymbioteNode): readonly ISymbioteNode[] {
   // see the childScan declaration for what the five counters mean and what they were built to
   // settle.
   childScan.scans += 1;
-  const kids = childrenOf(node);
+  const kids = from;
   const total = kids.length;
   let index = 0;
   while (index < total && !isSkippedAtCommit(kids[index])) index += 1;
@@ -964,8 +954,11 @@ function reconcile(
   // create and the update path. Anything that reads that snapshot afterwards is reading a current
   // one until the next structural op records against this node again.
   const structureChanged = hasPendingStructure(node);
-  // Read BEFORE the clear, which consumes it.
-  const childOps = pendingChildOps(node);
+  // BOTH read before the clear, which consumes them. The desired list is a derivation over the same
+  // log the replay below reads (`childrenOf`, tree.ts), so asking for it afterwards would get the
+  // base with the ops already dropped.
+  const desiredChildren = childrenOf(node);
+  const childOps = renderableChildOps(node);
   clearPendingStructure(node);
 
   const childInText = node.isText || hasTextAncestor;
@@ -1050,26 +1043,13 @@ function reconcile(
     // leaving this parent takes an op naming the child, and `replayChildOps` refuses any op naming
     // a node the base hid. Break-tested — removing it moved nothing, and the guard that DOES cover
     // it reddens three rows.
-    // The desired list takes the ops whenever there ARE ops, which is a strictly wider condition
-    // than the renderable list's: `replayChildOps` refuses three shapes, all of them consequences of
-    // the renderable list being a different list from the one the ops are written against, and none
-    // of them applies here. A `null` log is the one case with nothing to replay — it says the change
-    // is not describable as child ops at all (`recordStructureEdit`) — and `replaceChildren` is why
-    // that arm has to keep reading the tree for now.
-    desired =
-      childOps === undefined || childOps === null
-        ? // COPIED, and the copy is the whole of a bug the differential caught within eight
-          // thousand programs. `childrenOf` returns `node.children` BY REFERENCE, so storing it
-          // made the record ALIAS the live list: every later mutation leaked into the base, and the
-          // next cycle then replayed its ops onto a base that already held them — which reorders,
-          // because the replay removes a child by identity before re-inserting it. Exactly the
-          // hazard `snapshotCommittedChildren` (edit-buffer.ts) exists to prevent for
-          // `record.children`, one field over and with nothing protecting it. The arm is rare (a
-          // poisoned log: the container, the anchor climb, a skipped-ness flip) and it disappears
-          // entirely once `childrenOf` reads the derivation.
-          childrenOf(node).slice()
-        : replayDesired(committed?.desired ?? NO_SKIPPED, childOps);
-    verifyDesired(node, desired, committed?.desired ?? NO_SKIPPED, childOps);
+    // Read at the top of `reconcile`, before the log was consumed, and simply republished here.
+    // The `verifyDesired` differential that stood beside this line is gone with the field it
+    // compared against: `childrenOf` IS the derivation now, so the comparison would be a tautology.
+    // What still verifies it is the fuzzer's ORACLE 6, which compares the engine's answer against a
+    // model the executor keeps from the mutations it issues — the only oracle in the suite that can
+    // report a bug in the derivation, and the reason it exists.
+    desired = desiredChildren;
     const replayable = childOps !== undefined && childOps !== null;
     const replayed = replayable
       ? replayChildOps(
@@ -1090,9 +1070,10 @@ function reconcile(
         replayed,
         committed?.children ?? NO_SKIPPED,
         childOps ?? [],
+        desiredChildren,
       );
     } else {
-      kids = renderableChildren(node);
+      kids = renderableChildren(node, desiredChildren);
       skipped = takeSkipped();
       hoists = takeHoisted();
     }
@@ -1107,6 +1088,10 @@ function reconcile(
       committed.skipped = skipped;
       committed.hoists = hoists;
       committed.desired = desired;
+      // A real record now describes this node's desired children, so the contribution it published
+      // while it was an anchor is superseded. Exactly one of the two ever stands, which is what
+      // lets `childrenOf` pick between them with a `??` and no precedence rule.
+      node.contributed = undefined;
     }
   }
 
@@ -1186,11 +1171,13 @@ function reconcile(
         `committed (create) node=${debugNodeId(node)} tag=${tag} view=${viewName}`,
       );
     }
-    // `kids` is stored BY REFERENCE, not copied. With no anchors it IS `node.children`, so the
-    // record aliases the live array until the next structural op, which copies it out of the way
-    // (markStructureDirty, node.ts). Slicing here instead cost one array per node per commit -
-    // 9 002 on a 1 000-row create - and all but the handful of nodes that go on to change threw
-    // theirs away unread.
+    // `kids` is stored BY REFERENCE, not copied — and with no anchors it IS `desired`, the same
+    // array. That aliasing used to need protecting (`snapshotCommittedChildren`) because the array
+    // was also the live `node.children`; nothing mutates a published list any more, so two records
+    // pointing at one array is simply one array. Slicing instead cost one per node per commit —
+    // 9 002 on a 1 000-row create — and all but the handful that go on to change threw theirs away
+    // unread.
+    node.contributed = undefined;
     node.committed = {
       handle,
       tag,
@@ -1353,6 +1340,30 @@ export function disposeRoot(rootTag: IRootTag): void {
     dlog(`root container disposed root=${rootTag}`);
 }
 
+/**
+ * Hand the synthetic container a whole top-level list, as OPS.
+ *
+ * A surface hands its children over wholesale rather than one mutation at a time, and this used to
+ * be `replaceChildren` (tree.ts) writing the array plus `markStructureDirty` saying "changed,
+ * somehow". Neither survives the desired list becoming a derivation: there is no array to write, and
+ * "somehow" leaves nothing to derive FROM.
+ *
+ * So the whole list is expressed as ops — clear, then append in order — which is exact and, for a
+ * surface, cheap: a top-level list is one or two nodes, not a thousand. It also makes the container
+ * REPLAYABLE for the first time, where it used to force a re-derive on every single commit.
+ *
+ * The children deliberately keep `parent === undefined` (surface.ts sets it), so `markChildOp`'s
+ * bubble stops at the container rather than reaching past it — which is exactly why
+ * `commitContainer` marks the container unconditionally at its entry.
+ */
+function replaceContainerChildren(
+  container: ISymbioteNode,
+  children: readonly ISymbioteNode[],
+): void {
+  for (const child of childrenOf(container)) markChildRemoved(container, child);
+  for (const child of children) markChildAppended(container, child);
+}
+
 export function commitChildren(
   rootTag: IRootTag,
   children: readonly ISymbioteNode[],
@@ -1360,8 +1371,7 @@ export function commitChildren(
   // The wrapper holds the surface's top-level children; reconcile walks from it so the
   // whole tree, synthetic root included, goes through the same clone-on-write path.
   const container = rootContainerFor(rootTag);
-  replaceChildren(container, children);
-  markStructureDirty(container);
+  replaceContainerChildren(container, children);
   commitContainer(rootTag);
 }
 

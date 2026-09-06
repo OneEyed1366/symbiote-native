@@ -67,6 +67,8 @@ import {
   type ISymbioteNode,
 } from '../index';
 import { ANCHOR_COMPONENT } from '../node';
+// The seam: a node's desired children are derived, not a field (`tree.ts`).
+import { childrenOf } from '../tree';
 
 const fabric = installFabric();
 
@@ -77,7 +79,7 @@ function view(testID: string): ISymbioteNode {
 }
 
 function firstChildOf(node: ISymbioteNode): ISymbioteNode {
-  const child = node.children[0];
+  const child = childrenOf(node)[0];
   if (child === undefined) throw new Error('no first child');
   return child;
 }

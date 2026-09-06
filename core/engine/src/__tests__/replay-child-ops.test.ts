@@ -180,10 +180,13 @@ describe('and REFUSES the positions it cannot resolve — the tree is right eith
     surface.commit();
 
     expect(committedOrder('parent')).toEqual(['a', 'z']);
+    // EXACTLY one, and it is the parent. This was `>= 2` while the synthetic container re-derived on
+    // every commit; the container replays now (4c-3), so the loose bound would pass on a commit that
+    // scanned nothing at all — which is the state this row exists to distinguish from a refusal.
     expect(
       readCommitProfile().childScans,
       'the parent went back to the derivation',
-    ).toBeGreaterThanOrEqual(2);
+    ).toBe(1);
   });
 
   it('re-derives when `before` names a childless marker, and still inserts in front of it', () => {

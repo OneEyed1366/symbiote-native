@@ -20,6 +20,7 @@ import { compile } from 'svelte/compiler';
 import { writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { installFabric, waitUntil } from '@symbiote-native/test-utils';
+import { childrenOf } from '@symbiote-native/engine';
 import './register';
 import { mount, unmount } from './render';
 
@@ -79,9 +80,9 @@ function committed(): unknown {
 
 /** What the shim wrote onto the engine node, whether or not a commit carried it. */
 function onEngineNode(): unknown {
-  const children = pressedNode().children;
-  if (!Array.isArray(children)) return undefined;
-  for (const child of children) {
+  // Through the engine's own accessor, not a field: a node's desired children are DERIVED from its
+  // published record plus its op log, and `node.children` no longer exists.
+  for (const child of childrenOf(pressedNode() as never)) {
     if (isRecord(child) && isRecord(child.props)) return child.props.testID;
   }
   return undefined;

@@ -28,6 +28,8 @@ import {
   setText,
   type ISymbioteNode,
 } from '../index';
+// The seam: a node's desired children are derived, not a field (`tree.ts`).
+import { childrenOf } from '../tree';
 
 const fabric = installFabric();
 const ROOT_TAG = 77;
@@ -166,13 +168,13 @@ describe('every mutation entry point marks its subtree dirty', () => {
   it('insertBefore reaches Fabric', () => {
     const inserted = createElement('RCTView');
     setProp(inserted, 'testID', 'inserted');
-    insertBefore(nest, inserted, nest.children[0]);
+    insertBefore(nest, inserted, childrenOf(nest)[0]);
     surface.commit();
     expect(committedNest().children[0].props.testID).toBe('inserted');
   });
 
   it('removeChild reaches Fabric', () => {
-    removeChild(nest, nest.children[0]);
+    removeChild(nest, childrenOf(nest)[0]);
     surface.commit();
     expect(committedNest().children[0].props.testID).not.toBe('inserted');
   });

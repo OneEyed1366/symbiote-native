@@ -14,6 +14,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { appendChild, createElement, createSurface, setProp } from '../index';
+// The seam: a node's desired children are derived, not a field (`tree.ts`).
+import { childrenOf } from '../tree';
 
 const fabric = installFabric();
 const ROOT_TAG = 11;
@@ -58,7 +60,7 @@ describe('incremental commit', () => {
   // still be reused by reference: the clone only walks the changed branch's ancestor chain.
   it('changing a deeply nested child clones its ancestor chain, leaving the untouched sibling by reference', () => {
     fabric.reset();
-    setProp(a.children[0], 'opacity', 0.2);
+    setProp(childrenOf(a)[0], 'opacity', 0.2);
     surface.commit();
 
     expect(fabric.counts.completeRoot).toBe(1);

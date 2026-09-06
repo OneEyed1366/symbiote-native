@@ -17,6 +17,8 @@ import {
   setProp,
   type ISymbioteNode,
 } from './index';
+// The seam: a node's desired children are derived, not a field (`tree.ts`).
+import { childrenOf } from './tree';
 
 installFabric();
 let nextRootTag = 9000;
@@ -103,7 +105,7 @@ describe('teardown', () => {
     surface.commit();
 
     expect(log.detached, 'a reorder is not a removal').toEqual([]);
-    expect(root.children).toEqual([first, second]);
+    expect(childrenOf(root)).toEqual([first, second]);
   });
 
   it('tears down the whole removed SUBTREE, not just the node named', () => {

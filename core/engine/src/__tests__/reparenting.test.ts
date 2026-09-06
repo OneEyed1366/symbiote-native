@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
 import { appendChild, createElement, createSurface, setProp } from '../index';
+// The seam: a node's desired children are derived, not a field (`tree.ts`).
+import { childrenOf } from '../tree';
 
 const ROOT_TAG = 613;
 
@@ -79,7 +81,7 @@ describe('Fabric family reparenting', () => {
     // moved node exactly once (not duplicated under both parents).
     setProp(moved, 'opacity', 0.4);
     expect(() => surface.commit()).not.toThrow();
-    expect(sourceParent.children).toEqual([]);
-    expect(targetParent.children).toEqual([moved]);
+    expect(childrenOf(sourceParent)).toEqual([]);
+    expect(childrenOf(targetParent)).toEqual([moved]);
   });
 });

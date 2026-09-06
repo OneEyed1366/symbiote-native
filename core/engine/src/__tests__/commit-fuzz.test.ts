@@ -1,5 +1,5 @@
 // A property test over the commit path: drive a SEEDED random mutation program into the retained
-// tree, commit, and assert FIVE invariants — four after every commit and one BEFORE it. On failure
+// tree, commit, and assert SIX invariants — five after every commit and one BEFORE it. On failure
 // it SHRINKS the program to a minimal one that still fails and prints it, so a red run hands you a
 // reproduction rather than a seed number.
 //
@@ -11,7 +11,7 @@
 // own splice path, and the container at the commit entry point). The interactions between them are
 // what a fuzzer reaches and a case list does not.
 //
-// ── THE FOUR ORACLES, and what each one alone would miss ────────────────────────────────────────
+// ── THE ORACLES, and what each one alone would miss ────────────────────────────────────────
 //
 //   1 STRUCTURE   the committed view names and child order match an INDEPENDENT reimplementation of
 //                 the flattening rules. Catches a lost/duplicated/misordered node.
@@ -31,6 +31,22 @@
 //                 commit consumes the record it asks about. Nothing else here can see this class:
 //                 today's walk re-derives the renderable list on every node it visits and so
 //                 repairs itself, which is why every hole in it has been silent (see below).
+//   6 DESIRED     the engine's answer for a node's desired children equals an INDEPENDENT model the
+//                 executor keeps from the mutations it issues. The only oracle that asks what the
+//                 engine still KNOWS rather than what it committed, and the one the desired list
+//                 becoming a derivation rests on (`symbiote-fabric-cxx-surface` §8, 4c).
+//
+// ── ORACLE 1 AND ORACLE 6 SHARE THAT MODEL, AND THAT IS WHY IT EXISTS ───────────────────────────
+//
+// Oracle 1 used to take a node's children from `node.children` — a field the ENGINE maintains — so
+// it re-derived the flattening rules independently while trusting the engine's own bookkeeping for
+// the list those rules apply to. Enough while the field is the source of truth, and not enough once
+// the desired list is DERIVED: an oracle reading the derivation cannot report a bug in it.
+//
+// The executor therefore keeps its own copy, built from the mutations it ISSUES. That also moved
+// oracle 1's break arm: splicing a child list directly is no longer a defect oracle 1 should report
+// (the model holds what the ADAPTER asked for, and nothing was asked), so oracle 1's arm is now a
+// real removal whose MARK is destroyed, and the splice moved to oracle 6's arm where it belongs.
 //
 // Oracles 2 and 3 share `fabricProps` with the implementation, deliberately and with a stated
 // limit: they cannot see a bug INSIDE that function (`.claude/rules/test-harness-false-greens.md`
@@ -103,9 +119,15 @@ import {
   type ISymbioteNode,
 } from '../node';
 import { fabricProps } from '../fabric-props';
-import { hasPendingStructure, hasPendingWork } from '../edit-buffer';
+import {
+  clearPendingStructure,
+  clearPendingWork,
+  hasPendingStructure,
+  hasPendingWork,
+} from '../edit-buffer';
 import { createSurface, type SymbioteSurface } from '../surface';
 import { setReplayVerification } from '../commit';
+import { childrenOf } from '../tree';
 
 // mulberry32 — a seeded PRNG, so a failure names a seed that reproduces it exactly. `Math.random`
 // would make a red run unreproducible, which for a fuzzer is the difference between a bug report
@@ -192,6 +214,75 @@ function generateProgram(seed: number, length: number): IStep[] {
   return steps;
 }
 
+// ── AN INDEPENDENT MODEL OF THE DESIRED TREE ────────────────────────────────────────────────────
+//
+// The oracles below used to take a node's children from `node.children`, which is a field the ENGINE
+// maintains — so they re-derived the flattening rules independently while trusting the engine's own
+// bookkeeping for the list those rules are applied to. That was enough while the field was the
+// source of truth. It stops being enough the moment the desired list is DERIVED from the committed
+// record plus the op log (`symbiote-fabric-cxx-surface` §8, 4c): an oracle reading the derivation
+// cannot report a bug in the derivation.
+//
+// So the executor keeps its own copy, built from the mutations it ISSUES rather than read back out
+// of the engine. The mutators below must mirror `linkAppend` / `linkBefore` / `unlink` (tree.ts)
+// exactly — including that an insert detaches first and that an unknown `before` APPENDS, which is
+// what every framework's `insertBefore(…, null)` means.
+//
+// It also buys the sharpest oracle in the file for free: ORACLE 6 compares the engine's answer for
+// every reachable node against this model, node by node.
+const modelChildren = new WeakMap<ISymbioteNode, ISymbioteNode[]>();
+const modelParent = new WeakMap<ISymbioteNode, ISymbioteNode>();
+let modelTop: ISymbioteNode[] = [];
+
+function mChildren(node: ISymbioteNode): ISymbioteNode[] {
+  let list = modelChildren.get(node);
+  if (list === undefined) {
+    list = [];
+    modelChildren.set(node, list);
+  }
+  return list;
+}
+
+function mParent(node: ISymbioteNode): ISymbioteNode | undefined {
+  return modelParent.get(node);
+}
+
+function mDetach(child: ISymbioteNode): void {
+  const parent = modelParent.get(child);
+  if (parent !== undefined) {
+    const list = mChildren(parent);
+    const index = list.indexOf(child);
+    if (index >= 0) list.splice(index, 1);
+    modelParent.delete(child);
+    return;
+  }
+  const top = modelTop.indexOf(child);
+  if (top >= 0) modelTop.splice(top, 1);
+}
+
+function mAppend(parent: ISymbioteNode, child: ISymbioteNode): void {
+  mDetach(child);
+  mChildren(parent).push(child);
+  modelParent.set(child, parent);
+}
+
+function mInsertBefore(
+  parent: ISymbioteNode,
+  child: ISymbioteNode,
+  before: ISymbioteNode,
+): void {
+  mDetach(child);
+  const list = mChildren(parent);
+  const index = list.indexOf(before);
+  list.splice(index < 0 ? list.length : index, 0, child);
+  modelParent.set(child, parent);
+}
+
+function mAppendTop(child: ISymbioteNode): void {
+  mDetach(child);
+  modelTop.push(child);
+}
+
 function at<T>(list: readonly T[], fraction: number): T | undefined {
   if (list.length === 0) return undefined;
   return list[Math.min(list.length - 1, Math.floor(fraction * list.length))];
@@ -210,7 +301,7 @@ function isDescendant(
   let cursor: ISymbioteNode | undefined = candidate;
   while (cursor !== undefined) {
     if (cursor === ancestor) return true;
-    cursor = cursor.parent;
+    cursor = mParent(cursor);
   }
   return false;
 }
@@ -226,7 +317,7 @@ interface IExpected {
 // The rules the commit applies, restated independently (see the header).
 function expectedChildren(node: ISymbioteNode, inText: boolean): IExpected[] {
   const out: IExpected[] = [];
-  for (const child of node.children) {
+  for (const child of mChildren(node)) {
     // An anchor never becomes a Fabric view; its children take its place in the parent's list.
     if (isAnchor(child)) {
       out.push(...expectedChildren(child, inText));
@@ -287,14 +378,15 @@ function jsonEqual(a: unknown, b: unknown): boolean {
 
 /** Every node reachable from the surface, in document order. Anchors and skipped nodes included. */
 function reachable(surface: SymbioteSurface): ISymbioteNode[] {
+  void surface;
   const out: ISymbioteNode[] = [];
   const walk = (nodes: readonly ISymbioteNode[]): void => {
     for (const node of nodes) {
       out.push(node);
-      walk(node.children);
+      walk(mChildren(node));
     }
   };
-  walk(surface.children);
+  walk(modelTop);
   return out;
 }
 
@@ -391,7 +483,7 @@ function findUnrecordedStructuralChange(
 ): string | undefined {
   const renderable = (node: ISymbioteNode): ISymbioteNode[] => {
     const out: ISymbioteNode[] = [];
-    for (const child of node.children) {
+    for (const child of mChildren(node)) {
       if (isAnchor(child)) out.push(...renderable(child));
       else if (!isSkippedAtCommit(child)) out.push(child);
     }
@@ -421,7 +513,37 @@ function findUnrecordedStructuralChange(
   return undefined;
 }
 
-/** All four, in the order that makes a failure most readable: structure first, then payloads. */
+/**
+ * ORACLE 6 — the engine's answer for "this node's desired children" equals the model's.
+ *
+ * The most direct oracle in the file and the newest. Every other one asks about COMMITTED output;
+ * this one asks whether the engine still knows what the adapter built, which is the property the
+ * desired list becoming a DERIVATION rests on (`symbiote-fabric-cxx-surface` §8, 4c). While that
+ * list is a field it can only fail if something writes the field behind the mutation API's back —
+ * which is worth catching too, and is what its break arm does.
+ *
+ * Reads through `childrenOf`, the seam, rather than the field: the whole point is that the seam's
+ * BACKING can change and this must keep passing.
+ */
+function findDesiredDivergence(surface: SymbioteSurface): string | undefined {
+  for (const node of reachable(surface)) {
+    const engine = childrenOf(node);
+    const model = mChildren(node);
+    const same =
+      engine.length === model.length &&
+      model.every((child, index) => child === engine[index]);
+    if (same) continue;
+    const describe = (list: readonly ISymbioteNode[]): string =>
+      list.map(child => `${child.component}#${debugNodeId(child)}`).join(',');
+    return (
+      `${node.component}#${debugNodeId(node)}: the engine's desired children are not the ones the ` +
+      `program asked for.\n  engine=[${describe(engine)}]\n  model =[${describe(model)}]`
+    );
+  }
+  return undefined;
+}
+
+/** All of them, in the order that makes a failure most readable: structure first, then payloads. */
 function findViolation(
   recorder: ReturnType<typeof installFabric>,
   surface: SymbioteSurface,
@@ -437,6 +559,8 @@ function findViolation(
   if (diverged !== undefined) return `ORACLE 3 (mirror)\n  ${diverged}`;
   const undrained = findUndrainedNode(surface);
   if (undrained !== undefined) return `ORACLE 4 (drain)\n  ${undrained}`;
+  const desired = findDesiredDivergence(surface);
+  if (desired !== undefined) return `ORACLE 6 (desired)\n  ${desired}`;
   return undefined;
 }
 
@@ -465,6 +589,9 @@ function runProgram(steps: readonly IStep[]): string | undefined {
   nextRootTag += 1;
   const surface = createSurface(nextRootTag);
   const pool: ISymbioteNode[] = [];
+  // Per PROGRAM, and only the top-level list needs it: every other model entry is keyed on a node
+  // this program creates, so a stale entry is unreachable by construction.
+  modelTop = [];
 
   // A THROW is a violation, not a crash to let escape. The fake slot enforces real Fabric
   // invariants the oracles cannot express — `assertSameFamily` is the sharp one, since a clone
@@ -477,6 +604,21 @@ function runProgram(steps: readonly IStep[]): string | undefined {
       const step = steps[index];
       if (step === undefined) continue;
       applyStep(step, pool, surface);
+      // ORACLE 6 after EVERY step rather than at commits, which turns it from a verdict into a
+      // LOCATOR: the desired list is a property of the buffer and is answerable at any moment, so
+      // asking per step shrinks to the mutation that caused a divergence. Asked only at commits it
+      // reports wherever the next commit happens to fall — measured 2026-09-06, that shrank a real
+      // failure to 103 steps and named nothing, and the same failure located to one step here.
+      //
+      // OFF by default, because it is O(nodes) per STEP and costs several times the whole run on a
+      // deep one, and the commit-time ORACLE 6 in `findViolation` is what actually detects. Turn it
+      // on with SYMBIOTE_FUZZ_LOCATE=1 when a divergence needs pinning down.
+      if (LOCATE) {
+        const drift = findDesiredDivergence(surface);
+        if (drift !== undefined) {
+          return `after step ${index} (${step.kind})\nORACLE 6 (desired)\n  ${drift}`;
+        }
+      }
       if (step.kind !== 'commit') continue;
       // Oracle 5 asks about the RECORD, so it runs while the record still exists — the commit on
       // the next line consumes it and makes the question unanswerable.
@@ -522,8 +664,13 @@ function applyStep(
             ? createElement(TEXT_COMPONENT, true)
             : createElement('RCTView');
       const parent = at(containers(pool), step.a);
-      if (parent === undefined) surface.appendChild(node);
-      else appendChild(parent, node);
+      if (parent === undefined) {
+        surface.appendChild(node);
+        mAppendTop(node);
+      } else {
+        appendChild(parent, node);
+        mAppend(parent, node);
+      }
       pool.push(node);
       return;
     }
@@ -536,27 +683,29 @@ function applyStep(
       if (parent === undefined) return;
       const node = createRawText(`t${step.value}`);
       appendChild(parent, node);
+      mAppend(parent, node);
       pool.push(node);
       return;
     }
     // The op most likely to desync order if a mark is missed.
     case 'insertBefore': {
       const parent = at(
-        containers(pool).filter(node => node.children.length > 0),
+        containers(pool).filter(node => mChildren(node).length > 0),
         step.a,
       );
       if (parent === undefined) return;
-      const before = at(parent.children, step.b);
+      const before = at(mChildren(parent), step.b);
       if (before === undefined) return;
       const node = createElement('RCTView');
       insertBefore(parent, node, before);
+      mInsertBefore(parent, node, before);
       pool.push(node);
       return;
     }
     case 'remove': {
       const node = at(pool, step.a);
       if (node === undefined) return;
-      const parent = node.parent;
+      const parent = mParent(node);
       if (parent !== undefined) removeChild(parent, node);
       else surface.removeChild(node);
       // The whole subtree leaves with it, so it leaves the pool too — a later step addressing a
@@ -564,9 +713,10 @@ function applyStep(
       const gone = new Set<ISymbioteNode>();
       const collect = (current: ISymbioteNode): void => {
         gone.add(current);
-        current.children.forEach(collect);
+        mChildren(current).forEach(collect);
       };
       collect(node);
+      mDetach(node);
       for (let index = pool.length - 1; index >= 0; index -= 1) {
         const candidate = pool[index];
         if (candidate !== undefined && gone.has(candidate))
@@ -577,7 +727,7 @@ function applyStep(
     // MOVE, spelled as remove-then-reinsert, which is how every framework spells it.
     case 'move': {
       const node = at(
-        pool.filter(candidate => candidate.parent !== undefined),
+        pool.filter(candidate => mParent(candidate) !== undefined),
         step.a,
       );
       if (node === undefined) return;
@@ -589,6 +739,7 @@ function applyStep(
       );
       if (target === undefined) return;
       appendChild(target, node);
+      mAppend(target, node);
       return;
     }
     case 'setProp': {
@@ -632,7 +783,7 @@ function applyStep(
       // children are never visited and keep their buffer entries forever (ORACLE 4, four steps).
       // Unreachable from a legal tree — nothing else in this generator gives a raw text children,
       // and no adapter can — so the tree was invalid, not the engine.
-      if (node.children.length > 0) return;
+      if (mChildren(node).length > 0) return;
       setNodeComponent(node, RAW_TEXT_COMPONENT);
       setText(node, step.value % 5 === 0 ? '' : `t${step.value}`);
       return;
@@ -715,6 +866,9 @@ function describeProgram(steps: readonly IStep[]): string {
 // for a deep local run: SYMBIOTE_FUZZ_SEEDS=2000 SYMBIOTE_FUZZ_STEPS=200 pnpm vitest run <file>
 const SEED_COUNT = Number(process.env.SYMBIOTE_FUZZ_SEEDS ?? '40');
 const STEP_COUNT = Number(process.env.SYMBIOTE_FUZZ_STEPS ?? '60');
+// SYMBIOTE_FUZZ_LOCATE=1 asks ORACLE 6 after every step instead of at every commit — see the loop in
+// `runProgram` for why that is a locator rather than a stronger check, and why it is not the default.
+const LOCATE = process.env.SYMBIOTE_FUZZ_LOCATE === '1';
 
 // Scaled to the workload, because this loop is MEANT to be cranked up and vitest's 5s default
 // turns a deep run into a red that reads as a defect. Measured 2026-09-05: 5000 x 250 is 1.25M
@@ -723,7 +877,7 @@ const STEP_COUNT = Number(process.env.SYMBIOTE_FUZZ_STEPS ?? '60');
 // tight: the number exists to keep a hang from wedging CI, not to police speed.
 const FUZZ_TIMEOUT_MS = Math.max(30_000, SEED_COUNT * STEP_COUNT * 0.2);
 
-describe('commit fuzz — five oracles over a seeded mutation program', () => {
+describe('commit fuzz — six oracles over a seeded mutation program', () => {
   it(
     `holds over ${SEED_COUNT} programs of ${STEP_COUNT} steps`,
     () => {
@@ -744,23 +898,50 @@ describe('commit fuzz — five oracles over a seeded mutation program', () => {
     FUZZ_TIMEOUT_MS,
   );
 
+  // Each break arm builds its own tree outside `applyStep`, so it keeps the model itself. The
+  // helper exists so no arm can forget half of the pair — a model that silently disagrees with the
+  // engine makes every oracle fire for the wrong reason.
+  const mountTop = (surface: SymbioteSurface, node: ISymbioteNode): void => {
+    modelTop = [];
+    surface.appendChild(node);
+    mAppendTop(node);
+  };
+  const mountUnder = (parent: ISymbioteNode, child: ISymbioteNode): void => {
+    appendChild(parent, child);
+    mAppend(parent, child);
+  };
+
   // ── BREAK ARMS ────────────────────────────────────────────────────────────────────────────────
   // Each reproduces a defect one oracle exists for, WITHOUT touching the engine — so these run in
   // CI beside everything else and prove the oracles can still fail. An oracle whose only evidence
   // is a temporary source edit somebody made once is an oracle nobody can re-verify.
 
   it('ORACLE 1 catches a structural mark that never happened', () => {
-    // What an adapter bypassing the mutation API would do: splice the child list directly.
+    // A real removal whose MARK is then lost — which is what "a structural change nothing recorded"
+    // means once the oracle stops reading the engine's own bookkeeping.
+    //
+    // It used to splice `parent.children` directly, standing in for an adapter that bypasses the
+    // mutation API. That arm stopped firing the moment ORACLE 1 began reading an independent model:
+    // the model is what the ADAPTER asked for, so a corrupted internal field the commit ignores is
+    // no longer a defect the oracle should report — and it should not. The removal below is asked
+    // for properly, on both sides, and only the mark is destroyed.
     fabric.reset();
     const surface = createSurface(9001);
     const parent = createElement('RCTView');
-    appendChild(parent, createElement('RCTView'));
-    appendChild(parent, createElement('RCTView'));
-    surface.appendChild(parent);
+    mountUnder(parent, createElement('RCTView'));
+    mountUnder(parent, createElement('RCTView'));
+    mountTop(surface, parent);
     surface.commit();
     expect(findViolation(fabric, surface)).toBeUndefined();
 
-    parent.children.splice(0, 1);
+    const doomed = mChildren(parent)[0];
+    if (doomed === undefined) throw new Error('the parent has no children');
+    removeChild(parent, doomed);
+    mDetach(doomed);
+    // The mark, gone. Both entries, because the path mark alone would let the walk descend and
+    // repair it: `reconcile`'s early exit is what a lost mark actually costs.
+    clearPendingWork(parent);
+    clearPendingStructure(parent);
     surface.commit();
 
     expect(findViolation(fabric, surface)).toMatch(/ORACLE 1/);
@@ -773,7 +954,7 @@ describe('commit fuzz — five oracles over a seeded mutation program', () => {
     const surface = createSurface(9002);
     const node = createElement('RCTView');
     setProp(node, 'testID', 'before');
-    surface.appendChild(node);
+    mountTop(surface, node);
     surface.commit();
     expect(findViolation(fabric, surface)).toBeUndefined();
 
@@ -801,7 +982,7 @@ describe('commit fuzz — five oracles over a seeded mutation program', () => {
     const surface = createSurface(9003);
     const node = createElement('RCTView');
     setProp(node, 'testID', 'real');
-    surface.appendChild(node);
+    mountTop(surface, node);
     surface.commit();
     expect(findViolation(fabric, surface)).toBeUndefined();
 
@@ -827,13 +1008,41 @@ describe('commit fuzz — five oracles over a seeded mutation program', () => {
     fabric.reset();
     const surface = createSurface(9004);
     const node = createElement('RCTView');
-    surface.appendChild(node);
+    mountTop(surface, node);
     surface.commit();
     expect(findViolation(fabric, surface)).toBeUndefined();
 
     markDirty(node);
 
     expect(findViolation(fabric, surface)).toMatch(/ORACLE 4/);
+  });
+
+  it('ORACLE 6 catches a wrong PUBLISHED BASE for the desired list', () => {
+    // This arm started life as `parent.children.splice(0, 1)`, standing in for an adapter reaching
+    // past `appendChild` / `removeChild`. There is no field to splice any more, and the defect it
+    // modelled is no longer expressible from OUTSIDE the engine at all: a node's desired children
+    // are its published record plus its op log, and both are written only by the engine.
+    //
+    // So the injection moved to where the derivation can actually go wrong — the base it replays
+    // onto. A record that disagrees with what the adapter asked for is exactly the class of bug this
+    // oracle exists for, and it is the class that produced 33 red tests the day the field went (the
+    // derive path re-reading `childrenOf` AFTER the log was drained, so every removal came back).
+    // Nothing outside this oracle can see it: the tree commits, the props are right, and the wrong
+    // list is simply the one the engine believes in.
+    fabric.reset();
+    const surface = createSurface(9005);
+    const parent = createElement('RCTView');
+    mountUnder(parent, createElement('RCTView'));
+    mountUnder(parent, createElement('RCTView'));
+    mountTop(surface, parent);
+    surface.commit();
+    expect(findViolation(fabric, surface)).toBeUndefined();
+
+    const record = parent.committed;
+    if (record === undefined) throw new Error('the parent did not commit');
+    record.desired = record.desired.slice(1);
+
+    expect(findViolation(fabric, surface)).toMatch(/ORACLE 6/);
   });
 
   it('the shrinker searches down to the one step that fails', () => {
@@ -866,5 +1075,11 @@ describe('commit fuzz — five oracles over a seeded mutation program', () => {
 // The surface's top-level children, shaped as a node so the oracle has one entry point. Not a real
 // engine node — only `children` is ever read off it.
 function rootOf(surface: SymbioteSurface): ISymbioteNode {
-  return { children: surface.children } as unknown as ISymbioteNode;
+  void surface;
+  // A stand-in whose only job is to carry the surface's top-level list into `expectedChildren`,
+  // which reads through the model. Seeded here rather than given `surface.children`, so the oracle
+  // does not reach into the engine for the one list it would otherwise still take from it.
+  const root = {} as ISymbioteNode;
+  modelChildren.set(root, modelTop);
+  return root;
 }

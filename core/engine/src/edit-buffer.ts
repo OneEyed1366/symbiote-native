@@ -66,17 +66,17 @@ let pendingProps = new WeakSet<ISymbioteNode>();
 
 // "This node's CHILD LIST changed", and — since 2026-09-05 — WHAT changed, in order.
 //
-// The value is the ordered op log for that parent, or `null` for a change no sequence of child ops
-// describes (see `recordStructureEdit`). Membership alone answers `hasPendingStructure`, so the log
-// is not a second record beside a Set: it IS the record, which is what keeps it from being an
-// unread symbol (`symbiote-fabric-cxx-surface` §8 — "an ordered op log that nothing drains").
+// The ordered op log per parent. It is not a second record beside a Set: it IS the record, which is
+// what keeps it from being an unread symbol (`symbiote-fabric-cxx-surface` §8 — "an ordered op log
+// that nothing drains").
 //
-// Two things read it. The commit REPLAYS it onto the committed renderable list instead of
-// re-deriving that list from `node.children`, which is what takes the last structural read out of
-// the walk. And item 8's native drain re-applies it inside a retried commit lambda to rebase a
-// `pendingRoot_` (§7b, §5) — a buffer holding only "which nodes were touched" has nothing to
-// re-apply, which is why the log is required under BOTH design branches and not only this one.
-let pendingStructure = new WeakMap<ISymbioteNode, IEditOp[] | null>();
+// THREE things read it, and the third is why it stopped being nullable (see `unreplayable` below).
+// The commit REPLAYS it onto the committed renderable list instead of re-deriving that list. Item
+// 8's native drain re-applies it inside a retried commit lambda to rebase a `pendingRoot_` (§7b,
+// §5) — a buffer holding only "which nodes were touched" has nothing to re-apply, which is why the
+// log is required under BOTH design branches. And `childrenOf` (tree.ts) replays it onto the node's
+// published base to answer what its DESIRED children are, which is what removed the field.
+let pendingStructure = new WeakMap<ISymbioteNode, IEditOp[]>();
 
 /**
  * One child-list operation, at the level the adapter issued it.
@@ -121,57 +121,45 @@ export function recordPropEdit(node: ISymbioteNode): void {
   recordSubtreeEdit(node);
 }
 
-/**
- * De-alias the committed child list from the live one, ONCE per parent per cycle.
- *
- * `reconcile` stores the reconciled child list in the committed record BY REFERENCE, so for a
- * parent holding no skipped children the record ALIASES `parent.children`. The first structural
- * change of a cycle is the last moment that list can still be read as the COMMITTED one, and both
- * readers need it intact: the commit diffs against it, and the replay below uses it as the base.
- *
- * The identity test keeps it honest: a record whose `children` is not `parent.children` either
- * already holds this cycle's copy or holds the private array `renderableChildren` built to flatten
- * anchors away, and nobody mutates either.
- *
- * MEASURED 2026-09-05 and it is why this moved behind a "first op of the cycle" gate. It used to
- * run on EVERY structural mutation, so appending 1 000 rows read `parent.children` 2 001 times to
- * answer an identity question that can only be true once. Gating it on the map entry being absent
- * makes it once per parent per cycle: 2 001 -> 2 on the same append.
- */
-function snapshotCommittedChildren(parent: ISymbioteNode): void {
-  const record = parent.committed;
-  if (record === undefined) return;
-  const kids = childrenOf(parent);
-  if (record.children === kids) record.children = kids.slice();
-}
+// `snapshotCommittedChildren` lived here until 2026-09-06, and it is worth one note that it is
+// GONE rather than moved. It de-aliased `record.children` from `node.children`, which the record
+// held by reference for any parent with no skipped child — so the first structural op of a cycle
+// had to copy the committed list out of the way before the live one was spliced. There is no live
+// one now: every list the engine holds is published by a commit and never mutated in place, so an
+// alias between two of them is safe by construction and there is nothing to copy.
+
+// "This node's RENDERABLE child list moved in a way no sequence of child ops describes."
+//
+// SPLIT OUT OF `pendingStructure` 2026-09-06, and the split is a correctness fix rather than a
+// tidy-up. The two facts were one field — a `null` log meant "unreplayable" AND destroyed the ops —
+// which was harmless only while `node.children` was the source of truth. It is not: both callers
+// poison a parent whose DESIRED list did not change at all,
+//
+//   the anchor climb     an edit under an anchor changes the RENDERABLE list of the node above it,
+//                        at a position no op names (`markStructureDirty`, node.ts)
+//   a skipped-ness flip  a child leaves or joins the RENDERABLE list with no child op at all
+//                        (`markPresenceIfFlipped`, node.ts)
+//
+// so `appendChild(P, x)` followed by an edit under an anchor child of P used to throw away the `+x`
+// op. With the desired list derived from (record + ops), that loses `x` outright.
+let unreplayable = new WeakSet<ISymbioteNode>();
 
 /**
- * Record that `parent`'s child list changed in a way NO sequence of child ops describes.
+ * Record that `parent`'s RENDERABLE child list changed in a way no sequence of child ops describes.
  *
- * The unreplayable form, and the honest default: it says the list moved and refuses to say how, so
- * the commit re-derives from `node.children` exactly as it always did. Three callers need it and
- * each has a reason the ops cannot express —
- *
- *   the anchor climb        an edit under an anchor changes the RENDERABLE list of the node above
- *                           it, at a position no op names (`markStructureDirty`, node.ts)
- *   a skipped-ness flip     a child leaves or joins the renderable list with no child op at all
- *                           (`markPresenceIfFlipped`, node.ts)
- *   replaceChildren         a surface hands its whole top-level list over at once (commitChildren)
- *
- * MUST be called BEFORE the list is mutated, for `snapshotCommittedChildren`'s reason above.
+ * Says the renderable list moved and refuses to say how, so the commit re-derives it. Deliberately
+ * does NOT touch the op log: the ops describe the DESIRED list, which this says nothing about.
  */
 export function recordStructureEdit(parent: ISymbioteNode): void {
-  if (!pendingStructure.has(parent)) snapshotCommittedChildren(parent);
-  pendingStructure.set(parent, null);
+  unreplayable.add(parent);
   recordSubtreeEdit(parent);
 }
 
 /**
  * Record ONE child-list operation on `parent`, in issue order.
  *
- * Appends to the parent's log, unless the log has already been poisoned to `null` by an
- * unreplayable change this cycle — in which case there is nothing to append to and nothing that
- * would read it. MUST be called BEFORE the list is mutated, same as above.
+ * MUST be called BEFORE the list is mutated: `linkBefore` resolves its position against the list as
+ * it stands, so an op recorded afterwards would name a `before` that has already moved.
  */
 export function recordChildOp(
   parent: ISymbioteNode,
@@ -181,22 +169,33 @@ export function recordChildOp(
 ): void {
   const existing = pendingStructure.get(parent);
   if (existing === undefined) {
-    snapshotCommittedChildren(parent);
     pendingStructure.set(parent, [{ child, before, remove }]);
-  } else if (existing !== null) {
+  } else {
     existing.push({ child, before, remove });
   }
   recordSubtreeEdit(parent);
 }
 
 /**
- * This parent's ordered op log, `null` when the change is unreplayable, `undefined` when its
- * structure is not pending at all. Read by the commit; see the `pendingStructure` comment for the
- * second reader this exists for.
+ * This parent's ordered op log, or `undefined` when nothing was recorded against it this cycle.
+ *
+ * The DESIRED-side reader: `childrenOf` (tree.ts) replays these onto the node's published base, so
+ * it wants the ops whatever the renderable list is doing.
  */
 export function pendingChildOps(
   parent: ISymbioteNode,
+): readonly IEditOp[] | undefined {
+  return pendingStructure.get(parent);
+}
+
+/**
+ * The same log for the RENDERABLE replay, which additionally refuses when the list moved in a way
+ * the ops cannot describe — `null`, the shape `replayChildOps` (commit.ts) already reads.
+ */
+export function renderableChildOps(
+  parent: ISymbioteNode,
 ): readonly IEditOp[] | null | undefined {
+  if (unreplayable.has(parent)) return null;
   return pendingStructure.get(parent);
 }
 
@@ -227,9 +226,16 @@ export function hasPendingProps(node: ISymbioteNode): boolean {
   return pendingProps.has(node);
 }
 
-/** Whether this node's CHILD LIST changed since its last commit. */
+/**
+ * Whether this node's CHILD LIST changed since its last commit — EITHER way it can change.
+ *
+ * Both halves, because the commit asks one question here and the split above answers two: a node
+ * with ops needs its renderable list rebuilt, and so does one whose renderable list moved with no op
+ * against it at all (an edit under an anchor, a skipped-ness flip). Reading only the log would let
+ * the second class through, which is the attribution hole the fuzzer's ORACLE 5 exists for.
+ */
 export function hasPendingStructure(node: ISymbioteNode): boolean {
-  return pendingStructure.has(node);
+  return pendingStructure.has(node) || unreplayable.has(node);
 }
 
 /** Whether any direct child of `node` carries pending work — `commitTargeted`'s descendant bail. */
@@ -250,6 +256,7 @@ export function clearPendingProps(node: ISymbioteNode): void {
 
 export function clearPendingStructure(node: ISymbioteNode): void {
   pendingStructure.delete(node);
+  unreplayable.delete(node);
 }
 
 export function clearPendingWork(node: ISymbioteNode): void {
@@ -266,5 +273,6 @@ export function clearPendingWork(node: ISymbioteNode): void {
 export function resetEditBuffer(): void {
   pendingPath = new WeakSet<ISymbioteNode>();
   pendingProps = new WeakSet<ISymbioteNode>();
-  pendingStructure = new WeakMap<ISymbioteNode, IEditOp[] | null>();
+  pendingStructure = new WeakMap<ISymbioteNode, IEditOp[]>();
+  unreplayable = new WeakSet<ISymbioteNode>();
 }

@@ -26,7 +26,7 @@
 // standing behind another (`.claude/rules/test-harness-false-greens.md` §20):
 //
 //   clearPendingWork at reconcile                 many   the drain row, plus every counter probe
-//                                                        and three of the fuzzer's five oracles
+//                                                        and three of the fuzzer's six oracles
 //   publishContribution's clearPendingStructure      2   the anchor-log row, and
 //                                                        replay-child-ops' detached-anchor row
 //   removal drops the STRUCTURE log                  2   parked-subtree-revival's never-committed
@@ -59,6 +59,7 @@ import {
   hasPendingWork,
   pendingChildOps,
 } from '../edit-buffer';
+import { childrenOf } from '../tree';
 
 installFabric();
 const ROOT_TAG = 8801;
@@ -99,7 +100,7 @@ describe('the edit buffer drains', () => {
     // The commit walked all four, so every one of them is drained. A single stranded entry is the
     // silent stale-UI bug this file exists for: `markDirty` stops at the first already-recorded
     // ancestor, so one node left pending swallows every later mark from its subtree.
-    for (const each of [node, ...node.children]) {
+    for (const each of [node, ...childrenOf(node)]) {
       expect(pendingFor(each), each.props.testID as string).toBe('');
     }
   });
@@ -126,7 +127,7 @@ describe('the edit buffer drains', () => {
     surface.appendChild(to);
     surface.commit();
 
-    const moved = from.children[0];
+    const moved = childrenOf(from)[0];
     // A prop write and a move in ONE tick, which is how every adapter spells a reorder.
     setProp(moved, 'testID', 'moved-and-written');
     removeChild(from, moved);

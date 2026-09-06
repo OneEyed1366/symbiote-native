@@ -1001,8 +1001,8 @@ commit so a reader can diff rather than re-derive.
 3   a verification loop that can catch a silent regression    LANDED      —
 4a  the commit consumes the record for its child list         LANDED      —
 4b  the ordered op log, replayed by the commit                LANDED      —
-4c  node.children / node.parent deleted outright              IN PROGRESS the sweep, and only the
-                                                                          sweep — see below
+4c  node.children DELETED; node.parent still there           IN PROGRESS 4c-1/2/3 landed; the
+                                                                          back-edge is 4c-4
 5   anchors stop being NODES and become POSITIONS             LANDED      —
 6   setNativeProps arm for prop-only rows                     OPEN        —
 7   the address rides on the framework's own object           AFTER 4     —
@@ -1124,8 +1124,8 @@ So item 4 splits honestly into:
 ```
 4a  the commit consumes the record instead of re-deriving it     LANDED, measured above
 4b  the ordered op log, replayed by the commit                   LANDED, measured below
-4c  node.children / node.parent deleted outright                 4c-1 and 4c-2 LANDED; what is
-                                                                 left is the sweep, see below
+4c  node.children / node.parent deleted outright                 node.children is GONE (4c-3);
+                                                                 the back-edge is 4c-4, see below
 ```
 
 ### 4b LANDED — the numbers, and the one adapter it does not help
@@ -1336,26 +1336,73 @@ sweepDroppedEdits -> dropSubtree                            NOT covered — see 
 authoritative; after the switch it is the node's only structure, and a subtree that is parked across
 a commit and re-attached later comes back EMPTY. Svelte parks live subtrees, so the shape is real.
 
-Two repairs, and the choice is the open question rather than the effort:
+Two repairs were on the table and **only one of them works**, which is worth keeping because the
+losing one is the intuitive one:
 
-- **Fold before dropping.** The sweep computes the node's desired list and writes it into
-  `record.desired` before deleting the entry. Lossless and it pins nothing — the record lives on the
-  node. It covers every node that has ever committed, which is the mass case (`Clear` on a mounted
-  list). It does NOT cover a node that has never committed, whose ops are its only structure, so
-  those entries must be retained instead.
-- **Make the buffer WEAK.** `pendingPath` / `pendingProps` as `WeakSet` and `pendingStructure` as
-  `WeakMap` — every use is `has`/`get`/`set`/`delete`, so it is mechanical — and the whole
-  nominate-then-sweep machinery is deleted: a dead subtree is collected, entries and all. It also
-  fixes a live hazard the sweep has, which is that a node parked ACROSS commits loses a pending prop
-  write. The cost is `pendingEditCount`, the process-wide oracle three rows assert on; the
-  anchor-log row it exists for has a better per-node oracle now (`pendingChildOps(anchor)` after
-  each commit).
+- **Fold before dropping** — the sweep writes the node's desired list into its record before deleting
+  the entry. It addresses the WRONG SET. The only nodes the sweep reclaims are nodes that never
+  committed (one that HAS committed was drained at that commit, and removal records an op on the
+  PARENT), and a never-committed node has no record to fold into. Its ops ARE its structure.
+- **Make the buffer WEAK** — `pendingPath` / `pendingProps` as `WeakSet`, `pendingStructure` as
+  `WeakMap`; every use is `has`/`get`/`set`/`delete`, so it is mechanical, and the whole
+  nominate-then-sweep machinery goes. LANDED. It also fixed a live hazard the sweep had: a subtree
+  parked ACROSS commits lost a pending prop write. The cost is `pendingEditCount`, the process-wide
+  oracle three rows asserted on; those rows ask a NODE now, which is the better oracle anyway.
+
+### 4c-3 LANDED 2026-09-06 — `node.children` is deleted
+
+`childrenOf` (tree.ts) is the derivation: `committed.desired ?? contributed.desired ?? []`, plus the
+node's op log replayed onto it. Nothing maintains a child list at mutation time — `appendChild`
+records an op and links the parent, and the list materialises at the commit that consumes the log.
+`linkAppend` / `linkBefore` / `unlink` carry only the back-edge now, so `linkBefore`'s `indexOf`
+per insert is gone from the mutation path entirely.
+
+```
+                          4b     item 5    4c-1    4c-3
+childScans, 1 000 rows  2001       1001       1       0     nothing reads a child list
+childListsReplayed      2001       3001    3001    3002     the CONTAINER replays too
+```
+
+The container was the last holdout: a surface handed it the whole top-level list at once, recorded
+as "changed, somehow", so it re-derived on every commit for the life of the app. It arrives as ops
+now (`replaceContainerChildren`), and `childScans` is zero on every shape.
+
+**Four things this cost, each of which the next log-backed structure will meet again:**
+
+- **The buffer conflated two questions and had to be split.** A `null` log meant "the RENDERABLE list
+  moved unreplayably" AND destroyed the ops. Both callers of that (the anchor climb, a skipped-ness
+  flip) poison a parent whose DESIRED list did not change, so `appendChild(P, x)` followed by an edit
+  under an anchor child of P threw the `+x` op away. `unreplayable` is a separate WeakSet;
+  `pendingChildOps` serves the desired side and `renderableChildOps` the renderable one.
+- **The derive paths re-read `childrenOf` AFTER `reconcile` drained the log**, so they saw the
+  published base with this cycle's ops already gone: 33 red tests, every one a removed child still
+  committing or an inserted one missing — the shape of a lost mutation, with the mutation perfectly
+  recorded and simply read too late. The list is read once at the top and passed down.
+- **`hideSkippedChild` drops `committed`, which is where the desired children live.** An anchor was
+  covered (its contribution is published a moment earlier); nothing else was, and "everything else"
+  is not the harmless set it reads as — `setNodeComponent` can turn a node holding children into an
+  empty raw text, and an anchor holding children can become one directly, where
+  `markPresenceIfFlipped` sees no change in skipped-ness and correctly does nothing. It publishes
+  before it drops now.
+- **`markPresenceIfFlipped` cleared the contribution on un-skip**, which was right for one day and
+  became the same bug: that record carries the desired list, and while a node is un-skipped and not
+  yet re-committed it is the only place the children exist. It is dropped where a real record
+  supersedes it instead.
+
+**All four were found by the fuzzer's ORACLE 6 and by nothing else**, because every one of them is
+invisible in committed output — a hidden node's subtree is not painted either way. That oracle
+compares the engine's answer for every reachable node against a model the executor keeps from the
+mutations it ISSUES, and it exists because oracle 1 used to read `node.children`: an oracle reading
+the derivation cannot report a bug in the derivation. It runs after every STEP rather than at
+commits, which is what makes it a locator — asked only at commits it reported the divergence
+wherever the next commit fell and shrank to 103 steps naming nothing.
 
 **The general form, because it outlives this item: the desired list can be removed for every node the
 commit TRACKS, and the hard cases are all nodes it does not — built, parked, or discarded outside the
-committed tree. Making the mirror native does not help those, because they have no mirror.** They go
-when the engine stops being ASKED, which is the second half of the goal: the framework already holds
-its own tree, so a navigation query it can answer should not reach us at all.
+committed tree.** Each was closed by giving that node a published record of its own rather than by
+keeping a field: the mirror for a live node, the contribution for a hidden one, and the op log itself
+for one that has never committed. What remains ours forever is the anchor, which no native structure
+can hold — so `IContribution` is the one record item 8 does not take away.
 
 ### The two attribution holes that must stay closed, and how to look for a third
 

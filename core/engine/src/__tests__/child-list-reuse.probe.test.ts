@@ -59,12 +59,13 @@ describe('a Select-shaped commit reads the child list instead of re-deriving it'
     const out = process.env.SYMBIOTE_REUSE_PROBE_OUT;
     if (out !== undefined) writeFileSync(out, `${line}\n`);
 
-    // ONE scan, and naming which one is the whole assertion. `commitChildren` marks the synthetic
-    // container structurally dirty at every entry (a surface hands its top-level children over as a
-    // whole array), so the container always re-derives. Every other node on this shape reads its
-    // list off the record. A second scan means a node whose structure nothing recorded rebuilt its
-    // list anyway — which is the reuse silently switching itself off.
-    expect(profile.childScans, line).toBe(1);
+    // ZERO scans, and the zero is the point. This read ONE until 4c-3: the surface handed the
+    // container its whole top-level list at once, which no sequence of child ops described, so the
+    // container re-derived on every commit forever. It arrives as ops now
+    // (`replaceContainerChildren`, commit.ts) and replays like anything else — so on this shape the
+    // commit reads no child list at all. ANY scan here is a node whose structure nothing recorded
+    // rebuilding its list anyway, which is the reuse silently switching itself off.
+    expect(profile.childScans, line).toBe(0);
     expect(profile.childListsReused, line).toBe(2);
 
     // MEASURED 2026-09-05, and recorded because the numbers are smaller than the intuition and the
@@ -120,7 +121,7 @@ describe('a create builds its child lists from the op log, not from node.childre
     }
   }
 
-  it('replays every node of a flat create except the container', () => {
+  it('replays EVERY node of a flat create, the container included', () => {
     const surface = createSurface(7302);
     const list = createElement('RCTView');
     buildRows(list, ROWS, 0, false);
@@ -130,10 +131,12 @@ describe('a create builds its child lists from the op log, not from node.childre
 
     const profile = readCommitProfile();
     const line = `scans=${profile.childScans} replayed=${profile.childListsReplayed}`;
-    // The ONE scan is the synthetic container: `commitChildren` hands its whole top-level list over
-    // at once, which no sequence of child ops describes, so its log is poisoned and it re-derives.
-    expect(profile.childScans, line).toBe(1);
-    expect(profile.childListsReplayed, line).toBe(2 * ROWS + 1);
+    // ZERO, and the container is why this row was renamed. Its whole top-level list arrives from the
+    // surface at once, which used to be recorded as "changed, somehow" — so it re-derived on every
+    // commit for the life of the app. It arrives as ops now, so nothing on this shape reads a child
+    // list at all.
+    expect(profile.childScans, line).toBe(0);
+    expect(profile.childListsReplayed, line).toBe(2 * ROWS + 2);
   });
 
   it("replays a parent holding an anchor, reading only the ANCHOR's own list", () => {
@@ -149,18 +152,17 @@ describe('a create builds its child lists from the op log, not from node.childre
     // MEASURED on this shape, 1 000 rows, and the FOUR numbers are the whole claim — the first is
     // the one the item is for and the last is what says the other three are not an accounting trick:
     //
-    //                          4b     item 5    4c-1
-    //   childrenOf() calls    2004      1004       4    counted at the tree.ts seam
-    //   childScans            2001      1001       1    the survivor is the container
-    //   childFlattens         1000         0       0    the derivation is not reached at all
-    //   childListsReplayed    2001      3001    3001    the rows replay, and so does each anchor
+    //                          4b     item 5    4c-1    4c-3
+    //   childrenOf() calls    2004      1004       4       —    counted at the tree.ts seam
+    //   childScans            2001      1001       1       0    nothing reads a child list
+    //   childFlattens         1000         0       0       0    the derivation is not reached
+    //   childListsReplayed    2001      3001    3001    3002    the container replays too
     //
     // Item 5 left one desired-tree read standing — `flattenPure(anchor)`, once per anchor, to learn
-    // what the anchor contributes. `flattenContribution` closes it: an anchor has an op log like any
-    // other node, and on a create that log is its whole child list, so it replays from empty. The
-    // FOUR that remain are the synthetic container's entry bookkeeping and not one is inside the
-    // walk, which is the same four a flat tree reads. The commit no longer reads a desired child
-    // list on ANY shape.
+    // what the anchor contributes. `flattenContribution` closed it: an anchor has an op log like any
+    // other node, and on a create that log is its whole child list, so it replays from empty. 4c-3
+    // then deleted `node.children` outright, so `childrenOf` is itself the replay and the column has
+    // no meaning any more — what is left to count is `childScans`, and it is zero.
     const surface = createSurface(7303);
     const list = createElement('RCTView');
     buildRows(list, ROWS, 0, true);
@@ -173,14 +175,14 @@ describe('a create builds its child lists from the op log, not from node.childre
       `scans=${profile.childScans} replayed=${profile.childListsReplayed} ` +
       `contribReplayed=${profile.contributionsReplayed} ` +
       `contribDerived=${profile.contributionsDerived}`;
-    // ONE, and it is the container — whose whole top-level list arrives at once and can never be
-    // described by a sequence of child ops. Nothing else on this shape reads a child list.
-    expect(profile.childScans, line).toBe(1);
-    // And ZERO of that one scan is the flatten proper: `flattenPure` is a read, `renderableChildren`
-    // is a read plus a drain plus an allocation, and the second one no longer runs on this shape at
-    // all. Asserted separately because `childScans` alone cannot tell the two apart.
+    // ZERO. The container was the last holdout and its list arrives as ops now, so on the shape
+    // Angular emits — one anchor per composed component — a create reads no child list anywhere.
+    expect(profile.childScans, line).toBe(0);
+    // And none of it is the flatten proper: `flattenPure` is a read, `renderableChildren` is a read
+    // plus a drain plus an allocation, and the second one no longer runs on this shape at all.
+    // Asserted separately because `childScans` alone cannot tell the two apart.
     expect(profile.childFlattens, line).toBe(0);
-    expect(profile.childListsReplayed, line).toBe(3 * ROWS + 1);
+    expect(profile.childListsReplayed, line).toBe(3 * ROWS + 2);
     // The pair that says the anchors were ANSWERED rather than skipped. A `contributionsDerived`
     // above zero here is the residual coming back — `childScans` would report it too, but only this
     // pair says which of the two mechanisms served each anchor.
@@ -219,8 +221,9 @@ describe('a create builds its child lists from the op log, not from node.childre
 
     const control = readCommitProfile();
     const controlLine = `scans=${control.childScans} replayed=${control.childListsReplayed}`;
-    expect(control.childListsReplayed, controlLine).toBe(1);
-    expect(control.childScans, controlLine).toBe(1);
+    // TWO replays — the row and the container, which stopped re-deriving in 4c-3 — and NO scan.
+    expect(control.childListsReplayed, controlLine).toBe(2);
+    expect(control.childScans, controlLine).toBe(0);
 
     // And now the refusal: the same row, the same commit shape, one op naming the ANCHOR.
     removeChild(row, anchor);
@@ -228,12 +231,16 @@ describe('a create builds its child lists from the op log, not from node.childre
 
     const profile = readCommitProfile();
     const line = `scans=${profile.childScans} replayed=${profile.childListsReplayed}`;
-    expect(profile.childListsReplayed, line).toBe(0);
-    // Two scans: the container, which always re-derives, and the row, which refused. No FLATTEN —
-    // by the time the walk reaches the row the anchor is already gone from its list, so the probe
-    // finds no skipped child. That is what makes `childScans` and not `childFlattens` the counter
-    // this row can be pinned on.
-    expect(profile.childScans, line).toBe(2);
+    // ONE replay — the container — and ONE scan, which is the row that refused. Both numbers moved
+    // by one in 4c-3 and they moved for the same reason: the container replays now, so it is no
+    // longer a scan and it is a replay. What the row asserts is unchanged, and the control above is
+    // what says so: `replayed` fell 2 -> 1 and `scans` rose 0 -> 1, which is exactly one parent
+    // crossing from one column to the other.
+    expect(profile.childListsReplayed, line).toBe(1);
+    // No FLATTEN — by the time the walk reaches the row the anchor is already gone from its list, so
+    // the probe finds no skipped child. That is what makes `childScans` and not `childFlattens` the
+    // counter this row can be pinned on.
+    expect(profile.childScans, line).toBe(1);
     expect(profile.childFlattens, line).toBe(0);
   });
 });

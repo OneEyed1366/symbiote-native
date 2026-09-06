@@ -23,6 +23,9 @@ import {
   setText,
   type ISymbioteEvent,
 } from './node';
+// The seam, not a field: a node's desired children are derived from its published record plus the
+// ops recorded against it, and `childrenOf` is the only way to ask (`tree.ts`).
+import { childrenOf } from './tree';
 
 describe('isSymbioteEvent', () => {
   it('narrows a real synthetic event object', () => {
@@ -62,7 +65,7 @@ describe('insertBefore / removeChild (no throwing path — outcome-named groups)
 
     insertBefore(parent, c, b);
 
-    expect(parent.children).toEqual([a, c, b]);
+    expect(childrenOf(parent)).toEqual([a, c, b]);
     expect(c.parent).toBe(parent);
   });
 
@@ -79,8 +82,8 @@ describe('insertBefore / removeChild (no throwing path — outcome-named groups)
 
     insertBefore(newParent, moved, anchor);
 
-    expect(oldParent.children).toEqual([]);
-    expect(newParent.children).toEqual([moved, anchor]);
+    expect(childrenOf(oldParent)).toEqual([]);
+    expect(childrenOf(newParent)).toEqual([moved, anchor]);
   });
 
   // why: `beforeChild` is caller-supplied and can be stale (already removed/reparented
@@ -95,7 +98,7 @@ describe('insertBefore / removeChild (no throwing path — outcome-named groups)
 
     insertBefore(parent, c, stray);
 
-    expect(parent.children).toEqual([a, c]);
+    expect(childrenOf(parent)).toEqual([a, c]);
   });
 
   it('removes an existing child and clears its parent link', () => {
@@ -105,7 +108,7 @@ describe('insertBefore / removeChild (no throwing path — outcome-named groups)
 
     removeChild(parent, child);
 
-    expect(parent.children).toEqual([]);
+    expect(childrenOf(parent)).toEqual([]);
     expect(child.parent).toBeUndefined();
   });
 
@@ -118,7 +121,7 @@ describe('insertBefore / removeChild (no throwing path — outcome-named groups)
     appendChild(parent, other);
 
     expect(() => removeChild(parent, notAChild)).not.toThrow();
-    expect(parent.children).toEqual([other]);
+    expect(childrenOf(parent)).toEqual([other]);
   });
 });
 

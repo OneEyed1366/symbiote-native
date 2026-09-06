@@ -103,7 +103,11 @@ export interface ISymbioteNode {
   readonly isText: boolean;
   props: Record<string, unknown>;
   listeners: Map<string, IListener> | undefined;
-  children: ISymbioteNode[];
+  // `children` used to be here, and it is GONE (2026-09-06). A node's desired children are derived
+  // from the record it last published plus the ops recorded against it since — `childrenOf`
+  // (tree.ts), which is the only way to ask. Nothing maintains a child list at mutation time any
+  // more: `appendChild` records an op and links the parent, and the list materialises at the commit
+  // that consumes the log (`symbiote-fabric-cxx-surface` §8, item 4c).
   parent: ISymbioteNode | undefined;
   // The three questions a commit asks about a node — "descend?", "did its own payload change?",
   // "did its child list change?" — used to be three boolean FIELDS here. They now live in the
@@ -209,7 +213,6 @@ class SymbioteNode implements ISymbioteNode {
   declare readonly isText: boolean;
   declare props: Record<string, unknown>;
   declare listeners: Map<string, IListener> | undefined;
-  declare children: ISymbioteNode[];
   declare parent: ISymbioteNode | undefined;
   declare hasAriaAlias: boolean;
   declare committed: IMirror | undefined;
@@ -227,7 +230,6 @@ class SymbioteNode implements ISymbioteNode {
     this.isText = isText;
     this.props = props;
     this.listeners = undefined;
-    this.children = [];
     this.parent = undefined;
     // Assigned here, not lazily on first use: every slot present from the constructor keeps one
     // hidden class for every node. Adding it on demand buys a shape transition per aria-bearing
@@ -312,6 +314,11 @@ export interface IContribution {
   readonly renderable: readonly ISymbioteNode[];
   readonly skipped: readonly ISymbioteNode[];
   readonly hoists: boolean;
+  // The anchor's own DESIRED children, the twin of `IMirror.desired` — and the reason a skipped node
+  // needs a record at all beyond its contribution. `childrenOf` replays a node's op log onto its
+  // published base, and an anchor's `committed` is dropped the moment it is hidden, so without this
+  // there would be nothing to replay onto and every anchor would answer "no children".
+  readonly desired: readonly ISymbioteNode[];
 }
 
 export interface IMirror {
@@ -536,19 +543,17 @@ function markPresenceIfFlipped(node: ISymbioteNode, wasSkipped: boolean): void {
   const parent = parentOf(node);
   if (parent !== undefined) markStructureDirty(parent);
   // And when the node is coming BACK — an anchor that stops being one, an empty raw text that gains
-  // content — its own child list has to be re-derived rather than replayed. Its log was CONSUMED
-  // while it was skipped (`publishContribution`, commit.ts), against a base that is a contribution
-  // record and not a committed child list, so what it holds now describes neither: not its whole
-  // history, and not a delta the reconcile's own base could take.
-  if (wasSkipped) {
-    recordStructureEdit(node);
-    // AND drop the contribution it published while it was skipped. That record is the base
-    // `flattenContribution` (commit.ts) replays onto, and a node coming back is exactly when it
-    // stops describing anything: the node is about to reconcile as a real one, which clears its log
-    // — so a later flip BACK to skipped would find a stale base with no ops and replay nothing onto
-    // it, returning a contribution from two lives ago. Reachable with two `setNodeComponent` calls.
-    node.contributed = undefined;
-  }
+  // content — its RENDERABLE list has to be re-derived rather than replayed: it was built as a
+  // contribution, against a base that is not a committed child list.
+  //
+  // Its contribution record is deliberately KEPT, and that is the opposite of what this line did for
+  // one day. The record carries the node's DESIRED children too, and while the node is un-skipped and
+  // not yet re-committed it is the only place they exist — `childrenOf` reads `committed.desired ??
+  // contributed.desired`, and `committed` was dropped when the node was hidden. Clearing it here made
+  // an anchor that becomes a real view lose its whole subtree, found by the fuzzer's ORACLE 6 in four
+  // steps. It is dropped instead at the moment a real record supersedes it (`reconcile`, commit.ts),
+  // so exactly one of the two ever describes the node.
+  if (wasSkipped) recordStructureEdit(node);
 }
 
 // The three mark* names are the MUTATION-SIDE vocabulary and they stay: every adapter-facing write
@@ -642,6 +647,21 @@ export function markChildRemoved(
   child: ISymbioteNode,
 ): void {
   markChildOp(parent, child, undefined, true);
+}
+
+/**
+ * The append form, exported for the synthetic root container — whose whole top-level list arrives at
+ * once from a surface and is expressed as a clear-then-append run of ops
+ * (`replaceContainerChildren`, commit.ts).
+ *
+ * Deliberately does NOT link: a surface's top-level nodes carry `parent === undefined` by design, so
+ * the container is the one parent whose children do not point back at it.
+ */
+export function markChildAppended(
+  parent: ISymbioteNode,
+  child: ISymbioteNode,
+): void {
+  markChildOp(parent, child, undefined, false);
 }
 
 // How many prop writes actually landed, and how many the no-op guard below turned away.

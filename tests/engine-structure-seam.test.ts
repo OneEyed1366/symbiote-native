@@ -11,10 +11,17 @@
 // `core/engine/src` reports 93 matches where the real number is 25, so a grep-based guard would
 // either be permanently red or tuned until it caught nothing.
 //
-// The census this replaced, run 2026-09-05 before the seam landed:
+// The census this replaced, run 2026-09-05 before the seam landed, and what has happened to it:
 //
-//   DESIRED    node.children / node.parent        57 sites across 7 files   -> now 14, all in tree.ts
+//   DESIRED    node.children / node.parent   57 sites across 7 files  -> 14, all in tree.ts (the seam)
+//                                                                     -> 5, all `parent` (4c-3)
 //   COMMITTED  record.children / record.parent    11 sites across 2 files   -> unchanged, see below
+//
+// `node.children` no longer exists: a node's desired children are derived from its published record
+// plus its op log (`childrenOf`, tree.ts). So the seam's remaining sites are the back-edge alone,
+// and the sentinel below counts what is left of it. When 4c-4 removes `parent` the same way, the
+// seam will hold ZERO field accesses and this sentinel stops being expressible — the guard then has
+// to key on something else (the seam's exports, say) or go with the fields it was watching.
 //
 // COMMITTED IS DELIBERATELY NOT GUARDED YET, and the reason recorded here first was WRONG — see
 // `tree.ts`'s header. It is not replaced by RN's `NativeDOM`: that API reads the current revision
@@ -97,8 +104,11 @@ describe('the engine touches node structure only through tree.ts', () => {
     // examined nothing — the shape this repo has been bitten by often enough to write down
     // (`.claude/rules/test-harness-false-greens.md`). The seam's own sites are the sentinel: they
     // are the one thing that must ALWAYS be found.
+    // FIVE now, all of them `parent`, where it was fourteen before `node.children` went. The floor
+    // is deliberately just under the real count rather than a round number: too low and an empty
+    // program passes it, too high and the next legitimate deletion reads as a broken harness.
     const sites = collect(program, checker);
-    expect(sites.filter(site => site.file === SEAM).length).toBeGreaterThan(5);
+    expect(sites.filter(site => site.file === SEAM).length).toBeGreaterThan(3);
   });
 
   it('finds no structural field access outside the seam', () => {

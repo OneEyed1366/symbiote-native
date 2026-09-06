@@ -67,12 +67,12 @@ describe('renderableChildren scan counters', () => {
       expect(profile.childFlattens, 'no anchor, no flatten').toBe(0);
       expect(
         profile.childScans,
-        'only the container, whose whole list arrives at once, re-derives',
-      ).toBe(1);
+        'nothing reads a child list — the container replays too, since 4c-3',
+      ).toBe(0);
       expect(
         profile.childListsReplayed,
-        'the parent and both leaves build their lists from the op log',
-      ).toBe(3);
+        'the container, the parent and both leaves build their lists from the op log',
+      ).toBe(4);
     });
 
     // why: THE number. One anchor anywhere in a wide child list defeats the probe for the whole
