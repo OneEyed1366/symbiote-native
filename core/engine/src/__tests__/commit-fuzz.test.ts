@@ -89,6 +89,7 @@ import {
   createAnchor,
   createElement,
   createRawText,
+  debugNodeId,
   insertBefore,
   isAnchor,
   markDirty,
@@ -404,11 +405,16 @@ function findUnrecordedStructuralChange(
       now.length === snapshot.length &&
       now.every((child, index) => child === snapshot[index]);
     if (same || hasPendingStructure(node)) continue;
+    // Named by IDENTITY, not by component. The first version printed `child.component` and produced
+    // failures whose two lines were CHARACTER-IDENTICAL — a list of four RCTViews reordered, or one
+    // RCTView swapped for another, reads the same either way. An oracle that cannot describe the
+    // difference it found is one nobody can act on.
+    const describe = (list: readonly ISymbioteNode[]): string =>
+      list.map(child => `${child.component}#${debugNodeId(child)}`).join(',');
     return (
       `${record.viewName}#${record.tag}: its renderable child list moved on but nothing recorded ` +
-      `a structural edit against it.\n  snapshot=[${snapshot
-        .map(child => child.component)
-        .join(',')}]\n  now     =[${now.map(child => child.component).join(',')}]`
+      `a structural edit against it.\n  snapshot=[${describe(snapshot)}]` +
+      `\n  now     =[${describe(now)}]`
     );
   }
   return undefined;

@@ -1003,8 +1003,9 @@ LANDED name the commit so a reader can diff rather than re-derive.
 4b  the ordered op log, replayed by the commit                LANDED      —
 4c  node.children / node.parent deleted outright              OPEN        a non-JS base for the
                                                                           desired order — see below
-5   anchors stop being NODES and become POSITIONS             NEXT        nothing; it is what
-                                                                          unblocks 4b on Angular
+5   anchors stop being NODES and become POSITIONS             ATTEMPTED   nothing — but read
+                                                                          "Item 5, attempted"
+                                                                          below before retrying
 6   setNativeProps arm for prop-only rows                     OPEN        —
 7   the address rides on the framework's own object           AFTER 4     —
 8   our own JSI host object (pendingRoot_ + cloneMultiple)    OPEN        0, and a measured
@@ -1158,6 +1159,69 @@ not in the op.
 
 So **item 5 is no longer "only if the native branch is taken"** — it is what makes 4b work for the
 one adapter that mounts an anchor per component, and it needs no device.
+
+### Item 5, ATTEMPTED 2026-09-05 and REVERTED — the measurements are worth more than the code
+
+Built, measured, fuzzed, and taken back out. The numbers are good and the implementation kept
+producing correctness bugs in the hottest path in the engine, so what survives is this section.
+
+**The split that makes it tractable, and it is the finding.** An anchor is not one thing. A
+CHILDLESS one — Vue's `createComment`, Svelte's `ShimComment`, Solid's empty text, Angular's own
+`createComment` — punches a hole in the renderable list and reorders nothing, so every renderable
+child is still a direct child in order and an op replay is exact. A HOISTING one — Angular's
+component hosts, a portal host — puts GRANDCHILDREN into the list, so a renderable node can be one
+the desired list has never heard of. 4b refuses both, on `skipped.length === 0`; only the second
+needs refusing. A `hoists` flag on the mirror, set by the flatten, draws the line.
+
+Measured at the `tree.ts` seam, 1 000 rows, one anchor per row:
+
+```
+                              create childrenOf   childScans      update
+no anchors                            4               1              5
+CHILDLESS anchor                   2004 -> 1004    2001 -> 1         5
+HOISTING anchor                    2004 -> 1004    2001 -> 1         5
+```
+
+The hoisting row needed the replay to SPLICE the anchor's renderable contribution at the position
+the op names — which is literally "an anchor is a position, not a node", done incrementally instead
+of by changing `createAnchor`'s contract. The residual 1 000 is `childrenOf` on each anchor once,
+O(1) per anchor against O(children) per parent.
+
+**Why it came back out.** Five rounds, five real bugs, every one found by the fuzzer and none by
+review:
+
+```
+ORACLE 1   insert before a CHILDLESS anchor — no renderable slot, so `indexOf` misses and the
+           replay appends where `linkBefore` inserted mid-list
+ORACLE 5   a `before` REMOVED and then given text while DETACHED: by commit time it is not skipped
+           at all, so a skipped-ness guard waves it through
+ORACLE 1   `record.skipped` naming a node that un-skipped OFF-TREE, carried forward by the replay
+ORACLE 1   a node in the BASE that is skipped NOW — it has to leave the list, not just the set
+ORACLE 4   a NESTED anchor never entering the replay's skipped set, so it is never drained
+```
+
+The fifth was still open when this was reverted. They are all the same shape — the replay is
+re-deriving `renderableChildren`'s semantics incrementally, and those semantics have more cases
+than they look like they have — and every one of them is silent on a device.
+
+**What to carry into a retry.** Three things the attempt established:
+
+- **The `hoists` split is right and cheap**, and it is what makes the childless case (three
+  adapters' common marker) replayable at all.
+- **Skipped-ness is read at COMMIT time and can change after a node leaves its parent**, where
+  `markPresenceIfFlipped` has no parent to attribute to. Any state carried across a commit —
+  `skipped`, `hoists`, a base list — has to be revalidated against that, not assumed.
+- **Assert the replay's SIDE EFFECTS, not its result.** The replayed list matched an independent
+  pure re-derive on every single failing run; the bugs were in what the derive does BESIDES
+  returning a list (draining pending work, dropping records, tracking skipped nodes). A
+  differential on the return value alone reports green through all five.
+
+And one method note that cost a round: the first differential called `renderableChildren`, which
+DRAINS. A check that mutates the state it is checking is not a check —
+`flattenPure` was written for that reason.
+
+`skipped-presence-attribution.test.ts` keeps the detached-un-skip row, green today because the
+current refusal is wide enough to hide it, and red the moment that refusal is narrowed.
 
 ### The leak the log introduces, because the next log will introduce it too
 

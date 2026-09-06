@@ -34,9 +34,11 @@ import { describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import {
   appendChild,
+  createAnchor,
   createElement,
   createRawText,
   createSurface,
+  removeChild,
   setNativeProps,
   setNodeComponent,
   setProp,
@@ -242,6 +244,96 @@ describe('a targeted commit does not trust a stale snapshot after a flip', () =>
       'RCTText',
       'RCTRawText',
       'RCTVirtualText',
+    ]);
+  });
+});
+
+// A node can stop being skipped while it has NO PARENT, and that is the one route the attribution
+// above cannot cover: `markPresenceIfFlipped` records against `parentOf(node)`, and a detached node
+// has none. The flip is real, nothing anywhere hears about it, and the node is then re-attached.
+//
+// Harmless while every commit re-derives — the walk recomputes the renderable list and the record
+// with it. It stops being harmless the moment a path CARRIES a record forward, which is what the
+// op-log replay does (`replayChildOps`, commit.ts): the parent's recorded `skipped` list still
+// names a node that is now an ordinary view, so the parent replays with a stale idea of which of
+// its children reach Fabric, and the node's whole subtree silently stops being committed.
+//
+// FOUND by the fuzzer as ORACLE 1 at 15 000 programs x 300 steps, and only localised by asserting
+// the replay path's SIDE EFFECTS rather than its result — the replayed list matched an independent
+// re-derive every single time, because the wrong list was not the bug. The bug was what the derive
+// does BESIDES returning a list.
+//
+// GREEN TODAY, and deliberately so: the replay currently refuses any parent holding a skipped child
+// at all (`replayChildOps`'s caller, commit.ts), so the stale entry is never read and this sequence
+// commits correctly through the ordinary re-derive. The row is here because item 5 of
+// `symbiote-fabric-cxx-surface` §8 exists to weaken exactly that refusal, and the first attempt at
+// it turned this sequence red. So read a failure here as "the precondition you just relaxed does
+// not cover a node that un-skipped off-tree", not as a regression in the buffer.
+describe('a node that un-skips while DETACHED does not leave a stale record behind', () => {
+  it('commits the whole subtree of an anchor that became an ordinary view off-tree', () => {
+    fabric.reset();
+    const surface = createSurface(6301);
+    const parent = createElement('RCTView');
+    const anchor = createAnchor();
+    appendChild(parent, anchor);
+    surface.appendChild(parent);
+    surface.commit();
+    // The precondition this row is about: the parent's record names the anchor as skipped.
+    expect(viewNames(fabric.appRoot().children)).toEqual(['RCTView']);
+
+    // Detach FIRST, so the flip below has no parent to attribute itself to.
+    removeChild(parent, anchor);
+    setNodeComponent(anchor, 'RCTView');
+    appendChild(anchor, createElement('RCTImageView'));
+    appendChild(parent, anchor);
+    surface.commit();
+
+    expect(viewNames(fabric.appRoot().children)).toEqual([
+      'RCTView',
+      'RCTView',
+      'RCTImageView',
+    ]);
+
+    // THE THIRD COMMIT IS THE ASSERTION, and the first version of this row stopped at the second —
+    // where it passed with the guard removed, because the stale entry had not been READ yet. A
+    // carried-over `skipped` list does its damage on the NEXT cycle: `drainSkipped` clears the
+    // pending work of everything it names, so a node wrongly still listed as skipped has its
+    // subtree's mark thrown away and never commits again.
+    appendChild(anchor, createElement('RCTScrollView'));
+    surface.commit();
+
+    expect(viewNames(fabric.appRoot().children)).toEqual([
+      'RCTView',
+      'RCTView',
+      'RCTImageView',
+      'RCTScrollView',
+    ]);
+  });
+
+  it('control: the same flip made IN PLACE has always been attributed', () => {
+    // GREEN before the fix and after — it is the DIFFERENCE between this arm and the one above that
+    // carries the finding. Here `markPresenceIfFlipped` finds a parent and poisons its log, so the
+    // parent re-derives and the record is rebuilt.
+    fabric.reset();
+    const surface = createSurface(6302);
+    const parent = createElement('RCTView');
+    const anchor = createAnchor();
+    appendChild(parent, anchor);
+    surface.appendChild(parent);
+    surface.commit();
+
+    setNodeComponent(anchor, 'RCTView');
+    appendChild(anchor, createElement('RCTImageView'));
+    surface.commit();
+
+    appendChild(anchor, createElement('RCTScrollView'));
+    surface.commit();
+
+    expect(viewNames(fabric.appRoot().children)).toEqual([
+      'RCTView',
+      'RCTView',
+      'RCTImageView',
+      'RCTScrollView',
     ]);
   });
 });
