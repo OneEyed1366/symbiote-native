@@ -7,7 +7,6 @@ import { commitChildren } from './commit';
 import { dlog } from './debug';
 import { installEventHandler } from './events';
 import { markChildRemoved, type ISymbioteNode } from './node';
-import { nominateDroppedEdits } from './edit-buffer';
 import { parentOf, unlink, unlinkFromParent } from './tree';
 
 export class SymbioteSurface {
@@ -33,16 +32,11 @@ export class SymbioteSurface {
   }
 
   removeChild(child: ISymbioteNode): void {
-    nominateDroppedEdits(child);
     const index = this.children.indexOf(child);
     if (index >= 0) this.children.splice(index, 1);
   }
 
   clear(): void {
-    // Every top-level node is leaving, so every one of them is a nominee. The sweep will find none
-    // of them under a parent and none of them in the container's child list, and drop their
-    // subtrees' buffer entries — without this a root swap leaks the whole outgoing tree.
-    for (const child of this.children) nominateDroppedEdits(child);
     this.children.length = 0;
   }
 
@@ -69,9 +63,6 @@ export class SymbioteSurface {
   // that parent's child set from a snapshot that still contains the removed node.
   private detach(child: ISymbioteNode): void {
     const parent = parentOf(child);
-    // Nominates on BOTH branches, and only nominates: this is reached from appendChild /
-    // insertBefore, so the node is usually about to be re-listed. See sweepDroppedEdits.
-    nominateDroppedEdits(child);
     if (parent) {
       // Marks before the splice, like node.ts's own structural ops: the committed record may be
       // aliasing `parent.children`, and this call is what copies it out of the way. Records the

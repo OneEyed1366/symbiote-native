@@ -1,31 +1,46 @@
-// The pending-edit buffer (`../edit-buffer.ts`), and specifically the ONE property no other suite
-// in this repo can observe: that it DRAINS.
+// The pending-edit buffer (`../edit-buffer.ts`), and specifically the properties no other suite in
+// this repo can observe: what it HOLDS and what it DRAINS, per node.
 //
-// Everything else about the buffer is already covered from the outside — `dirty-marking.test.ts`
-// proves every mutator's change survives a commit, `commit-fuzz.test.ts` proves the walk agrees
-// with an independent oracle over twelve mutation programs. Both would stay green if the buffer
-// grew without bound, because an entry that is never removed is indistinguishable, in committed
-// output, from one that was consumed. The output is identical; only the memory differs.
+// Everything else about the buffer is covered from the outside — `dirty-marking.test.ts` proves
+// every mutator's change survives a commit, `commit-fuzz.test.ts` proves the walk agrees with an
+// independent oracle over generated programs. Both would stay green if the buffer held the wrong
+// thing between commits, because an entry that is never consumed is indistinguishable, in committed
+// output, from one that was.
 //
-// That failure mode is NEW with the buffer and is the whole reason `pendingEditCount` exists: a
-// boolean field died with its node, and a Set PINS it. Ten nodes a row times a thousand rows is
-// the size of the leak a missing sweep produces, and nothing on screen would show it.
+// ── REWRITTEN 2026-09-06, WHEN THE MECHANISM THREE OF ITS ROWS GUARDED WAS DELETED ───────────────
 //
-// Structure follows the other engine suites: one process-global `installFabric()` at module scope
-// (`getSlot()` caches the first slot, so a per-test install is silently ignored), each block
-// building its own subtree.
+// The buffer used to be a Set, a Set and a Map, and it paid for reclamation with a
+// nominate-then-sweep pass (`nominateDroppedEdits` on every removal, `sweepDroppedEdits` walking
+// each nominee's subtree at commit). Three rows here pinned that sweep, through a process-wide
+// `pendingEditCount`. The collections are weak now and the sweep is gone — see edit-buffer.ts's
+// header for why it was also WRONG, which is the part that mattered: the only nodes it reclaimed
+// were nodes that had never committed, and a never-committed node's op log is its entire child list.
 //
-// Break-tested per MECHANISM rather than per file, because three separate things have to hold and
-// two of them are breaks of the same function (`.claude/rules/test-harness-false-greens.md` §20):
+// So the rows changed subject rather than being deleted. Where one asserted that a detached node's
+// entries are DROPPED, it now asserts they are KEPT — the behaviour `parked-subtree-revival.test.ts`
+// depends on — and every count is asked of a NODE instead of the process. That is the better oracle
+// either way: a global count is satisfied or defeated by whatever an unrelated earlier test left
+// behind, which is why the old rows needed before/after deltas to say anything at all.
 //
-//   A  sweepDroppedEdits returns early, always      2 red   the leaf row AND the subtree row
-//   B  dropSubtree does not recurse                 1 red   the subtree row only
-//   C  removal DROPS instead of nominating          1 red   the moved-node row only
+// Break-tested per MECHANISM, and the row sets are disjoint, which is what says none of these is
+// standing behind another (`.claude/rules/test-harness-false-greens.md` §20):
 //
-// A and B are not disjoint and are not meant to be: B is a strictly weaker break of the same
-// mechanism, and the LEAF row exists only so the two can be told apart — with a four-node subtree
-// there, both arms redden both rows and no row separates them. C is disjoint from both, which is
-// what says the nominate-then-decide half is independently pinned.
+//   clearPendingWork at reconcile                 many   the drain row, plus every counter probe
+//                                                        and three of the fuzzer's five oracles
+//   publishContribution's clearPendingStructure      2   the anchor-log row, and
+//                                                        replay-child-ops' detached-anchor row
+//   removal drops the STRUCTURE log                  2   parked-subtree-revival's never-committed
+//                                                        row, and the fuzzer
+//   removal drops PENDING PROPS                      1   the moved-node row
+//
+// The last two are the SAME arm split in half, deliberately: dropping all three at once (which is
+// what the old sweep did, one commit later) reddens about thirty rows and tells you nothing about
+// which row pins what. Each half named above is the narrowest break that reaches its row.
+//
+// `parked-subtree-revival`'s OTHER row — a node that had committed and gained a child while
+// detached — stays green under every arm here, and that is honest rather than a gap: while the
+// desired list is still a FIELD, nothing the buffer does can lose it. That row is a forward guard
+// for the switch, and it says so.
 
 import { describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
@@ -38,7 +53,12 @@ import {
   setProp,
   type ISymbioteNode,
 } from '../index';
-import { hasPendingProps, pendingEditCount } from '../edit-buffer';
+import {
+  hasPendingProps,
+  hasPendingStructure,
+  hasPendingWork,
+  pendingChildOps,
+} from '../edit-buffer';
 
 installFabric();
 const ROOT_TAG = 8801;
@@ -55,68 +75,51 @@ function row(testID: string): ISymbioteNode {
   return node;
 }
 
-// The buffer is process-wide, so an absolute count would be a fact about every test that ran
-// before this one. Only the DELTA across an operation is meaningful, which is also why
-// `pendingEditCount`'s own comment refuses to call it a per-commit figure.
-function totalPending(): number {
-  const counts = pendingEditCount();
-  return counts.path + counts.props + counts.structure;
+/** Every question the buffer answers about ONE node, which is the only scope it answers in. */
+function pendingFor(node: ISymbioteNode): string {
+  return [
+    hasPendingWork(node) ? 'path' : '',
+    hasPendingProps(node) ? 'props' : '',
+    hasPendingStructure(node) ? 'structure' : '',
+  ]
+    .filter(Boolean)
+    .join('+');
 }
 
 describe('the edit buffer drains', () => {
-  it('holds nothing extra once a mounted subtree has committed', () => {
-    const before = totalPending();
+  it('holds nothing for a mounted subtree once it has committed', () => {
     const node = row('committed-row');
     // The surface's own appendChild, not node.ts's — a top-level node keeps `parent === undefined`.
     surface.appendChild(node);
+    // Four fresh nodes, each seeded by `recordNewNode` into all three collections.
+    expect(pendingFor(node)).toBe('path+props+structure');
+
     surface.commit();
 
-    // 4 nodes went in, the commit walked all 4, so the buffer is back where it started. A single
-    // stranded entry here is the leak, and it would be silent everywhere else.
-    expect(totalPending()).toBe(before);
+    // The commit walked all four, so every one of them is drained. A single stranded entry is the
+    // silent stale-UI bug this file exists for: `markDirty` stops at the first already-recorded
+    // ancestor, so one node left pending swallows every later mark from its subtree.
+    for (const each of [node, ...node.children]) {
+      expect(pendingFor(each), each.props.testID as string).toBe('');
+    }
   });
 
-  // Deliberately ONE node, where the row below uses four. The two breaks this file guards against
-  // are "the sweep does not run" and "the sweep does not descend", and a multi-node subtree here
-  // would redden on both — leaving no row that separates them. A leaf isolates the first.
-  it('drops the entries of a LEAF removed before it ever committed', () => {
-    const before = totalPending();
+  it('KEEPS the entries of a node removed before it ever committed', () => {
     const leaf = createElement('RCTView');
     setProp(leaf, 'testID', 'never-committed');
     surface.appendChild(leaf);
-    // One fresh node, seeded by recordNewNode into all three sets.
-    expect(totalPending()).toBeGreaterThan(before);
-
     surface.removeChild(leaf);
     surface.commit();
 
-    // The commit never walks this node — it is not in the container's child list — so the sweep is
-    // the ONLY thing that can reclaim it. Without `sweepDroppedEdits` this stays elevated forever
-    // and every assertion in this repo still passes.
-    expect(totalPending()).toBe(before);
+    // The commit never walks this node — it is not in the container's child list — and nothing
+    // reclaims it by hand any more. That is deliberate: its op log is the only place its structure
+    // exists, so a buffer that discarded it would lose the subtree of anything parked this way
+    // (`parked-subtree-revival.test.ts`). Reclamation is the weak collections' job now, and a dead
+    // node takes its entries with it.
+    expect(pendingFor(leaf)).toBe('path+props+structure');
   });
 
-  it('drops a subtree removed from inside the tree, descendants included', () => {
-    const parent = row('keeper');
-    surface.appendChild(parent);
-    surface.commit();
-    const before = totalPending();
-
-    const doomed = row('doomed');
-    appendChild(parent, doomed);
-    setProp(doomed.children[0], 'testID', 'doomed-touched');
-    expect(totalPending()).toBeGreaterThan(before);
-
-    removeChild(parent, doomed);
-    surface.commit();
-
-    // `doomed` and its three children all leave. The sweep walks the removed subtree rather than
-    // only the nominee, which is what this row pins: a nominee-only sweep leaves the three
-    // children behind and the count stays above `before`.
-    expect(totalPending()).toBe(before);
-  });
-
-  it('KEEPS a moved node pending — removal nominates, it does not drop', () => {
+  it('KEEPS a moved node pending across the tick that moves it', () => {
     const from = row('move-from');
     const to = row('move-to');
     surface.appendChild(from);
@@ -133,10 +136,7 @@ describe('the edit buffer drains', () => {
     // Under this move the committed output is correct EITHER WAY: the node arrives under a new
     // parent, so `committed.parent !== renderableParent` sends reconcile down the fresh-family path,
     // which rebuilds the payload from `node.props` and never consults the buffer at all. So the
-    // output cannot distinguish nominate from drop — only the entry can.
-    //
-    // Asked of THIS node, not of `pendingEditCount()`: the count is process-wide, so a global
-    // "greater than zero" is satisfied by any unrelated node any earlier test left pending.
+    // output cannot distinguish a kept entry from a dropped one — only the entry can.
     expect(hasPendingProps(moved)).toBe(true);
 
     // Positive control, and it passes under both arms by the paragraph above — it is here to prove
@@ -148,21 +148,18 @@ describe('the edit buffer drains', () => {
 });
 
 describe('the op log does not grow for a node the commit never reconciles', () => {
-  // The leak the op log introduces and the one thing arm C of its break-test could not see: a
-  // SKIPPED node is never reconciled, so `clearPendingStructure` is never reached for it through
-  // the normal path, and its ops accumulate for the life of the process. `structure` counts map
-  // ENTRIES, so it stays flat at 1 while the array behind it grows — which is why this asserts
-  // `ops` instead, added to `pendingEditCount` for exactly this row.
+  // A SKIPPED node is never reconciled, so `clearPendingStructure` is never reached for it through
+  // the normal path and its ops would accumulate for the life of the process. An anchor is that
+  // node, and an adapter that mounts one per composed component (Angular) has one per component.
   //
-  // An anchor is that node, and an adapter that mounts one per composed component (Angular) has
-  // one per component. The log used to be TRUNCATED by `renderableChildren` — discarded, because
-  // nothing consumed it; since 4c-1 it is CONSUMED by `publishContribution` (commit.ts), which is
-  // what makes an anchor's contribution replayable from its own record. Removing that drain leaves
-  // the fuzzer green and this row red, and it is the ONLY row that goes red: an append replayed
-  // twice removes the child by identity before re-inserting it, so a doubled log commits the right
-  // tree and only the leak shows. That split is what makes both worth keeping
-  // (`.claude/rules/test-harness-false-greens.md` §28).
-  it('truncates a SKIPPED node log at every commit that drops it', () => {
+  // The log used to be TRUNCATED by `renderableChildren` — discarded, because nothing consumed it.
+  // Since 4c-1 it is CONSUMED by `publishContribution` (commit.ts), which is what makes an anchor's
+  // contribution replayable from its own record instead of re-derived from its children.
+  //
+  // Asked of THIS anchor rather than of a process-wide op count, which is what this row used before
+  // the collections went weak. The per-node form is strictly stronger: a global count is flat when
+  // some other node's log shrinks by exactly as much as this one grows.
+  it('drains a SKIPPED node log at every commit that drops it', () => {
     const surface = createSurface(9401);
     const parent = createElement('RCTView');
     const anchor = createAnchor();
@@ -170,17 +167,19 @@ describe('the op log does not grow for a node the commit never reconciles', () =
     surface.appendChild(parent);
     surface.commit();
 
-    const counts: number[] = [];
+    const held: number[] = [];
     for (let round = 0; round < 20; round += 1) {
       const child = createElement('RCTView');
       appendChild(anchor, child);
       removeChild(anchor, child);
       surface.commit();
-      counts.push(pendingEditCount().ops);
+      held.push(pendingChildOps(anchor)?.length ?? 0);
     }
 
-    // Flat, not merely small: two rounds' worth of growth would already be a leak, and a bound like
-    // `< 100` would pass on one.
-    expect(new Set(counts).size, `ops per round: ${counts.join(',')}`).toBe(1);
+    // Zero every round, not merely bounded: one round's worth of retention already compounds, and a
+    // bound like `< 100` would pass on twenty rounds of growth.
+    expect(new Set(held), `ops held per round: ${held.join(',')}`).toEqual(
+      new Set([0]),
+    );
   });
 });

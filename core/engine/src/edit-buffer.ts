@@ -24,13 +24,45 @@
 import type { ISymbioteNode } from './node';
 import { childrenOf, parentOf } from './tree';
 
+// ── WHY ALL THREE ARE WEAK ───────────────────────────────────────────────────────────────────────
+//
+// They were a Set, a Set and a Map, and the one thing a buffer owed that a per-node boolean did not
+// was RECLAMATION: a boolean died with its node, and a strong collection PINS it. That was paid for
+// with a nominate-then-sweep pass — `nominateDroppedEdits` on every removal, `sweepDroppedEdits`
+// walking each nominee's subtree at commit — and the sweep was deleted 2026-09-06 in favour of the
+// language doing it.
+//
+// The reason is not tidiness. Every access here is `has` / `get` / `set` / `delete`, so the weak
+// form is mechanically identical — and the sweep was WRONG in a way that only becomes visible when
+// the desired child list stops being a field:
+//
+//   what the sweep reclaimed   a node created and discarded before it ever committed. A node that
+//                              HAS committed had its entries drained at that commit, and removal
+//                              records an op on the PARENT, so it holds nothing to reclaim.
+//   what that node holds       its op log, which for a never-committed node is its ENTIRE child
+//                              list — the only place its structure exists once `node.children` goes
+//                              (`symbiote-fabric-cxx-surface` §8, 4c).
+//
+// So the sweep's target set and the set whose structure must survive are the SAME set, and no
+// fold-before-drop repair separates them. It also silently dropped a pending PROP write from a
+// subtree parked across commits, which frameworks do (Svelte parks live subtrees; Solid spells a
+// move as remove-then-reinsert) — the sweep's own comment protects the same-tick case and not that
+// one. Both are closed by never dropping: a detached node keeps its entries, and when it is
+// genuinely dead the whole subtree is collected with them.
+//
+// The cost is that nothing can COUNT what is pending, so the process-wide `pendingEditCount` is
+// gone. Every row that used it now asks the question of a NODE (`hasPendingWork`,
+// `pendingChildOps`), which is the better oracle anyway — a global count is satisfied or defeated by
+// whatever an unrelated earlier test left behind. What is no longer testable is that a dead node is
+// reclaimed, and that is a guarantee of the language rather than of this file.
+
 // "This node, or something under it, has pending work." The subtree question the commit walk asks
 // before descending, and the one `commitTargeted` asks before taking its short route.
-const pendingPath = new Set<ISymbioteNode>();
+let pendingPath = new WeakSet<ISymbioteNode>();
 
 // "THIS node's own Fabric payload may differ from what the mirror holds." Strictly narrower than
 // the above, which is also raised by a descendant's change bubbling up.
-const pendingProps = new Set<ISymbioteNode>();
+let pendingProps = new WeakSet<ISymbioteNode>();
 
 // "This node's CHILD LIST changed", and — since 2026-09-05 — WHAT changed, in order.
 //
@@ -44,7 +76,7 @@ const pendingProps = new Set<ISymbioteNode>();
 // the walk. And item 8's native drain re-applies it inside a retried commit lambda to rebase a
 // `pendingRoot_` (§7b, §5) — a buffer holding only "which nodes were touched" has nothing to
 // re-apply, which is why the log is required under BOTH design branches and not only this one.
-const pendingStructure = new Map<ISymbioteNode, IEditOp[] | null>();
+let pendingStructure = new WeakMap<ISymbioteNode, IEditOp[] | null>();
 
 /**
  * One child-list operation, at the level the adapter issued it.
@@ -224,83 +256,15 @@ export function clearPendingWork(node: ISymbioteNode): void {
   pendingPath.delete(node);
 }
 
-// ── DROPPED NODES ────────────────────────────────────────────────────────────────────────────────
-// The one thing a buffer owes that a per-node boolean did not: a boolean died with its node, and a
-// Set PINS it. Without the sweep below, `Clear` on a thousand ten-node rows leaks ten thousand nodes
-// for the life of the process — every one of them recorded by `recordNewNode` and never drained,
-// because the commit walk only ever reaches nodes that are still in a tree.
-//
-// It cannot be done at removal, for the reason host-behavior.ts's own sweep exists: an adapter
-// spells a MOVE as remove-then-reinsert (Solid's replaceNode, Svelte parking a subtree), so a
-// removal is not a death. And clearing a moved child's entries is not merely premature, it is the
-// silent-stale-UI bug this whole file is careful about — a node with a pending prop write, removed
-// and re-appended to the SAME parent in one tick, would come back with `committed.parent` matching
-// and `viewName` matching, and reconcile would reuse it with the write lost. Removal nominates;
-// commit decides, once the tick's mutations are all in.
-const droppedCandidates = new Set<ISymbioteNode>();
-
-/** Nominate a node whose parent link was just cut. Not a claim that it is dead — see above. */
-export function nominateDroppedEdits(node: ISymbioteNode): void {
-  droppedCandidates.add(node);
-}
-
 /**
- * Drop the entries of every nominee that did not come back, and of everything beneath it.
+ * Test-only reset. A leaked entry from one test silently changes the next one's commit.
  *
- * The liveness test is host-behavior.ts's, for its reason: a surface's top-level nodes carry
- * `parent === undefined` by design (surface.ts), so the parent check alone reports a live one as
- * gone.
- *
- * The subtree is walked unconditionally rather than stopping at the first node holding no entry.
- * The bubble makes that early exit LOOK safe — a pending descendant implies a pending ancestor — but
- * the invariant is broken mid-walk by design, since `reconcile` drains a node before descending into
- * it. Only the removed subtree is walked either way, so the guard would buy little and could be
- * wrong; deletes are idempotent, so an overlapping nominee costs a second pass and nothing else.
+ * REPLACES the collections rather than clearing them, because a weak collection has no `clear`. The
+ * old instances go with whatever still references their keys, which is the same reclamation the
+ * sweep used to perform by hand.
  */
-export function sweepDroppedEdits(topLevel: readonly ISymbioteNode[]): void {
-  if (droppedCandidates.size === 0) return;
-  for (const node of droppedCandidates) {
-    if (parentOf(node) !== undefined || topLevel.includes(node)) continue;
-    dropSubtree(node);
-  }
-  droppedCandidates.clear();
-}
-
-function dropSubtree(node: ISymbioteNode): void {
-  pendingPath.delete(node);
-  pendingProps.delete(node);
-  pendingStructure.delete(node);
-  for (const child of childrenOf(node)) dropSubtree(child);
-}
-
-/**
- * Diagnostic only. The buffer is process-wide, so this counts every surface's pending work at once
- * and is meaningless as a per-commit figure — it exists so a test can assert the buffer DRAINS
- * rather than growing without bound, which no other observable would catch.
- */
-export function pendingEditCount(): {
-  path: number;
-  props: number;
-  structure: number;
-  ops: number;
-} {
-  let ops = 0;
-  for (const log of pendingStructure.values()) if (log !== null) ops += log.length;
-  return {
-    path: pendingPath.size,
-    props: pendingProps.size,
-    structure: pendingStructure.size,
-    // Entries alone cannot see the leak the op log introduced: a node the commit never reconciles
-    // keeps ONE map entry however many ops accumulate inside it, so `structure` stays flat while the
-    // array behind it grows for the life of the process. An anchor is exactly that node.
-    ops,
-  };
-}
-
-/** Test-only reset. A leaked entry from one test silently changes the next one's commit. */
 export function resetEditBuffer(): void {
-  pendingPath.clear();
-  pendingProps.clear();
-  pendingStructure.clear();
-  droppedCandidates.clear();
+  pendingPath = new WeakSet<ISymbioteNode>();
+  pendingProps = new WeakSet<ISymbioteNode>();
+  pendingStructure = new WeakMap<ISymbioteNode, IEditOp[] | null>();
 }

@@ -47,7 +47,6 @@ import {
   hasPendingStructure,
   pendingChildOps,
   hasPendingWork,
-  sweepDroppedEdits,
 } from './edit-buffer';
 import { dlog, isDebug } from './debug';
 import { childrenOf, replaceChildren } from './tree';
@@ -1389,11 +1388,6 @@ function commitContainer(rootTag: IRootTag): void {
   // remove-then-reinsert) or gone for good. Costs one Set-size read until an app registers its
   // first host behavior. See host-behavior.ts for why removal cannot answer this itself.
   sweepDetachedBehaviors(childrenOf(container));
-  // The buffer's half of the same question, and it runs unconditionally where the behavior sweep
-  // above is gated: every node holds buffer entries, so a node that left for good and is never
-  // walked again would be pinned by the buffer forever. Same nominate-then-decide shape, same
-  // liveness test, deliberately the same tick.
-  sweepDroppedEdits(childrenOf(container));
 
   stats.created = 0;
   stats.cloneProps = 0;

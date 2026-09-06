@@ -16,7 +16,6 @@ import type {
 import { isAriaAliasKey } from './accessibility-props';
 import { childrenOf, linkAppend, linkBefore, parentOf, unlink } from './tree';
 import {
-  nominateDroppedEdits,
   recordChildOp,
   recordNewNode,
   recordPropEdit,
@@ -1211,9 +1210,11 @@ export function setText(node: ISymbioteNode, text: string): void {
 function detach(child: ISymbioteNode): void {
   const parent = parentOf(child);
   if (!parent) return;
-  // Nominate, do not drop: this is reached from appendChild/insertBefore, so the node is about to
-  // be re-parented and its pending entries must survive. `sweepDroppedEdits` decides at commit.
-  nominateDroppedEdits(child);
+  // The child's OWN buffer entries are deliberately left alone. A removal is not a death — an
+  // adapter spells a MOVE as remove-then-reinsert (Solid's replaceNode, Svelte parking a subtree) —
+  // and a detached node's entries are its structure until it commits again. Nothing reclaims them
+  // by hand any more: the buffer is weak, so a node that is genuinely gone takes its entries with
+  // it (see edit-buffer.ts's header for why the sweep that used to do this was also wrong).
   markChildOp(parent, child, undefined, true);
   unlink(parent, child);
 }
@@ -1243,10 +1244,9 @@ export function insertBefore(
 // that comes back alive in the same batch — see host-behavior.ts's markDetachCandidate.
 export function removeChild(parent: ISymbioteNode, child: ISymbioteNode): void {
   if (hasHostBehaviors()) markDetachCandidate(child);
-  // Unconditional, unlike the behavior nomination one line above: a behavior is rare and its sweep
-  // is gated on any existing at all, while EVERY removed node holds buffer entries (`recordNewNode`
-  // seeds all three) and every one of them is a leak if nothing sweeps.
-  nominateDroppedEdits(child);
+  // Same as `detach` above: the removed child keeps its own entries. The behavior nomination one
+  // line up is a different question — a behavior owns a teardown that must actually run — and it
+  // still needs the commit to decide, because a move looks exactly like a removal from here.
   markChildOp(parent, child, undefined, true);
   unlink(parent, child);
 }
