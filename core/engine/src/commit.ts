@@ -33,6 +33,7 @@ import {
   markStructureDirty,
   takePropStats,
   VIRTUAL_TEXT_COMPONENT,
+  type IContribution,
   type IMirror,
   type ISymbioteNode,
 } from './node';
@@ -142,6 +143,12 @@ const childScan = {
   flattens: 0,
   flattenProbed: 0,
   widest: 0,
+  // An anchor's contribution served from its own record instead of re-derived from its children,
+  // and the times that failed. The pair is the whole claim of the cut that introduced them, exactly
+  // as `childScans`/`childListsReplayed` is for item 5: a `contributionsDerived` that does not fall
+  // to zero on a steady tree means the record is being invalidated by something nobody named.
+  contributionsReplayed: 0,
+  contributionsDerived: 0,
 };
 
 // Diagnostic (gated): Fabric serializes props to folly::dynamic, which rejects a JS
@@ -343,6 +350,161 @@ function flattenPure(node: ISymbioteNode): IFlattened {
   return { renderable, skipped, hoists };
 }
 
+/**
+ * An anchor's contribution to its parent's renderable list — REPLAYED from the record it published
+ * last commit, and derived only when it cannot be.
+ *
+ * This is item 5's residual, and it is the last desired-tree read the commit performs. Item 5 made a
+ * parent holding anchors replay, at the price of one `flattenPure(anchor)` per anchor per commit:
+ * on the shape Angular emits, `childrenOf` fell 2 004 -> 1 004 and the thousand that remained were
+ * all this call. An anchor is a node like any other from the buffer's point of view — it has an op
+ * log, and every edit under it marks it — so the same replay works on it, one level down.
+ *
+ * ── WHEN THE RECORD IS SOUND, WHICH IS THE WHOLE CORRECTNESS ARGUMENT ────────────────────────────
+ *
+ * `node.contributed` is valid exactly while `hasPendingStructure(node)` is false, which is item 4's
+ * standing invariant applied to an anchor. Every way an anchor's contribution can change records
+ * against the anchor itself:
+ *
+ *   a child in, out or moved     `markChildOp(anchor, …)` — an op on this log
+ *   an edit under a NESTED       `markRenderableAncestor` climbs past every anchor and poisons each
+ *   anchor                       one to `null`, so a grandchild's edit reaches this log too
+ *   a child flips skipped-ness   `markPresenceIfFlipped` -> `markStructureDirty(anchor)`, poison
+ *   this node stops being an     `markPresenceIfFlipped` poisons its OWN log and drops the record
+ *   anchor                       (node.ts), which is what makes a later flip back safe
+ *
+ * ── WHY THE THREE-WAY GUARD, RATHER THAN "REPLAY WHENEVER THE LOG IS AN ARRAY" ───────────────────
+ *
+ * A missing record and a missing log mean different things, and the pair has to be read together.
+ * A brand-new anchor has no record and a COMPLETE log (`recordNewNode` seeds `[]`), so it replays
+ * from empty — that is what keeps the create path off the desired tree. A node that last committed
+ * as a REAL one also has no record and no log, and its children are whatever the desired tree says;
+ * `committed !== undefined` is what tells the two apart.
+ */
+// The anchors whose contribution is being computed right now — see the re-entry guard below. A
+// module-level Set reused across calls rather than a parameter: it is empty except while a nested
+// anchor is resolving, and it never grows past the nesting depth.
+const contributionsInFlight = new Set<ISymbioteNode>();
+
+function flattenContribution(node: ISymbioteNode): IContribution {
+  // ── WHY A LOG-WALK NEEDS A CYCLE GUARD AND A TREE-WALK DOES NOT ────────────────────────────────
+  //
+  // An op log names nodes by IDENTITY and keeps naming them after they move. So two anchors can each
+  // hold a log naming the other while the desired tree stays perfectly acyclic, and resolving one
+  // through the other's log then never terminates. Found by the fuzzer on this change's first deep
+  // run, shrunk to five steps and reproduced as `two anchors moved through each other`:
+  //
+  //   appendChild(b, a)   b.log = [+a]
+  //   appendChild(v, a)   detach -> b.log = [+a, -a],  a leaves b
+  //   appendChild(a, b)   a.log = [+b]
+  //   tree: v > a > b     acyclic — and a.log names b, b.log names a
+  //
+  // `flattenPure` cannot hit this because it walks `childrenOf`, which the engine keeps acyclic. So
+  // the guard falls back to exactly that: it is the derivation this whole function is a memo of, it
+  // is always correct, and it terminates. Deliberately NOT a refusal — a refusal would have to
+  // propagate out through `replayChildOps` into `flattenRenderable`, and there is nothing to gain
+  // from it when the exact answer is one call away.
+  //
+  // It does NOT publish, which is the right direction: the log this node still holds has not been
+  // consumed, so leaving it is what lets the next cycle resolve it properly.
+  if (contributionsInFlight.has(node)) return flattenPure(node);
+  const ops = pendingChildOps(node);
+  const base = node.contributed;
+  const replayable =
+    ops !== null &&
+    (base !== undefined || (ops !== undefined && node.committed === undefined));
+  if (replayable) {
+    // Nothing recorded against an anchor that already holds a record: hand the record straight
+    // back. The common steady-state case, and the reason `IContribution` is readonly — this is the
+    // one path that does not copy.
+    if (ops === undefined && base !== undefined) {
+      childScan.contributionsReplayed += 1;
+      return base;
+    }
+    contributionsInFlight.add(node);
+    const replayed = replayChildOps(
+      base?.renderable ?? NO_SKIPPED,
+      base?.skipped ?? NO_SKIPPED,
+      base?.hoists ?? false,
+      ops ?? [],
+    );
+    contributionsInFlight.delete(node);
+    if (replayed !== undefined) {
+      childScan.contributionsReplayed += 1;
+      return publishContribution(node, {
+        renderable: replayed.children,
+        skipped: replayed.skipped,
+        hoists: replayed.hoists,
+      });
+    }
+  }
+  // The derive, and it recurses through THIS function rather than through `flattenPure`: a nested
+  // anchor owes a published record and a drained log of its own, and `flattenPure` deliberately
+  // gives neither (it is the oracle). Angular nests one anchor per composed component, so the
+  // nested case is the common one there rather than an edge.
+  childScan.contributionsDerived += 1;
+  const renderable: ISymbioteNode[] = [];
+  const skipped: ISymbioteNode[] = [];
+  let hoists = false;
+  const kids = childrenOf(node);
+  childScan.scans += 1;
+  childScan.probed += kids.length;
+  contributionsInFlight.add(node);
+  for (const child of kids) {
+    if (!isSkippedAtCommit(child)) {
+      renderable.push(child);
+      continue;
+    }
+    skipped.push(child);
+    if (!isAnchor(child)) continue;
+    const inner = flattenContribution(child);
+    if (inner.renderable.length > 0) hoists = true;
+    renderable.push(...inner.renderable);
+    skipped.push(...inner.skipped);
+  }
+  contributionsInFlight.delete(node);
+  return publishContribution(node, { renderable, skipped, hoists });
+}
+
+/**
+ * Store an anchor's contribution and DRAIN the log it was computed from.
+ *
+ * The drain is what closes the leak `flattenRenderable` used to close by TRUNCATING: a skipped node
+ * is never reconciled, so nothing else ever clears its entry and its ops accumulate for the life of
+ * the process. The difference is that the log is now consumed rather than discarded — what it said
+ * is in the record this line writes, so the next cycle replays onto it instead of re-deriving.
+ */
+/**
+ * The three lines every skipped child owes, wherever it is dropped from a renderable list.
+ *
+ * `clearPendingWork` because the walk will never visit this node again, so nothing else would ever
+ * drain its path entry — and `markDirty` stops at the first already-recorded ancestor, so one left
+ * standing swallows every later mark from its subtree. `committed = undefined` because a skipped
+ * node has no Fabric presence and its old handle is orphaned; keeping it lets a stale FAMILY come
+ * back across a parent re-creation, which Fabric refuses in C++ as a native abort rather than a
+ * misrender (`skipped-node-family.test.ts`).
+ *
+ * The structural log is the one that is NOT cleared for an anchor, and that is the change item 5's
+ * residual brought. It used to be TRUNCATED here — discarded to stop an unvisited node accumulating
+ * ops forever. It is now CONSUMED instead, by `publishContribution`, so discarding it here would
+ * throw away ops whose effect has not reached any record. Everything else that is skipped is
+ * childless (an empty raw text), so for those the clear is exact.
+ */
+function hideSkippedChild(child: ISymbioteNode): void {
+  clearPendingWork(child);
+  child.committed = undefined;
+  if (!isAnchor(child)) clearPendingStructure(child);
+}
+
+function publishContribution(
+  node: ISymbioteNode,
+  contribution: IContribution,
+): IContribution {
+  node.contributed = contribution;
+  clearPendingStructure(node);
+  return contribution;
+}
+
 interface IReplayed {
   children: ISymbioteNode[];
   skipped: ISymbioteNode[];
@@ -466,7 +628,11 @@ function replayChildOps(
 
     // ── put this child's contribution in ──
     if (isSkippedAtCommit(op.child)) {
-      const now = flattenPure(op.child);
+      // NOT `flattenPure` — that one stays the differential's ORACLE and must keep deriving from the
+      // desired tree, or the check would be verifying the thing it checks (see `verifyReplay`).
+      const now = isAnchor(op.child)
+        ? flattenContribution(op.child)
+        : flattenPure(op.child);
       if (now.renderable.length > 0) {
         out.splice(at, 0, ...now.renderable);
         hoists = true;
@@ -599,40 +765,33 @@ function flattenRenderable(node: ISymbioteNode): readonly ISymbioteNode[] {
   const children: ISymbioteNode[] = [];
   for (const child of kids) {
     if (isSkippedAtCommit(child)) {
-      // A skipped child is flattened away here and never reaches reconcile, so this is the only
-      // place that can drain its buffer entry. Leaving it recorded would be a silent stale-UI bug:
-      // markDirty stops at the first already-recorded ancestor, so a permanently-pending skipped
-      // node swallows every later mark - from an anchor's subtree, or from the setText that turns
-      // an empty raw text back into real content - and the real parent never learns anything
-      // changed.
+      // A skipped child is flattened away here and never reaches reconcile, so this is one of the
+      // two places that can drain its buffer entry — `hideSkipped` in reconcile is the other, for
+      // the list the replay produced. What the three lines are for: `hideSkippedChild`.
       skippedScratch.push(child);
-      clearPendingWork(child);
-      // AND its structural log, which nothing else would ever consume: a skipped node is never
-      // reconciled, so `clearPendingStructure` is never reached for it and its ops would accumulate
-      // for the life of the process. On an adapter that mounts an anchor per composed component
-      // (Angular) that is an unbounded array per anchor. Safe to drop because a node that stops
-      // being skipped poisons its OWN log in the same breath (`markPresenceIfFlipped`, node.ts), so
-      // it re-derives rather than replaying a log this line truncated.
-      clearPendingStructure(child);
-      // AND drop its committed record, because a skipped node has no Fabric presence and its old
-      // handle is now orphaned. Keeping it is what lets a stale FAMILY come back: `committed.parent`
-      // holds the RETAINED node, which survives its own Fabric re-creation, so a node skipped
-      // across a commit that re-created its parent later reads `committed.parent === renderableParent`
-      // and takes the UPDATE path — adopting a handle whose family belongs to the parent's previous
-      // Fabric node. Fabric refuses that in C++ (`ShadowNode` families cannot be reparented), so on
-      // a device it is a native abort rather than a misrender.
-      //
-      // Unconditional rather than "only when the parent was re-created": the skipped node is not
-      // visited during that commit, so there is no moment at which it could be told. The cost is one
-      // `createNode` when an empty text becomes non-empty again, which is rare and is the safe
-      // direction. Found by the fuzzer one value after its generator learned to write '' — see
-      // `skipped-node-family.test.ts` for the ten-step reproduction it shrank to.
-      child.committed = undefined;
       if (isAnchor(child)) {
-        const before = children.length;
-        children.push(...flattenRenderable(child));
-        if (children.length > before) hoistedScratch = true;
-      }
+        // Through the CONTRIBUTION rather than by recursing here, so this path gets the same record
+        // the replay path does — and so an anchor whose own subtree is unchanged is answered from
+        // its record even when the node ABOVE it had to re-derive. The nested skipped nodes come
+        // back in the contribution and are hidden here, because the recursion that used to hide
+        // them is gone.
+        // BEFORE `hideSkippedChild`, and the order is load-bearing rather than stylistic: that
+        // helper clears `committed`, which is the very field `flattenContribution` reads to tell a
+        // brand-new anchor (replay its whole log from empty) from one that last committed as a REAL
+        // node (derive — its children are whatever the desired tree says, and its log is empty).
+        // Hidden first, a node flipped from real to anchor replayed an empty base and dropped every
+        // child it had.
+        const inner = flattenContribution(child);
+        hideSkippedChild(child);
+        if (inner.renderable.length > 0) {
+          children.push(...inner.renderable);
+          hoistedScratch = true;
+        }
+        for (const nested of inner.skipped) {
+          skippedScratch.push(nested);
+          hideSkippedChild(nested);
+        }
+      } else hideSkippedChild(child);
     } else children.push(child);
   }
   return children;
@@ -790,16 +949,10 @@ function reconcile(
     for (const child of list) clearPendingWork(child);
   };
   // What `flattenRenderable` does to every skipped child it drops, done for a list the replay
-  // produced instead. The three lines are copied deliberately rather than shared: each has its own
-  // reason, all three are written out at the flatten, and a replayed list that skips any one of
-  // them is a silent stale-UI bug of exactly the kind that comment enumerates. Idempotent, so
-  // re-running them on a member the base already had costs a no-op.
+  // produced instead — the same helper, so the two paths cannot drift. Idempotent, so re-running it
+  // on a member the base already had costs a no-op.
   const hideSkipped = (list: readonly ISymbioteNode[]): void => {
-    for (const child of list) {
-      clearPendingWork(child);
-      clearPendingStructure(child);
-      child.committed = undefined;
-    }
+    for (const child of list) hideSkippedChild(child);
   };
   // `!recreating` is deliberate and was briefly missing. A node being re-created CAN reuse its list
   // safely — the children are the same nodes and each gets `forceFreshFamily` — but doing so is a
@@ -1244,6 +1397,11 @@ export interface ICommitProfile {
   childFlattens: number;
   childFlattenProbed: number;
   childFlattenWidest: number;
+  /** Anchors whose contribution came off their own record instead of their children. */
+  contributionsReplayed: number;
+  /** Anchors whose contribution had to be re-derived, which is the only remaining desired-tree read
+   * inside the commit. */
+  contributionsDerived: number;
 }
 
 export function readCommitProfile(): ICommitProfile {
@@ -1263,6 +1421,8 @@ export function readCommitProfile(): ICommitProfile {
     childFlattens: childScan.flattens,
     childFlattenProbed: childScan.flattenProbed,
     childFlattenWidest: childScan.widest,
+    contributionsReplayed: childScan.contributionsReplayed,
+    contributionsDerived: childScan.contributionsDerived,
   };
   profile.commits = 0;
   profile.walkMs = 0;
@@ -1276,6 +1436,8 @@ export function readCommitProfile(): ICommitProfile {
   childScan.flattens = 0;
   childScan.flattenProbed = 0;
   childScan.widest = 0;
+  childScan.contributionsReplayed = 0;
+  childScan.contributionsDerived = 0;
   return snapshot;
 }
 

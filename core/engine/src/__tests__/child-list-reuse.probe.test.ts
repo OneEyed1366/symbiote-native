@@ -149,14 +149,18 @@ describe('a create builds its child lists from the op log, not from node.childre
     // MEASURED on this shape, 1 000 rows, and the FOUR numbers are the whole claim — the first is
     // the one the item is for and the last is what says the other three are not an accounting trick:
     //
-    //                          4b     item 5
-    //   childrenOf() calls    2004      1004    counted at the tree.ts seam
-    //   childScans            2001      1001    the 1 000 left are the ANCHORS' own lists, read by
-    //                                           `flattenPure` when each is inserted — two children
-    //                                           rather than the row's whole list
-    //   childFlattens         1000         0    the derivation is not reached at all
-    //   childListsReplayed    2001      3001    the rows replay now, and so does each anchor's own
-    //                                           child, hoisted into the row's list
+    //                          4b     item 5    4c-1
+    //   childrenOf() calls    2004      1004       4    counted at the tree.ts seam
+    //   childScans            2001      1001       1    the survivor is the container
+    //   childFlattens         1000         0       0    the derivation is not reached at all
+    //   childListsReplayed    2001      3001    3001    the rows replay, and so does each anchor
+    //
+    // Item 5 left one desired-tree read standing — `flattenPure(anchor)`, once per anchor, to learn
+    // what the anchor contributes. `flattenContribution` closes it: an anchor has an op log like any
+    // other node, and on a create that log is its whole child list, so it replays from empty. The
+    // FOUR that remain are the synthetic container's entry bookkeeping and not one is inside the
+    // walk, which is the same four a flat tree reads. The commit no longer reads a desired child
+    // list on ANY shape.
     const surface = createSurface(7303);
     const list = createElement('RCTView');
     buildRows(list, ROWS, 0, true);
@@ -165,16 +169,23 @@ describe('a create builds its child lists from the op log, not from node.childre
     surface.commit();
 
     const profile = readCommitProfile();
-    const line = `scans=${profile.childScans} replayed=${profile.childListsReplayed}`;
-    // ONE per row, not two. The row no longer re-derives; what is left is `flattenPure` reading the
-    // anchor's own children to learn what it contributes. Plus the container, whose whole top-level
-    // list arrives at once and can never be described by a sequence of child ops.
-    expect(profile.childScans, line).toBe(ROWS + 1);
-    // And ZERO of those scans is the flatten proper: `flattenPure` is a read, `renderableChildren`
+    const line =
+      `scans=${profile.childScans} replayed=${profile.childListsReplayed} ` +
+      `contribReplayed=${profile.contributionsReplayed} ` +
+      `contribDerived=${profile.contributionsDerived}`;
+    // ONE, and it is the container — whose whole top-level list arrives at once and can never be
+    // described by a sequence of child ops. Nothing else on this shape reads a child list.
+    expect(profile.childScans, line).toBe(1);
+    // And ZERO of that one scan is the flatten proper: `flattenPure` is a read, `renderableChildren`
     // is a read plus a drain plus an allocation, and the second one no longer runs on this shape at
     // all. Asserted separately because `childScans` alone cannot tell the two apart.
     expect(profile.childFlattens, line).toBe(0);
     expect(profile.childListsReplayed, line).toBe(3 * ROWS + 1);
+    // The pair that says the anchors were ANSWERED rather than skipped. A `contributionsDerived`
+    // above zero here is the residual coming back — `childScans` would report it too, but only this
+    // pair says which of the two mechanisms served each anchor.
+    expect(profile.contributionsReplayed, line).toBe(ROWS);
+    expect(profile.contributionsDerived, line).toBe(0);
   });
 
   it('REFUSES when an op names a child the parent HIDES — with the control beside it', () => {

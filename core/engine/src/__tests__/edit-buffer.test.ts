@@ -155,9 +155,13 @@ describe('the op log does not grow for a node the commit never reconciles', () =
   // `ops` instead, added to `pendingEditCount` for exactly this row.
   //
   // An anchor is that node, and an adapter that mounts one per composed component (Angular) has
-  // one per component. `renderableChildren` truncates the log every time it drops the anchor;
-  // removing that line leaves the fuzzer green and this row red, which is the split that makes
-  // both worth keeping (`.claude/rules/test-harness-false-greens.md` §28).
+  // one per component. The log used to be TRUNCATED by `renderableChildren` — discarded, because
+  // nothing consumed it; since 4c-1 it is CONSUMED by `publishContribution` (commit.ts), which is
+  // what makes an anchor's contribution replayable from its own record. Removing that drain leaves
+  // the fuzzer green and this row red, and it is the ONLY row that goes red: an append replayed
+  // twice removes the child by identity before re-inserting it, so a doubled log commits the right
+  // tree and only the leak shows. That split is what makes both worth keeping
+  // (`.claude/rules/test-harness-false-greens.md` §28).
   it('truncates a SKIPPED node log at every commit that drops it', () => {
     const surface = createSurface(9401);
     const parent = createElement('RCTView');

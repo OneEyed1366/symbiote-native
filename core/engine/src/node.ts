@@ -152,6 +152,10 @@ export interface ISymbioteNode {
   // does when it carries its layout box. Collapsing the side table into a field makes the code say
   // that: there is one tree, the framework's, and each of its nodes remembers what it committed.
   committed: IMirror | undefined;
+  // What this node contributed to its parent's renderable list while SKIPPED — see IContribution.
+  // `undefined` for every node that is not, and has never been, a flattened-away anchor, which is
+  // every node under four of the five adapters.
+  contributed: IContribution | undefined;
   // The declarative halves of this node's style — see IClassStyleParts and commitClassStyle below.
   // `undefined` until the node's first class/style write, so a node nobody styles carries a slot
   // and nothing more.
@@ -210,6 +214,7 @@ class SymbioteNode implements ISymbioteNode {
   declare parent: ISymbioteNode | undefined;
   declare hasAriaAlias: boolean;
   declare committed: IMirror | undefined;
+  declare contributed: IContribution | undefined;
   declare styleParts: IClassStyleParts | undefined;
   declare payloadFold: IPayloadFold | undefined;
 
@@ -236,6 +241,7 @@ class SymbioteNode implements ISymbioteNode {
     // path is ever added that passes real props, this line owes that probe back.
     this.hasAriaAlias = false;
     this.committed = undefined;
+    this.contributed = undefined;
     this.styleParts = undefined;
     // Assigned here for the same hidden-class reason as `hasAriaAlias` above; `attachHostBehavior`
     // overwrites it a few lines later for the rare node that has a behavior.
@@ -286,6 +292,29 @@ class SymbioteNode implements ISymbioteNode {
 // The committed-state record. `tag` is the reactTag minted at first create, stable across
 // clone-on-write (a clone keeps the family), kept so the native-driven Animated path can bind to it
 // directly. `rootTag` lets a targeted re-commit (setNativeProps) find the surface.
+/**
+ * What a SKIPPED anchor contributed to its renderable ancestor's child list, last commit.
+ *
+ * The mirror's twin for the one class of node the mirror cannot hold. An anchor never becomes a
+ * Fabric view, so it has no handle, no tag and no payload — `IMirror` is the wrong shape for it and
+ * giving it one is the stale-FAMILY hazard `flattenRenderable` spells out. But it DOES have a
+ * committed answer: the renderable nodes it put in its parent's list, the children it hid, and
+ * whether any of those hid children of their own.
+ *
+ * That record is what lets `flattenContribution` REPLAY an anchor's contribution from its own op log
+ * instead of re-deriving it from `childrenOf(anchor)` — the last desired-tree read left inside the
+ * commit after item 5 (`symbiote-fabric-cxx-surface` §8). Same relationship the mirror has to a real
+ * node: a memo of the buffer, invalidated by the same mark.
+ *
+ * Read-only by contract: `flattenContribution` may hand the stored object straight back when nothing
+ * was recorded against the anchor, so a caller that mutated it would corrupt the next cycle's base.
+ */
+export interface IContribution {
+  readonly renderable: readonly ISymbioteNode[];
+  readonly skipped: readonly ISymbioteNode[];
+  readonly hoists: boolean;
+}
+
 export interface IMirror {
   handle: IFabricNode;
   tag: number;
@@ -498,11 +527,19 @@ function markPresenceIfFlipped(node: ISymbioteNode, wasSkipped: boolean): void {
   const parent = parentOf(node);
   if (parent !== undefined) markStructureDirty(parent);
   // And when the node is coming BACK — an anchor that stops being one, an empty raw text that gains
-  // content — its own child list has to be re-derived rather than replayed. The commit truncates a
-  // skipped node's op log every time it drops it (`flattenRenderable`, commit.ts), because a node
-  // it never reconciles would otherwise accumulate ops forever; so the log this node carries is not
-  // its whole history and must not be replayed from an empty base.
-  if (wasSkipped) recordStructureEdit(node);
+  // content — its own child list has to be re-derived rather than replayed. Its log was CONSUMED
+  // while it was skipped (`publishContribution`, commit.ts), against a base that is a contribution
+  // record and not a committed child list, so what it holds now describes neither: not its whole
+  // history, and not a delta the reconcile's own base could take.
+  if (wasSkipped) {
+    recordStructureEdit(node);
+    // AND drop the contribution it published while it was skipped. That record is the base
+    // `flattenContribution` (commit.ts) replays onto, and a node coming back is exactly when it
+    // stops describing anything: the node is about to reconcile as a real one, which clears its log
+    // — so a later flip BACK to skipped would find a stale base with no ops and replay nothing onto
+    // it, returning a contribution from two lives ago. Reachable with two `setNodeComponent` calls.
+    node.contributed = undefined;
+  }
 }
 
 // The three mark* names are the MUTATION-SIDE vocabulary and they stay: every adapter-facing write
