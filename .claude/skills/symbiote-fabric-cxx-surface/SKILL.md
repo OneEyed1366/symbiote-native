@@ -1001,8 +1001,8 @@ commit so a reader can diff rather than re-derive.
 3   a verification loop that can catch a silent regression    LANDED      —
 4a  the commit consumes the record for its child list         LANDED      —
 4b  the ordered op log, replayed by the commit                LANDED      —
-4c  node.children / node.parent deleted outright              OPEN        a non-JS base for the
-                                                                          desired order — see below
+4c  node.children / node.parent deleted outright              IN PROGRESS the sweep, and only the
+                                                                          sweep — see below
 5   anchors stop being NODES and become POSITIONS             LANDED      —
 6   setNativeProps arm for prop-only rows                     OPEN        —
 7   the address rides on the framework's own object           AFTER 4     —
@@ -1124,8 +1124,8 @@ So item 4 splits honestly into:
 ```
 4a  the commit consumes the record instead of re-deriving it     LANDED, measured above
 4b  the ordered op log, replayed by the commit                   LANDED, measured below
-4c  node.children / node.parent deleted outright                 needs a base for the order that
-                                                                 is not another JS array
+4c  node.children / node.parent deleted outright                 4c-1 and 4c-2 LANDED; what is
+                                                                 left is the sweep, see below
 ```
 
 ### 4b LANDED — the numbers, and the one adapter it does not help
@@ -1262,13 +1262,100 @@ for the nodes the commit never visits.** The buffer already owed one for REMOVED
 (`sweepDroppedEdits`); skipped nodes are the second class, and they are not removed — they are in
 the tree and permanently unvisited.
 
-### 4c is blocked on a fact, not on effort
+### 4c-1 LANDED 2026-09-06 — the last desired-tree read inside the commit
 
-The mirror cannot answer "this node's desired children, in order": `record.children` is the
-RENDERABLE list and `record.skipped` loses where the skipped nodes sat between them. Giving the
-record a desired list is renaming the skeleton, not removing it. So the desired copy goes only when
-the record itself is native, which is what §9 already says from the other side — 4c is where the
-two branches genuinely diverge and it is blocked on item 0 in a way 4a and 4b were not.
+Item 5 left one: `flattenPure(anchor)`, once per anchor per commit, to learn what an anchor puts in
+its parent's place. An anchor is an ordinary participant in the buffer — it has an op log, and every
+edit that can change its contribution marks that log — so its contribution now REPLAYS from a record
+it published last commit (`IContribution`, node.ts: the mirror's twin for the one node the mirror
+cannot hold, because an anchor has no Fabric handle).
+
+```
+                       4b    item 5    4c-1
+childrenOf() calls   2004      1004       4     1 000 rows, one hoisting anchor each
+childScans           2001      1001       1     the survivor is the container
+childFlattens        1000         0       0
+childListsReplayed   2001      3001    3001
+```
+
+**The four that remain are the container's entry bookkeeping, and they are the same four a FLAT tree
+reads. The commit no longer reads a desired child list on any shape.** Pinned by
+`child-list-reuse.probe.test.ts`; the rules and their break ledger are in
+`anchor-contribution.test.ts`.
+
+**The bug the fuzzer found on the first deep run, because the next log-walk will meet it too.** An op
+log names nodes by IDENTITY and goes on naming them after they move, so two anchors can each hold a
+log naming the other while the desired tree stays perfectly acyclic:
+
+```
+appendChild(b, a)   b.log = [+a]
+appendChild(v, a)   detach -> b.log = [+a, -a],  a leaves b
+appendChild(a, b)   a.log = [+b]
+tree: v > a > b     acyclic — and a.log names b, b.log names a
+```
+
+`flattenPure` cannot hit it (it walks `childrenOf`, which the engine keeps acyclic); a log-walk
+recursed forever. Guarded by falling back to `flattenPure`, which is always correct and terminates.
+**Any future traversal that follows op logs instead of the tree inherits this**, and the tree being
+acyclic is not the property that saves it.
+
+### 4c-2 LANDED 2026-09-06 — `IMirror.desired`, verified against the tree and not yet read
+
+`replayDesired` is the plain twin of `replayChildOps`: it works in desired space, where an op says
+exactly what it did, so it has none of that function's three refusals and must stay a line-for-line
+mirror of `linkAppend` / `linkBefore` / `unlink`. `verifyDesired` compares its output against
+`node.children` under the same `SYMBIOTE_VERIFY_REPLAY` switch. 40 000 programs x 400 steps agree.
+
+It caught the aliasing hazard immediately: `childrenOf` returns `node.children` BY REFERENCE, so
+storing it made the record ALIAS the live list — the next cycle then replayed its ops onto a base
+that already held them, which REORDERS, because the replay removes a child by identity before
+re-inserting it. Exactly what `snapshotCommittedChildren` exists to prevent for `record.children`,
+one field over and with nothing protecting it.
+
+### 4c is NOT blocked on what this file said, and the real blocker is smaller and sharper
+
+**The recorded blocker was wrong and is withdrawn.** It read: the mirror cannot answer "this node's
+desired children, in order", because `record.children` is the RENDERABLE list and `record.skipped`
+loses where the skipped nodes sat — so giving the record a desired list is renaming the skeleton
+rather than removing it. The first clause was true of the record as it stood and is now false
+(`IMirror.desired`), and the second does not follow: a field the MUTATION writes eagerly and a field
+the COMMIT derives from the buffer are not the same thing wearing two names, and only the second can
+be handed to a native drain.
+
+What actually stands in the way is one consumer, and it is not in the commit at all:
+
+```
+the commit walk           record + ops                     covered, 4c-1 and 4c-2
+the flatten and oracle    same                             covered
+snapshotCommittedChildren disappears with the aliasing      covered
+host-access, hasPendingChild, the container's three reads   answerable from the record
+sweepDroppedEdits -> dropSubtree                            NOT covered — see below
+```
+
+`dropSubtree` DISCARDS a detached node's op log. That is harmless today because `node.children` is
+authoritative; after the switch it is the node's only structure, and a subtree that is parked across
+a commit and re-attached later comes back EMPTY. Svelte parks live subtrees, so the shape is real.
+
+Two repairs, and the choice is the open question rather than the effort:
+
+- **Fold before dropping.** The sweep computes the node's desired list and writes it into
+  `record.desired` before deleting the entry. Lossless and it pins nothing — the record lives on the
+  node. It covers every node that has ever committed, which is the mass case (`Clear` on a mounted
+  list). It does NOT cover a node that has never committed, whose ops are its only structure, so
+  those entries must be retained instead.
+- **Make the buffer WEAK.** `pendingPath` / `pendingProps` as `WeakSet` and `pendingStructure` as
+  `WeakMap` — every use is `has`/`get`/`set`/`delete`, so it is mechanical — and the whole
+  nominate-then-sweep machinery is deleted: a dead subtree is collected, entries and all. It also
+  fixes a live hazard the sweep has, which is that a node parked ACROSS commits loses a pending prop
+  write. The cost is `pendingEditCount`, the process-wide oracle three rows assert on; the
+  anchor-log row it exists for has a better per-node oracle now (`pendingChildOps(anchor)` after
+  each commit).
+
+**The general form, because it outlives this item: the desired list can be removed for every node the
+commit TRACKS, and the hard cases are all nodes it does not — built, parked, or discarded outside the
+committed tree. Making the mirror native does not help those, because they have no mirror.** They go
+when the engine stops being ASKED, which is the second half of the goal: the framework already holds
+its own tree, so a navigation query it can answer should not reach us at all.
 
 ### The two attribution holes that must stay closed, and how to look for a third
 
