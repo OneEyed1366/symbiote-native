@@ -1092,7 +1092,10 @@ commit so a reader can diff rather than re-derive.
 8   our own JSI host object — SPLIT, see 0' and below         DECIDED     nothing; 8a starts now
 8a  detach stops reading the parent (declarative insert op)   NEXT        — pure JS, no device
 8b  the node table: parent/firstChild/nextSibling as a
-    typed-array VIEW over native memory                       OPEN        8a, and a native package
+    typed-array VIEW over native memory                       PRICED      see 0'' — the table is
+                                                                          FREE, only id RECLAMATION
+                                                                          costs, and that is the
+                                                                          open question
 8c  pendingRoot_ + cloneMultiple + the commit hook            OPEN        8b
 ```
 
@@ -1574,6 +1577,71 @@ repair commit. 4c-3 deleted `node.children` and left three reads of it in `recon
 had been throwing on every row for a day with nothing red anywhere. **An instrument rots silently
 until the moment someone needs it, and that moment is always mid-decision** — run it after any edit
 to the mutation API, not only when a number is wanted.
+
+### 0'' — 8b PRICED 2026-09-07: the typed-array table is FREE; only id RECLAMATION costs 17%
+
+0' concluded that structure must be READ from a typed-array view rather than called for over JSI.
+The obvious next question is what that view costs, and the answer splits in a way that decides 8b's
+whole shape. Spike: `parentOf` alone answered from an `Int32Array` row plus a tid→node lookup, with
+`childrenOf` left on record+ops so the arms differ by one mechanism. Same interleaved protocol as
+4c-4, four arms per side, reading `min`:
+
+```
+                             create 1000      replace 1000     create 10 000
+field (today)                0.808-0.858      1.079-1.164      20.93-23.24
+Int32Array + STRONG array    0.845-0.852      1.100-1.128      21.07-22.18    inside the baseline
+Int32Array + WeakRef         0.947-0.988      1.160-1.221      22.53-23.26    +17% on create 1000
+WeakMap (4c-4, rejected)     +32%             +27%             +16%
+```
+
+**The strong-array arm lies INSIDE the field's own spread on every row**, so an `Int32Array` row
+plus an array index is indistinguishable from a field read. That is the load-bearing result: the
+structure can leave the node object for nothing.
+
+**The entire +17% is one `WeakRef` allocation per node, and the shape of the numbers says so** — it
+lands on `create 1000` (+140 ns/node) and vanishes on `create 10 000`, which is dominated by the
+flat parent's child-set re-append. A per-read cost would scale with the bigger row; a per-creation
+cost cannot.
+
+So the open question is not "is a native table affordable" — it is **how to reclaim an id on
+Hermes**, and that is where the runtime constrains the design:
+
+```
+WeakRef               SHIPS. RN's own Fantom itests construct one (ShadowNodeReferenceCounter-itest.js,
+                      VirtualView-itest.js) and Fantom runs on Hermes. The Hermes Features.md that
+                      lists it "in progress" is STALE — do not quote it.
+FinalizationRegistry  ZERO hits across react-native's src/ and Libraries/. Assume absent, so
+                      reclamation must be PULL (sweep for dead refs) and cannot be push.
+TypedArrays           supported.
+```
+
+An id-indexed table needs reclamation because a node's id row outlives the node otherwise, and the
+growth is unbounded on any list that scrolls. **A commit-time sweep cannot decide death** — Svelte
+parks live subtrees across commits, which is recorded and already paid for once (the weak-buffer
+change, 4c-3). So WeakRef sweeping is the only mechanism the runtime offers.
+
+**The refinement worth trying before accepting 17%, and it follows from where the cost landed.**
+The hot path never needs an OBJECT: `detach` reads the parent only to record an op against it, and
+the bubble only climbs. Both work in tid space. Only the framework boundary (`host-access`'s
+`firstChildOf` / `nextSiblingOf` / `parentOf`) must hand back a real node, and that is ~0 calls on a
+create against ~4 000 on a keyed swap. So: **keep the hot path in tids and allocate the WeakRef
+LAZILY, on the first resolution of a tid back to a node.** A create then allocates none, and the
+swap pays for the few thousand it actually resolves.
+
+That is unmeasured. What is measured is that the table itself is free, so the next arm is worth
+running rather than reasoning about.
+
+**Two method notes from this run, both of which nearly cost the measurement.**
+
+`npx tsc --build` in a worktree with no `node_modules` resolves to a DECOY package that prints
+nothing, and the rtk wrapper reported "TypeScript compilation completed" over it — a false green of
+exactly the shape `test-harness-false-greens.md` §6 records, arrived at from a new direction (the
+tool was missing, not lying). `rtk proxy` showed the decoy's real banner. Install first, and never
+read a bare `tsc` exit through the wrapper.
+
+And a fresh worktree can be many commits BEHIND the branch it is on — this one was 8 behind, so the
+first `git log` showed a tree without any of 4c. Fetch and compare against the remote before reading
+any file as current.
 
 ### The two attribution holes that must stay closed, and how to look for a third
 
