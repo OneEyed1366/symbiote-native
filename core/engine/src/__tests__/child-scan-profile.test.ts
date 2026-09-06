@@ -22,6 +22,7 @@ import {
   createSurface,
   readCommitProfile,
   setProp,
+  setText,
   type ISymbioteNode,
 } from '../index';
 
@@ -87,6 +88,15 @@ describe('renderableChildren scan counters', () => {
       surface.appendChild(parent);
       surface.commit();
 
+      // The SECOND commit is where the flatten happens, and that is item 5 rather than a wart in
+      // the fixture: as of 2026-09-06 a create replays even for a parent holding an anchor, so the
+      // first commit reaches `renderableChildren` never. An edit UNDER the anchor is what poisons
+      // this parent's log (`markRenderableAncestor`, node.ts) and sends it back to the derivation —
+      // which is the production shape these counters exist to price.
+      readCommitProfile();
+      appendChild(anchor, view('behind-anchor-2'));
+      surface.commit();
+
       const profile = readCommitProfile();
       expect(profile.childFlattens, 'the anchor defeats the probe').toBe(1);
       expect(
@@ -105,9 +115,18 @@ describe('renderableChildren scan counters', () => {
     it('counts an empty raw text as a defeating child too', () => {
       const parent = createElement('RCTText', true);
       setProp(parent, 'testID', 'text-parent');
-      appendChild(parent, createRawText(''));
+      const flipper = createRawText('present');
+      appendChild(parent, flipper);
       appendChild(parent, createRawText('real'));
       surface.appendChild(parent);
+      surface.commit();
+
+      // Same reason as the case above — the create replays — and this one has no anchor to edit
+      // under. What poisons a text parent is the PRESENCE FLIP itself: emptying a raw text takes it
+      // out of the parent's renderable list, which `markPresenceIfFlipped` records against the
+      // parent. So the flip both arms the derivation and is the thing being counted.
+      readCommitProfile();
+      setText(flipper, '');
       surface.commit();
 
       expect(

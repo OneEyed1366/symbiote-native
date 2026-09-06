@@ -277,15 +277,76 @@ function isSkippedAtCommit(node: ISymbioteNode): boolean {
 // an anchor's own skipped children are the outer node's to drain too.
 const skippedScratch: ISymbioteNode[] = [];
 const NO_SKIPPED: readonly ISymbioteNode[] = [];
+// Set by the flatten when a skipped child contributed children of its own. Same scratch discipline
+// as `skippedScratch` — written by the recursion, read by the one caller immediately after.
+let hoistedScratch = false;
 
 function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
   skippedScratch.length = 0;
+  hoistedScratch = false;
   return flattenRenderable(node);
 }
 
 /** What `renderableChildren` dropped on its last call. Valid only until the next one. */
 function takeSkipped(): readonly ISymbioteNode[] {
   return skippedScratch.length === 0 ? NO_SKIPPED : skippedScratch.slice();
+}
+
+/** Whether that call HOISTED — see `IMirror.hoists` for why the two are different questions. */
+function takeHoisted(): boolean {
+  return hoistedScratch;
+}
+
+interface IFlattened {
+  renderable: ISymbioteNode[];
+  skipped: ISymbioteNode[];
+  hoists: boolean;
+}
+
+/**
+ * What a node's children contribute to its renderable list, which of them are hidden, and whether
+ * any hidden one CONTRIBUTED — computed WITHOUT touching the buffer.
+ *
+ * `renderableChildren` is the production derivation and it has SIDE EFFECTS — it drains skipped
+ * children and drops their records — so it cannot be used to ANSWER a question, only to perform
+ * one. This one only reads, which is what makes it safe to call from inside a replay that may still
+ * refuse, and from the verification below.
+ *
+ * Returns both halves because they are both needed and the second is not bookkeeping: an anchor
+ * nested inside an anchor is a node the walk never visits and never drains, so a `skipped` list
+ * naming only the outer one leaves the inner one pending forever — which swallows every later mark
+ * from its subtree.
+ */
+function flattenPure(node: ISymbioteNode): IFlattened {
+  const renderable: ISymbioteNode[] = [];
+  const skipped: ISymbioteNode[] = [];
+  let hoists = false;
+  const kids = childrenOf(node);
+  // Counted as a scan, because it IS one — this reads a child list, and the whole point of these
+  // counters is what the commit READS. It is a much smaller read than the one it replaces (an
+  // anchor's own children, not the parent's whole list), and pricing it honestly is what lets the
+  // probe state the halving rather than claim the reads went away.
+  childScan.scans += 1;
+  childScan.probed += kids.length;
+  for (const child of kids) {
+    if (!isSkippedAtCommit(child)) {
+      renderable.push(child);
+      continue;
+    }
+    skipped.push(child);
+    if (!isAnchor(child)) continue;
+    const inner = flattenPure(child);
+    if (inner.renderable.length > 0) hoists = true;
+    renderable.push(...inner.renderable);
+    skipped.push(...inner.skipped);
+  }
+  return { renderable, skipped, hoists };
+}
+
+interface IReplayed {
+  children: ISymbioteNode[];
+  skipped: ISymbioteNode[];
+  hoists: boolean;
 }
 
 /**
@@ -297,51 +358,217 @@ function takeSkipped(): readonly ISymbioteNode[] {
  * the base is empty and the log is its whole child list, which is what takes the last structural
  * read out of the create path.
  *
- * ── THE PRECONDITION, and it is ONE fact, not a list ─────────────────────────────────────────────
+ * ── SKIPPED CHILDREN ARE POSITIONS, NOT NODES (item 5) ───────────────────────────────────────────
  *
- * The base is the RENDERABLE list and the ops are in DESIRED space, so a replay is only sound while
- * THE TWO ARE THE SAME LIST — that is, while this parent holds no skipped child. The caller checks
- * that (`committed.skipped` empty, or no record at all, which is a node that has never committed),
- * and this function checks the half the caller cannot: a child arriving THIS cycle that is itself
- * skipped, which would put an anchor into a renderable list.
+ * The base is the RENDERABLE list and the ops are in DESIRED space, so the two lists are the same
+ * list only while the parent holds no skipped child. That used to be the precondition, and it cost
+ * the whole replay to any parent holding one anchor — which on Angular is every composed component
+ * and on Vue every `v-if`.
  *
- * Under that precondition every step matches its mutation-side twin exactly: `out.indexOf` answers
- * what `parent.children.indexOf` answered, a `before` the list does not hold appends — which is
- * what `linkBefore` does with a `beforeChild` it cannot find, and what every framework's
- * `insertBefore(…, null)` means — and the ops replay in issue order, so an intermediate state is
- * reproduced rather than approximated.
+ * It is not the actual requirement. What a replay needs is that each op's effect on the RENDERABLE
+ * list be computable, and a skipped child's effect is exactly its CONTRIBUTION: nothing at all for
+ * the common childless marker (Vue's `createComment`, Svelte's `ShimComment`, an empty raw text),
+ * and its own flattened children for a hoisting anchor. So the ops splice contributions rather than
+ * nodes, and a parent holding markers replays like any other.
  *
- * FOUND BY THE FUZZER, ORACLE 1, before this precondition existed. The refusal used to be per-op
- * (`op.child` or `op.before` skipped) and that is NOT enough: with an anchor among the parent's
- * children, a `before` naming one of the anchor's FLATTENED grandchildren is absent from
- * `parent.children` — so `linkBefore` appends — and present in the renderable base — so the replay
- * inserted in the middle. Two lists, one index, silently different trees. The per-op check could
- * not see it because neither node in the op is skipped; the ANCHOR is, and it is not in the op.
+ * ── WHAT STILL REFUSES — THREE THINGS, AND EACH HAS ITS OWN BREAK-TEST ─────────────────────────
+ *
+ *   an op naming a node    its contribution is a BLOCK of `out` whose extent this function does not
+ *   the base HIDES         hold, and recomputing it is unsound. This is the one refusal that is not
+ *                          about a position; the body says why.
+ *   `hoists` + a `before`  a hoisted grandchild is IN the renderable list and NOT in the desired
+ *                          one, so `out.indexOf(before)` can find a node `parent.children.indexOf`
+ *                          would miss — where `linkBefore` appends, the replay would insert
+ *                          mid-way. FOUND BY THE FUZZER, ORACLE 1, when the refusal was per-op:
+ *                          neither node in the op is skipped, so a per-op check cannot see it —
+ *                          the ANCHOR is, and it is not in the op.
+ *   a `before` that is     a childless marker paints nothing, so there is no renderable slot in
+ *   itself SKIPPED         front of it. Also the fuzzer, ORACLE 1.
+ *
+ * `before === undefined` — an append — is always exact whatever the parent holds, which is why the
+ * create and append paths replay in full. And a `before` the list simply does not hold is NOT a
+ * refusal; see the comment at that line for why appending there is the exact answer rather than the
+ * lenient one.
  *
  * Two hazards a reader will look for are handled elsewhere and deliberately not here. A
  * skipped-ness FLIP mid-cycle poisons the parent's log to `null` (`markPresenceIfFlipped`,
  * node.ts), so `isSkippedAtCommit` reading the node's state at COMMIT time cannot disagree with
  * what it was at op time. And an edit UNDER an anchor poisons the renderable ancestor's log the
- * same way (`markRenderableAncestor`).
+ * same way (`markRenderableAncestor`) — which is what makes `flattenPure(anchor)` computed HERE
+ * equal to the contribution the base was built from.
+ *
+ * A third hole those two leave — a node removed from this parent and then un-skipped while DETACHED,
+ * where `markPresenceIfFlipped` finds no parent to poison — briefly had a precondition of its own at
+ * the call site. It is subsumed by the first refusal above (leaving takes an op naming the child),
+ * break-tested, and removed.
  */
 function replayChildOps(
   base: readonly ISymbioteNode[],
+  baseSkipped: readonly ISymbioteNode[],
+  baseHoists: boolean,
   ops: readonly IEditOp[],
-): ISymbioteNode[] | undefined {
+): IReplayed | undefined {
   const out = base.slice();
+  // Every node the base hid, DIRECT children and the nested ones inside an anchor alike — the same
+  // set `IMirror.skipped` carries, and for the same reason: an inner anchor is a node the walk
+  // never visits and never drains.
+  const hidden = new Set<ISymbioteNode>(baseSkipped);
+  // Monotone within a replay: a hoisting anchor inserted mid-log makes every later `before` op
+  // ambiguous, and one REMOVED mid-log leaves the flag standing. Over-reporting costs a refusal on
+  // the next cycle; under-reporting would commit a wrong list, so the asymmetry is deliberate.
+  let hoists = baseHoists;
+
   for (const op of ops) {
-    if (isSkippedAtCommit(op.child)) return undefined;
-    const index = out.indexOf(op.child);
-    if (index >= 0) out.splice(index, 1);
+    // An op naming a node this parent HIDES, and it is the one refusal that is not about a
+    // position. A hidden child occupies a BLOCK of `out` — empty for a marker, its flattened
+    // subtree for a hoisting anchor — and this function does not hold that block's extent.
+    // Recomputing it is not sound: `markRenderableAncestor` climbs from the anchor, so once the
+    // anchor is detached from this parent there is nothing left to poison, and its children can
+    // then be edited with the parent's log still reading replayable.
+    //
+    // FOUND BY THE DIFFERENTIAL, on this change's first 15 000-program run: an anchor removed from
+    // its parent and then emptied in the SAME cycle left its old contribution standing in the
+    // replayed list, where the derivation had dropped it. The base's `hoists` was true and its
+    // `skipped` was intact, so nothing cheaper than this could see it.
+    if (hidden.has(op.child)) return undefined;
+
+    // Absent is not an error: an op can name a child inserted and removed within one cycle, and
+    // the mutation side's own splice is equally tolerant.
+    const removeAt = out.indexOf(op.child);
+    if (removeAt >= 0) out.splice(removeAt, 1);
+
     if (op.remove) continue;
-    if (op.before === undefined) {
-      out.push(op.child);
-      continue;
+
+    // ── resolve the position ──
+    let at = out.length;
+    // `before` is TYPED as a node and is not always one. Solid's `insertNode` narrows its anchor on
+    // `!== undefined` and lets a `null` through, so `insertBefore(parent, child, null)` reaches the
+    // engine — where `linkBefore` reads it as an APPEND, because `indexOf(null)` is -1. The replay
+    // has to answer the same way, and the nullish coalesce is load-bearing rather than defensive:
+    // the line below it reads `op.before.component`, which throws on `null`.
+    //
+    // Cost of getting this wrong, measured 2026-09-06: 30 red tests across six Solid suites, all
+    // reporting a MISSING SUBTREE (`no RCTScrollView was committed`) because the throw was
+    // swallowed by the adapter's render guard. Nothing named the engine.
+    const before = op.before ?? undefined;
+    if (before !== undefined) {
+      if (hoists) return undefined;
+      if (isSkippedAtCommit(before)) return undefined;
+      // NOT a refusal, and the asymmetry with the line above is the point. A `before` this list
+      // does not hold is not a desired child either — `out` carries every renderable direct child,
+      // and a non-skipped desired child IS renderable — so `linkBefore` appended, and appending
+      // here reproduces it exactly. Refusing instead was tried and is strictly worse: it costs a
+      // re-derive on a shape frameworks do emit, and it made the refusal above unwitnessable by
+      // catching its cases first (`.claude/rules/test-harness-false-greens.md` §20).
+      const found = out.indexOf(before);
+      at = found < 0 ? out.length : found;
     }
-    const at = out.indexOf(op.before);
-    out.splice(at < 0 ? out.length : at, 0, op.child);
+
+    // ── put this child's contribution in ──
+    if (isSkippedAtCommit(op.child)) {
+      const now = flattenPure(op.child);
+      if (now.renderable.length > 0) {
+        out.splice(at, 0, ...now.renderable);
+        hoists = true;
+      }
+      hidden.add(op.child);
+      for (const nested of now.skipped) hidden.add(nested);
+    } else {
+      out.splice(at, 0, op.child);
+    }
   }
-  return out;
+  return {
+    children: out,
+    skipped: hidden.size === 0 ? [] : [...hidden],
+    hoists,
+  };
+}
+
+// ── THE DIFFERENTIAL: a replayed list, checked against a derived one ────────────────────────────
+//
+// `replayChildOps` and `flattenRenderable` are two implementations of one answer, and the whole
+// value of the first is that the second never runs. That is also what makes a divergence between
+// them SILENT — a wrong list commits a wrong tree and nothing anywhere compares the two.
+//
+// So this compares them, on demand. Off by default and worth exactly one boolean read per replayed
+// node; on, every replay is re-derived through `flattenPure` (the side-effect-free twin of the
+// flatten — see there) and any disagreement THROWS at the node that produced it rather than
+// surfacing as a misrendered screen three commits later.
+//
+// It is a permanent switchable guard rather than a temporary probe because the refusal set above is
+// a list of shapes someone reasoned about, and the fuzzer has already found four positions that
+// reasoning missed. `commit-fuzz.test.ts` turns it on for every generated program, which is what
+// makes a new refusal cheap to get wrong safely: the next hole fails as an exception naming the
+// parent, not as a stale row.
+//
+// SYMBIOTE_VERIFY_REPLAY=1 turns it on for a whole process (a headless smoke, a device bundle built
+// with it inlined); `setReplayVerification` is the per-test switch.
+const envVerifyReplay =
+  typeof process !== 'undefined' && process.env.SYMBIOTE_VERIFY_REPLAY === '1';
+let verifyReplayOn = envVerifyReplay;
+
+/** Turn the replay differential on or off; returns the previous setting so a test can restore it. */
+export function setReplayVerification(on: boolean): boolean {
+  const previous = verifyReplayOn;
+  verifyReplayOn = on;
+  return previous;
+}
+
+function sameNodes(
+  a: readonly ISymbioteNode[],
+  b: readonly ISymbioteNode[],
+): boolean {
+  return a.length === b.length && a.every((node, index) => node === b[index]);
+}
+
+function verifyReplay(
+  node: ISymbioteNode,
+  replayed: IReplayed,
+  base: readonly ISymbioteNode[],
+  ops: readonly IEditOp[],
+): void {
+  if (!verifyReplayOn) return;
+  // The verification must not move the instrument. `flattenPure` counts as a scan, so a run with
+  // the differential on would report reads the production path never performs — and every counter
+  // assertion in the suite would then be measuring the checker.
+  const before = { ...childScan };
+  const truth = flattenPure(node);
+  Object.assign(childScan, before);
+  const skippedAgrees =
+    truth.skipped.length === replayed.skipped.length &&
+    truth.skipped.every(child => replayed.skipped.includes(child));
+  // `hoists` is compared one-sided ON PURPOSE: the replay is documented as monotone, so it may
+  // stand true after the hoisting anchor leaves. What is never allowed is the other direction — a
+  // replay claiming no hoisting while the derived list holds a grandchild, which is exactly the
+  // state that makes the next cycle's `before` resolution wrong.
+  if (
+    sameNodes(truth.renderable, replayed.children) &&
+    skippedAgrees &&
+    (replayed.hoists || !truth.hoists)
+  ) {
+    return;
+  }
+  // The message is a REPRODUCTION rather than a verdict: the base it started from, the ops it
+  // replayed, and the desired list the derivation read. A divergence is always one op's effect on
+  // one list, and those three are what identify which.
+  const describe = (list: readonly ISymbioteNode[]): string =>
+    `[${list.map(debugNodeId).join(',')}]`;
+  throw new Error(
+    `replay diverged at ${debugNodeId(node)}: ` +
+      `children replay=${describe(replayed.children)} ` +
+      `derived=${describe(truth.renderable)} ` +
+      `skipped replay=${describe(replayed.skipped)} ` +
+      `derived=${describe(truth.skipped)} ` +
+      `hoists replay=${replayed.hoists} derived=${truth.hoists} ` +
+      `base=${describe(base)} desired=${describe(childrenOf(node))} ops=[${ops
+        .map(
+          op =>
+            `${op.remove ? '-' : '+'}${debugNodeId(op.child)}${
+              op.before === undefined ? '' : `@${debugNodeId(op.before)}`
+            }`,
+        )
+        .join(',')}]`,
+  );
 }
 
 function flattenRenderable(node: ISymbioteNode): readonly ISymbioteNode[] {
@@ -401,7 +628,11 @@ function flattenRenderable(node: ISymbioteNode): readonly ISymbioteNode[] {
       // direction. Found by the fuzzer one value after its generator learned to write '' — see
       // `skipped-node-family.test.ts` for the ten-step reproduction it shrank to.
       child.committed = undefined;
-      if (isAnchor(child)) children.push(...flattenRenderable(child));
+      if (isAnchor(child)) {
+        const before = children.length;
+        children.push(...flattenRenderable(child));
+        if (children.length > before) hoistedScratch = true;
+      }
     } else children.push(child);
   }
   return children;
@@ -540,14 +771,35 @@ function reconcile(
   // nothing to reuse and the flatten is needed anyway.
   let kids: readonly ISymbioteNode[];
   let skipped: readonly ISymbioteNode[];
+  // See `IMirror.hoists`: whether any of `skipped` put children of its own into `kids`. Carried
+  // rather than re-derived because the next cycle's replay needs it before it has looked at a
+  // single child.
+  let hoists: boolean;
   // The one thing a reused or replayed list still owes, and the reason the record carries `skipped`
   // at all. A node the walk drops has no commit of its own, so the ONLY code that ever drained its
   // buffer entry is the flatten we are about to skip — and an anchor accumulates one from any mark
   // that bubbles through it. Left standing it swallows every later mark from its subtree, which is
   // the silent stale-UI class this whole file is careful about. Empty for every node holding no
   // anchor and no empty raw text, so the common case is one length read.
+  //
+  // The reuse path drains only the pending WORK, because its skipped set is by construction the one
+  // the flatten already saw: it carried out the other two lines then, and both are idempotent. The
+  // replay path can GAIN a member (an anchor appended this cycle), so it owes all three — see
+  // `hideSkipped`.
   const drainSkipped = (list: readonly ISymbioteNode[]): void => {
     for (const child of list) clearPendingWork(child);
+  };
+  // What `flattenRenderable` does to every skipped child it drops, done for a list the replay
+  // produced instead. The three lines are copied deliberately rather than shared: each has its own
+  // reason, all three are written out at the flatten, and a replayed list that skips any one of
+  // them is a silent stale-UI bug of exactly the kind that comment enumerates. Idempotent, so
+  // re-running them on a member the base already had costs a no-op.
+  const hideSkipped = (list: readonly ISymbioteNode[]): void => {
+    for (const child of list) {
+      clearPendingWork(child);
+      clearPendingStructure(child);
+      child.committed = undefined;
+    }
   };
   // `!recreating` is deliberate and was briefly missing. A node being re-created CAN reuse its list
   // safely — the children are the same nodes and each gets `forceFreshFamily` — but doing so is a
@@ -558,29 +810,42 @@ function reconcile(
     profile.childListsReused += 1;
     kids = committed.children;
     skipped = committed.skipped;
+    hoists = committed.hoists;
     drainSkipped(skipped);
   } else {
-    // The precondition `replayChildOps` cannot check for itself: this parent's renderable list and
-    // its desired list must be the SAME list, which they are exactly while it holds no skipped
-    // child. A node with no record has never committed and holds none by construction.
-    const replayable =
-      childOps !== undefined &&
-      childOps !== null &&
-      (committed === undefined || committed.skipped.length === 0);
+    // A node with no record has never committed; one with a `null` log had an unreplayable change.
+    //
+    // There is NO third condition here, and an earlier draft of item 5 carried one — that every
+    // node the base hid still answers `isSkippedAtCommit`, guarding a hidden child un-skipped while
+    // DETACHED (where `markPresenceIfFlipped` marks `parentOf`, and finds nobody). It is subsumed:
+    // leaving this parent takes an op naming the child, and `replayChildOps` refuses any op naming
+    // a node the base hid. Break-tested — removing it moved nothing, and the guard that DOES cover
+    // it reddens three rows.
+    const replayable = childOps !== undefined && childOps !== null;
     const replayed = replayable
-      ? replayChildOps(committed?.children ?? NO_SKIPPED, childOps)
+      ? replayChildOps(
+          committed?.children ?? NO_SKIPPED,
+          committed?.skipped ?? NO_SKIPPED,
+          committed?.hoists ?? false,
+          childOps,
+        )
       : undefined;
     if (replayed !== undefined) {
       profile.childListsReplayed += 1;
-      kids = replayed;
-      // Unchanged by construction: any op touching a skipped node makes the replay refuse, and any
-      // skipped-ness FLIP poisons the log, so a replayed list has exactly the skipped children the
-      // record already named. A node with no record has none — an anchor child would have refused.
-      skipped = committed?.skipped ?? NO_SKIPPED;
-      drainSkipped(skipped);
+      kids = replayed.children;
+      skipped = replayed.skipped;
+      hoists = replayed.hoists;
+      hideSkipped(skipped);
+      verifyReplay(
+        node,
+        replayed,
+        committed?.children ?? NO_SKIPPED,
+        childOps ?? [],
+      );
     } else {
       kids = renderableChildren(node);
       skipped = takeSkipped();
+      hoists = takeHoisted();
     }
     // Written HERE and not with the rest of the record below, and the reason is a real failure
     // rather than tidiness. The update path returns early for a node whose children and props both
@@ -589,7 +854,10 @@ function reconcile(
     // parent. That early return then skipped the write, the next commit reused a `skipped` list
     // that did not name the anchor, and the anchor's buffer entry was never drained again.
     // Reported by the fuzzer as ORACLE 4 in five steps within a minute of the reuse landing.
-    if (!recreating && committed !== undefined) committed.skipped = skipped;
+    if (!recreating && committed !== undefined) {
+      committed.skipped = skipped;
+      committed.hoists = hoists;
+    }
   }
 
   if (recreating) {
@@ -680,6 +948,7 @@ function reconcile(
       props,
       children: kids,
       skipped,
+      hoists,
       viewName,
       parent: renderableParent,
       owner: node,

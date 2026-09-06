@@ -105,6 +105,7 @@ import {
 import { fabricProps } from '../fabric-props';
 import { hasPendingStructure, hasPendingWork } from '../edit-buffer';
 import { createSurface, type SymbioteSurface } from '../surface';
+import { setReplayVerification } from '../commit';
 
 // mulberry32 — a seeded PRNG, so a failure names a seed that reproduces it exactly. `Math.random`
 // would make a red run unreproducible, which for a fuzzer is the difference between a bug report
@@ -443,6 +444,15 @@ function findViolation(
 
 const fabric = installFabric();
 let nextRootTag = 1000;
+
+// The SIXTH oracle, and it lives in the engine rather than here because it needs the two lists at
+// the moment the commit chooses between them. `replayChildOps` rebuilds a parent's renderable list
+// from its op log INSTEAD of deriving it; with this on, every replay is also derived and the two
+// are compared, so a divergence throws at the node that produced it. Off in production, on for
+// every generated program here — see `setReplayVerification` (commit.ts) for why it is a permanent
+// switch and not a probe. A throw surfaces below as `run()`'s caught error, so it shrinks like any
+// other violation.
+setReplayVerification(true);
 
 /**
  * Execute a program against a fresh surface and return the first violation, or undefined.

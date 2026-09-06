@@ -990,8 +990,8 @@ can satisfy and would hide which half is actually done.
 
 ## 8. THE WORK ORDER — read this before starting anything in this file
 
-Status as of 2026-09-05, end of session. Every item names what it depends on, and the ones marked
-LANDED name the commit so a reader can diff rather than re-derive.
+Status as of 2026-09-06. Every item names what it depends on, and the ones marked LANDED name the
+commit so a reader can diff rather than re-derive.
 
 ```
                                                               status      blocked on
@@ -1003,9 +1003,7 @@ LANDED name the commit so a reader can diff rather than re-derive.
 4b  the ordered op log, replayed by the commit                LANDED      —
 4c  node.children / node.parent deleted outright              OPEN        a non-JS base for the
                                                                           desired order — see below
-5   anchors stop being NODES and become POSITIONS             ATTEMPTED   nothing — but read
-                                                                          "Item 5, attempted"
-                                                                          below before retrying
+5   anchors stop being NODES and become POSITIONS             LANDED      —
 6   setNativeProps arm for prop-only rows                     OPEN        —
 7   the address rides on the framework's own object           AFTER 4     —
 8   our own JSI host object (pendingRoot_ + cloneMultiple)    OPEN        0, and a measured
@@ -1030,8 +1028,9 @@ is free. `NativeDOM` already ships `getChildNodes` / `getParentNode` (§1a), so 
 measured from JS with zero native work; `examples/react/screens/JsiNavigationCostScreen.tsx`
 exists for exactly this.
 
-**Item 5 was NOT a prerequisite for 4, and is now the thing 4b is waiting on — CORRECTED
-2026-09-05 by measuring it.** The paragraph here read: an anchor has no Fabric node, so no native
+**Item 5 was NOT a prerequisite for 4, and was the thing 4b was waiting on — CORRECTED 2026-09-05
+by measuring it, and CLOSED 2026-09-06 when item 5 landed; the reasoning error below is why it is
+kept.** The paragraph here read: an anchor has no Fabric node, so no native
 structure can hold one, which makes it a blocker for the NATIVE branch and irrelevant to a JS
 drain, "which handles anchors exactly as the walk does today". Every clause is still true and the
 conclusion no longer follows. "Handles them as the walk does" is exactly the cost: 4b's replay
@@ -1160,68 +1159,95 @@ not in the op.
 So **item 5 is no longer "only if the native branch is taken"** — it is what makes 4b work for the
 one adapter that mounts an anchor per component, and it needs no device.
 
-### Item 5, ATTEMPTED 2026-09-05 and REVERTED — the measurements are worth more than the code
+That prediction held: item 5 took this row's `childrenOf` from 2 004 to 1 004 and its `childScans`
+from 2 001 to 1 001, with the flatten not reached at all. The next section is what shipped.
 
-Built, measured, fuzzed, and taken back out. The numbers are good and the implementation kept
-producing correctness bugs in the hottest path in the engine, so what survives is this section.
+### Item 5, LANDED 2026-09-06 — an anchor is a POSITION, and the four numbers that say so
+
+Attempted 2026-09-05, reverted the same day after five fuzzer-found bugs, and finished 2026-09-06.
+The revert was the mistake: the loop was diagnosing one bug per run and it was stopped one round
+short. What follows is what shipped, and the sequencing note is the transferable half — **the
+differential went in FIRST on the retry, before the replay it verifies.**
 
 **The split that makes it tractable, and it is the finding.** An anchor is not one thing. A
 CHILDLESS one — Vue's `createComment`, Svelte's `ShimComment`, Solid's empty text, Angular's own
 `createComment` — punches a hole in the renderable list and reorders nothing, so every renderable
-child is still a direct child in order and an op replay is exact. A HOISTING one — Angular's
-component hosts, a portal host — puts GRANDCHILDREN into the list, so a renderable node can be one
-the desired list has never heard of. 4b refuses both, on `skipped.length === 0`; only the second
-needs refusing. A `hoists` flag on the mirror, set by the flatten, draws the line.
+child is still a direct child in order. A HOISTING one — Angular's component hosts, a portal host —
+puts GRANDCHILDREN into the list, so a renderable node can be one the desired list has never heard
+of. 4b refused both, on `skipped.length === 0`; only the second needs refusing, and only for an op
+that carries a `before`. A `hoists` flag on the mirror, set by the flatten, draws the line.
 
-Measured at the `tree.ts` seam, 1 000 rows, one anchor per row:
-
-```
-                              create childrenOf   childScans      update
-no anchors                            4               1              5
-CHILDLESS anchor                   2004 -> 1004    2001 -> 1         5
-HOISTING anchor                    2004 -> 1004    2001 -> 1         5
-```
-
-The hoisting row needed the replay to SPLICE the anchor's renderable contribution at the position
-the op names — which is literally "an anchor is a position, not a node", done incrementally instead
-of by changing `createAnchor`'s contract. The residual 1 000 is `childrenOf` on each anchor once,
-O(1) per anchor against O(children) per parent.
-
-**Why it came back out.** Five rounds, five real bugs, every one found by the fuzzer and none by
-review:
+Measured at the `tree.ts` seam, 1 000 rows, one hoisting anchor per row, both arms on one machine:
 
 ```
-ORACLE 1   insert before a CHILDLESS anchor — no renderable slot, so `indexOf` misses and the
-           replay appends where `linkBefore` inserted mid-list
-ORACLE 5   a `before` REMOVED and then given text while DETACHED: by commit time it is not skipped
-           at all, so a skipped-ness guard waves it through
-ORACLE 1   `record.skipped` naming a node that un-skipped OFF-TREE, carried forward by the replay
-ORACLE 1   a node in the BASE that is skipped NOW — it has to leave the list, not just the set
-ORACLE 4   a NESTED anchor never entering the replay's skipped set, so it is never drained
+                         4b     item 5
+childrenOf() calls     2004       1004     the residual is each anchor's OWN list, read once
+childScans             2001       1001     O(1) per anchor against O(children) per parent
+childFlattens          1000          0     the derivation is not reached at all
+childListsReplayed     2001       3001     the rows replay now, and so does each anchor's child
 ```
 
-The fifth was still open when this was reverted. They are all the same shape — the replay is
-re-deriving `renderableChildren`'s semantics incrementally, and those semantics have more cases
-than they look like they have — and every one of them is silent on a device.
+The last row is what says the first three are not an accounting trick: work did not move somewhere
+unnamed, it stopped happening. Pinned by `child-list-reuse.probe.test.ts`.
 
-**What to carry into a retry.** Three things the attempt established:
+**How the ops splice.** A skipped child's effect on the renderable list is its CONTRIBUTION —
+nothing for a marker, its flattened subtree for a hoisting anchor — so the replay splices
+contributions instead of nodes. That is literally "an anchor is a position, not a node", done
+incrementally rather than by changing `createAnchor`'s contract.
 
-- **The `hoists` split is right and cheap**, and it is what makes the childless case (three
-  adapters' common marker) replayable at all.
-- **Skipped-ness is read at COMMIT time and can change after a node leaves its parent**, where
-  `markPresenceIfFlipped` has no parent to attribute to. Any state carried across a commit —
-  `skipped`, `hoists`, a base list — has to be revalidated against that, not assumed.
-- **Assert the replay's SIDE EFFECTS, not its result.** The replayed list matched an independent
-  pure re-derive on every single failing run; the bugs were in what the derive does BESIDES
-  returning a list (draining pending work, dropping records, tracking skipped nodes). A
-  differential on the return value alone reports green through all five.
+**The refusals that survive, and each is a position the renderable list cannot resolve:**
 
-And one method note that cost a round: the first differential called `renderableChildren`, which
-DRAINS. A check that mutates the state it is checking is not a check —
-`flattenPure` was written for that reason.
+```
+an op naming a node the base HIDES     its block's extent is not held, and recomputing it is
+                                       unsound — once the anchor is detached from this parent
+                                       there is nothing left for an edit under it to poison
+`hoists` and the op carries a `before` a `before` found in the renderable list may be a hoisted
+                                       grandchild, which `linkBefore` would have appended past
+a `before` that is SKIPPED             a marker paints nothing, so there is no slot in front of it
+```
 
-`skipped-presence-attribution.test.ts` keeps the detached-un-skip row, green today because the
-current refusal is wide enough to hide it, and red the moment that refusal is narrowed.
+`before === undefined` — an append — is always exact whatever the parent holds, which is why the
+create and append paths replay in full.
+
+**The five bugs the first attempt hit are all closed by the FIRST of those refusals**, and that is
+the thing the reverted session did not see. It kept trying to recompute a hidden child's old
+contribution; refusing to recompute it at all makes four of the five states unreachable and the
+fifth (a nested anchor never entering the replay's skipped set) fall out of tracking `flattenPure`'s
+`skipped` half. A sixth turned up on the retry's first 15 000-program run and is the same shape:
+an anchor removed from its parent and then EMPTIED in the same cycle left its old contribution
+standing.
+
+**Two things that must travel with this, both paid for once:**
+
+- **A `before` is typed as a node and is not always one.** Solid's `insertNode` narrows its anchor
+  on `!== undefined`, so `insertBefore(parent, child, null)` reaches the engine, where `linkBefore`
+  reads it as an append. 4b tolerated it by accident (`indexOf(null)` is -1); item 5 read
+  `before.component` and threw. Cost: 30 red tests across six Solid suites, every one reporting a
+  MISSING SUBTREE, because the adapter's render guard swallowed the throw. **Nothing in that output
+  named the engine**, and the bisect that found it took six arms.
+- **Refusing is not free, and an over-wide refusal hides a narrower one.** A `before` the renderable
+  list does not hold used to refuse; it appends now, matching `linkBefore` exactly — and the reason
+  is not only coverage. While it refused, it caught the skipped-`before` cases first, so THAT
+  refusal stayed green under its own break-test (`test-harness-false-greens.md` §20).
+
+**The break ledger is in `replay-child-ops.test.ts`**, six mechanisms broken separately with
+disjoint row sets. It also retired a third precondition the attempt had added — that every node the
+base hid still answers `isSkippedAtCommit` — which moved nothing when removed, because reaching that
+state takes an op naming the child and the first refusal already covers those.
+
+**And the differential is permanent.** `setReplayVerification` / `SYMBIOTE_VERIFY_REPLAY=1`
+(commit.ts) re-derives every replayed list through `flattenPure` and throws at the node that
+diverged; `commit-fuzz.test.ts` turns it on for every generated program, which is what makes the
+next refusal cheap to get wrong safely. It cost one method note the first time round: the first
+differential called `renderableChildren`, which DRAINS — a check that mutates what it checks is not
+a check, and `flattenPure` exists for that reason.
+
+**What the attempt got right about side effects still holds.** The replayed list matched a pure
+re-derive on every one of the first attempt's failing runs; the bugs were in what the derivation
+does BESIDES returning a list. So the replay path owes the flatten's other three lines
+(`clearPendingWork`, `clearPendingStructure`, `child.committed = undefined`) on the children it
+hides — the last two are witnessed by their own rows, and without the third a node that becomes an
+anchor off-tree carries a stale Fabric FAMILY back, which is a native abort rather than a misrender.
 
 ### The leak the log introduces, because the next log will introduce it too
 

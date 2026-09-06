@@ -303,6 +303,17 @@ export interface IMirror {
   // stale-UI bug — `markDirty` stops at the first already-recorded ancestor, so a permanently
   // pending skipped node swallows every later mark from its subtree.
   skipped: readonly ISymbioteNode[];
+  // Whether any of those skipped children CONTRIBUTED children of its own to `children` above — an
+  // anchor flattened away that left its subtree in its place. False for the common marker anchor,
+  // which is childless (Vue's `createComment`, Svelte's `ShimComment`, Solid's empty text) and
+  // simply vanishes.
+  //
+  // The distinction is why this is a flag and not `skipped.length > 0`. A childless skipped child
+  // removes a slot and reorders nothing, so this node's renderable list is still its desired list
+  // with holes punched in it. A HOISTING one puts grandchildren into the list, so a renderable node
+  // can be one the desired list has never heard of — and an op positioned relative to it means two
+  // different things in the two lists. See `replayChildOps` (commit.ts).
+  hoists: boolean;
   viewName: string;
   parent: ISymbioteNode | undefined;
   // Back-reference to the node this record was written on, read by committedOf below and by

@@ -263,12 +263,16 @@ describe('a targeted commit does not trust a stale snapshot after a flip', () =>
 // re-derive every single time, because the wrong list was not the bug. The bug was what the derive
 // does BESIDES returning a list.
 //
-// GREEN TODAY, and deliberately so: the replay currently refuses any parent holding a skipped child
-// at all (`replayChildOps`'s caller, commit.ts), so the stale entry is never read and this sequence
-// commits correctly through the ordinary re-derive. The row is here because item 5 of
-// `symbiote-fabric-cxx-surface` §8 exists to weaken exactly that refusal, and the first attempt at
-// it turned this sequence red. So read a failure here as "the precondition you just relaxed does
-// not cover a node that un-skipped off-tree", not as a regression in the buffer.
+// GREEN TODAY, and the REASON changed on 2026-09-06 — worth reading before relaxing anything else.
+// It used to be green because the replay refused any parent holding a skipped child at all. Item 5
+// of `symbiote-fabric-cxx-surface` §8 removed that refusal, and this row stayed green under a
+// narrower one: `replayChildOps` refuses any op NAMING a node the parent hides, and taking the
+// anchor off the parent is exactly such an op. A dedicated precondition for this sequence was
+// written during item 5, break-tested, found to move nothing, and deleted.
+//
+// So read a failure here as "the refusal you just relaxed no longer covers a node that un-skipped
+// off-tree", not as a regression in the buffer — and note that the covering refusal is now about
+// the OP rather than about the parent's state.
 describe('a node that un-skips while DETACHED does not leave a stale record behind', () => {
   it('commits the whole subtree of an anchor that became an ordinary view off-tree', () => {
     fabric.reset();

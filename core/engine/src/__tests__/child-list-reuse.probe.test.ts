@@ -18,6 +18,7 @@ import {
   createElement,
   createSurface,
   readCommitProfile,
+  removeChild,
   setProp,
 } from '../index';
 
@@ -135,17 +136,27 @@ describe('a create builds its child lists from the op log, not from node.childre
     expect(profile.childListsReplayed, line).toBe(2 * ROWS + 1);
   });
 
-  it('REFUSES to replay a parent holding an anchor, and says so in the counters', () => {
-    // The negative half, and it is not a wart — it is `symbiote-fabric-cxx-surface` §8's own
-    // prediction that a JS drain "handles anchors exactly as the walk does today", which is what
-    // item 5 exists to change. A parent whose renderable list is not its desired list cannot have a
-    // desired-space op replayed onto it: the fuzzer found that as ORACLE 1 when the refusal was
-    // per-op instead of per-parent (an insert positioned before an anchor's FLATTENED grandchild
-    // appends in one list and inserts mid-way in the other).
+  it("replays a parent holding an anchor, reading only the ANCHOR's own list", () => {
+    // The negative half of 4b, turned positive by item 5. It used to assert a REFUSAL, on 4b's own
+    // reasoning that "a JS drain handles anchors exactly as the walk does today": a parent whose
+    // renderable list is not its desired list could not have a desired-space op replayed onto it.
     //
-    // So the row asserts the split rather than a win: the rows re-derive, everything below them
-    // still replays. Angular mounts an anchor per composed component and is the adapter this
-    // describes.
+    // That was true of the op-per-NODE replay and is not true of the op-per-CONTRIBUTION one. A
+    // skipped child's effect on the renderable list is its contribution — nothing for a marker, its
+    // flattened subtree for a hoisting anchor — so the ops splice contributions and the parent
+    // replays. Angular mounts an anchor per composed component and is the adapter this is for.
+    //
+    // MEASURED on this shape, 1 000 rows, and the FOUR numbers are the whole claim — the first is
+    // the one the item is for and the last is what says the other three are not an accounting trick:
+    //
+    //                          4b     item 5
+    //   childrenOf() calls    2004      1004    counted at the tree.ts seam
+    //   childScans            2001      1001    the 1 000 left are the ANCHORS' own lists, read by
+    //                                           `flattenPure` when each is inserted — two children
+    //                                           rather than the row's whole list
+    //   childFlattens         1000         0    the derivation is not reached at all
+    //   childListsReplayed    2001      3001    the rows replay now, and so does each anchor's own
+    //                                           child, hoisted into the row's list
     const surface = createSurface(7303);
     const list = createElement('RCTView');
     buildRows(list, ROWS, 0, true);
@@ -155,11 +166,63 @@ describe('a create builds its child lists from the op log, not from node.childre
 
     const profile = readCommitProfile();
     const line = `scans=${profile.childScans} replayed=${profile.childListsReplayed}`;
-    // TWO per row, not one: the row refuses, and the flatten then RECURSES into the anchor to hoist
-    // its children, which is a scan of its own. Plus the container. The first version of this row
-    // expected `ROWS + 1` and the count said 2001 — worth keeping as the arithmetic, because a
-    // reader pricing anchors will make the same omission.
-    expect(profile.childScans, line).toBe(2 * ROWS + 1);
-    expect(profile.childListsReplayed, line).toBe(2 * ROWS + 1);
+    // ONE per row, not two. The row no longer re-derives; what is left is `flattenPure` reading the
+    // anchor's own children to learn what it contributes. Plus the container, whose whole top-level
+    // list arrives at once and can never be described by a sequence of child ops.
+    expect(profile.childScans, line).toBe(ROWS + 1);
+    // And ZERO of those scans is the flatten proper: `flattenPure` is a read, `renderableChildren`
+    // is a read plus a drain plus an allocation, and the second one no longer runs on this shape at
+    // all. Asserted separately because `childScans` alone cannot tell the two apart.
+    expect(profile.childFlattens, line).toBe(0);
+    expect(profile.childListsReplayed, line).toBe(3 * ROWS + 1);
+  });
+
+  it('REFUSES when an op names a child the parent HIDES — with the control beside it', () => {
+    // The one refusal that survives item 5, and the only one that is not about a position. A hidden
+    // child occupies a BLOCK of the renderable list whose extent the replay does not hold, and
+    // recomputing it is unsound — an anchor detached from this parent can be edited afterwards with
+    // nothing left to poison the parent's log. See `replayChildOps`.
+    //
+    // FOUND BY THE DIFFERENTIAL over 40 000 generated programs; this is the enumerated twin, so the
+    // shape is readable without running the fuzzer.
+    const surface = createSurface(7304);
+    const list = createElement('RCTView');
+    const row = createElement('RCTView');
+    const anchor = createAnchor();
+    appendChild(anchor, createElement('RCTView'));
+    appendChild(row, anchor);
+    appendChild(list, row);
+    surface.appendChild(list);
+    surface.commit();
+
+    // THE CONTROL, and it runs FIRST so a `refuse` below cannot be read as "this shape never
+    // replays". Same row, still holding the anchor, and an ordinary child removed from it: the
+    // parent's renderable list is NOT its desired list and it replays anyway, which is exactly what
+    // item 5 is for and what the 4b precondition forbade.
+    const plain = createElement('RCTView');
+    appendChild(row, plain);
+    surface.commit();
+    readCommitProfile();
+    removeChild(row, plain);
+    surface.commit();
+
+    const control = readCommitProfile();
+    const controlLine = `scans=${control.childScans} replayed=${control.childListsReplayed}`;
+    expect(control.childListsReplayed, controlLine).toBe(1);
+    expect(control.childScans, controlLine).toBe(1);
+
+    // And now the refusal: the same row, the same commit shape, one op naming the ANCHOR.
+    removeChild(row, anchor);
+    surface.commit();
+
+    const profile = readCommitProfile();
+    const line = `scans=${profile.childScans} replayed=${profile.childListsReplayed}`;
+    expect(profile.childListsReplayed, line).toBe(0);
+    // Two scans: the container, which always re-derives, and the row, which refused. No FLATTEN —
+    // by the time the walk reaches the row the anchor is already gone from its list, so the probe
+    // finds no skipped child. That is what makes `childScans` and not `childFlattens` the counter
+    // this row can be pinned on.
+    expect(profile.childScans, line).toBe(2);
+    expect(profile.childFlattens, line).toBe(0);
   });
 });
