@@ -325,6 +325,16 @@ export interface IMirror {
   // skipped children it IS `node.children` until the next structural op copies it aside
   // (`recordStructureEdit`).
   children: readonly ISymbioteNode[];
+  // The DESIRED child list this node last committed — every direct child in order, skipped ones
+  // included, anchors NOT flattened. `children` above is what Fabric was handed; this is what the
+  // adapter had built.
+  //
+  // It is not a second copy of `node.children` bolted on: it is the BASE the desired list is
+  // replayed onto, so that the desired list can stop being a field the mutation API maintains and
+  // become a derivation of (this record + the buffer's op log). The two alias for every node
+  // holding no skipped child, which is every node under four of the five adapters, so the common
+  // case costs one more reference and no array (`symbiote-fabric-cxx-surface` §8, item 4c).
+  desired: readonly ISymbioteNode[];
   // The children the same derivation DROPPED — the anchors and empty raw texts that `children`
   // flattened or skipped. Empty for almost every node, and stored for one reason: a commit that
   // REUSES `children` instead of re-deriving it never walks the child list, so it has no other way

@@ -650,6 +650,36 @@ function replayChildOps(
   };
 }
 
+/**
+ * A node's DESIRED child list, replayed from the one it last committed plus this cycle's ops.
+ *
+ * The plain twin of `replayChildOps`: no anchors, no contributions, no refusals — it is `linkAppend`
+ * / `linkBefore` / `unlink` (tree.ts) applied in issue order, and it must stay a line-for-line mirror
+ * of those three or the two answers drift. In particular a `before` the list does not hold APPENDS,
+ * which is what `linkBefore`'s `index < 0` does and what every framework's `insertBefore(…, null)`
+ * means; and the pre-remove matches `appendChild`'s own `detach`, which the adapter API performs
+ * before every insert.
+ *
+ * Unlike the renderable replay this one can never refuse. It works in desired space, where an op
+ * says exactly what it did — the refusals over there all exist because the renderable list is a
+ * DIFFERENT list from the one the ops are written against.
+ */
+function replayDesired(
+  base: readonly ISymbioteNode[],
+  ops: readonly IEditOp[],
+): ISymbioteNode[] {
+  const out = base.slice();
+  for (const op of ops) {
+    const at = out.indexOf(op.child);
+    if (at >= 0) out.splice(at, 1);
+    if (op.remove) continue;
+    const before = op.before ?? undefined;
+    const found = before === undefined ? -1 : out.indexOf(before);
+    out.splice(found < 0 ? out.length : found, 0, op.child);
+  }
+  return out;
+}
+
 // ── THE DIFFERENTIAL: a replayed list, checked against a derived one ────────────────────────────
 //
 // `replayChildOps` and `flattenRenderable` are two implementations of one answer, and the whole
@@ -734,6 +764,48 @@ function verifyReplay(
             }`,
         )
         .join(',')}]`,
+  );
+}
+
+/**
+ * The desired list the record now carries, checked against the one the tree still holds.
+ *
+ * Same switch and the same purpose as `verifyReplay` above, one layer down. `IMirror.desired` is
+ * built beside `node.children` and consumed by nothing yet — deliberately, because a derivation that
+ * REPLACES the field has to be shown to agree with it first, over the fuzzer's programs, before the
+ * field can go (`symbiote-fabric-cxx-surface` §8, "the safe way to land it whole").
+ *
+ * Delete this check when `childrenOf` reads the derivation: at that point the two sides are the same
+ * expression and the comparison is a tautology.
+ */
+function verifyDesired(
+  node: ISymbioteNode,
+  desired: readonly ISymbioteNode[],
+  base: readonly ISymbioteNode[],
+  ops: readonly IEditOp[] | null | undefined,
+): void {
+  if (!verifyReplayOn) return;
+  const truth = childrenOf(node);
+  if (sameNodes(truth, desired)) return;
+  const describe = (list: readonly ISymbioteNode[]): string =>
+    `[${list.map(debugNodeId).join(',')}]`;
+  throw new Error(
+    `desired diverged at ${debugNodeId(node)}: ` +
+      `record=${describe(desired)} tree=${describe(truth)} ` +
+      `base=${describe(base)} ops=${
+        ops == null
+          ? String(ops)
+          : `[${ops
+              .map(
+                op =>
+                  `${op.remove ? '-' : '+'}${debugNodeId(op.child)}${
+                    op.before === undefined || op.before === null
+                      ? ''
+                      : `@${debugNodeId(op.before)}`
+                  }`,
+              )
+              .join(',')}]`
+      }`,
   );
 }
 
@@ -930,6 +1002,10 @@ function reconcile(
   // nothing to reuse and the flatten is needed anyway.
   let kids: readonly ISymbioteNode[];
   let skipped: readonly ISymbioteNode[];
+  // The DESIRED list, built beside the renderable one and stored on the record — see `IMirror.desired`
+  // for what it is the base of. Costs nothing for a node holding no skipped child: the two lists are
+  // equal there, and the assignment below aliases rather than copies.
+  let desired: readonly ISymbioteNode[];
   // See `IMirror.hoists`: whether any of `skipped` put children of its own into `kids`. Carried
   // rather than re-derived because the next cycle's replay needs it before it has looked at a
   // single child.
@@ -964,6 +1040,7 @@ function reconcile(
     kids = committed.children;
     skipped = committed.skipped;
     hoists = committed.hoists;
+    desired = committed.desired;
     drainSkipped(skipped);
   } else {
     // A node with no record has never committed; one with a `null` log had an unreplayable change.
@@ -974,6 +1051,26 @@ function reconcile(
     // leaving this parent takes an op naming the child, and `replayChildOps` refuses any op naming
     // a node the base hid. Break-tested — removing it moved nothing, and the guard that DOES cover
     // it reddens three rows.
+    // The desired list takes the ops whenever there ARE ops, which is a strictly wider condition
+    // than the renderable list's: `replayChildOps` refuses three shapes, all of them consequences of
+    // the renderable list being a different list from the one the ops are written against, and none
+    // of them applies here. A `null` log is the one case with nothing to replay — it says the change
+    // is not describable as child ops at all (`recordStructureEdit`) — and `replaceChildren` is why
+    // that arm has to keep reading the tree for now.
+    desired =
+      childOps === undefined || childOps === null
+        ? // COPIED, and the copy is the whole of a bug the differential caught within eight
+          // thousand programs. `childrenOf` returns `node.children` BY REFERENCE, so storing it
+          // made the record ALIAS the live list: every later mutation leaked into the base, and the
+          // next cycle then replayed its ops onto a base that already held them — which reorders,
+          // because the replay removes a child by identity before re-inserting it. Exactly the
+          // hazard `snapshotCommittedChildren` (edit-buffer.ts) exists to prevent for
+          // `record.children`, one field over and with nothing protecting it. The arm is rare (a
+          // poisoned log: the container, the anchor climb, a skipped-ness flip) and it disappears
+          // entirely once `childrenOf` reads the derivation.
+          childrenOf(node).slice()
+        : replayDesired(committed?.desired ?? NO_SKIPPED, childOps);
+    verifyDesired(node, desired, committed?.desired ?? NO_SKIPPED, childOps);
     const replayable = childOps !== undefined && childOps !== null;
     const replayed = replayable
       ? replayChildOps(
@@ -1010,6 +1107,7 @@ function reconcile(
     if (!recreating && committed !== undefined) {
       committed.skipped = skipped;
       committed.hoists = hoists;
+      committed.desired = desired;
     }
   }
 
@@ -1100,6 +1198,7 @@ function reconcile(
       rootTag,
       props,
       children: kids,
+      desired,
       skipped,
       hoists,
       viewName,
@@ -1207,6 +1306,7 @@ function reconcile(
   // here makes every anchored subtree look structurally changed on the next commit and can
   // re-append already-parented Fabric ShadowNode families under a cloned parent.
   committed.children = kids;
+  committed.desired = desired;
   committed.viewName = viewName;
   committed.parent = renderableParent;
   return { handle, changed: true };
