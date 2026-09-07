@@ -1001,8 +1001,9 @@ commit so a reader can diff rather than re-derive.
 3   a verification loop that can catch a silent regression    LANDED      —
 4a  the commit consumes the record for its child list         LANDED      —
 4b  the ordered op log, replayed by the commit                LANDED      —
-4c  node.children DELETED; node.parent still there           IN PROGRESS 4c-1/2/3 landed; the
-                                                                          back-edge is 4c-4
+4c  node.children DELETED; node.parent STAYS                 DONE        4c-1/2/3 landed; 4c-4
+                                                                          measured and REJECTED —
+                                                                          it lands at item 8
 5   anchors stop being NODES and become POSITIONS             LANDED      —
 6   setNativeProps arm for prop-only rows                     OPEN        —
 7   the address rides on the framework's own object           AFTER 4     —
@@ -1125,7 +1126,7 @@ So item 4 splits honestly into:
 4a  the commit consumes the record instead of re-deriving it     LANDED, measured above
 4b  the ordered op log, replayed by the commit                   LANDED, measured below
 4c  node.children / node.parent deleted outright                 node.children is GONE (4c-3);
-                                                                 the back-edge is 4c-4, see below
+                                                                 node.parent STAYS (4c-4, below)
 ```
 
 ### 4b LANDED — the numbers, and the one adapter it does not help
@@ -1403,6 +1404,78 @@ committed tree.** Each was closed by giving that node a published record of its 
 keeping a field: the mirror for a live node, the contribution for a hidden one, and the op log itself
 for one that has never committed. What remains ours forever is the anchor, which no native structure
 can hold — so `IContribution` is the one record item 8 does not take away.
+
+### 4c-4 MEASURED AND REJECTED 2026-09-07 — `node.parent` stays until item 8
+
+The back-edge was deleted, the engine went green (1008 tests, 10 000 fuzz programs x 250 steps, all
+six oracles), and it was **reverted on the numbers**. Recorded in full because the item reads as the
+obvious next step and the design space is smaller than it looks.
+
+**There is no derivation available, only an index.** `childrenOf` became a derivation because the op
+log is keyed by PARENT — the ops for a node's children are all in one place. The reverse question has
+no such home: answering "who is this child's parent" from the logs alone means scanning every log in
+the process. So 4c-4 is not "derive it like the children"; it is "move one field into a keyed
+lookup", which is a different kind of change and has to justify itself on cost alone.
+
+The other candidate — `desiredParent` on `IMirror`/`IContribution` — is strictly more machinery, not
+less. A node reparented since its last commit has published nothing, so the record needs a pending
+map beside it; that is the same hot-path index PLUS a field, and the field costs an O(children) stamp
+at publish that 4c-3 had just removed.
+
+**The measurement, `core/engine/src/__tests__/reconcile.bench.ts`, four interleaved arms per side
+(two vitest projects x two passes), reading `min`:**
+
+```
+                  before (4 arms)          after (4 arms)          delta
+create 1000       1.53 1.59 1.53 1.66      2.24 2.16 2.02 2.14     +32%
+replace 1000      2.07 2.01 1.94 1.94      2.90 2.46 2.61 2.64     +27%
+create 10 000    42.6 42.5 46.4 45.4      50.2 49.6 49.3 53.8      +16%
+append 1000      15.0 14.4 14.7 14.9      16.9 15.1 16.6 16.7      +10%
+clear 10 000     68.2 60.8 61.0 68.1      71.6 65.4 71.6 71.2       +8%
+select/swap/rm    0.055-0.067              0.056-0.068             flat
+```
+
+Zero overlap between the arms on every mutation-heavy row.
+
+**INTERLEAVE, and do not trust two runs taken minutes apart.** The first attempt read the before-arm
+once, made the change, read the after-arm, and got a plausible-looking +20% with the after-run's
+`rme` three times the before-run's. Re-running the after-arm alone made it look worse again: this
+container degrades across successive bench runs, so a sequential A/B measures the container. The
+arms above alternate before/after/before/after with a `git checkout` between them.
+
+**Two control arms, and both were worth their three minutes:**
+
+```
+strong Map instead of WeakMap   create 1000 1.79-1.84   recovers about HALF the regression
+field restored but UNREAD       create 1000 2.13-2.13   identical to the deletion arm
+```
+
+The second rules out the explanation everyone reaches for first — that removing a constructor field
+changed the object's hidden class. It did not; the index is the whole cost. The first splits the cost
+in two: roughly half is the keyed lookup itself and roughly half is WEAKNESS, since every live weak
+entry is ephemeron work on every scavenge and the engine scavenges hard (a props object per node per
+commit). A strong `Map` is not an escape — it pins every node the adapter ever built, which is the
+exact leak the weak buffer was introduced to fix.
+
+**Why the microbenchmark predicted 0.5% and the truth was 16-32%.** A synthetic loop over 200 000
+pre-allocated nodes measured `WeakMap.get/set` at 28 ns against 2.3 ns for a field — 12x, which
+against ~4.8 us of engine work per created node reads as noise. It models the instruction and not the
+GC: the real path holds tens of thousands of live weak entries while allocating heavily, and that
+term does not exist in a tight loop over a fixed array. **A microbenchmark of a weak collection
+prices the lookup and cannot price the weakness.**
+
+**Where it does land: item 8.** A native `pendingRoot_` answers the parent off the shadow node it
+already holds, so the field disappears with no JS index at all — which is the same shape as every
+other part of 4c, where the answer came from giving the node a published record rather than from
+moving a field sideways. `node.parent` is therefore not debt; it is the one piece of desired
+structure whose removal is genuinely blocked on native work.
+
+**And the bench itself was BROKEN at HEAD**, which is why this section can quote numbers only after a
+repair commit. 4c-3 deleted `node.children` and left three reads of it in `reconcile.bench.ts`; a
+`.bench.ts` is excluded from its package's tsconfig, is not in `vitest run`, and is not in CI, so it
+had been throwing on every row for a day with nothing red anywhere. **An instrument rots silently
+until the moment someone needs it, and that moment is always mid-decision** — run it after any edit
+to the mutation API, not only when a number is wanted.
 
 ### The two attribution holes that must stay closed, and how to look for a third
 

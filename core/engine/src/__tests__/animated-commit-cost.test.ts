@@ -17,6 +17,7 @@ import {
   appendChild,
   createElement,
   createSurface,
+  parentOf,
   readCommitProfile,
   registerPostCommit,
   setNativeProps,
@@ -235,7 +236,7 @@ describe('the targeted animation path clones the chain and nothing else', () => 
     // A structural change is pending: the new row has no committed record, so the targeted path
     // cannot rebuild its parent's child set from committed handles and must bail. The value still
     // has to arrive, and the new sibling has to appear.
-    const parent = animTargets[0].parent!;
+    const parent = parentOf(animTargets[0])!;
     const late = createElement('RCTView');
     setProp(late, 'testID', 'late-row');
     appendChild(parent, late);

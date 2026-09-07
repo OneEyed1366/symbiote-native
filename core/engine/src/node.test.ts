@@ -25,7 +25,7 @@ import {
 } from './node';
 // The seam, not a field: a node's desired children are derived from its published record plus the
 // ops recorded against it, and `childrenOf` is the only way to ask (`tree.ts`).
-import { childrenOf } from './tree';
+import { childrenOf, parentOf } from './tree';
 
 describe('isSymbioteEvent', () => {
   it('narrows a real synthetic event object', () => {
@@ -66,7 +66,7 @@ describe('insertBefore / removeChild (no throwing path — outcome-named groups)
     insertBefore(parent, c, b);
 
     expect(childrenOf(parent)).toEqual([a, c, b]);
-    expect(c.parent).toBe(parent);
+    expect(parentOf(c)).toBe(parent);
   });
 
   // why: an adapter moving a node between parents (Vue's patch, a Svelte each-block

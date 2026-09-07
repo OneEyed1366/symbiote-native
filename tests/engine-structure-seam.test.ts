@@ -18,10 +18,22 @@
 //   COMMITTED  record.children / record.parent    11 sites across 2 files   -> unchanged, see below
 //
 // `node.children` no longer exists: a node's desired children are derived from its published record
-// plus its op log (`childrenOf`, tree.ts). So the seam's remaining sites are the back-edge alone,
-// and the sentinel below counts what is left of it. When 4c-4 removes `parent` the same way, the
-// seam will hold ZERO field accesses and this sentinel stops being expressible — the guard then has
-// to key on something else (the seam's exports, say) or go with the fields it was watching.
+// plus its op log (`childrenOf`, tree.ts). So the seam's remaining sites are the back-edge alone.
+//
+// **`node.parent` IS STAYING, and that is a measured decision rather than an unfinished one** — see
+// `symbiote-fabric-cxx-surface` §8, 4c-4. Deleting it needs something else to answer `parentOf`, and
+// the only JS candidate is a keyed index: the op log is keyed by PARENT, so it holds no reverse
+// edge, and a `desiredParent` on the record still needs a pending map beside it for a node reparented
+// since its last commit. A `WeakMap` was built, measured against this file's own bench in four
+// interleaved arms, and cost 8-32% on every mutation-heavy row (create 1000 +32%, create 10 000 +16%)
+// — so the field survives until item 8, where a native `pendingRoot_` answers the parent off the
+// shadow node it already holds and no JS index exists at all.
+//
+// THE SENTINEL WAS RE-KEYED WHILE THAT WAS MEASURED, and the reason survives the revert: it counted
+// sites IN THE SEAM, which is exactly the quantity this whole roadmap drives to zero, so it went red
+// on a change that was correct in every other respect. **A false-green sentinel must not be keyed on
+// the thing being deleted.** It asks whether the PROGRAM resolved instead — the real question ("did
+// this examine anything?"), which no legitimate deletion can move.
 //
 // COMMITTED IS DELIBERATELY NOT GUARDED YET, and the reason recorded here first was WRONG — see
 // `tree.ts`'s header. It is not replaced by RN's `NativeDOM`: that API reads the current revision
@@ -102,13 +114,18 @@ describe('the engine touches node structure only through tree.ts', () => {
   it('resolves the engine, so a silent empty run is impossible', () => {
     // A moved barrel or a bad tsconfig gives an empty program, zero violations and a green run that
     // examined nothing — the shape this repo has been bitten by often enough to write down
-    // (`.claude/rules/test-harness-false-greens.md`). The seam's own sites are the sentinel: they
-    // are the one thing that must ALWAYS be found.
-    // FIVE now, all of them `parent`, where it was fourteen before `node.children` went. The floor
-    // is deliberately just under the real count rather than a round number: too low and an empty
-    // program passes it, too high and the next legitimate deletion reads as a broken harness.
-    const sites = collect(program, checker);
-    expect(sites.filter(site => site.file === SEAM).length).toBeGreaterThan(3);
+    // (`.claude/rules/test-harness-false-greens.md`).
+    //
+    // Asks about the PROGRAM, not about the violations. It used to require the seam to hold at least
+    // four field accesses, which is the count the roadmap is deleting — see the header. The floor of
+    // 60 is deliberately well under the ~110 engine sources: measured 2026-09-07, the real barrel
+    // resolves 103 and a moved one resolves 0, so anything in between is a broken tsconfig.
+    const engineFiles = program
+      .getSourceFiles()
+      .map(source => path.relative(REPO_ROOT, source.fileName))
+      .filter(rel => rel.startsWith(path.join('core', 'engine', 'src')));
+    expect(engineFiles).toContain(SEAM);
+    expect(engineFiles.length).toBeGreaterThan(60);
   });
 
   it('finds no structural field access outside the seam', () => {
@@ -121,9 +138,9 @@ describe('the engine touches node structure only through tree.ts', () => {
       leaks.length === 0
         ? ''
         : `The engine is reading an ISymbioteNode's structure outside ${SEAM}. Use childrenOf / ` +
-            `parentOf / linkAppend / linkBefore / unlink / unlinkFromParent / replaceChildren ` +
-            `instead — the whole point is that the desired tree can be replaced by the edit buffer ` +
-            `in one file:\n${report}`,
+            `parentOf / linkAppend / linkBefore / unlink / unlinkFromParent instead — the whole ` +
+            `point is that the desired tree can be answered by the record, the op log and the ` +
+            `back-edge map in one file:\n${report}`,
     ).toEqual([]);
   });
 
