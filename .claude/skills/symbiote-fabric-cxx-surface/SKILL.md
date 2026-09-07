@@ -618,6 +618,85 @@ branches off one unmeasured number, and the number is still unmeasured.
 
 So the next decision is not "which design", it is "run step 0".
 
+### 0' — step 0 is SUPERSEDED, 2026-09-07: the COUNT was measured with no device, and it kills the per-call form of design (2)
+
+Step 0 asks what ONE crossing costs, to decide between the branches. The cheaper question is how
+MANY crossings each branch implies, and it needs no device — a counter on `childrenOf` / `parentOf`
+in `tree.ts` answers it. The answer removes the choice rather than informing it.
+
+**Two censuses, and the first one is the trap.** Driving the mutation API directly measures the
+ENGINE's own navigation and reports almost none:
+
+```
+                  mutate                    commit
+create 1000 rows  children=0 parent=3001    children=3005 parent=1
+select 1 of 1000  children=0 parent=2       children=6    parent=1
+swap 2            children=0 parent=3       children=5    parent=1
+```
+
+`parent` is exactly 1 per structural op — all of it `detach`, which exists ONLY to synthesise the
+remove op, and which a declarative applier (`insert child into parent before X`, native resolving
+the old parent) deletes outright. `children` on the commit side is the JS walk, and the walk is
+what design (2) moves native. So on this reading the engine needs ONE batched crossing per commit
+and nothing per mutation, and the design looks free.
+
+**It is not, because a real framework navigates and the engine census cannot see it.** Vue's
+`RendererOptions.parentNode` / `nextSibling`, Solid's `getFirstChild` / `getNextSibling`, Angular's
+`Renderer2.nextSibling` are CONTRACT — the framework calls them during its own patch, and no
+amount of engine work removes them. Measured through the real `mount()` harness, 500 rows, two
+runs byte-identical:
+
+```
+vue create 500 rows   children=1505  parent=1501    createNode=1502
+vue swap 2 rows       children=1005  parent=3008    <- ~4 000 reads for an O(1) logical change
+vue remove 1 row      children=1006  parent=3002
+vue clear 500 rows    children=1502  parent=1004
+```
+
+At §7b's own ~1.5 us constant that is **~6 ms of pure crossings to swap two rows**, against 8.7 ms
+for the whole operation today. `remove 1` the same. So **navigation may not be a per-call JSI
+crossing**, and step 0 would only have told us how bad it is.
+
+**What survives, and it is the design that finally has no JS tree in it.** The two things JS does
+are asymmetric and must not share a mechanism:
+
+```
+WRITES   the op log, shipped once per commit          ONE crossing, batched — already built (4b)
+READS    parent / firstChild / nextSibling            a TYPED-ARRAY VIEW over native memory,
+                                                      not a function call
+```
+
+A `jsi::ArrayBuffer` over a C++-owned `MutableBuffer` gives JS an `Int32Array` whose reads are
+direct memory loads — no crossing per element, the cost of an array index. The node table
+(`parent[] / firstChild[] / nextSibling[] / generation[]`, keyed by a dense node id) lives in
+native beside `pendingRoot_`; JS holds a view, not a copy, and holds no child arrays, no records,
+no back-edge. That satisfies "no tree in JS" literally rather than by relocation — the structure
+exists once, natively — and it is the only shape the 4 000-read census permits.
+
+Three things this makes concrete, in order:
+
+- **`detach` must go before anything else.** It is the whole of the engine's per-mutation
+  navigation, it is removable with no native work at all (make the insert op declarative and let
+  the applier resolve the old parent), and every later step is cheaper without it.
+- **The node id becomes the address.** `ISymbioteNode` today carries `committed` (a JS record);
+  under this design it carries an integer index into the table. That is item 7's "the address
+  rides on the framework's own object", now with a concrete address.
+- **`IContribution` still cannot move**, for the reason §7b already gives: an anchor has no Fabric
+  node, so it has no row in a table of shadow nodes. It is per-node bookkeeping, not a tree, and
+  it stays.
+
+**The one thing step 0 would still be worth measuring on a device**, once there is one: whether a
+`MutableBuffer`-backed `ArrayBuffer` read from Hermes is genuinely a direct load, or whether Hermes
+inserts a bounds/detach check per access that makes it closer to a call. That is a much narrower
+question than the original, and it gates the READ half only.
+
+**Method note, because it decided the answer.** The engine-side census is the one anybody would
+write, it is cheap, and it reports the design as free. It is wrong for the same reason
+`test-harness-false-greens` §11 records: it constructs the subject differently from production —
+no framework in the loop, so the caller that actually navigates never runs. **A census of a seam
+must be driven by the layer that calls it**, and here the two answers differ by three orders of
+magnitude.
+
 **Its cost is a per-call JSI crossing plus a family->node resolution** whose phase 2 linearly
 scans each level's children (§6a). Arithmetic on this repo's own measured constant (~1.5 us per
 crossing): Solid's `cleanChildren` on 1 000 children is ~1 000 crossings ~= 1.5 ms plus 1 000
@@ -995,7 +1074,10 @@ commit so a reader can diff rather than re-derive.
 
 ```
                                                               status      blocked on
-0   price a JSI navigation round-trip on a device             NOT RUN     a device
+0   price a JSI navigation round-trip on a device             SUPERSEDED  the COUNT was measured
+                                                                          without one, and it
+                                                                          settles the design —
+                                                                          see 0'
 1   the seam: structure reachable through ONE module          LANDED      —
 2   the edit buffer holds WHICH nodes were touched            LANDED      —
 3   a verification loop that can catch a silent regression    LANDED      —
@@ -1006,10 +1088,26 @@ commit so a reader can diff rather than re-derive.
                                                                           it lands at item 8
 5   anchors stop being NODES and become POSITIONS             LANDED      —
 6   setNativeProps arm for prop-only rows                     OPEN        —
-7   the address rides on the framework's own object           AFTER 4     —
-8   our own JSI host object (pendingRoot_ + cloneMultiple)    OPEN        0, and a measured
-                                                                          residual after 4-7
+7   the address rides on the framework's own object           AFTER 4     8a (the id IS the address)
+8   our own JSI host object — SPLIT, see 0' and below         DECIDED     nothing; 8a starts now
+8a  detach stops reading the parent (declarative insert op)   NEXT        — pure JS, no device
+8b  the node table: parent/firstChild/nextSibling as a
+    typed-array VIEW over native memory                       OPEN        8a, and a native package
+8c  pendingRoot_ + cloneMultiple + the commit hook            OPEN        8b
 ```
+
+**Item 8 is DECIDED and no longer blocked on item 0** (2026-09-07, on the user's direction that no
+JS tree may remain and that native work is acceptable). 0' explains why the naive form of it —
+answering navigation with a JSI call per read — is dead on arrival at ~4 000 reads per two-row swap,
+and why the surviving form splits writes from reads: the op log crosses once per commit, the
+structure is READ through a typed-array view over the native node table rather than called for.
+
+**8a is the whole of the engine's own per-mutation navigation and needs no native code at all**, so
+it is the next thing whatever happens to 8b/8c: make the insert op declarative and let the applier
+resolve the child's old parent, and `detach`'s `parentOf` — 3 001 reads on a 1 000-row create, the
+entire `mutate parent=` column in 0''s first census — stops existing. Both replays
+(`replayDesired` in tree.ts, `replayChildOps` in commit.ts) must lose the pre-remove in the same
+change, since an op that no longer carries it must not be replayed as though it did.
 
 **Why 4 is next and not 5 or 8.** It is the only item BOTH design branches require, for two
 different reasons (§7b): under a JS skeleton the drain needs the ops to derive the new child
