@@ -40,6 +40,7 @@ import { bench, describe } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
+  childrenOf,
   createElement,
   createSurface,
   disposeRoot,
@@ -54,9 +55,6 @@ import {
 // setNativeProps queues; the flush is what a frame actually pays for, so every row that drives it
 // has to close the frame explicitly or it would time the enqueue and report a fictional win.
 import { flushNativeProps } from '../commit';
-// Not on the public barrel: an adapter never needs it, only a harness that mutates a child list
-// without going through the structural ops (truncateChildren below).
-import { markStructureDirty } from '../node';
 
 const fabric = installFabric();
 
@@ -74,20 +72,27 @@ function makeRow(id: number): ISymbioteNode {
   return row;
 }
 
-// `removeChild` finds its target with indexOf, so dropping N children through it is O(N^2) —
-// at 10 000 rows the teardown would dwarf the commit we are trying to time. Clearing the
-// parent pointer by hand is what the surface's own detach does, and it is O(N).
+// Drop every child past `length`.
 //
-// It owes the same mark the surface's detach owes, and now for a second reason: a committed record
-// holds its child list BY REFERENCE, so truncating `parent.children` in place also truncates the
-// snapshot the next commit diffs against — the two arrays are one. Without the mark the truncation
-// is literally invisible to reconcile and the row measures nothing.
+// This used to splice `parent.children` by hand and clear each child's `parent` field, because
+// `removeChild` resolved its target with `indexOf` and dropping N children through it was O(N^2) —
+// at 10 000 rows the teardown dwarfed the commit being timed. Neither reason survives: there is no
+// child list to splice (`childrenOf` derives it from the record plus the op log, tree.ts) and
+// `removeChild` is O(1), since a remove op names its child by identity and resolves no position.
+//
+// So it is the ordinary mutation API now, and the mark it used to owe by hand comes with it.
+//
+// **This file was BROKEN at HEAD for a day and nothing said so**: 4c-3 deleted `node.children` and
+// left three reads of it here, so every row threw `Cannot read properties of undefined`. A bench is
+// not in `vitest run`, not in `tsc --build` (a package's tsconfig excludes `*.bench.ts`, same as its
+// tests), and not in CI — so an instrument can rot for as long as nobody needs it, and the moment
+// someone does need it is precisely when they are trying to price a change. Run it after any edit to
+// the mutation API, not only when a number is wanted.
 function truncateChildren(parent: ISymbioteNode, length: number): void {
-  markStructureDirty(parent);
-  for (let index = length; index < parent.children.length; index += 1) {
-    parent.children[index].parent = undefined;
+  const kids = childrenOf(parent);
+  for (let index = kids.length - 1; index >= length; index -= 1) {
+    removeChild(parent, kids[index]);
   }
-  parent.children.length = length;
 }
 
 interface IMountedTable {
@@ -197,7 +202,7 @@ describe('krausest operations', () => {
   bench(
     'swap 2 rows of 1000',
     () => {
-      const kids = swapTable.table.children;
+      const kids = childrenOf(swapTable.table);
       const first = kids[SWAP_FIRST];
       const second = kids[SWAP_SECOND];
       const after = kids[SWAP_SECOND + 1];
@@ -217,13 +222,13 @@ describe('krausest operations', () => {
     'remove row from 1000',
     () => {
       if (detachedRow === undefined) {
-        detachedRow = removeTable.table.children[REMOVE_INDEX];
+        detachedRow = childrenOf(removeTable.table)[REMOVE_INDEX];
         removeChild(removeTable.table, detachedRow);
       } else {
         insertBefore(
           removeTable.table,
           detachedRow,
-          removeTable.table.children[REMOVE_INDEX],
+          childrenOf(removeTable.table)[REMOVE_INDEX],
         );
         detachedRow = undefined;
       }
