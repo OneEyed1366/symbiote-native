@@ -15,11 +15,38 @@ name — no import — was priced and skipped: it is what costs, on two adapters
 (Solid loses the import as EVIDENCE that a `View` is ours; Vue's global registration is a live
 reference, so every app bundles all 12 wrappers). Do not reintroduce it as an ergonomic win.
 
-- **Tag case decides whether a transform is NEEDED, never what it must DO.** React/Vue/Angular need
-  no plugin (`export const View: 'symbiote-view' = 'symbiote-view'` — and TypeScript still resolves
-  `JSX.IntrinsicElements`, so a bad prop is TS2322). Solid and Svelte keep a transform because their
-  compilers decide by CASE — but Svelte's stays attribute-reading, because its props reach the
-  engine only through the one `p={{…}}` bag.
+**SUPERSEDED 2026-09-07 by the owner, and it changes the TARGET rather than a measurement: the
+developer writes the tag explicitly, so no lowering transform may remain.** The reconciliation
+recorded on 2026-09-01 — "the consumer API may not change, therefore the transform STAYS as the
+router for a refusing call site" — assumed the app keeps writing `<View>`. It does not: the app
+writes `<view>`, there is no call site to route, and a refusal has nothing to refuse. Minimum
+component wrappers, everything that can go through the engine going through the engine.
+
+What that costs is one thing per adapter, and only Svelte's was a correctness dependency — now
+closed (`svelte-shim-element-global-must-be-an-ancestor.md`). Do not quote the sections below that
+price "keeping the transform"; they answer a question that is no longer open.
+
+**DONE 2026-09-08.** All four transforms, the Angular Metro wrapper, the shared verdict table, the
+`specialize-state-style` compiler and the `state-style` runtime helper it emitted are deleted, and
+the wiring is out of `solid/babel-preset.cjs`, `vue/babel-jsx.cjs`, `vue/metro-vue-transformer.cjs`,
+`examples/angular/metro.config.js` and `examples/svelte/svelte.config.js`. `HOST_PRIMITIVES` stays
+and is now read only at runtime (`resolve-intrinsic.ts`, `fold-host-bag.ts`) plus
+`adapters/vue/intrinsic-tags.cjs`. `REFUSAL_CATEGORIES` and `LOWERING_RUNS_LAST` are gone with the
+layer they described. 647 files / 5495 tests green, `tsc --build` clean.
+
+Two things that fell out of it and are NOT bookkeeping. `minPressDuration` was the last real
+wrapper-only capability: RN's `Touchable*` hand Pressability a 0 floor because they own the floor
+themselves, and a tag has no private input to seed — so it is a readable prop now, in `configFor`
+and in `MACHINE_ONLY_KEYS` so it never reaches Fabric. And `Animated.View` was the last consumer of
+a deleted wrapper outside `adapters/` — `packages/navigation`'s Svelte drawer, which is why a
+capability audit has to reach `packages/*`, not just the five adapters.
+
+- **Tag case decides whether a transform is NEEDED, never what it must DO — and it only ever
+  mattered for a CAPITALIZED spelling.** React/Vue/Angular need no plugin
+  (`export const View: 'view' = 'view'` — and TypeScript still resolves `JSX.IntrinsicElements`, so
+  a bad prop is TS2322). Solid and Svelte needed one because their compilers read `<View>` as a
+  component. An app writing `<view>` is past all of it: the tag is lowercase, every compiler calls
+  it an element, and the transform has nothing left to decide.
 - **The `symbiote-` hyphen is load-bearing in the INTERNAL tag — SUPERSEDED 2026-09-03.** The
   original claim was: `view`, `text`, `image` and `switch` are real SVG elements, so Solid emits
   `<svg><view …` and Svelte drops off the custom-element codegen path, stringifying props. Both

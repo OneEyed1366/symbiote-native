@@ -2207,3 +2207,246 @@ three blockers on marked children (anchor per composed component, `ng-content` d
 `parent === null`, and the hand-rolled `ScrollViewProjectionController`) are all consequences of
 ScrollView and RefreshControl still being components, so they are expected to dissolve with the
 swap. Expected, not measured.
+
+## DIRECTION RESET 2026-09-07: no lowering transform may remain
+
+Stated by the project owner: *the developer writes declaratively and explicitly, we keep minimum
+component wrappers, and everything that can go through the engine goes through the engine rather
+than through the JS framework.*
+
+That retires the reconciliation recorded under "THE CONSTRAINT that governs all of the above". It
+was not wrong — it was the correct answer to *"the app keeps writing `<View>`, so who routes a
+refusing call site?"* The app does not keep writing `<View>`. It writes `<view>`, which every
+compiler already reads as an element, so there is no call site to route and a refusal has nothing to
+refuse. Everything priced under "what keeping the transforms COSTS" and "can the transform still
+route a refusing call site" answers a closed question.
+
+**Do not read the earlier sections as superseded wholesale.** The measurements stand; only the
+question changed. In particular `half A` (the primitive resolves to a tag, the import stays) is
+still the shape — an app may write `<view>` or `import { View }` where `View === 'view'`, and both
+reach the same commit.
+
+### The one correctness dependency, and it is closed
+
+Four adapters treated the transform as an optimisation and one did not:
+
+```
+react vue solid angular    a bare tag committed correctly; the transform saved a wrapper
+svelte                     a bare tag committed NOTHING, and THREW on style
+```
+
+Svelte's `ShimElement.setAttribute` wrote an inert Map, so only the `p={{…}}` bag the transform
+builds ever reached `routeProp`. Closed 2026-09-07: `setAttribute` merges each key into that same
+folded bag and routes it, `removeAttribute` routes `undefined`, and both share the pre-live buffer
+the bag already had. `dom-shim/bare-tag-props.test.ts` pins the parity row — bare and bagged commit
+byte-equal payloads — and all six rows go red with the routing call removed.
+
+It cost one private method, against a prediction of "a separate and much larger change" written into
+`.claude/rules/svelte-shim-element-global-must-be-an-ancestor.md`. The estimate was made when the
+bag machinery did not exist; by the time the change was made, the fold, the class normalisation, the
+diff and the replay were all already there and only needed a second writer. **A cost recorded before
+its neighbours were built is an estimate about a different tree** — re-price before quoting one.
+
+### Scope of the reset, stated by the owner the same day
+
+*As few components as possible, as many tags as possible.* Only the LIST family
+(`FlatList` / `SectionList` / `VirtualizedList` / `VirtualizedSectionList`) is expected to stay a
+component — it owns windowing state, a cell registry and a render callback per item, none of which a
+tag can carry. Everything else becomes a tag, and the lowering transform is deleted in every form.
+
+## Angular cannot admit a DASHLESS tag by schema — and a directive beats every schema anyway
+
+Measured 2026-09-07 through the real `@angular/compiler-cli` with the repo's own
+`strictTemplates: true` (`adapters/angular/src/bare-intrinsic-tag-aot.test.ts`, 14 cases with a
+control that the compilation ran). JIT is blind to all of it: a bare `<view>` mounts clean under
+JIT with no schema and no warning, so no mounting test in this repo could have found it.
+
+```
+<view [testID]>          no schema                NG8001 'view' is not a known element
+<view [testID]>          CUSTOM_ELEMENTS_SCHEMA   NG8001          <- the finding
+<view [testID]>          NO_ERRORS_SCHEMA         clean
+<text-input [value]>     CUSTOM_ELEMENTS_SCHEMA   clean
+```
+
+`hasElement` / `hasProperty` gate the `CUSTOM_ELEMENTS_SCHEMA` branch behind
+`normalizedTag.includes('-')` (`dom_element_schema_registry.ts:405,427`) — a custom element must
+have a hyphen. Dropping the `symbiote-` prefix split the alphabet: the dashed tags still compile
+with their whole surface, the six dashless ones (`view`, `text`, `pressable`, `image`, `switch`,
+`modal`) compile under no schema at all.
+
+**A CUSTOM schema is not a thing.** `SchemaMetadata` is `{ name: string }` and the name is compared
+against exactly two constants, in one file. A third object is silently ignored. The registry itself
+is a module-level `const` in four places in ngtsc, so it cannot be swapped either — every article
+describing an `ElementSchemaRegistry` replacement is ViewEngine-era.
+
+### The directive route, and why it is better than the schema it replaces
+
+A `@Directive({ selector: 'view' })` makes the element known with NO schema. What made it look like
+a dead end is real and is a repair rather than a wall: matching a directive turns every binding into
+an input lookup, so an undeclared prop is NG8002 — declare it and the lookup succeeds.
+
+```
+<view [testID]="v">    directive declares testID    compiles, no schema anywhere
+<vieww [testID]="v">   same                          NG8001 — the typo is caught
+<view [testID]="42">   same                          type error — the PROP TYPE is caught
+```
+
+The third row is strictly beyond either schema: both return `true` for EVERY property on a tag they
+admit ("we don't know which properties a custom element will get", `:407`), so `<text-input
+[nonsense]>` compiles silently under `CUSTOM_ELEMENTS_SCHEMA`.
+
+**The value still reaches the engine, through ONE generic loop** — an `ngOnChanges` forwarding each
+changed key to `Renderer2.setProperty`, not per-prop code. Measured end to end
+(`element-directive-forward.test.ts`); with the loop removed the node does not commit at all, which
+is the break-test and also the proof that a claimed binding never reaches the renderer on its own.
+
+### The ergonomics answer, because it is the first objection
+
+There is no global-import mechanism for standalone components — per-component `imports` is the
+design (angular/angular#43784), and it was discussed and not built. That is the floor whatever we
+ship, and it costs nothing new here: **every component in `examples/angular` already writes
+`imports: [SafeAreaView, Text, View]`**, 73 of them. The directives take the same line, and Angular
+flattens a nested array, so the whole set collapses to one symbol — `imports: [SYMBIOTE_ELEMENTS]`,
+which stays one symbol as the set grows (pinned as case L).
+
+An app that genuinely wants zero per-component lines still has NgModules: declare its components in
+a module that imports ours and every one of them sees the directives.
+
+**What is NOT priced yet:** a directive instance per node plus `ngOnChanges`. Cheaper than a
+component (no separate LView) and still the per-node tax this whole migration exists to remove.
+Measure on the Angular benchmark screen before committing to it.
+
+### DECIDED 2026-09-07: the NgModule route, like NativeScript-Angular
+
+The app writes it ONCE. A component DECLARED in an NgModule inherits that module's whole import
+scope, so one `imports: [SymbioteElementsModule]` gives every component in it the element
+directives — no `imports` line and no `schemas` line anywhere else. Measured through real ngtsc
+(cases M and N): two components with nothing between them compile clean, and `<vieww>` still fails
+with NG8001, which is the half NativeScript-Angular gives up by needing `NO_ERRORS_SCHEMA` (they
+have no directives to match).
+
+One correction to the obvious spelling: in v20 a `@Directive` is STANDALONE by default, so the
+module `imports` them and `exports` them. `declarations:` fails with "Directive X is standalone,
+and cannot be declared in an NgModule".
+
+The cost is `standalone: false` on every app component that wants the scope — still supported in
+v20, and case M is what proves that rather than assuming it. `examples/angular` has 73 components
+to convert.
+
+#### SUPERSEDED the same day: standalone + explicit imports
+
+The owner reversed it within the hour, and the reversal is the cheaper answer: components stay
+`standalone: true` and list the elements in their own `imports`. The NgModule measurement above is
+kept because it is what makes the reversal informed — the module route is available and costs 73
+components' worth of `standalone: false` in `examples/angular` alone.
+
+**The decisive fact is that this costs NO new boilerplate.** Every component in `examples/angular`
+already writes `imports: [SafeAreaView, Text, View]` — 73 of them. The directives take the same
+line, and Angular flattens a nested array, so the whole set collapses to one symbol
+(`imports: [SYMBIOTE_ELEMENTS]`, case L) and the line gets shorter rather than longer.
+
+### The engine owns a primitive's inner node — decided 2026-09-07, and it kills the `-managed` route
+
+A ScrollView is two nodes (`RCTScrollView` > `RCTScrollContentView`). Exactly one thing may build the
+inner one. Today the ADAPTER builds it, three ways: the `ScrollView` wrapper (Vue, Angular, React),
+and `VirtualizedList` hand-authoring the `scroll-view`/`scroll-content` intrinsics directly (Svelte,
+Solid). Registering `registerScrollViewBehavior()` makes `buildStructure` build it as well, and the
+committed tree grows a second `RCTScrollContentView`.
+
+Three agents reached this independently, and the finding that matters is **why deleting the wrapper
+does not fix it**: `VirtualizedList` is a second owner, the LIST family deliberately stays a
+component, and on two adapters it never imports the wrapper at all — so an import grep reports those
+adapters clean. The plan's "atomic per-adapter cut" does not exist as an operation.
+
+**The owner's decision: the engine builds it.** Every list and wrapper stops. That rules out the
+route `behaviors/scroll-view/shared.ts` proposed in its own header — a `scroll-view-managed` pair on
+the `text-input-managed` precedent — which was already forbidden by
+`.claude/rules/fold-only-primitive-recipe.md` §4 ("a second tag is not an available answer… delete
+the wrapper rather than giving it a private spelling").
+
+**And the two documents contradicted each other in writing, which is the reusable half.** The rule
+forbids a second tag *because* "this migration is removing the wrapper, which removes the second
+owner" — a premise that is simply false for any primitive whose inner node a surviving component
+also builds. The rule's verdict held; its stated reason did not. Same shape as
+`.claude/rules/adapter-parity-audit.md`'s repeated finding, from the other side: **before applying a
+rule, check that the premise it names is true of YOUR primitive** — here, ask who else builds the
+inner node, and grep for the hand-authored intrinsic as well as for the wrapper import.
+
+### A windowed list must NOT forward `stickyHeaderIndices` to the engine
+
+The behavior's index reconciler numbers the owner's PAINT children — the nodes actually committed
+under the content slot. A list's `stickyHeaderIndices` are indices into its DATA stream. On a
+non-windowed list the two coincide, which is what makes this dangerous; on a windowed one they do
+not, and the reconciler wraps whichever child happens to sit at that paint position.
+
+Measured 2026-09-07 on Svelte's `VirtualizedList` with `stickyHeaderIndices=[0,3,6]`: a phantom
+sticky header appeared at `layoutY=900` — data index 9, which is not in the list at all — and fed a
+bogus collision point to the header at 600.
+
+**The rule for every adapter's list: mark the cell with the `sticky-header` TAG, never forward the
+index array.** The index path in the behavior is the COMPATIBILITY path for an app that writes RN's
+prop on a plain `<scroll-view>`, where paint and data order do agree.
+
+Second, smaller, same family: forward the RAW `scrollEventThrottle`, not a folded one. The behavior's
+`syncThrottle` reads a number back as the app's own value and can then never lower it again.
+
+### Declaring the tag alphabet to each framework's type-checker — measured 2026-09-07
+
+Two of five adapters declared nothing, and Svelte's case is not "no types" but WRONG types, because
+four of our 21 tag names are real SVG elements.
+
+```
+react     src/jsx-runtime.ts + jsx-namespace.type-check.tsx    has it
+solid     src/jsx-runtime.ts                                   has it
+angular   20 element directives with typed @Inputs             has it, by a different mechanism
+vue       nothing — GlobalComponents augmentation is the route, no name conflicts to work around
+svelte    nothing, and view/text/image/switch actively mistype
+```
+
+**Svelte, measured with a control arm:**
+
+```
+augment svelte/elements -> SvelteHTMLElements      TS2717 on view/text/image/switch
+                                                   (svelte/elements.d.ts:2035 view: SVGAttributes<SVGViewElement>)
+                                                   a NEW name such as sticky-header augments cleanly
+augment global svelteHTML.IntrinsicElements        WINS. examples/svelte svelte-check 5 errors -> 3
+bind:this element type                             NOT FIXABLE from a library
+```
+
+The `bind:this` half is closed by construction, so do not re-derive it: `svelte2tsx/svelte-jsx-v4.d.ts:25`
+bakes `Key extends keyof ElementTagNameMap ? … : Key extends keyof SVGElementTagNameMap ? … : any` into
+its shim's RETURN type. Both maps come from `lib.dom`, which line 1 of that same file force-includes with
+`/// <reference lib="dom" />` — a triple-slash lib reference inside a dependency cannot be suppressed from
+a consumer's tsconfig, and the example's own `lib` list contains no `dom` at all. Augmenting either map
+hits the same TS2717. Svelte's custom-renderer API (PR sveltejs/svelte#18042) is not in 5.56.8.
+
+**Scope, which is what keeps this a wart and not a blocker:** a hyphenated tag falls through to `any`
+there, so NO adapter tag has ever given a typed ref in Svelte. Dropping the `symbiote-` prefix turned
+`any` into an ERROR, and only on sites that take a ref — three in the whole canary, all of them ref
+demos. The decision was to ship the attribute half and leave the ref typing alone rather than rename a
+tag.
+
+**Method note worth more than the finding.** The first probe used `--skipLibCheck` and reported the
+augmentation as ACCEPTED — that flag skips exactly the `.d.ts` files where a merge conflict lives, so it
+suppressed the error the probe existed to find. Any probe about declaration merging must run without it,
+and needs a second arm using a name that does NOT collide, or "no error" and "nothing was checked" read
+the same.
+
+#### Refinement: an OWN member of a merged interface outranks an INHERITED one
+
+The measurement above (`svelteHTML.IntrinsicElements` augmentation takes the count 5 -> 3) is true for
+the shape the probe used and MISLEADING for the shape the fix needs. The probe wrote `view: …` directly
+into the augmentation — an own member, same rank as svelte2tsx's own `view: HTMLProps<'view', SVGAttributes>`.
+The shipped version derives its tag list (`interface IntrinsicElements extends Record<ISymbioteIntrinsic, …>`),
+which makes every name INHERITED, and inherited loses. Error count stayed at 5 while the declaration
+demonstrably loaded — svelte-check's file count moved 635 -> 636.
+
+So a probe that hardcodes one name cannot predict a fix that derives the list, and the failure is silent
+in the direction that flatters you. When a probe and the real change differ in HOW a member arrives, the
+probe has not tested the change.
+
+What actually closes it is svelte2tsx's own documented extension point: its `SVGAttributes` is an empty
+interface commented "in case someone enhanced the typings", and its entries are
+`Omit<SvelteHTMLElements[tag], keyof SVGAttributes> & SVGAttributes` — so an index signature there makes
+`keyof` become `string | number`, the `Omit` erases the whole SVG surface, and ours is what remains. Blunt
+(it reaches every SVG tag) and free (a React Native app has none).

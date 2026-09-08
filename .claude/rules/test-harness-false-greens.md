@@ -1191,3 +1191,161 @@ EFFECT (a `ɵɵdefineComponent` present at its own `Program` exit — the linker
 generated `base$N`, so a name check would rot) and throws, and the rewrite moved to a source
 pre-pass in `@symbiote-native/angular/metro-transformer`, which prints the lowered code to text
 before Metro parses it.
+
+## An oracle that reads SOURCE TEXT is invalidated by a FORMATTING pass
+
+Measured 2026-09-03. `adapters/angular/babel-register-composed.test.ts` derives its expected
+selector set by regexing `core/components/src/component-names/index.{ios,android}.ts` for
+`'([a-z][a-z-]*)':` — a QUOTED kebab key. That was exact until prettier ran: it drops the quotes
+from a key that is a valid identifier, so `view` / `text` / `image` / `modal` / `switch` /
+`pressable` went bare and every hyphenated name kept them. The oracle found 13 of 19 and the suite
+went red on a run with no source change behind it.
+
+The direction is what makes it worth an entry. Here it was a false RED, which is loud; the same
+extractor over a set that only GREW would have quietly stopped seeing the new members.
+
+Two things generalise:
+
+- **Bound a source-reading extractor by the STRUCTURE it is reading** — the object literal's own
+  braces — and then match keys with the punctuation optional. A pattern keyed on incidental syntax
+  is keyed on the formatter's current settings.
+- **A formatting pass is a code change for any test that parses source.** After a repo-wide
+  `prettier --write`, a suite that goes red has not necessarily found a bug; check whether the
+  failing assertion reads a file as TEXT before chasing the diff.
+
+## 30. A multi-stage compiler reports the FIRST failing stage — the later one never runs
+
+`performCompilation` (`@angular/compiler-cli`) collects the program's TypeScript SEMANTIC diagnostics
+first and **never runs the template checker when any exist**. One stray TS error anywhere in a
+fixture — a missing `@types`, an unresolved import — makes every template assertion report CLEAN,
+the must-fail cases included.
+
+Measured 2026-09-07 while probing bare-tag directives. The fixtures import the package, which pulls
+a module reading `process.env`; without `types: ['node']` in the AOT options every case came back
+with zero diagnostics. Three probe rounds were invalidated before it was caught, and each read as a
+RESULT rather than as an error — "the directive route type-checks nothing" and "the directive route
+accepts everything" are the same empty list.
+
+A control of the shape "some case failed" does not catch it: one stray TS error satisfies it while
+every template check is dead. Pin a diagnostic only the stage under test can produce — here `is not
+a known element` — and break-test that pin.
+
+The general form, and it is not Angular's: a staged compiler stops at the first unhappy stage, so a
+harness asserting on stage N is silently measuring stage N-1 whenever stage N-1 has anything to say.
+Before trusting a clean run, plant an error the stage you care about MUST produce and confirm it
+appears.
+
+## 31. Node's ESM cache is keyed by resolved URL — one fixture file means one measured tree
+
+A suite that COMPILES a fixture to disk and imports it per case must write a distinct PATH per case.
+Node caches an ES module by its resolved URL, and a `?t=` cache-buster does not defeat it under
+vite-node. Rewriting one fixture path between cases therefore leaves every case importing case one's
+module — and every case passes, because case one is valid.
+
+Measured 2026-09-07 on `adapters/svelte`, in a test whose whole job was counting nodes in a committed
+tree: six cases, one file, all green, all measuring the same tree. The shape is nastier than a normal
+false green because node COUNTS are plausible for any of the trees, so nothing looks wrong.
+
+This is specific to adapters whose suites pre-compile sources to sibling artifacts — Svelte here —
+and it will not appear in a suite that imports its subject directly. Two tells: cases that should
+differ report identical numbers, and deliberately breaking case three reddens case one.
+
+## 32. `tsc --build` is clean because it never reads a test file — in every package
+
+Measured 2026-09-07 across the whole repo:
+
+```
+core/engine        exclude: src/**/*.test.ts, src/**/*.test.tsx, src/**/*.bench.ts
+core/components    exclude: src/**/*.test.ts, src/**/*.test.tsx
+all five adapters  the same, svelte/solid/angular also *.test.ts at the root
+```
+
+Vitest transpiles through esbuild and type-ERASES, so nothing in this repo type-checks a test. "`tsc
+--build` clean" is a true statement about source and an empty one about tests, and it was offered as
+verification seven times in one session before anyone checked what it covers.
+
+**Why this is a false-green source and not merely untidy.** A wrong type in a FIXTURE is the tell that
+the test is not calling what it believes: a hand-built object that does not satisfy the real parameter
+type means the production signature was never exercised. Measured the same day — a test passing
+`{nativeEvent: {contentOffset: {y}}}` where the listener is `(event: ISymbioteEvent) => void` bypasses
+the real dispatch path entirely and stays green.
+
+The editor's language service DOES check these files, so its diagnostics are strictly stronger than CI
+here. That asymmetry is worth knowing in both directions: a diagnostic an agent "cannot reproduce with
+`tsc --build`" is not necessarily wrong, and a green `tsc --build` is not evidence that a test's types
+hold.
+
+Closing it is a real cleanup, not a flag flip — the excluded files currently need `types: ["node"]`
+(`node:fs`, `__dirname` are unresolved in dozens of them). The cheap interim is to stop accepting "tsc
+clean" as coverage for anything a test file asserts.
+
+## 33. While a capability MOVES between layers, both can be live — and only a COUNT sees it
+
+A migration that relocates work from a wrapper into the engine has a window where both implementations
+run. Neither is broken, each test of each layer passes, and the committed tree usually looks right —
+the damage is a doubled side effect on a shared external resource.
+
+Measured 2026-09-07: `addAnimatedEventToView` was called twice per view tag, because
+`createAnimatedComponent`'s leaf lifecycle attached native events and the engine's new `routeProp` hook
+attached them too. The wrapper hands its `on*` props DOWN to a host element, so they reach `routeProp`
+regardless — the two paths are not alternatives, they compose.
+
+**What caught it was an assertion on the NUMBER of native calls, and only two of five adapters had one.**
+React, Solid and Angular assert behaviour and payload, not call counts, so on those three it would have
+shipped silently. That is the generalisable half:
+
+- A payload oracle cannot see a doubled call whose second write is identical to the first.
+- So for any resource that is ATTACHED rather than written — a native module registration, a listener, a
+  subscription, a connect/disconnect pair — assert the count, not just the effect.
+- And during a layer migration specifically, ask which layer OWNS the resource now, in writing. "Both
+  work" is the symptom.
+
+The diagnosis to reach for first is worth naming, because the instinct is wrong: a failure that appears
+in some adapters and not others reads as an adapter divergence. Here it was layer-vs-layer, identical in
+all five, and the adapters differed only in whether their tests could see it.
+
+## 34. Asserting a value's PRESENCE cannot see a value that stopped changing
+
+An animation that freezes still commits its prop. So a test that identifies a node by
+`Array.isArray(node.props.transform)`, or asserts a key exists, stays green through the exact defect
+it looks like it covers — and reads as protection to everyone after.
+
+Measured 2026-09-07 while pricing the deletion of `createAnimatedComponent`. Vue's sticky header is
+instantiated by three tests, and a frozen pin passes all three:
+
+```
+sticky-native-attach   asserts addAnimatedEventToView on the SCROLL VIEW, not the header's leaf
+section-list           filters wrappers by Array.isArray(props.transform)   presence, not value
+virtualized-list       mounts stickyHeaderIndices, asserts no pin at all
+```
+
+The comparison that makes the point: the same deletion on Angular was also silent, but there the
+sticky header had NO test. **Coverage that asserts the wrong observable is worse than no coverage** —
+an audit counting tests finds Vue protected and Angular exposed, and the two are equally blind.
+
+The rule for anything time-varying — an animation, a scroll offset, a debounce, a poll: assert the
+value at two points and require them to DIFFER. A single-sample assertion about a moving value is a
+presence check wearing a behaviour check's name.
+
+## 35. A watchdog shorter than the suite kills agents that obeyed the brief
+
+Two agents were killed the same minute for "no progress for 600s". Neither was stuck: `vitest run
+adapters/svelte` takes **1071 seconds** on this tree, and both briefs asked for it. The watchdog sees
+a silent stream and reports a stall, so the failure is indistinguishable from a real hang and the
+work is lost mid-edit.
+
+Measured 2026-09-07. The cost is not the wasted run — it is that a killed agent leaves a HALF-APPLIED
+deletion, and the next reader has to reconstruct which half.
+
+So a brief must scope verification to what changed: the touched test files by path, or one directory.
+Reserve a full-suite run for a session that can wait on it, and say so explicitly, because an agent
+will otherwise do the thorough thing and die of it.
+
+### `tsc --build` does not read `.svelte` either
+
+Same shape as §32 (test files are excluded) and wider. On the run above, seven live `.svelte`
+components still imported a `View.svelte` that had been deleted, and `tsc --build` was **clean** —
+`.svelte` is not a TypeScript input at all, so nothing type-checks a component's imports.
+
+In an adapter whose components are `.svelte`, `tsc --build` covers the `.ts` half and says nothing
+about the templates. The oracle there is the suite or `svelte-check`, never tsc.

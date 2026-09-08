@@ -446,3 +446,114 @@ difference at all** (`.claude/rules/canary-visual-defects.md`) — here the miss
 compiler, one layer below every hypothesis anyone was testing. And **a headless green on the exact
 reported shape is evidence about the CODE, never about the device**: it is what tells you to go
 looking at what the device is running instead of at what the repo says.
+
+## `adapters/svelte/build/` is never cleaned, so DELETED sources keep shipping
+
+Its `prepare` is `typecheck && copy-svelte-sources && emit-svelte-declarations` — no `clean` step,
+unlike the Angular packages' `rm -rf build`. So a `.svelte` deleted from `src/` stays in `build/`
+forever and rides every `pnpm pack` into every example.
+
+Measured 2026-09-08, after the wrapper deletion: `View.svelte`, `Text.svelte`, `SafeAreaView.svelte`
+and `scroll-view/sticky-header.svelte` were all absent from `src/` and present in the example's
+installed `node_modules`. Inert — the barrel re-exports none of them — but it is exactly the
+artifact that makes a later reader conclude the wrapper still exists, and the file-presence checks
+this rule already prescribes all report it as healthy.
+
+The tell is a file the INSTALLED build has and `src/` does not, which no diff of `index.js` can
+show:
+
+```bash
+comm -13 <(cd adapters/svelte/src && find . -name '*.svelte' | sort) \
+         <(cd adapters/svelte/build && find . -name '*.svelte' | sort)
+```
+
+`rm -rf adapters/svelte/build` before the pack whenever a `.svelte` has been deleted. A build
+directory with no clean step is a cache keyed on nothing.
+
+## Read METRO'S CACHE to settle "the fix is not on the device"
+
+A device screenshot cannot say whether it is showing a defect or an old bundle, and neither can a
+headless test — a green test against workspace SOURCE proves nothing about what Metro served. The
+argument that follows ("did you reset the cache?" / "I did, it is still broken") is unresolvable by
+assertion, and it burned most of an hour on 2026-09-08.
+
+Metro's on-disk cache is the transformed module text, greppable, and it answers directly:
+
+```bash
+D="${TMPDIR}metro-cache"
+command grep -rl "<a string only the fix contains>" "$D"      # is the new code in the bundle?
+command grep -rl "<the class name>"                "$D"      # did the CSS rule survive compilation?
+stat -f "%Sm %N" -t "%H:%M:%S" <the hit>                     # WHEN was it written?
+```
+
+The timestamp is the half that ends the argument. Here the module carrying the fix was written at
+**09:57** and the screenshots were **09:37 and 09:38** — so the screenshots predate the bundle by
+twenty minutes and describe code that was never on the device. Compare the cache entry's mtime with
+the screenshot's clock before diagnosing anything from the image.
+
+The same read also verifies the layers a unit test cannot reach in one pass, all from the bytes the
+device actually ran: the compiled `.svelte` (does the screen still pass the prop?), the compiled CSS
+(`{"tokens":["scroll-content"], "style":{…}}` — did the rule survive lightningcss?), and the
+transformed engine module. Three questions, one grep each, no build and no simulator.
+
+And the cheap ordering rule this cost: **check the artifact before writing the probe.** Two mount
+harnesses and a resolver hook were built to answer a question `grep` + `stat` answered in ten
+seconds, because the probes were aimed at the source tree — which was never in doubt.
+
+### The mtime read the cache correctly and the CONCLUSION from it was still wrong
+
+Recorded immediately above, an hour before it was refuted, and the sequence is the lesson. The
+cache entry carrying the fix was newer than the screenshots, so "the screenshots predate the
+bundle" was stated as settled. The user produced a screenshot 40 minutes later with the same
+defect, and the real cause was in the same cache all along — a module carrying
+`SCROLL_VIEW_TAG = 'symbiote-scroll-view'`, a tag name nothing had emitted for days.
+
+**A fresh timestamp says the bundle was rebuilt. It says nothing about WHAT was rebuilt from.**
+Here the rebuild faithfully re-transformed a stale file that the published package still shipped
+(next section). So read the cache's CONTENT for the thing you are debugging, not only the clock —
+the clock answers "is this bundle current", and the question was "is this bundle correct".
+
+## `tsc --build` deletes nothing, so a renamed module ships FOREVER — and a flat emit SHADOWS its folder
+
+The failure above, root-caused. `behaviors/scroll-view.ts` became `behaviors/scroll-view/` months
+ago. `tsc --build` is incremental and removes no output, so `build/behaviors/scroll-view.js` stayed
+beside the new `build/behaviors/scroll-view/` — and **every resolver prefers `X.js` to
+`X/index.js`**, so the package shipped the pre-move file to every consumer.
+
+That file registered the ScrollView host behavior under its own era's tag name, which nothing emits
+any more. So `<scroll-view>` got no behavior at all:
+
+```
+no buildStructure   ->  no content node
+no childHost        ->  contentContainerStyle has nowhere to be redirected, and is dropped
+                    ->  the app's children commit straight into RCTScrollView
+```
+
+On screen: no padding, no gap, and — on the canary — subtrees drawn over each other, because the
+outer content and the inner lists were laid out from one origin. Every suite stayed green, `tsc`
+stayed green, and a real mount of the real `index.svelte` through the real compiler was green TOO,
+because vitest resolves `src` and never reads `build`. **Only the published artifact was wrong**,
+which is the one thing no test in this repo was reading.
+
+Two other orphans surfaced with it, both merely dead rather than shadowing, and both were being
+published as importable modules a week after their sources were deleted: `core/components/build/
+state-style.js` and `adapters/react/build/jsx.js`.
+
+The sweep exists — `scripts/clean-build-outputs.mjs` — but only `pnpm run prepublish-build` calls
+it, and `pnpm run registry:publish` does not. **Run `pnpm run prepublish-build` before publishing,
+never a bare rebuild.** Then force the reinstall, because a same-version republish short-circuits:
+
+```bash
+pnpm run prepublish-build && pnpm run registry:publish
+rm -rf examples/<app>/node_modules/@symbiote-native examples/<app>/package-lock.json
+pnpm run registry:refresh examples/<app>
+```
+
+Guarded since by `tests/build-output-has-no-orphans.test.ts`: every `build/**.js` must have a
+source twin, with the shadowing case reported separately from the merely-dead one. The package list
+is read off disk and the emit root is DERIVED (Angular's `ngc` writes `build/angular/**` because
+its `rootDir` sits a level above `src`, so a lone top-level directory `src/` does not also have is
+taken as the emit root). Break-tested by re-creating the file, which reddens `core/components`.
+
+It only sees a tree that has been built, so it is a local and pre-publish guard, not a CI one —
+which is the right shape here, since the artifact is exactly what CI does not have.

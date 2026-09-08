@@ -274,6 +274,20 @@ requires transitively from every loose root script listed in `files`).
 
 ## The fifth surface: the LOWERING TRANSFORMS, and no audit sees it
 
+> **THE SUBJECT IS GONE — 2026-09-08. Every lowering transform is deleted, along with
+> `lowering-fixtures.cjs`, `specialize-state-style.cjs`, `REFUSAL_CATEGORIES`, `LOWERING_RUNS_LAST`
+> and the `state-style` subpath on all six packages.** An app writes the intrinsic tag itself, so
+> there is no call site to rewrite and nothing to refuse. `host-primitives.cjs` survives as the
+> PRIMITIVE spec — read at runtime by `resolve-intrinsic.ts` / `fold-host-bag.ts`, and by
+> `adapters/vue/intrinsic-tags.cjs` for element-vs-component.
+>
+> **Read every section from here to "A styled element's prop-key count" as METHOD, never as
+> current state.** The method lessons transfer — a shared table cannot check plumbing it does not
+> run, a green `refuse` proves nothing without a positive control, a substring oracle over a
+> namespace where one name extends another, a spec field dropped between the file and its reader.
+> Every claim in the present tense about a transform, a refusal category or a fixture row is
+> history. This is the file's own rule (§`bagFold` IS RETIRED) applied to the whole layer.
+
 Four transforms now implement the same rule set — `adapters/solid/babel-lower-host-primitives.cjs`,
 `adapters/vue/babel-lower-host-primitives.cjs`, `adapters/vue/metro-vue-transformer.cjs`,
 `adapters/svelte/src/preprocessor/lower-host-primitives.ts`. They read one shared spec
@@ -1466,3 +1480,64 @@ Two things worth carrying past this instance:
 That last point is the audit's boundary stated as a fact rather than a caveat: **it measures parity
 with our wrapper, never parity with React Native.** A fold both paths are missing is agreement, and
 agreement is what it reports as healthy.
+
+## A comment declaring something IMPOSSIBLE is a claim about a sibling you did not check
+
+`behaviors/scroll-view/sticky.ts` recorded, as the reason it implements no index form: *"A lowered
+element has no children array to walk and no render to wrap anything in, so the index cannot be
+resolved at all."* Both halves were measured false on 2026-09-07, and the disproof was not a clever
+argument — it was **a sibling adapter already doing it**. `adapters/angular/src/components/scroll-view/projection.ts`
+resolves those same indices on engine nodes today, wraps children with the plain mutation API, and
+even documents the index-drift bug a fresh walk avoids.
+
+The reason the claim survived is that it is true at BUILD time — a transform cannot see children —
+and the file was written while the transform still existed. It was never re-read after the behavior
+started owning the structure, so a statement about one phase stood as a statement about the system.
+
+Two working rules, and the second is the cheap one:
+
+- **An impossibility claim ages worse than any other kind**, because nothing ever fails when it is
+  wrong — it just silently scopes the work down. Give it a phase and a subject ("at build time, a
+  transform cannot…"), never a bare "cannot".
+- **Before recording one, grep whether another adapter already does the thing.** Five adapters
+  solved the same problems five ways; one of them has usually built what you are about to call
+  impossible. This is the mirror of the rule above it — a claim about a sibling is a claim you have
+  not checked — pointed at your own file instead of theirs.
+
+### The fold audit INTERSECTS across adapters, so a fold only SOME wrappers hold is invisible
+
+`tests/lowered-primitive-fold-parity.test.ts` diffs each wrapper's shared-layer value imports
+against the behavior's, **intersected across the five adapters**. That intersection was chosen so a
+per-adapter idiom cannot raise a false positive. It also means a name present in three wrappers and
+absent from two is dropped before the comparison — and "some wrappers have it, some do not" is the
+exact shape of a fold two adapters are already missing.
+
+Device-found 2026-09-08 on `examples/svelte`, a lost `gap` and a lost `padding`:
+
+```
+contentContainerStyle="scroll-content"    a class NAME, what every canary writes
+
+react    shared.ts:306   typeof … === 'string' ? resolveClassName(…)     three separate copies
+vue      shared.ts:327   "                                                of one fold
+angular  shared.ts:554   "
+solid    resolves it too, with its own test
+svelte   pure passthrough  ->  behavior renames it verbatim to `style`
+behavior SLOT_PROPS = { contentContainerStyle: 'style' }   no resolution anywhere
+```
+
+A `style` holding a string is not a style, so the whole rule — padding on all four sides, plus the
+`gap` that gave the screen its vertical rhythm — was dropped with nothing red. `tsc`, 5 499 tests
+and `svelte-check` were all green; the screen just looked squashed.
+
+Three things worth carrying:
+
+- **A duplicated fold is the tell, not the fix.** Three adapters each writing the same six lines is
+  what the shared layer exists to delete; it is also what let two adapters not have it. Grep the
+  fold's OUTPUT across `adapters/*/src/components/**` before assuming the shared layer owns it —
+  the same instruction this file already gives for `Image`'s three implementations.
+- **`ScrollView` is not in the audit at all** — it covers `Pressable` and `TextInput`. A composed
+  primitive whose wrapper survives as a thin passthrough is the case the audit was never pointed at.
+- Fixed in `routeProp`'s slot branch (`core/engine/src/node.ts`): a slot rename targeting `style`
+  routes a STRING as `class` instead, so the registry resolves it once for every adapter. The three
+  wrapper copies are now redundant but harmless — they resolve to an object before the engine sees
+  the prop.
