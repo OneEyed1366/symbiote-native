@@ -1,6 +1,6 @@
 // SafeAreaView — the native view that insets its children past the notch, the rounded corners and
 // the system bars. There is no JS-side inset math anywhere in this project: the host does it, and
-// every adapter's job is only to put style + children on the `symbiote-safe-area-view` intrinsic.
+// every adapter's job is only to put style + children on the `safe-area-view` intrinsic.
 //
 // So this is a View twin, and ./view.tsx carries the reasoning they share (why the file is real
 // JSX, why nothing is destructured at setup, why children and ref are pulled out of the bag).
@@ -62,9 +62,5 @@ export function SafeAreaView(props: ISafeAreaViewProps): JSX.Element {
 
   const bag = withStableKeys(() => ({ ...resolveAccessibilityProps(rest) }));
 
-  return (
-    <symbiote-safe-area-view {...bag()}>
-      {local.children}
-    </symbiote-safe-area-view>
-  );
+  return <safe-area-view {...bag()}>{local.children}</safe-area-view>;
 }

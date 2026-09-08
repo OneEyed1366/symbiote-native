@@ -21,15 +21,15 @@ import {
 } from '@symbiote-native/components';
 
 registerPressableBehavior();
-// Only the LOWERED tags carry this — the wrapper renders `symbiote-text-input-managed` and
+// Only the LOWERED tags carry this — the wrapper renders `text-input-managed` and
 // keeps running its own lifecycle. One owner per node; see `component-names/shared.ts`.
 registerTextInputBehavior();
-// Same reason as TextInput: the wrapper renders `symbiote-switch-managed` and runs its own
+// Same reason as TextInput: the wrapper renders `switch-managed` and runs its own
 // lastNativeReport/snap-back lifecycle, so the engine's copy attaches only to the bare tag.
 registerSwitchBehavior();
 
 // Image owns no runtime — its behavior is a prop FOLD and nothing else, and it is registered on the
-// same `symbiote-image` the wrapper already emits rather than on a `-managed` twin. That is safe
+// same `image` the wrapper already emits rather than on a `-managed` twin. That is safe
 // only because the mapping is idempotent, which `core/components/src/behaviors/image.test.ts`
 // asserts rather than assumes; a wrapper-built node simply folds a second time and nothing moves.
 registerImageBehavior();

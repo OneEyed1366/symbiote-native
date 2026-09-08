@@ -34,13 +34,11 @@
     "./jsx-runtime": "./src/jsx-runtime.ts",
     "./jsx-dev-runtime": "./src/jsx-runtime.ts",
     "./babel-preset": "./babel-preset.cjs",
-    "./metro-css-parser": "./metro-css-parser.cjs",
-    "./state-style": "./src/state-style.ts"
+    "./metro-css-parser": "./metro-css-parser.cjs"
   },
   "files": [
     "build",
     "babel-preset.cjs",
-    "babel-lower-host-primitives.cjs",
     "metro-css-parser.cjs"
   ],
   "publishConfig": {
@@ -70,11 +68,7 @@
         "default": "./build/jsx-runtime.js"
       },
       "./babel-preset": "./babel-preset.cjs",
-      "./metro-css-parser": "./metro-css-parser.cjs",
-      "./state-style": {
-        "types": "./build/state-style.d.ts",
-        "default": "./build/state-style.js"
-      }
+      "./metro-css-parser": "./metro-css-parser.cjs"
     }
   },
   "scripts": {

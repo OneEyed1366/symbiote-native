@@ -33,7 +33,7 @@ import { REFRESH_CONTROL, SCROLL_VIEW_TAG } from './shared';
 const fabric = installFabric();
 let nextRootTag = 9900;
 const SCROLL = descriptorFor(SCROLL_VIEW_TAG).component;
-const CONTENT = descriptorFor('symbiote-scroll-content').component;
+const CONTENT = descriptorFor('scroll-content').component;
 
 beforeEach(() => {
   registerScrollViewBehavior();
@@ -55,11 +55,7 @@ function mount(props: Readonly<Record<string, unknown>> = {}): {
   surface.appendChild(root);
   const node = createElement(SCROLL, false, SCROLL_VIEW_TAG);
   for (const key of Object.keys(props)) routeProp(node, key, props[key]);
-  const refresh = createElement(
-    REFRESH_CONTROL,
-    false,
-    'symbiote-refresh-control',
-  );
+  const refresh = createElement(REFRESH_CONTROL, false, 'refresh-control');
   return {
     node,
     root,
@@ -170,6 +166,14 @@ describe('the style splits across the two boxes', () => {
   it('wires nestedScrollEnabled on the inner scroll view', () => {
     const { scroll } = boxes({});
     expect(scroll.props.nestedScrollEnabled).toBe(true);
+  });
+
+  // The wrap swaps the owner's fold, so anything the ordinary fold does had to be restated in the
+  // wrapped copy — and `decelerationRate` was not. It reached Fabric as the string 'fast' on every
+  // Android ScrollView carrying a RefreshControl, which the native side cannot read.
+  it('still resolves decelerationRate while wrapped', () => {
+    const { scroll } = boxes({ decelerationRate: 'fast' });
+    expect(typeof scroll.props.decelerationRate).toBe('number');
   });
 
   // `markPropsDirty` bubbles UP, so a style written on the owner reaches every ancestor and never

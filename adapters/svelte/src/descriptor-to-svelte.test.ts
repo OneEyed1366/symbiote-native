@@ -38,7 +38,7 @@ describe('mountDescriptorChildren', () => {
 
       const children: IDescriptorChild[] = [
         {
-          type: 'symbiote-activity-indicator',
+          type: 'activity-indicator',
           props: { animating: true },
           children: [],
         },
@@ -61,7 +61,7 @@ describe('mountDescriptorChildren', () => {
 
       const mounted = mountDescriptorChildren(root, [
         {
-          type: 'symbiote-activity-indicator',
+          type: 'activity-indicator',
           props: { animating: true, color: 'red' },
           children: [],
         },
@@ -71,7 +71,7 @@ describe('mountDescriptorChildren', () => {
 
       mounted.update([
         {
-          type: 'symbiote-activity-indicator',
+          type: 'activity-indicator',
           props: { animating: false, color: 'red' },
           children: [],
         },
@@ -94,18 +94,18 @@ describe('mountDescriptorChildren', () => {
 
       const mounted = mountDescriptorChildren(root, [
         {
-          type: 'symbiote-view',
+          type: 'view',
           props: { style: { flex: 1 } },
-          children: [{ type: 'symbiote-text', props: {}, children: ['hello'] }],
+          children: [{ type: 'text', props: {}, children: ['hello'] }],
         },
       ]);
       await tick();
 
       mounted.update([
         {
-          type: 'symbiote-view',
+          type: 'view',
           props: { style: { flex: 2 } },
-          children: [{ type: 'symbiote-text', props: {}, children: ['world'] }],
+          children: [{ type: 'text', props: {}, children: ['world'] }],
         },
       ]);
       await tick();
@@ -151,14 +151,14 @@ describe('mountDescriptorChildren', () => {
       const root = createRootShimElement(surface);
 
       const mounted = mountDescriptorChildren(root, [
-        { type: 'symbiote-view', props: {}, children: [] },
+        { type: 'view', props: {}, children: [] },
       ]);
       await tick();
 
       expect(() =>
         mounted.update([
-          { type: 'symbiote-view', props: {}, children: [] },
-          { type: 'symbiote-view', props: {}, children: [] },
+          { type: 'view', props: {}, children: [] },
+          { type: 'view', props: {}, children: [] },
         ]),
       ).toThrow(/shape changed/);
     });
@@ -169,9 +169,9 @@ describe('mountDescriptorChildren', () => {
 
       const mounted = mountDescriptorChildren(root, [
         {
-          type: 'symbiote-view',
+          type: 'view',
           props: {},
-          children: [{ type: 'symbiote-text', props: {}, children: [] }],
+          children: [{ type: 'text', props: {}, children: [] }],
         },
       ]);
       await tick();
@@ -179,11 +179,11 @@ describe('mountDescriptorChildren', () => {
       expect(() =>
         mounted.update([
           {
-            type: 'symbiote-view',
+            type: 'view',
             props: {},
             children: [
-              { type: 'symbiote-text', props: {}, children: [] },
-              { type: 'symbiote-text', props: {}, children: [] },
+              { type: 'text', props: {}, children: [] },
+              { type: 'text', props: {}, children: [] },
             ],
           },
         ]),
@@ -195,7 +195,7 @@ describe('mountDescriptorChildren', () => {
       const root = createRootShimElement(surface);
 
       const mounted = mountDescriptorChildren(root, [
-        { type: 'symbiote-view', props: {}, children: [] },
+        { type: 'view', props: {}, children: [] },
       ]);
       await tick();
 
@@ -212,7 +212,7 @@ describe('mountDescriptorChildren', () => {
       await tick();
 
       expect(() =>
-        mounted.update([{ type: 'symbiote-view', props: {}, children: [] }]),
+        mounted.update([{ type: 'view', props: {}, children: [] }]),
       ).toThrow(/shape changed/);
     });
 
@@ -221,12 +221,12 @@ describe('mountDescriptorChildren', () => {
       const root = createRootShimElement(surface);
 
       const mounted = mountDescriptorChildren(root, [
-        { type: 'symbiote-view', props: {}, children: [] },
+        { type: 'view', props: {}, children: [] },
       ]);
       await tick();
 
       expect(() =>
-        mounted.update([{ type: 'symbiote-text', props: {}, children: [] }]),
+        mounted.update([{ type: 'text', props: {}, children: [] }]),
       ).toThrow(/shape changed/);
     });
   });
@@ -244,12 +244,12 @@ describe('createDescriptorChildrenSync', () => {
 
       // Called with `hostShim === null` first (matches an $effect firing before bind:this
       // populates it) — must not throw and must not mount anything.
-      syncChildren(null, [{ type: 'symbiote-view', props: {}, children: [] }]);
+      syncChildren(null, [{ type: 'view', props: {}, children: [] }]);
       await tick();
       expect(fabric.appRoot().children[0]?.children.length ?? 0).toBe(0);
 
       syncChildren(root, [
-        { type: 'symbiote-view', props: { collapsable: false }, children: [] },
+        { type: 'view', props: { collapsable: false }, children: [] },
       ]);
       await tick();
       const child = fabric.appRoot().children[0]?.children[0];

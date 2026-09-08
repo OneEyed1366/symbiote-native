@@ -15,7 +15,6 @@
 import { forbidWebOnlyConstructs } from './src/preprocessor/forbid-web-only-constructs.ts';
 import { scopedStyles } from './src/preprocessor/scoped-styles.ts';
 import { collapseTextWhitespace } from './src/preprocessor/collapse-text-whitespace.ts';
-import { lowerHostPrimitives } from './src/preprocessor/lower-host-primitives.ts';
 
 export default {
   compilerOptions: {
@@ -28,14 +27,13 @@ export default {
   // `collapseTextWhitespace` only touches Text node content, never the style/attribute/class
   // output the other two rewrite, so its position doesn't affect them.
   //
-  // `lowerHostPrimitives` MUST run LAST, and specifically AFTER `scopedStyles`. It copies each
-  // attribute's value into an object-bag expression, so once it has run there is no plain `class`
-  // attribute left for the style scoper to find — reverse the order and every scoped class in the
-  // file silently stops being scoped.
+  // There is no lowering pass any more. A primitive IS an intrinsic tag the app writes itself, so
+  // nothing rewrites `<View>` into `<view p={…}>` — which also retires the ordering constraint
+  // that pass carried (it had to run after `scopedStyles`, or every scoped class silently lost
+  // its scope).
   preprocess: [
     forbidWebOnlyConstructs(),
     scopedStyles(),
     collapseTextWhitespace(),
-    lowerHostPrimitives(),
   ],
 };

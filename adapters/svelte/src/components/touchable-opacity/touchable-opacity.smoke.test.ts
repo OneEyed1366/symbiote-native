@@ -31,6 +31,9 @@ import {
   waitUntil,
   type IFakeNode,
 } from '@symbiote-native/test-utils';
+// The press machine reaches a `pressable` TAG through the engine's behavior registry, so this
+// suite is pressing nothing without the registration.
+import '../../register';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -50,19 +53,12 @@ const ACTIVE_OPACITY = 0.3;
 const BASE_WIDTH = 10;
 const PRESS_DELAY_MS = 30;
 
-const COMPONENTS_DIR = join(__dirname, '..');
 // Every compiled artifact sits NEXT TO its real source: the compiled output's own relative
-// imports ('../runes/attachments', './pressable-props') resolve from where the FILE lives, not
-// from where it was compiled (svelte-adapter-dom-shim §15). The `-for-opacity` suffix and the
-// `.smoke-compiled-` prefix are both load-bearing: View and Pressable are owned by other suites
-// that run concurrently (.claude/rules/smoke-compiled-artifact-collisions.md), and only
-// `.smoke-compiled-*.mjs` is gitignored.
-const VIEW_OUT = join(COMPONENTS_DIR, '.smoke-compiled-view-for-opacity.mjs');
-const PRESSABLE_OUT = join(
-  COMPONENTS_DIR,
-  'pressable',
-  '.smoke-compiled-pressable-for-opacity.mjs',
-);
+// imports ('../../runes/attachments') resolve from where the FILE lives, not from where it was
+// compiled (svelte-adapter-dom-shim §15). The `-own` suffix and the `.smoke-compiled-` prefix are
+// both load-bearing: a name owned by two concurrently-running suites races
+// (.claude/rules/smoke-compiled-artifact-collisions.md), and only `.smoke-compiled-*.mjs` is
+// gitignored.
 const TOUCHABLE_OUT = join(
   __dirname,
   '.smoke-compiled-touchable-opacity-own.mjs',
@@ -143,30 +139,13 @@ interface ILoaded {
 }
 
 async function loadParent(): Promise<ILoaded> {
-  compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'),
-    'View.svelte',
-    VIEW_OUT,
-  );
-  compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'pressable', 'index.svelte'), 'utf8'),
-    'Pressable.svelte',
-    PRESSABLE_OUT,
-  );
+  // No import rewrites left: this component composes no other component. It writes the
+  // `pressable` and `view` TAGS directly, and the press machine reaches it from the engine's
+  // behavior registry rather than from a wrapper it imports.
   compileToFile(
     readFileSync(join(__dirname, 'index.svelte'), 'utf8'),
     'TouchableOpacity.svelte',
     TOUCHABLE_OUT,
-    [
-      [
-        "from '../View.svelte'",
-        "from '../.smoke-compiled-view-for-opacity.mjs'",
-      ],
-      [
-        "from '../pressable/index.svelte'",
-        "from '../pressable/.smoke-compiled-pressable-for-opacity.mjs'",
-      ],
-    ],
   );
   // ONE parent file for every scenario — Node's import() cache would hand back a stale module for
   // a rewritten path anyway (svelte-adapter-dom-shim §15). Props handed to `mount()` are a plain
@@ -223,8 +202,6 @@ afterEach(() => {
   unmount(ROOT_TAG);
   Reflect.deleteProperty(globalThis, 'requestAnimationFrame');
   Reflect.deleteProperty(globalThis, 'cancelAnimationFrame');
-  rmSync(VIEW_OUT, { force: true });
-  rmSync(PRESSABLE_OUT, { force: true });
   rmSync(TOUCHABLE_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
 });

@@ -59,8 +59,13 @@ export interface IPanResponderCallbacks {
   onShouldBlockNativeResponder?: IActiveCallback;
 }
 
-// The responder props PanResponder produces; spread onto a View as `panHandlers`.
-export interface IGestureResponderHandlers {
+// The responder props PanResponder produces, handed to a primitive as `panHandlers`.
+//
+// A `type` and not an `interface` on purpose: an interface gets no implicit index signature, so it
+// is not assignable to a `Record<string, unknown>` — and that is exactly what the Svelte shim's
+// bag prop takes. Declared as an interface, `p={panResponder.panHandlers}` is a type error while
+// the identical object literal is fine.
+export type IGestureResponderHandlers = {
   onStartShouldSetResponder: (event: ISymbioteEvent) => boolean;
   onStartShouldSetResponderCapture: (event: ISymbioteEvent) => boolean;
   onMoveShouldSetResponder: (event: ISymbioteEvent) => boolean;
@@ -73,7 +78,7 @@ export interface IGestureResponderHandlers {
   onResponderRelease: (event: ISymbioteEvent) => void;
   onResponderTerminate: (event: ISymbioteEvent) => void;
   onResponderTerminationRequest: (event: ISymbioteEvent) => boolean;
-}
+};
 
 export interface IPanResponderInstance {
   panHandlers: IGestureResponderHandlers;
@@ -401,9 +406,12 @@ const PanResponder = {
 
     const panHandlers: IGestureResponderHandlers = {
       onStartShouldSetResponder(event: ISymbioteEvent): boolean {
-        return config.onStartShouldSetPanResponder === undefined
-          ? false
-          : config.onStartShouldSetPanResponder(event, gestureState);
+        const wants =
+          config.onStartShouldSetPanResponder === undefined
+            ? false
+            : config.onStartShouldSetPanResponder(event, gestureState);
+        dlog(`PanResponder startShouldSet -> ${wants}`);
+        return wants;
       },
 
       onMoveShouldSetResponder(event: ISymbioteEvent): boolean {
@@ -480,14 +488,20 @@ const PanResponder = {
 
       onResponderMove(event: ISymbioteEvent): void {
         const touches = readTouches(event);
-        // Same duplicate-frame guard as the capture path.
-        if (
-          gestureState._accountsForMovesUpTo ===
-          frameTimestampOf(event, touches)
-        ) {
+        const frame = frameTimestampOf(event, touches);
+        // Same duplicate-frame guard as the capture path. Logged on BOTH sides: a frame
+        // stamp that never advances swallows every move while the handlers themselves keep
+        // firing, so the app looks inert with nothing to see from the outside.
+        if (gestureState._accountsForMovesUpTo === frame) {
+          dlog(
+            `PanResponder move SWALLOWED frame=${frame} touches=${touches.length} history=${touchHistoryOf(event) === undefined ? 'none' : 'yes'}`,
+          );
           return;
         }
         updateGestureStateOnMove(gestureState, event, touches);
+        dlog(
+          `PanResponder move frame=${frame} dx=${gestureState.dx} dy=${gestureState.dy}`,
+        );
         config.onPanResponderMove?.(event, gestureState);
       },
 

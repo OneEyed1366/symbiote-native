@@ -115,75 +115,72 @@ function asStyle(value: unknown): IStyleProp<IViewStyle> | undefined {
     </ng-template>
     @if (isHorizontal) {
       @if (hasProjectedRefreshControl) {
-        <symbiote-refresh-control
+        <refresh-control
           #refreshHost="symbioteHost"
           [symbioteHostProps]="androidRefreshControlProps"
           (refresh)="handleProjectedRefresh(refreshHost.node)"
         >
-          <symbiote-horizontal-scroll-view
+          <horizontal-scroll-view
             #host="symbioteHost"
             [symbioteHostProps]="androidWrappedScrollProps()"
           >
-            <symbiote-horizontal-scroll-content
+            <horizontal-scroll-content
               [symbioteHostProps]="contentProps()"
               [symbioteScrollViewProjection]="projectionController"
             >
               <ng-container
                 [symbioteTemplateOutlet]="sharedContent"
               ></ng-container>
-            </symbiote-horizontal-scroll-content>
-          </symbiote-horizontal-scroll-view>
-        </symbiote-refresh-control>
+            </horizontal-scroll-content>
+          </horizontal-scroll-view>
+        </refresh-control>
       } @else {
-        <symbiote-horizontal-scroll-view
+        <horizontal-scroll-view
           #host="symbioteHost"
           [symbioteHostProps]="scrollProps()"
         >
-          <symbiote-horizontal-scroll-content
+          <horizontal-scroll-content
             [symbioteHostProps]="contentProps()"
             [symbioteScrollViewProjection]="projectionController"
           >
             <ng-container
               [symbioteTemplateOutlet]="sharedContent"
             ></ng-container>
-          </symbiote-horizontal-scroll-content>
-        </symbiote-horizontal-scroll-view>
+          </horizontal-scroll-content>
+        </horizontal-scroll-view>
       }
     } @else {
       @if (hasProjectedRefreshControl) {
-        <symbiote-refresh-control
+        <refresh-control
           #refreshHost="symbioteHost"
           [symbioteHostProps]="androidRefreshControlProps"
           (refresh)="handleProjectedRefresh(refreshHost.node)"
         >
-          <symbiote-scroll-view
+          <scroll-view
             #host="symbioteHost"
             [symbioteHostProps]="androidWrappedScrollProps()"
           >
-            <symbiote-scroll-content
+            <scroll-content
               [symbioteHostProps]="contentProps()"
               [symbioteScrollViewProjection]="projectionController"
             >
               <ng-container
                 [symbioteTemplateOutlet]="sharedContent"
               ></ng-container>
-            </symbiote-scroll-content>
-          </symbiote-scroll-view>
-        </symbiote-refresh-control>
+            </scroll-content>
+          </scroll-view>
+        </refresh-control>
       } @else {
-        <symbiote-scroll-view
-          #host="symbioteHost"
-          [symbioteHostProps]="scrollProps()"
-        >
-          <symbiote-scroll-content
+        <scroll-view #host="symbioteHost" [symbioteHostProps]="scrollProps()">
+          <scroll-content
             [symbioteHostProps]="contentProps()"
             [symbioteScrollViewProjection]="projectionController"
           >
             <ng-container
               [symbioteTemplateOutlet]="sharedContent"
             ></ng-container>
-          </symbiote-scroll-content>
-        </symbiote-scroll-view>
+          </scroll-content>
+        </scroll-view>
       }
     }
   `,

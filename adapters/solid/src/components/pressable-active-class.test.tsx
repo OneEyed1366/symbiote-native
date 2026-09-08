@@ -3,7 +3,7 @@
 // The lowering leaves an element a component whenever the template must read the press state — a
 // functional `style`, a render-prop child. That costs the tier-2 win, and it must not also cost the
 // pressed STYLING: the machine still knows when the node is pressed, so one call into the engine
-// applies the same `:active` rule a lowered `symbiote-pressable` would get
+// applies the same `:active` rule a lowered `pressable` would get
 // (`.claude/rules/host-primitive-tier.md`).
 //
 // The seam is `host.setPressed` in pressable.tsx — the single point where press state changes —
@@ -115,7 +115,7 @@ describe('a Pressable that stayed a component still resolves :active', () => {
   it('applies the pressed rule on touch-down and restores it on lift', async () => {
     mount(ROOT_TAG, () => (
       <Pressable testID={TARGET} class="btn">
-        <symbiote-text>tap</symbiote-text>
+        <text>tap</text>
       </Pressable>
     ));
     await flush();

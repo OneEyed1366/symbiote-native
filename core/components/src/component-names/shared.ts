@@ -8,25 +8,25 @@
 // Every intrinsic our components.ts emits. A name table must cover exactly these keys,
 // so a missing/renamed primitive is a compile error, not a silent gap at runtime.
 export type ISymbioteIntrinsic =
-  | 'symbiote-view'
+  | 'view'
   // Resolves to the SAME RCTView as a plain view: the tag exists so the host-behavior registry
   // (keyed by tag, never by resolved name) can find the press machine. Registering under RCTView
   // instead would put a press machine on every View in the app.
-  | 'symbiote-pressable'
-  | 'symbiote-text'
-  | 'symbiote-image'
-  | 'symbiote-scroll-view'
-  | 'symbiote-scroll-content'
+  | 'pressable'
+  | 'text'
+  | 'image'
+  | 'scroll-view'
+  | 'scroll-content'
   // Horizontal scroll is a SEPARATE native ViewManager on Android (AndroidHorizontalScrollView),
   // not RCTScrollView with a flag, so it needs its own intrinsic. On iOS both map back to
   // RCTScrollView (one view; the `horizontal` prop flips its axis).
-  | 'symbiote-horizontal-scroll-view'
-  | 'symbiote-horizontal-scroll-content'
-  | 'symbiote-text-input'
-  | 'symbiote-text-input-multiline'
+  | 'horizontal-scroll-view'
+  | 'horizontal-scroll-content'
+  | 'text-input'
+  | 'text-input-multiline'
   // The COMPONENT path's spelling of the pair above, resolving to the SAME native views. Same
-  // trick as `symbiote-pressable`, used the other way round: there the LOWERED tag is the new one
-  // because the wrapper always emitted `symbiote-view`; here the wrapper got the plain name first,
+  // trick as `pressable`, used the other way round: there the LOWERED tag is the new one
+  // because the wrapper always emitted `view`; here the wrapper got the plain name first,
   // so the lowered path keeps it and the wrapper is the one that qualifies.
   //
   // WHY THE SPLIT EXISTS AT ALL. `registerTextInputBehavior()` puts the whole TextInput machine on
@@ -39,25 +39,25 @@ export type ISymbioteIntrinsic =
   // DELETE THIS PAIR when the wrappers stop owning that state and render the plain tag instead —
   // one machine, one implementation, which is what `<adapters_reach_full_feature_parity>` asks for
   // and what makes lowered and un-lowered call sites structurally identical.
-  | 'symbiote-text-input-managed'
-  | 'symbiote-text-input-multiline-managed'
-  | 'symbiote-switch'
+  | 'text-input-managed'
+  | 'text-input-multiline-managed'
+  | 'switch'
   // The component path's spelling, resolving to the SAME native Switch/AndroidSwitch. Same trick
-  // as `symbiote-text-input-managed`: the plain tag belongs to the behavior registry
+  // as `text-input-managed`: the plain tag belongs to the behavior registry
   // (`registerSwitchBehavior`), so the wrapper — which still runs its own lastNativeReport mirror
   // and snap-back effect — renders this one instead, or the registry would attach a second,
   // redundant machine to a node whose lifecycle already owns it.
-  | 'symbiote-switch-managed'
-  | 'symbiote-activity-indicator'
-  | 'symbiote-safe-area-view'
-  | 'symbiote-modal'
-  | 'symbiote-refresh-control'
+  | 'switch-managed'
+  | 'activity-indicator'
+  | 'safe-area-view'
+  | 'modal'
+  | 'refresh-control'
   // The sticky-header wrapper RN builds in JS (ScrollViewStickyHeader.js): an ordinary view
   // carrying zIndex and an animated translateY. Resolves to the SAME RCTView as a plain view for
-  // the `symbiote-pressable` reason — the behavior registry is keyed by tag, and registering the
+  // the `pressable` reason — the behavior registry is keyed by tag, and registering the
   // sticky machine under RCTView would put it on every View in the app.
-  | 'symbiote-sticky-header'
-  | 'symbiote-input-accessory-view';
+  | 'sticky-header'
+  | 'input-accessory-view';
 
 export interface IComponentDescriptor {
   component: string;
@@ -67,7 +67,7 @@ export interface IComponentDescriptor {
 // The only text-laying intrinsic; drives the RCTText / RCTVirtualText nesting choice
 // (a <Text> inside another <Text> becomes a virtual span). Platform-invariant, so it is
 // not part of the per-platform name table.
-const TEXT_INTRINSICS: ReadonlySet<string> = new Set(['symbiote-text']);
+const TEXT_INTRINSICS: ReadonlySet<string> = new Set(['text']);
 
 // Assemble the descriptor map a platform file exports: each intrinsic's Fabric name from
 // the platform table, paired with its invariant isText flag.
@@ -97,13 +97,24 @@ export function makeDescriptorFor(
   return type => {
     const descriptor = descriptors[type];
     if (descriptor !== undefined) return descriptor;
-    if (type.startsWith('symbiote-')) {
-      throw new Error(`Unknown symbiote component type: ${type}`);
-    }
+    // NO "unknown tag of ours" throw any more, and the reason is the whole cost of dropping the
+    // prefix: `symbiote-*` was a MARKER, so a miss carrying it could only be our own typo. Without
+    // it this namespace holds three populations that a string cannot tell apart —
+    //
+    //   view · scroll-view          ours
+    //   counter-child · app-root    an Angular app's OWN component selectors, kebab by convention
+    //   RCTView · RNCSlider         a Fabric view name, resolving through the fallthrough below
+    //
+    // — and the first attempt at a replacement ("lowercase is ours") threw on the second row, which
+    // is most of an Angular app. Measured: 222 tests, the primary failure being `counter-child`.
+    //
+    // What replaces it is stronger and is not runtime at all: `ISymbioteIntrinsic` is a closed
+    // union, so a misspelled tag in our own source is a compile error at every call site that names
+    // one. The guard was only ever a backstop for a name built dynamically.
     if (unrewritten.has(type)) {
       throw new Error(
         `"${type}" is a primitive's PUBLIC name, not a Fabric view name — a rewrite was missed. ` +
-          `Expected the intrinsic tag (e.g. "symbiote-view"). Falling through would have committed ` +
+          `Expected the intrinsic tag (e.g. "view"). Falling through would have committed ` +
           `a Fabric view literally named "${type}", which fails on device only.`,
       );
     }
@@ -136,7 +147,6 @@ function publicNamesThatAreNotViewNames(
   const names = new Set<string>();
   for (const intrinsic of Object.keys(descriptors)) {
     const publicName = intrinsic
-      .slice('symbiote-'.length)
       .split('-')
       .map(part => part.charAt(0).toUpperCase() + part.slice(1))
       .join('');

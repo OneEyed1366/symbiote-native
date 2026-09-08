@@ -15,7 +15,7 @@
 // nothing can end up with two owners on one node. Idempotence is asserted rather than reasoned.
 //
 // PLATFORM. This is the only primitive in its group that is not platform-invariant in what it
-// COMMITS TO: `symbiote-input-accessory-view` resolves to `RCTInputAccessoryView` on iOS and to a
+// COMMITS TO: `input-accessory-view` resolves to `RCTInputAccessoryView` on iOS and to a
 // plain `RCTView` on Android. The fold itself is platform-invariant on purpose — it reproduces the
 // wrapper's mapping exactly, on both platforms, so the lowered and wrapped paths cannot diverge
 // per-platform. What it does NOT do is fix the pre-existing Android divergence underneath it:
@@ -36,7 +36,7 @@ import {
   mapInputAccessoryViewProps,
 } from '../view/render-input-accessory-view';
 
-export const INPUT_ACCESSORY_VIEW_TAG = 'symbiote-input-accessory-view';
+export const INPUT_ACCESSORY_VIEW_TAG = 'input-accessory-view';
 
 const CONSUMED: ReadonlySet<string> = new Set(INPUT_ACCESSORY_VIEW_PROP_NAMES);
 

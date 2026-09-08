@@ -32,11 +32,8 @@ const model = { text: '', on: false };
   // Bare intrinsics, no primitive imported: a component in scope would take the tag back through
   // the dual selector and this would silently measure the wrapper instead.
   template: `
-    <symbiote-text-input
-      testID="input"
-      [(value)]="state.text"
-    ></symbiote-text-input>
-    <symbiote-switch testID="toggle" [(value)]="state.on"></symbiote-switch>
+    <text-input testID="input" [(value)]="state.text"></text-input>
+    <switch testID="toggle" [(value)]="state.on"></switch>
   `,
 })
 class TwoWayHost {

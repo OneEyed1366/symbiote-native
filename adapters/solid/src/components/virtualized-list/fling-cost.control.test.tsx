@@ -129,9 +129,9 @@ describe('CONTROL: the cost of a FLING frame on PATH B geometry (Solid)', () => 
           renderItemCalls += 1;
           const label = info().item.id;
           return (
-            <symbiote-view>
-              <symbiote-text>{label}</symbiote-text>
-            </symbiote-view>
+            <view>
+              <text>{label}</text>
+            </view>
           );
         }}
       />

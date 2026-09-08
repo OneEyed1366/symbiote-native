@@ -17,6 +17,10 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
+// The adapter entry's side-effect module. Mounting through `../../render` skips `index.ts`, so a
+// test that wants the ScrollView host behavior — the content node, the RefreshControl claim, the
+// folds — has to name it the same way `index.ts` does.
+import '../../register';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -124,7 +128,7 @@ async function loadMountable(): Promise<Component> {
        });
      </script>
      <ScrollView bind:this={handle} contentContainerStyle={{ padding: 8 }}>
-       <symbiote-view p={{}}></symbiote-view>
+       <view p={{}}></view>
      </ScrollView>`,
     'ScrollParent.svelte',
     PARENT_OUT,
@@ -234,7 +238,7 @@ describe('ScrollView (real compiled index.svelte)', () => {
            }
          </script>
          <ScrollView onScroll={onScroll}>
-           <symbiote-view p={{}}></symbiote-view>
+           <view p={{}}></view>
          </ScrollView>`,
         'ScrollEventParent.svelte',
         EVENT_PARENT_OUT,
@@ -273,7 +277,7 @@ describe('ScrollView (real compiled index.svelte)', () => {
            import ScrollView from './.smoke-compiled-scroll-view.mjs';
          </script>
          <ScrollView refreshControl={{ refreshing: true, tintColor: 'red' }}>
-           <symbiote-view p={{}}></symbiote-view>
+           <view p={{}}></view>
          </ScrollView>`,
         'ScrollRefreshParent.svelte',
         REFRESH_PARENT_OUT,

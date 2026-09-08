@@ -11,6 +11,9 @@ import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import type { IFakeNode } from '@symbiote-native/test-utils';
+// See scroll-view.smoke.test.ts: mounting through `../../render` skips `index.ts`, so the host
+// behaviors have to be named here.
+import '../../register';
 import { mount, unmount } from '../../render';
 
 // fabric.find() walks the CREATION log, which never reflects a later clone's props
@@ -67,22 +70,6 @@ const REFRESH_CONTROL_OUT = join(
   COMPONENTS_DIR,
   '.smoke-compiled-refresh-control-for-virtualized-list.mjs',
 );
-// index.svelte also statically imports the REAL ScrollViewStickyHeader (../scroll-view/sticky-
-// header.svelte, the sticky-header wiring) — same "no .svelte-aware loader" reason as
-// RefreshControl above, compiled to a sibling of the real file so ITS OWN relative imports
-// ('./scroll-view-sticky-context', '@symbiote-native/components', '@symbiote-native/engine')
-// keep resolving unchanged.
-const STICKY_HEADER_OUT = join(
-  COMPONENTS_DIR,
-  'scroll-view',
-  '.smoke-compiled-sticky-header-for-virtualized-list.mjs',
-);
-// sticky-header.svelte renders a real Animated.View (createAnimatedComponent(View)) — same treatment,
-// compiled to a sibling of the real file so ITS OWN relative imports keep resolving unchanged.
-const VIEW_OUT = join(
-  COMPONENTS_DIR,
-  '.smoke-compiled-view-for-virtualized-list.mjs',
-);
 const LIST_OUT = join(__dirname, '.smoke-compiled-virtualized-list.mjs');
 const ROOT_OUT = join(__dirname, '.smoke-compiled-list-root.mjs');
 const REFRESH_ROOT_OUT = join(__dirname, '.smoke-compiled-refresh-root.mjs');
@@ -102,8 +89,6 @@ beforeEach(() => {
 afterEach(() => {
   unmount(ROOT_TAG);
   rmSync(REFRESH_CONTROL_OUT, { force: true });
-  rmSync(VIEW_OUT, { force: true });
-  rmSync(STICKY_HEADER_OUT, { force: true });
   rmSync(LIST_OUT, { force: true });
   rmSync(ROOT_OUT, { force: true });
   rmSync(REFRESH_ROOT_OUT, { force: true });
@@ -140,36 +125,15 @@ function compileVirtualizedListWithRefreshControl(): void {
     REFRESH_CONTROL_OUT,
   );
 
-  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
-  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
-
-  const stickyHeaderSource = readFileSync(
-    join(COMPONENTS_DIR, 'scroll-view', 'sticky-header.svelte'),
-    'utf8',
-  );
-  const stickyHeaderResult = compile(stickyHeaderSource, {
-    ...COMPILE_OPTIONS,
-    filename: 'sticky-header.svelte',
-  }).js.code.replace(
-    "from '../View.svelte'",
-    "from '../.smoke-compiled-view-for-virtualized-list.mjs'",
-  );
-  writeFileSync(STICKY_HEADER_OUT, stickyHeaderResult);
-
   const listSource = readFileSync(join(__dirname, 'index.svelte'), 'utf8');
   const result = compile(listSource, {
     ...COMPILE_OPTIONS,
     filename: 'VirtualizedList.svelte',
   });
-  const rewritten = result.js.code
-    .replace(
-      "from '../RefreshControl.svelte'",
-      "from '../.smoke-compiled-refresh-control-for-virtualized-list.mjs'",
-    )
-    .replace(
-      "from '../scroll-view/sticky-header.svelte'",
-      "from '../scroll-view/.smoke-compiled-sticky-header-for-virtualized-list.mjs'",
-    );
+  const rewritten = result.js.code.replace(
+    "from '../RefreshControl.svelte'",
+    "from '../.smoke-compiled-refresh-control-for-virtualized-list.mjs'",
+  );
   writeFileSync(LIST_OUT, rewritten);
 }
 
@@ -177,7 +141,7 @@ async function loadMountable(): Promise<Component> {
   compileVirtualizedListWithRefreshControl();
 
   // A root that hands VirtualizedList a 100-item array and an empty cell snippet — the cell
-  // WRAPPER symbiote-view VirtualizedList itself creates around each cell is what the assertion
+  // WRAPPER view VirtualizedList itself creates around each cell is what the assertion
   // below counts, so the cell content itself does not need to render anything.
   compileToFile(
     `<script>
@@ -226,8 +190,8 @@ async function loadMountableWithSeparator(
          return { length: 100, offset: 100 * index, index };
        }
      </script>
-     {#snippet cell(info)}<symbiote-text p={{}}>row-{info.item}</symbiote-text>{/snippet}
-     {#snippet divider()}<symbiote-text p={{}}>divider</symbiote-text>{/snippet}
+     {#snippet cell(info)}<text p={{}}>row-{info.item}</text>{/snippet}
+     {#snippet divider()}<text p={{}}>divider</text>{/snippet}
      <VirtualizedList
        {data}
        {getItem}
@@ -420,13 +384,12 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       ).toBe(true);
     });
 
-    // Unlike ScrollView.svelte (only an opaque children Snippet — no auto-wrap, see
-    // scroll-view-props.ts's KNOWN GAP), this file walks an indexable `plan.cells` list and CAN
-    // auto-wrap a flagged cell in ScrollViewStickyHeader itself. Proves the wiring end to end: a
-    // stickyHeaderIndices-flagged windowed cell actually paints through the sticky component (real
-    // zIndex/collapsable), not just an inert prop forwarded onto the native scroll view (which does
-    // NOT honor stickyHeaderIndices on its own — see render-scroll-sticky.ts's header comment).
-    it('wraps a stickyHeaderIndices-flagged windowed cell in ScrollViewStickyHeader', async () => {
+    // This file walks an indexable `plan.cells` list, so it MARKS a flagged cell by giving it the
+    // `sticky-header` tag rather than forwarding an index. Proves the wiring end to end: the cell
+    // paints through the engine's sticky behavior (real zIndex/collapsable), not as an inert prop
+    // on the native scroll view, which honors `stickyHeaderIndices` only by numbering its own paint
+    // children — a numbering a windowed list cannot supply, which is why the tag exists.
+    it('marks a stickyHeaderIndices-flagged windowed cell with the sticky-header tag', async () => {
       compileVirtualizedListWithRefreshControl();
       compileToFile(
         `<script>
@@ -434,7 +397,7 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
          function getItem(source, index) { return source[index]; }
          function getItemCount(source) { return source.length; }
        </script>
-       {#snippet cell()}<symbiote-text p={{}}>row</symbiote-text>{/snippet}
+       {#snippet cell()}<text p={{}}>row</text>{/snippet}
        <VirtualizedList
          data={['a', 'b', 'c']}
          {getItem}
@@ -459,7 +422,7 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       );
       expect(
         stickyHost,
-        'the flagged cell painted through ScrollViewStickyHeader',
+        'the flagged cell painted through the sticky-header behavior',
       ).toBeDefined();
       expect(stickyHost?.props.collapsable).toBe(false);
     });

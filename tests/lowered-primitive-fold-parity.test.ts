@@ -56,7 +56,14 @@ const kebab = (name: string): string =>
 // contributes an empty set, and ONE empty set zeroes an intersection across five adapters — which
 // is how the first run of this comparison reported "no gaps" while three were live. The throw is
 // the whole point: a silent miss here is indistinguishable from a clean tree.
-function wrapperPathFor(adapter: string, primitive: string): string {
+//
+// ZERO hits is the one non-throwing answer, and it means something different: the adapter has
+// finished the tag migration and has no wrapper left to compare against. That is indistinguishable
+// from a broken locator, so the callers pin WHICH adapters answer zero, for equality.
+function wrapperPathFor(
+  adapter: string,
+  primitive: string,
+): string | undefined {
   const root = join('adapters', adapter, 'src', 'components');
   const want = kebab(primitive);
   const hits: string[] = [];
@@ -78,11 +85,10 @@ function wrapperPathFor(adapter: string, primitive: string): string {
       }
     }
   }
-  if (hits.length !== 1) {
+  if (hits.length > 1) {
     throw new Error(
-      `${adapter}: expected exactly one ${primitive} wrapper, found ${hits.length}` +
-        (hits.length > 0 ? ` (${hits.join(', ')})` : '') +
-        ' — an unlocated wrapper makes this audit report a clean tree.',
+      `${adapter}: expected at most one ${primitive} wrapper, found ${hits.length}` +
+        ` (${hits.join(', ')}) — an ambiguous match makes this audit report a clean tree.`,
     );
   }
   return hits[0];
@@ -90,6 +96,11 @@ function wrapperPathFor(adapter: string, primitive: string): string {
 
 interface ILoweredPrimitive {
   readonly behavior: string;
+  // Adapters that write the intrinsic tag and keep no wrapper for this primitive, so there is
+  // nothing on their side to compare. Compared for EQUALITY: an adapter that joins this set without
+  // being added is a locator that stopped matching, which is the false green this file exists for.
+  // The whole test retires when it grows to `adapterNames()` — no wrapper left anywhere.
+  readonly noWrapper: readonly string[];
   // Names every wrapper imports that the behavior legitimately does not. Compared for EQUALITY, so
   // closing a gap without deleting its entry fails here too — the shape `KNOWN_GAPS` uses in
   // `tests/adapter-barrel-parity.test.ts`, and for the same reason: an allowlist nobody has to
@@ -100,20 +111,19 @@ interface ILoweredPrimitive {
 const LOWERED: Readonly<Record<string, ILoweredPrimitive>> = {
   Pressable: {
     behavior: 'core/components/src/behaviors/pressable.ts',
+    noWrapper: ['svelte'],
     // `android_ripple` was the one open FOLD gap and it is closed: the ripple background is an
     // ordinary prop of the responder itself in RN's own Pressable, so a single lowered node carries
     // it (see the behavior's foldPayload). Our wrapper's inner-View spelling mirrors
     // TouchableNativeFeedback and is what made this read as unfixable.
-    wrapperOnly: {
-      // The floor itself reaches both paths — the machine defaults to it when a config omits
-      // `minPressDuration`. A wrapper names the constant only to seed `__minPressDuration`, the
-      // input `Touchable*` overrides to 0. A lowered element has no such input to seed.
-      DEFAULT_MIN_PRESS_DURATION_MS:
-        'seeds the wrapper-only __minPressDuration override input',
-    },
+    // Empty since 2026-09-08: `DEFAULT_MIN_PRESS_DURATION_MS` sat here while `minPressDuration`
+    // was a wrapper-only input. A lowered `Touchable*` has no such input, so the floor is now a
+    // readable prop and `configFor` names the constant on both paths.
+    wrapperOnly: {},
   },
   TextInput: {
     behavior: 'core/components/src/behaviors/text-input.ts',
+    noWrapper: ['svelte'],
     wrapperOnly: {
       // The render fn itself. Wrapper-only by construction — a lowered element has no render, which
       // is the entire point of lowering it.
@@ -131,12 +141,28 @@ describe('a lowered primitive applies every fold its wrapper applies', () => {
   for (const [primitive, spec] of Object.entries(LOWERED)) {
     it(`${primitive}`, () => {
       const behaviorNames = sharedImports(readFileSync(spec.behavior, 'utf8'));
-      const perAdapter = adapterNames().map(adapter =>
-        sharedImports(readFileSync(wrapperPathFor(adapter, primitive), 'utf8')),
+      const located = adapterNames().map(adapter => ({
+        adapter,
+        path: wrapperPathFor(adapter, primitive),
+      }));
+
+      expect(
+        located.filter(hit => hit.path === undefined).map(hit => hit.adapter),
+        'an adapter joined or left the wrapperless set — update `noWrapper`, or fix the locator',
+      ).toEqual([...spec.noWrapper]);
+
+      const perAdapter = located.flatMap(hit =>
+        hit.path === undefined
+          ? []
+          : [sharedImports(readFileSync(hit.path, 'utf8'))],
       );
+      expect(
+        perAdapter.length,
+        'no wrapper left anywhere — nothing to compare, retire this row',
+      ).toBeGreaterThan(0);
 
       // Intersection, not union: a name only ONE adapter imports is that adapter's own business,
-      // and only a fold all five apply is a shared contract the lowered path owes.
+      // and only a fold every surviving wrapper applies is a shared contract the lowered path owes.
       const union = new Set(perAdapter.flatMap(set => [...set]));
       const inEveryWrapper = [...union].filter(name =>
         perAdapter.every(set => set.has(name)),
@@ -153,9 +179,9 @@ describe('a lowered primitive applies every fold its wrapper applies', () => {
   // nothing would satisfy them all by making both sides empty — the false green this audit already
   // produced once. So pin that the parser reads a real, non-trivial set off a real wrapper.
   it('reads a non-empty import set, so an empty diff means agreement', () => {
-    const names = sharedImports(
-      readFileSync(wrapperPathFor('react', 'Pressable'), 'utf8'),
-    );
+    const wrapper = wrapperPathFor('react', 'Pressable');
+    expect(wrapper, 'the control needs a real wrapper to parse').toBeDefined();
+    const names = sharedImports(readFileSync(wrapper ?? '', 'utf8'));
     expect(names.has('createPressHandlers')).toBe(true);
     expect(names.size).toBeGreaterThan(3);
   });

@@ -43,7 +43,7 @@ function mountScrollView(contentContainerStyle: unknown): Promise<void> {
         h(
           ScrollView,
           { contentContainerStyle },
-          { default: () => [h('symbiote-text')] },
+          { default: () => [h('text')] },
         ),
     }),
   );

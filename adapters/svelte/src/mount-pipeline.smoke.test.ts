@@ -79,11 +79,11 @@ async function compileComponent(
 
 describe('mount (real compiled output, real fake-Fabric)', () => {
   describe('Positive', () => {
-    it('mounts a static symbiote-text and commits it under the root symbiote-view', async () => {
+    it('mounts a static text and commits it under the root view', async () => {
       // why: proves the whole chain end to end — compiled Svelte output believing it talks
       // to a real DOM actually reaches a committed native Fabric node, not just a shim tree.
       const Hello = await compileComponent(
-        '<symbiote-text p={{}}>hello</symbiote-text>',
+        '<text p={{}}>hello</text>',
         'Hello',
       );
 
@@ -106,7 +106,7 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
            let count = $state(0);
            $effect(() => { if (count < 1) count = count + 1; });
          </script>
-         <symbiote-text p={{}}>count {count}</symbiote-text>`,
+         <text p={{}}>count {count}</text>`,
         'Counter',
       );
 
@@ -130,7 +130,7 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       // why: a wrapper missing flex:1 is a silent visual regression (nothing throws), so
       // this pins the one prop that prevents it.
       const Hello = await compileComponent(
-        '<symbiote-text p={{}}>hello</symbiote-text>',
+        '<text p={{}}>hello</text>',
         'Hello',
       );
 
@@ -151,7 +151,7 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       // second Svelte app onto the same target, or the tree would carry both components'
       // committed nodes side by side.
       const Hello = await compileComponent(
-        '<symbiote-text p={{}}>hello</symbiote-text>',
+        '<text p={{}}>hello</text>',
         'HelloA',
       );
       mount(ROOT_TAG, Hello);
@@ -162,7 +162,7 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       );
 
       const Goodbye = await compileComponent(
-        '<symbiote-text p={{}}>goodbye</symbiote-text>',
+        '<text p={{}}>goodbye</text>',
         'GoodbyeA',
       );
       mount(ROOT_TAG, Goodbye);
@@ -185,7 +185,7 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       expect(typeof globalThis.RN$stopSurface).toBe('function');
 
       const Hello = await compileComponent(
-        '<symbiote-text p={{}}>hello</symbiote-text>',
+        '<text p={{}}>hello</text>',
         'HelloB',
       );
       mount(ROOT_TAG, Hello);
@@ -196,7 +196,7 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       await tick();
 
       const Goodbye = await compileComponent(
-        '<symbiote-text p={{}}>goodbye</symbiote-text>',
+        '<text p={{}}>goodbye</text>',
         'GoodbyeB',
       );
       mount(ROOT_TAG, Goodbye);

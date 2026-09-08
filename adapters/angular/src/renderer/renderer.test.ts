@@ -67,7 +67,7 @@ afterEach(() => {
 
 describe('Angular SymbioteRenderer drives the engine', () => {
   // why: `View`/`Text` are the public ergonomic selectors apps can author directly (as opposed
-  // to the internal `symbiote-view`/`symbiote-text` primitive names) — PRIMITIVE_SELECTOR_ALIAS
+  // to the internal `view`/`text` primitive names) — PRIMITIVE_SELECTOR_ALIAS
   // must resolve BOTH spellings to the identical engine descriptor, or an app using the
   // ergonomic name would silently get a different (or missing) primitive than one using the
   // internal name.
@@ -75,7 +75,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     const { surface, renderer } = setup();
     const aliasedView = renderer.createElement('View');
     renderer.setProperty(aliasedView, 'testID', 'aliased-view');
-    const directView = renderer.createElement('symbiote-view');
+    const directView = renderer.createElement('view');
     renderer.setProperty(directView, 'testID', 'direct-view');
     renderer.appendChild(surface, aliasedView);
     renderer.appendChild(surface, directView);
@@ -88,8 +88,8 @@ describe('Angular SymbioteRenderer drives the engine', () => {
 
   it('maps createElement / createText / appendChild into a committed Fabric tree', async () => {
     const { surface, renderer } = setup();
-    const view = renderer.createElement('symbiote-view');
-    const text = renderer.createElement('symbiote-text');
+    const view = renderer.createElement('view');
+    const text = renderer.createElement('text');
     const raw = renderer.createText('Hello');
     renderer.appendChild(text, raw);
     renderer.appendChild(view, text);
@@ -108,10 +108,10 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // proving the Angular renderer doesn't hand-roll its own descriptor mapping.
   it('maps additional symbiote intrinsics through the shared descriptor table', async () => {
     const { surface, renderer } = setup();
-    const spinner = renderer.createElement('symbiote-activity-indicator');
+    const spinner = renderer.createElement('activity-indicator');
     renderer.setProperty(spinner, 'testID', 'spinner');
     renderer.setProperty(spinner, 'animating', true);
-    const image = renderer.createElement('symbiote-image');
+    const image = renderer.createElement('image');
     renderer.setProperty(image, 'testID', 'image');
     renderer.setProperty(image, 'source', {
       uri: 'https://example.invalid/image.png',
@@ -135,7 +135,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // props, so the seam must accumulate them, not overwrite on each call.
   it('commits setProperty and merges per-key setStyle into one style prop', async () => {
     const { surface, renderer } = setup();
-    const view = renderer.createElement('symbiote-view');
+    const view = renderer.createElement('view');
     renderer.setProperty(view, 'nativeID', PROBE_ID);
     renderer.setStyle(view, 'padding', 24);
     renderer.setStyle(view, 'opacity', 0.5);
@@ -169,7 +169,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
       },
     ]);
     const { surface, renderer } = setup();
-    const view = renderer.createElement('symbiote-view');
+    const view = renderer.createElement('view');
     renderer.setProperty(view, 'nativeID', PROBE_ID);
     // Ivy compiles class="card highlight" to one addClass call per token, never a single string.
     renderer.addClass(view, 'card');
@@ -207,7 +207,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
       },
     ]);
     const { surface, renderer } = setup();
-    const view = renderer.createElement('symbiote-view');
+    const view = renderer.createElement('view');
     renderer.setProperty(view, 'nativeID', PROBE_ID);
     renderer.addClass(view, 'card');
     renderer.addClass(view, 'highlight');
@@ -225,8 +225,8 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // "nested inside another node" case is a SEPARATE branch, covered by the next test.
   it('removeChild detaches a node from the next commit', async () => {
     const { surface, renderer } = setup();
-    const keep = renderer.createElement('symbiote-view');
-    const drop = renderer.createElement('symbiote-view');
+    const keep = renderer.createElement('view');
+    const drop = renderer.createElement('view');
     renderer.setProperty(drop, 'nativeID', PROBE_ID);
     renderer.appendChild(surface, keep);
     renderer.appendChild(surface, drop);
@@ -252,8 +252,8 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // nested node would silently no-op.
   it('removeChild detaches a nested node (not a direct surface child) from its retained parent', async () => {
     const { surface, renderer } = setup();
-    const container = renderer.createElement('symbiote-view');
-    const nested = renderer.createElement('symbiote-view');
+    const container = renderer.createElement('view');
+    const nested = renderer.createElement('view');
     renderer.setProperty(nested, 'nativeID', PROBE_ID);
     renderer.appendChild(container, nested);
     renderer.appendChild(surface, container);
@@ -279,9 +279,9 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // two existing siblings under the surface, not just append it at the end.
   it('insertBefore positions a new child before an existing sibling under the surface', async () => {
     const { surface, renderer } = setup();
-    const first = renderer.createElement('symbiote-text');
+    const first = renderer.createElement('text');
     renderer.appendChild(first, renderer.createText('first'));
-    const last = renderer.createElement('symbiote-text');
+    const last = renderer.createElement('text');
     renderer.appendChild(last, renderer.createText('last'));
     renderer.appendChild(surface, first);
     renderer.appendChild(surface, last);
@@ -290,7 +290,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
       'RCTText(RCTRawText "first")RCTText(RCTRawText "last")',
     );
 
-    const middle = renderer.createElement('symbiote-text');
+    const middle = renderer.createElement('text');
     renderer.appendChild(middle, renderer.createText('middle'));
     renderer.insertBefore(surface, middle, last);
     await tick();
@@ -307,7 +307,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // and doesn't commit the orphaned child anywhere it shouldn't be.
   it('appendChild silently defers a null parent instead of throwing or misplacing the child', async () => {
     const { renderer } = setup();
-    const orphan = renderer.createElement('symbiote-view');
+    const orphan = renderer.createElement('view');
     expect(() => renderer.appendChild(null, orphan)).not.toThrow();
     await tick();
 
@@ -320,7 +320,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // attribute in a template would render without its value.
   it('setAttribute commits a static attribute and removeAttribute clears it', async () => {
     const { surface, renderer } = setup();
-    const view = renderer.createElement('symbiote-view');
+    const view = renderer.createElement('view');
     renderer.setProperty(view, 'nativeID', PROBE_ID);
     renderer.setAttribute(view, 'testID', 'static-attr');
     renderer.appendChild(surface, view);
@@ -344,7 +344,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // entirely; untested before this rewrite even though setStyle's merge behavior was.
   it('removeStyle drops one key and keeps the rest of the accumulated style', async () => {
     const { surface, renderer } = setup();
-    const view = renderer.createElement('symbiote-view');
+    const view = renderer.createElement('view');
     renderer.setProperty(view, 'nativeID', PROBE_ID);
     renderer.setStyle(view, 'padding', 24);
     renderer.setStyle(view, 'opacity', 0.5);
@@ -363,7 +363,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // creation.
   it('setValue updates a committed RawText node on a later call', async () => {
     const { surface, renderer } = setup();
-    const text = renderer.createElement('symbiote-text');
+    const text = renderer.createElement('text');
     renderer.setProperty(text, 'nativeID', PROBE_ID);
     const raw = renderer.createText('first');
     renderer.appendChild(text, raw);
@@ -389,9 +389,9 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // parentNode points into.
   it('parentNode and nextSibling reflect the retained tree structure', async () => {
     const { surface, renderer } = setup();
-    const container = renderer.createElement('symbiote-view');
-    const childA = renderer.createElement('symbiote-view');
-    const childB = renderer.createElement('symbiote-view');
+    const container = renderer.createElement('view');
+    const childA = renderer.createElement('view');
+    const childB = renderer.createElement('view');
     renderer.appendChild(container, childA);
     renderer.appendChild(container, childB);
     renderer.appendChild(surface, container);
@@ -422,9 +422,9 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   it('createComment yields an anchor the commit walk skips but flattens its children', async () => {
     const { surface, renderer } = setup();
     const anchor = renderer.createComment();
-    renderer.appendChild(anchor, renderer.createElement('symbiote-view'));
+    renderer.appendChild(anchor, renderer.createElement('view'));
     renderer.appendChild(surface, anchor);
-    renderer.appendChild(surface, renderer.createElement('symbiote-text'));
+    renderer.appendChild(surface, renderer.createElement('text'));
     await tick();
 
     // The anchor never reaches Fabric; its child keeps the same sibling position. Angular
@@ -438,7 +438,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // actually remove it, not just stop firing without cleaning the listener map (a leak).
   it('listen attaches an explicit event listener and the unlisten fn removes it', () => {
     const { renderer } = setup();
-    const view = renderer.createElement('symbiote-view');
+    const view = renderer.createElement('view');
     expect(isSymbioteNode(view)).toBe(true);
     if (!isSymbioteNode(view))
       throw new Error('unreachable: createElement returns a node');
@@ -533,7 +533,7 @@ describe('Angular SymbioteRenderer rejects text placed outside a <Text> host', (
   // appendChild, and Angular's own codegen can reach either call for structural insertion.
   it('throws when a raw text node is inserted directly under a non-<Text> View host', () => {
     const { surface, renderer } = setup();
-    const view = renderer.createElement('symbiote-view');
+    const view = renderer.createElement('view');
     renderer.appendChild(surface, view);
     const raw = renderer.createText('stray');
     expect(() => renderer.insertBefore(view, raw, null)).toThrow(

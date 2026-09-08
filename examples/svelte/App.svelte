@@ -19,7 +19,7 @@
   // The markers below can be laid out normally. A whitespace-only text node under a parent that
   // takes no raw text becomes an anchor in the shim, so the gap between two <Screen> markers
   // never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b) — on top of the
-  // navigator already parking the markers inside a collapsed symbiote-text.
+  // navigator already parking the markers inside a collapsed text.
   import './App.css';
   import {
     Screen,

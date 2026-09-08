@@ -25,7 +25,7 @@ const fabric = installFabric();
   imports: [InputAccessoryView],
   template: `
     <InputAccessoryView [testID]="'iav'" class="toolbar">
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </InputAccessoryView>
   `,
 })

@@ -60,12 +60,10 @@ let hostWindowSize = 1;
       [windowSize]="windowSize"
     >
       <ng-template vListItem let-item>
-        <symbiote-text [testID]="'row-' + item.id">{{
-          'row-' + item.id
-        }}</symbiote-text>
+        <text [testID]="'row-' + item.id">{{ 'row-' + item.id }}</text>
       </ng-template>
       <ng-template vListSeparator>
-        <symbiote-text testID="divider">divider</symbiote-text>
+        <text testID="divider">divider</text>
       </ng-template>
     </VirtualizedList>
   `,

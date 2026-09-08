@@ -5,7 +5,7 @@
 // native node, which reads what it understands and ignores the rest, so Android-only and iOS-only
 // prop families ride down harmlessly on both. This folds aria/role through the shared
 // resolveAccessibilityProps and maps the native props + a11y + onRefresh onto the
-// symbiote-refresh-control host, children via <ng-content>. One composed component covers both
+// refresh-control host, children via <ng-content>. One composed component covers both
 // platforms, so this stays a flat single file.
 //
 // `refreshing` is a controlled prop: the parent owns it and pushes it down each commit; native
@@ -105,13 +105,13 @@ export type IAngularRefreshControlInputs = Omit<
   imports: [RefreshControlHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <symbiote-refresh-control
+    <refresh-control
       #host
       [symbioteHostProps]="hostProps()"
       (refresh)="handleRefresh()"
     >
       <ng-content></ng-content>
-    </symbiote-refresh-control>
+    </refresh-control>
   `,
 })
 export class RefreshControl
@@ -178,13 +178,13 @@ export class RefreshControl
   @Input('aria-valuenow') ariaValueNow?: number;
   @Input('aria-valuetext') ariaValueText?: string;
 
-  // The inner symbiote-refresh-control primitive — NOT this component's own anchor host. Used for
+  // The inner refresh-control primitive — NOT this component's own anchor host. Used for
   // the imperative dispatchViewCommand calls below.
   @ViewChild('host') private host?: RefreshControlHost;
 
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
   // onto (see anchorHostStyle's doc comment) — distinct from `host` above, which targets the real
-  // inner `symbiote-refresh-control` primitive one level down.
+  // inner `refresh-control` primitive one level down.
   private readonly elementRef = inject(ElementRef);
 
   private lastNativeRefreshing = false;

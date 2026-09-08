@@ -72,9 +72,9 @@ export type IAngularInputAccessoryViewInputs = Omit<
   imports: [InputAccessoryViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <symbiote-input-accessory-view [symbioteHostProps]="hostProps()">
+    <input-accessory-view [symbioteHostProps]="hostProps()">
       <ng-content></ng-content>
-    </symbiote-input-accessory-view>
+    </input-accessory-view>
   `,
 })
 export class InputAccessoryView

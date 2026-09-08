@@ -90,8 +90,8 @@ export interface ITextProps extends IAccessibilityProps, IAriaProps {
 
 // `View` and `Text` are the intrinsic TAGS, not components wrapping them. JSX resolves a
 // capitalized tag to the value in scope, and a value that is a STRING is a host element to React —
-// so `<View/>` compiles to `_jsx('symbiote-view', …)` with no component instance, while
-// `JSX.IntrinsicElements['symbiote-view']` still supplies the strict props (a bad prop is TS2322).
+// so `<View/>` compiles to `_jsx('view', …)` with no component instance, while
+// `JSX.IntrinsicElements['view']` still supplies the strict props (a bad prop is TS2322).
 //
 // The two folds their component bodies used to apply both moved down a layer, which is what let
 // the bodies go:
@@ -101,5 +101,5 @@ export interface ITextProps extends IAccessibilityProps, IAriaProps {
 //   Text's defaults        (`foldHostBag`, driven by HOST_PRIMITIVES)
 //
 // A type annotation rather than `as const`: same literal type, no cast (`ts-js-best-practices`).
-export const View = 'symbiote-view';
-export const Text = 'symbiote-text';
+export const View = 'view';
+export const Text = 'text';

@@ -73,7 +73,7 @@ afterEach(() => {
   imports: [TouchableOpacity],
   template: `
     <TouchableOpacity [testID]="'opacity'" class="card">
-      <symbiote-text>Press</symbiote-text>
+      <text>Press</text>
     </TouchableOpacity>
   `,
 })
@@ -85,7 +85,7 @@ class TouchableOpacityHost {}
   imports: [TouchableHighlight],
   template: `
     <TouchableHighlight [testID]="'highlight'" class="card">
-      <symbiote-text>Press</symbiote-text>
+      <text>Press</text>
     </TouchableHighlight>
   `,
 })
@@ -97,7 +97,7 @@ class TouchableHighlightHost {}
   imports: [TouchableWithoutFeedback],
   template: `
     <TouchableWithoutFeedback [testID]="'without-feedback'" class="card">
-      <symbiote-text>Press</symbiote-text>
+      <text>Press</text>
     </TouchableWithoutFeedback>
   `,
 })
@@ -216,13 +216,13 @@ let toggleFixture: TouchableToggleFixture | undefined;
   imports: [TouchableHighlight, TouchableOpacity, TouchableWithoutFeedback],
   template: `
     <TouchableHighlight [testID]="'toggle-highlight'" [class.dark]="dark">
-      <symbiote-text>Press</symbiote-text>
+      <text>Press</text>
     </TouchableHighlight>
     <TouchableOpacity [testID]="'toggle-opacity'" [class.dark]="dark">
-      <symbiote-text>Press</symbiote-text>
+      <text>Press</text>
     </TouchableOpacity>
     <TouchableWithoutFeedback [testID]="'toggle-plain'" [class.dark]="dark">
-      <symbiote-text>Press</symbiote-text>
+      <text>Press</text>
     </TouchableWithoutFeedback>
   `,
 })
@@ -331,14 +331,14 @@ let underlayHost: UnderlayHost | undefined;
       (showUnderlay)="onShowUnderlay()"
       (hideUnderlay)="onHideUnderlay()"
     >
-      <symbiote-text>Press</symbiote-text>
+      <text>Press</text>
     </TouchableHighlight>
     <TouchableHighlight
       [testID]="'decorative'"
       [underlayColor]="'blue'"
       (showUnderlay)="onDecorativeShowUnderlay()"
     >
-      <symbiote-text>Look</symbiote-text>
+      <text>Look</text>
     </TouchableHighlight>
   `,
 })
@@ -451,7 +451,7 @@ let opacityHost: OpacityHost | undefined;
       [style]="restingStyle"
       (pressOut)="onPressOut($event)"
     >
-      <symbiote-text>Press</symbiote-text>
+      <text>Press</text>
     </TouchableOpacity>
   `,
 })
@@ -541,7 +541,7 @@ let plainHost: PlainHost | undefined;
       [delayPressIn]="40"
       (pressIn)="onPressIn($event)"
     >
-      <symbiote-text>Press</symbiote-text>
+      <text>Press</text>
     </TouchableWithoutFeedback>
   `,
 })

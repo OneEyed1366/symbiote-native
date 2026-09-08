@@ -37,14 +37,14 @@ function census(): { views: string[]; props: Record<string, unknown> } {
 
 describe('createAnimatedComponent over a tag', () => {
   it('commits its children and folds its props', async () => {
-    const AnimatedTag = createAnimatedComponent('symbiote-view');
+    const AnimatedTag = createAnimatedComponent('view');
     fabric.reset();
     mount(
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
           h(AnimatedTag, { 'accessibility-label': 'bar' }, () =>
-            h('symbiote-text', {}, 'hi'),
+            h('text', {}, 'hi'),
           ),
       }),
     );
@@ -61,7 +61,7 @@ describe('createAnimatedComponent over a tag', () => {
   });
 
   it('names itself after the tag, since a tag has no displayName', () => {
-    const AnimatedTag = createAnimatedComponent('symbiote-view');
-    expect(AnimatedTag.name).toBe('Animated(symbiote-view)');
+    const AnimatedTag = createAnimatedComponent('view');
+    expect(AnimatedTag.name).toBe('Animated(view)');
   });
 });

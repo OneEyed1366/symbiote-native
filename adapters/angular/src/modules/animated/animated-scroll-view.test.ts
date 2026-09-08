@@ -1,9 +1,9 @@
 // Regression tests for two Android-only bugs AnimatedScrollView's bespoke template hit because
-// it talks to the raw symbiote-scroll-view primitive directly instead of reusing the real
+// it talks to the raw scroll-view primitive directly instead of reusing the real
 // ScrollView component (which already has both fixes — see scroll-view/shared.ts):
 //
-// 1. It projected <ng-content> straight into symbiote-scroll-view with no content wrapper. On
-//    Android, symbiote-scroll-content resolves to a plain RCTView, which Fabric view-flattens
+// 1. It projected <ng-content> straight into scroll-view with no content wrapper. On
+//    Android, scroll-content resolves to a plain RCTView, which Fabric view-flattens
 //    away unless collapsable:false pins it — so multiple projected children were hoisted up as
 //    direct children of the scroll view, which natively hosts exactly one ("ScrollView can
 //    host only one direct child" -> addViewAt crash).
@@ -45,8 +45,8 @@ Component({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <AnimatedScrollView>
-      <symbiote-view testID="a"></symbiote-view>
-      <symbiote-view testID="b"></symbiote-view>
+      <view testID="a"></view>
+      <view testID="b"></view>
     </AnimatedScrollView>
   `,
 })(AnimatedScrollViewApp);
@@ -59,7 +59,7 @@ Component({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <AnimatedScrollView [animatedProps]="{ nestedScrollEnabled: false }">
-      <symbiote-view testID="a"></symbiote-view>
+      <view testID="a"></view>
     </AnimatedScrollView>
   `,
 })(AnimatedScrollViewOverrideApp);
@@ -71,7 +71,7 @@ afterEach(() => {
 });
 
 describe('AnimatedScrollView', () => {
-  // why: bug #1 in the file header — projecting content straight into symbiote-scroll-view
+  // why: bug #1 in the file header — projecting content straight into scroll-view
   // with no wrapper lets Android's Fabric view-flattening hoist multiple children up to be
   // direct children of the native scroll view, which crashes since it hosts exactly one. The
   // wrapper + `collapsable: false` is what pins the content view and keeps it un-flattened.

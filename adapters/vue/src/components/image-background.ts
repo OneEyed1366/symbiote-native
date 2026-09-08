@@ -139,7 +139,7 @@ const ImageBackgroundComponent: FunctionalComponent = (
     },
   });
 
-  // wrapper = symbiote-view > [imageDescriptor]; the slot children paint AFTER the image (on top).
+  // wrapper = view > [imageDescriptor]; the slot children paint AFTER the image (on top).
   const slotChildren = slots.default !== undefined ? slots.default() : [];
   return h(
     wrapper.type,

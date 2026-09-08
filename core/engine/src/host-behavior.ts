@@ -226,7 +226,7 @@ const tornDown = new WeakSet<ISymbioteNode>();
 //
 // THE REGISTRY IS KEYED BY INTRINSIC TAG AND THE NODE IS NOT. `node.component` is the FABRIC view
 // name: every adapter resolves the tag through `descriptorFor` before calling `createElement`, so
-// `symbiote-view` arrives as `RCTView`. Keying the registry by Fabric name instead is not an
+// `view` arrives as `RCTView`. Keying the registry by Fabric name instead is not an
 // option — a pressable resolves to `RCTView` like any other view, so the press machine would
 // attach to every plain `View` in the app. So the tag alphabet is used EXACTLY ONCE, at
 // `attachHostBehavior`, where the caller still holds it; every later lookup reads this map.
@@ -436,8 +436,15 @@ export function markDetachCandidate(node: ISymbioteNode): void {
 //
 // The subtree walk lives here rather than at removal, and is cheaper for it: only the nodes that
 // actually left are walked.
+//
+// `onDetached` runs for EVERY node of a genuinely-removed subtree, whether or not it carries a
+// behavior — it is how the engine's other per-node lifetime state (an Animated subscription, see
+// `animated/host-binding.ts`) gets the same "did it really leave" answer this sweep exists to
+// compute. Passed in for the no-cycle reason `runDeferredAttaches`' predicate is: this module must
+// keep pointing one way, and Metro's `inlineRequires` makes that a live hazard rather than taste.
 export function sweepDetachedBehaviors(
   topLevel: readonly ISymbioteNode[],
+  onDetached: (node: ISymbioteNode) => void,
 ): void {
   if (detachCandidates.size === 0) return;
   // A surface's top-level nodes carry `parent === undefined` by design (surface.ts), and
@@ -446,16 +453,21 @@ export function sweepDetachedBehaviors(
   const seen = new Set<ISymbioteNode>();
   for (const node of detachCandidates) {
     if (node.parent !== undefined || topLevel.includes(node)) continue;
-    detachSubtree(node, seen);
+    detachSubtree(node, seen, onDetached);
   }
   detachCandidates.clear();
 }
 
 // `seen` guards the one overlap the candidate set can contain: a removed parent and a removed
 // descendant of it are both nominated, and without it the descendant is detached twice.
-function detachSubtree(node: ISymbioteNode, seen: Set<ISymbioteNode>): void {
+function detachSubtree(
+  node: ISymbioteNode,
+  seen: Set<ISymbioteNode>,
+  onDetached: (node: ISymbioteNode) => void,
+): void {
   if (seen.has(node)) return;
   seen.add(node);
+  onDetached(node);
   // Marked whether or not THIS node carries a behavior: the mark is what tells a later insert to
   // walk, and the node re-inserted is usually a plain container whose DESCENDANT holds the
   // machine. Gating the mark on `behaviors.has` made the row wrapper unmarked and the whole walk
@@ -477,7 +489,7 @@ function detachSubtree(node: ISymbioteNode, seen: Set<ISymbioteNode>): void {
   committedEachTime.delete(node);
   // The map, not the registry: by here only the Fabric name is left on the node.
   attached.get(node)?.detach(node);
-  for (const child of node.children) detachSubtree(child, seen);
+  for (const child of node.children) detachSubtree(child, seen, onDetached);
 }
 
 // Re-arms a node the sweep tore down but that the framework put back. Called from appendChild and

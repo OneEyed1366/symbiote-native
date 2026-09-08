@@ -1,5 +1,5 @@
 // InputAccessoryView — the Solid lifecycle half (iOS). The host-node assembly (nativeID /
-// backgroundColor / style / passthrough forwarding onto `symbiote-input-accessory-view`) lives
+// backgroundColor / style / passthrough forwarding onto `input-accessory-view`) lives
 // framework-agnostic in @symbiote-native/components' renderInputAccessoryView and is shared
 // verbatim with React, Vue and Svelte; Solid supplies only the reactivity and the children.
 //
@@ -72,8 +72,6 @@ export function InputAccessoryView(
   );
 
   return (
-    <symbiote-input-accessory-view {...bag()}>
-      {local.children}
-    </symbiote-input-accessory-view>
+    <input-accessory-view {...bag()}>{local.children}</input-accessory-view>
   );
 }

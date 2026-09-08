@@ -35,7 +35,10 @@ import {
   SymbioteSurface,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { descriptorFor } from '@symbiote-native/components';
+import {
+  descriptorFor,
+  TEXT_INPUT_MULTILINE_TAG,
+} from '@symbiote-native/components';
 
 // Solid host nodes are all SymbioteNode (elements, raw text, anchors). The mount container is the
 // surface, and Solid's own `render(code, node)` takes that container as a NodeType, so the surface
@@ -179,16 +182,10 @@ function foldTextValue(
   return fold === undefined ? value : fold(value);
 }
 
-// The alias fold, at the RENDERER and not only in the transform — the defect class Angular paid for
-// twice on 2026-08-31. A lowered element inherits nothing the component wrapper did, and the
-// compile-time rename in `babel-lower-host-primitives.cjs` covers exactly the call sites the
-// transform REWROTE: `<View id={x} />` is fine (the attribute name is renamed before the preset
-// compiles it, dynamic value included), but a hand-written `<symbiote-view id="x">` is not, and it
-// committed `id` — a key Fabric does not know — while the component committed `nativeID`. Measured
-// by mounting both forms and diffing committed key NAMES; totals were identical and said nothing.
-//
-// The transform's rename STAYS. It is not redundant: it means the markup path arrives here already
-// spelled `nativeID`, so the common case never takes the branch below with a key to rewrite.
+// The alias fold, at the RENDERER — the only place it can live now that an app writes the tag
+// itself. A bare `<view id="x">` has no wrapper to inherit the fold from, and `id` is a key Fabric
+// does not know, so it committed nothing while the component committed `nativeID`. Measured by
+// mounting both forms and diffing committed key NAMES; totals were identical and said nothing.
 //
 // One string comparison rather than a Map lookup, because this sits on the per-prop write path —
 // 32 001 prop writes on a benchmark create, where a Map.get is the kind of cost the engine spent
@@ -197,6 +194,26 @@ function foldTextValue(
 // both constants from `HOST_PRIMITIVES` and fails the moment a second pair appears.
 const ALIAS_FROM = 'id';
 const ALIAS_TO = 'nativeID';
+
+// `multiline` selects between TWO Fabric views, so the TAG decides and no prop write moves a node
+// between them. Two of the three paths that can build the node resolve it earlier — the wrapper
+// CONSUMES the prop to pick its intrinsic, a lowering transform reads a literal at compile time —
+// and an author writing the tag by hand has neither, which leaves two silent divergences.
+//
+// The shared behavior (`core/components/src/behaviors/text-input.ts`) already makes the PAYLOAD
+// follow the tag. The complaint has to live here instead of there: `foldPayload` runs inside the
+// commit, so a throw from it lands a tick later as an uncaught exception with no frame naming the
+// call site — measured, a test awaiting the mount sees `nothing committed` rather than the error.
+const MULTILINE_PROP = 'multiline';
+
+function assertMultilineMatchesTag(node: ISymbioteNode, value: unknown): void {
+  if ((value === true) === (node.props[MULTILINE_PROP] === true)) return;
+  throw new Error(
+    `multiline={${String(value)}} contradicts the tag: <text-input> and ` +
+      `<text-input-multiline> are different Fabric views and no prop write moves a node ` +
+      `between them. Pick the tag (a runtime choice needs a <Show> around both).`,
+  );
+}
 
 function foldAliasKey(name: string): string {
   return name === ALIAS_FROM ? ALIAS_TO : name;
@@ -216,6 +233,10 @@ const nodeOps: RendererOptions<IHostNode> = {
       tag,
     );
     if (descriptor.isText) seedTextDefaults(node);
+    // Only the multiline tag is seeded: writing `multiline: false` on the single-line one would add
+    // a key the wrapper's payload does not carry, i.e. a divergence in the other direction.
+    if (tag === TEXT_INPUT_MULTILINE_TAG)
+      setEngineProp(node, MULTILINE_PROP, true);
     // Graft the imperative public-instance API (measure / setNativeProps / focus / …) onto the raw
     // node so a `ref` to a host element exposes it exactly like React's getPublicInstance.
     // toPublicInstance mutates in place and returns the SAME node identity, so the engine's commit
@@ -254,6 +275,7 @@ const nodeOps: RendererOptions<IHostNode> = {
 
   setProperty(node, name, value) {
     if (isSurface(node)) return;
+    if (name === MULTILINE_PROP) assertMultilineMatchesTag(node, value);
     // routeProp makes the prop-vs-event decision from the node's ViewConfig (onPress on a View
     // becomes a listener; onTintColor on a Switch stays a prop), and centralizes the class+style
     // merge. Shared with React and Vue — never re-implement an `onX` check here

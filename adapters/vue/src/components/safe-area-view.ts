@@ -3,7 +3,7 @@
 // JS-side translation, so this maps style + children straight onto the intrinsic. The Vue twin
 // of the React adapter's SafeAreaView. Vue takes children via slots, folds aria/role through
 // the shared resolveAccessibilityProps (so every adapter normalizes the web aliases identically),
-// and forwards the rest onto the symbiote-safe-area-view host node.
+// and forwards the rest onto the safe-area-view host node.
 //
 // Inputs arrive as attrs (untyped), so the forwarded bag is BUILT at the a11y-intersection type
 // (a genuine narrowing, not a cast) before resolveAccessibilityProps folds aria-* into accessibility*.
@@ -52,7 +52,7 @@ export const SafeAreaView = defineComponent({
       dlog('SafeAreaView -> SafeAreaView');
       const nativeProps = foldAttrs(normalizeVueAttrs(rawAttrs));
       return h(
-        'symbiote-safe-area-view',
+        'safe-area-view',
         nativeProps,
         slots.default !== undefined ? slots.default() : undefined,
       );

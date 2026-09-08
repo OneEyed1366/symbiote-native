@@ -10,34 +10,34 @@
 // truth: core/components/src/component-names/index.ios.ts's ISymbioteIntrinsic union. Kept in
 // sync by the drift-protection test in babel-register-composed.test.ts.
 const PRIMITIVE_SELECTORS = new Set([
-  'symbiote-view',
+  'view',
   // Same RCTView as a plain view; the tag exists so the host-behavior registry can key on it.
-  'symbiote-pressable',
-  'symbiote-text',
-  'symbiote-image',
-  'symbiote-scroll-view',
-  'symbiote-scroll-content',
-  'symbiote-horizontal-scroll-view',
-  'symbiote-horizontal-scroll-content',
-  'symbiote-text-input',
-  'symbiote-text-input-multiline',
+  'pressable',
+  'text',
+  'image',
+  'scroll-view',
+  'scroll-content',
+  'horizontal-scroll-view',
+  'horizontal-scroll-content',
+  'text-input',
+  'text-input-multiline',
   // The COMPONENT path's pair. Only a lowering transform may emit the plain tags above — those
   // carry the engine's TextInput machine, and this adapter's own component runs that state in
   // its template. See `core/components/src/component-names/shared.ts`.
-  'symbiote-text-input-managed',
-  'symbiote-text-input-multiline-managed',
-  'symbiote-switch',
+  'text-input-managed',
+  'text-input-multiline-managed',
+  'switch',
   // The component path's spelling — same native view, a tag the engine's Switch behavior does
   // not carry. See `core/components/src/component-names/shared.ts`.
-  'symbiote-switch-managed',
-  'symbiote-activity-indicator',
-  'symbiote-safe-area-view',
-  'symbiote-modal',
-  'symbiote-refresh-control',
+  'switch-managed',
+  'activity-indicator',
+  'safe-area-view',
+  'modal',
+  'refresh-control',
   // RN's JS sticky wrapper as a tag: the same RCTView again, carrying the pin the engine's
   // ScrollView behavior drives.
-  'symbiote-sticky-header',
-  'symbiote-input-accessory-view',
+  'sticky-header',
+  'input-accessory-view',
 ]);
 
 // Inject from the package barrel — the ONE resolution route every consumer already uses, so the

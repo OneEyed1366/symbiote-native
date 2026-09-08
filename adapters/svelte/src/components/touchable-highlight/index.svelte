@@ -27,7 +27,8 @@
     IStyleProp,
     IViewStyle,
   } from '@symbiote-native/engine';
-  import Pressable from '../pressable/index.svelte';
+  import { createAttachmentsSync } from '../../runes/attachments';
+  import type { ShimElement } from '../../dom-shim';
 
   function scheduleTimeout(callback: () => void, ms: number): () => void {
     const id = setTimeout(callback, ms);
@@ -123,17 +124,24 @@
     underlay.handlePressOut(event);
     onPressOut?.(event);
   }
+
+  // See touchable-opacity/index.svelte for the tag's one timing gap (`__minPressDuration`).
+  const pressBag = $derived({
+    ...rest,
+    style: containerStyle,
+    onPress: handlePress,
+    onPressIn: handlePressIn,
+    onPressOut: handlePressOut,
+  });
+
+  // `{@attach}` rides `rest` as a symbol key and no bag carries it into the engine.
+  let hostShim = $state.raw<ShimElement | null>(null);
+  const syncAttachments = createAttachmentsSync();
+  $effect(() => {
+    syncAttachments(hostShim, rest);
+  });
 </script>
 
-<Pressable
-  __minPressDuration={0}
-  {...rest}
-  style={containerStyle}
-  onPress={handlePress}
-  onPressIn={handlePressIn}
-  onPressOut={handlePressOut}
->
-  {#snippet children()}
-    {@render content?.()}
-  {/snippet}
-</Pressable>
+<pressable p={pressBag} bind:this={hostShim}>
+  {@render content?.()}
+</pressable>

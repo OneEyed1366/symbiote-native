@@ -64,7 +64,7 @@ describe('React FlatList columnWrapperStyle class-name resolution (Positive)', (
         columnWrapperStyle: 'rowGap',
         keyExtractor: (item: IRow) => `k-${item.id}`,
         renderItem: ({ item }: { item: IRow }): ReactElement =>
-          createElement('symbiote-text', { key: item.id }, item.label),
+          createElement('text', { key: item.id }, item.label),
       }),
     );
 
@@ -85,7 +85,7 @@ describe('React FlatList columnWrapperStyle class-name resolution (Positive)', (
         columnWrapperStyle: { columnGap: 8 },
         keyExtractor: (item: IRow) => `k-${item.id}`,
         renderItem: ({ item }: { item: IRow }): ReactElement =>
-          createElement('symbiote-text', { key: item.id }, item.label),
+          createElement('text', { key: item.id }, item.label),
       }),
     );
 

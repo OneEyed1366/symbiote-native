@@ -1,7 +1,7 @@
 // Regression coverage for the anchor-vs-real-content class bug (see pressable.test.ts for the
 // full writeup): a `class="..."` written on SafeAreaView's OWN use site always resolves through
 // Angular's addClass/removeClass onto its non-painting ANCHOR host, never onto the real committed
-// symbiote-safe-area-view node — so the resolved style was silently lost until hostProps' `style`
+// safe-area-view node — so the resolved style was silently lost until hostProps' `style`
 // merged in anchorHostStyle(this.elementRef). SafeAreaView has no inner ViewChild (a single flat
 // component, per index.ts's own comment), so unlike ScrollView/Switch there is only one anchor and
 // one host to reconcile. No Negative group: hostProps is a pure prop fold with no throwing branch —
@@ -23,7 +23,7 @@ const fabric = installFabric();
   standalone: true,
   imports: [SafeAreaView],
   template: `<SafeAreaView [testID]="'safe-area'"
-    ><symbiote-text>Hello</symbiote-text></SafeAreaView
+    ><text>Hello</text></SafeAreaView
   >`,
 })
 class SafeAreaViewNoSubscriberFixture {}
@@ -37,7 +37,7 @@ class SafeAreaViewNoSubscriberFixture {}
       [testID]="'safe-area'"
       (accessibilityAction)="onAction($event)"
     >
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </SafeAreaView>
   `,
 })
@@ -51,7 +51,7 @@ class SafeAreaViewOneSubscriberFixture {
   imports: [SafeAreaView],
   template: `
     <SafeAreaView [testID]="'safe-area'" class="screen">
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </SafeAreaView>
   `,
 })
@@ -69,7 +69,7 @@ let toggleFixture: SafeAreaViewToggleFixture | undefined;
   imports: [SafeAreaView],
   template: `
     <SafeAreaView [testID]="'safe-area'" [class.dark]="dark">
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </SafeAreaView>
   `,
 })

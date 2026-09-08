@@ -67,7 +67,7 @@ const PROBES = [
   ['element', 'bind:value', `<script>let v = $state('')</script><input bind:value={v}/>`],
   ['element', 'bind:this', `<script>let r = $state(null)</script><div bind:this={r}></div>`],
 
-  ['host tag', 'object bag', `<script>let bag = $state({})</script><symbiote-view p={bag}></symbiote-view>`],
+  ['host tag', 'object bag', `<script>let bag = $state({})</script><view p={bag}></view>`],
 ];
 
 const emitted = new Map();

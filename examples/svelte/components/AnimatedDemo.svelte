@@ -6,7 +6,7 @@
   // offloads it. Each dot keeps its own Animated.Value so a JS run and a native run never touch
   // the same node.
   //
-  import { View, Text, Animated } from '@symbiote-native/svelte';
+  import { Animated } from '@symbiote-native/svelte';
   import ActionButton from './ActionButton.svelte';
 
   const SLIDE_DISTANCE = 220;
@@ -82,35 +82,35 @@
   };
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">Animated · JS vs native driver</Text>
-  <View class="pulse-frame">
-    <Animated.View
+<view class="section-nested">
+  <text class="section-label">Animated · JS vs native driver</text>
+  <view class="pulse-frame">
+    <view
       testID="pulse-dot"
       class="pulse-dot"
       style={{ opacity: pulseOpacity, transform: [{ scale: pulseScale }] }}
     />
-  </View>
-  <View class="slide-track">
-    <Animated.View
+  </view>
+  <view class="slide-track">
+    <view
       testID="slide-js-dot"
       class="js-slide-dot"
       style={{ transform: [{ translateX: jsX }] }}
     />
-  </View>
+  </view>
   <ActionButton
     testID="slide-js-btn"
     title="Slide (JS driver)"
     onPress={() => slide(jsSlide, jsForward, next => (jsForward = next), false)}
     color="#f6ad55"
   />
-  <View class="slide-track">
-    <Animated.View
+  <view class="slide-track">
+    <view
       testID="slide-native-dot"
       class="native-slide-dot"
       style={{ transform: [{ translateX: nativeX }] }}
     />
-  </View>
+  </view>
   <ActionButton
     testID="slide-native-btn"
     title="Slide (native driver)"
@@ -119,4 +119,4 @@
     color="#68d391"
   />
   <ActionButton title="Freeze JS 1.5s" onPress={freezeJs} color="#fc8181" />
-</View>
+</view>

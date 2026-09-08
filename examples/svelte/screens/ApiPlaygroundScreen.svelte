@@ -9,12 +9,7 @@
   // whitespace-only text node under a parent that takes no raw text to an anchor, so a gap
   // between siblings never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b), and
   // svelte.config.js's collapseTextWhitespace() folds a sentence wrapped across source lines.
-  import {
-    SafeAreaView,
-    ScrollView,
-    Text,
-    View,
-  } from '@symbiote-native/svelte';
+  import { ScrollView } from '@symbiote-native/svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
   import RunesDemo from '../components/api-playground/RunesDemo.svelte';
@@ -30,56 +25,56 @@
   const accent = LINE_COLOR.primitives;
 </script>
 
-<SafeAreaView class="screen">
+<safe-area-view class="screen">
   <ScrollView
     testID="api-playground-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View class="hero-badge" style={{ backgroundColor: accent }}>
-        <Text class="hero-badge-text">{lineInfo.code}</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">API Playground</Text>
-        <Text class="hero-body">
+      </text>
+    </view>
+    <view class="hero-card">
+      <view class="hero-badge" style={{ backgroundColor: accent }}>
+        <text class="hero-badge-text">{lineInfo.code}</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">API Playground</text>
+        <text class="hero-body">
           Svelte 5's own runes, template syntax, bindings, stores, context and
           lifecycle — running live under Symbiote's custom renderer.
-        </Text>
-      </View>
-    </View>
+        </text>
+      </view>
+    </view>
     <RunesDemo />
     <TemplateSyntaxDemo />
     <BindingsDemo />
     <EventsActionsDemo />
     <CompositionDemo>
       {#snippet header()}
-        <Text class="note-text">
+        <text class="note-text">
           this section's `header` is a NAMED snippet prop, supplied by
           ApiPlaygroundScreen.svelte
-        </Text>
+        </text>
       {/snippet}
-      <Text class="list-row-text">
+      <text class="list-row-text">
         this line is CompositionDemo's default `children` snippet — also
         supplied by ApiPlaygroundScreen.svelte
-      </Text>
+      </text>
     </CompositionDemo>
     <StoresDemo />
     <SpecialElementsDemo />
     <LifecycleDemo />
-    <View class="section-nested">
-      <Text class="section-label">Legacy reactivity (Svelte 4 style)</Text>
-      <Text class="note-text">
+    <view class="section-nested">
+      <text class="section-label">Legacy reactivity (Svelte 4 style)</text>
+      <text class="note-text">
         No, across the board — top-level `let` reactivity, `$:` reactive
         statements and `export let` props are all disallowed in runes mode,
         which every component on this screen (and this whole adapter) uses
         exclusively; `$state`/`$derived`/`$effect`/`$props()` replace them.
-      </Text>
-    </View>
+      </text>
+    </view>
   </ScrollView>
-</SafeAreaView>
+</safe-area-view>

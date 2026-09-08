@@ -55,7 +55,7 @@ async function committedText(
   props: Record<string, unknown>,
 ): Promise<IFakeNode> {
   fabric.reset();
-  mount(ROOT_TAG, () => <symbiote-text {...props} />);
+  mount(ROOT_TAG, () => <text {...props} />);
   await tick();
   return fabric.appRoot().children[0];
 }

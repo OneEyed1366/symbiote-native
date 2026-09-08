@@ -109,7 +109,7 @@ function sliderWrapperNode(): IFakeNode {
 describe('React Slider wrapper', () => {
   describe('Positive', () => {
     it('paints the raw RNCSlider leaf inside a centering wrapper View', () => {
-      // why: renderSlider (core) always wraps the native leaf in a centering symbiote-view — a
+      // why: renderSlider (core) always wraps the native leaf in a centering view — a
       // caller must see BOTH the wrapper and the leaf, with the leaf's own props unaffected by
       // being nested rather than mounted at the root.
       mount(
@@ -290,7 +290,7 @@ describe('React Slider wrapper', () => {
           step: 0.5,
           StepMarker: ({ index }: { index: number }) =>
             createElement(
-              'symbiote-text',
+              'text',
               { testID: `custom-marker-${index}` },
               String(index),
             ),
@@ -327,7 +327,7 @@ describe('React Slider wrapper', () => {
             stepMarked: boolean;
           }) => {
             if (stepMarked) markedIndex = index;
-            return createElement('symbiote-view');
+            return createElement('view');
           },
         }),
       );
@@ -344,7 +344,7 @@ describe('React Slider wrapper', () => {
           value: 0.5,
           thumbTintColor: '#0000ff',
           thumbImage: { uri: 'https://example.com/thumb.png' },
-          StepMarker: () => createElement('symbiote-view'),
+          StepMarker: () => createElement('view'),
         }),
       );
       // 'processed(...)' is the fake color processor from RNC_SLIDER_VIEW_CONFIG — the fold's own

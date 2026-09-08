@@ -45,7 +45,7 @@ const HANDLED_PROPS = [
   'style',
 ];
 
-// The wrapper is a raw symbiote-view emitted by the render fn, not the View component, so it never
+// The wrapper is a raw view emitted by the render fn, not the View component, so it never
 // runs resolveAccessibilityProps itself — the fold happens here, exactly like React's hook does.
 // The two branches of that fold emit DIFFERENT key sets; descriptorToSolid runs the resulting bag
 // through withStableKeys, so a vanished key still reaches routeProp as a delete

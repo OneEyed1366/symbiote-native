@@ -3,7 +3,7 @@
 // object property (`p={bag}`), never as individual attributes.
 //
 // Why it is worth a test of its own. Three separate Svelte-side bug classes are impossible here
-// only because of that rule, and all three come back the moment a single `<symbiote-view {...bag}>`
+// only because of that rule, and all three come back the moment a single `<view {...bag}>`
 // is written:
 //   - an `on`-prefixed PROP (`onTintColor` on a Switch) is eaten as an event listener,
 //   - an object `style` is stringified to "[object Object]" (`set_custom_element_data` excludes

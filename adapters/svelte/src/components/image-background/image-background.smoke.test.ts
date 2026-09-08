@@ -16,7 +16,7 @@
 //     literal host tags — covered below.
 //   - live `children` (the marker View) landing as a real sibling AFTER the image, not swallowed
 //     or reordered — covered below.
-//   - the §16 whitespace hazard between the literal `<symbiote-image>` and `{@render children}`
+//   - the §16 whitespace hazard between the literal `<image>` and `{@render children}`
 //     tags (a real bug this exact test caught and got fixed alongside, per the file header) —
 //     covered below implicitly: an exact 2-child assertion (image then marker) would fail if a
 //     stray whitespace text node were reintroduced between them.
@@ -51,14 +51,6 @@ const PARENT_STYLE_OUT = join(
   __dirname,
   '.smoke-compiled-image-background-parent-style.mjs',
 );
-// Co-located next to the REAL View.svelte (one level up) so a relative import from PARENT_OUT
-// resolves it, following button.smoke.test.ts's precedent for pulling in a real sibling.
-const VIEW_OUT = join(
-  __dirname,
-  '..',
-  '.smoke-compiled-view-for-image-background.mjs',
-);
-
 const fabric = installFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -73,7 +65,6 @@ afterEach(() => {
   rmSync(OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
   rmSync(PARENT_STYLE_OUT, { force: true });
-  rmSync(VIEW_OUT, { force: true });
 });
 
 const COMPILE_OPTIONS = {
@@ -95,26 +86,19 @@ async function loadMountable(imageStyle?: string): Promise<Component> {
   const source = readFileSync(join(__dirname, 'index.svelte'), 'utf8');
   compileToFile(source, 'ImageBackground.svelte', OUT);
 
-  compileToFile(
-    readFileSync(join(__dirname, '..', 'View.svelte'), 'utf8'),
-    'View.svelte',
-    VIEW_OUT,
-  );
-
   const imageStyleAttr =
     imageStyle === undefined ? '' : ` imageStyle="${imageStyle}"`;
   const parentOut = imageStyle === undefined ? PARENT_OUT : PARENT_STYLE_OUT;
 
   // No whitespace anywhere between the </script> and the markup, or between sibling elements —
   // Svelte's whitespace-collapse turns any indentation between siblings into a real
-  // single-space text-node child, invalid as a symbiote-view child (skill §16). This bit
+  // single-space text-node child, invalid as a view child (skill §16). This bit
   // ImageBackground/index.svelte itself too (fixed alongside this test).
   compileToFile(
     '<script>\n' +
       "  import ImageBackground from './.smoke-compiled-image-background.mjs';\n" +
-      "  import View from '../.smoke-compiled-view-for-image-background.mjs';\n" +
       '</script>' +
-      `<ImageBackground style={{ width: 200, height: 100 }}${imageStyleAttr} source={{ uri: 'https://example.test/x.png' }}><View testID="marker" /></ImageBackground>`,
+      `<ImageBackground style={{ width: 200, height: 100 }}${imageStyleAttr} source={{ uri: 'https://example.test/x.png' }}><view testID="marker"></view></ImageBackground>`,
     'Parent.svelte',
     parentOut,
   );

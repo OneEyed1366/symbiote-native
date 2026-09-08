@@ -25,7 +25,7 @@ export interface IInputAccessoryViewProps
 }
 
 export const InputAccessoryView: FC<IInputAccessoryViewProps> = rawProps => {
-  // Owns its host element (symbiote-input-accessory-view), so it folds aria/role here; the
+  // Owns its host element (input-accessory-view), so it folds aria/role here; the
   // resolved accessibility* surface rides the node via `...passthrough`.
   const { nativeID, backgroundColor, style, children, ...passthrough } =
     resolveAccessibilityProps(rawProps);

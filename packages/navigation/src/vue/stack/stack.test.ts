@@ -139,11 +139,11 @@ function headerConfigOf(screen: IFakeNode): IFakeNode {
 }
 
 function HomeScreen() {
-  return h('symbiote-text', {}, 'home');
+  return h('text', {}, 'home');
 }
 
 function DetailsScreen() {
-  return h('symbiote-text', {}, 'details');
+  return h('text', {}, 'details');
 }
 
 function mountStack(
@@ -160,7 +160,7 @@ function mountStack(
 }
 
 function ProfileScreen() {
-  return h('symbiote-text', {}, 'profile');
+  return h('text', {}, 'profile');
 }
 
 // A slot whose marker list is REACTIVE - the Vue shape of "a <Stack.Screen> behind a v-if", which
@@ -331,7 +331,7 @@ describe('Vue Stack navigator', () => {
         const route = useRoute();
         return () => {
           receivedParams = route.value.params;
-          return h('symbiote-text', {}, 'params');
+          return h('text', {}, 'params');
         };
       });
       const handleRef = ref<INavigatorHandle | null>(null);
@@ -353,7 +353,7 @@ describe('Vue Stack navigator', () => {
         const route = useRoute();
         return () => {
           receivedParams = route.value.params;
-          return h('symbiote-text', {}, 'params');
+          return h('text', {}, 'params');
         };
       });
       const handleRef = ref<INavigatorHandle | null>(null);
@@ -380,7 +380,7 @@ describe('Vue Stack navigator', () => {
         return () => {
           homeKey = route.value.key;
           homeParams = route.value.params;
-          return h('symbiote-text', {}, 'home');
+          return h('text', {}, 'home');
         };
       });
       const handleRef = ref<INavigatorHandle | null>(null);

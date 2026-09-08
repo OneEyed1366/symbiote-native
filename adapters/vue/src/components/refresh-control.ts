@@ -4,7 +4,7 @@
 // takes the wrapped child via its DEFAULT SLOT (the seam the Android scroll-view wrap re-invokes
 // to host the scroll view inside it; iOS leaves the slot empty), folds aria/role through the
 // shared resolveAccessibilityProps, and forwards the native props onto the
-// symbiote-refresh-control host node.
+// refresh-control host node.
 //
 // `refreshing` is a controlled prop the parent pushes down each commit; native reports the
 // gesture via the direct `topRefresh` event, routed to the host onRefresh prop and turned into
@@ -69,7 +69,7 @@ export const RefreshControl = defineComponent<
         );
       dlog('RefreshControl refresh emit wired');
       return h(
-        'symbiote-refresh-control',
+        'refresh-control',
         {
           ...nativeProps,
           onRefresh: (): void => {

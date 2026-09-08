@@ -35,7 +35,7 @@ const tick = (): Promise<void> =>
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <ScrollView class="card">
-      <symbiote-view testID="cell"></symbiote-view>
+      <view testID="cell"></view>
     </ScrollView>
   `,
 })
@@ -48,7 +48,7 @@ class IOSScrollViewClassHost {}
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <ScrollView class="card">
-      <symbiote-view testID="cell"></symbiote-view>
+      <view testID="cell"></view>
     </ScrollView>
   `,
 })
@@ -62,7 +62,7 @@ class AndroidScrollViewClassHost {}
   template: `
     <ScrollView class="card">
       <RefreshControl [refreshing]="true" (refresh)="refresh()" />
-      <symbiote-view testID="cell"></symbiote-view>
+      <view testID="cell"></view>
     </ScrollView>
   `,
 })
@@ -78,7 +78,7 @@ class AndroidWrappedScrollViewClassHost {
   template: `
     <ScrollView class="box">
       <RefreshControl [refreshing]="true" (refresh)="refresh()" />
-      <symbiote-view testID="cell"></symbiote-view>
+      <view testID="cell"></view>
     </ScrollView>
   `,
 })
@@ -99,7 +99,7 @@ let toggleHost: ScrollViewClassToggleHost | undefined;
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <ScrollView [class.card]="lit">
-      <symbiote-view testID="cell"></symbiote-view>
+      <view testID="cell"></view>
     </ScrollView>
   `,
 })

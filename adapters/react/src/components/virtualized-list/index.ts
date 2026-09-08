@@ -626,17 +626,13 @@ export function VirtualizedList<ItemT>(
 
   const header = resolveElement(ListHeaderComponent);
   if (header !== undefined) {
-    children.push(
-      createElement('symbiote-view', { key: 'list-header' }, header),
-    );
+    children.push(createElement('view', { key: 'list-header' }, header));
   }
 
   if (count === FIRST_INDEX) {
     const empty = resolveElement(ListEmptyComponent);
     if (empty !== undefined) {
-      children.push(
-        createElement('symbiote-view', { key: 'list-empty' }, empty),
-      );
+      children.push(createElement('view', { key: 'list-empty' }, empty));
     }
   } else {
     // The shared plan: spacer extents, in-window cell keys, and the sticky child positions.
@@ -655,7 +651,7 @@ export function VirtualizedList<ItemT>(
 
     if (plan.leadingExtent > EMPTY_OFFSET) {
       children.push(
-        createElement('symbiote-view', {
+        createElement('view', {
           key: 'spacer-leading',
           style: horizontal
             ? { width: plan.leadingExtent }
@@ -679,7 +675,7 @@ export function VirtualizedList<ItemT>(
       });
       children.push(
         createElement(
-          'symbiote-view',
+          'view',
           {
             key: `cell-${plan.forcedStickyCell.key}`,
             onLayout: makeCellMeasure(forcedIndex),
@@ -696,7 +692,7 @@ export function VirtualizedList<ItemT>(
 
     if (plan.gapExtent > EMPTY_OFFSET) {
       children.push(
-        createElement('symbiote-view', {
+        createElement('view', {
           key: 'spacer-gap',
           style: horizontal
             ? { width: plan.gapExtent }
@@ -740,7 +736,7 @@ export function VirtualizedList<ItemT>(
       // its content reads upright inside the flipped content container.
       children.push(
         createElement(
-          'symbiote-view',
+          'view',
           {
             key: `cell-${planCell.key}`,
             onLayout: makeCellMeasure(planCell.index),
@@ -758,7 +754,7 @@ export function VirtualizedList<ItemT>(
 
     if (plan.trailingExtent > EMPTY_OFFSET) {
       children.push(
-        createElement('symbiote-view', {
+        createElement('view', {
           key: 'spacer-trailing',
           style: horizontal
             ? { width: plan.trailingExtent }
@@ -770,9 +766,7 @@ export function VirtualizedList<ItemT>(
 
   const footer = resolveElement(ListFooterComponent);
   if (footer !== undefined) {
-    children.push(
-      createElement('symbiote-view', { key: 'list-footer' }, footer),
-    );
+    children.push(createElement('view', { key: 'list-footer' }, footer));
   }
 
   // A horizontal list pins the content container to the full row width so the row overflows for

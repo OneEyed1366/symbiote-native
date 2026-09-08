@@ -50,7 +50,7 @@ function mountPedometer(): Ref<IPedometerResult | null> {
     defineComponent({
       setup: () => {
         result = usePedometer();
-        return () => h('symbiote-text', {}, 'pedometer');
+        return () => h('text', {}, 'pedometer');
       },
     }),
   );

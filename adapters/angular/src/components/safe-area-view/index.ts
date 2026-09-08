@@ -2,7 +2,7 @@
 // children to the safe area (notch, rounded corners, system bars). There is no JS-side
 // translation — RN renders the native RCTSafeAreaView and lets the host do the inset math —
 // so this folds aria/role through the shared resolveAccessibilityProps and maps style +
-// a11y + onLayout straight onto the symbiote-safe-area-view host, children via <ng-content>.
+// a11y + onLayout straight onto the safe-area-view host, children via <ng-content>.
 // The Angular twin of the React/Vue SafeAreaView. No platform branch (one Fabric name both
 // platforms), so this stays a flat single file.
 
@@ -76,9 +76,9 @@ export type IAngularSafeAreaViewInputs = Omit<
   imports: [SafeAreaViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <symbiote-safe-area-view [symbioteHostProps]="hostProps()">
+    <safe-area-view [symbioteHostProps]="hostProps()">
       <ng-content></ng-content>
-    </symbiote-safe-area-view>
+    </safe-area-view>
   `,
 })
 export class SafeAreaView

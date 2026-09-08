@@ -37,12 +37,12 @@ function committedTextProps(): Record<string, unknown> | undefined {
   return found;
 }
 
-describe('lowered symbiote-text carries RN’s Text defaults', () => {
+describe('lowered text carries RN’s Text defaults', () => {
   it('seeds ellipsizeMode and allowFontScaling at create', async () => {
     mount(ROOT_TAG, () => (
-      <symbiote-view>
-        <symbiote-text numberOfLines={1}>clipped</symbiote-text>
-      </symbiote-view>
+      <view>
+        <text numberOfLines={1}>clipped</text>
+      </view>
     ));
     await tick();
     const props = committedTextProps();
@@ -52,11 +52,11 @@ describe('lowered symbiote-text carries RN’s Text defaults', () => {
 
   it('lets an explicit value beat the default', async () => {
     mount(ROOT_TAG, () => (
-      <symbiote-view>
-        <symbiote-text ellipsizeMode="clip" allowFontScaling={false}>
+      <view>
+        <text ellipsizeMode="clip" allowFontScaling={false}>
           x
-        </symbiote-text>
-      </symbiote-view>
+        </text>
+      </view>
     ));
     await tick();
     const props = committedTextProps();
@@ -70,9 +70,9 @@ describe('lowered symbiote-text carries RN’s Text defaults', () => {
   it('re-seeds the default when a set value is later cleared', async () => {
     const [mode, setMode] = createSignal<string | undefined>('clip');
     mount(ROOT_TAG, () => (
-      <symbiote-view>
-        <symbiote-text ellipsizeMode={mode()}>x</symbiote-text>
-      </symbiote-view>
+      <view>
+        <text ellipsizeMode={mode()}>x</text>
+      </view>
     ));
     await tick();
     expect(committedTextProps()?.ellipsizeMode).toBe('clip');
@@ -101,11 +101,11 @@ describe('lowered symbiote-text carries RN’s Text defaults', () => {
   // the lowered tag committed the null instead, which no test caught and only a device showed.
   it('folds a null the same way resolveTextProps does, not just an undefined', async () => {
     mount(ROOT_TAG, () => (
-      <symbiote-view>
-        <symbiote-text ellipsizeMode={null} allowFontScaling={null}>
+      <view>
+        <text ellipsizeMode={null} allowFontScaling={null}>
           x
-        </symbiote-text>
-      </symbiote-view>
+        </text>
+      </view>
     ));
     await tick();
     const props = committedTextProps();
@@ -114,7 +114,7 @@ describe('lowered symbiote-text carries RN’s Text defaults', () => {
   });
 
   it('does not seed a non-text node', async () => {
-    mount(ROOT_TAG, () => <symbiote-view testID="plain" />);
+    mount(ROOT_TAG, () => <view testID="plain" />);
     await tick();
     const view = fabric.committed.find(node => node.props.testID === 'plain');
     expect(view?.props.ellipsizeMode).toBeUndefined();

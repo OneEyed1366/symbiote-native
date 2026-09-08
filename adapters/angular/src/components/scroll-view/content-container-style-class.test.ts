@@ -30,7 +30,7 @@ function committedContentView(): IFakeNode {
   imports: [ScrollView],
   template: `
     <ScrollView [contentContainerStyle]="'padded'">
-      <symbiote-text>content</symbiote-text>
+      <text>content</text>
     </ScrollView>
   `,
 })
@@ -42,7 +42,7 @@ class ScrollViewContentStyleClassHost {}
   imports: [ScrollView],
   template: `
     <ScrollView [contentContainerStyle]="{ padding: 12 }">
-      <symbiote-text>content</symbiote-text>
+      <text>content</text>
     </ScrollView>
   `,
 })

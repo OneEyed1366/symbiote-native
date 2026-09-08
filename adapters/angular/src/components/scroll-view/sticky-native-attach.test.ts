@@ -75,8 +75,8 @@ Component({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <ScrollView [stickyHeaderIndices]="indices" (layout)="onLayout()">
-      <symbiote-view testID="sticky"></symbiote-view>
-      <symbiote-view testID="body"></symbiote-view>
+      <view testID="sticky"></view>
+      <view testID="body"></view>
     </ScrollView>
   `,
 })(LateStickyApp);
@@ -91,8 +91,8 @@ Component({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <ScrollView [stickyHeaderIndices]="[0]" (layout)="onLayout()">
-      <symbiote-view testID="sticky"></symbiote-view>
-      <symbiote-view testID="body"></symbiote-view>
+      <view testID="sticky"></view>
+      <view testID="body"></view>
     </ScrollView>
   `,
 })(StaticStickyApp);

@@ -234,7 +234,7 @@ describe('Solid ActivityIndicator on the engine (iOS platform build, index.ios.t
     });
 
     // why: native reads only `accessibility*`; the web aliases must be folded in JS before commit
-    // (RN's own View.js transform). The wrapper is a raw symbiote-view emitted by the render fn, not
+    // (RN's own View.js transform). The wrapper is a raw view emitted by the render fn, not
     // the View component, so nothing else in the path performs that fold — dropping it would let
     // `aria-label` ride to Fabric as a meaningless prop and leave the spinner unlabelled.
     it('folds aria aliases into the canonical accessibility props on the wrapper', async () => {

@@ -37,7 +37,7 @@ function find(node: IFakeNode): IFakeNode | undefined {
 describe('an undefined-valued gated event on a lowered tag', () => {
   it('reports the committed keys', async () => {
     const absent = undefined;
-    mount(ROOT_TAG, () => <symbiote-view onLayout={absent} testID={TARGET} />);
+    mount(ROOT_TAG, () => <view onLayout={absent} testID={TARGET} />);
     await flush();
     const hit = fabric.committed.map(find).find(n => n !== undefined);
     expect(hit, 'node not committed').toBeDefined();
@@ -49,9 +49,7 @@ describe('an undefined-valued gated event on a lowered tag', () => {
   // Break-test: the arm above must be able to FAIL. A probe whose negative result would hold
   // regardless of the mechanism proves nothing (`verify-the-deciding-side`).
   it('lights the flag for a real handler', async () => {
-    mount(ROOT_TAG + 1, () => (
-      <symbiote-view onLayout={() => {}} testID={TARGET} />
-    ));
+    mount(ROOT_TAG + 1, () => <view onLayout={() => {}} testID={TARGET} />);
     await flush();
     const hit = fabric.committed.map(find).find(n => n !== undefined);
     expect(Object.keys(hit?.props ?? {}).sort()).toEqual([
@@ -68,11 +66,7 @@ describe('an undefined-valued gated event on a lowered tag', () => {
   it('commits no key for a plain undefined prop', async () => {
     const absent = undefined;
     mount(ROOT_TAG + 2, () => (
-      <symbiote-view
-        nativeID={absent}
-        backgroundColor={absent}
-        testID={TARGET}
-      />
+      <view nativeID={absent} backgroundColor={absent} testID={TARGET} />
     ));
     await flush();
     const hit = fabric.committed.map(find).find(n => n !== undefined);

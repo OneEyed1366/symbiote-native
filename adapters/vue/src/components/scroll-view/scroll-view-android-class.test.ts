@@ -68,7 +68,7 @@ function mountAndroidScrollView(props: Record<string, unknown>): Promise<void> {
             ...props,
             refreshControl: h(RefreshControl, { refreshing: false }),
           },
-          { default: () => [h('symbiote-text')] },
+          { default: () => [h('text')] },
         ),
     }),
   );

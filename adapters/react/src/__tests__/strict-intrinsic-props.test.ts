@@ -24,15 +24,15 @@ const componentsSource = readFileSync(join(SRC, 'components.ts'), 'utf8');
 const jsxSource = readFileSync(join(SRC, 'jsx-runtime.ts'), 'utf8');
 
 // A primitive is a TAG here exactly when the barrel exports its name as a string constant whose
-// value is the intrinsic — `export const View = 'symbiote-view'`. No annotation and no `as const`:
+// value is the intrinsic — `export const View = 'view'`. No annotation and no `as const`:
 // a `const` already infers the literal type, and both spellings are lint errors here. Derived from the
 // source rather than listed, so a primitive that crosses is picked up by this test in the same
 // commit that crosses it.
 function taggedIntrinsics(): string[] {
   const found = [
-    ...componentsSource.matchAll(
-      /export const [A-Za-z]+ = '(symbiote-[a-z-]+)';/g,
-    ),
+    // The tag has no prefix to key on since it was dropped, so the shape of the DECLARATION is the
+    // marker: a barrel const whose value is a lowercase kebab literal.
+    ...componentsSource.matchAll(/export const [A-Za-z]+ = '([a-z][a-z-]*)';/g),
   ].map(match => match[1]);
   return [...new Set(found)].sort();
 }
@@ -43,7 +43,7 @@ function strictlyDeclared(): string[] {
     /Record<ISymbioteIntrinsic, IHostProps>,\s*([^>]+)>/s,
   );
   if (omit === null) return [];
-  return [...omit[1].matchAll(/'(symbiote-[a-z-]+)'/g)]
+  return [...omit[1].matchAll(/'([a-z][a-z-]*)'/g)]
     .map(match => match[1])
     .sort();
 }
@@ -70,7 +70,7 @@ describe('intrinsic prop strictness follows the tags', () => {
   });
 
   // why: the table must stay DERIVED from the union. It had drifted four names behind while it was
-  // hand-written — `symbiote-pressable` among them, the next primitive due to cross — and a
+  // hand-written — `pressable` among them, the next primitive due to cross — and a
   // hand-written list cannot report a name that is absent from it.
   it('declares the tag set by deriving it, not by listing it', () => {
     expect(jsxSource).toContain('Record<ISymbioteIntrinsic, IHostProps>');

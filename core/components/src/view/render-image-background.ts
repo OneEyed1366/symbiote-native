@@ -72,7 +72,7 @@ export function renderImageBackground(
 
   // The wrapper View holds the inner Image as its only structural child; the adapter appends
   // the user children after it (so they paint on top).
-  return el('symbiote-view', { style: view.style }, [
+  return el('view', { style: view.style }, [
     renderImage({ ...view.image, style: imageMergedStyle }),
   ]);
 }

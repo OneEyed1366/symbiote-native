@@ -45,12 +45,12 @@ Component({
   template: `
     <ScrollView [stickyHeaderIndices]="stickyIndices()">
       @if (hasLead()) {
-        <symbiote-view testID="lead"></symbiote-view>
+        <view testID="lead"></view>
       }
-      <symbiote-view testID="row0"></symbiote-view>
-      <symbiote-view testID="h1"></symbiote-view>
-      <symbiote-view testID="row2"></symbiote-view>
-      <symbiote-view testID="h3"></symbiote-view>
+      <view testID="row0"></view>
+      <view testID="h1"></view>
+      <view testID="row2"></view>
+      <view testID="h3"></view>
     </ScrollView>
   `,
 })(StickyReuseApp);

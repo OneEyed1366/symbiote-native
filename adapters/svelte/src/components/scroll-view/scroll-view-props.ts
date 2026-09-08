@@ -8,11 +8,14 @@
 // by index the way React (Children.toArray) / Vue (slots.default(), a real VNode[]) do. Svelte
 // hands a component only an opaque `Snippet` — a render FUNCTION, not an introspectable/indexable
 // list of elements — so there is no mechanical way to pull "child at index N" out of it and
-// re-wrap it. `stickyHeaderIndices` / `invertStickyHeaders` are still typed here for interface
-// parity (an app porting from React/Vue type-checks against the same surface), but index.svelte
-// dlogs a warning once when they are supplied, since nothing actually goes sticky as a result. Use
-// the exported `ScrollViewStickyHeader` component directly around a section instead — see
-// sticky-header.svelte and index.svelte's header comment for the full reasoning.
+// re-wrap it. It is still typed here for interface parity (an app porting from React/Vue
+// type-checks against the same surface), but index.svelte dlogs a warning when it is supplied.
+// Mark the sections that should pin with the `sticky-header` TAG instead — the ScrollView host
+// behavior registers it, finds this ScrollView by walking up, and derives each header's collision
+// point from document order, so no index is involved on either side.
+//
+// `invertStickyHeaders` IS honored: it is an ordinary prop of the scroll node and the behavior
+// reads it off the owner when it builds a pin.
 import type { Snippet } from 'svelte';
 import type {
   IStyleProp,
@@ -50,9 +53,10 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
     right?: number;
   };
   contentOffset?: { x: number; y: number };
-  // The REAL RefreshControl's own prop bag, minus `children` — ScrollView itself supplies that to
-  // wire the platform-correct sibling (iOS) / wrap (Android) shape; see index.svelte's header
-  // comment for why this is a props object rather than React's/Vue's rendered-element shape.
+  // The REAL RefreshControl's own prop bag, minus `children` — ScrollView instantiates it as an
+  // ordinary child and the ScrollView host behavior claims it, placing it beside the content view
+  // on iOS and inverting the tree on Android. A props object rather than React's/Vue's
+  // rendered-element shape because Svelte has no cloneElement to re-parent one with.
   refreshControl?: Omit<IRefreshControlProps, 'children'>;
   removeClippedSubviews?: boolean;
   // Fired when the content container's size changes. RN synthesizes this in JS by putting an

@@ -3,14 +3,7 @@
   // iOS, a Custom Tab on Android) for a URL typed above, reports the result type it resolves with,
   // and exposes the Android-only Custom Tabs service trio behind a Platform guard. Svelte twin of
   // ../../expo-vue-sfc/screens/WebBrowserScreen.vue.
-  import {
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
-  } from '@symbiote-native/svelte';
+  import { Platform, ScrollView } from '@symbiote-native/svelte';
   import {
     coolDownAsync,
     dismissBrowser,
@@ -96,33 +89,33 @@
   }
 </script>
 
-<SafeAreaView class="screen">
+<safe-area-view class="screen">
   <ScrollView
     testID="web-browser-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-        <Text class="hero-badge-text">{lineInfo.code}</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">Web Browser</Text>
-        <Text class="hero-body">
+      </text>
+    </view>
+    <view class="hero-card">
+      <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <text class="hero-badge-text">{lineInfo.code}</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">Web Browser</text>
+        <text class="hero-body">
           @symbiote-native/web-browser — an in-app browser that keeps the user
           inside the app, unlike Linking.openURL, plus the OAuth auth session
           built on it.
-        </Text>
-      </View>
-    </View>
-    <View testID="web-browser-open-card" class="web-browser-card">
-      <Text class="web-browser-card-title">Open a page</Text>
-      <TextInput
+        </text>
+      </view>
+    </view>
+    <view testID="web-browser-open-card" class="web-browser-card">
+      <text class="web-browser-card-title">Open a page</text>
+      <text-input
         testID="web-browser-url-input"
         value={url}
         onValueChange={next => (url = next)}
@@ -131,7 +124,7 @@
         class="text-input"
         autoCapitalize="none"
         autoCorrect={false}
-      />
+      ></text-input>
       <ActionButton
         testID="web-browser-open-button"
         title="Open"
@@ -144,34 +137,35 @@
         onPress={handleDismiss}
         color={lineColor}
       />
-      <View class="web-browser-row">
-        <Text class="web-browser-row-label">Last result</Text>
-        <Text testID="web-browser-result" class="web-browser-value-text">
+      <view class="web-browser-row">
+        <text class="web-browser-row-label">Last result</text>
+        <text testID="web-browser-result" class="web-browser-value-text">
           {lastResult}
-        </Text>
-      </View>
-      <Text class="web-browser-note">
+        </text>
+      </view>
+      <text class="web-browser-note">
         iOS resolves once the browser closes (cancel, or dismiss when closed
         from code); Android resolves opened as soon as the Custom Tab launches
         and never reports the close. Dismiss is iOS-only.
-      </Text>
-    </View>{#if Platform.OS === 'android'}<View
+      </text>
+    </view>
+    {#if Platform.OS === 'android'}<view
         testID="web-browser-custom-tabs-card"
         class="web-browser-card"
       >
-        <Text class="web-browser-card-title">Custom Tabs service</Text>
+        <text class="web-browser-card-title">Custom Tabs service</text>
         <ActionButton
           testID="web-browser-list-browsers-button"
           title="List supporting browsers"
           onPress={handleListBrowsers}
           color={lineColor}
         />
-        <View class="web-browser-row">
-          <Text class="web-browser-row-label">Browsers</Text>
-          <Text testID="web-browser-browsers" class="web-browser-value-text">
+        <view class="web-browser-row">
+          <text class="web-browser-row-label">Browsers</text>
+          <text testID="web-browser-browsers" class="web-browser-value-text">
             {supportingBrowsers ?? '(not queried)'}
-          </Text>
-        </View>
+          </text>
+        </view>
         <ActionButton
           testID="web-browser-warm-up-button"
           title="Warm up"
@@ -184,19 +178,19 @@
           onPress={handleCoolDown}
           color={lineColor}
         />
-        <View class="web-browser-row">
-          <Text class="web-browser-row-label">Service package</Text>
-          <Text
+        <view class="web-browser-row">
+          <text class="web-browser-row-label">Service package</text>
+          <text
             testID="web-browser-service-package"
             class="web-browser-value-text"
           >
             {servicePackage ?? '(not warmed up)'}
-          </Text>
-        </View>
-        <Text class="web-browser-note">
+          </text>
+        </view>
+        <text class="web-browser-note">
           Android only. Listing the browsers throws on iOS, so this whole card
           is behind a Platform.OS check.
-        </Text>
-      </View>{/if}
+        </text>
+      </view>{/if}
   </ScrollView>
-</SafeAreaView>
+</safe-area-view>

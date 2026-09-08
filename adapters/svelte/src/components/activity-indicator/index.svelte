@@ -60,4 +60,4 @@
   });
 </script>
 
-<symbiote-view p={descriptor.props} bind:this={hostShim} />
+<view p={descriptor.props} bind:this={hostShim} />

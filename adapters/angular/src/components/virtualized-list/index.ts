@@ -22,7 +22,7 @@
 // shape differs, since a callback prop returning an element has no Angular equivalent.
 //
 // Lists have no Descriptor render fn — the cell content is the framework's own children.
-// Cells/spacers are plain symbiote-view host elements.
+// Cells/spacers are plain view host elements.
 
 import {
   CUSTOM_ELEMENTS_SCHEMA,
@@ -292,23 +292,23 @@ interface IWindowCell<ItemT> {
       }
 
       @if (headerDir !== undefined) {
-        <symbiote-view>
+        <view>
           <ng-container [vListOutlet]="headerDir.templateRef"></ng-container>
-        </symbiote-view>
+        </view>
       }
 
       @if (itemCount === 0) {
         @if (emptyDir !== undefined) {
-          <symbiote-view>
+          <view>
             <ng-container [vListOutlet]="emptyDir.templateRef"></ng-container>
-          </symbiote-view>
+          </view>
         }
       } @else {
         @if (leadingSpacerStyle !== null) {
-          <symbiote-view [style]="leadingSpacerStyle"></symbiote-view>
+          <view [style]="leadingSpacerStyle"></view>
         }
         @if (forcedStickyCell !== null) {
-          <symbiote-view
+          <view
             (layout)="handleCellLayout(forcedStickyCell.measure, $event)"
             [style]="cellStyle"
           >
@@ -316,10 +316,10 @@ interface IWindowCell<ItemT> {
               [vListOutlet]="itemDir?.templateRef"
               [vListOutletContext]="forcedStickyCell.context"
             ></ng-container>
-          </symbiote-view>
+          </view>
         }
         @if (gapSpacerStyle !== null) {
-          <symbiote-view [style]="gapSpacerStyle"></symbiote-view>
+          <view [style]="gapSpacerStyle"></view>
         }
         <!-- The separator sits INSIDE the measuring view, as RN's own cell renderer places it
              (VirtualizedListCellRenderer.js:218-221). As a sibling it is an extra flex child, so
@@ -329,7 +329,7 @@ interface IWindowCell<ItemT> {
              first index moves. Measured at exactly 17px on device 2026-08-19; see
              .claude/rules/list-geometry-feedback-loop.md. -->
         @for (cell of windowCells; track cell.key) {
-          <symbiote-view
+          <view
             (layout)="handleCellLayout(cell.measure, $event)"
             [style]="cellStyle"
           >
@@ -343,17 +343,17 @@ interface IWindowCell<ItemT> {
                 [vListOutletContext]="cell.separatorContext"
               ></ng-container>
             }
-          </symbiote-view>
+          </view>
         }
         @if (trailingSpacerStyle !== null) {
-          <symbiote-view [style]="trailingSpacerStyle"></symbiote-view>
+          <view [style]="trailingSpacerStyle"></view>
         }
       }
 
       @if (footerDir !== undefined) {
-        <symbiote-view>
+        <view>
           <ng-container [vListOutlet]="footerDir.templateRef"></ng-container>
-        </symbiote-view>
+        </view>
       }
     </ScrollView>
   `,

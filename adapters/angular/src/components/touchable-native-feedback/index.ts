@@ -1,7 +1,7 @@
 // TouchableNativeFeedback: the Angular lifecycle half. Android's ripple / state-drawable
 // touchable, built on Pressable like the rest of the family. RN realizes its feedback by cloning
 // the child into an RCTView carrying native ripple props; we instead nest the child under a
-// feedback <symbiote-view> that carries those props (nativeBackgroundAndroid /
+// feedback <view> that carries those props (nativeBackgroundAndroid /
 // nativeForegroundAndroid), inside a <Pressable> that owns the press wiring. The native props are
 // read by Android's ReactViewManager; on iOS they are inert, so the child still renders with
 // working press wiring. The static factories + background mapping are shared in
@@ -101,9 +101,9 @@ export type IAngularTouchableNativeFeedbackProps = Omit<
       [android_ripple]="android_ripple"
       [android_disableSound]="android_disableSound"
     >
-      <symbiote-view [symbioteHostProps]="hostProps()">
+      <view [symbioteHostProps]="hostProps()">
         <ng-content></ng-content>
-      </symbiote-view>
+      </view>
     </Pressable>
   `,
 })
@@ -180,7 +180,7 @@ export class TouchableNativeFeedback
   @Input('aria-valuetext') ariaValueText?: string;
 
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT the feedback <symbiote-view> one level down.
+  // onto (see anchorHostStyle's doc comment) — NOT the feedback <view> one level down.
   // TouchableNativeFeedback has no explicit `style`/`class`-forwarding @Input() of its own (RN's
   // TouchableNativeFeedback takes none either — style/class always came from the child), so the
   // anchor's class-derived style is the ONLY style source for hostProps.style below.

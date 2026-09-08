@@ -2,7 +2,7 @@
 // node: it lives in the SAME childSet and commits through the SAME completeRoot as the rest of
 // the tree. The native iOS/Android view presents its own window internally; there is no second
 // root or second surface on the JS side. So this is a thin render exactly like the others: it
-// maps to the `symbiote-modal` intrinsic the host config routes to ModalHostView, wrapping a
+// maps to the `modal` intrinsic the host config routes to ModalHostView, wrapping a
 // full-screen container View that holds the user children (injected by the adapter). Shared
 // verbatim: React and Vue both bridge this Descriptor; the keep-alive state lives in state/modal.ts.
 
@@ -110,13 +110,13 @@ export function renderModal(view: IModalViewProps): IDescriptor {
   // never flattened away under the host). Empty structural children: the adapter injects the
   // user children UNDER this container, never as a direct sibling of the host.
   const container = el(
-    'symbiote-view',
+    'view',
     { style: containerStyle, collapsable: false },
     [],
   );
 
   return el(
-    'symbiote-modal',
+    'modal',
     {
       ...view.passthrough,
       style: MODAL_HOST_STYLE,

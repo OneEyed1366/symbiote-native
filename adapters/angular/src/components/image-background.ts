@@ -90,7 +90,7 @@ export type IAngularImageBackgroundInputs = Omit<
   imports: [Image, ViewHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <symbiote-view [style]="wrapperStyle">
+    <view [style]="wrapperStyle">
       <Image
         [source]="source"
         [defaultSource]="defaultSource"
@@ -148,7 +148,7 @@ export type IAngularImageBackgroundInputs = Omit<
         (accessibilityEscape)="accessibilityEscape.emit($event)"
       />
       <ng-content></ng-content>
-    </symbiote-view>
+    </view>
   `,
 })
 export class ImageBackground implements IAngularImageBackgroundInputs {
@@ -232,7 +232,7 @@ export class ImageBackground implements IAngularImageBackgroundInputs {
   @Input('aria-valuetext') ariaValueText?: string;
 
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT the inner `symbiote-view [style]="wrapperStyle"`
+  // onto (see anchorHostStyle's doc comment) — NOT the inner `view [style]="wrapperStyle"`
   // one level down. Merged FIRST so the explicit `style` @Input still wins (flattenStyle's
   // later-wins collapse), mirroring every other composed component's anchor merge. `imageStyle`
   // below stays untouched per the ImageBackground-specific nuance: it targets the inner image, not

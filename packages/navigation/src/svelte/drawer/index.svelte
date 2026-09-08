@@ -35,10 +35,6 @@
     IPanResponderGestureState,
     ISymbioteEvent,
   } from '@symbiote-native/engine';
-  // The ONLY import from the adapter's main barrel: `Animated.View` is a compiled `.svelte`
-  // component, so unlike PanResponder/Dimensions/AnimatedValue (pure engine re-exports, taken
-  // from the engine directly here) it has no `.svelte`-free home to import from.
-  import { Animated } from '@symbiote-native/svelte';
   import {
     DRAWER_DEFAULT_OVERLAY_COLOR,
     NAVIGATION_EVENT_BLUR,
@@ -471,16 +467,18 @@
   {@const descriptor = slotDescriptors.content}
   {#if descriptor !== undefined}
     {#if contentStyle !== undefined}
-      <Animated.View
-        {...descriptor.props}
-        style={[descriptor.props.style, contentStyle]}
+      <view
+        p={{
+          ...descriptor.props,
+          style: [descriptor.props.style, contentStyle],
+        }}
       >
         {@render screenContent()}
-      </Animated.View>
+      </view>
     {:else}
-      <symbiote-view p={descriptor.props}>
+      <view p={descriptor.props}>
         {@render screenContent()}
-      </symbiote-view>
+      </view>
     {/if}
   {/if}
 {/snippet}
@@ -489,12 +487,14 @@
   {@const descriptor = slotDescriptors.overlay}
   {#if descriptor !== undefined}
     {#if overlayStyle !== undefined}
-      <Animated.View
-        {...descriptor.props}
-        style={[descriptor.props.style, overlayStyle]}
+      <view
+        p={{
+          ...descriptor.props,
+          style: [descriptor.props.style, overlayStyle],
+        }}
       />
     {:else}
-      <symbiote-view p={descriptor.props} />
+      <view p={descriptor.props} />
     {/if}
   {/if}
 {/snippet}
@@ -503,32 +503,31 @@
   {@const descriptor = slotDescriptors.panel}
   {#if descriptor !== undefined}
     {#if panelStyle !== undefined}
-      <Animated.View
-        {...descriptor.props}
-        style={[descriptor.props.style, panelStyle]}
+      <view
+        p={{ ...descriptor.props, style: [descriptor.props.style, panelStyle] }}
       >
         {@render drawerContent?.({
           state,
           descriptors,
           navigation: handle,
         })}
-      </Animated.View>
+      </view>
     {:else}
-      <symbiote-view p={descriptor.props}>
+      <view p={descriptor.props}>
         {@render drawerContent?.({
           state,
           descriptors,
           navigation: handle,
         })}
-      </symbiote-view>
+      </view>
     {/if}
   {/if}
 {/snippet}
 
-<symbiote-view p={rootProps}>
-  <symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>
+<view p={rootProps}>
+  <text p={SCREEN_REGISTRY_HOST_PROPS}>
     {@render children?.()}
-  </symbiote-text>
+  </text>
   {#each order as slot (slot)}
     {#if slot === 'content'}
       {@render contentSlot()}
@@ -538,7 +537,7 @@
       {@render panelSlot()}
     {/if}
   {/each}
-</symbiote-view>
+</view>
 
 <!-- --- Explicit gap list vs the real react-native-gesture-handler + react-native-reanimated
      @react-navigation/drawer (confirmed against its current docs, mirrored verbatim from the

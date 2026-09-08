@@ -7,7 +7,7 @@
 // won. The two orders are opposite on purpose (base under on the owner, row over on the slot), so
 // a test that checked only one would pass with both folds written the same way.
 //
-// Registration happens HERE and nowhere else. `symbiote-scroll-view` is the tag the wrappers
+// Registration happens HERE and nowhere else. `scroll-view` is the tag the wrappers
 // already emit, so a global registration would give every existing ScrollView a second content
 // node; see the behavior's header for the `-managed` split that resolves it.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -22,6 +22,7 @@ import {
   createSurface,
   insertBefore,
   removeChild,
+  registerRules,
   routeProp,
   type ISymbioteEvent,
   type ISymbioteNode,
@@ -121,7 +122,7 @@ describe('app children reach Fabric under the content node', () => {
     surface.commit();
 
     const committed = fabric.find(node => node.viewName === 'RCTScrollView');
-    const contentName = descriptorFor('symbiote-scroll-content').component;
+    const contentName = descriptorFor('scroll-content').component;
     expect(fabric.serialize([committed as never])).toBe(
       `RCTScrollView(${contentName}(RCTImageView))`,
     );
@@ -138,6 +139,30 @@ describe('owner props that belong to the slot', () => {
     expect(owner.props.contentContainerStyle).toBeUndefined();
     expect(owner.props.style).toBeUndefined();
     expect(owner.childHost?.props.style).toEqual([undefined, { padding: 12 }]);
+  });
+
+  // Device-found 2026-09-08: every canary writes `contentContainerStyle="scroll-content"`, a class
+  // NAME. Renamed verbatim onto the slot it becomes a `style` holding a string — not a style, so
+  // the whole rule (here the padding AND the gap) vanished with nothing red. React never showed it
+  // because its wrapper calls resolveClassName itself before the engine sees the prop.
+  it('resolves a class-NAME contentContainerStyle through the registry', () => {
+    registerRules([
+      {
+        tokens: ['scroll-content'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 24, gap: 20 },
+      },
+    ]);
+    const owner = scrollNode(SCROLL_VIEW_TAG);
+    routeProp(owner, 'contentContainerStyle', 'scroll-content');
+
+    expect(owner.childHost?.props.style).toEqual([
+      { padding: 24, gap: 20 },
+      undefined,
+    ]);
+    // The owner keeps its own class slot free: the name belongs to the content view.
+    expect(owner.props.style).toBeUndefined();
   });
 
   it('leaves the owner its own style', () => {
@@ -276,6 +301,43 @@ describe('decelerationRate reaches Fabric as a number', () => {
   });
 });
 
+// `horizontal` is a real C++ prop (`BaseScrollViewProps.h:56`) and the separate ViewManager is
+// ANDROID's — on iOS both tags resolve to RCTScrollView, so the prop is the only thing that turns
+// the axis there. Silent and device-only: the tag looks right, the content node is a row, and the
+// scroller still pages vertically.
+describe('the horizontal tag sets the C++ axis flag, not just the style', () => {
+  it('writes horizontal on the horizontal tag', () => {
+    const { commit } = mountScroll(HORIZONTAL_SCROLL_VIEW_TAG);
+    expect(commit().owner.props.horizontal).toBe(true);
+  });
+
+  // The negative half, and the case above is its control on the same fold: both tags go through
+  // `ownerFold`, so a fold that wrote the key unconditionally would fail here and a fold that wrote
+  // it nowhere would fail there.
+  it('invents no key on the vertical tag, matching the wrapper', () => {
+    const { commit } = mountScroll(SCROLL_VIEW_TAG);
+    expect(Object.hasOwn(commit().owner.props, 'horizontal')).toBe(false);
+  });
+});
+
+// Every wrapper writes `nestedScrollEnabled ?? true` on every ScrollView, both platforms — RN
+// itself only defaults it on Android's RefreshControl WRAP path (`ScrollView.js:1862`), and it is
+// the WRAPPER a lowered element replaces. Without it an Android list nested in a scroll view does
+// not scroll on its own.
+describe('nested scrolling defaults on, as the wrapper leaves it', () => {
+  it('defaults to true when the app set nothing', () => {
+    const { commit } = mountScroll(SCROLL_VIEW_TAG);
+    expect(commit().owner.props.nestedScrollEnabled).toBe(true);
+  });
+
+  it('honours an explicit false', () => {
+    const { commit } = mountScroll(SCROLL_VIEW_TAG, {
+      nestedScrollEnabled: false,
+    });
+    expect(commit().owner.props.nestedScrollEnabled).toBe(false);
+  });
+});
+
 describe('collapsableChildren is derived from props that stay on the owner', () => {
   it('writes no key when neither anchor prop is set', () => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG);
@@ -385,11 +447,11 @@ describe('onContentSizeChange is synthesized from the content view layout', () =
 });
 
 describe('a RefreshControl child is claimed by the owner', () => {
-  const REFRESH = descriptorFor('symbiote-refresh-control').component;
-  const CONTENT = descriptorFor('symbiote-scroll-content').component;
+  const REFRESH = descriptorFor('refresh-control').component;
+  const CONTENT = descriptorFor('scroll-content').component;
 
   function refreshNode(): ISymbioteNode {
-    return createElement(REFRESH, false, 'symbiote-refresh-control');
+    return createElement(REFRESH, false, 'refresh-control');
   }
 
   // The app writes it among the children, because that is what a tag-only surface leaves it: the

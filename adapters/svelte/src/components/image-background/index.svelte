@@ -81,7 +81,7 @@
   });
 </script>
 
-<symbiote-view p={wrapperBag} bind:this={hostShim}>
-  <symbiote-image p={imageBag} />
+<view p={wrapperBag} bind:this={hostShim}>
+  <image p={imageBag} />
   {@render children?.()}
-</symbiote-view>
+</view>

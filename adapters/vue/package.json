@@ -35,13 +35,12 @@
     "./runtime-helpers": "./src/runtime-helpers/index.ts",
     "./metro-css-parser": "./metro-css-parser.cjs",
     "./metro-vue-transformer": "./metro-vue-transformer.cjs",
-    "./babel-jsx": "./babel-jsx.cjs",
-    "./state-style": "./src/state-style.ts"
+    "./babel-jsx": "./babel-jsx.cjs"
   },
   "files": [
     "babel-jsx.cjs",
-    "babel-lower-host-primitives.cjs",
     "build",
+    "intrinsic-tags.cjs",
     "metro-css-parser.cjs",
     "metro-vue-transformer.cjs"
   ],
@@ -65,11 +64,7 @@
       },
       "./metro-css-parser": "./metro-css-parser.cjs",
       "./metro-vue-transformer": "./metro-vue-transformer.cjs",
-      "./babel-jsx": "./babel-jsx.cjs",
-      "./state-style": {
-        "types": "./build/state-style.d.ts",
-        "default": "./build/state-style.js"
-      }
+      "./babel-jsx": "./babel-jsx.cjs"
     }
   },
   "scripts": {

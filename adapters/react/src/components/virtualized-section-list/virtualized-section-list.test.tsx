@@ -46,11 +46,11 @@ function App(): ReactElement {
     sections: SECTIONS,
     keyExtractor: (item: IRow) => `k-${item.id}`,
     renderSectionHeader: ({ section }: { section: ISectionShape }) =>
-      createElement('symbiote-text', {}, `header:${section.title}`),
+      createElement('text', {}, `header:${section.title}`),
     renderSectionFooter: ({ section }: { section: ISectionShape }) =>
-      createElement('symbiote-text', {}, `footer:${section.title}`),
+      createElement('text', {}, `footer:${section.title}`),
     renderItem: ({ item }: { item: IRow }) =>
-      createElement('symbiote-text', {}, item.label),
+      createElement('text', {}, item.label),
   });
 }
 

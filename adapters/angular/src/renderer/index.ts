@@ -25,7 +25,10 @@ import {
   SymbioteSurface,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { descriptorFor } from '@symbiote-native/components';
+import {
+  COMPONENT_DESCRIPTORS,
+  descriptorFor,
+} from '@symbiote-native/components';
 import { foldHostBag } from '@symbiote-native/components/fold-host-bag';
 import type { Renderer2, RendererFactory2, RendererType2 } from '@angular/core';
 import { isAnchorHostComponent } from '../anchor-host-registry';
@@ -62,8 +65,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // resolveTextProps, which the composed `Text` @Component already calls). That component's own
 // host paints directly (Text is not anchor-hosted — see the top-level "View/Text's own component
 // doesn't have this split" reasoning elsewhere in this file), so createElement runs for its INNER
-// symbiote-text node too; seeding here therefore covers both the composed Text and any bare
-// `symbiote-text` a future lowering emits, uniformly. Found missing 2026-08-31 (a cross-adapter
+// text node too; seeding here therefore covers both the composed Text and any bare
+// `text` a future lowering emits, uniformly. Found missing 2026-08-31 (a cross-adapter
 // key-count diff against Vue's real BenchmarkRow.vue) — without this a lowered Text's
 // `numberOfLines` clips with no ellipsis, silently, on device only. Vue's renderer already does
 // this (`adapters/vue/src/renderer/index.ts`'s `seedTextDefaults`); Angular's simply never did.
@@ -72,11 +75,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // `HOST_PRIMITIVES.Text.defaults`) rather than a second hardcoded copy — React and Svelte call the
 // same function directly; this used to be a THIRD, independent restatement of the same two
 // defaults, with nothing to catch it drifting from the spec if a default's value ever changed.
-// `foldHostBag('symbiote-text', {})` on an EMPTY bag folds every default with no authored value to
+// `foldHostBag('text', {})` on an EMPTY bag folds every default with no authored value to
 // override it (the alias loop has nothing to fold — `id` is only rewritten when present), which is
 // exactly the seed this function needs.
 function seedTextDefaults(node: ISymbioteNode): void {
-  const seeded = foldHostBag('symbiote-text', {});
+  const seeded = foldHostBag('text', {});
   for (const [key, value] of Object.entries(seeded)) setProp(node, key, value);
 }
 
@@ -87,7 +90,7 @@ function seedTextDefaults(node: ISymbioteNode): void {
 // contract is "fold a whole bag" — the extra key computed alongside `key` is simply unread here.
 function textDefaultFor(el: IHostElement, key: string): unknown {
   if (isSurface(el) || !el.isText) return undefined;
-  return foldHostBag('symbiote-text', { [key]: undefined })[key];
+  return foldHostBag('text', { [key]: undefined })[key];
 }
 
 // RN's `id` is the modern W3C-named alias for `nativeID` (core/components/host-primitives.cjs's
@@ -139,10 +142,38 @@ function describeHost(node: IHostElement | null | undefined): string {
     : node.component;
 }
 
+// A hand-written tag ngtsc accepts must contain a HYPHEN, so the six dashless intrinsics
+// (`view`/`text`/`pressable`/`image`/`switch`/`modal`) need a second spelling that has one.
+// `hasElement`/`hasProperty` gate the CUSTOM_ELEMENTS_SCHEMA branch behind
+// `normalizedTag.includes('-')` (compiler/src/schema/dom_element_schema_registry.ts), so a dashless
+// tag is NG8001 under every schema but NO_ERRORS_SCHEMA — which switches off element checking
+// entirely. Dropping the `symbiote-` prefix from the tag alphabet is what took the dash away.
+//
+// A per-tag directive is the other repair, and it is the one an app should reach for now that
+// `SYMBIOTE_ELEMENTS` exists (`../elements.ts`). Matching a directive does turn every bound prop
+// into an input lookup — the sentence that used to end this paragraph — but that is a repair
+// rather than a dead end: declare the input and the lookup succeeds, with a real TYPE, which no
+// schema gives. This alias map stays for the `symbiote-*` spelling and for an app that has not
+// imported the directives.
+//
+// Derived, so a future dashless intrinsic joins by existing; when the alphabet regains its dashes
+// upstream every entry becomes identity and the map can go. See `bare-intrinsic-tag-aot.test.ts`.
+const HYPHEN_PREFIX = 'symbiote-';
+
+function hyphenatedIntrinsicAliases(): Record<string, string> {
+  const aliases: Record<string, string> = {};
+  for (const tag of Object.keys(COMPONENT_DESCRIPTORS)) {
+    if (tag.includes('-')) continue;
+    aliases[`${HYPHEN_PREFIX}${tag}`] = tag;
+  }
+  return aliases;
+}
+
 const PRIMITIVE_SELECTOR_ALIAS: Record<string, string> = {
   // Public ergonomic selectors map directly to the engine primitive descriptors.
-  View: 'symbiote-view',
-  Text: 'symbiote-text',
+  View: 'view',
+  Text: 'text',
+  ...hyphenatedIntrinsicAliases(),
 };
 
 // The ANCHOR_HOST_COMPONENTS Set and registerComposedComponent now live in the dependency-free
@@ -178,8 +209,8 @@ export class SymbioteRenderer implements Renderer2 {
   destroy(): void {}
 
   createElement(name: string): IHostNode {
-    // `name` is the component's host tag — a symbiote intrinsic (`symbiote-view`,
-    // `symbiote-text`, …), a public ergonomic alias (`View`, `Text`), or a raw Fabric view
+    // `name` is the component's host tag — a symbiote intrinsic (`view`,
+    // `text`, …), a public ergonomic alias (`View`, `Text`), or a raw Fabric view
     // name for a native leaf. Public aliases are normalized to their engine primitive name
     // before descriptor lookup. descriptorFor resolves it; an unknown `symbiote-*` is a typo,
     // any other string flows through as a raw Fabric name (events/processors derived from its
@@ -189,7 +220,20 @@ export class SymbioteRenderer implements Renderer2 {
     noteAngularCreate(name);
     const engineName = PRIMITIVE_SELECTOR_ALIAS[name] ?? name;
 
-    if (isAnchorHostComponent(engineName)) {
+    // An INTRINSIC is never an anchor, and the check has to come first now that the tags carry no
+    // prefix. The anchor registry is keyed on lowercased selectors — Angular lowercases a
+    // dynamically-mounted component's selector at runtime, so it must be — and the composed
+    // wrappers are named after the primitives they render: `Text`.toLowerCase() IS the tag `text`.
+    // While both layers exist, every `<Text>` would anchor instead of painting.
+    //
+    // Derived from the descriptor table rather than an exclusion list, so it cannot go stale; and
+    // it disappears on its own when the wrappers do, which is what this migration is for. The
+    // collision is exactly the single-word names — `TextInput` lowercases to `textinput`, which is
+    // no tag of ours.
+    if (
+      COMPONENT_DESCRIPTORS[engineName] === undefined &&
+      isAnchorHostComponent(engineName)
+    ) {
       const anchor = tagAnchorForDebug(createAnchor());
       if (isDebug()) {
         dlog(

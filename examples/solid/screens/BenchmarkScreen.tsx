@@ -434,7 +434,7 @@ function BenchmarkRow(props: IBenchmarkRowProps) {
 
           No `multiline` — it selects a different native view. No `onChangeText` — a listener would
           price the event path rather than the node. And no `ref`, which for this adapter is not
-          merely surplus but measurement-cancelling: `symbiote-text-input` sits in the transform's
+          merely surplus but measurement-cancelling: `text-input` sits in the transform's
           ref-refusal set, so a ref would keep the component and the row would measure the wrapper.
 
           `value`, not `defaultValue`: controlled is the shape that exercises the behavior's

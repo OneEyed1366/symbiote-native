@@ -97,6 +97,16 @@ export interface IFabricSlot {
   // RN's Fabric binding passes the public-instance handle straight here; the C++ side
   // maps the string eventType to the platform's accessibility-event kind.
   sendAccessibilityEvent(node: IFabricNode, eventType: string): void;
+  // Tell the native side that JS has taken (or given up) the gesture, so a native
+  // recogniser — a UIScrollView above the node, above all — stops competing for it.
+  // React's entire contribution to this is `injectGlobalResponderHandler`
+  // (ReactFabric-dev.js:18862): one call as the responder leaves a node and one as it
+  // arrives. Everything below is stock (UIManagerBinding.cpp:255 -> UIManager::setIsJSResponder).
+  setIsJSResponder(
+    node: IFabricNode,
+    isResponder: boolean,
+    blockNativeResponder: boolean,
+  ): void;
   // Imperative measurement, against a node's CURRENT (committed) Fabric handle.
   measure(node: IFabricNode, callback: IMeasureOnSuccess): void;
   measureInWindow(node: IFabricNode, callback: IMeasureInWindowOnSuccess): void;
@@ -170,6 +180,7 @@ export function getSlot(): IFabricSlot {
   // Optional on some hosts: read it off the live binding and feature-detect below so an
   // older slot without it degrades to a logged no-op instead of throwing.
   const { sendAccessibilityEvent } = host;
+  const { setIsJSResponder } = host;
   const { measure } = host;
   const { measureInWindow } = host;
   const { measureLayout } = host;
@@ -208,6 +219,13 @@ export function getSlot(): IFabricSlot {
         return;
       }
       sendAccessibilityEvent(node, eventType);
+    },
+    setIsJSResponder: (node, isResponder, blockNativeResponder) => {
+      if (typeof setIsJSResponder !== 'function') {
+        dlog('setIsJSResponder -> host lacks the method (no-op)');
+        return;
+      }
+      setIsJSResponder(node, isResponder, blockNativeResponder);
     },
     measure: (node, callback) => measure(node, callback),
     measureInWindow: (node, callback) => measureInWindow(node, callback),

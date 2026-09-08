@@ -41,9 +41,9 @@ const DATA: IRow[] = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({
 }));
 
 const Separator = (): ReactElement =>
-  createElement('symbiote-view', { style: { height: 1 } });
-const Header = (): ReactElement => createElement('symbiote-text', {}, 'HEADER');
-const Footer = (): ReactElement => createElement('symbiote-text', {}, 'FOOTER');
+  createElement('view', { style: { height: 1 } });
+const Header = (): ReactElement => createElement('text', {}, 'HEADER');
+const Footer = (): ReactElement => createElement('text', {}, 'FOOTER');
 
 const listRef = createRef<IFlatListHandle>();
 // Recorded by the App callbacks; reset in beforeEach so each `it` starts clean. Read the
@@ -73,7 +73,7 @@ function App(): ReactElement {
       startReachedDistances.push(distanceFromStart);
     },
     renderItem: ({ item }: { item: IRow }) =>
-      createElement('symbiote-text', { key: item.id }, item.label),
+      createElement('text', { key: item.id }, item.label),
   });
 }
 
@@ -283,7 +283,7 @@ describe('React FlatList multi-column composition (Positive)', () => {
       leadingLabel: props.leadingItem?.label,
       trailingLabel: props.trailingItem?.label,
     });
-    return createElement('symbiote-view', { style: { height: 1 } });
+    return createElement('view', { style: { height: 1 } });
   }
 
   const viewableReports: IViewableItemsChangedInfo<IRow>[] = [];
@@ -299,7 +299,7 @@ describe('React FlatList multi-column composition (Positive)', () => {
         viewableReports.push(info);
       },
       renderItem: ({ item }: { item: IRow }) =>
-        createElement('symbiote-text', { key: item.id }, item.label),
+        createElement('text', { key: item.id }, item.label),
     });
   }
 
@@ -312,7 +312,7 @@ describe('React FlatList multi-column composition (Positive)', () => {
   function findRowWrappers(): IFakeNode[] {
     const rows: IFakeNode[] = [];
     walk(fabric.committed, node => {
-      if (node.viewName === 'symbiote-view' || node.viewName === 'RCTView') {
+      if (node.viewName === 'view' || node.viewName === 'RCTView') {
         if (node.props.flexDirection === 'row') rows.push(node);
       }
     });

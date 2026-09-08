@@ -527,7 +527,7 @@ function DrawerImpl(props: IDrawerProps): JSX.Element {
       );
     }
 
-    const root = hostElement('symbiote-view', () => ({
+    const root = hostElement('view', () => ({
       ...rootDescriptor().props,
       ...panResponder.panHandlers,
     }));
@@ -540,7 +540,7 @@ function DrawerImpl(props: IDrawerProps): JSX.Element {
     return untrack(() => buildDrawer(current));
   });
 
-  const host = hostElement('symbiote-view', () => ({ style: { flex: 1 } }));
+  const host = hostElement('view', () => ({ style: { flex: 1 } }));
   insert(host, drawer);
 
   return createComponent(ScreenCollectorProvider, {

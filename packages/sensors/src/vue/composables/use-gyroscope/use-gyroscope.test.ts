@@ -57,7 +57,7 @@ function mountGyroscope(
     defineComponent({
       setup: () => {
         measurement = useGyroscope(updateIntervalMs);
-        return () => h('symbiote-text', {}, 'sensor');
+        return () => h('text', {}, 'sensor');
       },
     }),
   );

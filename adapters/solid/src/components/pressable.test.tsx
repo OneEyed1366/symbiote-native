@@ -499,7 +499,7 @@ describe('Solid Pressable on the engine', () => {
           android_ripple={{ color: '#f00' }}
           onPress={() => {}}
         >
-          <symbiote-view testID="ripple-child" />
+          <view testID="ripple-child" />
         </Pressable>
       ));
       await flush();
@@ -617,9 +617,7 @@ describe('Solid Pressable on the engine', () => {
     it('feeds a render-prop child the live pressed state through its accessor', async () => {
       mount(ROOT_TAG, () => (
         <Pressable testID={TARGET} onPress={() => {}}>
-          {state => (
-            <symbiote-view testID={state().pressed ? 'pressed' : 'idle'} />
-          )}
+          {state => <view testID={state().pressed ? 'pressed' : 'idle'} />}
         </Pressable>
       ));
       await flush();
@@ -648,11 +646,7 @@ describe('Solid Pressable on the engine', () => {
       mount(ROOT_TAG, () => (
         <Pressable testID={TARGET} onPress={() => {}}>
           {() =>
-            flipped() ? (
-              <symbiote-view testID="second" />
-            ) : (
-              <symbiote-view testID="first" />
-            )
+            flipped() ? <view testID="second" /> : <view testID="first" />
           }
         </Pressable>
       ));
@@ -673,7 +667,7 @@ describe('Solid Pressable on the engine', () => {
     it('does not re-create a static child subtree on a press', async () => {
       mount(ROOT_TAG, () => (
         <Pressable testID={TARGET} onPress={() => {}}>
-          <symbiote-view testID="static-child" />
+          <view testID="static-child" />
         </Pressable>
       ));
       await flush();

@@ -24,13 +24,15 @@ import {
   type IScrollPlatform,
 } from './shared';
 
-// The owner under a wrap: the VISUAL half of its own style, plus the gesture wiring. The base is
-// already composed under it by `splitScrollViewStyle`.
-function wrappedOwnerFold(base: IViewStyle): IPayloadFold {
+// The owner under a wrap: the ordinary fold with the VISUAL half of its own style in place of the
+// composed one. Delegating rather than restating is what keeps `decelerationRate`, `horizontal` and
+// `nestedScrollEnabled` in ONE place — none of the three has anything to do with the wrap, and the
+// hand-written copy this replaced had already lost the first of them.
+function wrappedOwnerFold(base: IViewStyle, horizontal: boolean): IPayloadFold {
+  const plain = ownerFold(base, horizontal);
   return props => ({
-    ...props,
+    ...plain(props),
     style: splitScrollViewStyle(base, props.style).inner,
-    nestedScrollEnabled: props.nestedScrollEnabled ?? true,
   });
 }
 
@@ -47,11 +49,13 @@ function wrapperFold(owner: ISymbioteNode, base: IViewStyle): IPayloadFold {
 const android: IScrollPlatform = {
   claimMode: 'wrap',
   slotDerived: ['style'],
-  onWrapChange: base => (owner, wrapper) => {
-    // Back to the ordinary composition, not to `undefined` — the plain fold also resolves
-    // `decelerationRate`, which has nothing to do with the wrap.
+  onWrapChange: (base, horizontal) => (owner, wrapper) => {
+    // Back to the ordinary composition, not to `undefined` — the plain fold carries the axis and
+    // the gesture props, which have nothing to do with the wrap.
     owner.payloadFold =
-      wrapper === undefined ? ownerFold(base) : wrappedOwnerFold(base);
+      wrapper === undefined
+        ? ownerFold(base, horizontal)
+        : wrappedOwnerFold(base, horizontal);
     if (wrapper !== undefined) wrapper.payloadFold = wrapperFold(owner, base);
   },
 };

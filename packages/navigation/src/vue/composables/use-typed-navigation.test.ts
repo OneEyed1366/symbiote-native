@@ -68,7 +68,7 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 function textScreen(label: string) {
-  return () => h('symbiote-text', {}, label);
+  return () => h('text', {}, label);
 }
 
 // Each of the three composables below is a THIN union-narrowing wrapper over useNavigation() (see
@@ -104,7 +104,7 @@ describe('useStackNavigation', () => {
         const navigation = useStackNavigation();
         return () => {
           canPush = typeof navigation.value.push === 'function';
-          return h('symbiote-text', {}, 'home');
+          return h('text', {}, 'home');
         };
       });
 
@@ -135,7 +135,7 @@ describe('useStackNavigation', () => {
         const navigation = useStackNavigation();
         return () => {
           void navigation.value;
-          return h('symbiote-text', {}, 'home');
+          return h('text', {}, 'home');
         };
       });
 
@@ -169,7 +169,7 @@ describe('useTabNavigation', () => {
         const navigation = useTabNavigation();
         return () => {
           canJumpTo = typeof navigation.value.jumpTo === 'function';
-          return h('symbiote-text', {}, 'home');
+          return h('text', {}, 'home');
         };
       });
 
@@ -198,7 +198,7 @@ describe('useTabNavigation', () => {
         const navigation = useTabNavigation();
         return () => {
           void navigation.value;
-          return h('symbiote-text', {}, 'home');
+          return h('text', {}, 'home');
         };
       });
 
@@ -235,7 +235,7 @@ describe('useDrawerNavigation', () => {
         const navigation = useDrawerNavigation();
         return () => {
           canOpenDrawer = typeof navigation.value.openDrawer === 'function';
-          return h('symbiote-text', {}, 'home');
+          return h('text', {}, 'home');
         };
       });
 
@@ -264,7 +264,7 @@ describe('useDrawerNavigation', () => {
         const navigation = useDrawerNavigation();
         return () => {
           void navigation.value;
-          return h('symbiote-text', {}, 'home');
+          return h('text', {}, 'home');
         };
       });
 

@@ -79,9 +79,7 @@ function currentOutletChild() {
 })
 class DescriptorOutletHost {
   readonly node = signal<IDescriptor>(
-    el('symbiote-view', { testID: 'root', style: { width: 10 } }, [
-      txt({}, ['hello']),
-    ]),
+    el('view', { testID: 'root', style: { width: 10 } }, [txt({}, ['hello'])]),
   );
 
   constructor() {
@@ -122,7 +120,7 @@ describe('DescriptorOutlet', () => {
       // otherwise every unrelated re-render of a parent would recommit every descriptor-driven
       // component underneath it, defeating the point of diffing at all.
       capturedHost?.node.set(
-        el('symbiote-view', { testID: 'root', style: { width: 10 } }, [
+        el('view', { testID: 'root', style: { width: 10 } }, [
           txt({}, ['hello']),
         ]),
       );
@@ -142,7 +140,7 @@ describe('DescriptorOutlet', () => {
       // Fabric's clone-on-write model wants the SAME retained node updated in place, not a
       // fresh `createNode` per re-render.
       capturedHost?.node.set(
-        el('symbiote-view', { testID: 'root', style: { width: 20 } }, [
+        el('view', { testID: 'root', style: { width: 20 } }, [
           txt({}, ['hello']),
         ]),
       );
@@ -163,7 +161,7 @@ describe('DescriptorOutlet', () => {
       // key that only applies conditionally. Every other test in this file only ever CHANGES or
       // KEEPS existing prop keys, so this branch had zero coverage before.
       capturedHost?.node.set(
-        el('symbiote-view', { testID: 'root' }, [txt({}, ['hello'])]),
+        el('view', { testID: 'root' }, [txt({}, ['hello'])]),
       );
       await flushAngular();
 
@@ -183,7 +181,7 @@ describe('DescriptorOutlet', () => {
       // what makes text content reactive at all — every other test in this file leaves the
       // child string "hello" untouched across renders, changing only the PARENT's props.
       capturedHost?.node.set(
-        el('symbiote-view', { testID: 'root', style: { width: 10 } }, [
+        el('view', { testID: 'root', style: { width: 10 } }, [
           txt({}, ['goodbye']),
         ]),
       );
@@ -205,7 +203,7 @@ describe('DescriptorOutlet', () => {
       // length) must create ONLY the new child — a bug here (e.g. falling back to
       // clear-and-rebuild) would recreate the first child too, losing its retained identity.
       capturedHost?.node.set(
-        el('symbiote-view', { testID: 'root', style: { width: 10 } }, [
+        el('view', { testID: 'root', style: { width: 10 } }, [
           txt({}, ['hello']),
           txt({}, ['world']),
         ]),
@@ -228,7 +226,7 @@ describe('DescriptorOutlet', () => {
       })
       class TwoChildHost {
         readonly node = signal<IDescriptor>(
-          el('symbiote-view', { testID: 'root' }, [
+          el('view', { testID: 'root' }, [
             txt({}, ['hello']),
             txt({}, ['world']),
           ]),
@@ -249,7 +247,7 @@ describe('DescriptorOutlet', () => {
       // must `removeChild` exactly the trailing ones — the surviving first child keeps its
       // Fabric identity, it is not cleared and recreated as a side effect of the shrink.
       capturedTwoChildHost?.node.set(
-        el('symbiote-view', { testID: 'root' }, [txt({}, ['hello'])]),
+        el('view', { testID: 'root' }, [txt({}, ['hello'])]),
       );
       await flushAngular();
 
@@ -272,9 +270,7 @@ describe('DescriptorOutlet', () => {
       // place, it is a genuinely different element, so it must go through createElement +
       // replaceChild and get a fresh Fabric identity. This is the branch `sameElement` exists
       // to protect and the original file never exercised it.
-      capturedHost?.node.set(
-        el('symbiote-text', { testID: 'root' }, ['replaced']),
-      );
+      capturedHost?.node.set(el('text', { testID: 'root' }, ['replaced']));
       await flushAngular();
 
       const after = currentOutletChild();
@@ -299,7 +295,7 @@ describe('DescriptorOutlet', () => {
       class ConditionalHost {
         readonly visible = signal(true);
         readonly node = signal<IDescriptor>(
-          el('symbiote-view', { testID: 'child' }, []),
+          el('view', { testID: 'child' }, []),
         );
 
         constructor() {

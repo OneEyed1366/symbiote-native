@@ -2,7 +2,7 @@
 //
 // That file pins a REFUSED Pressable — the component path, where `host.setPressed` drives the
 // engine call itself. Nothing covered the other side: an element the transform turned into
-// `symbiote-pressable`, whose press machine lives on the node. Reported from device 2026-08-31 as
+// `pressable`, whose press machine lives on the node. Reported from device 2026-08-31 as
 // "buttons give no visual feedback, callbacks fire", which is exactly what a machine that presses
 // without republishing the style looks like.
 //
@@ -110,13 +110,13 @@ afterEach(() => {
 describe('a LOWERED Pressable resolves :active', () => {
   it('dims on touch-down and restores on lift, keeping the authored style', async () => {
     mount(ROOT_TAG, () => (
-      <symbiote-pressable
+      <pressable
         testID={TARGET}
         class="action-button"
         style={{ borderColor: TINT }}
       >
-        <symbiote-text>tap</symbiote-text>
-      </symbiote-pressable>
+        <text>tap</text>
+      </pressable>
     ));
     await flush();
     expect(findCommitted().props.opacity, 'unpressed').toBe(1);
@@ -142,13 +142,13 @@ describe('a LOWERED Pressable resolves :active', () => {
   // above is the one an app has to be migrated to.
   it('swaps the specialised activeStyle in while pressed', async () => {
     mount(ROOT_TAG, () => (
-      <symbiote-pressable
+      <pressable
         testID={TARGET}
         style={{ opacity: 1 }}
         activeStyle={{ opacity: 0.4 }}
       >
-        <symbiote-text>tap</symbiote-text>
-      </symbiote-pressable>
+        <text>tap</text>
+      </pressable>
     ));
     await flush();
     expect(findCommitted().props.opacity, 'resting').toBe(1);

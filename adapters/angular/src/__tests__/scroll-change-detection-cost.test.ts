@@ -82,9 +82,7 @@ let mountedSibling: ScrollCostSibling | undefined;
     ScrollCostSibling,
   ],
   template: `
-    <symbiote-scroll-view
-      [symbioteHostProps]="scrollHostProps"
-    ></symbiote-scroll-view>
+    <scroll-view [symbioteHostProps]="scrollHostProps"></scroll-view>
     <Text [symbioteHostProps]="ownProbeProps">{{ ownLabel }}</Text>
     <scroll-cost-sibling></scroll-cost-sibling>
   `,
@@ -134,9 +132,7 @@ let mountedScreen: ScrollCostScreen | undefined;
   selector: 'scroll-cost-inner',
   standalone: true,
   imports: [ScrollViewHost, SymbioteHostPropsDirective],
-  template: `<symbiote-scroll-view
-    [symbioteHostProps]="scrollHostProps"
-  ></symbiote-scroll-view>`,
+  template: `<scroll-view [symbioteHostProps]="scrollHostProps"></scroll-view>`,
 })
 class ScrollCostInner {
   scrollEvents = 0;

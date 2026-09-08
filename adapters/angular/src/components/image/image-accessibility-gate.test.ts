@@ -2,7 +2,7 @@
 // (`.claude/rules/fabric-boolean-event-gates.md`). Image is unique among the eager-gate fixes: it
 // forwards each accessibility event through TWO channels — a plain `[onAccessibilityAction]` @Input
 // callback AND an `accessibilityAction` @Output — and before this, the template bound the four
-// events unconditionally on <symbiote-image>, so every Image lit all four gate flags whether or not
+// events unconditionally on <image>, so every Image lit all four gate flags whether or not
 // either channel had a consumer. gatedAccessibilityHandler (shared.ts) must light the flag when
 // EITHER channel is wired and stay dark when neither is.
 import '@angular/compiler';

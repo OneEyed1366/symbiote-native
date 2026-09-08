@@ -44,6 +44,7 @@ import { fabricProps } from './fabric-props';
 import { isRecord } from './type-guards';
 import { isAriaAliasKey } from './accessibility-props';
 import { runDeferredAttaches, sweepDetachedBehaviors } from './host-behavior';
+import { detachAnimatedProps } from './animated/host-binding';
 
 // Re-exported from ./platform-color so callers don't need to change their import path.
 export { processColor, setColorProcessor } from './platform-color';
@@ -668,7 +669,7 @@ function commitContainer(rootTag: IRootTag): void {
   // that `removeChild` unlinked is now either back under a parent (a framework spelling a move as
   // remove-then-reinsert) or gone for good. Costs one Set-size read until an app registers its
   // first host behavior. See host-behavior.ts for why removal cannot answer this itself.
-  sweepDetachedBehaviors(container.children);
+  sweepDetachedBehaviors(container.children, detachAnimatedProps);
 
   stats.created = 0;
   stats.cloneProps = 0;

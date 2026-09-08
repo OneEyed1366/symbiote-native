@@ -168,7 +168,7 @@ export const KeyboardAvoidingView: FC<IKeyboardAvoidingViewProps> = props => {
   return renderWrapper(layout.wrapperStyle, children);
 
   // The wrapper carries onLayout. The View FC's public props don't surface it, but
-  // `symbiote-view` routes the base layout event at runtime; widen the props through
+  // `view` routes the base layout event at runtime; widen the props through
   // a typed variable (no inline-literal excess-property check, no `as`) so the
   // onLayout reaches the host without editing View's public type.
   function renderWrapper(

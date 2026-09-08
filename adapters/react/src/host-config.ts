@@ -153,7 +153,7 @@ const reconciler = createReconciler<
   createInstance(type, props, _container, hostContext) {
     // The INTRINSIC tag, kept in a binding rather than inlined, because it is needed twice: once
     // to resolve the Fabric view name and once to hand the engine below. The host-behavior
-    // registry is keyed by TAG and never by Fabric name — `symbiote-pressable` and a plain `View`
+    // registry is keyed by TAG and never by Fabric name — `pressable` and a plain `View`
     // both resolve to `RCTView`, so keying by the resolved name would put a press machine on every
     // view in the app (`core/engine/src/host-behavior.ts`).
     const tag = resolveIntrinsicTag(type, props);
@@ -171,7 +171,7 @@ const reconciler = createReconciler<
     //
     // Inert on landing and deliberately so — nothing registers a behavior under a tag React emits.
     // The `-managed` split is what keeps it inert once something does: React's TextInput and
-    // Switch wrappers emit `symbiote-text-input-managed` / `symbiote-switch-managed`, so a machine
+    // Switch wrappers emit `text-input-managed` / `switch-managed`, so a machine
     // registered on the lowered tag cannot also attach to a wrapper-built node and run twice.
     const node = createElement(descriptor.component, descriptor.isText, tag);
     applyProps(node, foldHostBag(type, props));

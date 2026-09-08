@@ -99,17 +99,17 @@ let fixture: AnchorClassFixture | undefined;
       [class.dark]="dark"
     />
     <ImageBackground [testID]="'anchor-image-bg'" src="x" [class.dark]="dark">
-      <symbiote-text>Hi</symbiote-text>
+      <text>Hi</text>
     </ImageBackground>
     <!-- FlatList's own [testID] does not reach the committed tree (it is not forwarded down to the
          inner VirtualizedList/ScrollView), so the tile is anchored by a wrapper View instead. -->
-    <symbiote-view [testID]="'anchor-flat-list'">
+    <view [testID]="'anchor-flat-list'">
       <FlatList [data]="rows" [keyExtractor]="rowKey" [class.dark]="dark">
         <ng-template vListItem>
-          <symbiote-text>Hi</symbiote-text>
+          <text>Hi</text>
         </ng-template>
       </FlatList>
-    </symbiote-view>
+    </view>
     <VirtualizedList
       [testID]="'anchor-vlist'"
       [data]="rows"
@@ -119,7 +119,7 @@ let fixture: AnchorClassFixture | undefined;
       [class.dark]="dark"
     >
       <ng-template vListItem>
-        <symbiote-text>Hi</symbiote-text>
+        <text>Hi</text>
       </ng-template>
     </VirtualizedList>
   `,

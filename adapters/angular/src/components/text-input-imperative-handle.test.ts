@@ -1,5 +1,5 @@
 // Verifies the imperative handle (focus/blur/clear/isFocused/setSelection) survived today's
-// tag split — TextInput's own template now renders `symbiote-text-input-managed` /
+// tag split — TextInput's own template now renders `text-input-managed` /
 // `-multiline-managed` instead of the bare intrinsic tags, so the engine's TextInput host
 // behavior (keyed by the bare tags, `core/components/src/behaviors/text-input.ts`) does not
 // double up with this component's own hand-rolled state.
@@ -91,10 +91,10 @@ describe('TextInput imperative handle over the -managed tag split', () => {
     await tick();
 
     const names = probe.names();
-    expect(names).toContain('symbiote-text-input-managed');
-    expect(names).toContain('symbiote-text-input-multiline-managed');
-    expect(names).not.toContain('symbiote-text-input');
-    expect(names).not.toContain('symbiote-text-input-multiline');
+    expect(names).toContain('text-input-managed');
+    expect(names).toContain('text-input-multiline-managed');
+    expect(names).not.toContain('text-input');
+    expect(names).not.toContain('text-input-multiline');
   });
 
   it('focus() dispatches a focus view command on the committed single-line host', async () => {

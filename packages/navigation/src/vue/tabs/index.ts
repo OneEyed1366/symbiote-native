@@ -4,7 +4,7 @@
 // router state (Vue's twin of useReducer), useId for route-key generation, expose() for the
 // jumpTo/setParams handle - plus the descriptor bridge for the tab-bar leaf, like Stack's header
 // config (stack.ts). Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints ordinary
-// `symbiote-view`/`symbiote-text` primitives via the shared render fn, so there is no
+// `view`/`text` primitives via the shared render fn, so there is no
 // react-native-screens ViewConfig to register here - Tab needs no `../register` import.
 
 import {
@@ -327,9 +327,9 @@ const TabImpl = defineComponent<ITabProps>(
             )
           : null;
 
-      return h('symbiote-view', { style: TAB_ROOT_STYLE }, [
+      return h('view', { style: TAB_ROOT_STYLE }, [
         h(
-          'symbiote-view',
+          'view',
           { style: TAB_CONTENT_STYLE },
           content === null ? [] : [content],
         ),

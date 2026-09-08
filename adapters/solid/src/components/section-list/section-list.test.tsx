@@ -96,14 +96,12 @@ describe('Solid SectionList on the engine', () => {
         <SectionList<IRow>
           sections={SECTIONS}
           renderSectionHeader={info => (
-            <symbiote-text>{`header:${info().section.title}`}</symbiote-text>
+            <text>{`header:${info().section.title}`}</text>
           )}
           renderSectionFooter={info => (
-            <symbiote-text>{`footer:${info().section.title}`}</symbiote-text>
+            <text>{`footer:${info().section.title}`}</text>
           )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -133,13 +131,9 @@ describe('Solid SectionList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderSectionFooter={() => <symbiote-text>footer</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderSectionFooter={() => <text>footer</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -177,12 +171,8 @@ describe('Solid SectionList on the engine', () => {
           sections={SECTIONS}
           testID="the-section-list"
           style={{ backgroundColor: 'red' }}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();

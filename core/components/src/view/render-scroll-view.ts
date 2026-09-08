@@ -90,11 +90,11 @@ export function selectScrollIntrinsics(
   // ViewManager, not RCTScrollView+flag); on iOS both intrinsics map back to RCTScrollView.
   // The name table does the per-platform mapping; here we only pick the intrinsic.
   const scrollViewIntrinsic: ISymbioteIntrinsic = isHorizontal
-    ? 'symbiote-horizontal-scroll-view'
-    : 'symbiote-scroll-view';
+    ? 'horizontal-scroll-view'
+    : 'scroll-view';
   const contentIntrinsic: ISymbioteIntrinsic = isHorizontal
-    ? 'symbiote-horizontal-scroll-content'
-    : 'symbiote-scroll-content';
+    ? 'horizontal-scroll-content'
+    : 'scroll-content';
   const scrollViewBaseStyle = isHorizontal
     ? SCROLL_VIEW_BASE_HORIZONTAL
     : SCROLL_VIEW_BASE_VERTICAL;

@@ -504,7 +504,7 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>(
       .filter((element): element is ReactElement => element !== null);
 
     return createElement(
-      'symbiote-view',
+      'view',
       { style: root.props.style, ...panResponder.panHandlers },
       ...drawerChildren,
     );

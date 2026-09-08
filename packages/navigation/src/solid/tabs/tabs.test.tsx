@@ -1,5 +1,5 @@
 // Co-located Solid-driven pipeline test, the Solid twin of react/tabs/tabs.test.tsx and
-// vue/tabs/tabs.test.ts. The bottom-tabs bar is PURE JS (symbiote-view/symbiote-text), so unlike
+// vue/tabs/tabs.test.ts. The bottom-tabs bar is PURE JS (view/text), so unlike
 // Stack there is no react-native-screens ViewConfig to inject - the fake Fabric slot's own
 // primitives are the whole surface.
 //
@@ -48,8 +48,8 @@ const texts = (): string[] =>
 const tabItems = (): IFakeNode[] =>
   findAll(node => node.props.accessibilityRole === 'tab');
 
-const FeedScreen = () => <symbiote-text>feed-content</symbiote-text>;
-const InboxScreen = () => <symbiote-text>inbox-content</symbiote-text>;
+const FeedScreen = () => <text>feed-content</text>;
+const InboxScreen = () => <text>inbox-content</text>;
 
 describe('Solid Tab navigator', () => {
   describe('Positive', () => {
@@ -241,9 +241,7 @@ describe('Solid Tab navigator', () => {
       const ParamScreen = () => {
         const route = useRoute();
         routeKey = route().key;
-        return (
-          <symbiote-text>{`p:${String(route().params ?? 'none')}`}</symbiote-text>
-        );
+        return <text>{`p:${String(route().params ?? 'none')}`}</text>;
       };
       mount(ROOT_TAG, () => (
         <Tab ref={h => (handle = h)} initialRouteName="Feed">
@@ -268,9 +266,7 @@ describe('Solid Tab navigator', () => {
     it('createIsFocused turns true once the focused screen is mounted', async () => {
       const FocusScreen = () => {
         const isFocused = createIsFocused();
-        return (
-          <symbiote-text>{isFocused() ? 'focused' : 'blurred'}</symbiote-text>
-        );
+        return <text>{isFocused() ? 'focused' : 'blurred'}</text>;
       };
       mount(ROOT_TAG, () => (
         <Tab initialRouteName="Feed">

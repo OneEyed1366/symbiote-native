@@ -189,7 +189,7 @@ function PressableImpl(
     // Two sinks for one fact, and both are needed. The signal drives the FRAMEWORK-visible half —
     // a functional `style`, a render-prop child — which is what forces this element to stay a
     // component at all. `setHostPressed` drives the ENGINE-visible half, so `.btn:active` applies
-    // to a refused Pressable exactly as it would to a lowered `symbiote-pressable`. That is what
+    // to a refused Pressable exactly as it would to a lowered `pressable`. That is what
     // makes a refusal cost the component instance and NOT the pressed styling
     // (`.claude/rules/host-primitive-tier.md`).
     //
@@ -324,7 +324,7 @@ function PressableImpl(
     const ripple = config !== undefined ? rippleProps(config) : undefined;
     if (ripple === undefined) return resolveChildren();
     dlog('Pressable wrapping children in an android_ripple View');
-    return <symbiote-view {...ripple}>{resolveChildren()}</symbiote-view>;
+    return <view {...ripple}>{resolveChildren()}</view>;
   };
 
   return (

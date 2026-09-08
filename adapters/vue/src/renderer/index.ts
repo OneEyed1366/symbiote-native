@@ -39,7 +39,7 @@ function isRawText(node: ISymbioteNode): boolean {
 // RN's Text.js applies two defaults on the way to native (core/components/src/text-props.ts:
 // ellipsizeMode 'tail', allowFontScaling true unless literally false). The Vue <Text> wrapper
 // folded them with resolveTextProps; a template that the SFC transformer lowered to the
-// intrinsic `symbiote-text` has no wrapper, so the renderer seeds them instead. Without this a
+// intrinsic `text` has no wrapper, so the renderer seeds them instead. Without this a
 // numberOfLines={1} line clips mid-word with no ellipsis — device-observed, and silent.
 const TEXT_DEFAULTS: ReadonlyMap<string, unknown> = new Map<string, unknown>([
   ['ellipsizeMode', 'tail'],
@@ -56,7 +56,7 @@ function seedTextDefaults(node: ISymbioteNode): void {
 // id="x">` reached Fabric with an unknown `id` and no `nativeID`, silently and on device only.
 // It lives in the renderer rather than in a transform because that covers all four Vue paths at
 // once — lowered SFC, lowered TSX, the component wrapper, and a hand-written
-// `h('symbiote-view', { id })` no compiler ever sees.
+// `h('view', { id })` no compiler ever sees.
 //
 // Caveat, and it matches what Solid's compile-time rename already does: with BOTH `id` and
 // `nativeID` on one element the last patchProp wins, where upstream gives `id` priority
@@ -80,7 +80,7 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
     createElement(type) {
       const descriptor = descriptorFor(type);
       // `type` as the third argument, not just `descriptor.component`: the behavior registry is
-      // keyed by the INTRINSIC TAG (`symbiote-pressable`), while a node only ever carries the
+      // keyed by the INTRINSIC TAG (`pressable`), while a node only ever carries the
       // resolved Fabric name (`RCTView`). This is the one place that still holds both, so a
       // lowered primitive whose machine lives on the engine node can be matched at all.
       const node = createElement(descriptor.component, descriptor.isText, type);

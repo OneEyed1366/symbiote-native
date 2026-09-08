@@ -21,6 +21,8 @@ import {
   waitUntil,
   type IFakeNode,
 } from '@symbiote-native/test-utils';
+// The press machine reaches a `pressable` TAG through the engine's behavior registry.
+import '../../register';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -36,14 +38,6 @@ const TOUCH_END = 'topTouchEnd';
 const BASE_WIDTH = 14;
 const PRESS_DELAY_MS = 30;
 
-const COMPONENTS_DIR = join(__dirname, '..');
-// `-for-without-feedback` per .claude/rules/smoke-compiled-artifact-collisions.md: Pressable is
-// owned by ../pressable/pressable.smoke.test.ts and vitest runs files concurrently.
-const PRESSABLE_OUT = join(
-  COMPONENTS_DIR,
-  'pressable',
-  '.smoke-compiled-pressable-for-without-feedback.mjs',
-);
 const TOUCHABLE_OUT = join(__dirname, '.smoke-compiled-without-feedback.mjs');
 const PARENT_OUT = join(
   __dirname,
@@ -73,21 +67,12 @@ function compileToFile(
 }
 
 async function loadParent(): Promise<Component> {
-  compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'pressable', 'index.svelte'), 'utf8'),
-    'Pressable.svelte',
-    PRESSABLE_OUT,
-  );
+  // No rewrites: this component composes nothing, it writes the `pressable` TAG and the engine's
+  // behavior registry supplies the machine.
   compileToFile(
     readFileSync(join(__dirname, 'index.svelte'), 'utf8'),
     'TouchableWithoutFeedback.svelte',
     TOUCHABLE_OUT,
-    [
-      [
-        "from '../pressable/index.svelte'",
-        "from '../pressable/.smoke-compiled-pressable-for-without-feedback.mjs'",
-      ],
-    ],
   );
   compileToFile(
     `<script>
@@ -96,7 +81,7 @@ async function loadParent(): Promise<Component> {
      </script>
      <TouchableWithoutFeedback {...props}>
        {#snippet children()}
-         <symbiote-view p={{ testID: 'without-feedback-child' }} />
+         <view p={{ testID: 'without-feedback-child' }} />
        {/snippet}
      </TouchableWithoutFeedback>`,
     'Parent.svelte',
@@ -116,7 +101,6 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(PRESSABLE_OUT, { force: true });
   rmSync(TOUCHABLE_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
 });

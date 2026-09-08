@@ -5,13 +5,15 @@
 // structural, not oversights. The other four adapters should be more sensitive, not less.
 //
 //   1. `View` and `Text` HAVE NO COMPONENT ARM. They are string constants (`components.ts`), so
-//      `<View>` and `<symbiote-view>` are the same expression after compilation. There is nothing
+//      `<View>` and `<view>` are the same expression after compilation. There is nothing
 //      to compare; a row for them would assert a value against itself, which is
 //      `test-harness-false-greens.md` §12 exactly.
-//   2. React REGISTERS NO HOST BEHAVIORS — `registerPressableBehavior` and friends are called in
-//      the other four adapters' `register.ts` and nowhere here. So a bare `symbiote-pressable` in
-//      React carries no press machine: React has no lowered path for a STATEFUL primitive at all,
-//      and comparing the arms would compare a working wrapper against a dead tag.
+//   2. A STATEFUL primitive still has no comparable pair. `src/register.ts` now installs the same
+//      behaviors the other four adapters do, so a bare `pressable` / `text-input` / `switch` does
+//      carry its machine — but the wrappers deliberately render the `-managed` twins (one owner per
+//      node), so the two arms commit different TAGS by design and the oracle has nothing to equate.
+//      What the registration did close is the FOLD-only pair: `image` and `input-accessory-view`
+//      share their tag with the wrapper, so those rows compare a real pair.
 //   3. For what remains, BOTH ARMS TRAVERSE ONE FOLD. React's wrappers render the intrinsic
 //      themselves, and `foldHostBag` runs in the host config for whatever tag arrives — so a fold
 //      that broke would move both arms identically and they would still agree. This is the failure
@@ -72,31 +74,20 @@ describe('React: component and bare intrinsic commit the same tree', () => {
   });
 
   describe('Positive', () => {
-    // why: THE finding of this file's first run, kept as an assertion of the GAP rather than
-    // softened into a pass. React registers no host behaviors (see 2. above), and Image's real
-    // mapping — `normalizeSource`, which wraps `{uri}` into RN's array shape — lives in
-    // `behaviors/image.ts`, not in the spec. `foldHostBag` applies only `aliases` and `defaults`,
-    // so the lowered arm commits the RAW object:
-    //
-    //     component  source: [{ uri: 'x' }]
-    //     lowered    source: { uri: 'x' }
-    //
-    // Latent today, because React's `Image` is still a component and nothing emits the bare tag.
-    // It becomes a device-only defect the day it crosses — the exact shape this oracle exists for,
-    // caught before the crossing rather than after. CLOSED BY: React calling
-    // `registerImageBehavior()` (it has no `register.ts` at all), or the mapping moving into the
-    // spec so `foldHostBag` covers it. Delete this row and restore the equality assertion then.
-    it('Image: the lowered arm is MISSING the behavior fold, and that is recorded', () => {
+    // why: this row recorded a GAP until React gained `src/register.ts` — Image's real mapping
+    // (`normalizeSource`, which wraps `{uri}` into RN's array shape) lives in `behaviors/image.ts`
+    // and not in the spec, so `foldHostBag`'s aliases-and-defaults left the lowered arm committing
+    // the raw object. `registerImageBehavior()` is what closed it, and the equality below is what
+    // keeps it closed: drop the registration and this row reports the two source shapes again.
+    it('Image: both spellings commit the same source shape', () => {
       const component = commitAndRead(
         <Image testID="probe" source={{ uri: 'x' }} />,
       );
       const lowered = commitAndRead(
-        <symbiote-image testID="probe" source={{ uri: 'x' }} />,
+        <image testID="probe" source={{ uri: 'x' }} />,
       );
       const result = compareLoweringEquivalence(component, lowered);
-      expect(result.differences).toEqual([
-        'RCTImageView[0]: "source" differs — component [{"uri":"x"}], lowered {"uri":"x"}',
-      ]);
+      expect(result.differences).toEqual([]);
     });
 
     // why: the ABSOLUTE half, and on React it is the one carrying the weight — both arms share the
@@ -104,9 +95,7 @@ describe('React: component and bare intrinsic commit the same tree', () => {
     it('Image: nativeID is folded from id on BOTH spellings', () => {
       for (const tree of [
         commitAndRead(<Image testID="probe" id="hero" source={{ uri: 'x' }} />),
-        commitAndRead(
-          <symbiote-image testID="probe" id="hero" source={{ uri: 'x' }} />,
-        ),
+        commitAndRead(<image testID="probe" id="hero" source={{ uri: 'x' }} />),
       ]) {
         const result = expectCommittedProps(tree, 'probe', {
           nativeID: 'hero',
@@ -121,7 +110,7 @@ describe('React: component and bare intrinsic commit the same tree', () => {
     it('SafeAreaView: id folds to nativeID on both spellings', () => {
       for (const tree of [
         commitAndRead(<SafeAreaView testID="probe" id="pane" />),
-        commitAndRead(<symbiote-safe-area-view testID="probe" id="pane" />),
+        commitAndRead(<safe-area-view testID="probe" id="pane" />),
       ]) {
         const result = expectCommittedProps(tree, 'probe', {
           nativeID: 'pane',
@@ -134,9 +123,7 @@ describe('React: component and bare intrinsic commit the same tree', () => {
     // here would be the wrapper adding something rather than the tag losing it.
     it('InputAccessoryView: the two spellings agree', () => {
       const component = commitAndRead(<InputAccessoryView testID="probe" />);
-      const lowered = commitAndRead(
-        <symbiote-input-accessory-view testID="probe" />,
-      );
+      const lowered = commitAndRead(<input-accessory-view testID="probe" />);
       expect(
         compareLoweringEquivalence(component, lowered).differences,
       ).toEqual([]);
@@ -162,7 +149,7 @@ describe('React: component and bare intrinsic commit the same tree', () => {
         <Image testID="probe" source={{ uri: 'x' }} />,
       );
       const lowered = commitAndRead(
-        <symbiote-image testID="probe" source={{ uri: 'x' }} />,
+        <image testID="probe" source={{ uri: 'x' }} />,
       );
       // React's wrappers render the intrinsic directly, so node COUNTS legitimately match here —
       // `assertArmsAreDistinct` would fire on a correct adapter. Assert the arms were both built

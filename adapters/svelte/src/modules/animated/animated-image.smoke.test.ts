@@ -1,25 +1,26 @@
-// Real-compiled-source smoke test for Animated.Image: proves it goes through buildImageBag
-// (source resolved to the array shape RCTImageView expects, resizeMode/tintColor folded off
-// style) rather than forwarding raw props — the exact gap the old hand-authored AnimatedImage
-// warns a hand-authored pass-through bag would create. Also proves the JS-driven animated style
-// path (opacity) still lands, keyed the same way as AnimatedView's own JS-driven smoke.
+// Real-compiled-source smoke test for an animated `<image>` — there is no wrapper and no
+// `Animated.Image`. Image is the one primitive whose props are FOLDED before they reach Fabric
+// (source resolved to the array shape RCTImageView expects, resizeMode/tintColor lifted off
+// style), so it is the place an animated value is likeliest to be lost — a fold that rebuilds the
+// style object without carrying the node through would strand the subscription silently. Asserts
+// both halves on one mount: the fold still happens, AND the animated opacity lands and repaints.
 //
-// Scope note: buildImageBag's own field mapping (source normalization, resizeMode/tintColor
-// resolution) is core/components logic, already covered by image/index.svelte's own tests; this
-// file's job is proving the wrapped Image actually GETS rasterized values, rather than
-// hand-rolling a pass-through bag — the exact copy-paste-instead-of-calling bug class the
-// svelte-adapter-dom-shim skill's §15/§19 caught on four other components.
+// Scope note: the fold itself is now the engine-side host behavior
+// (`core/components/src/behaviors/image.ts`, registered by `../../register`), already covered
+// there; here it is the thing the animated value has to survive.
 //
-// No Negative group: Animated.Image has no throwing/rejecting path — every prop is optional
-// and rides an open `[key: string]: unknown` bag (IAnimatedComponentProps).
+// No Negative group: no prop on this path rejects — a `style` holding nothing animated is simply
+// published unchanged (`bindAnimatedValue` returns its input by identity).
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { AnimatedValue } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// The fold is a host BEHAVIOR now, so it exists only once this side-effect module has run.
+import '../../register';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -61,35 +62,17 @@ const COMPILE_OPTIONS = {
   fragments: 'tree',
   css: 'external',
 } as const;
-const IMAGE_DIR = join(__dirname, '..', '..', 'components', 'image');
-// The compiled base sits NEXT TO its real source, so its own relative imports resolve.
-const IMAGE_OUT = join(IMAGE_DIR, '.smoke-compiled-image-for-animated.mjs');
 const PARENT_OUT = join(__dirname, '.smoke-compiled-image-parent.mjs');
 
-function compileToFile(
-  source: string,
-  filename: string,
-  outPath: string,
-): void {
-  const result = compile(source, { ...COMPILE_OPTIONS, filename });
-  writeFileSync(outPath, result.js.code);
-}
-
 async function loadParent(): Promise<Component> {
-  const imageSource = readFileSync(join(IMAGE_DIR, 'index.svelte'), 'utf8');
-  compileToFile(imageSource, 'Image.svelte', IMAGE_OUT);
-
-  compileToFile(
+  const result = compile(
     `<script>
-       import Image from '../../components/image/.smoke-compiled-image-for-animated.mjs';
-       import { createAnimatedComponent } from './create-animated-component';
-       const AnimatedImage = createAnimatedComponent(Image);
        let { source, style, resizeMode } = $props();
      </script>
-     <AnimatedImage {source} {style} {resizeMode} />`,
-    'ImageParent.svelte',
-    PARENT_OUT,
+     <image {source} {style} {resizeMode}></image>`,
+    { ...COMPILE_OPTIONS, filename: 'ImageParent.svelte' },
   );
+  writeFileSync(PARENT_OUT, result.js.code);
 
   const mod: unknown = await import(`file://${PARENT_OUT}`);
   if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
@@ -104,7 +87,6 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(IMAGE_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
 });
 

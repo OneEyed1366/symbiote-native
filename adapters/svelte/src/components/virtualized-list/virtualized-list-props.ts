@@ -84,7 +84,7 @@ export interface IVirtualizedListProps<ItemT>
   // Data indices (into the item stream) that should stick to the top. Unlike ScrollView.svelte
   // (which only ever sees an opaque children Snippet, see scroll-view-props.ts's KNOWN GAP), this
   // component walks an indexable cell list, so it wraps each flagged windowed cell in
-  // ScrollViewStickyHeader itself — see index.svelte's sticky wiring.
+  // `sticky-header` tag itself — see index.svelte's sticky wiring.
   stickyHeaderIndices?: number[];
   maintainVisibleContentPosition?: {
     minIndexForVisible: number;

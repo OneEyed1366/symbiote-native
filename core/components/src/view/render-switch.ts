@@ -1,5 +1,5 @@
 // Switch: the render half (framework-agnostic). Maps the resolved props onto the single
-// `symbiote-switch` host node: the strict value fold lands as the `value` Fabric prop, the
+// `switch` host node: the strict value fold lands as the `value` Fabric prop, the
 // track colors take platform-specific prop NAMES (iOS onTintColor/tintColor vs Android
 // trackColorFor*/trackTintColor, supplied via `platform`), thumbColor → thumbTintColor, and
 // ios_backgroundColor folds into the style as the pill that shows through the shrunken track.
@@ -64,7 +64,7 @@ const IOS_BACKGROUND_BORDER_RADIUS = 16;
 // (lastNativeReport, the snap-back effect), so it may not share a tag the behavior registry would
 // also attach to; see that behavior's module header and `.claude/rules/host-primitive-tier.md`,
 // "A lowered element and its wrapper must not share an intrinsic tag" (the TextInput precedent).
-const SWITCH_MANAGED_INTRINSIC = 'symbiote-switch-managed';
+const SWITCH_MANAGED_INTRINSIC = 'switch-managed';
 
 // Fold ios_backgroundColor into the style, matching RN's iOS branch: it paints the
 // background that shows through the shrunken track. Untouched when unset, so a caller's own

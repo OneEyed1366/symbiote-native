@@ -6,7 +6,7 @@
 // Angular twin of React's setState / Vue's reactive ref), ngOnDestroy tears the subscriptions down,
 // and the wrapper's onLayout measures the frame that feeds the next event's inset. The user
 // children nest under the wrapper (or, for 'position', an inner View) via <ng-content>. No native
-// host of its own — it wraps symbiote-view — so this stays a flat single file.
+// host of its own — it wraps view — so this stays a flat single file.
 //
 // Full parity: behavior 'height'|'position'|'padding', enabled, keyboardVerticalOffset,
 // contentContainerStyle, onLayout, plus the full a11y/aria surface every View carries.
@@ -103,18 +103,15 @@ export type IAngularKeyboardAvoidingViewInputs = Omit<
   // on `.observed` would silently break the inset fixpoint correction the moment an app didn't
   // listen to `layout`.
   template: `
-    <symbiote-view
-      [symbioteHostProps]="hostProps"
-      (layout)="handleLayout($event)"
-    >
+    <view [symbioteHostProps]="hostProps" (layout)="handleLayout($event)">
       @if (isNested) {
-        <symbiote-view [style]="innerStyle">
+        <view [style]="innerStyle">
           <ng-content></ng-content>
-        </symbiote-view>
+        </view>
       } @else {
         <ng-content></ng-content>
       }
-    </symbiote-view>
+    </view>
   `,
 })
 export class KeyboardAvoidingView
@@ -189,7 +186,7 @@ export class KeyboardAvoidingView
 
   private readonly changeDetector = inject(ChangeDetectorRef);
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT a ViewChild into the inner symbiote-view (this
+  // onto (see anchorHostStyle's doc comment) — NOT a ViewChild into the inner view (this
   // component has none; the wrapper IS the outer template node hostProps binds onto).
   private readonly elementRef = inject(ElementRef);
 

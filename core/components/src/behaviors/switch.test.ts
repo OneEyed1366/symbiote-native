@@ -221,14 +221,14 @@ describe('switch host behavior', () => {
     expect(committedPropsOf(TEST_ID)).toMatchObject({ value: false });
   });
 
-  // The `symbiote-switch-managed` tag resolves to the SAME native views as `symbiote-switch` — the
+  // The `switch-managed` tag resolves to the SAME native views as `switch` — the
   // wrapper's spelling must not silently orphan itself from either platform table.
-  it('resolves symbiote-switch-managed to the same Fabric view as symbiote-switch, on iOS', () => {
-    expect(descriptorFor('symbiote-switch')).toEqual({
+  it('resolves switch-managed to the same Fabric view as switch, on iOS', () => {
+    expect(descriptorFor('switch')).toEqual({
       component: 'Switch',
       isText: false,
     });
-    expect(descriptorFor('symbiote-switch-managed')).toEqual({
+    expect(descriptorFor('switch-managed')).toEqual({
       component: 'Switch',
       isText: false,
     });

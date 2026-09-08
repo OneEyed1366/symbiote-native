@@ -8,7 +8,7 @@
 //
 // Coverage ledger (per CLAUDE.md's <components_split_logic_view_lifecycle> — Button has no
 // `renderButton()` in core/components at all, it is adapter-assembled per
-// component-render-fn-boundary.md's rule, composing TouchableOpacity + a raw symbiote-text):
+// component-render-fn-boundary.md's rule, composing TouchableOpacity + a raw text):
 //   - `resolveButtonTextStyle(color, disabled)` (the color-tint / disabled-grey fold) — this
 //     file only asserts its OUTPUT indirectly is applied (title paints); it does not assert the
 //     tint/grey branches themselves. characterization: no test anywhere in the repo (core or any
@@ -32,6 +32,8 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
+// The press machine reaches a `pressable` TAG through the engine's behavior registry.
+import '../register';
 import { mount, unmount } from '../render';
 
 if (globalThis.window === undefined)
@@ -46,14 +48,6 @@ const ROOT_TAG = 91_004;
 // while also rewriting it with a `disabled` variant mid-run. Sharing the path meant this suite
 // could import a file the other one had just removed or replaced. Same reasoning, and the same
 // `-for-<consumer>` spelling, as flat-list.smoke.test.ts's LIST_OUT.
-const PRESSABLE_OUT = join(
-  __dirname,
-  'pressable',
-  '.smoke-compiled-pressable-for-button.mjs',
-);
-// TouchableOpacity's feedback node is an Animated.View wrapping the real View.svelte, so View
-// has to be compiled here too — `-for-button` for the same concurrency reason as PRESSABLE_OUT.
-const VIEW_OUT = join(__dirname, '.smoke-compiled-view-for-button.mjs');
 const TOUCHABLE_OPACITY_OUT = join(
   __dirname,
   'touchable-opacity',
@@ -101,8 +95,6 @@ afterEach(() => {
   unmount(ROOT_TAG);
   Reflect.deleteProperty(globalThis, 'requestAnimationFrame');
   Reflect.deleteProperty(globalThis, 'cancelAnimationFrame');
-  rmSync(PRESSABLE_OUT, { force: true });
-  rmSync(VIEW_OUT, { force: true });
   rmSync(TOUCHABLE_OPACITY_OUT, { force: true });
   rmSync(BUTTON_OUT, { force: true });
 });
@@ -123,31 +115,13 @@ function compileToFile(
 }
 
 async function loadButton(): Promise<Component> {
-  // Compile Pressable and TouchableOpacity co-located with their own real siblings first (each
-  // has its own relative imports — switch-platform-style resolution — that must resolve next to
-  // the compiled file, not in an isolated temp dir), THEN Button, whose own `./touchable-opacity/
-  // index.svelte` import is rewritten to point at the compiled TouchableOpacity output.
+  // Compile TouchableOpacity co-located with its own real siblings first (its relative imports
+  // must resolve next to the compiled file, not in an isolated temp dir), THEN Button, whose own
+  // `./touchable-opacity/index.svelte` import is rewritten to point at that output.
+  // TouchableOpacity composes no component of its own any more — it writes the `pressable` and
+  // `view` tags — so nothing else needs compiling here.
   compileToFile(
-    readFileSync(join(__dirname, 'pressable', 'index.svelte'), 'utf8'),
-    'Pressable.svelte',
-    PRESSABLE_OUT,
-  );
-  compileToFile(
-    readFileSync(join(__dirname, 'View.svelte'), 'utf8'),
-    'View.svelte',
-    VIEW_OUT,
-  );
-  const touchableOpacitySource = readFileSync(
-    join(__dirname, 'touchable-opacity', 'index.svelte'),
-    'utf8',
-  )
-    .replace(
-      "'../pressable/index.svelte'",
-      "'../pressable/.smoke-compiled-pressable-for-button.mjs'",
-    )
-    .replace("'../View.svelte'", "'../.smoke-compiled-view-for-button.mjs'");
-  compileToFile(
-    touchableOpacitySource,
+    readFileSync(join(__dirname, 'touchable-opacity', 'index.svelte'), 'utf8'),
     'TouchableOpacity.svelte',
     TOUCHABLE_OPACITY_OUT,
   );

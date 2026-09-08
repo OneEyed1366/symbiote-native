@@ -65,7 +65,7 @@ afterEach(() => unmount(ROOT_TAG));
   selector: 'plain-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>plain</symbiote-text>`,
+  template: `<text>plain</text>`,
 })
 class PlainScreenComponent {}
 
@@ -75,7 +75,7 @@ let canPush = false;
   selector: 'stack-tracked-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>home</symbiote-text>`,
+  template: `<text>home</text>`,
 })
 class StackTrackedScreenComponent {
   constructor() {
@@ -88,7 +88,7 @@ class StackTrackedScreenComponent {
   selector: 'stack-throwing-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>home</symbiote-text>`,
+  template: `<text>home</text>`,
 })
 class StackThrowingScreenComponent {
   constructor() {
@@ -102,7 +102,7 @@ let canJumpTo = false;
   selector: 'tab-tracked-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>home</symbiote-text>`,
+  template: `<text>home</text>`,
 })
 class TabTrackedScreenComponent {
   constructor() {
@@ -115,7 +115,7 @@ class TabTrackedScreenComponent {
   selector: 'tab-throwing-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>home</symbiote-text>`,
+  template: `<text>home</text>`,
 })
 class TabThrowingScreenComponent {
   constructor() {
@@ -129,7 +129,7 @@ let canOpenDrawer = false;
   selector: 'drawer-tracked-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>home</symbiote-text>`,
+  template: `<text>home</text>`,
 })
 class DrawerTrackedScreenComponent {
   constructor() {
@@ -142,7 +142,7 @@ class DrawerTrackedScreenComponent {
   selector: 'drawer-throwing-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>home</symbiote-text>`,
+  template: `<text>home</text>`,
 })
 class DrawerThrowingScreenComponent {
   constructor() {

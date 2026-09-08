@@ -173,17 +173,17 @@
   index: number;
   separators: ISeparators;
 })}
-  <symbiote-view p={{ style: rowStyle }}>
+  <view p={{ style: rowStyle }}>
     {#each row.items as rowItem, column (props.keyExtractor ? props.keyExtractor(rowItem, row.startIndex + column) : String(row.startIndex + column))}
-      <symbiote-view p={{ style: { flex: 1 } }}>
+      <view p={{ style: { flex: 1 } }}>
         {@render props.item({
           item: rowItem,
           index: row.startIndex + column,
           separators,
         })}
-      </symbiote-view>
+      </view>
     {/each}
-  </symbiote-view>
+  </view>
 {/snippet}
 
 {#snippet rowSeparator(entryProps: ISeparatorProps<IRow<ItemT>>)}

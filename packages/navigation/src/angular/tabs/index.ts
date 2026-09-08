@@ -6,7 +6,7 @@
 // implements ITabNavigatorHandle`) - plus the descriptor bridge (`symbiote-descriptor-outlet`,
 // `@symbiote-native/angular`) for the tab-bar leaf, exactly like Stack bridges its header config.
 // Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints
-// ordinary `symbiote-view`/`symbiote-text` primitives via the shared render fn, so there is no
+// ordinary `view`/`text` primitives via the shared render fn, so there is no
 // react-native-screens ViewConfig to register - Tab needs no `../register` import. Every tag this
 // template names (`View`, `symbiote-descriptor-outlet`) is a REAL imported Angular component (no
 // raw non-dashed native tag names the way stack.ts needs `NO_ERRORS_SCHEMA` for), so no loosened

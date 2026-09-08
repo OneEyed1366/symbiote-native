@@ -11,7 +11,7 @@
 // @symbiote-native/components; this file only attaches them to the component value and nests the
 // feedback view. Press timing is Pressable's, which is the shared state machine.
 //
-// The feedback carrier is a raw `symbiote-view`, not the `View` component — the same choice
+// The feedback carrier is a raw `view`, not the `View` component — the same choice
 // Pressable already makes for its android_ripple wrapper. It carries native props and nothing
 // else: no accessibility surface, no class, no ref, so View's aria fold and nativeID resolution
 // would be pure overhead. The committed node is `RCTView` either way.
@@ -99,7 +99,7 @@ function TouchableNativeFeedbackImpl(
   // source for their element, so there is nothing to merge.
   return (
     <Pressable {...rest}>
-      <symbiote-view {...feedbackProps()}>{local.children}</symbiote-view>
+      <view {...feedbackProps()}>{local.children}</view>
     </Pressable>
   );
 }

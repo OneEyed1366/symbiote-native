@@ -38,14 +38,14 @@ describe('renderImageBackground', () => {
   const image = asDescriptor(wrapper.children[0]);
   const imageStyle = flattenStyle(image.props.style);
 
-  it('wraps a symbiote-view carrying the wrapper style and one structural child', () => {
-    expect(wrapper.type).toBe('symbiote-view');
+  it('wraps a view carrying the wrapper style and one structural child', () => {
+    expect(wrapper.type).toBe('view');
     expect(wrapper.props.style).toBe(wrapperStyle);
     expect(wrapper.children).toHaveLength(1);
   });
 
-  it('makes the inner image an absolute-fill symbiote-image', () => {
-    expect(image.type).toBe('symbiote-image');
+  it('makes the inner image an absolute-fill image', () => {
+    expect(image.type).toBe('image');
     expect(imageStyle.position).toBe('absolute');
     expect(imageStyle.left).toBe(0);
   });
@@ -87,8 +87,8 @@ describe('renderInputAccessoryView', () => {
     passthrough: { testID: 'iav', accessibilityLabel: 'bar' },
   });
 
-  it('hosts a symbiote-input-accessory-view forwarding its props', () => {
-    expect(host.type).toBe('symbiote-input-accessory-view');
+  it('hosts a input-accessory-view forwarding its props', () => {
+    expect(host.type).toBe('input-accessory-view');
     expect(host.props.nativeID).toBe('kbd-bar');
     expect(host.props.backgroundColor).toBe('#eee');
     expect(host.props.style).toBe(style);
@@ -113,12 +113,12 @@ describe('renderInputAccessoryView', () => {
 });
 
 describe('renderModal', () => {
-  it('builds a symbiote-modal host with the default attributes', () => {
+  it('builds a modal host with the default attributes', () => {
     const root = renderModal({
       visible: true,
       passthrough: { testID: 'm', onShow: () => {} },
     });
-    expect(root.type).toBe('symbiote-modal');
+    expect(root.type).toBe('modal');
     expect(flattenStyle(root.props.style).position).toBe('absolute');
     expect(root.props.animationType).toBe('none');
     expect(root.props.presentationStyle).toBe('fullScreen');
@@ -131,7 +131,7 @@ describe('renderModal', () => {
     const root = renderModal({ visible: true, passthrough: {} });
     const container = asDescriptor(root.children[0]);
     expect(root.children).toHaveLength(1);
-    expect(container.type).toBe('symbiote-view');
+    expect(container.type).toBe('view');
     expect(container.props.collapsable).toBe(false);
     const containerStyle = flattenStyle(container.props.style);
     expect(containerStyle.backgroundColor).toBe('white');

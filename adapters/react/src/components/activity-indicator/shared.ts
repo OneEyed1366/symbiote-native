@@ -36,7 +36,7 @@ export function useActivityIndicatorLogic(
   rawProps: IActivityIndicatorProps,
   platform: IActivityIndicatorPlatform,
 ) {
-  // The wrapper is a raw symbiote-view, not the View FC, so it never runs
+  // The wrapper is a raw view, not the View FC, so it never runs
   // resolveAccessibilityProps itself, so fold aria/role here, then forward the resolved
   // accessibility* surface (plus testID / onLayout) onto the wrapper via `passthrough`.
   const props = resolveAccessibilityProps(rawProps);

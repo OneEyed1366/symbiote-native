@@ -1,6 +1,6 @@
 // Side-effect ONLY — this module exports nothing, and that is the whole design.
 //
-// The host-behavior registry has to know that `symbiote-pressable` carries a press machine before
+// The host-behavior registry has to know that `pressable` carries a press machine before
 // any node of that tag is created, and a registration is exactly the shape Metro's
 // `inlineRequires` silently drops in RELEASE builds: it moves a `require` down to the first place
 // its binding is used as a VALUE, and a barrel's `export { X } from './x'` compiles to a lazy
@@ -18,20 +18,21 @@ import {
   registerImageBehavior,
   registerInputAccessoryViewBehavior,
   registerPressableBehavior,
+  registerScrollViewBehavior,
   registerSwitchBehavior,
   registerTextInputBehavior,
 } from '@symbiote-native/components';
 
 registerPressableBehavior();
-// Only the LOWERED tags carry this — the wrapper renders `symbiote-text-input-managed` and
+// Only the LOWERED tags carry this — the wrapper renders `text-input-managed` and
 // keeps running its own lifecycle. One owner per node; see `component-names/shared.ts`.
 registerTextInputBehavior();
-// Same reason as TextInput: the wrapper renders `symbiote-switch-managed` and runs its own
+// Same reason as TextInput: the wrapper renders `switch-managed` and runs its own
 // lastNativeReport/snap-back lifecycle, so the engine's copy attaches only to the bare tag.
 registerSwitchBehavior();
 
 // Image owns no runtime — its behavior is a prop FOLD and nothing else, and it is registered on the
-// same `symbiote-image` the wrapper already emits rather than on a `-managed` twin. That is safe
+// same `image` the wrapper already emits rather than on a `-managed` twin. That is safe
 // only because the mapping is idempotent, which `core/components/src/behaviors/image.test.ts`
 // asserts rather than assumes; a wrapper-built node simply folds a second time and nothing moves.
 registerImageBehavior();
@@ -40,3 +41,17 @@ registerImageBehavior();
 // aliasing at all, so a wrapper-built node folding a second time moves nothing.
 // `core/components/src/behaviors/input-accessory-view.test.ts` asserts that rather than assuming it.
 registerInputAccessoryViewBehavior();
+
+// The ENGINE is the single owner of a ScrollView's content node from here: `buildStructure` builds
+// `RCTScrollContentView`, `slotProps` carries `contentContainerStyle` onto it, and the claim on
+// `refresh-control` places it beside the content view (iOS) or inverts the tree (Android).
+//
+// It also registers `sticky-header`, which is what replaced this adapter's own per-header
+// component — a header is a CHILD carrying the tag, and the behavior derives its collision point
+// from the owner's document order instead of an index map.
+//
+// EXACTLY ONE THING MAY BUILD THAT CONTENT NODE. `components/scroll-view` and
+// `components/virtualized-list` both used to; both now emit only the scroll tag, and
+// `scroll-view-content-owner.test.ts` is what stops a third owner reappearing — the failure it
+// guards is silent, a second `RCTScrollContentView` nested inside the first.
+registerScrollViewBehavior();

@@ -83,7 +83,7 @@ export function ImageBackground(props: IImageBackgroundProps): ReactElement {
     },
   });
 
-  // wrapper = symbiote-view > [imageDescriptor]; the user children paint AFTER the image (on top).
+  // wrapper = view > [imageDescriptor]; the user children paint AFTER the image (on top).
   return createElement(
     wrapper.type,
     { key: wrapper.key, ...wrapper.props, className },

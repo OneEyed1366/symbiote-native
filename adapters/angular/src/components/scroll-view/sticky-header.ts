@@ -49,7 +49,7 @@ import { anchorHostStyle } from '../../primitives';
 // AOT-safely instantiate an arbitrary component Type while auto-projecting stickyHeaderIndices,
 // because that renderer-level bridge only sees committed engine nodes, not a ViewContainerRef with
 // Angular projectable nodes. This type remains public for explicit composition: compose your wrapper
-// around <ScrollViewStickyHeader>/<symbiote-sticky-header> in the template when custom visuals are
+// around <ScrollViewStickyHeader>/<sticky-header> in the template when custom visuals are
 // needed. Auto projection intentionally uses the built-in wrapper.
 export type IStickyHeaderComponentType = unknown;
 
@@ -61,7 +61,7 @@ export type IStickyHeaderComponentType = unknown;
 // reach the host node: they configure the interpolation; only the resolved transform reaches
 // AnimatedView (a scrollAnimatedValue on a host node would crash Android's folly::dynamic).
 @Component({
-  selector: 'ScrollViewStickyHeader, symbiote-sticky-header',
+  selector: 'ScrollViewStickyHeader, sticky-header',
   standalone: true,
   imports: [AnimatedView],
   changeDetection: ChangeDetectionStrategy.OnPush,

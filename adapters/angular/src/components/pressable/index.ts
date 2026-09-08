@@ -132,10 +132,10 @@ function asSymbioteEvent(event: unknown): ISymbioteEvent | undefined {
 
 @Component({
   // Single-name selector, matching TextInput's own ('TextInput', text-input.ts) rather than
-  // View/Text's dual one. The alternate `symbiote-pressable` spelling was vestigial — nothing in
-  // this component's own template ever renders that tag (it renders `symbiote-view`, below), and
+  // View/Text's dual one. The alternate `pressable` spelling was vestigial — nothing in
+  // this component's own template ever renders that tag (it renders `view`, below), and
   // no app or example code invokes the composed component by that literal tag (verified by grep,
-  // 2026-08-31). Its only effect was to force `symbiote-pressable` into
+  // 2026-08-31). Its only effect was to force `pressable` into
   // `ANCHOR_HOST_COMPONENTS` unconditionally, which collided with the tag's OTHER, load-bearing
   // meaning — the host-behavior registry key (`PRESSABLE_TAG`,
   // core/components/src/behaviors/pressable.ts) a lowered `<Pressable>` must carry to get the
@@ -150,7 +150,7 @@ function asSymbioteEvent(event: unknown): ISymbioteEvent | undefined {
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [ViewHost, SymbioteHostPropsDirective],
   template: `
-    <symbiote-view
+    <view
       #host
       [symbioteHostProps]="hostProps()"
       (press)="handlePress($event)"
@@ -161,7 +161,7 @@ function asSymbioteEvent(event: unknown): ISymbioteEvent | undefined {
       (responderTerminationRequest)="allowTermination()"
     >
       <ng-content></ng-content>
-    </symbiote-view>
+    </view>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -290,7 +290,7 @@ export class Pressable
   private readonly gateDemand = injectGateDemand();
   // This component's OWN host - the non-painting anchor `class="..."` at the use site resolves
   // onto (see anchorHostStyle's doc comment) - NOT `hostElement` above, which targets the real
-  // inner `symbiote-view` one level down.
+  // inner `view` one level down.
   private readonly elementRef = inject(ElementRef);
 
   // Bridges the non-reactive @Input fields above into the reactive graph, so the computed() bag

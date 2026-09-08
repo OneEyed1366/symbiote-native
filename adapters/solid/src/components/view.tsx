@@ -1,7 +1,7 @@
 // View — the Solid host primitive, and the file that fixes the children/ref idiom every other
 // Solid component will copy.
 //
-// WHY THIS IS REAL JSX AND NOT A HAND-BUILT NODE. `symbiote-view` takes a live subtree of the
+// WHY THIS IS REAL JSX AND NOT A HAND-BUILT NODE. `view` takes a live subtree of the
 // user's components, and reducing that subtree to primitives IS Solid's reconciler. So the only
 // two moving parts are (a) forwarding a prop bag onto one host element and (b) handing the
 // children accessor to the renderer's `insert` — precisely what compiled JSX emits
@@ -109,8 +109,8 @@ export function View(props: IViewProps): JSX.Element {
   };
 
   return (
-    <symbiote-view ref={attachRef} {...bag()}>
+    <view ref={attachRef} {...bag()}>
       {local.children}
-    </symbiote-view>
+    </view>
   );
 }

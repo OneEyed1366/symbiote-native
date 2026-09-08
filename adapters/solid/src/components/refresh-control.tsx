@@ -1,5 +1,5 @@
 // RefreshControl — the Solid lifecycle half, and there is barely any: the component owns one host
-// tag and forwards its props onto it. On iOS `symbiote-refresh-control` resolves to Fabric's
+// tag and forwards its props onto it. On iOS `refresh-control` resolves to Fabric's
 // PullToRefreshView, which lives INSIDE a ScrollView as a childless sibling before the content
 // container; on Android it is AndroidSwipeRefreshLayout and WRAPS the scroll view instead (an
 // Android ScrollView hosts exactly one child). Which of the two shapes is built is ScrollView's
@@ -72,9 +72,5 @@ export function RefreshControl(props: IRefreshControlProps): JSX.Element {
 
   dlog('RefreshControl -> PullToRefreshView');
 
-  return (
-    <symbiote-refresh-control {...bag()}>
-      {local.children}
-    </symbiote-refresh-control>
-  );
+  return <refresh-control {...bag()}>{local.children}</refresh-control>;
 }

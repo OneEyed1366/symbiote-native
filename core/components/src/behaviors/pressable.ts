@@ -29,6 +29,7 @@ import {
   createPressRuntime,
   disposePressRuntime,
   DEFAULT_DELAY_LONG_PRESS_MS,
+  DEFAULT_MIN_PRESS_DURATION_MS,
   type IPressHost,
   type IPressHandler,
   type IPressMachineConfig,
@@ -43,7 +44,7 @@ import {
   resolveDisabledAccessibilityState,
 } from '../view/render-pressable';
 
-export const PRESSABLE_TAG = 'symbiote-pressable';
+export const PRESSABLE_TAG = 'pressable';
 
 interface IBehaviorState {
   readonly runtime: IPressRuntime;
@@ -99,6 +100,7 @@ const MACHINE_ONLY_KEYS = [
   'disabled',
   'cancelable',
   'delayLongPress',
+  'minPressDuration',
   'unstable_pressDelay',
   'pressRetentionOffset',
   'delayHoverIn',
@@ -208,6 +210,14 @@ function configFor(node: ISymbioteNode): IPressMachineConfig {
       DEFAULT_DELAY_LONG_PRESS_MS,
     ),
     unstable_pressDelay: numberOr(node.props.unstable_pressDelay, 0),
+    // RN's Touchables own the deactivation floor in their OWN machine and hand Pressability
+    // `minPressDuration: 0` (TouchableOpacity.js:195). While they were wrappers they passed it as
+    // an internal input; on the tag there is nowhere else to say it, so the floor has to be a
+    // readable prop or every Touchable holds its fade for the machine's 130 ms default.
+    minPressDuration: numberOr(
+      node.props.minPressDuration,
+      DEFAULT_MIN_PRESS_DURATION_MS,
+    ),
     hitSlop: asRectOffset(node.props.hitSlop),
     pressRetentionOffset: asRectOffset(node.props.pressRetentionOffset),
   };

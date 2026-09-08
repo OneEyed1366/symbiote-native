@@ -3,7 +3,7 @@
   // TouchableOpacity wrapping a Text. The base text style, the role constant, and the color fold
   // (caller color tints the label; disabled greys it) are shared in
   // @symbiote-native/components/view/render-button — this component only composes its
-  // TouchableOpacity + a raw `symbiote-text` host and forwards the native-only props, the Svelte
+  // TouchableOpacity + a raw `text` host and forwards the native-only props, the Svelte
   // twin of React's/Vue's Button.
   import type { IButtonProps } from './button-props';
 
@@ -71,6 +71,6 @@
   accessibilityState={{ disabled }}
 >
   {#snippet children()}
-    <symbiote-text p={{ style: textStyle }}>{title}</symbiote-text>
+    <text p={{ style: textStyle }}>{title}</text>
   {/snippet}
 </TouchableOpacity>

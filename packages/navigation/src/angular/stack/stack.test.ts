@@ -150,7 +150,7 @@ function headerConfigOf(screen: IFakeNode): IFakeNode {
   selector: 'home-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>home</symbiote-text>`,
+  template: `<text>home</text>`,
 })
 class HomeScreenComponent {}
 
@@ -158,7 +158,7 @@ class HomeScreenComponent {}
   selector: 'details-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>details</symbiote-text>`,
+  template: `<text>details</text>`,
 })
 class DetailsScreenComponent {}
 
@@ -171,7 +171,7 @@ const capturedParamRoutes: Signal<IRoute<unknown>>[] = [];
   selector: 'params-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>params</symbiote-text>`,
+  template: `<text>params</text>`,
 })
 class ParamsScreenComponent {
   constructor() {
@@ -328,7 +328,7 @@ class ModalStackTestHost {
   selector: 'profile-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>profile</symbiote-text>`,
+  template: `<text>profile</text>`,
 })
 class ProfileScreenComponent {}
 

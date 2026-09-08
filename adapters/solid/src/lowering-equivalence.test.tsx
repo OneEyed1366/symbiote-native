@@ -115,46 +115,46 @@ interface ICase {
 const CASES: Record<string, ICase> = {
   View: {
     component: () => <View {...PROBE} />,
-    lowered: () => <symbiote-view {...PROBE} />,
+    lowered: () => <view {...PROBE} />,
     expected: FOLDED,
   },
   Text: {
     component: () => <Text {...PROBE} />,
-    lowered: () => <symbiote-text {...PROBE} />,
+    lowered: () => <text {...PROBE} />,
     // Text is the primitive whose defaults the renderer seeds, so its absolute expectation is the
     // one that would catch `seedTextDefaults` dying — which no arm comparison could.
     expected: { ...FOLDED, ellipsizeMode: 'tail', allowFontScaling: true },
   },
   Pressable: {
     component: () => <Pressable {...PROBE} />,
-    lowered: () => <symbiote-pressable {...PROBE} />,
+    lowered: () => <pressable {...PROBE} />,
     expected: FOLDED,
   },
   TextInput: {
     component: () => <TextInput {...PROBE} />,
-    lowered: () => <symbiote-text-input {...PROBE} />,
+    lowered: () => <text-input {...PROBE} />,
     expected: FOLDED,
   },
   Image: {
     component: () => <Image {...PROBE} source={{ uri: 'x' }} />,
-    lowered: () => <symbiote-image {...PROBE} source={{ uri: 'x' }} />,
+    lowered: () => <image {...PROBE} source={{ uri: 'x' }} />,
     // The array shape `normalizeSource` guarantees — the fold that lives in the BEHAVIOR rather
     // than in `foldHostBag`, and is therefore invisible to any adapter that registers no behavior.
     expected: { ...FOLDED, source: [{ uri: 'x' }] },
   },
   InputAccessoryView: {
     component: () => <InputAccessoryView {...PROBE} />,
-    lowered: () => <symbiote-input-accessory-view {...PROBE} />,
+    lowered: () => <input-accessory-view {...PROBE} />,
     expected: FOLDED,
   },
   SafeAreaView: {
     component: () => <SafeAreaView {...PROBE} />,
-    lowered: () => <symbiote-safe-area-view {...PROBE} />,
+    lowered: () => <safe-area-view {...PROBE} />,
     expected: FOLDED,
   },
   Switch: {
     component: () => <Switch {...PROBE} />,
-    lowered: () => <symbiote-switch {...PROBE} />,
+    lowered: () => <switch {...PROBE} />,
     expected: FOLDED,
   },
 };

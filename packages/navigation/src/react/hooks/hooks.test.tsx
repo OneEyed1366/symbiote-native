@@ -93,11 +93,11 @@ function screenNodes(): IFakeNode[] {
 }
 
 function HomeScreen(): ReturnType<typeof createElement> {
-  return createElement('symbiote-text', {}, 'home');
+  return createElement('text', {}, 'home');
 }
 
 function DetailsScreen(): ReturnType<typeof createElement> {
-  return createElement('symbiote-text', {}, 'details');
+  return createElement('text', {}, 'details');
 }
 
 describe('navigation hooks', () => {
@@ -109,7 +109,7 @@ describe('navigation hooks', () => {
       let latestIsFocused: boolean | undefined;
       function TrackedHomeScreen(): ReturnType<typeof createElement> {
         latestIsFocused = useIsFocused();
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
 
       mount(
@@ -150,7 +150,7 @@ describe('navigation hooks', () => {
             return () => events.push('cleanup');
           }, []),
         );
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
 
       mount(
@@ -197,7 +197,7 @@ describe('navigation hooks', () => {
             navigation.addListener('focus', () => focusEvents.push('focus')),
           [navigation],
         );
-        return createElement('symbiote-text', {}, 'details');
+        return createElement('text', {}, 'details');
       }
 
       const ref = createRef<INavigatorHandle>();
@@ -229,7 +229,7 @@ describe('navigation hooks', () => {
       let routeCount: number | undefined;
       function TrackedHomeScreen(): ReturnType<typeof createElement> {
         routeCount = useNavigationState(state => state.routes.length);
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
 
       const ref = createRef<INavigatorHandle>();
@@ -271,7 +271,7 @@ describe('navigation hooks', () => {
     it('useRoute() throws when rendered outside any navigator screen', () => {
       function OrphanScreen(): ReturnType<typeof createElement> {
         useRoute();
-        return createElement('symbiote-text', {}, 'orphan');
+        return createElement('text', {}, 'orphan');
       }
 
       expect(() => {

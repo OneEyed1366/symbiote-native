@@ -55,9 +55,8 @@ function renderSection(props: {
     sections: props.sections,
     stickySectionHeadersEnabled: props.stickySectionHeadersEnabled,
     renderSectionHeader: ({ section }) =>
-      createElement('symbiote-text', {}, section.title),
-    renderItem: ({ item }) =>
-      createElement('symbiote-text', {}, `row-${item.id}`),
+      createElement('text', {}, section.title),
+    renderItem: ({ item }) => createElement('text', {}, `row-${item.id}`),
   });
 }
 

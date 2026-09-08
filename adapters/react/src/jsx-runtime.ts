@@ -41,7 +41,7 @@ interface IHostProps {
 
 type ILooseIntrinsics = Omit<
   Record<ISymbioteIntrinsic, IHostProps>,
-  'symbiote-view' | 'symbiote-text'
+  'view' | 'text'
 >;
 
 // The member names are TypeScript's own — the compiler looks each up by exact name — so the repo's
@@ -65,8 +65,8 @@ export namespace JSX {
   // the commit that registers its Fabric name. The hand-written twin of this list had fallen four
   // names behind before it was derived (`jsx.ts` records it).
   export interface IntrinsicElements extends ILooseIntrinsics {
-    'symbiote-view': IViewProps;
-    'symbiote-text': ITextProps;
+    view: IViewProps;
+    text: ITextProps;
   }
 }
 /* eslint-enable @typescript-eslint/no-namespace */

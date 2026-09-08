@@ -57,7 +57,7 @@ function mountMagnetometer(
     defineComponent({
       setup: () => {
         measurement = useMagnetometer(updateIntervalMs);
-        return () => h('symbiote-text', {}, 'sensor');
+        return () => h('text', {}, 'sensor');
       },
     }),
   );

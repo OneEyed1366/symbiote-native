@@ -55,10 +55,10 @@ import {
   type ISwitchState,
 } from '../state/switch';
 
-// The LOWERED tag — NOT the wrapper's `symbiote-switch-managed` (`render-switch.ts`). One owner
+// The LOWERED tag — NOT the wrapper's `switch-managed` (`render-switch.ts`). One owner
 // per node: the wrapper already runs this same machine in its own lifecycle, so registering here
 // under the tag it emits would attach a second, redundant copy.
-export const SWITCH_TAG = 'symbiote-switch';
+export const SWITCH_TAG = 'switch';
 
 const states = new WeakMap<ISymbioteNode, ISwitchState>();
 

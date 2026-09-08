@@ -43,9 +43,9 @@ const chips: IChip[] = Array.from({ length: 24 }, (_unused, index) => ({
       [style]="chipListStyle"
     >
       <ng-template vListItem let-item>
-        <symbiote-view [testID]="'chip-' + item.n" [style]="chipCardStyle">
-          <symbiote-text>{{ item.n }}</symbiote-text>
-        </symbiote-view>
+        <view [testID]="'chip-' + item.n" [style]="chipCardStyle">
+          <text>{{ item.n }}</text>
+        </view>
       </ng-template>
     </FlatList>
   `,

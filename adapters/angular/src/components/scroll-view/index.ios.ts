@@ -54,24 +54,21 @@ export type { IAngularScrollViewProps, IScrollViewHandle } from './shared';
   changeDetection: ChangeDetectionStrategy.OnPush,
   inputs: SCROLL_VIEW_INPUTS,
   template: `
-    <symbiote-scroll-view
-      #host="symbioteHost"
-      [symbioteHostProps]="scrollProps()"
-    >
+    <scroll-view #host="symbioteHost" [symbioteHostProps]="scrollProps()">
       @if (hasProjectedRefreshControl) {
-        <symbiote-refresh-control
+        <refresh-control
           #refreshHost="symbioteHost"
           [symbioteHostProps]="iosRefreshControlProps"
           (refresh)="handleProjectedRefresh(refreshHost.node)"
-        ></symbiote-refresh-control>
+        ></refresh-control>
       }
-      <symbiote-scroll-content
+      <scroll-content
         [symbioteHostProps]="contentProps()"
         [symbioteScrollViewProjection]="projectionController"
       >
         <ng-content></ng-content>
-      </symbiote-scroll-content>
-    </symbiote-scroll-view>
+      </scroll-content>
+    </scroll-view>
   `,
 })
 // Behavior lives entirely in ScrollViewBase; this class exists for the decorator + iOS template.

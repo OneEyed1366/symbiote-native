@@ -5,7 +5,7 @@
 // exactly RN's imperative-override semantics.
 //
 // Solid takes the ref on the public `View`, which forwards it (IViewProps.ref: Ref<IHostInstance>)
-// — no hand-authored `symbiote-view` host tag, which is what Svelte's twin needs because its View
+// — no hand-authored `view` host tag, which is what Svelte's twin needs because its View
 // has no bind:this escape hatch. And no shallowRef discipline either, which is Vue's concern: a
 // Solid signal stores the node by identity, so the engine's WeakMap mirror still finds it.
 

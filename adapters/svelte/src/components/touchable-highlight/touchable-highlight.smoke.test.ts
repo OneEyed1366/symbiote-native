@@ -30,6 +30,8 @@ import {
   waitUntil,
   type IFakeNode,
 } from '@symbiote-native/test-utils';
+// The press machine reaches a `pressable` TAG through the engine's behavior registry.
+import '../../register';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -48,14 +50,6 @@ const CHILD_OPACITY = 0.5;
 const BASE_WIDTH = 12;
 const HOLD_MS = 40;
 
-const COMPONENTS_DIR = join(__dirname, '..');
-// `-for-highlight` per .claude/rules/smoke-compiled-artifact-collisions.md: Pressable is compiled
-// here but owned by ../pressable/pressable.smoke.test.ts, and vitest runs files concurrently.
-const PRESSABLE_OUT = join(
-  COMPONENTS_DIR,
-  'pressable',
-  '.smoke-compiled-pressable-for-highlight.mjs',
-);
 const HIGHLIGHT_OUT = join(__dirname, '.smoke-compiled-highlight.mjs');
 const PARENT_OUT = join(__dirname, '.smoke-compiled-highlight-parent.mjs');
 
@@ -84,21 +78,12 @@ function compileToFile(
 }
 
 async function loadParent(): Promise<Component> {
-  compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'pressable', 'index.svelte'), 'utf8'),
-    'Pressable.svelte',
-    PRESSABLE_OUT,
-  );
+  // No rewrites: this component composes nothing, it writes the `pressable` TAG and the engine's
+  // behavior registry supplies the machine.
   compileToFile(
     readFileSync(join(__dirname, 'index.svelte'), 'utf8'),
     'TouchableHighlight.svelte',
     HIGHLIGHT_OUT,
-    [
-      [
-        "from '../pressable/index.svelte'",
-        "from '../pressable/.smoke-compiled-pressable-for-highlight.mjs'",
-      ],
-    ],
   );
   // Every scenario's variance travels through mount()'s props, so one parent file suffices —
   // Node's import() cache would hand back a stale module for a rewritten path anyway.
@@ -109,7 +94,7 @@ async function loadParent(): Promise<Component> {
      </script>
      <TouchableHighlight {...props}>
        {#snippet children()}
-         <symbiote-view p={{ testID: '${CHILD}' }} />
+         <view p={{ testID: '${CHILD}' }} />
        {/snippet}
      </TouchableHighlight>`,
     'Parent.svelte',
@@ -129,7 +114,6 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(PRESSABLE_OUT, { force: true });
   rmSync(HIGHLIGHT_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
 });

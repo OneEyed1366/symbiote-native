@@ -20,12 +20,12 @@
 import type { ReactElement } from 'react';
 
 const strictIntrinsicAcceptsItsOwnProp: ReactElement = (
-  <symbiote-view testID="jsx-namespace-check" />
+  <view testID="jsx-namespace-check" />
 );
 
 const strictIntrinsicRejectsAnUnknownProp: ReactElement = (
-  // @ts-expect-error `symbiote-view` is typed by IViewProps, not by the loose host bag
-  <symbiote-view definitelyNotAViewProp={1} />
+  // @ts-expect-error `view` is typed by IViewProps, not by the loose host bag
+  <view definitelyNotAViewProp={1} />
 );
 
 export const JSX_NAMESPACE_CHECK = [

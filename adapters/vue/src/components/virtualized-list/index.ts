@@ -753,7 +753,7 @@ export const VirtualizedList = defineComponent(
 
       const header = resolveElement(p.listHeaderComponent);
       if (header !== undefined) {
-        children.push(h('symbiote-view', { key: 'list-header' }, [header]));
+        children.push(h('view', { key: 'list-header' }, [header]));
       }
 
       let renderedStickyIndices: number[] = [];
@@ -761,7 +761,7 @@ export const VirtualizedList = defineComponent(
       if (m.count === FIRST_INDEX) {
         const empty = resolveElement(p.listEmptyComponent);
         if (empty !== undefined) {
-          children.push(h('symbiote-view', { key: 'list-empty' }, [empty]));
+          children.push(h('view', { key: 'list-empty' }, [empty]));
         }
       } else {
         const plan = buildListPlan({
@@ -779,7 +779,7 @@ export const VirtualizedList = defineComponent(
 
         if (plan.leadingExtent > EMPTY_OFFSET) {
           children.push(
-            h('symbiote-view', {
+            h('view', {
               key: 'spacer-leading',
               style: p.horizontal
                 ? { width: plan.leadingExtent }
@@ -827,7 +827,7 @@ export const VirtualizedList = defineComponent(
               : undefined;
           children.push(
             h(
-              'symbiote-view',
+              'view',
               {
                 key: `cell-${cell.key}`,
                 onLayout: makeCellMeasure(cell.index),
@@ -845,7 +845,7 @@ export const VirtualizedList = defineComponent(
           pushCell(plan.forcedStickyCell);
           if (plan.gapExtent > EMPTY_OFFSET) {
             children.push(
-              h('symbiote-view', {
+              h('view', {
                 key: 'spacer-gap',
                 style: p.horizontal
                   ? { width: plan.gapExtent }
@@ -861,7 +861,7 @@ export const VirtualizedList = defineComponent(
 
         if (plan.trailingExtent > EMPTY_OFFSET) {
           children.push(
-            h('symbiote-view', {
+            h('view', {
               key: 'spacer-trailing',
               style: p.horizontal
                 ? { width: plan.trailingExtent }
@@ -873,7 +873,7 @@ export const VirtualizedList = defineComponent(
 
       const footer = resolveElement(p.listFooterComponent);
       if (footer !== undefined) {
-        children.push(h('symbiote-view', { key: 'list-footer' }, [footer]));
+        children.push(h('view', { key: 'list-footer' }, [footer]));
       }
 
       const resolvedContentContainerStyle: IStyleProp<IViewStyle> = p.horizontal

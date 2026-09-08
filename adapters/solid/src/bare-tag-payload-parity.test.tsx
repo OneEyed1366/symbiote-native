@@ -74,7 +74,7 @@ describe('a bare intrinsic commits the wrapper payload', () => {
     };
 
     const wrapper = await payloadOf(WRAPPER_ROOT, () => <View {...props} />);
-    const tag = await payloadOf(TAG_ROOT, () => <symbiote-view {...props} />);
+    const tag = await payloadOf(TAG_ROOT, () => <view {...props} />);
 
     expect(tag.view).toBe(wrapper.view);
     expect(keysOf(tag.props)).toEqual(keysOf(wrapper.props));
@@ -92,7 +92,7 @@ describe('a bare intrinsic commits the wrapper payload', () => {
     const props = { testID: 'plain' };
 
     const wrapper = await payloadOf(WRAPPER_ROOT, () => <View {...props} />);
-    const tag = await payloadOf(TAG_ROOT, () => <symbiote-view {...props} />);
+    const tag = await payloadOf(TAG_ROOT, () => <view {...props} />);
 
     expect(keysOf(tag.props)).toEqual(keysOf(wrapper.props));
     expect(keysOf(wrapper.props)).not.toContain('nativeID');
@@ -102,7 +102,7 @@ describe('a bare intrinsic commits the wrapper payload', () => {
     const props = { numberOfLines: 1 };
 
     const wrapper = await payloadOf(WRAPPER_ROOT, () => <Text {...props} />);
-    const tag = await payloadOf(TAG_ROOT, () => <symbiote-text {...props} />);
+    const tag = await payloadOf(TAG_ROOT, () => <text {...props} />);
 
     expect(tag.view).toBe(wrapper.view);
     expect(keysOf(tag.props)).toEqual(keysOf(wrapper.props));
@@ -115,7 +115,7 @@ describe('a bare intrinsic commits the wrapper payload', () => {
     const props = { allowFontScaling: false, ellipsizeMode: 'clip' };
 
     const wrapper = await payloadOf(WRAPPER_ROOT, () => <Text {...props} />);
-    const tag = await payloadOf(TAG_ROOT, () => <symbiote-text {...props} />);
+    const tag = await payloadOf(TAG_ROOT, () => <text {...props} />);
 
     expect(tag.props).toEqual(wrapper.props);
     expect(tag.props.allowFontScaling).toBe(false);

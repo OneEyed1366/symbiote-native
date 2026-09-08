@@ -3,19 +3,13 @@
   // real host: I18nManager (RTL layout constants), Settings (a value round-tripped
   // through iOS NSUserDefaults via SettingsManager), and Image's static methods
   // (getSize / queryCache / prefetch, which hit the ImageLoader native module).
-  import {
-    View,
-    Text,
-    Image,
-    I18nManager,
-    Settings,
-  } from '@symbiote-native/svelte';
+  import { Image, I18nManager, Settings } from '@symbiote-native/svelte';
   import ActionButton from './ActionButton.svelte';
 
   const LOGO_URI = 'https://svelte.dev/favicon.png';
   // A distinct cache key for the prefetch demo: same asset, different URL (query
   // string), so nothing has loaded it yet. The cache starts cold and the button
-  // visibly warms it, unlike LOGO_URI, which getSize + the <Image> already pulled in.
+  // visibly warms it, unlike LOGO_URI, which getSize + the <image> already pulled in.
   const PREFETCH_URI = 'https://svelte.dev/favicon.png?warm=symbiote';
   const TAP_KEY = 'symbiote.tapCount';
 
@@ -44,7 +38,7 @@
   }
 
   // Image statics: getSize resolves the rendered logo's real pixel dimensions
-  // through ImageLoader (the <Image> below paints that same asset).
+  // through ImageLoader (the <image> below paints that same asset).
   let imageSize = $state('measuring…');
   $effect(() => {
     Image.getSize(LOGO_URI)
@@ -69,33 +63,33 @@
   }
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">
+<view class="section-nested">
+  <text class="section-label">
     Runtime modules · I18nManager / Settings / Image statics
-  </Text>
-  <Text class="info-text">
+  </text>
+  <text class="info-text">
     {`RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`}
-  </Text>
+  </text>
   <ActionButton
     title={rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'}
     onPress={() => I18nManager.forceRTL(!rtl.isRTL)}
     color="#7fb5ff"
   />
-  <Text testID="persist-count" class="info-text">
+  <text testID="persist-count" class="info-text">
     {`persisted taps: ${persisted} · survives relaunch`}
-  </Text>
+  </text>
   <ActionButton
     testID="persist-btn"
     title="Persist a tap"
     onPress={persistTap}
     color="#7fb5ff"
   />
-  <View class="row-align-center">
-    <Image source={{ uri: LOGO_URI }} class="logo-thumb" />
-    <Text testID="logo-size" class="info-text-flex">
+  <view class="row-align-center">
+    <image source={{ uri: LOGO_URI }} class="logo-thumb" />
+    <text testID="logo-size" class="info-text-flex">
       {`logo size: ${imageSize}`}
-    </Text>
-  </View>
-  <Text class="info-text">{`prefetch cache: ${cacheState}`}</Text>
+    </text>
+  </view>
+  <text class="info-text">{`prefetch cache: ${cacheState}`}</text>
   <ActionButton title="Prefetch logo" onPress={prefetchLogo} color="#7fb5ff" />
-</View>
+</view>

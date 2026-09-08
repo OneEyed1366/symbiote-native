@@ -54,7 +54,7 @@ export type { ISwitchProps, ISwitchTrackColor } from './shared';
   ],
   outputs: ['valueChange', 'change'],
   template: `
-    <symbiote-switch-managed
+    <switch-managed
       #nativeSwitch="symbioteHost"
       [symbioteHostProps]="hostProps()"
       (change)="handleChange($event, nativeSwitch)"
@@ -63,7 +63,7 @@ export type { ISwitchProps, ISwitchTrackColor } from './shared';
 })
 export class Switch extends SwitchBase implements DoCheck {
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT the <symbiote-switch-managed> leaf one level down.
+  // onto (see anchorHostStyle's doc comment) — NOT the <switch-managed> leaf one level down.
   private readonly elementRef = inject(ElementRef);
 
   protected readonly platform = {

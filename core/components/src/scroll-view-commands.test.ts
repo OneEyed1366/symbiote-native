@@ -30,7 +30,7 @@ function mountScrollNode(): ISymbioteNode {
   const surface = createSurface((nextRootTag += 1));
   const root = createElement('RCTView');
   surface.appendChild(root);
-  const node = createElement('RCTScrollView', false, 'symbiote-scroll-view');
+  const node = createElement('RCTScrollView', false, 'scroll-view');
   appendChild(root, node);
   surface.commit();
   return node;

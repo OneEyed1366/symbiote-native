@@ -467,7 +467,7 @@ export { registerSwitchBehavior, SWITCH_TAG } from './behaviors/switch';
 // caller of `registerScrollViewBehavior()` names it. The shape CLAUDE.md forbids is a module whose
 // evaluation alone registers.
 //
-// NO ADAPTER CALLS IT YET, deliberately — `symbiote-scroll-view` is the tag the wrappers already
+// NO ADAPTER CALLS IT YET, deliberately — `scroll-view` is the tag the wrappers already
 // emit and they build their own content node, so registering globally would double-nest every
 // existing ScrollView. See the behavior's header.
 export {

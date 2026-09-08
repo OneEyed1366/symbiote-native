@@ -94,7 +94,7 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
 }
 
 function StackDetailsScreen(): ReturnType<typeof createElement> {
-  return createElement('symbiote-text', {}, 'stack-details');
+  return createElement('text', {}, 'stack-details');
 }
 
 describe('nested navigators (Context parent chain)', () => {
@@ -107,7 +107,7 @@ describe('nested navigators (Context parent chain)', () => {
       function RootScreen(): ReturnType<typeof createElement> {
         capturedParent = useNavigation().getParent();
         getParentCalled = true;
-        return createElement('symbiote-text', {}, 'root');
+        return createElement('text', {}, 'root');
       }
 
       mount(
@@ -132,7 +132,7 @@ describe('nested navigators (Context parent chain)', () => {
 
       function NestedTabHomeScreen(): ReturnType<typeof createElement> {
         capturedParent = useNavigation().getParent();
-        return createElement('symbiote-text', {}, 'tab-home');
+        return createElement('text', {}, 'tab-home');
       }
 
       // The Stack screen's own component: a Tab navigator, nested exactly the way a real app

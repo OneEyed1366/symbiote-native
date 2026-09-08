@@ -56,9 +56,7 @@ const tick = (): Promise<void> =>
       [stickyHeaderIndices]="stickyHeaderIndices"
     >
       <ng-template vListItem let-item>
-        <symbiote-text [testID]="'row-' + item.id">{{
-          'row-' + item.id
-        }}</symbiote-text>
+        <text [testID]="'row-' + item.id">{{ 'row-' + item.id }}</text>
       </ng-template>
     </VirtualizedList>
   `,

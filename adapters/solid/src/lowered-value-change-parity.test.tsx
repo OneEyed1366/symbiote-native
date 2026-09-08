@@ -51,9 +51,7 @@ function type(text: string, eventCount: number): void {
 describe('lowered vs component TextInput: onValueChange', () => {
   it('the LOWERED intrinsic calls onValueChange with the typed text', async () => {
     const seen = vi.fn();
-    mount(ROOT_TAG, () => (
-      <symbiote-text-input value="" onValueChange={seen} />
-    ));
+    mount(ROOT_TAG, () => <text-input value="" onValueChange={seen} />);
     await tick();
 
     type('ab', 1);
@@ -82,7 +80,7 @@ describe('lowered vs component TextInput: onValueChange', () => {
   it('a lowered input drives a derived signal, as the canary does', async () => {
     const [name, setName] = createSignal('');
     mount(ROOT_TAG, () => (
-      <symbiote-text-input value={name()} onValueChange={setName} />
+      <text-input value={name()} onValueChange={setName} />
     ));
     await tick();
 

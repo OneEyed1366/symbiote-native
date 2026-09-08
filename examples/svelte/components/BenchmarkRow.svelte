@@ -4,8 +4,8 @@
   // BenchmarkScreen imports IBenchmarkRow back.
   //
   // TEN native views, and the count is the whole point (see BenchmarkScreen's own note): the
-  // outer View is 1, each of the three Texts is a symbiote-text plus its RCTRawText child (6),
-  // each Pressable is exactly one symbiote-view (2) - Pressable only adds a second host view when
+  // outer View is 1, each of the three Texts is a text plus its RCTRawText child (6),
+  // each Pressable is exactly one view (2) - Pressable only adds a second host view when
   // android_ripple is supplied, which it is not here - and the TextInput is exactly one more. Its
   // text rides as the `text` prop rather than as a RawText child, so it does not bring the +1 a
   // Text does.
@@ -26,8 +26,6 @@
 </script>
 
 <script lang="ts">
-  import { Pressable, Text, TextInput, View } from '@symbiote-native/svelte';
-
   let {
     row,
     isSelected,
@@ -41,13 +39,13 @@
   } = $props();
 </script>
 
-<View class={isSelected ? 'bench-row bench-row-selected' : 'bench-row'}>
-  <Text class="bench-row-id">{String(row.id)}</Text>
-  <Pressable class="flex1" onPress={() => onSelect(row.id)}>
-    <Text class="bench-row-label">{row.label}</Text>
-  </Pressable>
-  <Pressable class="bench-row-remove" onPress={() => onRemove(row.id)}>
-    <Text class="bench-row-remove-text">×</Text>
-  </Pressable>
-  <TextInput class="bench-row-input" value={row.label} />
-</View>
+<view class={isSelected ? 'bench-row bench-row-selected' : 'bench-row'}>
+  <text class="bench-row-id">{String(row.id)}</text>
+  <pressable class="flex1" onPress={() => onSelect(row.id)}>
+    <text class="bench-row-label">{row.label}</text>
+  </pressable>
+  <pressable class="bench-row-remove" onPress={() => onRemove(row.id)}>
+    <text class="bench-row-remove-text">×</text>
+  </pressable>
+  <text-input class="bench-row-input" value={row.label}></text-input>
+</view>

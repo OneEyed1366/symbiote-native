@@ -85,7 +85,7 @@ export interface IScrollViewProjectionConfig {
 }
 
 function createViewNode(): ISymbioteNode {
-  const descriptor = descriptorFor('symbiote-view');
+  const descriptor = descriptorFor('view');
   return createElement(descriptor.component, descriptor.isText);
 }
 
@@ -636,7 +636,7 @@ export class ScrollViewProjectionController {
   // arbitrary Angular component class as a wrapper without owning a ViewContainerRef/injector and
   // Angular projectable nodes for its <ng-content>. Therefore the automatic sticky path always uses
   // the built-in engine-node wrapper; custom StickyHeaderComponent wrappers remain supported by
-  // explicit Angular composition with <ScrollViewStickyHeader>/<symbiote-sticky-header> or a user
+  // explicit Angular composition with <ScrollViewStickyHeader>/<sticky-header> or a user
   // component that composes it in the template.
   private wrapRecord(record: IProjectedRecord, childIndex: number): void {
     if (this.contentNode === undefined) return;

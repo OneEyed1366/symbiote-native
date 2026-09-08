@@ -18,7 +18,8 @@
     selectableBackground,
   } from '@symbiote-native/components';
   import { dlog } from '@symbiote-native/engine';
-  import Pressable from '../pressable/index.svelte';
+  import { createAttachmentsSync } from '../../runes/attachments';
+  import type { ShimElement } from '../../dom-shim';
 
   let {
     background,
@@ -38,12 +39,18 @@
   });
 
   const nativeProps = $derived(backgroundProps(resolved, useForeground));
+
+  // `{@attach}` rides `rest` as a symbol key and no bag carries it into the engine. See
+  // touchable-opacity/index.svelte for the tag's one timing gap (`__minPressDuration`).
+  let hostShim = $state.raw<ShimElement | null>(null);
+  const syncAttachments = createAttachmentsSync();
+  $effect(() => {
+    syncAttachments(hostShim, rest);
+  });
 </script>
 
-<Pressable __minPressDuration={0} {...rest}>
-  {#snippet children()}
-    <symbiote-view p={nativeProps}>
-      {@render content?.()}
-    </symbiote-view>
-  {/snippet}
-</Pressable>
+<pressable p={rest} bind:this={hostShim}>
+  <view p={nativeProps}>
+    {@render content?.()}
+  </view>
+</pressable>

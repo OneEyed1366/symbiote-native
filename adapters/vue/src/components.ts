@@ -108,8 +108,8 @@ function hostComponent<Props extends object>(
 // Children go to a tag as an ARRAY (or a bare string / vnode), never a slot function — an element
 // ignores slot children entirely and renders nothing. The reverse of the rule that applies to a
 // component.
-export const HOST_VIEW = 'symbiote-view';
-export const HOST_TEXT = 'symbiote-text';
+export const HOST_VIEW = 'view';
+export const HOST_TEXT = 'text';
 
 export const View = hostComponent<IViewProps>(HOST_VIEW, 'View');
 export const Text = hostComponent<ITextProps>(

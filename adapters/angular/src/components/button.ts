@@ -1,7 +1,7 @@
 // Button for Angular. The minimal cross-platform button in RN's iOS shape (Button.js): a
 // TouchableOpacity wrapping a Text. The base text style, the role constant, and the color fold are
 // shared in @symbiote-native/components/view; Angular only composes its TouchableOpacity + a
-// symbiote-text child and re-maps the few Button-owned props. No JS-side platform branch, so this
+// text child and re-maps the few Button-owned props. No JS-side platform branch, so this
 // stays a flat single file.
 //
 // RN's Button fixes accessibilityRole="button", marks the root accessible, and propagates
@@ -121,7 +121,7 @@ export type IButtonProps = Omit<
       [ariaValueText]="ariaValueText"
       [role]="role"
     >
-      <symbiote-text [style]="textStyle">{{ title }}</symbiote-text>
+      <text [style]="textStyle">{{ title }}</text>
     </TouchableOpacity>
   `,
 })

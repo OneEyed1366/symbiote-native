@@ -40,7 +40,7 @@ export type {
   inputs: IMAGE_INPUTS,
   outputs: IMAGE_OUTPUTS,
   template: `
-    <symbiote-image
+    <image
       [symbioteHostProps]="imageProps()"
       (loadStart)="handleLoadStart($event)"
       (load)="handleLoad($event)"
@@ -53,7 +53,7 @@ export type {
 })
 export class Image extends ImageBase implements OnChanges, DoCheck {
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT the inner `symbiote-image` one level down.
+  // onto (see anchorHostStyle's doc comment) — NOT the inner `image` one level down.
   private readonly elementRef = inject(ElementRef);
 
   // The anchor's class-derived style is written by the renderer's addClass/removeClass and never

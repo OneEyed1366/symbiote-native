@@ -169,14 +169,12 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
           renderSectionHeader={info => (
-            <symbiote-text>{`header:${info().section.title}`}</symbiote-text>
+            <text>{`header:${info().section.title}`}</text>
           )}
           renderSectionFooter={info => (
-            <symbiote-text>{`footer:${info().section.title}`}</symbiote-text>
+            <text>{`footer:${info().section.title}`}</text>
           )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -201,12 +199,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       mount(ROOT_TAG, () => (
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -227,12 +221,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
           stickySectionHeadersEnabled={false}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -251,18 +241,14 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       mount(ROOT_TAG, () => (
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
-          SectionSeparatorComponent={() => (
-            <symbiote-text>section-gap</symbiote-text>
-          )}
+          SectionSeparatorComponent={() => <text>section-gap</text>}
           renderSectionHeader={info => (
-            <symbiote-text>{`header:${info().section.title}`}</symbiote-text>
+            <text>{`header:${info().section.title}`}</text>
           )}
           renderSectionFooter={info => (
-            <symbiote-text>{`footer:${info().section.title}`}</symbiote-text>
+            <text>{`footer:${info().section.title}`}</text>
           )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -290,18 +276,14 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
           ItemSeparatorComponent={separatorProps => (
-            <symbiote-text>
-              {separatorProps.highlighted ? 'sep-on' : 'sep-off'}
-            </symbiote-text>
+            <text>{separatorProps.highlighted ? 'sep-on' : 'sep-off'}</text>
           )}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
           renderItem={info => {
             if (info().item.label === 'row-a0') {
               highlight = info().separators.highlight;
             }
-            return <symbiote-text>{info().item.label}</symbiote-text>;
+            return <text>{info().item.label}</text>;
           }}
         />
       ));
@@ -332,12 +314,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
             seen.add(`${item.label}@${index}`);
             return `k-${item.id}`;
           }}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -361,19 +339,17 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
           ItemSeparatorComponent={separatorProps => (
-            <symbiote-text>
+            <text>
               {`sep:${label(separatorProps.leadingItem)}>${label(separatorProps.trailingItem)}`}
-            </symbiote-text>
+            </text>
           )}
           renderSectionHeader={info => (
-            <symbiote-text>{`header:${info().section.title}`}</symbiote-text>
+            <text>{`header:${info().section.title}`}</text>
           )}
           renderSectionFooter={info => (
-            <symbiote-text>{`footer:${info().section.title}`}</symbiote-text>
+            <text>{`footer:${info().section.title}`}</text>
           )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -410,13 +386,9 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderSectionFooter={() => <symbiote-text>footer</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderSectionFooter={() => <text>footer</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -446,14 +418,12 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       mount(ROOT_TAG, () => (
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
-          ListHeaderComponent={<symbiote-text>list-header</symbiote-text>}
-          ListFooterComponent={<symbiote-text>list-footer</symbiote-text>}
+          ListHeaderComponent={<text>list-header</text>}
+          ListFooterComponent={<text>list-footer</text>}
           renderSectionHeader={info => (
-            <symbiote-text>{`header:${info().section.title}`}</symbiote-text>
+            <text>{`header:${info().section.title}`}</text>
           )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -474,16 +444,12 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
           stickySectionHeadersEnabled={false}
-          SectionSeparatorComponent={() => <symbiote-text>gap</symbiote-text>}
-          ItemSeparatorComponent={() => <symbiote-text>sep</symbiote-text>}
+          SectionSeparatorComponent={() => <text>gap</text>}
+          ItemSeparatorComponent={() => <text>sep</text>}
           keyExtractor={item => `k-${item.id}`}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderSectionFooter={() => <symbiote-text>footer</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderSectionFooter={() => <text>footer</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -512,14 +478,12 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       mount(ROOT_TAG, () => (
         <VirtualizedSectionList<IRow>
           sections={sections()}
-          ListEmptyComponent={<symbiote-text>nothing-here</symbiote-text>}
+          ListEmptyComponent={<text>nothing-here</text>}
           renderSectionHeader={info => (
-            <symbiote-text>{`header:${info().section.title}`}</symbiote-text>
+            <text>{`header:${info().section.title}`}</text>
           )}
-          renderSectionFooter={() => <symbiote-text>footer</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionFooter={() => <text>footer</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -544,12 +508,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           onRefresh={() => {}}
           refreshing={refreshing()}
           progressViewOffset={12}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -587,12 +547,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           onScrollEndDrag={onScrollEndDrag}
           onMomentumScrollBegin={onMomentumScrollBegin}
           onMomentumScrollEnd={onMomentumScrollEnd}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -646,12 +602,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           scrollEventThrottle={16}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -682,13 +634,9 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           sections={LONG_SECTIONS}
           onEndReachedThreshold={0}
           onEndReached={onEndReached}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderSectionFooter={() => <symbiote-text>footer</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderSectionFooter={() => <text>footer</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport(shortViewport);
@@ -720,12 +668,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           sections={SECTIONS}
           testID="the-section-list"
           aria-label="Orders"
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -748,11 +692,9 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           sections={LONG_SECTIONS}
           initialNumToRender={3}
           renderSectionHeader={info => (
-            <symbiote-text>{`header:${info().section.title}`}</symbiote-text>
+            <text>{`header:${info().section.title}`}</text>
           )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -769,12 +711,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
           inverted
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -794,14 +732,10 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       mount(ROOT_TAG, () => (
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
-          ListHeaderComponent={<symbiote-text>list-header</symbiote-text>}
+          ListHeaderComponent={<text>list-header</text>}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -824,12 +758,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           sections={LONG_SECTIONS}
           onStartReachedThreshold={0}
           onStartReached={onStartReached}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport(shortViewport);
@@ -870,11 +800,9 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           maxToRenderPerBatch={2}
           updateCellsBatchingPeriod={10}
           renderSectionHeader={info => (
-            <symbiote-text>{`header:${info().section.title}`}</symbiote-text>
+            <text>{`header:${info().section.title}`}</text>
           )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -911,13 +839,9 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderSectionFooter={() => <symbiote-text>footer</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderSectionFooter={() => <text>footer</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -947,12 +871,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -977,12 +897,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1020,12 +936,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         <VirtualizedSectionList<IRow>
           sections={sections()}
           keyExtractor={item => `k-${item.id}`}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1061,14 +973,12 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           sections={sections()}
           keyExtractor={item => `k-${item.id}`}
           renderSectionHeader={info => (
-            <symbiote-text>{`header:${info().section.title}`}</symbiote-text>
+            <text>{`header:${info().section.title}`}</text>
           )}
           renderSectionFooter={info => (
-            <symbiote-text>{`footer:${info().section.title}`}</symbiote-text>
+            <text>{`footer:${info().section.title}`}</text>
           )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1108,11 +1018,9 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           sections={sections()}
           keyExtractor={item => `k-${item.id}`}
           renderSectionHeader={info => (
-            <symbiote-text>{`header:${info().section.title}`}</symbiote-text>
+            <text>{`header:${info().section.title}`}</text>
           )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1151,9 +1059,7 @@ describe('Solid VirtualizedSectionList on the engine', () => {
           <VirtualizedSectionList<IRow>
             sections={SECTIONS}
             renderSectionHeader={info => info().section.title}
-            renderItem={info => (
-              <symbiote-text>{info().item.label}</symbiote-text>
-            )}
+            renderItem={info => <text>{info().item.label}</text>}
           />
         )),
       ).toThrow(/must be rendered inside a <Text>/);
@@ -1174,12 +1080,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         <VirtualizedSectionList<IRow>
           sections={LONG_SECTIONS}
           initialScrollIndex={12}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport(shortViewport);
@@ -1202,18 +1104,14 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
           ItemSeparatorComponent={separatorProps => (
-            <symbiote-text>
+            <text>
               {separatorProps.leadingItem === undefined
                 ? 'chrome-gap'
                 : 'item-gap'}
-            </symbiote-text>
+            </text>
           )}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1234,12 +1132,8 @@ describe('Solid VirtualizedSectionList on the engine', () => {
         <VirtualizedSectionList<IRow>
           sections={SECTIONS}
           extraData={extra()}
-          renderSectionHeader={info => (
-            <symbiote-text>{info().section.title}</symbiote-text>
-          )}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderSectionHeader={info => <text>{info().section.title}</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();

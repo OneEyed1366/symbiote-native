@@ -6,7 +6,7 @@
 //
 // SPLIT DOWN THE MIDDLE, and the seam is the children rule. The wrapper hosts a live Solid subtree
 // (the overlay content), which only the reconciler can reduce, so it stays a literal
-// `symbiote-view` carrying the shared fn's own props — the same shape View and SafeAreaView use,
+// `view` carrying the shared fn's own props — the same shape View and SafeAreaView use,
 // and the same one Svelte's ImageBackground lands on. The inner image is a leaf built entirely
 // from VALUES, so it goes through descriptorToSolid, which builds it once and re-props it in place
 // (replacing it would restart the download and drop the decoded bitmap).
@@ -114,9 +114,9 @@ export function ImageBackground(props: IImageBackgroundProps): JSX.Element {
 
   // The user children come AFTER the image in child order, which is what makes them paint on top.
   return (
-    <symbiote-view {...wrapperBag()}>
+    <view {...wrapperBag()}>
       {backgroundImage}
       {local.children}
-    </symbiote-view>
+    </view>
   );
 }

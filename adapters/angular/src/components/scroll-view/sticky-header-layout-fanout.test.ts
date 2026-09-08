@@ -36,12 +36,12 @@ Component({
   // everyone" — with two it would not be.
   template: `
     <ScrollView [stickyHeaderIndices]="[0, 2, 4]">
-      <symbiote-view testID="h0"></symbiote-view>
-      <symbiote-view testID="row1"></symbiote-view>
-      <symbiote-view testID="h2"></symbiote-view>
-      <symbiote-view testID="row3"></symbiote-view>
-      <symbiote-view testID="h4"></symbiote-view>
-      <symbiote-view testID="row5"></symbiote-view>
+      <view testID="h0"></view>
+      <view testID="row1"></view>
+      <view testID="h2"></view>
+      <view testID="row3"></view>
+      <view testID="h4"></view>
+      <view testID="row5"></view>
     </ScrollView>
   `,
 })(StickyFanoutApp);

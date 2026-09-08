@@ -112,7 +112,7 @@ async function loadProbe(): Promise<Component> {
        const screenOrientation = useScreenOrientation();
        $effect(() => { onValue(screenOrientation.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'ScreenOrientationProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

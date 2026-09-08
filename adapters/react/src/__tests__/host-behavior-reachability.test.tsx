@@ -8,7 +8,7 @@
 //
 // The two assertions are a pair on purpose. The positive one fails when the tag is dropped; the
 // negative one fails when someone "fixes" it by keying the registry on the Fabric name instead —
-// which would work for this test's `symbiote-view` and put a press machine on every View in the app.
+// which would work for this test's `view` and put a press machine on every View in the app.
 import { afterEach, describe, expect, it } from 'vitest';
 import { Image, mount, unmount, View } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
@@ -36,7 +36,7 @@ afterEach(() => {
 
 describe('a behavior registered under an intrinsic tag', () => {
   it('attaches to a node React created for that tag', () => {
-    const attached = trackAttachesOn('symbiote-view');
+    const attached = trackAttachesOn('view');
     const rootTag = (nextRootTag += 1);
 
     mount(rootTag, <View testID="probe" />);
@@ -67,7 +67,7 @@ describe('a behavior registered under an intrinsic tag', () => {
   // intrinsic tag, so the negative above is a statement about KEYING and not about the node
   // never being created.
   it('attaches to that same Image node under its intrinsic tag', () => {
-    const attached = trackAttachesOn('symbiote-image');
+    const attached = trackAttachesOn('image');
     const rootTag = (nextRootTag += 1);
 
     mount(rootTag, <Image source={{ uri: 'probe' }} />);

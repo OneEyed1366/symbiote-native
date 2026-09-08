@@ -3,9 +3,8 @@
 // identical. `core/test-utils/src/lowering-equivalence.ts` holds the canonicaliser and the
 // assertions; the mounts are per-framework by construction and live here.
 //
-// This adapter was the LAST to get an arm and the first to turn lowering on app-wide: seven
-// primitives at once (`babel-lower-host-primitives.cjs`, `LOWERABLE_NAMES`). Every other adapter
-// had the oracle before it lowered.
+// Still worth running with the transforms gone: the two spellings are now what an app CHOOSES
+// between, so a fold only one of them applies is a live divergence rather than a compiler bug.
 //
 // TWO ASSERTIONS PER CASE, and neither is redundant:
 //   compareLoweringEquivalence  catches a fold ONE path lost   (the wrapper had it, the tag does not)
@@ -14,8 +13,8 @@
 // arms traverse, so a fold dying there moves both arms identically and they still agree.
 //
 // THE DUAL SELECTOR IS WHY THE LOWERED FIXTURE IMPORTS NOTHING. `ViewHost` declares
-// `selector: 'symbiote-view, View'` (primitives/index.ts), and Angular resolves directives per
-// TEMPLATE — so writing `<symbiote-view>` in a template whose `imports` still lists the primitive
+// `selector: 'view, View'` (primitives/index.ts), and Angular resolves directives per
+// TEMPLATE — so writing `<view>` in a template whose `imports` still lists the primitive
 // resolves straight back to the component and lowers NOTHING, silently. A lowered fixture that
 // imported its primitive would compare the component against itself and pass every case.
 import '@angular/compiler';
@@ -242,7 +241,11 @@ describe('the two spellings of a primitive commit one tree', () => {
   // pins that the shared spec still carries what this adapter claims to lower.
   it('control: every case names a primitive the spec carries', () => {
     expect(NAMES.length).toBeGreaterThan(0);
-    for (const name of NAMES) expect(intrinsicOf(name)).toMatch(/^symbiote-/);
+    // A tag is lowercase kebab and carries no marker since the `symbiote-` prefix was dropped, so
+    // the control pins the SHAPE the spec must hand back rather than a prefix that no longer
+    // exists. Still discriminating: a primitive the spec does not carry yields undefined here.
+    for (const name of NAMES)
+      expect(intrinsicOf(name)).toMatch(/^[a-z][a-z-]*$/);
   });
 
   // why: `discriminates: false` disables the one control that catches an arm which never lowered,

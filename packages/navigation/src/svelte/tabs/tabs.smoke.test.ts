@@ -64,7 +64,7 @@ function screenSource(testID: string): string {
      const route = useRoute();
      const focused = useIsFocused();
    </script>
-   <symbiote-view p={{ testID: '${testID}', accessibilityLabel: [route.current.name, String(focused.current), JSON.stringify(route.current.params ?? null), route.current.key].join('|') }} />`;
+   <view p={{ testID: '${testID}', accessibilityLabel: [route.current.name, String(focused.current), JSON.stringify(route.current.params ?? null), route.current.key].join('|') }} />`;
 }
 
 function appSource(tabAttributes: string): string {

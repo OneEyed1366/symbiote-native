@@ -32,8 +32,8 @@ Component({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <ScrollView [horizontal]="true">
-      <symbiote-view testID="a"></symbiote-view>
-      <symbiote-view testID="b"></symbiote-view>
+      <view testID="a"></view>
+      <view testID="b"></view>
     </ScrollView>
   `,
 })(HorizontalNoRefreshApp);
@@ -49,8 +49,8 @@ Component({
   template: `
     <ScrollView [horizontal]="true">
       <RefreshControl [refreshing]="true" (refresh)="refresh()" />
-      <symbiote-view testID="a"></symbiote-view>
-      <symbiote-view testID="b"></symbiote-view>
+      <view testID="a"></view>
+      <view testID="b"></view>
     </ScrollView>
   `,
 })(HorizontalRefreshApp);
@@ -63,8 +63,8 @@ Component({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <ScrollView>
-      <symbiote-view testID="a"></symbiote-view>
-      <symbiote-view testID="b"></symbiote-view>
+      <view testID="a"></view>
+      <view testID="b"></view>
     </ScrollView>
   `,
 })(VerticalNoRefreshApp);
@@ -82,8 +82,8 @@ Component({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <ScrollView [horizontal]="isHorizontal">
-      <symbiote-view testID="a"></symbiote-view>
-      <symbiote-view testID="b"></symbiote-view>
+      <view testID="a"></view>
+      <view testID="b"></view>
     </ScrollView>
   `,
 })(AxisSwitchApp);

@@ -113,7 +113,7 @@ describe('a false conditional child costs React nothing to retain', () => {
     const absent = measure(false);
     const present = measure(true);
 
-    // One Text is two native views (symbiote-text + its RCTRawText child).
+    // One Text is two native views (text + its RCTRawText child).
     expect(present.createNode - absent.createNode).toBe(ROWS * 2);
     expect(present.nodes - absent.nodes).toBe(ROWS * 2);
     expect(present.renderable - absent.renderable).toBe(ROWS * 2);

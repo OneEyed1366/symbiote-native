@@ -150,13 +150,13 @@ export const vShow: ObjectDirective<ISymbioteNode, boolean> = {
 // defect. On a component `v-model="name"` expands to the prop/emit pair `modelValue` +
 // `onUpdate:modelValue`, which the wrapper reads. On an element it expands to a RUNTIME DIRECTIVE:
 //
-//   _withDirectives(_createElementBlock("symbiote-text-input", {
+//   _withDirectives(_createElementBlock("text-input", {
 //     "onUpdate:modelValue": $event => (name.value = $event)
 //   }), [[_vModelText, name.value]])
 //
 // Measured identical on BOTH Vue paths — `@vue/compiler-sfc` and `babel-jsx.cjs` emit the same two
 // lines — which is why the repair is here and not in the two lowering transforms. One runtime
-// implementation also covers a hand-written `h('symbiote-text-input', …)`, the fourth path, exactly
+// implementation also covers a hand-written `h('text-input', …)`, the fourth path, exactly
 // as `PROP_ALIASES` covers all four for `id` -> `nativeID`.
 //
 // AND IT FAILED SILENTLY, which is the part worth remembering. `vModelText` lives in
@@ -257,7 +257,7 @@ function syncModelListener(el: ISymbioteNode, state: IModelState): void {
 }
 
 // Vue's compiler picks the directive by ELEMENT, and for anything it does not recognise as a DOM
-// input it emits `vModelText` — including a lowered `<symbiote-switch>`. Stringifying there is what
+// input it emits `vModelText` — including a lowered `<switch>`. Stringifying there is what
 // upstream must do (a DOM input's value IS a string) and what we must not: the Switch behavior
 // reads `props.value === true`, so `String(true)` pins the control OFF and no tap can move it.
 // Device-confirmed on `examples/vue-sfc` 2026-09-02, both switches on `CanaryScreen`.

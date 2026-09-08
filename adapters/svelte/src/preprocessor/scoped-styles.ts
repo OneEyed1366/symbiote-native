@@ -5,7 +5,7 @@
 // (`generate:'client', fragments:'tree', css:'external'`), a `<style>` block behaves one of two
 // ways:
 //
-//   <symbiote-view class="card">   ->  result.css: `.card.svelte-4psua6 { … }`
+//   <view class="card">   ->  result.css: `.card.svelte-4psua6 { … }`
 //                                      result.js:  `$.set_class(node, 1, 'card svelte-4psua6')`
 //   <View class="card">            ->  warning: css_unused_selector
 //                                      result.css: `/* (unused) .card { … }*/`

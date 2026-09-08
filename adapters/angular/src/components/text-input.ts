@@ -2,7 +2,7 @@
 // and the controlled-write predicate live in @symbiote-native/components/state, the render (intrinsic
 // + native-prop mapping) in @symbiote-native/components/view, both shared verbatim with the React and
 // Vue adapters. Here Angular supplies only the lifecycle: renderTextInput picks ONE of two host
-// intrinsics at runtime (symbiote-text-input-managed / …-multiline-managed) via `@if`/`@else`,
+// intrinsics at runtime (text-input-managed / …-multiline-managed) via `@if`/`@else`,
 // each wired through the shared `SymbioteHostPropsDirective` (`[symbioteHostProps]="hostProps"`,
 // `../primitives/shared.ts`) so the flat resolved prop bag doesn't need enumerating as individual
 // `[prop]` bindings; a @ViewChild reading that directive (by its `#host` template ref, across
@@ -192,7 +192,7 @@ export type IAngularTextInputInputs = Omit<
   ],
   template: `
     @if (isMultiline) {
-      <symbiote-text-input-multiline-managed
+      <text-input-multiline-managed
         #host
         [symbioteHostProps]="hostProps"
         (change)="handleChange($event)"
@@ -203,9 +203,9 @@ export type IAngularTextInputInputs = Omit<
         (keyPress)="emit(keyPress, $event)"
         (endEditing)="emit(endEditing, $event)"
         (contentSizeChange)="emit(contentSizeChange, $event)"
-      ></symbiote-text-input-multiline-managed>
+      ></text-input-multiline-managed>
     } @else {
-      <symbiote-text-input-managed
+      <text-input-managed
         #host
         [symbioteHostProps]="hostProps"
         (change)="handleChange($event)"
@@ -216,7 +216,7 @@ export type IAngularTextInputInputs = Omit<
         (keyPress)="emit(keyPress, $event)"
         (endEditing)="emit(endEditing, $event)"
         (contentSizeChange)="emit(contentSizeChange, $event)"
-      ></symbiote-text-input-managed>
+      ></text-input-managed>
     }
   `,
 })
@@ -325,7 +325,7 @@ export class TextInput
 
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
   // onto (see anchorHostStyle's doc comment) — NOT `hostRef` above, which targets the real inner
-  // symbiote-text-input-managed(-multiline-managed) one level down.
+  // text-input-managed(-multiline-managed) one level down.
   private readonly elementRef = inject(ElementRef);
   // Only setDisabledState() needs this: it mutates `editable` from OUTSIDE Angular's own binding
   // path (@angular/forms calling in directly), which doesn't itself schedule a tick under zoneless CD.

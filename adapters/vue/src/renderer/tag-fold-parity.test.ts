@@ -82,11 +82,11 @@ describe('a bare tag commits what its wrapper commits', () => {
   it('View: kebab attrs fold to camelCase and id becomes nativeID', async () => {
     // Both folds run in patchProp (normalizeVueAttrKey, then PROP_ALIASES) rather than at compile
     // time, because Vue has FOUR paths to a node — lowered SFC, lowered TSX, the wrapper, and a
-    // hand-written h('symbiote-view', …) — and a transform covers only two of them.
+    // hand-written h('view', …) — and a transform covers only two of them.
     const props = { 'accessibility-label': 'hi', id: 'row-1' };
 
     const wrapper = await commit(View, props);
-    const tag = await commit('symbiote-view', props);
+    const tag = await commit('view', props);
 
     // Pinned by VALUE, not just compared: two empty payloads are also "equal", and the fold being
     // the thing under test means the committed names are the assertion.
@@ -96,7 +96,7 @@ describe('a bare tag commits what its wrapper commits', () => {
 
   it('Pressable: the stateful primitive matches too, subtree included', async () => {
     // The other two are fold-only; this one owns a press machine, which the tag path reaches
-    // through the behavior registered for `symbiote-pressable` rather than through a component.
+    // through the behavior registered for `pressable` rather than through a component.
     //
     // Compared as a whole committed FOREST, not as one node's props: the wrapper and the tag could
     // agree on every key and still differ in tree SHAPE, and a single-node check cannot see that.
@@ -105,7 +105,7 @@ describe('a bare tag commits what its wrapper commits', () => {
     const props = { accessibilityLabel: 'go', testID: 't' };
 
     const wrapper = await subtree(Pressable, props);
-    const tag = await subtree('symbiote-pressable', props);
+    const tag = await subtree('pressable', props);
 
     expect(wrapper).toEqual([
       'RCTView{flex,pointerEvents}',
@@ -122,7 +122,7 @@ describe('a bare tag commits what its wrapper commits', () => {
     // copy. Two independent mechanisms that happen to agree: when the wrapper goes, the seed is
     // the one that must survive.
     const wrapper = await commit(Text, {}, 'hi');
-    const tag = await commit('symbiote-text', {}, 'hi');
+    const tag = await commit('text', {}, 'hi');
 
     expect(wrapper).toEqual({ ellipsizeMode: 'tail', allowFontScaling: true });
     expect(tag).toEqual(wrapper);

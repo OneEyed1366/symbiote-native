@@ -1,12 +1,12 @@
 // Covers BOTH shapes the disambiguation rule has to tell apart (class-value.ts's header):
 // `{ active: true }` is a clsx map and must resolve through the style registry, `{ color: 'red' }`
 // is an already-resolved style and must reach the engine untouched. The pure cases are asserted
-// directly; the last block proves the same through a REAL compiled View mount, since the whole
+// directly; the last block proves the same through a REAL compiled `<view>` mount, since the whole
 // point is what lands on the native node.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
@@ -136,18 +136,7 @@ describe('resolveSvelteClass', () => {
 });
 
 const ROOT_TAG = 91_811;
-// Written NEXT TO the real View.svelte, not into src/: the compiled output keeps View's own
-// relative imports ('../runes/attachments'), which only resolve from that directory.
-const VIEW_OUT = join(
-  __dirname,
-  'components',
-  '.smoke-compiled-class-value-view.mjs',
-);
-const PARENT_OUT = join(
-  __dirname,
-  'components',
-  '.smoke-compiled-class-value-parent.mjs',
-);
+const PARENT_OUT = join(__dirname, '.smoke-compiled-class-value-parent.mjs');
 const COMPILE_OPTIONS = {
   generate: 'client',
   fragments: 'tree',
@@ -183,16 +172,10 @@ function findLive(
 
 async function loadParent(): Promise<Component> {
   compileToFile(
-    readFileSync(join(__dirname, 'components', 'View.svelte'), 'utf8'),
-    'View.svelte',
-    VIEW_OUT,
-  );
-  compileToFile(
     `<script>
-       import View from './.smoke-compiled-class-value-view.mjs';
        let { on } = $props();
      </script>
-     <View testID="clsx-target" class={{ card: on, cardOn: on }} style={{ margin: 2 }} />`,
+     <view testID="clsx-target" class={{ card: on, cardOn: on }} style={{ margin: 2 }}></view>`,
     'Parent.svelte',
     PARENT_OUT,
   );
@@ -230,15 +213,14 @@ describe('a clsx `class` on a real compiled View', () => {
 
   afterEach(() => {
     unmount(ROOT_TAG);
-    rmSync(VIEW_OUT, { force: true });
     rmSync(PARENT_OUT, { force: true });
   });
 
   // why: proves the whole path end-to-end through the ADAPTER boundary, not just the pure
-  // function — a real compiled `<View class={{...}}>` must land the resolved style fields as
+  // function — a real compiled `<view class={{...}}>` must land the resolved style fields as
   // ACTUAL props on the committed native node. A unit test of normalizeSvelteClass alone would
-  // not catch a wiring break at ShimElement's `set p` (class-value.ts is only reached because
-  // `normalizeBagClasses` calls it there — element.ts:132-142).
+  // not catch a wiring break at ShimElement's bag write (class-value.ts is only reached because
+  // `normalizeBagClasses` calls it there — `dom-shim/element.ts`).
   it('resolves each truthy key through the registry and keeps the explicit style winning', async () => {
     const Parent = await loadParent();
     mount(ROOT_TAG, Parent, { on: true });

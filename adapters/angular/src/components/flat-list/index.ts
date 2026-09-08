@@ -230,16 +230,16 @@ export type IFlatListInputs<ItemT> = Omit<
         [contentContainerStyle]="contentContainerStyle"
       >
         <ng-template vListItem let-row let-separators="separators">
-          <symbiote-view [style]="rowStyle">
+          <view [style]="rowStyle">
             @for (cell of rowCells(row, separators); track cell.key) {
-              <symbiote-view [style]="columnCellStyle">
+              <view [style]="columnCellStyle">
                 <ng-container
                   [vListOutlet]="itemDir?.templateRef"
                   [vListOutletContext]="cell.context"
                 ></ng-container>
-              </symbiote-view>
+              </view>
             }
-          </symbiote-view>
+          </view>
         </ng-template>
         @if (headerDir !== undefined) {
           <ng-template vListHeader>

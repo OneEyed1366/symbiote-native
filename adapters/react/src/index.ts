@@ -2,6 +2,12 @@
 // @symbiote-native/engine. React is a known-good driver: it proves the native pipe
 // and the shared clone-on-write engine before any non-React adapter has to.
 
+// Bare side-effect import, deliberately NOT a re-export and deliberately not beside one of the
+// same specifier: it installs the engine's host behaviors, which is what makes a bare
+// `<pressable>` / `<text-input>` / `<switch>` carry its machine. Any other shape is dropped by
+// Metro's inlineRequires in a release build — see register.ts.
+import './register';
+
 // The intrinsic-element table now reaches an app through `jsxImportSource`, not through this
 // barrel: TypeScript resolves the JSX namespace from `@symbiote-native/react/jsx-runtime` and
 // NOTHING else, so an app sets that one tsconfig line and gets the tags. What is re-exported here

@@ -110,7 +110,7 @@ function shrinkingList(size: number): string {
   let rows = $state(Array.from({length: ${size}}, (_, i) => i));
   $effect(() => { if (rows.length > 0) rows = []; });
 </script>
-<symbiote-view p={{}}>{#each rows as row (row)}<symbiote-view p={{}}><symbiote-text p={{}}>row {row}</symbiote-text></symbiote-view>{/each}</symbiote-view>`;
+<view p={{}}>{#each rows as row (row)}<view p={{}}><text p={{}}>row {row}</text></view>{/each}</view>`;
 }
 
 // Renders `size` rows, empties the list, drops every strong reference, and reports how many of

@@ -43,7 +43,7 @@ describe('Solid createAnimatedComponent', () => {
     const opacity = new Animated.Value(0);
     mount(ROOT_TAG, () => (
       <Animated.View style={{ opacity }}>
-        <symbiote-text>label</symbiote-text>
+        <text>label</text>
       </Animated.View>
     ));
     await tick();

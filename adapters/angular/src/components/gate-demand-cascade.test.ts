@@ -87,7 +87,7 @@ const SECTIONS = [{ title: 'A', data: [{ id: 'row' }] }];
   template: `
     <SectionList [testID]="'list'" [sections]="sections">
       <ng-template vSectionItem let-item>
-        <symbiote-text [testID]="item.id">{{ item.id }}</symbiote-text>
+        <text [testID]="item.id">{{ item.id }}</text>
       </ng-template>
     </SectionList>
   `,
@@ -103,7 +103,7 @@ class SectionListQuietFixture {
   template: `
     <SectionList [testID]="'list'" [sections]="sections" (magicTap)="onTap()">
       <ng-template vSectionItem let-item>
-        <symbiote-text [testID]="item.id">{{ item.id }}</symbiote-text>
+        <text [testID]="item.id">{{ item.id }}</text>
       </ng-template>
     </SectionList>
   `,

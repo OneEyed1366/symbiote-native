@@ -1,7 +1,7 @@
 // ACTIVITYINDICATOR IS NOT A LOWERABLE PRIMITIVE, AND WILL NOT BECOME ONE. Decided 2026-09-01.
 // It stays a component in every adapter; do not add it to `HOST_PRIMITIVES`.
 //
-// The reason is the `el('symbiote-view', wrapperProps, [el('symbiote-activity-indicator', …)])` at
+// The reason is the `el('view', wrapperProps, [el('activity-indicator', …)])` at
 // the bottom of this file: the render SYNTHESIZES a node that is not the primitive itself. A lowered
 // tag is ONE engine node, and a host behavior's `foldPayload` maps props to props on that node — it
 // cannot create a child. Lowering would therefore drop the centering container and change layout,
@@ -143,7 +143,5 @@ export function renderActivityIndicator(
     style: [CONTAINER_STYLE, view.style],
   };
 
-  return el('symbiote-view', wrapperProps, [
-    el('symbiote-activity-indicator', nativeProps),
-  ]);
+  return el('view', wrapperProps, [el('activity-indicator', nativeProps)]);
 }

@@ -341,7 +341,7 @@ export function createSlider(
     // replacing it — which would drop the thumb the user is dragging.
     const leaf = descriptorToSolid(() => renderSliderNative(view(), platform));
 
-    const wrapper = hostElement('symbiote-view');
+    const wrapper = hostElement('view');
     // A statically-present key set (all three are always emitted), so this needs no withStableKeys
     // widening — `spread` alone has no removal pass for a key that vanishes.
     spread(
@@ -382,7 +382,7 @@ function buildCustomOverlay(params: ICustomOverlayParams): ISymbioteNode {
   const min = params.cells[0];
   const max = params.cells[params.cells.length - 1];
 
-  const container = hostElement('symbiote-view');
+  const container = hostElement('view');
   // pointerEvents none so the overlay never eats the drag. `style` tracks the measured width, hence
   // an accessor rather than a one-shot setProp.
   spread(
@@ -415,10 +415,10 @@ type IStepCellParams = {
 
 function buildStepCell(cell: IStepCellParams): ISymbioteNode {
   const { params } = cell;
-  const element = hostElement('symbiote-view');
+  const element = hostElement('view');
   setProp(element, 'style', STEP_INDICATOR_ELEMENT_STYLE);
 
-  const track = hostElement('symbiote-view');
+  const track = hostElement('view');
   setProp(track, 'style', TRACK_MARK_CONTAINER_STYLE);
   insertNode(element, track);
 
@@ -438,9 +438,9 @@ function buildStepCell(cell: IStepCellParams): ISymbioteNode {
   insert(track, () => [markerElement, buildThumbImage(cell)]);
 
   if (params.withNumbers) {
-    const numberBox = hostElement('symbiote-view');
+    const numberBox = hostElement('view');
     setProp(numberBox, 'style', STEP_NUMBER_CONTAINER_STYLE);
-    const label = hostElement('symbiote-text');
+    const label = hostElement('text');
     setProp(label, 'testID', `${cell.index}th-step`);
     setProp(label, 'style', { fontSize: cell.fontSize });
     insertNode(label, createTextNode(String(cell.value)));
@@ -455,10 +455,10 @@ function buildThumbImage(cell: IStepCellParams): ISymbioteNode | null {
   if (source === undefined || cell.value !== cell.params.currentValue()) {
     return null;
   }
-  const container = hostElement('symbiote-view');
+  const container = hostElement('view');
   setProp(container, 'style', THUMB_IMAGE_CONTAINER_STYLE);
   setProp(container, 'testID', 'sliderTrackMark-thumbImage');
-  // The Image COMPONENT, not a raw symbiote-image: it resolves an asset id through RN's own
+  // The Image COMPONENT, not a raw image: it resolves an asset id through RN's own
   // resolveAssetSource, exactly as React's and Vue's custom overlays do.
   insert(
     container,

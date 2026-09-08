@@ -32,9 +32,9 @@ describe('el() / txt()', () => {
   // call produces a Descriptor, so there is no Negative group.
   describe('Positive', () => {
     const tree = el(
-      'symbiote-view',
+      'view',
       { style: { flex: 1 } },
-      [txt({}, ['hi']), el('symbiote-image', { source: 'x' })],
+      [txt({}, ['hi']), el('image', { source: 'x' })],
       'k',
     );
 
@@ -42,18 +42,18 @@ describe('el() / txt()', () => {
     // in @symbiote-native/components targets and every adapter bridge consumes — a field dropped
     // here breaks that contract for every framework at once, not just React.
     it('builds the descriptor shape with type, key and children', () => {
-      expect(tree.type).toBe('symbiote-view');
+      expect(tree.type).toBe('view');
       expect(tree.key).toBe('k');
       expect(tree.children).toHaveLength(2);
     });
 
-    // why: txt() is sugar over el('symbiote-text', ...) — proves it produces the SAME element
-    // type a hand-written el('symbiote-text', ...) would, not a distinct text-node shape.
-    it('makes txt() a symbiote-text element', () => {
+    // why: txt() is sugar over el('text', ...) — proves it produces the SAME element
+    // type a hand-written el('text', ...) would, not a distinct text-node shape.
+    it('makes txt() a text element', () => {
       const textChild = tree.children[0];
-      expect(
-        typeof textChild !== 'string' && textChild.type === 'symbiote-text',
-      ).toBe(true);
+      expect(typeof textChild !== 'string' && textChild.type === 'text').toBe(
+        true,
+      );
     });
   });
 });
@@ -63,9 +63,9 @@ describe('descriptorToReact', () => {
   // rejecting branch, so no Negative group.
   describe('Positive', () => {
     const tree = el(
-      'symbiote-view',
+      'view',
       { style: { flex: 1 } },
-      [txt({}, ['hi']), el('symbiote-image', { source: 'x' })],
+      [txt({}, ['hi']), el('image', { source: 'x' })],
       'k',
     );
     const reactEl = inspect(descriptorToReact(tree));
@@ -74,7 +74,7 @@ describe('descriptorToReact', () => {
     // type/key/props must survive verbatim, or every component built on a shared render fn
     // would silently lose its key (breaking React's reconciliation) or its props.
     it('maps type, key and props', () => {
-      expect(reactEl.type).toBe('symbiote-view');
+      expect(reactEl.type).toBe('view');
       expect(reactEl.key).toBe('k');
       expect(reactEl.props.style).toEqual({ flex: 1 });
     });
@@ -88,8 +88,8 @@ describe('descriptorToReact', () => {
       expect(kids).toHaveLength(2);
       const textKid = inspect(kids[0]);
       const imageKid = inspect(kids[1]);
-      expect(textKid.type).toBe('symbiote-text');
-      expect(imageKid.type).toBe('symbiote-image');
+      expect(textKid.type).toBe('text');
+      expect(imageKid.type).toBe('image');
       // the raw string 'hi' passes through as a child of the text element
       expect(textKid.props.children).toBe('hi');
     });
@@ -114,13 +114,12 @@ describe('renderActivityIndicator', () => {
         },
         { defaultColor: '#999999', nativeExtras: {} },
       );
-      expect(ios.type).toBe('symbiote-view');
+      expect(ios.type).toBe('view');
       expect(ios.props.testID).toBe('t');
 
       const spinner = ios.children[0];
       expect(
-        typeof spinner !== 'string' &&
-          spinner.type === 'symbiote-activity-indicator',
+        typeof spinner !== 'string' && spinner.type === 'activity-indicator',
       ).toBe(true);
       if (typeof spinner === 'string')
         throw new Error('spinner should be a descriptor');

@@ -1,6 +1,6 @@
 // Co-located Solid-driven pipeline test, the Solid twin of react/drawer/drawer.test.tsx and
 // vue/drawer/drawer.test.ts. The drawer is a PURE-JS UI (PanResponder + Animated over
-// symbiote-view), so there is no react-native-screens ViewConfig to inject.
+// view), so there is no react-native-screens ViewConfig to inject.
 //
 // The router and the whole swipe/geometry math are core's own responsibility and are covered by
 // core's suite. This file proves the Solid lifecycle: the slot tree is built from renderDrawer's
@@ -84,8 +84,8 @@ const overlayNodes = (): IFakeNode[] =>
       node.props.pointerEvents === 'none',
   );
 
-const HomeScreen = () => <symbiote-text>home-content</symbiote-text>;
-const SettingsScreen = () => <symbiote-text>settings-content</symbiote-text>;
+const HomeScreen = () => <text>home-content</text>;
+const SettingsScreen = () => <text>settings-content</text>;
 
 describe('Solid Drawer navigator', () => {
   describe('Positive', () => {
@@ -96,7 +96,7 @@ describe('Solid Drawer navigator', () => {
       mount(ROOT_TAG, () => (
         <Drawer
           initialRouteName="Home"
-          drawerContent={() => <symbiote-text>panel</symbiote-text>}
+          drawerContent={() => <text>panel</text>}
         >
           <Drawer.Screen name="Home" component={HomeScreen} />
           <Drawer.Screen name="Settings" component={SettingsScreen} />
@@ -181,9 +181,7 @@ describe('Solid Drawer navigator', () => {
           drawerContent={slot => {
             calls += 1;
             return (
-              <symbiote-text>
-                {slot().state.isOpen ? 'panel-open' : 'panel-closed'}
-              </symbiote-text>
+              <text>{slot().state.isOpen ? 'panel-open' : 'panel-closed'}</text>
             );
           }}
         >
@@ -210,7 +208,7 @@ describe('Solid Drawer navigator', () => {
         <Drawer
           initialRouteName="Home"
           drawerType={isPermanent() ? 'permanent' : 'front'}
-          drawerContent={() => <symbiote-text>panel</symbiote-text>}
+          drawerContent={() => <text>panel</text>}
         >
           <Drawer.Screen name="Home" component={HomeScreen} />
         </Drawer>
@@ -233,7 +231,7 @@ describe('Solid Drawer navigator', () => {
       let handle: IDrawerNavigatorHandle | null = null;
       const NameScreen = () => {
         const route = useRoute();
-        return <symbiote-text>{`route:${route().name}`}</symbiote-text>;
+        return <text>{`route:${route().name}`}</text>;
       };
       mount(ROOT_TAG, () => (
         <Drawer ref={h => (handle = h)} initialRouteName="Home">

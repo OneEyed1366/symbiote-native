@@ -28,7 +28,7 @@ export interface ISafeAreaViewProps extends IAccessibilityProps, IAriaProps {
 }
 
 export const SafeAreaView: FC<ISafeAreaViewProps> = rawProps => {
-  // Owns its host element (symbiote-safe-area-view), so it folds aria/role here;
+  // Owns its host element (safe-area-view), so it folds aria/role here;
   // the resolved accessibility* surface rides the node via `...accessibilityRest`.
   const props = resolveAccessibilityProps(rawProps);
   const { style, children, onLayout, ...accessibilityRest } = props;
@@ -38,5 +38,5 @@ export const SafeAreaView: FC<ISafeAreaViewProps> = rawProps => {
   const nodeProps: Record<string, unknown> = { ...accessibilityRest, style };
   if (onLayout !== undefined) nodeProps.onLayout = onLayout;
 
-  return createElement('symbiote-safe-area-view', nodeProps, children);
+  return createElement('safe-area-view', nodeProps, children);
 };

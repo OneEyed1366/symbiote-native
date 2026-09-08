@@ -3,7 +3,7 @@
 // every other adapter; here Solid supplies the lifecycle - a signal for the dispatched router
 // state, a callback `ref` for the jumpTo/setParams handle - plus the descriptor bridge for the
 // tab-bar leaf. Unlike Stack, a bottom-tabs bar is a PURE-JS UI painting ordinary
-// `symbiote-view`/`symbiote-text` primitives, so there is no react-native-screens ViewConfig to
+// `view`/`text` primitives, so there is no react-native-screens ViewConfig to
 // register here.
 //
 // TWO SOLID-ONLY REBUILD BOUNDARIES, both invisible in every other adapter:
@@ -305,12 +305,12 @@ function TabImpl(props: ITabProps): JSX.Element {
     return found ?? { key: routeKey, name: '', params: undefined };
   }
 
-  const contentHost = hostElement('symbiote-view', () => ({
+  const contentHost = hostElement('view', () => ({
     style: TAB_CONTENT_STYLE,
   }));
   insert(contentHost, content);
 
-  const root = hostElement('symbiote-view', () => ({ style: TAB_ROOT_STYLE }));
+  const root = hostElement('view', () => ({ style: TAB_ROOT_STYLE }));
   // ONE array insert rather than two: a second `insert` on the same parent would find the first
   // child already there and REPLACE it (solid-js/universal's insertExpression), while an array is
   // reconciled by identity - contentHost keeps its node, only the bar is swapped when it rebuilds.

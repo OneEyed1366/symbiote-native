@@ -207,9 +207,9 @@ export abstract class AnimatedComponentBase
   imports: [SymbioteHostPropsDirective, ViewHost],
   inputs: ANIMATED_INPUTS,
   template: `
-    <symbiote-view [symbioteHostProps]="reducedProps">
+    <view [symbioteHostProps]="reducedProps">
       <ng-content></ng-content>
-    </symbiote-view>
+    </view>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -225,9 +225,9 @@ export class AnimatedView extends AnimatedComponentBase {}
   imports: [SymbioteHostPropsDirective, TextHost],
   inputs: ANIMATED_INPUTS,
   template: `
-    <symbiote-text [symbioteHostProps]="reducedProps">
+    <text [symbioteHostProps]="reducedProps">
       <ng-content></ng-content>
-    </symbiote-text>
+    </text>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -244,7 +244,7 @@ export class AnimatedText extends AnimatedComponentBase {}
   inputs: ANIMATED_IMAGE_INPUTS,
   outputs: IMAGE_OUTPUTS,
   template: `
-    <symbiote-image
+    <image
       [symbioteHostProps]="animatedImageProps"
       (loadStart)="handleLoadStart($event)"
       (load)="handleLoad($event)"
@@ -254,7 +254,7 @@ export class AnimatedText extends AnimatedComponentBase {}
       (partialLoad)="handlePartialLoad($event)"
     >
       <ng-content></ng-content>
-    </symbiote-image>
+    </image>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -385,11 +385,11 @@ export class AnimatedImage
   imports: [SymbioteHostPropsDirective, ScrollViewHost],
   inputs: ANIMATED_INPUTS,
   template: `
-    <symbiote-scroll-view [symbioteHostProps]="reducedProps">
-      <symbiote-scroll-content [symbioteHostProps]="contentProps">
+    <scroll-view [symbioteHostProps]="reducedProps">
+      <scroll-content [symbioteHostProps]="contentProps">
         <ng-content></ng-content>
-      </symbiote-scroll-content>
-    </symbiote-scroll-view>
+      </scroll-content>
+    </scroll-view>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

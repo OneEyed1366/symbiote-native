@@ -9,7 +9,7 @@
 // RefreshControl (adapters/react/src/components/refresh-control/index.ts) is a plain
 // functional component with no reducer/render split into core/components and no guard
 // clause on any prop — every branch is either a `dlog` side effect or an unconditional
-// object spread onto `createElement('symbiote-refresh-control', ...)`. There is no input
+// object spread onto `createElement('refresh-control', ...)`. There is no input
 // this component rejects, so there is no Negative (toThrow) group here — only Positive.
 // `resolveAccessibilityProps` is shared infrastructure exercised elsewhere (activity-indicator,
 // image, modal tests) and not RefreshControl-specific, so it stays out of scope here.

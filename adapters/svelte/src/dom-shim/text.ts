@@ -48,8 +48,8 @@ const WHITESPACE_ONLY = /^[\s\u200b-\u200d\ufeff]+$/;
 // The PARENT is what makes this exact rather than a heuristic. Measured on svelte 5.56.8, a
 // stray gap and an {#each} text placeholder are the same ' ' string in the from_tree template:
 //
-//   stray gap    ['symbiote-view', null, [...], ' ', [...]]   parent takes no raw text -> drop
-//   placeholder  ['symbiote-text', null, ' ']                 parent IS a <Text>       -> keep
+//   stray gap    ['view', null, [...], ' ', [...]]   parent takes no raw text -> drop
+//   placeholder  ['text', null, ' ']                 parent IS a <Text>       -> keep
 //
 // So `<Text><Text>a</Text> <Text>b</Text></Text>` keeps its separator, correctly — there the
 // space really is a word boundary. This also covers the one shape the source preprocessor

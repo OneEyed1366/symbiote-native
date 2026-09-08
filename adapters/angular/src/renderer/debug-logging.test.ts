@@ -26,9 +26,7 @@ const tick = (): Promise<void> =>
   selector: 'debug-log-host',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-view testID="probe"
-    ><symbiote-text>hi</symbiote-text></symbiote-view
-  >`,
+  template: `<view testID="probe"><text>hi</text></view>`,
 })
 class DebugLogHost {}
 

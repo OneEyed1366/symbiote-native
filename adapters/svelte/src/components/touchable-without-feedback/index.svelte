@@ -20,7 +20,8 @@
     TOUCHABLE_MIN_PRESS_DURATION_MS,
   } from '@symbiote-native/components';
   import type { ISymbioteEvent } from '@symbiote-native/engine';
-  import Pressable from '../pressable/index.svelte';
+  import { createAttachmentsSync } from '../../runes/attachments';
+  import type { ShimElement } from '../../dom-shim';
 
   function scheduleTimeout(callback: () => void, ms: number): () => void {
     const id = setTimeout(callback, ms);
@@ -61,15 +62,23 @@
       },
     ),
   );
+
+  // See touchable-opacity/index.svelte for why the tag takes `minPressDuration: 0`.
+  const pressBag = $derived({
+    ...rest,
+    minPressDuration: 0,
+    onPressIn: handlers.handlePressIn,
+    onPressOut: handlers.handlePressOut,
+  });
+
+  // `{@attach}` rides `rest` as a symbol key and no bag carries it into the engine.
+  let hostShim = $state.raw<ShimElement | null>(null);
+  const syncAttachments = createAttachmentsSync();
+  $effect(() => {
+    syncAttachments(hostShim, rest);
+  });
 </script>
 
-<Pressable
-  __minPressDuration={0}
-  {...rest}
-  onPressIn={handlers.handlePressIn}
-  onPressOut={handlers.handlePressOut}
->
-  {#snippet children()}
-    {@render content?.()}
-  {/snippet}
-</Pressable>
+<pressable p={pressBag} bind:this={hostShim}>
+  {@render content?.()}
+</pressable>

@@ -173,6 +173,6 @@ describe('bootstrapHost — default native-view-config source (Positive / guarde
     const registered = setNativeViewConfigSource.mock.calls[0][0] as (
       name: string,
     ) => unknown;
-    expect(registered('symbiote-view')).toBeUndefined();
+    expect(registered('view')).toBeUndefined();
   });
 });

@@ -3,7 +3,7 @@
 // lives in the engine, shared with every other adapter. App code names only @symbiote-native/vue.
 
 // Side-effect import, FIRST and deliberately not a re-export: it installs the engine-side press
-// machine that a lowered `<symbiote-pressable>` needs. `export * from './register'` or a bare
+// machine that a lowered `<pressable>` needs. `export * from './register'` or a bare
 // import sitting beside a re-export of the same specifier both go lazy under Metro's production
 // `inlineRequires` and the registration silently never runs in a release build. See register.ts.
 
@@ -20,6 +20,13 @@ export type { IAppConfigurator } from './render';
 export { Teleport, type ITeleportTarget } from './create-portal';
 export { createTunnel, type ITunnel } from './create-tunnel';
 export { View, Text } from './components';
+// Type-only, and the re-export is the POINT rather than the names: it is what makes the checker
+// load `intrinsic-elements.ts`, whose `declare module 'vue'` is the tag alphabet vue-tsc reads.
+// A declaration nothing imports applies inside this package only.
+export type {
+  ISymbioteIntrinsicTag,
+  ISymbioteHostAttributes,
+} from './intrinsic-elements';
 export type {
   IAccessibilityProps,
   IAriaProps,

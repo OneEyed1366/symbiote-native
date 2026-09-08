@@ -16,9 +16,9 @@
   // the main barrel pulls in the whole `.svelte` module graph, fatal under vitest's plain
   // svelte-plugin-free transform (this component's own smoke test).
   //
-  // The custom-marker overlay's thumb-image cell uses the raw `symbiote-image` host tag rather
+  // The custom-marker overlay's thumb-image cell uses the raw `image` host tag rather
   // than the framework's `Image` component: core's `render-steps-indicator.ts` paints the same
-  // default-overlay thumb with a bare `el('symbiote-image', {source, style})` Descriptor, and
+  // default-overlay thumb with a bare `el('image', {source, style})` Descriptor, and
   // importing another `.svelte` component here would reintroduce the same main-barrel problem
   // one level down.
   import type { ISliderProps } from './slider-props';
@@ -274,8 +274,8 @@
 </script>
 
 {#if hasStepMarker}
-  <symbiote-view p={markerWrapperBag} bind:this={hostShimMarker}>
-    <symbiote-view
+  <view p={markerWrapperBag} bind:this={hostShimMarker}>
+    <view
       p={{
         pointerEvents: 'none',
         testID: 'StepsIndicator-Container',
@@ -283,8 +283,8 @@
       }}
     >
       {#each orderedOptions as optionValue, index (optionValue)}
-        <symbiote-view p={{ style: STEP_INDICATOR_ELEMENT_STYLE }}>
-          <symbiote-view p={{ style: TRACK_MARK_CONTAINER_STYLE }}>
+        <view p={{ style: STEP_INDICATOR_ELEMENT_STYLE }}>
+          <view p={{ style: TRACK_MARK_CONTAINER_STYLE }}>
             {@render stepMarker?.({
               stepMarked: optionValue === currentValue,
               currentValue,
@@ -293,33 +293,33 @@
               max: maxOption,
             })}
             {#if thumbImage !== undefined && optionValue === currentValue}
-              <symbiote-view
+              <view
                 p={{
                   style: THUMB_IMAGE_CONTAINER_STYLE,
                   testID: 'sliderTrackMark-thumbImage',
                 }}
               >
-                <symbiote-image
+                <image
                   p={{ source: thumbImage, style: THUMB_IMAGE_STYLE }}
                 />
-              </symbiote-view>
+              </view>
             {/if}
-          </symbiote-view>
+          </view>
           {#if renderStepNumber}
-            <symbiote-view p={{ style: STEP_NUMBER_CONTAINER_STYLE }}>
-              <symbiote-text
+            <view p={{ style: STEP_NUMBER_CONTAINER_STYLE }}>
+              <text
                 p={{ testID: `${index}th-step`, style: { fontSize } }}
               >
                 {String(optionValue)}
-              </symbiote-text>
-            </symbiote-view>
+              </text>
+            </view>
           {/if}
-        </symbiote-view>
+        </view>
       {/each}
-    </symbiote-view>
-  </symbiote-view>
+    </view>
+  </view>
 {:else}
-  <symbiote-view
+  <view
     p={{ ...defaultDescriptor?.props, class: className }}
     bind:this={hostShimDefault}
   />

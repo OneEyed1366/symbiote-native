@@ -89,7 +89,7 @@ const texts = (): string[] =>
     String(node.props.text),
   );
 
-const Blank = () => <symbiote-text>blank</symbiote-text>;
+const Blank = () => <text>blank</text>;
 
 describe('Solid navigation primitives', () => {
   describe('Positive', () => {
@@ -98,7 +98,7 @@ describe('Solid navigation primitives', () => {
     it('useRoute resolves the screen route at build time', async () => {
       const RouteScreen = () => {
         const route = useRoute();
-        return <symbiote-text>{`name:${route().name}`}</symbiote-text>;
+        return <text>{`name:${route().name}`}</text>;
       };
       mount(ROOT_TAG, () => (
         <Stack initialRouteName="Home">
@@ -116,9 +116,7 @@ describe('Solid navigation primitives', () => {
     it('createIsFocused flips on the native onAppear and back on onDisappear', async () => {
       const FocusScreen = () => {
         const isFocused = createIsFocused();
-        return (
-          <symbiote-text>{isFocused() ? 'focused' : 'blurred'}</symbiote-text>
-        );
+        return <text>{isFocused() ? 'focused' : 'blurred'}</text>;
       };
       mount(ROOT_TAG, () => (
         <Stack initialRouteName="Home">
@@ -147,7 +145,7 @@ describe('Solid navigation primitives', () => {
           effect();
           return cleanup;
         });
-        return <symbiote-text>effect</symbiote-text>;
+        return <text>effect</text>;
       };
       mount(ROOT_TAG, () => (
         <Stack initialRouteName="Home">
@@ -174,7 +172,7 @@ describe('Solid navigation primitives', () => {
       let handle: INavigatorHandle | null = null;
       const StateScreen = () => {
         const depth = createNavigationState(state => state.routes.length);
-        return <symbiote-text>{`depth:${depth()}`}</symbiote-text>;
+        return <text>{`depth:${depth()}`}</text>;
       };
       mount(ROOT_TAG, () => (
         <Stack ref={h => (handle = h)} initialRouteName="Home">
@@ -197,7 +195,7 @@ describe('Solid navigation primitives', () => {
       const PushScreen = () => {
         const navigation = useStackNavigation();
         navigation().push('Details');
-        return <symbiote-text>pushed</symbiote-text>;
+        return <text>pushed</text>;
       };
       mount(ROOT_TAG, () => (
         <Stack initialRouteName="Home">
@@ -219,7 +217,7 @@ describe('Solid navigation primitives', () => {
       const ListenerScreen = () => {
         const navigation = useNavigation();
         navigation().addListener('focus', () => seen.push('focus'));
-        return <symbiote-text>listening</symbiote-text>;
+        return <text>listening</text>;
       };
       mount(ROOT_TAG, () => (
         <Stack initialRouteName="Home">
@@ -242,7 +240,7 @@ describe('Solid navigation primitives', () => {
       const effect = vi.fn();
       const FocusScreen = () => {
         createFocusEffect(effect);
-        return <symbiote-text>focus</symbiote-text>;
+        return <text>focus</text>;
       };
       mount(ROOT_TAG, () => (
         <Stack ref={h => (handle = h)} initialRouteName="Home">
@@ -293,7 +291,7 @@ describe('Solid navigation primitives', () => {
     it('useTabNavigation throws under a Stack', () => {
       const WrongScreen = () => {
         useTabNavigation()();
-        return <symbiote-text>wrong</symbiote-text>;
+        return <text>wrong</text>;
       };
 
       expect(() =>
@@ -308,7 +306,7 @@ describe('Solid navigation primitives', () => {
     it('useStackNavigation throws under a Tab', () => {
       const WrongScreen = () => {
         useStackNavigation()();
-        return <symbiote-text>wrong</symbiote-text>;
+        return <text>wrong</text>;
       };
 
       expect(() =>

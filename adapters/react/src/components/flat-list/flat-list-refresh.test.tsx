@@ -42,7 +42,7 @@ function RefreshApp(): ReactElement {
       index,
     }),
     renderItem: ({ item }: { item: IRow }) =>
-      createElement('symbiote-text', { key: item.id }, item.label),
+      createElement('text', { key: item.id }, item.label),
   });
 }
 
@@ -56,7 +56,7 @@ function PlainApp(): ReactElement {
       index,
     }),
     renderItem: ({ item }: { item: IRow }) =>
-      createElement('symbiote-text', { key: item.id }, item.label),
+      createElement('text', { key: item.id }, item.label),
   });
 }
 

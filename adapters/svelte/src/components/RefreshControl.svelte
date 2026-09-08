@@ -35,6 +35,6 @@
   });
 </script>
 
-<symbiote-refresh-control p={bag} bind:this={hostShim}>
+<refresh-control p={bag} bind:this={hostShim}>
   {@render children?.()}
-</symbiote-refresh-control>
+</refresh-control>

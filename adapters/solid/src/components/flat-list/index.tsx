@@ -127,7 +127,7 @@ export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
     info: Accessor<IVirtualizedListCellInfo<IRow<ItemT>>>,
   ): JSX.Element {
     return (
-      <symbiote-view style={rowStyle()}>
+      <view style={rowStyle()}>
         <Index each={info().item.items}>
           {(item, column): JSX.Element => {
             // Called ONCE and untracked, the shape VirtualizedList's own cell build uses: a
@@ -142,12 +142,10 @@ export function FlatList<ItemT>(props: IFlatListProps<ItemT>): JSX.Element {
                 separators: info().separators,
               })),
             );
-            return (
-              <symbiote-view style={COLUMN_STYLE}>{content}</symbiote-view>
-            );
+            return <view style={COLUMN_STYLE}>{content}</view>;
           }}
         </Index>
-      </symbiote-view>
+      </view>
     );
   }
 

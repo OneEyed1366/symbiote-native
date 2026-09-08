@@ -5,7 +5,6 @@
   // own header comment). `$props.id()` (Runes · Partial) rides along here too: it generates a
   // real per-instance id, but this project has no <label for> to link it to, so it's shown only
   // as a plain debug caption — the caveat is the whole point of the demo.
-  import { Pressable, Text, View } from '@symbiote-native/svelte';
 
   let {
     value = $bindable(0),
@@ -20,22 +19,22 @@
   }
 </script>
 
-<View class="row-align-center" {testID}>
-  <Pressable
+<view class="row-align-center" {testID}>
+  <pressable
     testID={testID && `${testID}-decrement`}
     class="action-button"
     onPress={() => (value -= 1)}
   >
-    <Text class="action-button-text">−</Text>
-  </Pressable>
-  <Text class="info-text-flex">
+    <text class="action-button-text">−</text>
+  </pressable>
+  <text class="info-text-flex">
     {`${label}: ${value} · $props.id(): ${instanceId}`}
-  </Text>
-  <Pressable
+  </text>
+  <pressable
     testID={testID && `${testID}-increment`}
     class="action-button"
     onPress={() => (value += 1)}
   >
-    <Text class="action-button-text">+</Text>
-  </Pressable>
-</View>
+    <text class="action-button-text">+</text>
+  </pressable>
+</view>

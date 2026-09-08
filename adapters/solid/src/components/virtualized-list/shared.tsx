@@ -831,18 +831,15 @@ export function createVirtualizedList(
       // gap); see .claude/rules/list-geometry-feedback-loop.md.
       const separator = (
         <Show when={hasSeparatorAfter(index())}>
-          <symbiote-view>{separatorElement(index())}</symbiote-view>
+          <view>{separatorElement(index())}</view>
         </Show>
       );
       if (!sticky) {
         return (
-          <symbiote-view
-            onLayout={makeCellMeasure(index)}
-            style={invertedStyle()}
-          >
+          <view onLayout={makeCellMeasure(index)} style={invertedStyle()}>
             {content}
             {separator}
-          </symbiote-view>
+          </view>
         );
       }
       // The sticky wrapper measures the cell itself, so it REPLACES the plain measuring view rather
@@ -885,7 +882,7 @@ export function createVirtualizedList(
         <Show
           when={forcedStickyIndex() === index() && gapExtent() > EMPTY_OFFSET}
         >
-          <symbiote-view style={spacerStyle(gapExtent())} />
+          <view style={spacerStyle(gapExtent())} />
         </Show>,
       ];
     }
@@ -999,28 +996,28 @@ export function createVirtualizedList(
     function listBody(): JSX.Element {
       return [
         <Show when={headerElement !== undefined}>
-          <symbiote-view>{headerElement}</symbiote-view>
+          <view>{headerElement}</view>
         </Show>,
         <Show
           when={isEmpty()}
           fallback={
             <>
               <Show when={leadingExtent() > EMPTY_OFFSET}>
-                <symbiote-view style={spacerStyle(leadingExtent())} />
+                <view style={spacerStyle(leadingExtent())} />
               </Show>
               <For each={cellKeys()}>{buildRow}</For>
               <Show when={trailingExtent() > EMPTY_OFFSET}>
-                <symbiote-view style={spacerStyle(trailingExtent())} />
+                <view style={spacerStyle(trailingExtent())} />
               </Show>
             </>
           }
         >
           <Show when={emptyElement !== undefined}>
-            <symbiote-view>{emptyElement}</symbiote-view>
+            <view>{emptyElement}</view>
           </Show>
         </Show>,
         <Show when={footerElement !== undefined}>
-          <symbiote-view>{footerElement}</symbiote-view>
+          <view>{footerElement}</view>
         </Show>,
       ];
     }

@@ -1,7 +1,7 @@
 // Regression coverage for the anchor-vs-real-content class bug (see pressable.test.ts for the
 // full writeup): a `class="..."` written on TouchableNativeFeedback's OWN use site always resolves
 // through Angular's addClass/removeClass onto its non-painting ANCHOR host, never onto the real
-// committed feedback <symbiote-view> one level down. TouchableNativeFeedback has no explicit
+// committed feedback <view> one level down. TouchableNativeFeedback has no explicit
 // `style`/`class`-forwarding @Input() of its own, so the anchor's class-derived style is the
 // ONLY style source hostProps.style forwards.
 import '@angular/compiler';
@@ -30,7 +30,7 @@ afterEach(() => {
   imports: [TouchableNativeFeedback],
   template: `
     <TouchableNativeFeedback [testID]="'native-feedback'" class="card">
-      <symbiote-text>Press</symbiote-text>
+      <text>Press</text>
     </TouchableNativeFeedback>
   `,
 })
@@ -81,7 +81,7 @@ let toggleHost: ClassToggleHost | undefined;
   imports: [TouchableNativeFeedback],
   template: `
     <TouchableNativeFeedback [testID]="'toggle'" [class.on]="on()">
-      <symbiote-text>Press</symbiote-text>
+      <text>Press</text>
     </TouchableNativeFeedback>
   `,
 })

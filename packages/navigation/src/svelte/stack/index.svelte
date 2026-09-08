@@ -15,7 +15,7 @@
   // HOW SCREENS ARE DISCOVERED: not by reading `children`, which Svelte hands over as an opaque
   // Snippet - the markers register themselves through the context collector (../screen-registry.ts)
   // while the snippet renders, and the route list derives from that. The snippet is rendered
-  // inside a collapsed `symbiote-text` (../registry-host.ts) so whitespace between two markers
+  // inside a collapsed `text` (../registry-host.ts) so whitespace between two markers
   // can never become an illegal raw-text child of a native view.
 
   // Route keys must be unique per Stack INSTANCE (Svelte has no useId); a module counter is the
@@ -233,10 +233,10 @@
   }
 </script>
 
-<symbiote-view p={STACK_ROOT_PROPS}>
-  <symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>
+<view p={STACK_ROOT_PROPS}>
+  <text p={SCREEN_REGISTRY_HOST_PROPS}>
     {@render children?.()}
-  </symbiote-text>
+  </text>
   <svelte:element
     this={RNS_SCREEN_STACK_VIEW_NAME}
     {@attach hostProps(stackProps)}
@@ -258,4 +258,4 @@
       {/if}
     {/each}
   </svelte:element>
-</symbiote-view>
+</view>

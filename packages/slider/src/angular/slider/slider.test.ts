@@ -156,7 +156,7 @@ async function mountSlider(
 describe('Angular Slider wrapper', () => {
   describe('Positive', () => {
     it('paints the raw RNCSlider leaf inside a centering wrapper View', async () => {
-      // why: renderSlider (core) always wraps the native leaf in a centering symbiote-view — a
+      // why: renderSlider (core) always wraps the native leaf in a centering view — a
       // caller must see BOTH the wrapper and the leaf, with the leaf's own props unaffected by
       // being nested rather than mounted at the root.
       await mountSlider({
@@ -170,7 +170,7 @@ describe('Angular Slider wrapper', () => {
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
       expect(props.step).toBe(0.1);
-      // The native leaf lives under a symbiote-view wrapper (RCTView), not at the root.
+      // The native leaf lives under a view wrapper (RCTView), not at the root.
       expect(fabric.find(n => n.viewName === 'RCTView')).toBeDefined();
     });
 

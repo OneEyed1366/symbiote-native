@@ -68,15 +68,15 @@ class ExplicitHost {}
 // THE LOWERED SPELLING, and the arm this file was missing for as long as it has existed.
 //
 // Everything above mounts `<Text>`, the @Component — the path that already folds the defaults. A
-// LOWERED `<symbiote-text>` has no component behind it: `resolveTextProps` lives in
+// LOWERED `<text>` has no component behind it: `resolveTextProps` lives in
 // `../primitives`, which is exactly what lowering routes around. So the two tests above were green
 // while the lowered path shipped text that truncates with no ellipsis, device-observed once
 // already on examples/svelte.
 //
 // `schemas: [CUSTOM_ELEMENTS_SCHEMA]` with `TextHost` absent from `imports` is load-bearing and is
 // the whole reason this needs its own component: Angular's primitives carry a DUAL selector
-// (`'symbiote-text, Text'`) and directive matching is resolved per TEMPLATE, so importing TextHost
-// anywhere in this template would make `<symbiote-text>` resolve straight back to the component
+// (`'text, Text'`) and directive matching is resolved per TEMPLATE, so importing TextHost
+// anywhere in this template would make `<text>` resolve straight back to the component
 // and the test would assert the wrapper path twice under two spellings
 // (`.claude/rules/host-primitive-tier.md`).
 //
@@ -88,7 +88,7 @@ class ExplicitHost {}
 @Component({
   selector: 'symbiote-text-defaults-lowered',
   standalone: true,
-  template: `<symbiote-text testID="lowered">clamped</symbiote-text>`,
+  template: `<text testID="lowered">clamped</text>`,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 class LoweredHost {}
@@ -123,11 +123,11 @@ describe('Angular Text RN defaults', () => {
     expect(node?.props.allowFontScaling).toBe(false);
   });
 
-  it('applies the same defaults to a LOWERED symbiote-text', async () => {
+  it('applies the same defaults to a LOWERED text', async () => {
     mount(ROOT_TAG, LoweredHost);
     await waitUntil(
       () => committed('lowered') !== undefined,
-      'lowered symbiote-text commits',
+      'lowered text commits',
     );
 
     const node = committed('lowered');

@@ -41,9 +41,9 @@ Component({
   template: `
     <ScrollView [stickyHeaderIndices]="[1]">
       <RefreshControl [refreshing]="refreshing()" (refresh)="refresh()" />
-      <symbiote-view testID="before"></symbiote-view>
-      <symbiote-view testID="sticky"></symbiote-view>
-      <symbiote-view testID="after"></symbiote-view>
+      <view testID="before"></view>
+      <view testID="sticky"></view>
+      <view testID="after"></view>
     </ScrollView>
   `,
 })(StickyWithRefreshApp);

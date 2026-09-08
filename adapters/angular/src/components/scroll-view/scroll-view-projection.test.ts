@@ -30,9 +30,9 @@ Component({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <ScrollView [stickyHeaderIndices]="[1]">
-      <symbiote-view testID="before"></symbiote-view>
-      <symbiote-view testID="sticky"></symbiote-view>
-      <symbiote-view testID="after"></symbiote-view>
+      <view testID="before"></view>
+      <view testID="sticky"></view>
+      <view testID="after"></view>
     </ScrollView>
   `,
 })(StickyProjectionApp);
@@ -49,9 +49,9 @@ Component({
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
-    <symbiote-view testID="custom-sticky-wrapper">
+    <view testID="custom-sticky-wrapper">
       <ng-content></ng-content>
-    </symbiote-view>
+    </view>
   `,
 })(CustomStickyHeader);
 
@@ -65,8 +65,8 @@ Component({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <ScrollView [stickyHeaderIndices]="[0]" [StickyHeaderComponent]="CustomStickyHeader">
-      <symbiote-view testID="sticky"></symbiote-view>
-      <symbiote-view testID="after"></symbiote-view>
+      <view testID="sticky"></view>
+      <view testID="after"></view>
     </ScrollView>
   `,
 })(CustomStickyProjectionApp);
@@ -92,7 +92,7 @@ Component({
   template: `
     <ScrollView>
       <RefreshControl [refreshing]="refreshing()" (refresh)="refresh()" />
-      <symbiote-view testID="content"></symbiote-view>
+      <view testID="content"></view>
     </ScrollView>
   `,
 })(IOSRefreshProjectionApp);
@@ -112,7 +112,7 @@ Component({
   template: `
     <ScrollView [style]="{ marginTop: 4, backgroundColor: 'red' }">
       <RefreshControl [refreshing]="true" (refresh)="refresh()" />
-      <symbiote-view testID="content"></symbiote-view>
+      <view testID="content"></view>
     </ScrollView>
   `,
 })(AndroidRefreshProjectionApp);

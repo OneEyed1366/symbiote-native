@@ -101,13 +101,12 @@ function MvcpApp(): ReactElement {
     data: MVCP_DATA,
     keyExtractor: item => `k-${item.id}`,
     // A header occupies child 0, so RN bumps minIndexForVisible by 1 (1 -> 2).
-    ListHeaderComponent: () => createElement('symbiote-text', {}, 'header'),
+    ListHeaderComponent: () => createElement('text', {}, 'header'),
     maintainVisibleContentPosition: {
       minIndexForVisible: 1,
       autoscrollToTopThreshold: 10,
     },
-    renderItem: ({ item }) =>
-      createElement('symbiote-text', {}, `row-${item.id}`),
+    renderItem: ({ item }) => createElement('text', {}, `row-${item.id}`),
   });
 }
 
@@ -117,8 +116,7 @@ function FailPathApp(): ReactElement {
     keyExtractor: item => `k-${item.id}`,
     // No getItemLayout: cells are unmeasured in headless (no real onLayout), so a far
     // target has no resolvable offset.
-    renderItem: ({ item }) =>
-      createElement('symbiote-text', {}, `row-${item.id}`),
+    renderItem: ({ item }) => createElement('text', {}, `row-${item.id}`),
     onScrollToIndexFailed: info => failures.push(info),
     ref: listRef,
   });

@@ -45,7 +45,7 @@ export interface IRefreshControlProps extends IAccessibilityProps, IAriaProps {
 }
 
 export const RefreshControl: FC<IRefreshControlProps> = rawProps => {
-  // Owns its host element (symbiote-refresh-control), so it folds aria/role here;
+  // Owns its host element (refresh-control), so it folds aria/role here;
   // the resolved accessibility* fields ride down via `...nativeProps`.
   const props = resolveAccessibilityProps(rawProps);
   const { children, ...nativeProps } = props;
@@ -55,9 +55,5 @@ export const RefreshControl: FC<IRefreshControlProps> = rawProps => {
     dlog(`RefreshControl enabled=${String(props.enabled)} (Android-only)`);
   if (props.onRefresh !== undefined)
     dlog('RefreshControl onRefresh listener wired');
-  return createElement(
-    'symbiote-refresh-control',
-    { ...nativeProps },
-    children,
-  );
+  return createElement('refresh-control', { ...nativeProps }, children);
 };

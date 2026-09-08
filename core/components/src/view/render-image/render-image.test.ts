@@ -36,7 +36,7 @@ describe('renderImage — source resolution (Positive)', () => {
     const descriptor = renderImage(
       baseView({ source: { uri: 'http://x/a.png' } }),
     );
-    expect(descriptor.type).toBe('symbiote-image');
+    expect(descriptor.type).toBe('image');
     expect(descriptor.props.source).toEqual([
       { uri: 'http://x/a.png', scale: 2 },
     ]);

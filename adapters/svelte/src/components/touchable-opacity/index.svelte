@@ -13,17 +13,8 @@
   // modules/animated landed, and a setTimeout tween can never be native-driven — which is
   // exactly what RN asks for here (useNativeDriver: true, TouchableOpacity.js:242).
   import type { ITouchableOpacityProps } from './touchable-opacity-props';
-  import View from '../View.svelte';
-  import { createAnimatedComponent } from '../../modules/animated/create-animated-component';
 
   export type { ITouchableOpacityProps };
-
-  // Wrapped here, not imported from modules/animated: that barrel pulls in six `.svelte`
-  // components (View/Text/Image/ScrollView/FlatList/SectionList), and this package's vitest has
-  // no `.svelte` loader — a smoke test would have to pre-compile the whole tree to reach one
-  // Animated.View. Same reasoning, different cause, as sticky-header.svelte's own local wrap.
-  // Module scope, so every TouchableOpacity instance shares one component identity.
-  const AnimatedView = createAnimatedComponent(View);
 </script>
 
 <script lang="ts">
@@ -45,7 +36,8 @@
     timing,
     type ISymbioteEvent,
   } from '@symbiote-native/engine';
-  import Pressable from '../pressable/index.svelte';
+  import { createAttachmentsSync } from '../../runes/attachments';
+  import type { ShimElement } from '../../dom-shim';
 
   // modules/animated's barrel swaps the WHOLE driver namespace for the mock when the host
   // reports reduced motion; reaching it here would close the import the module block above
@@ -165,17 +157,32 @@
   // HOLDS, never this array — the per-frame path is setValue -> AnimatedProps.update ->
   // setNativeProps, which never re-renders this component.
   const feedbackStyle = $derived([style, { opacity }]);
+
+  // The responder bag for the `pressable` TAG. There is no Pressable component any more: the press
+  // machine lives on the engine node (`core/components/src/behaviors/pressable.ts`), keyed by this
+  // tag, and reads its callbacks out of the listener stash.
+  //
+  // `minPressDuration: 0` mirrors RN (TouchableOpacity.js:195): THIS component owns the
+  // deactivation floor in its own machine, so the press machine must not add a second one — with
+  // the machine's own 130 ms default the fade back is held that long after every tap.
+  const pressBag = $derived({
+    ...rest,
+    minPressDuration: 0,
+    onPressIn: handlers.handlePressIn,
+    onPressOut: handlers.handlePressOut,
+  });
+
+  // `{@attach}` arrives as a SYMBOL key in `rest`, which no prop bag carries into the engine. The
+  // wrapper used to sync it; with the wrapper gone this component owns the seam to its own host.
+  let hostShim = $state.raw<ShimElement | null>(null);
+  const syncAttachments = createAttachmentsSync();
+  $effect(() => {
+    syncAttachments(hostShim, rest);
+  });
 </script>
 
-<Pressable
-  __minPressDuration={0}
-  {...rest}
-  onPressIn={handlers.handlePressIn}
-  onPressOut={handlers.handlePressOut}
->
-  {#snippet children()}
-    <AnimatedView style={feedbackStyle} class={className}>
-      {@render content?.()}
-    </AnimatedView>
-  {/snippet}
-</Pressable>
+<pressable p={pressBag} bind:this={hostShim}>
+  <view p={{ style: feedbackStyle, class: className }}>
+    {@render content?.()}
+  </view>
+</pressable>

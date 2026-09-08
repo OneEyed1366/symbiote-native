@@ -241,7 +241,7 @@ function asNumber(value: unknown, label: string): number {
 // A child with its own host node, so the counters below would actually move if a press rebuilt the
 // subtree instead of re-propping it.
 function TouchableChild(): JSX.Element {
-  return <symbiote-view testID="touchable-child" />;
+  return <view testID="touchable-child" />;
 }
 
 describe('Solid TouchableOpacity', () => {

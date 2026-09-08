@@ -25,7 +25,7 @@ const fabric = installFabric();
       class="card"
       [source]="{ uri: 'https://example.com/a.png' }"
     >
-      <symbiote-text>on top</symbiote-text>
+      <text>on top</text>
     </ImageBackground>
   `,
 })

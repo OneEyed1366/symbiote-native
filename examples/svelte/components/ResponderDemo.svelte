@@ -8,7 +8,7 @@
   // responder handler props are plain passthrough props on View (IViewProps extends
   // IResponderProps), same event names and handler signatures as React's, so no adapter-level
   // translation is needed here beyond useRef/useState -> plain-let/$state.
-  import { View, Text, type ISymbioteEvent } from '@symbiote-native/svelte';
+  import { type ISymbioteEvent } from '@symbiote-native/svelte';
   import { firstTouchX } from './event-utils';
 
   const RESPONDER_CHIPS = [0, 1, 2, 3, 4];
@@ -30,18 +30,18 @@
   let grabbed: number | null = null;
 </script>
 
-<View class="section-tight">
-  <Text class="section-label">
+<view class="section-tight">
+  <text class="section-label">
     Responder · drag a chip vs hand-off to the strip
-  </Text>
-  <Text class="info-text">{status}</Text>
-  <Text
+  </text>
+  <text class="info-text">{status}</text>
+  <text
     class="transfer-text"
     style={{ color: transfer ? '#f6ad55' : '#41506a' }}
   >
     {transfer || 'transfer: —'}
-  </Text>
-  <View
+  </text>
+  <view
     onMoveShouldSetResponder={(event: ISymbioteEvent) =>
       grabbed !== null &&
       Math.abs(firstTouchX(event) - startX) > RESPONDER_STEAL_DX}
@@ -61,9 +61,9 @@
     onResponderTerminate={() => (rowDx = 0)}
     class="strip-box"
   >
-    <View class="row-tight" style={{ transform: [{ translateX: rowDx }] }}>
+    <view class="row-tight" style={{ transform: [{ translateX: rowDx }] }}>
       {#each RESPONDER_CHIPS as index (index)}
-        <View
+        <view
           testID={`resp-chip-${index}`}
           onStartShouldSetResponder={() => true}
           onResponderGrant={(event: ISymbioteEvent) => {
@@ -96,9 +96,9 @@
             transform: [{ translateX: activeChip === index ? chipDx : 0 }],
           }}
         >
-          <Text class="chip-text">{index}</Text>
-        </View>
+          <text class="chip-text">{index}</text>
+        </view>
       {/each}
-    </View>
-  </View>
-</View>
+    </view>
+  </view>
+</view>

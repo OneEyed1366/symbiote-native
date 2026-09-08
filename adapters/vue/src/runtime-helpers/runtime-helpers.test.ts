@@ -48,7 +48,7 @@ function mountShowable(visible: boolean): void {
     ROOT_TAG,
     defineComponent({
       setup: () => () =>
-        withDirectives(h('symbiote-view', { style: { padding: PADDING } }), [
+        withDirectives(h('view', { style: { padding: PADDING } }), [
           [vShow, visible],
         ]),
     }),
@@ -87,7 +87,7 @@ describe('vShow runtime-helpers shim', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          withDirectives(h('symbiote-view', { style: { padding: PADDING } }), [
+          withDirectives(h('view', { style: { padding: PADDING } }), [
             [vShow, visible.value],
           ]),
       }),
@@ -119,7 +119,7 @@ describe('vShow runtime-helpers shim', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          withDirectives(h('symbiote-view', { style: { padding: PADDING } }), [
+          withDirectives(h('view', { style: { padding: PADDING } }), [
             [vShow, visible.value],
           ]),
       }),
@@ -205,7 +205,7 @@ describe('useCssModule runtime-helpers shim', () => {
     const component = defineComponent({
       setup: () => () => {
         result = useCssModule();
-        return h('symbiote-view');
+        return h('view');
       },
     });
     (
@@ -226,7 +226,7 @@ describe('useCssModule runtime-helpers shim', () => {
       defineComponent({
         setup: () => () => {
           result = useCssModule();
-          return h('symbiote-view');
+          return h('view');
         },
       }),
     );

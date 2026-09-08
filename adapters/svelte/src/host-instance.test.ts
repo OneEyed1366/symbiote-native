@@ -71,7 +71,7 @@ async function loadMountable(): Promise<Component> {
        let box = $state.raw<ShimElement | null>(null);
        $effect(() => { if (box !== null) onCapture(box); });
      </script>
-     <symbiote-view p={{ testID: 'ref-box' }} bind:this={box} />`,
+     <view p={{ testID: 'ref-box' }} bind:this={box} />`,
     'RefParent.svelte',
     PARENT_OUT,
   );
@@ -148,7 +148,7 @@ describe('hostInstance', () => {
       // why: the shim's engine node is bound LAZILY on first insertion (skill §9) — a
       // freshly-created, unattached ShimElement has no engineNode yet, and hostInstance must
       // reflect that instead of crashing on the missing field.
-      const detached = getShimDocument().createElement('symbiote-view');
+      const detached = getShimDocument().createElement('view');
       expect(hostInstance(detached)).toBeUndefined();
     });
   });
@@ -193,7 +193,7 @@ describe('findNodeHandle', () => {
     it('returns null for a shim element that has never been inserted into a live tree', () => {
       // why: mirrors hostInstance's own not-yet-live case — a ref captured before the first
       // commit has no native tag to report yet, and must not throw while waiting for one.
-      const detached = getShimDocument().createElement('symbiote-view');
+      const detached = getShimDocument().createElement('view');
       expect(findNodeHandle(detached)).toBeNull();
     });
   });

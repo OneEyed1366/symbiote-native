@@ -49,8 +49,7 @@ function App(): ReactElement {
       offset: ITEM_HEIGHT * index,
       index,
     }),
-    renderItem: ({ item }) =>
-      createElement('symbiote-text', {}, `row-${item.id}`),
+    renderItem: ({ item }) => createElement('text', {}, `row-${item.id}`),
     onScroll: event => {
       seenEvents.push(event.nativeEvent);
     },

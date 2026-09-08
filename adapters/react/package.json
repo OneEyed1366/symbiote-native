@@ -33,7 +33,6 @@
     ".": "./src/index.ts",
     "./bootstrap": "./src/bootstrap.ts",
     "./metro-css-parser": "./metro-css-parser.cjs",
-    "./state-style": "./src/state-style.ts",
     "./jsx-runtime": "./src/jsx-runtime.ts",
     "./jsx-dev-runtime": "./src/jsx-dev-runtime.ts"
   },
@@ -56,10 +55,6 @@
         "default": "./build/bootstrap.js"
       },
       "./metro-css-parser": "./metro-css-parser.cjs",
-      "./state-style": {
-        "types": "./build/state-style.d.ts",
-        "default": "./build/state-style.js"
-      },
       "./jsx-runtime": {
         "types": "./build/jsx-runtime.d.ts",
         "default": "./build/jsx-runtime.js"

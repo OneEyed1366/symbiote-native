@@ -9,7 +9,7 @@
 // (`viewNameFor` in core/engine/src/commit.ts — `node.isText && hasTextAncestor` -> RCTVirtualText),
 // and it re-creates the node from scratch when that kind flips. So there is no Solid context, no
 // provider, and nothing for an adapter to thread; every adapter emits the same flat
-// `symbiote-text` and the engine resolves the position-dependent name for all of them. The
+// `text` and the engine resolves the position-dependent name for all of them. The
 // Solid equivalent of TextAncestorContext is deliberately ABSENT, not missing.
 
 import { splitProps, type Ref } from 'solid-js';
@@ -75,8 +75,8 @@ export function Text(props: ITextProps): JSX.Element {
   };
 
   return (
-    <symbiote-text ref={attachRef} {...bag()}>
+    <text ref={attachRef} {...bag()}>
       {local.children}
-    </symbiote-text>
+    </text>
   );
 }

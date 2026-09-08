@@ -77,8 +77,7 @@ function App(): ReactElement {
     // and a scroll to the middle of the list genuinely evicts index 0.
     windowSize: 1,
     stickyHeaderIndices: [0, 10],
-    renderItem: ({ item }) =>
-      createElement('symbiote-text', {}, `row-${item.id}`),
+    renderItem: ({ item }) => createElement('text', {}, `row-${item.id}`),
   });
 }
 

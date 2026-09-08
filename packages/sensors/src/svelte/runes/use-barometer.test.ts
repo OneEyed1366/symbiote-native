@@ -93,7 +93,7 @@ async function loadProbe(): Promise<Component> {
        const measurement = useBarometer(updateIntervalMs);
        $effect(() => { onValue(measurement.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'BarometerProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

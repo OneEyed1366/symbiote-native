@@ -52,6 +52,16 @@ import {
   setNativeProps as engineSetNativeProps,
   dispatchViewCommand,
 } from './commit';
+// The same deliberate cycle, for the same reason: `routeProp` resolves an AnimatedNode written
+// into a prop, and the module that owns that resolution reaches back here for `setProp`. See
+// `animated/host-binding.ts`'s header.
+import { hasAnimatedNodes } from './animated/graph';
+import {
+  bindAnimatedEvent,
+  bindAnimatedValue,
+  hasAnimatedBindings,
+  reattachAnimatedProps,
+} from './animated/host-binding';
 
 const BRAND: unique symbol = Symbol('symbiote.node');
 
@@ -142,8 +152,8 @@ export interface ISymbioteNode {
   //
   // WHY IT HANGS OFF THE BEHAVIOR AND NOT OFF `node.component`, which is how the aria and
   // value->text folds next to it are keyed. A wrapper and its lowered twin commit the SAME Fabric
-  // view name — `RCTSinglelineTextInputView` for both `symbiote-text-input` and
-  // `symbiote-text-input-managed` — so a fold keyed on the component name runs on both, and the
+  // view name — `RCTSinglelineTextInputView` for both `text-input` and
+  // `text-input-managed` — so a fold keyed on the component name runs on both, and the
   // wrapper has already folded in its own body. Double-folding is the hazard. A behavior attaches
   // to the LOWERED tag alone, so it is the discriminator that already exists.
   payloadFold: IPayloadFold | undefined;
@@ -1079,17 +1089,39 @@ export function routeProp(
   if (node.childHost !== undefined) {
     const slotKey = slotPropNameFor(node, key);
     if (slotKey !== undefined) {
-      routeProp(node.childHost, slotKey, value);
+      // A class NAME is a legal spelling of `contentContainerStyle` — every canary writes
+      // `contentContainerStyle="scroll-content"` — so a string has to land on the slot as a
+      // CLASS. Only the class branch consults the registry; renaming it verbatim would publish a
+      // `style` holding a string, which is not a style and is dropped with nothing red. React's
+      // wrapper resolves the name itself (components/scroll-view/shared.ts), so this gap could
+      // only ever show on the tag path.
+      routeProp(
+        node.childHost,
+        slotKey === 'style' && typeof value === 'string' ? 'class' : slotKey,
+        value,
+      );
       return;
     }
   }
+  // An AnimatedNode written straight into a prop — `<view style={{opacity: value}}/>` — is
+  // resolved here into the value to PUBLISH, with the engine holding the subscription. Same
+  // shape as the `style` callback below: a value the engine interprets rather than forwards.
+  // Returns its input by identity when nothing is animated, so every branch under this line is
+  // unchanged. See `animated/host-binding.ts`; the gate is one boolean for an app that animates
+  // nothing.
+  //
+  // AFTER the slot redirect, so an animated `contentContainerStyle` binds on the node that
+  // actually carries the style.
+  const resolved = hasAnimatedNodes()
+    ? bindAnimatedValue(node, key, value)
+    : value;
   if (CLASS_PROP_KEYS.has(key)) {
     const parts = stylePartsOf(node);
     // Canonicalised HERE so the stored value is what everything downstream keys on: an all-string
     // array becomes one string, and then the pressed variant and isAlreadyPublished work on it
     // exactly as on an authored string. One `typeof` for the common case.
     parts.className = canonicalClassName(
-      isClassNameValue(value) ? value : undefined,
+      isClassNameValue(resolved) ? resolved : undefined,
     );
     parts.classStyle = resolveClassName(parts.className);
     pushClassStyle(node, parts);
@@ -1110,12 +1142,12 @@ export function routeProp(
     //
     // The callback must be PURE in `pressed`: its result is read once per state, here and under
     // every transform's emission (`core/components/src/state-style.ts` carries the same contract).
-    if (isStyleCallback(value)) {
-      parts.explicitStyle = value({ pressed: false });
-      parts.activeStyle = value({ pressed: true });
+    if (isStyleCallback(resolved)) {
+      parts.explicitStyle = resolved({ pressed: false });
+      parts.activeStyle = resolved({ pressed: true });
       parts.activeStyleFromCallback = true;
     } else {
-      parts.explicitStyle = value;
+      parts.explicitStyle = resolved;
       // Only a variant WE derived is stale now. `style` switching from a callback to a plain value
       // must not leave the old pressed look standing, and an `activeStyle` the transform wrote must
       // survive a `style` write, because the two arrive as independent props in an unspecified
@@ -1132,7 +1164,7 @@ export function routeProp(
   // in the app carries an unknown key to native.
   if (key === 'activeStyle') {
     const parts = stylePartsOf(node);
-    parts.activeStyle = value;
+    parts.activeStyle = resolved;
     // Slot 1 is no longer ours, by definition — whatever a callback derived earlier has just been
     // replaced. Without this the flag outlives the value it describes: a callback sets it, this
     // branch overwrites the slot silently, and a later plain `style` then clears a variant the
@@ -1144,6 +1176,9 @@ export function routeProp(
     return;
   }
   if (ON_PREFIX.test(key)) {
+    // A native-driven `Animated.event` needs the native module as well as the listener map, and
+    // registers under the PROP name — see `bindAnimatedEvent`, which no-ops for anything else.
+    if (hasAnimatedNodes()) bindAnimatedEvent(node, key, resolved);
     const name = listenerName(key);
     const isRegisteredEvent =
       RESPONDER_EVENTS.has(name) || isEventFor(node.component, name);
@@ -1159,11 +1194,11 @@ export function routeProp(
       );
     }
     if (isRegisteredEvent) {
-      setEventListener(node, name, value);
+      setEventListener(node, name, resolved);
       return;
     }
   }
-  setProp(node, key, value);
+  setProp(node, key, resolved);
 }
 
 // The same no-op guard as setProp, and here it is strictly stronger: `text` is a string, so
@@ -1249,6 +1284,7 @@ function wrapsOwner(owner: ISymbioteNode, child: ISymbioteNode): boolean {
   if (owner.childHost === undefined) return false;
   if (claimModeFor(owner, child.component) !== 'wrap') return false;
   if (hasHostBehaviors()) reattachHostBehaviors(child);
+  if (hasAnimatedBindings()) reattachAnimatedProps(child);
   detach(child);
   const outerParent = owner.parent;
   if (outerParent !== undefined) {
@@ -1309,6 +1345,7 @@ export function appendChild(
   // A node the sweep tore down can be put back — Svelte parks live subtrees offscreen across
   // commits. A WeakSet miss for anything freshly built, so the create path pays nothing.
   if (hasHostBehaviors()) reattachHostBehaviors(child);
+  if (hasAnimatedBindings()) reattachAnimatedProps(child);
   const placed = placedNode(child);
   detach(placed);
   markStructureDirty(parent);
@@ -1332,6 +1369,7 @@ export function insertBefore(
   if (wrapsOwner(requestedParent, child)) return;
   const parent = hostFor(requestedParent, child);
   if (hasHostBehaviors()) reattachHostBehaviors(child);
+  if (hasAnimatedBindings()) reattachAnimatedProps(child);
   const placed = placedNode(child);
   detach(placed);
   markStructureDirty(parent);
@@ -1358,11 +1396,11 @@ export function removeChild(
   // A wrap claim leaving: the owner takes its own place back and stays in the tree. Nominated for
   // teardown like any other removed node, because the wrapper IS leaving.
   if (unwrapsOwner(requestedParent, child)) {
-    if (hasHostBehaviors()) markDetachCandidate(child);
+    if (hasHostBehaviors() || hasAnimatedBindings()) markDetachCandidate(child);
     return;
   }
   const parent = hostFor(requestedParent, child);
-  if (hasHostBehaviors()) markDetachCandidate(child);
+  if (hasHostBehaviors() || hasAnimatedBindings()) markDetachCandidate(child);
   markStructureDirty(parent);
   const placed = placedNode(child);
   const index = parent.children.indexOf(placed);

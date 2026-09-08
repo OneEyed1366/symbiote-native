@@ -97,12 +97,12 @@ export function renderDrawer(
 ): IDescriptor {
   const type = resolveDrawerType(options);
   const content = el(
-    'symbiote-view',
+    'view',
     { ...view.contentPassthrough, style: CONTENT_STYLE },
     [],
   );
   const panel = el(
-    'symbiote-view',
+    'view',
     {
       ...view.panelPassthrough,
       style: [panelBaseStyle(options), view.drawerStyle],
@@ -113,7 +113,7 @@ export function renderDrawer(
   const slots: Partial<Record<IDrawerSlot, IDescriptor>> = { content, panel };
   if (isDrawerOverlayVisible(options)) {
     slots.overlay = el(
-      'symbiote-view',
+      'view',
       {
         ...view.overlayPassthrough,
         style: [OVERLAY_BASE_STYLE, { backgroundColor: view.overlayColor }],
@@ -134,5 +134,5 @@ export function renderDrawer(
   const rootStyle: IViewStyle =
     type === 'permanent' ? { ...ROOT_STYLE, flexDirection: 'row' } : ROOT_STYLE;
 
-  return el('symbiote-view', { style: rootStyle }, children);
+  return el('view', { style: rootStyle }, children);
 }

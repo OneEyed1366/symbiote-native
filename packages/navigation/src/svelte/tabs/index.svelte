@@ -4,8 +4,8 @@
   // with the React/Vue/Angular entries; here Svelte supplies the lifecycle - `$state.raw` for the
   // router (its twin of useReducer), a module counter for route-key generation, `export
   // function`s for the jumpTo/setParams handle - plus the Descriptor bridge for the tab-bar leaf.
-  // Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints ordinary `symbiote-view`/
-  // `symbiote-text` primitives via the shared render fn, so there is no react-native-screens
+  // Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints ordinary `view`/
+  // `text` primitives via the shared render fn, so there is no react-native-screens
   // ViewConfig to register here - Tab needs no `../../register` import.
   //
   // Screens are discovered through the context collector (../screen-registry.ts), not by reading
@@ -253,17 +253,17 @@
   });
 </script>
 
-<symbiote-view p={TAB_ROOT_PROPS}>
-  <symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>
+<view p={TAB_ROOT_PROPS}>
+  <text p={SCREEN_REGISTRY_HOST_PROPS}>
     {@render children?.()}
-  </symbiote-text>
-  <symbiote-view p={TAB_CONTENT_PROPS}>
+  </text>
+  <view p={TAB_CONTENT_PROPS}>
     {#if focusedScreen !== undefined}
       {@const FocusedComponent = focusedScreen.component}
       <NavigationScope value={focusedScreen.scope}>
         <FocusedComponent />
       </NavigationScope>
     {/if}
-  </symbiote-view>
-  <symbiote-view p={tabBar.props} bind:this={tabBarHost} />
-</symbiote-view>
+  </view>
+  <view p={tabBar.props} bind:this={tabBarHost} />
+</view>

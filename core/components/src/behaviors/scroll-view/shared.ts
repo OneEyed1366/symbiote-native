@@ -10,9 +10,10 @@
 // WHAT IS WIRED. Structure, the style compositions, `decelerationRate` resolution,
 // `collapsableChildren`, the synthesized `onContentSizeChange`, the RefreshControl on both
 // platforms — and, since the sticky half landed, the raised `scrollEventThrottle`, the scroll
-// value that drives the pins, and the owner layout an inverted pin needs. The sticky machinery
-// itself lives in `./sticky`, because a `<StickyHeader>` is a CHILD and the three props above are
-// functions of whether one registered.
+// value that drives the pins, the owner layout an inverted pin needs, and the per-commit walk that
+// turns `stickyHeaderIndices` into those same headers. The sticky machinery itself lives in
+// `./sticky`, because a `<StickyHeader>` is a CHILD and the three props above are functions of
+// whether one registered.
 //
 // WHAT A COMPOSED PRIMITIVE COSTS TODAY. Every adapter's ScrollView wrapper builds the same two
 // nodes: `selectScrollIntrinsics` picks a scroll intrinsic and a content intrinsic, and the
@@ -25,19 +26,26 @@
 //
 // WHY THE TAG CARRIES THE AXIS. `buildStructure` runs at `createElement`, before a single prop is
 // routed, so it cannot read `horizontal`. It does not need to: horizontal scroll is already a
-// SEPARATE intrinsic (`symbiote-horizontal-scroll-view` — a different native ViewManager on
+// SEPARATE intrinsic (`horizontal-scroll-view` — a different native ViewManager on
 // Android, not RCTScrollView with a flag), so the decision the behavior needs is in the tag it was
 // looked up by. One behavior per tag, each knowing its own content intrinsic. That is the same
 // shape `intrinsicWhen` gives TextInput's `multiline`, arrived at from the other side.
 //
 // NOT REGISTERED BY ANY ADAPTER, deliberately, and this is the whole reason the file is safe to
-// land. `symbiote-scroll-view` is the tag the WRAPPERS already emit, and a wrapper builds its own
-// content node from `selectScrollIntrinsics`. Registering here would give those trees a second
-// content node — every existing ScrollView, silently double-nested. The precedent for the fix is
-// `symbiote-text-input` vs `symbiote-text-input-managed` in `../../component-names/shared.ts`: the
-// wrapper and the lowered path get separate tags so exactly one owner builds each node. Splitting
-// the scroll tags is the NEXT step and is not this one; until then `registerScrollViewBehavior()`
-// is called only by tests, which is what exercises it.
+// land. `scroll-view` is the tag the WRAPPERS already emit, and a wrapper builds its own content
+// node from `selectScrollIntrinsics` — as does `VirtualizedList`, which hand-authors the two
+// intrinsics on some adapters. Registering while either stands gives those trees a SECOND content
+// node: `RCTScrollView > RCTScrollContentView > RCTScrollContentView`, silently, on every existing
+// ScrollView.
+//
+// A SECOND TAG IS NOT THE ANSWER, and this reverses what this header said until 2026-09-07. The
+// `text-input` / `text-input-managed` split is debt with a deletion date, not a technique
+// (`.claude/rules/fold-only-primitive-recipe.md` §4): each pair exists only to keep two owners
+// apart while a wrapper and a lowered element both emit a tag, and minting one here would buy a
+// rename across every call site now and a second rename when the wrapper dies. The owner's decision
+// is that the ENGINE becomes the single owner of the content node — every adapter's list and
+// wrapper stops building one — so registration waits on that cut rather than on a new spelling.
+// Until then `registerScrollViewBehavior()` is called only by tests, which is what exercises it.
 //
 // STYLE, on both nodes, and the precedence is the part that is easy to get silently wrong. The
 // wrapper composes exactly two arrays, and this reproduces both:
@@ -87,14 +95,15 @@ import {
 import {
   handleOwnerScroll,
   markScrollOwner,
+  reconcileStickyIndices,
   releaseStickyOwner,
   stickyHeaderBehavior,
   STICKY_HEADER_TAG,
   syncOwnerLayout,
 } from './sticky';
 
-export const SCROLL_VIEW_TAG = 'symbiote-scroll-view';
-export const HORIZONTAL_SCROLL_VIEW_TAG = 'symbiote-horizontal-scroll-view';
+export const SCROLL_VIEW_TAG = 'scroll-view';
+export const HORIZONTAL_SCROLL_VIEW_TAG = 'horizontal-scroll-view';
 
 // The app writes it on the ScrollView; it styles the content view. One entry, and it is the whole
 // reason `slotProps` exists.
@@ -110,20 +119,38 @@ const SLOT_DERIVED = ['maintainVisibleContentPosition', 'snapToAlignment'];
 // it is the one thing that genuinely differs per platform — see the platform files. Resolved
 // through `descriptorFor`, so this is `PullToRefreshView` on iOS and `AndroidSwipeRefreshLayout`
 // on Android without either name appearing here.
-export const REFRESH_CONTROL = descriptorFor(
-  'symbiote-refresh-control',
-).component;
+export const REFRESH_CONTROL = descriptorFor('refresh-control').component;
 
 // The OWNER's fold: the per-axis base style UNDER the app's (so an explicit `flexDirection` still
-// wins), and `decelerationRate` resolved from RN's two words to the platform's friction constant.
-// The resolution has to happen here rather than in an adapter because a lowered element has no
-// wrapper to do it, and 'normal'/'fast' reach Fabric as strings it cannot read.
-export function ownerFold(base: IViewStyle): IPayloadFold {
+// wins), `decelerationRate` resolved from RN's two words to the platform's friction constant, and
+// the two props a lowered element has no wrapper to write for it. The resolution has to happen here
+// because 'normal'/'fast' reach Fabric as strings it cannot read.
+//
+// `horizontal` is a real C++ prop (`BaseScrollViewProps.h:56`) and the separate ViewManager is
+// ANDROID's — on iOS both tags resolve to RCTScrollView, so the PROP is what turns the axis there
+// and a bare `<horizontal-scroll-view>` would otherwise scroll vertically. Written from the tag
+// rather than read off props, which is the same source `buildStructure` picked the content
+// intrinsic from; an app that also writes `horizontal` on the vertical tag is contradicting the
+// element it chose, and the tag wins.
+//
+// `nestedScrollEnabled` defaults ON because every wrapper writes it on every ScrollView, both
+// platforms. RN itself only defaults it on the Android RefreshControl WRAP path
+// (`ScrollView.js:1862`) — parity here is with the wrapper, which is what the lowered path replaces.
+export function ownerFold(base: IViewStyle, horizontal: boolean): IPayloadFold {
   return props => {
     const next: Record<string, unknown> = {
       ...props,
       style: [base, props.style],
+      nestedScrollEnabled: props.nestedScrollEnabled ?? true,
     };
+    if (horizontal) next.horizontal = true;
+    // Consumed by the behavior and declared by no ViewConfig — neither name appears anywhere under
+    // `ReactCommon/react/renderer/components/scrollview`. `stickyHeaderIndices` decides which
+    // children get a `sticky-header`, `invertStickyHeaders` feeds the pin. Every wrapper strips both
+    // (Vue's `HANDLED_ATTRS` is the reference list), and a key Fabric does not know throws nothing,
+    // logs nothing and paints nothing — so the strip has to be here or it is never noticed.
+    delete next.stickyHeaderIndices;
+    delete next.invertStickyHeaders;
     const rate = props.decelerationRate;
     if (rate === 'normal' || rate === 'fast' || typeof rate === 'number')
       next.decelerationRate = resolveDecelerationRate(rate);
@@ -253,11 +280,14 @@ function syncOwnedListener(
 // else; Android takes it as a `wrap` and has to move the scroll view's layout style up to it,
 // which is what `onWrapChange` is for.
 //
-// The hook is a FACTORY over the axis base rather than the hook itself, because the two behaviors
+// The hook is a FACTORY over the axis rather than the hook itself, because the two behaviors
 // registered below carry different bases (vertical and horizontal) and each needs its own.
 export interface IScrollPlatform {
   claimMode: IClaimMode;
-  onWrapChange?: (base: IViewStyle) => IHostBehavior['onWrapChange'];
+  onWrapChange?: (
+    base: IViewStyle,
+    horizontal: boolean,
+  ) => IHostBehavior['onWrapChange'];
   // Owner props this platform's WRAPPER fold reads, added to the slot's own. Android's needs
   // `style`, because the layout half of the scroll view's style is what the wrapper paints.
   //
@@ -273,6 +303,9 @@ function scrollBehavior(
   rowStyle: IViewStyle | undefined,
   platform: IScrollPlatform,
 ): IHostBehavior {
+  // The row style is the horizontal tag's constant and nothing else carries it, so it IS the axis —
+  // deriving keeps the two from ever disagreeing about which behavior this is.
+  const horizontal = rowStyle !== undefined;
   return {
     // `scroll` and `layout` are owned for the collision reason rather than because the behavior
     // consumes them: RN's ScrollView installs `_handleScroll` and `_handleLayout` on the native
@@ -283,9 +316,9 @@ function scrollBehavior(
     slotProps: SLOT_PROPS,
     slotDerived: [...SLOT_DERIVED, ...(platform.slotDerived ?? [])],
     claimedChildren: { [REFRESH_CONTROL]: platform.claimMode },
-    onWrapChange: platform.onWrapChange?.(base),
+    onWrapChange: platform.onWrapChange?.(base, horizontal),
     buildStructure: buildContent(contentIntrinsic, rowStyle),
-    foldPayload: ownerFold(base),
+    foldPayload: ownerFold(base, horizontal),
     // The scroll dispatcher is installed here and never conditionally: it is what drives the
     // sticky AnimatedValue, and a header can register long after this node was created. It costs a
     // forward per scroll event on a ScrollView with no sticky child, which is what RN pays too.
@@ -297,6 +330,11 @@ function scrollBehavior(
       );
     },
     onOwnedListenerChange: syncOwnedListener,
+    // The one beat at which the app's children are all present — `stickyHeaderIndices` addresses
+    // them positionally, and no hook reports a children CHANGE. Costs a Set iteration per commit
+    // over the ScrollViews alone, and `reconcileStickyIndices` returns on a WeakSet miss for any
+    // that never used the prop.
+    afterCommit: reconcileStickyIndices,
     detach(node) {
       lastContentSize.delete(node);
       releaseStickyOwner(node);
@@ -310,7 +348,7 @@ export function registerScrollViewBehaviors(platform: IScrollPlatform): void {
   registerHostBehavior(
     SCROLL_VIEW_TAG,
     scrollBehavior(
-      'symbiote-scroll-content',
+      'scroll-content',
       SCROLL_VIEW_BASE_VERTICAL,
       undefined,
       platform,
@@ -319,7 +357,7 @@ export function registerScrollViewBehaviors(platform: IScrollPlatform): void {
   registerHostBehavior(
     HORIZONTAL_SCROLL_VIEW_TAG,
     scrollBehavior(
-      'symbiote-horizontal-scroll-content',
+      'horizontal-scroll-content',
       SCROLL_VIEW_BASE_HORIZONTAL,
       { flexDirection: 'row' },
       platform,

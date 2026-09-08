@@ -31,7 +31,7 @@ let capturedHost: PressableHost | undefined;
       (pressIn)="onPressIn($event)"
       (pressOut)="onPressOut($event)"
     >
-      <symbiote-text>Press me</symbiote-text>
+      <text>Press me</text>
     </Pressable>
   `,
 })

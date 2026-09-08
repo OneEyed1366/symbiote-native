@@ -69,7 +69,7 @@ const INNER_SOURCE = `<script lang="ts">
      parent === undefined ? 'no-parent' : (typeof parent.jumpTo === 'function' ? 'tab-parent' : 'other-parent'),
    ].join('|'));
  </script>
- <symbiote-view p={{ testID: 'inner', accessibilityLabel: label }} />`;
+ <view p={{ testID: 'inner', accessibilityLabel: label }} />`;
 
 const STACK_HOST_SOURCE = `<script lang="ts">
    import Stack from './stack/index.svelte';
@@ -78,9 +78,9 @@ const STACK_HOST_SOURCE = `<script lang="ts">
    import { useRoute } from './runes/use-route.svelte';
    const route = useRoute();
  </script>
- <symbiote-view p={{ testID: 'stack-host', accessibilityLabel: route.current.name }}><Stack><Screen name="inner" component={Inner} /></Stack></symbiote-view>`;
+ <view p={{ testID: 'stack-host', accessibilityLabel: route.current.name }}><Stack><Screen name="inner" component={Inner} /></Stack></view>`;
 
-const OTHER_SOURCE = `<symbiote-view p={{ testID: 'other' }} />`;
+const OTHER_SOURCE = `<view p={{ testID: 'other' }} />`;
 
 async function mountNested(): Promise<void> {
   const dir = __dirname;

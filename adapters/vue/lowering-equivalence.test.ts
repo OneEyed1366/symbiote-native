@@ -8,9 +8,9 @@
 // reaching two mechanisms is the drift shape this repo treats as P0, so the arms are built per path
 // and then compared to EACH OTHER; that cross-path row is the one no other adapter can run.
 //
-// Each arm compiles the SAME source twice — once through the real transform (lowered) and once
-// through the stock compiler with no transform installed (component). Mounting `h(Component)` by
-// hand would test the wrapper but never the transform, which is the half this oracle exists for.
+// Each arm compiles a REAL SOURCE FILE per spelling — the component one and the bare-tag one — and
+// mounts what the compiler produced. Mounting `h(Component)` by hand would compare two hand-built
+// trees and never the compiler's, which is the half this oracle exists for.
 
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
@@ -31,10 +31,9 @@ import {
 } from '@symbiote-native/test-utils';
 import { HOST_PRIMITIVES } from '@symbiote-native/components/host-primitives';
 import * as runtimeHelpers from './src/runtime-helpers';
-import * as stateStyle from './src/state-style';
 import metroVueTransformer from './metro-vue-transformer.cjs';
 import vueJsx from '@vue/babel-plugin-jsx';
-import lowerHostPrimitives from './babel-lower-host-primitives.cjs';
+import symbioteVueJsx from './babel-jsx.cjs';
 
 const ROOT_TAG = 9401;
 const TEST_ID = 'probe';
@@ -55,7 +54,6 @@ const moduleRequire = (specifier: string): unknown => {
   if (specifier === '@symbiote-native/engine') return engine;
   if (specifier === '@symbiote-native/vue/runtime-helpers')
     return runtimeHelpers;
-  if (specifier === '@symbiote-native/vue/state-style') return stateStyle;
   if (specifier === '@symbiote-native/vue') return vueAdapter;
   // The stock SFC compiler and @vue/babel-plugin-jsx both emit `from "vue"`; only the transformed
   // arm has its imports retargeted at the runtime-helpers shim, so the component arm needs this.
@@ -112,14 +110,31 @@ async function mountArm(component: Component): Promise<readonly IFakeNode[]> {
 
 // `id` rather than a per-primitive prop: every entry in HOST_PRIMITIVES carries `ID_ALIAS`, so this
 // exercises a real fold on all eight from the SPEC rather than from a hand-written table.
+// The two arms differ in what the APP WROTE, not in how it was compiled. Until 2026-09-08 the tag
+// arm was produced by running a lowering transform over the component source; the transform is
+// retired — an app writes the tag itself — so the fixture authors both spellings and one compiler
+// pipeline handles each.
+const ATTRS = `id="${TEST_ID}" testID="${TEST_ID}"`;
+
 const sfcSource = (name: string): string =>
   `<script setup lang="ts">\nimport { ${name} } from '@symbiote-native/vue';\n</script>\n` +
-  `<template><${name} id="${TEST_ID}" testID="${TEST_ID}" /></template>`;
+  `<template><${name} ${ATTRS} /></template>`;
+
+// The block carries a statement because @vue/compiler-sfc drops an EMPTY one, and the adapter's
+// transformer refuses an SFC with no script at all. A bare tag needs no import — that is the point
+// of the arm — so the statement is inert.
+const sfcTagSource = (tag: string): string =>
+  `<script setup lang="ts">\nconst __tagArm = true;\n</script>\n` +
+  `<template><${tag} ${ATTRS} /></template>`;
 
 const tsxSource = (name: string): string =>
   `import { ${name} } from '@symbiote-native/vue';\n` +
   `import { defineComponent } from '@vue/runtime-core';\n` +
-  `export default defineComponent(() => () => <${name} id="${TEST_ID}" testID="${TEST_ID}" />);`;
+  `export default defineComponent(() => () => <${name} ${ATTRS} />);`;
+
+const tsxTagSource = (tag: string): string =>
+  `import { defineComponent } from '@vue/runtime-core';\n` +
+  `export default defineComponent(() => () => <${tag} ${ATTRS} />);`;
 
 interface IArm {
   committed: readonly IFakeNode[];
@@ -129,11 +144,14 @@ interface IArm {
 
 async function sfcArm(name: string, lowered: boolean): Promise<IArm> {
   if (lowered) {
-    const code = await compileSfc(sfcSource(name), `/low-${name}.vue`);
+    // The adapter's own SFC pipeline, which is what an app runs: it supplies the isCustomElement
+    // a hyphenated tag needs, or the compiler would emit resolveComponent and mount nothing.
+    const tag = HOST_PRIMITIVES[name].intrinsic;
+    const code = await compileSfc(sfcTagSource(tag), `/tag-${name}.vue`);
     return { committed: await mountArm(evaluate(code)), code };
   }
-  // The stock compiler, with no nodeTransform and no isCustomElement: the same source left as a
-  // component, which is what the lowered arm has to agree with.
+  // The stock compiler, with no nodeTransform and no isCustomElement: the component spelling,
+  // which is what the tag arm has to agree with.
   const { descriptor } = sfcCompiler.parse(sfcSource(name), {
     filename: `/cmp-${name}.vue`,
   });
@@ -146,14 +164,19 @@ async function sfcArm(name: string, lowered: boolean): Promise<IArm> {
 }
 
 async function tsxArm(name: string, lowered: boolean): Promise<IArm> {
-  const out = babel.transformSync(tsxSource(name), {
+  // symbioteVueJsx pairs the plugin with the isCustomElement a hyphenated tag needs; the component
+  // arm takes the bare plugin, since a capitalized name never consults that option.
+  const source = lowered
+    ? tsxTagSource(HOST_PRIMITIVES[name].intrinsic)
+    : tsxSource(name);
+  const out = babel.transformSync(source, {
     babelrc: false,
     configFile: false,
     filename: `${name}.tsx`,
     presets: [
       ['@babel/preset-typescript', { isTSX: true, allExtensions: true }],
     ],
-    plugins: lowered ? [lowerHostPrimitives, [vueJsx, {}]] : [[vueJsx, {}]],
+    plugins: lowered ? symbioteVueJsx() : [[vueJsx, {}]],
   });
   const code = out?.code ?? '';
   return { committed: await mountArm(evaluate(code)), code };
@@ -171,8 +194,8 @@ const NAMES = Object.keys(HOST_PRIMITIVES);
 // intrinsic as a string literal and the component arm's names an imported identifier, so the two
 // are told apart by what the compiler PRINTED rather than by what the mount allocated.
 //
-// Matched WITH ITS QUOTES, never as a bare substring: `symbiote-text-input` is a prefix of
-// `symbiote-text-input-multiline` and of the two `-managed` spellings, so `includes(tag)` reads any
+// Matched WITH ITS QUOTES, never as a bare substring: `text-input` is a prefix of
+// `text-input-multiline` and of the two `-managed` spellings, so `includes(tag)` reads any
 // of the four as "lowered" and a transform emitting the wrong sibling would report correct.
 function assertPathsAreDistinct(
   component: IArm,

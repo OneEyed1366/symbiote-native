@@ -11,6 +11,9 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
+// See scroll-view.smoke.test.ts: mounting through `../../render` skips `index.ts`, so the host
+// behaviors have to be named here.
+import '../../register';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -34,15 +37,9 @@ const SECTIONS = [
 // tree is pre-compiled to a sibling .mjs with its static import specifiers rewritten. The
 // `.section-smoke-` prefix keeps these artifacts distinct from the other suites' temp files.
 const COMPONENTS_DIR = join(__dirname, '..');
-const VIEW_OUT = join(COMPONENTS_DIR, '.section-smoke-compiled-view.mjs');
 const REFRESH_CONTROL_OUT = join(
   COMPONENTS_DIR,
   '.section-smoke-compiled-refresh-control.mjs',
-);
-const STICKY_HEADER_OUT = join(
-  COMPONENTS_DIR,
-  'scroll-view',
-  '.section-smoke-compiled-sticky-header.mjs',
 );
 const LIST_OUT = join(
   COMPONENTS_DIR,
@@ -85,27 +82,10 @@ function compileToFile(
 
 function compileSectionListTree(): void {
   compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'),
-    'View.svelte',
-    VIEW_OUT,
-  );
-  compileToFile(
     readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8'),
     'RefreshControl.svelte',
     REFRESH_CONTROL_OUT,
   );
-
-  const stickyHeader = compile(
-    readFileSync(
-      join(COMPONENTS_DIR, 'scroll-view', 'sticky-header.svelte'),
-      'utf8',
-    ),
-    { ...COMPILE_OPTIONS, filename: 'sticky-header.svelte' },
-  ).js.code.replace(
-    "from '../View.svelte'",
-    "from '../.section-smoke-compiled-view.mjs'",
-  );
-  writeFileSync(STICKY_HEADER_OUT, stickyHeader);
 
   const list = compile(
     readFileSync(
@@ -113,15 +93,10 @@ function compileSectionListTree(): void {
       'utf8',
     ),
     { ...COMPILE_OPTIONS, filename: 'VirtualizedList.svelte' },
-  )
-    .js.code.replace(
-      "from '../RefreshControl.svelte'",
-      "from '../.section-smoke-compiled-refresh-control.mjs'",
-    )
-    .replace(
-      "from '../scroll-view/sticky-header.svelte'",
-      "from '../scroll-view/.section-smoke-compiled-sticky-header.mjs'",
-    );
+  ).js.code.replace(
+    "from '../RefreshControl.svelte'",
+    "from '../.section-smoke-compiled-refresh-control.mjs'",
+  );
   writeFileSync(LIST_OUT, list);
 
   const sectionList = compile(
@@ -146,8 +121,8 @@ function compileSectionListTree(): void {
   writeFileSync(WRAPPER_OUT, wrapper);
 }
 
-const CELL_SNIPPETS = `{#snippet cell({ item })}<symbiote-text p={{ text: 'row-' + item }}></symbiote-text>{/snippet}
-     {#snippet sectionHeader({ section })}<symbiote-text p={{ text: 'head-' + section.title }}></symbiote-text>{/snippet}`;
+const CELL_SNIPPETS = `{#snippet cell({ item })}<text p={{ text: 'row-' + item }}></text>{/snippet}
+     {#snippet sectionHeader({ section })}<text p={{ text: 'head-' + section.title }}></text>{/snippet}`;
 
 async function loadRoot(
   source: string,
@@ -173,9 +148,7 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(VIEW_OUT, { force: true });
   rmSync(REFRESH_CONTROL_OUT, { force: true });
-  rmSync(STICKY_HEADER_OUT, { force: true });
   rmSync(LIST_OUT, { force: true });
   rmSync(SECTION_LIST_OUT, { force: true });
   rmSync(WRAPPER_OUT, { force: true });

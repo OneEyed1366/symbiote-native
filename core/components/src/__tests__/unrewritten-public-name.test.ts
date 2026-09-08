@@ -1,6 +1,6 @@
 // A primitive's PUBLIC name must never resolve to a Fabric view.
 //
-// Three of the five adapters rewrite `<View>` to `symbiote-view` at build time, because their
+// Three of the five adapters rewrite `<View>` to `view` at build time, because their
 // compilers decide host-vs-component by tag case and cannot be told otherwise. A missed call site
 // therefore sends the string `"View"` into `descriptorFor`, which used to fall through to
 // `{ component: 'View' }` — committing a Fabric view literally named `View`, with no error at any
@@ -21,24 +21,24 @@ import {
 // and vitest resolves the base file, so importing it would silently test the wrong table. These are
 // the two names that collide, plus enough neighbours for the derivation to be exercised.
 const IOS_NAMES: Record<ISymbioteIntrinsic, string> = {
-  'symbiote-view': 'RCTView',
-  'symbiote-pressable': 'RCTView',
-  'symbiote-text': 'RCTText',
-  'symbiote-image': 'RCTImageView',
-  'symbiote-scroll-view': 'RCTScrollView',
-  'symbiote-scroll-content': 'RCTScrollContentView',
-  'symbiote-horizontal-scroll-view': 'RCTScrollView',
-  'symbiote-horizontal-scroll-content': 'RCTScrollContentView',
-  'symbiote-text-input': 'RCTSinglelineTextInputView',
-  'symbiote-text-input-multiline': 'RCTMultilineTextInputView',
-  'symbiote-text-input-managed': 'RCTSinglelineTextInputView',
-  'symbiote-text-input-multiline-managed': 'RCTMultilineTextInputView',
-  'symbiote-switch': 'Switch',
-  'symbiote-activity-indicator': 'ActivityIndicatorView',
-  'symbiote-safe-area-view': 'SafeAreaView',
-  'symbiote-modal': 'ModalHostView',
-  'symbiote-refresh-control': 'PullToRefreshView',
-  'symbiote-input-accessory-view': 'RCTInputAccessoryView',
+  view: 'RCTView',
+  pressable: 'RCTView',
+  text: 'RCTText',
+  image: 'RCTImageView',
+  'scroll-view': 'RCTScrollView',
+  'scroll-content': 'RCTScrollContentView',
+  'horizontal-scroll-view': 'RCTScrollView',
+  'horizontal-scroll-content': 'RCTScrollContentView',
+  'text-input': 'RCTSinglelineTextInputView',
+  'text-input-multiline': 'RCTMultilineTextInputView',
+  'text-input-managed': 'RCTSinglelineTextInputView',
+  'text-input-multiline-managed': 'RCTMultilineTextInputView',
+  switch: 'Switch',
+  'activity-indicator': 'ActivityIndicatorView',
+  'safe-area-view': 'SafeAreaView',
+  modal: 'ModalHostView',
+  'refresh-control': 'PullToRefreshView',
+  'input-accessory-view': 'RCTInputAccessoryView',
 };
 
 const descriptorFor = makeDescriptorFor(buildDescriptors(IOS_NAMES));
@@ -48,8 +48,8 @@ describe('an unrewritten public name never resolves', () => {
     // why: the control, and it is not decoration — every Negative row below asserts a THROW, and a
     // function that threw on everything would satisfy all of them.
     it('control: the intrinsic tags still resolve', () => {
-      expect(descriptorFor('symbiote-view').component).toBe('RCTView');
-      expect(descriptorFor('symbiote-text').isText).toBe(true);
+      expect(descriptorFor('view').component).toBe('RCTView');
+      expect(descriptorFor('text').isText).toBe(true);
     });
 
     // why: THE collision, measured off the real iOS table. `Switch` and `SafeAreaView` are genuine
@@ -89,10 +89,20 @@ describe('an unrewritten public name never resolves', () => {
       expect(() => descriptorFor('ActivityIndicator')).toThrow(/PUBLIC name/);
     });
 
-    // why: a `symbiote-` miss is our own typo and keeps its own message — the two failures have
-    // different causes and a reader must not be sent looking for a missed rewrite.
-    it('still reports an unknown symbiote tag as a typo, not as a missed rewrite', () => {
-      expect(() => descriptorFor('symbiote-nope')).toThrow(/Unknown symbiote/);
+    // why: this used to assert the mirror-image throw — an unknown `symbiote-*` name was our own
+    // typo and got its own message. The prefix WAS that discriminator, and dropping it took the
+    // guard with it: a lowercase kebab name is just as likely an Angular app's own component
+    // selector (`counter-child`, `app-root`), which reaches here and must resolve. Asserting the
+    // throw would now break every Angular template — measured at 180 failures.
+    //
+    // So the contract flipped, and this pins the direction it flipped to. The typo protection moved
+    // to the compiler: `ISymbioteIntrinsic` is a closed union, so a misspelled tag in our own source
+    // cannot reach runtime at all.
+    it('passes an unknown kebab name through as a view name, for an app selector', () => {
+      expect(descriptorFor('counter-child')).toEqual({
+        component: 'counter-child',
+        isText: false,
+      });
     });
   });
 });

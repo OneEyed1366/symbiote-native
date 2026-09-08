@@ -133,7 +133,7 @@ async function loadProbe(): Promise<Component> {
        const locales = useLocales();
        $effect(() => { onValue(locales.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'LocalesProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

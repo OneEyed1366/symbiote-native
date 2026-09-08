@@ -37,7 +37,7 @@ const rows: IRow[] = [{ id: 'a' }, { id: 'b' }];
       [getItemLayout]="getItemLayout"
     >
       <ng-template vListItem let-item>
-        <symbiote-text [testID]="item.id">{{ item.id }}</symbiote-text>
+        <text [testID]="item.id">{{ item.id }}</text>
       </ng-template>
     </VirtualizedList>
   `,

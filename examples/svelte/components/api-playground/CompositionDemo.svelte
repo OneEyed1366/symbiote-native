@@ -1,7 +1,7 @@
 <script lang="ts" module>
   import type { Snippet } from 'svelte';
   import { setContext } from 'svelte';
-  import { Text, TouchableOpacity, View } from '@symbiote-native/svelte';
+  import { TouchableOpacity } from '@symbiote-native/svelte';
   import { dlog } from '@symbiote-native/engine';
   import ActionButton from '../ActionButton.svelte';
   import TreeNode from './TreeNode.svelte';
@@ -65,26 +65,26 @@
   setContext(API_PLAYGROUND_THEME_CONTEXT, { accent: ACCENT });
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">
+<view class="section-nested">
+  <text class="section-label">
     Component Composition · children, snippets, context
-  </Text>
+  </text>
   {#if header !== undefined}{@render header()}
   {/if}
-  <View class="box-list160" testID="composition-children-slot">
+  <view class="box-list160" testID="composition-children-slot">
     {@render children?.()}
-  </View>
-  <Text class="note-text">
+  </view>
+  <text class="note-text">
     the box above renders CompositionDemo's own `children` snippet — supplied by
     ApiPlaygroundScreen.svelte
-  </Text>
-  <Text class="section-label">
+  </text>
+  <text class="section-label">
     {'<svelte:self> — recursive tree'}
-  </Text>
+  </text>
   <TreeNode node={TREE} />
-  <Text class="section-label">
+  <text class="section-label">
     {'<svelte:component> (Partial)'}
-  </Text>
+  </text>
   <ActionButton
     testID="composition-toggle-badge"
     title="Swap badge"
@@ -92,27 +92,27 @@
     onPress={toggleBadge}
   />
   <svelte:component this={currentBadge} />
-  <Text class="note-text">
+  <text class="note-text">
     Partial — legal, but superseded by a plain component-value reference in
     runes mode; kept here for completeness, not the house convention.
-  </Text>
-  <Text class="section-label">
+  </text>
+  <text class="section-label">
     {'{@attach}'} on a component — forwarded through TouchableOpacity
-  </Text>
+  </text>
   <TouchableOpacity
     testID="composition-touchable"
     onPress={() => {}}
     {@attach onTouchableAttach}
   >
-    <Text class="pressable-label">
+    <text class="pressable-label">
       press, or just mount, to fire the attach
-    </Text>
+    </text>
   </TouchableOpacity>
-  <Text class="info-text" testID="composition-attach-readout">
+  <text class="info-text" testID="composition-attach-readout">
     {`attach fired: ${touchableAttachCount} time(s)`}
-  </Text>
-  <Text class="section-label">
+  </text>
+  <text class="section-label">
     setContext / getContext / hasContext / getAllContexts
-  </Text>
+  </text>
   <ContextConsumer />
-</View>
+</view>
