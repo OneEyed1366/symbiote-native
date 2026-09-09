@@ -5,7 +5,7 @@
 // forwarding the raw value, which native (CSS parsing off) silently ignores: shadow
 // rendered nothing. This restores the missing JS parse + per-color processColor.
 
-import { isOpaqueColorValue, processColor } from '../platform-color';
+import { isProcessableColor, processColor } from '../platform-color';
 import { dlog } from '../debug';
 
 // RN processBoxShadow.js:16-19: split args only on the delimiters that are NOT inside
@@ -39,14 +39,11 @@ function resolveLength(value: unknown): number | null {
   return null;
 }
 
-// A shadow color may already be a platform int (number) or undefined; processColor only
-// types CSS strings / opaque PlatformColor objects. A number is passed through (already
-// resolved), anything else (incl. undefined) is null, i.e. unprocessable, like RN.
+// Every color form this slot accepts goes through the platform processor, exactly as RN's own
+// processColor call for it does: a CSS string, an opaque PlatformColor, and the author's numeric
+// literal alike. Only `undefined` has nothing to resolve, and resolves to null.
 function processShadowColor(color: unknown): unknown {
-  if (typeof color === 'number') return color;
-  if (typeof color === 'string' || isOpaqueColorValue(color))
-    return processColor(color);
-  return null;
+  return isProcessableColor(color) ? processColor(color) : null;
 }
 
 // RN processBoxShadow.js:30-111. Returns [] on any invalid primitive (matches web: an

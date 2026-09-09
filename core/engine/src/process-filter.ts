@@ -5,7 +5,7 @@
 // (Fabric accepts it raw, `filter:[{brightness:0.5}]` was device-verified), but the
 // CSS-string form and drop-shadow color processing were missing. This restores them.
 
-import { isOpaqueColorValue, processColor } from './platform-color';
+import { isProcessableColor, processColor } from './platform-color';
 import { dlog } from './debug';
 import { isRecord } from './type-guards';
 
@@ -52,14 +52,11 @@ function resolveLength(value: unknown): number | null {
   return null;
 }
 
-// A drop-shadow color may already be a platform int (number) or undefined; processColor
-// only types CSS strings / opaque PlatformColor objects. Number passes through, anything
-// else (incl. undefined) is null: unprocessable, like RN.
+// Every color form this slot accepts goes through the platform processor, exactly as RN's own
+// processColor call for it does: a CSS string, an opaque PlatformColor, and the author's numeric
+// literal alike. Only `undefined` has nothing to resolve, and resolves to null.
 function processShadowColor(color: unknown): unknown {
-  if (typeof color === 'number') return color;
-  if (typeof color === 'string' || isOpaqueColorValue(color))
-    return processColor(color);
-  return null;
+  return isProcessableColor(color) ? processColor(color) : null;
 }
 
 // RN processFilter.js:45-124. Returns [] on any invalid primitive (web semantics: an

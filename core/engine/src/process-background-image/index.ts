@@ -4,7 +4,7 @@
 // string / structured array in JS and sends only the processed array to native - Fabric's C++
 // never sees the raw string. This restores that missing JS parse.
 
-import { isOpaqueColorValue, processColor } from '../platform-color';
+import { isProcessableColor, processColor } from '../platform-color';
 import { dlog } from '../debug';
 import { isRecord } from '../type-guards';
 import type {
@@ -82,13 +82,11 @@ function isPositionValue(value: unknown): value is number | string {
   );
 }
 
-// A gradient color may already be a platform int (array form) or a CSS string/PlatformColor
-// object needing processColor; mirrors process-box-shadow's processShadowColor.
+// Every color form this slot accepts goes through the platform processor, exactly as RN's own
+// processColor call for it does: a CSS string, an opaque PlatformColor, and the author's numeric
+// literal alike. Only `undefined` has nothing to resolve, and resolves to null.
 function processStopColor(color: unknown): unknown {
-  if (typeof color === 'number') return color;
-  if (typeof color === 'string' || isOpaqueColorValue(color))
-    return processColor(color);
-  return null;
+  return isProcessableColor(color) ? processColor(color) : null;
 }
 
 // RN processBackgroundImage.js's `getPositionFromCSSValue`: `px` resolves to a plain number,

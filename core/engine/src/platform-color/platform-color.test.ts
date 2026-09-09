@@ -101,13 +101,28 @@ describe('isOpaqueColorValue / isProcessableColor — returns false for anything
     expect(isOpaqueColorValue(42)).toBe(false);
   });
 
-  it('isProcessableColor accepts a CSS string and an opaque color, rejects a bare number or undefined', () => {
+  // why: RN registers every color prop with its own processColor, which takes a NUMBER through
+  // normalizeColor (a range check) and then rotates 0xrrggbbaa into 0xaarrggbb. A number reaching
+  // us is the app author's literal, not an already-resolved platform int - the CSS parser emits
+  // hex STRINGS, and fabricProps builds a fresh payload object rather than writing the resolved
+  // value back into node.props, so nothing in the pipeline can hand the same number back twice.
+  // Skipping the processor makes `color: 0xff0000ff` (opaque red) commit as 0xff0000ff, which
+  // native reads as aarrggbb: blue.
+  it('a numeric color still needs processing - it is the author literal, not a resolved int', () => {
+    expect(isProcessableColor(0xff_00_00_ff)).toBe(true);
+    setColorProcessor(value =>
+      value === 0xff_00_00_ff ? 0xff_ff_00_00 : null,
+    );
+    expect(processColor(0xff_00_00_ff)).toBe(0xff_ff_00_00);
+    setColorProcessor(value => value);
+  });
+
+  it('isProcessableColor accepts every color form, rejects undefined', () => {
     expect(isProcessableColor('rgba(0,0,0,1)')).toBe(true);
     expect(isProcessableColor(PlatformColor('systemBlue'))).toBe(true);
-    // why: a platform int (already the Fabric-resolved output) must NOT be re-run through
-    // the processor — isProcessableColor is how callers tell "still needs processing" apart
-    // from "already resolved".
-    expect(isProcessableColor(0xff_00_00)).toBe(false);
+    expect(isProcessableColor(0xff_00_00)).toBe(true);
+    // why: `undefined` is the one value with nothing to resolve. It is how a caller spells "this
+    // prop is absent", and setProp collapses it to a deleted key rather than a payload entry.
     expect(isProcessableColor(undefined)).toBe(false);
   });
 });

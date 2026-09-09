@@ -13,6 +13,31 @@ import { setColorProcessor } from '../commit';
 
 const PROCESSED_COLOR = 0x7f_b5_ff_d9;
 
+const ROTATED = 0xff_ff_00_00;
+
+// why: a numeric color stop is the app author's own literal (rrggbbaa), not an already-resolved
+// platform int - it owes the same processColor hop a string owes. RN's processColor range-checks
+// it and rotates rrggbbaa into aarrggbb; skipping the hop commits opaque RED unrotated, which
+// native reads as aarrggbb, i.e. blue.
+describe('a numeric color stop goes through the platform processor', () => {
+  it('routes a numeric stop color in the array form', () => {
+    setColorProcessor(value =>
+      value === 0xff_00_00_ff ? ROTATED : PROCESSED_COLOR,
+    );
+    const [gradient] = processBackgroundImage([
+      {
+        type: 'linear-gradient',
+        direction: '180deg',
+        colorStops: [{ color: 0xff_00_00_ff }, { color: 0xff_00_00_ff }],
+      },
+    ]);
+    expect(gradient.colorStops).toEqual([
+      { color: ROTATED, position: null },
+      { color: ROTATED, position: null },
+    ]);
+  });
+});
+
 function installRealisticColorProcessor(): void {
   setColorProcessor(value => {
     if (

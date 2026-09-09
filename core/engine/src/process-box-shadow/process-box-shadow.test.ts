@@ -24,6 +24,36 @@ function installRealisticColorProcessor(): void {
   });
 }
 
+const ROTATED = 0xff_ff_00_00;
+
+// why: a numeric color is the app author's own literal (`color: 0xff0000ff`, rrggbbaa), not an
+// already-resolved platform int - so it owes the same processColor hop a string owes. RN's
+// processColor range-checks it and rotates rrggbbaa into aarrggbb; skipping the hop commits
+// opaque RED as 0xff0000ff, which native reads as aarrggbb, i.e. blue.
+describe('a numeric color goes through the platform processor, exactly like a string', () => {
+  function installNumberRotatingProcessor(): void {
+    setColorProcessor(value =>
+      value === 0xff_00_00_ff ? ROTATED : PROCESSED_COLOR,
+    );
+  }
+
+  it('processBoxShadow routes a numeric shadow color', () => {
+    installNumberRotatingProcessor();
+    expect(
+      processBoxShadow([{ offsetX: 0, offsetY: 2, color: 0xff_00_00_ff }]),
+    ).toEqual([{ offsetX: 0, offsetY: 2, color: ROTATED }]);
+  });
+
+  it('processFilter routes a numeric drop-shadow color', () => {
+    installNumberRotatingProcessor();
+    expect(
+      processFilter([
+        { dropShadow: { offsetX: 0, offsetY: 2, color: 0xff_00_00_ff } },
+      ]),
+    ).toEqual([{ dropShadow: { offsetX: 0, offsetY: 2, color: ROTATED } }]);
+  });
+});
+
 // Reset so the identity processor (the engine default) is restored for any later test.
 afterAll(() => {
   setColorProcessor(value => value);
