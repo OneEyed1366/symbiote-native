@@ -48,6 +48,9 @@ catalogs:
     '@react-native/metro-babel-transformer':
       specifier: 0.86.0
       version: 0.86.0
+    '@react-native/normalize-colors':
+      specifier: 0.86.2
+      version: 0.86.2
     '@react-native/typescript-config':
       specifier: 0.86.0
       version: 0.86.0
@@ -556,6 +559,9 @@ importers:
 
   core/engine:
     dependencies:
+      '@react-native/normalize-colors':
+        specifier: 'catalog:'
+        version: 0.86.2
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)

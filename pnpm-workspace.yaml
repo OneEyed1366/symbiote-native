@@ -207,6 +207,10 @@ catalog:
   '@react-native/typescript-config': 0.86.0
   '@react-native/gradle-plugin': 0.86.0
   '@react-native/codegen': 0.86.0
+  # A real runtime dependency of @symbiote-native/engine, not just tooling: animated/rgba.ts
+  # decomposes colors through it instead of hand-rolling a parser that knew no named colors.
+  # Versioned independently of the 0.86.0 family above - react-native 0.86.0 itself ships 0.86.2.
+  '@react-native/normalize-colors': 0.86.2
   '@react-native/new-app-screen': 0.86.0
   '@react-native-community/cli': 20.1.0
   '@react-native-community/cli-platform-android': 20.1.0
