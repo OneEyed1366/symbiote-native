@@ -421,8 +421,17 @@ const PanResponder = {
           : centroidY(touches);
         gestureState.dx = 0;
         gestureState.dy = 0;
-        // The grant frame is already accounted for, so the first move's velocity
-        // is measured from here, not from time 0.
+        // Two deliberate divergences from upstream's onResponderGrant (PanResponder.js:459),
+        // which sets x0/y0/dx/dy and nothing else. Both are decisions, not drift - recorded here
+        // because the first one spent months living in a comment nobody audited against upstream.
+        //
+        // 1. The grant frame is already accounted for, so the first move's velocity is measured
+        //    from here, not from time 0. packages/navigation's drawer reads vx through
+        //    resolveSwipeIntent with a 0.5 flick threshold, and upstream's version makes the first
+        //    move look instantaneous.
+        // 2. numberActiveTouches is refreshed at grant. Upstream leaves whatever the previous
+        //    gesture's onResponderEnd left behind - usually 0 - so an app reading it inside
+        //    onPanResponderGrant gets a stale count there and a correct one everywhere else.
         gestureState._accountsForMovesUpTo = frameTimestampOf(event, touches);
         gestureState.numberActiveTouches =
           touchHistory?.numberActiveTouches ?? touches.length;
