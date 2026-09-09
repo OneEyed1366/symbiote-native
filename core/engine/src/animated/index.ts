@@ -38,7 +38,7 @@ export {
   type INativeEventAttachment,
 } from './event';
 export { AnimatedColor, type IRgbaValue, type IColorInput } from './color';
-export { Easing, type IEasingFunction } from './easing';
+export { Easing, type IEasing, type IEasingFunction } from './easing';
 export {
   createNumericInterpolation,
   createInterpolation,

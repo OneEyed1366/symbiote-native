@@ -247,6 +247,7 @@ export type {
   IAnimatedEventHandler,
   INativeEventAttachment,
   IValueListener,
+  IEasing,
   IEasingFunction,
   IInterpolationConfig,
   IExtrapolateType,
