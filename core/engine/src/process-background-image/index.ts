@@ -292,9 +292,21 @@ function processBackgroundImageArray(
         dlog('processBackgroundImage reject: invalid radial-gradient size');
         return [];
       }
-      const position = isRadialPositionValue(rawBgImage.position)
-        ? rawBgImage.position
-        : DEFAULT_RADIAL_POSITION;
+      // Upstream just forwards whatever is there (`if (bgImage.position != null)`,
+      // processBackgroundImage.js:178) because Flow's RadialGradientPosition already guarantees
+      // one vertical + one horizontal key. Our IRadialGradientPosition says the same, so a
+      // half-specified position is unreachable from typed code and this branch only fires for
+      // untyped JS - where centering beats handing native a malformed map. Keeping the guard, but
+      // it must not be silent: a position the author DID write is being discarded.
+      let position = DEFAULT_RADIAL_POSITION;
+      if (isRadialPositionValue(rawBgImage.position)) {
+        position = rawBgImage.position;
+      } else if (rawBgImage.position != null) {
+        dlog(
+          `processBackgroundImage: radial-gradient position needs one vertical and one ` +
+            `horizontal edge, got ${JSON.stringify(rawBgImage.position)} - centering instead`,
+        );
+      }
 
       result.push({
         type: 'radial-gradient',
