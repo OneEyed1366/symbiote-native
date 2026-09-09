@@ -596,9 +596,11 @@ Full incident record: `angular-adapter` skill §19.
 **zero** imports from `react-native` — a module we already carry as a `peerDependency` and that
 is therefore always present at runtime. Every one of those files re-derives by hand the corner
 cases of an implementation we already ship. It is the same mistake the CSS parser had before it
-was rebuilt around `lightningcss`, and it has already cost a real device bug (`process-transform`
-diverged from upstream on array input and crashed Android with
-`String cannot be cast to ReadableArray`).
+was rebuilt around `lightningcss`, and it has already cost a real device bug: `process-transform` crashed
+Android with `String cannot be cast to ReadableArray`. **The cause was the ABSENCE of the JS parse,
+not a divergence** - RN parses `transform` in JS only for a STRING, and we forwarded a raw string.
+This line read "diverged from upstream on array input" until 2026-09-10, which sends the next
+reader auditing the wrong branch.
 
 Measured against `react-native@0.86.0`, the candidates split cleanly:
 
