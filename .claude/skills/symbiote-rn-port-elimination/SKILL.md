@@ -367,3 +367,52 @@ const RE =
 - Do **not** put this work on an engine or perf branch.
 - Do **not** reach for a Vitest alias stub instead of the Flow transform — importing a fake
   instead of a hand-rolled port trades one reimplementation for a worse one.
+
+## Corrections measured 2026-09-10 — four facts above are now wrong
+
+A seven-domain re-audit (reports: `.docs/rn-port-elimination-audit.md`,
+`.docs/list-parity-across-adapters.md` — untracked, `.docs/` is gitignored) contradicted this
+skill on four points. Each was measured, not reasoned.
+
+**1. The vendored path is `.vendors/react-native/packages/react-native/Libraries/**`**, not
+`.vendors/react-native/Libraries/**`. The checkout is the RN monorepo. Six briefs written against
+the shorter path had to fall back to `node_modules`.
+
+**2. The list family is a SEPARATE npm package.** `Libraries/Lists/*` are 17-27-line re-export
+shims; the source is `@react-native/virtualized-lists@0.86.0`, whose runtime deps are only
+`invariant` + `nullthrows`. It is declared nowhere in this repo, so taking it is a manifest change.
+Six of its files are React-free and importable whole — `ViewabilityHelper` (353),
+`ListMetricsAggregator` (331), `VirtualizeUtils` (257), `FillRateHelper` (256), `CellRenderMask`
+(156), `ChildListCollection` (73). Traps: the `Libraries/Lists` shims cover only three of the six
+and re-export `keyExtractor` alone from `VirtualizeUtils`; the package barrel pulls React; and
+`exports` declares `"types": null` for every subpath, so each import needs our own `.d.ts`.
+
+**3. `ReactNativeAttributePayload` moved out of `Renderer/`** into
+`Libraries/ReactNative/ReactFabricPublicInstance/`, and its value closure is THREE files — itself,
+`deepDiffer.js`, `flattenStyle.js` — with zero renderer hits. Constraint 1 does not block it. This
+skill assumes otherwise. Its `flattenStyle` and `deepDiffer` leaves are importable; `create()` and
+`diff()` are not, for a CONFIG reason rather than a renderer one (they are driven by a
+`validAttributes` we deliberately do not have, and `create` flags every function prop `true` where
+our `GATED_EVENT_PROPS` flags exactly six).
+
+**4. The ~1.2k-LOC Tier B floor is ALREADY PAID, so its break-even is the zeroth module.** All five
+`adapters/*/src/bootstrap.ts:6` do `import { AppRegistry } from 'react-native'` — closure 456 files
+/ 91 566 LOC, containing every floor file, every Tier B candidate, and `RendererProxy` itself. The
+invariant still intact, and the one conversions must not break, is that `core/engine/src/index.ts`
+does not reach the renderer. Tier B's cost/benefit in this file was computed against a floor nobody
+pays twice.
+
+**And Tier C is a module-level verdict hiding a symbol-level one.** `Keyboard` and
+`AccessibilityInfo` each reach `RendererProxy` through exactly ONE symbol used by exactly ONE
+method (`dismissKeyboard`->`TextInputState`->`findNodeHandle`, and `sendAccessibilityEvent`). Their
+other submodules are renderer-free and individually importable, so the answer is a partial import,
+not a full port. For `Image` the edge is real but belongs to the COMPONENT
+(`ImageViewNativeComponent` -> `codegenNativeCommands`); the loader path is clean. Consequence:
+`core/components/src/bootstrap/index.ts:6` imports `{ Image }` from the barrel and drags 106 files
+plus react plus ReactFabric into every adapter's bootstrap, when it needs only
+`react-native/Libraries/Image/resolveAssetSource` (145 LOC, 22 files).
+
+**Method note that outlived the findings.** Where two auditors disagreed about the SAME shared
+file, one of them was always looking at a real gap — the disagreement located it. A `YES` in a
+feature inventory means "I found code", never "the behaviour matches RN"; only reading both sides
+settles that. Both times it was checked by hand here, there was something there.
