@@ -354,7 +354,13 @@ export function fabricProps(node: ISymbioteNode): IFabricProps {
     const value = props[key];
     if (typeof value === 'function') continue;
     if (value === undefined) continue;
-    out[key] = processValue(node.component, key, value);
+    const processed = processValue(node.component, key, value);
+    // A processor that REFUSES its input answers undefined (a malformed transformOrigin, a
+    // malformed aspectRatio). Assigning it would hand Fabric an explicit undefined for a prop the
+    // app never set; absent is what "refused" means. The check is one strict comparison per key
+    // and allocates nothing, so it does not fall under this loop's own for-in caution above.
+    if (processed === undefined) continue;
+    out[key] = processed;
   }
   // Hoist the style slot (object | array | nested arrays) into the SAME payload object - no
   // intermediate flatten. See addStyle for the shape and for the two things this fixed.
