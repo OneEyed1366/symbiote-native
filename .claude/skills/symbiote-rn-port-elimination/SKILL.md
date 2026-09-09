@@ -315,6 +315,35 @@ that reads nine or sixteen — but it used to reach it silently, and now it is d
 **A red test here is a question about which side is wrong, not a fixture to retune.** Three of the
 four fixtures were written from the port's own behaviour and documented a decision nobody made.
 
+## Decided 2026-09-10: PanResponder KEEPS its divergence, and only its TouchHistoryMath half went
+
+Upstream's `onResponderGrant` sets `x0/y0/dx/dy` and leaves `_accountsForMovesUpTo` at 0. Ours
+seeds it with the grant frame's timestamp (`pan-responder/index.ts`, and the line says why). The
+consequence is only visible on a gesture claimed at START, where no capture-phase move has advanced
+the clock: upstream then computes `dt` against an absolute timestamp and reports `vx ~ 0` on the
+first move, and we report a real velocity.
+
+That is not academic. `packages/navigation`'s drawer, in all five adapters, reads `vx` through
+`resolveSwipeIntent` with a 0.5 flick threshold — so adopting upstream's PanResponder wholesale
+would stop a fast swipe being recognised. **Decision: keep ours.** It was a deliberate improvement
+recorded only in a code comment until now.
+
+What DID go is the `TouchHistoryMath` half: six centroid readings that were a line-by-line
+re-derivation of a dependency-free, native-free upstream module. Verified first by running upstream
+against our own record shape across five histories and three thresholds — including the case where
+its two scans disagree (a timestamp EQUAL to the threshold, where the single-active-touch fast path
+uses a strict `>` and the multi-touch loop uses `>=`).
+
+The per-record runtime guard went with it. It existed because `nativeEvent` is a
+`Record<string, unknown>` and the no-`as` rule forces a guard; `touchHistoryOf` already validates
+the bank at the boundary, and our own `touch-history.ts` writes what is inside it. A malformed
+record now yields NaN rather than being skipped — reachable only from a hand-built fixture, which
+is a bad fixture rather than a defect the guard should hide.
+
+**`processFontVariant` was deliberately NOT taken.** Our port is upstream plus a `[]` fallback, and
+upstream is `split(' ').filter(Boolean)` — there are no corner cases to inherit, so the import edge
+would buy nothing. Ports are deleted to inherit upstream's edge cases, not to lower a line count.
+
 ## The closure script (re-run it on every RN bump — the tiers move)
 
 ```sh
