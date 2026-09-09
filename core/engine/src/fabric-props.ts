@@ -17,6 +17,12 @@ import { processTransform } from './process-transform';
 import { processAspectRatio } from './process-aspect-ratio';
 import { processFontVariant } from './process-font-variant';
 import { processBackgroundImage } from './process-background-image';
+import {
+  processBackgroundPosition,
+  processBackgroundRepeat,
+  processBackgroundSize,
+  type IBackgroundLonghandInput,
+} from './process-background-longhands';
 import { isRecord, isString } from './type-guards';
 
 // Color props must reach Fabric as platform ints, not CSS strings. Fabric's C++
@@ -67,10 +73,19 @@ const COLOR_PROPS: ReadonlySet<string> = new Set([
   'trackTintColor',
 ]);
 
-// Structured CSS-style keys RN parses in JS before native (boxShadow/filter register
-// with enableNativeCSSParsing(), which DEFAULTS TO FALSE, so native CSS parsing is off
-// and the raw string is dropped). Each runs on the hoisted top-level style key, turning
-// a CSS string or structured array into the processed array Fabric's C++ expects.
+// Structured CSS-style keys RN parses in JS before native. Each runs on the hoisted top-level
+// style key, turning a CSS string or structured array into the processed array Fabric's C++
+// expects.
+//
+// The gate is enableNativeCSSParsing(), which defaults to false today - but upstream READS that
+// flag once at module load (ReactNativeStyleAttributes.js:27) and switches all eleven attributes
+// to raw passthrough when it is on, whereas this table always processes. So an app that enables
+// the flag gets upstream sending raw and us sending processed: same input, different payload.
+// Latent while the default holds; the fix is to read the flag, not to port anything.
+//
+// Keep this table in step with ReactNativeStyleAttributes' gated attributes. It carried
+// backgroundImage without its three longhand siblings for as long as they have existed, and the
+// symptom of a missing entry is silent: the CSS string reaches Fabric, which expects a structure.
 const STYLE_PROCESSORS = new Map<string, (value: unknown) => unknown>([
   ['boxShadow', value => processBoxShadow(asBoxShadowInput(value))],
   ['filter', value => processFilter(asFilterInput(value))],
@@ -85,7 +100,28 @@ const STYLE_PROCESSORS = new Map<string, (value: unknown) => unknown>([
     'experimental_backgroundImage',
     value => processBackgroundImage(asBackgroundImageInput(value)),
   ],
+  [
+    'experimental_backgroundSize',
+    value => processBackgroundSize(asBackgroundLonghandInput(value)),
+  ],
+  [
+    'experimental_backgroundPosition',
+    value => processBackgroundPosition(asBackgroundLonghandInput(value)),
+  ],
+  [
+    'experimental_backgroundRepeat',
+    value => processBackgroundRepeat(asBackgroundLonghandInput(value)),
+  ],
 ]);
+
+// All three longhands take the same two shapes: a CSS string, or an already-structured array RN
+// passes through untouched. Anything else is undefined, which upstream answers with [] and the
+// wrapper turns into an absent key.
+function asBackgroundLonghandInput(value: unknown): IBackgroundLonghandInput {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value;
+  return undefined;
+}
 
 // boxShadow accepts a CSS string or an array of shadow objects; anything else is
 // undefined to processBoxShadow (which returns []). Narrowing avoids an `as` cast.
