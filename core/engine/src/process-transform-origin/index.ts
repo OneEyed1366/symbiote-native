@@ -7,8 +7,12 @@
 // ReadableArray and crashed. This restores the missing parse.
 //
 // Why the try/catch: upstream rejects a malformed origin through `invariant`, i.e. it THROWS, and
-// a commit path must never throw. Note these invariants are NOT __DEV__-gated - unlike
-// processTransform's array check, upstream refuses '50% left' in a Release build too.
+// a commit path must never throw. Which of its invariants survive a Release build is worth being
+// precise about, because this comment said "these invariants are NOT __DEV__-gated" and that is
+// only half true: `_validateTransformOrigin` IS gated (processTransformOrigin.js:115), while the
+// four invariants inside the parse loop (:42, :52, :79, :91) are not. '50% left' hits an ungated
+// one - a horizontal keyword in the y slot - so upstream does refuse it in Release, and the
+// try/catch is load-bearing there. A malformed ARRAY, by contrast, is only caught in dev.
 //
 // The hand-written port this replaces kept whatever it had parsed and returned a PARTIAL origin.
 // That is not the safer option it looks like: a partial origin is a real, wrong origin, applied
