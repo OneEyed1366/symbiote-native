@@ -45,10 +45,13 @@
     "test:node": "node scripts/run-node-tests.mjs"
   },
   "devDependencies": {
+    "@babel/core": "catalog:",
+    "@babel/plugin-transform-flow-strip-types": "catalog:",
     "@changesets/changelog-github": "catalog:",
     "@changesets/cli": "catalog:",
     "@eslint/js": "catalog:",
     "@eslint/json": "catalog:",
+    "babel-plugin-syntax-hermes-parser": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-plugin-react-hooks": "catalog:",

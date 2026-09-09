@@ -30,6 +30,9 @@ catalogs:
     '@babel/core':
       specifier: ^7.25.2
       version: 7.29.7
+    '@babel/plugin-transform-flow-strip-types':
+      specifier: ^7.25.2
+      version: 7.29.7
     '@changesets/changelog-github':
       specifier: ^1.0.0
       version: 1.0.0
@@ -90,6 +93,9 @@ catalogs:
     astro:
       specifier: ^7.0.3
       version: 7.0.6
+    babel-plugin-syntax-hermes-parser:
+      specifier: ^0.36.0
+      version: 0.36.0
     babel-preset-solid:
       specifier: ^1.9.12
       version: 1.9.12
@@ -248,6 +254,12 @@ importers:
 
   .:
     devDependencies:
+      '@babel/core':
+        specifier: 'catalog:'
+        version: 7.29.7
+      '@babel/plugin-transform-flow-strip-types':
+        specifier: 'catalog:'
+        version: 7.29.7(@babel/core@7.29.7)
       '@changesets/changelog-github':
         specifier: 'catalog:'
         version: 1.0.0
@@ -260,6 +272,9 @@ importers:
       '@eslint/json':
         specifier: 'catalog:'
         version: 2.0.1
+      babel-plugin-syntax-hermes-parser:
+        specifier: 'catalog:'
+        version: 0.36.0
       eslint:
         specifier: 'catalog:'
         version: 10.6.0(jiti@2.7.0)

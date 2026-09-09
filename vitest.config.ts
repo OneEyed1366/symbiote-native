@@ -1,3 +1,5 @@
+import babel from '@babel/core';
+import { createRequire } from 'node:module';
 import { defineConfig } from 'vitest/config';
 import solidPlugin from 'vite-plugin-solid';
 
@@ -79,11 +81,88 @@ const SOLID_TRANSFORM = solidPlugin({
 // Vitest imports Angular adapter source directly. The production AOT path is still ngc partial
 // compilation, but source tests need Vite/Oxc to lower Angular's legacy TS decorators before
 // Node evaluates @Component/@Directive files.
+// react-native's own source is Flow, which Rolldown cannot parse - importing any of it from a
+// module a test reaches kills the run with `Parse failure: Flow is not supported`. That is the
+// single reason this repo hand-ported 36 RN modules (symbiote-rn-port-elimination); stripping the
+// types here is what lets a port be deleted in favour of the upstream implementation.
+//
+// The parser swap is load-bearing. @babel/preset-flow, the obvious choice, is BEHIND Flow's
+// syntax and dies on the conditional type at flattenStyle.js:19 with a bare `Missing semicolon`.
+// react-native compiles itself with Hermes' parser for exactly that reason.
+const require_ = createRequire(import.meta.url);
+const HERMES_SYNTAX = require_.resolve('babel-plugin-syntax-hermes-parser');
+const FLOW_STRIP = require_.resolve('@babel/plugin-transform-flow-strip-types');
+
+// RN mixes ESM `import` with top-level `require('./X')` in ONE file (PanResponder.js:15). Vite
+// rewrites the imports and leaves the require, so Node loads the next hop RAW - as Flow - and the
+// failure reads as a syntax error in a file this transform was never asked about. Hoisting those
+// requires into real imports keeps every hop inside the transform.
+const requireToImport = ({ types: t }: { types: typeof babel.types }) => ({
+  visitor: {
+    CallExpression(path: babel.NodePath<babel.types.CallExpression>, state) {
+      if (!t.isIdentifier(path.node.callee, { name: 'require' })) return;
+      const [arg] = path.node.arguments;
+      if (!t.isStringLiteral(arg)) return;
+      if (path.scope.getBinding('require')) return;
+      const ns = path.scope.generateUidIdentifier('req');
+      // A namespace object is not callable, so a CJS target (`invariant`) is read through
+      // `.default`. But RN writes `require('./X').default` against its own ESM files, where that
+      // unwrap is already the caller's - doing it twice yields undefined.
+      const callerUnwraps =
+        path.parentPath.isMemberExpression({ computed: false }) &&
+        t.isIdentifier(path.parentPath.node.property, { name: 'default' });
+      state.file.path.unshiftContainer(
+        'body',
+        t.importDeclaration(
+          [t.importNamespaceSpecifier(ns)],
+          t.stringLiteral(arg.value),
+        ),
+      );
+      path.replaceWith(
+        callerUnwraps
+          ? ns
+          : t.logicalExpression(
+              '??',
+              t.memberExpression(ns, t.identifier('default')),
+              ns,
+            ),
+      );
+    },
+  },
+});
+
+// NOT just `react-native/`: its Flow reaches into sibling @react-native/* packages.
+const RN_SOURCE =
+  /\/node_modules\/(react-native|@react-native\/[^/]+)\/.*\.jsx?$/;
+
+const REACT_NATIVE_FLOW = {
+  name: 'strip-flow-from-react-native',
+  enforce: 'pre' as const,
+  async transform(code: string, id: string) {
+    if (!RN_SOURCE.test(id.split('?')[0])) return null;
+    const out = await babel.transformAsync(code, {
+      filename: id,
+      babelrc: false,
+      configFile: false,
+      sourceMaps: true,
+      plugins: [
+        [HERMES_SYNTAX, { parseLangTypes: 'flow' }],
+        FLOW_STRIP,
+        requireToImport,
+      ],
+    });
+    return out?.code == null ? null : { code: out.code, map: out.map };
+  },
+};
+
 const SHARED = {
   oxc: { decorator: { legacy: true } },
+  plugins: [REACT_NATIVE_FLOW],
   test: {
     environment: 'node' as const,
-    server: { deps: { inline: [/@symbiote-native\//] } },
+    // ./vitest.setup.ts defines __DEV__, which react-native's own source reads bare.
+    setupFiles: ['./vitest.setup.ts'],
+    server: { deps: { inline: [/@symbiote-native\//, /react-native/] } },
   },
 };
 
@@ -124,7 +203,8 @@ export default defineConfig({
       {
         ...SHARED,
         ...BROWSER_CONDITIONS,
-        plugins: [SOLID_TRANSFORM],
+        // SHARED.plugins is REPLACED, not merged, so the Flow transform has to be restated.
+        plugins: [REACT_NATIVE_FLOW, SOLID_TRANSFORM],
         test: {
           ...SHARED.test,
           name: 'solid',
