@@ -262,12 +262,21 @@ implementation with a fake, which defeats the entire point of importing upstream
 
 ## The plan
 
-1. **Step 0 — DONE 2026-09-10, green on all 12.** Fold `vitest-rn-flow-transform.ts` and
-   `vitest-rn-globals.setup.ts` into the real `vitest.config.ts` and declare
-   `@babel/core`, `@babel/plugin-transform-flow-strip-types` and `babel-plugin-syntax-hermes-parser`
-   as devDependencies. Then run the FULL suite once: the probe proved the imports resolve, not that
-   5 500 existing tests still pass with `resolve.extensions` reordered — `.ios.js` now wins over
-   `.js` repo-wide, which is a behaviour change for our own platform modules, not only RN's.
+1. **Step 0 — LANDED 2026-09-10 in `vitest.config.ts`, full suite green (653 files, 5569 tests).**
+   The reference copies beside this file are what shipped, minus two things they got wrong.
+
+   `resolve.extensions` is NOT in the landed config. Putting `.ios.js` ahead of `.js` is repo-wide
+   and would silently change which platform variant every `react-native-*` package resolves to in
+   tests. Add a scoped `resolveId` if a module ever needs it; `processTransform` does not.
+
+   **`define: { __DEV__ }` does not reach a module in the SSR pipeline** — the import succeeds and
+   the first CALL throws `__DEV__ is not defined`, inside our own catch, so it surfaces as an empty
+   result rather than a stack. `vitest.setup.ts` assigns the global instead. `true` is deliberate:
+   RN gates its validation on it, and that validation is the half a port never reproduces.
+
+   And `SHARED.plugins` is REPLACED, not merged, by a project that declares its own — the solid
+   project did, so the transform has to be restated there or half the suite never sees it.
+
 2. **Tier A — delete 12 ports.** One commit per module or small group, each keeping the port's
    existing tests pointed at the upstream implementation. Where our port deliberately DIVERGES
    from upstream, that divergence is either a bug to drop or a documented reason to keep the
@@ -279,6 +288,32 @@ implementation with a fake, which defeats the entire point of importing upstream
 4. **Tier B — module by module, not wholesale.** Land one first (`Platform` or `PixelRatio`) and
    measure the bundle delta on a real example app before continuing.
 5. **Tier C — never.** Record the `RendererProxy` path beside each port so nobody re-litigates it.
+
+## The first port deleted, and what its four red tests were worth
+
+`process-transform/index.ts` is now a wrapper: 157 lines to 44. Upstream validates through
+`invariant`, i.e. it THROWS, so the wrapper catches and dlogs — which keeps the never-throw
+guarantee AND inherits all ~12 checks where the port implemented two. **The recipe generalises:
+import, try/catch, dlog upstream's own message, return the empty result.**
+
+Its own suite went red in four places, and every one was the port being LOOSER than RN in a way
+that forwarded something native cannot read:
+
+```
+[{a: 1, b: 2}]              two properties in one entry     forwarded  -> dropped
+'rotate(0.5)'               RN needs a string with deg/rad  {rotate:0.5} -> dropped
+'perspective(100)'          STRING form needs a unit        {persp:100}  -> dropped
+                            (the ARRAY form takes a bare number - keep both halves pinned)
+'matrix(1,0,0,1,10,20)'     CSS's own 2D matrix is SIX      forwarded  -> dropped
+                            values; RN accepts 9 or 16
+```
+
+The matrix row is the one real capability loss, and it is worth stating to a user: CSS `matrix()`
+in its standard 2D spelling no longer parses. It never worked — six numbers reached a native side
+that reads nine or sixteen — but it used to reach it silently, and now it is dropped silently.
+
+**A red test here is a question about which side is wrong, not a fixture to retune.** Three of the
+four fixtures were written from the port's own behaviour and documented a decision nobody made.
 
 ## The closure script (re-run it on every RN bump — the tiers move)
 
