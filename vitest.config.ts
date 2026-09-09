@@ -155,9 +155,74 @@ const REACT_NATIVE_FLOW = {
   },
 };
 
+// `Libraries/Utilities/Platform.js` is a back-compat shim whose entire body is
+// `import Platform from './Platform'`. Metro resolves that by platform extension to
+// `Platform.ios.js` / `Platform.android.js`; Vite has no such step, so `./Platform` resolves back
+// to the shim ITSELF. The default export is then undefined, and the first `Platform.OS` read
+// throws - inside our own catch, so it surfaces as an empty result rather than a stack. That one
+// self-import is what blocked importing processColor, and with it every colour-touching upstream
+// processor.
+//
+// Pinned to `.ios.js` because that is already this repo's headless answer: core/engine/src/
+// platform/index.ts re-exports the iOS implementation for the same reason - headless has no
+// platform, so the filename is the selector.
+//
+// A resolver rather than `resolve.extensions`: putting `.ios.js` ahead of `.js` repo-wide would
+// silently change which platform variant EVERY react-native-* package resolves to under test, a
+// far larger blast radius than the one file that needs it. Scoped to an importer inside RN's own
+// source so our code, which never imports RN's Platform, cannot be caught by it.
+const RN_PLATFORM_IOS = require_.resolve(
+  'react-native/Libraries/Utilities/Platform.ios.js',
+);
+
+// Platform.ios then reaches `TurboModuleRegistry.getEnforcing('PlatformConstants')` at MODULE
+// scope, so the import throws without a native host - and satisfying that through
+// `global.__turboModuleProxy` is the wrong lever, because that global is itself the SUBJECT of
+// several tests: platform.test.ts sets it to undefined to prove Platform degrades gracefully, and
+// a dozen others install a single-module proxy of their own. A host fake living there either
+// breaks those tests or gets broken by them, depending on load order.
+//
+// Resolving the spec module instead keeps the two apart entirely: RN's chain is satisfied at the
+// import boundary, and `__turboModuleProxy` keeps meaning exactly what every existing test already
+// assumes. The values are an iOS simulator's.
+//
+// `isTesting: false` is the one that is not cosmetic. It stands in for a DEVICE, not for a test
+// runner, and core/engine/src/platform/index.ios.ts:92 derives `isDisableAnimations` from it - set
+// it true and animations switch off engine-wide, which took the native Animated driver down with
+// it in ten tests across three adapters, none of them near this file.
+const RN_PLATFORM_CONSTANTS = '\0symbiote:rn-platform-constants';
+const PLATFORM_CONSTANTS = {
+  forceTouchAvailable: false,
+  interfaceIdiom: 'phone',
+  isTesting: false,
+  osVersion: '26.5',
+  reactNativeVersion: { major: 0, minor: 86, patch: 0, prerelease: null },
+  systemName: 'iOS',
+};
+
+const REACT_NATIVE_PLATFORM = {
+  name: 'react-native-platform-ios',
+  enforce: 'pre' as const,
+  resolveId(source: string, importer: string | undefined) {
+    if (source === RN_PLATFORM_CONSTANTS) return source;
+    if (importer == null) return null;
+    if (!RN_SOURCE.test(importer.split('?')[0])) return null;
+    if (/NativePlatformConstants(IOS|Android)$/.test(source)) {
+      return RN_PLATFORM_CONSTANTS;
+    }
+    return /(^|\/)Platform(\.js)?$/.test(source) ? RN_PLATFORM_IOS : null;
+  },
+  load(id: string) {
+    if (id !== RN_PLATFORM_CONSTANTS) return null;
+    return `export default { getConstants: () => (${JSON.stringify(
+      PLATFORM_CONSTANTS,
+    )}) };`;
+  },
+};
+
 const SHARED = {
   oxc: { decorator: { legacy: true } },
-  plugins: [REACT_NATIVE_FLOW],
+  plugins: [REACT_NATIVE_FLOW, REACT_NATIVE_PLATFORM],
   test: {
     environment: 'node' as const,
     // ./vitest.setup.ts defines __DEV__, which react-native's own source reads bare.
@@ -204,7 +269,9 @@ export default defineConfig({
         ...SHARED,
         ...BROWSER_CONDITIONS,
         // SHARED.plugins is REPLACED, not merged, so the Flow transform has to be restated.
-        plugins: [REACT_NATIVE_FLOW, SOLID_TRANSFORM],
+        // SHARED.plugins is REPLACED, not merged, by a project that declares its own - so every
+        // react-native plugin has to be restated here or solid's tests lose them silently.
+        plugins: [REACT_NATIVE_FLOW, REACT_NATIVE_PLATFORM, SOLID_TRANSFORM],
         test: {
           ...SHARED.test,
           name: 'solid',
