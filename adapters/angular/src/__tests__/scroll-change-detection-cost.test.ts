@@ -50,7 +50,7 @@ function handleFor(testID: string): unknown {
   selector: 'scroll-cost-sibling',
   standalone: true,
   imports: [Text, SymbioteHostPropsDirective],
-  template: `<Text [symbioteHostProps]="probeProps">{{ label }}</Text>`,
+  template: `<text [symbioteHostProps]="probeProps">{{ label }}</text>`,
 })
 class ScrollCostSibling {
   templateReads = 0;
@@ -83,7 +83,7 @@ let mountedSibling: ScrollCostSibling | undefined;
   ],
   template: `
     <scroll-view [symbioteHostProps]="scrollHostProps"></scroll-view>
-    <Text [symbioteHostProps]="ownProbeProps">{{ ownLabel }}</Text>
+    <text [symbioteHostProps]="ownProbeProps">{{ ownLabel }}</text>
     <scroll-cost-sibling></scroll-cost-sibling>
   `,
 })
@@ -149,9 +149,9 @@ class ScrollCostInner {
   standalone: true,
   imports: [Text, SymbioteHostPropsDirective, ScrollCostInner],
   template: `
-    <Text [symbioteHostProps]="screenProbeProps">{{ screenLabel }}</Text>
+    <text [symbioteHostProps]="screenProbeProps">{{ screenLabel }}</text>
     @for (row of rows; track row) {
-      <Text [symbioteHostProps]="screenProbeProps">{{ rowLabel(row) }}</Text>
+      <text [symbioteHostProps]="screenProbeProps">{{ rowLabel(row) }}</text>
     }
     <scroll-cost-inner></scroll-cost-inner>
   `,
@@ -193,7 +193,7 @@ let mountedSignalChild: SignalChild | undefined;
   selector: 'signal-child',
   standalone: true,
   imports: [Text, SymbioteHostPropsDirective],
-  template: `<Text [symbioteHostProps]="probeProps">{{ label() }}</Text>`,
+  template: `<text [symbioteHostProps]="probeProps">{{ label() }}</text>`,
 })
 class SignalChild {
   templateReads = 0;
@@ -217,9 +217,9 @@ class SignalChild {
   standalone: true,
   imports: [Text, SymbioteHostPropsDirective, SignalChild],
   template: `
-    <Text [symbioteHostProps]="screenProbeProps">{{ screenLabel }}</Text>
+    <text [symbioteHostProps]="screenProbeProps">{{ screenLabel }}</text>
     @for (row of rows; track row) {
-      <Text [symbioteHostProps]="screenProbeProps">{{ rowLabel(row) }}</Text>
+      <text [symbioteHostProps]="screenProbeProps">{{ rowLabel(row) }}</text>
     }
     <signal-child></signal-child>
   `,

@@ -9,8 +9,8 @@
 // in ngAfterViewChecked. OnPush + ChangeDetectorRef.markForCheck() drives re-render off the native
 // scroll/layout/measure callbacks (they fire outside Angular's own event bindings, so they must
 // mark the view dirty). This is the Angular twin of the React useReducer/useEffect and Vue
-// ref/computed/watch over the same shared functions. It composes the Angular ScrollView, exactly
-// as the React/Vue lists drive their ScrollView.
+// ref/computed/watch over the same shared functions. It writes the `scroll-view`/
+// `horizontal-scroll-view` TAG directly, exactly as the React/Vue lists drive their scroll tag.
 //
 // Per-item rendering is TEMPLATES, not a callback: React/Vue `renderItem: (info) => element` does
 // not translate to Angular. The app supplies the cell via `<ng-template vListItem>` (and the
@@ -80,20 +80,21 @@ import {
   type IViewabilityConfigCallbackPair,
   type IViewableItemsChangedInfo,
   type IVirtualizedListHandle,
+  buildScrollViewHandle,
 } from '@symbiote-native/components';
 import {
   dlog,
   flattenStyle,
+  isSymbioteNode,
   type IStyleProp,
   type ISymbioteEvent,
   type ISymbioteNode,
   type IViewStyle,
 } from '@symbiote-native/engine';
 import { countAngular } from '../../diagnostics';
-import { ScrollView } from '../scroll-view';
-import { RefreshControl } from '../refresh-control';
 import {
   anchorHostStyle,
+  SymbioteHostPropsDirective,
   SymbioteStyleInputDirective,
   ViewHost,
 } from '../../primitives';
@@ -130,8 +131,6 @@ export {
 import {
   gateWanted,
   injectGateDemandAbove,
-  provideGateDemand,
-  type IGateDemand,
   type IGatedAccessibilityEvent,
 } from '../../gate-demand';
 export type { IVListItemContext, IVListSeparatorContext } from './directives';
@@ -217,145 +216,162 @@ interface IWindowCell<ItemT> {
   separatorContext?: IVListSeparatorContext<ItemT>;
 }
 
+// The scroll body is identical on both axes; only the outer tag differs (the axis comes from the
+// TAG, never a prop — `<horizontal-scroll-view>` vs `<scroll-view>`, matching every other adapter,
+// `.claude/rules/host-primitive-tier.md`). No shared-outlet primitive exists to de-duplicate this
+// (this package's own NgTemplateOutlet twin is keyed on a per-cell context, not a static block, and
+// ngc's partial evaluator needs the decorator's `template` to be one literal), so the body is
+// duplicated across the two branches — the same shape Svelte's own `{#if horizontal}` takes.
 @Component({
   selector: 'VirtualizedList',
   standalone: true,
-  viewProviders: [provideGateDemand(() => VirtualizedList)],
   hostDirectives: [
     { directive: SymbioteStyleInputDirective, inputs: ['style'] },
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  imports: [ScrollView, RefreshControl, VListOutletDirective, ViewHost],
+  imports: [SymbioteHostPropsDirective, VListOutletDirective, ViewHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <ScrollView
-      [horizontal]="isHorizontal"
-      [style]="resolvedStyle"
-      [contentContainerStyle]="resolvedContentContainerStyle"
-      [testID]="foldedAccessibility().testID"
-      [nativeID]="foldedAccessibility().nativeID"
-      [accessible]="foldedAccessibility().accessible"
-      [accessibilityLabel]="foldedAccessibility().accessibilityLabel"
-      [accessibilityHint]="foldedAccessibility().accessibilityHint"
-      [accessibilityRole]="foldedAccessibility().accessibilityRole"
-      [accessibilityState]="foldedAccessibility().accessibilityState"
-      [accessibilityValue]="foldedAccessibility().accessibilityValue"
-      [accessibilityActions]="foldedAccessibility().accessibilityActions"
-      [accessibilityLabelledBy]="foldedAccessibility().accessibilityLabelledBy"
-      [importantForAccessibility]="
-        foldedAccessibility().importantForAccessibility
-      "
-      [accessibilityLiveRegion]="foldedAccessibility().accessibilityLiveRegion"
-      [screenReaderFocusable]="foldedAccessibility().screenReaderFocusable"
-      [accessibilityViewIsModal]="
-        foldedAccessibility().accessibilityViewIsModal
-      "
-      [accessibilityElementsHidden]="
-        foldedAccessibility().accessibilityElementsHidden
-      "
-      [accessibilityIgnoresInvertColors]="
-        foldedAccessibility().accessibilityIgnoresInvertColors
-      "
-      [accessibilityLanguage]="foldedAccessibility().accessibilityLanguage"
-      [accessibilityRespondsToUserInteraction]="
-        foldedAccessibility().accessibilityRespondsToUserInteraction
-      "
-      [accessibilityShowsLargeContentViewer]="
-        foldedAccessibility().accessibilityShowsLargeContentViewer
-      "
-      [accessibilityLargeContentTitle]="
-        foldedAccessibility().accessibilityLargeContentTitle
-      "
-      (accessibilityAction)="accessibilityActionTick($event)"
-      (accessibilityTap)="accessibilityTapTick($event)"
-      (magicTap)="magicTapTick($event)"
-      (accessibilityEscape)="accessibilityEscapeTick($event)"
-      [onScroll]="onScrollTick"
-      (layout)="onLayoutTick($event)"
-      [onScrollBeginDrag]="onScrollBeginDrag"
-      [onScrollEndDrag]="onScrollEndDrag"
-      [onMomentumScrollBegin]="onMomentumScrollBegin"
-      [onMomentumScrollEnd]="onMomentumScrollEnd"
-      [scrollEventThrottle]="scrollEventThrottle"
-      [keyboardShouldPersistTaps]="keyboardShouldPersistTaps"
-      [keyboardDismissMode]="keyboardDismissMode"
-      [contentOffset]="commandedOffset"
-      [stickyHeaderIndices]="renderedStickyIndices"
-      [maintainVisibleContentPosition]="resolvedMaintainVisibleContentPosition"
-    >
-      @if (shouldRenderRefreshControl) {
-        <RefreshControl
-          [refreshing]="refreshing ?? false"
-          (refresh)="handleRefresh()"
-          [progressViewOffset]="progressViewOffset"
-        />
-      }
+    @if (isHorizontal) {
+      <horizontal-scroll-view #scrollHost [symbioteHostProps]="scrollViewBag()">
+        @if (shouldRenderRefreshControl) {
+          <refresh-control
+            [symbioteHostProps]="refreshControlBag()"
+          ></refresh-control>
+        }
 
-      @if (headerDir !== undefined) {
-        <view>
-          <ng-container [vListOutlet]="headerDir.templateRef"></ng-container>
-        </view>
-      }
-
-      @if (itemCount === 0) {
-        @if (emptyDir !== undefined) {
+        @if (headerDir !== undefined) {
           <view>
-            <ng-container [vListOutlet]="emptyDir.templateRef"></ng-container>
+            <ng-container [vListOutlet]="headerDir.templateRef"></ng-container>
           </view>
         }
-      } @else {
-        @if (leadingSpacerStyle !== null) {
-          <view [style]="leadingSpacerStyle"></view>
-        }
-        @if (forcedStickyCell !== null) {
-          <view
-            (layout)="handleCellLayout(forcedStickyCell.measure, $event)"
-            [style]="cellStyle"
-          >
-            <ng-container
-              [vListOutlet]="itemDir?.templateRef"
-              [vListOutletContext]="forcedStickyCell.context"
-            ></ng-container>
-          </view>
-        }
-        @if (gapSpacerStyle !== null) {
-          <view [style]="gapSpacerStyle"></view>
-        }
-        <!-- The separator sits INSIDE the measuring view, as RN's own cell renderer places it
-             (VirtualizedListCellRenderer.js:218-221). As a sibling it is an extra flex child, so
-             the chrome between two cells is gap + separator + gap while a spacer collapsing that
-             region replaces it with a single gap — every cell below the leading spacer then lands
-             short by (separator + gap) and the content jumps by that much whenever the window's
-             first index moves. Measured at exactly 17px on device 2026-08-19; see
-             .claude/rules/list-geometry-feedback-loop.md. -->
-        @for (cell of windowCells; track cell.key) {
-          <view
-            (layout)="handleCellLayout(cell.measure, $event)"
-            [style]="cellStyle"
-          >
-            <ng-container
-              [vListOutlet]="itemDir?.templateRef"
-              [vListOutletContext]="cell.context"
-            ></ng-container>
-            @if (cell.separatorContext !== undefined) {
-              <ng-container
-                [vListOutlet]="separatorDir?.templateRef"
-                [vListOutletContext]="cell.separatorContext"
-              ></ng-container>
-            }
-          </view>
-        }
-        @if (trailingSpacerStyle !== null) {
-          <view [style]="trailingSpacerStyle"></view>
-        }
-      }
 
-      @if (footerDir !== undefined) {
-        <view>
-          <ng-container [vListOutlet]="footerDir.templateRef"></ng-container>
-        </view>
-      }
-    </ScrollView>
+        @if (itemCount === 0) {
+          @if (emptyDir !== undefined) {
+            <view>
+              <ng-container [vListOutlet]="emptyDir.templateRef"></ng-container>
+            </view>
+          }
+        } @else {
+          @if (leadingSpacerStyle !== null) {
+            <view [style]="leadingSpacerStyle"></view>
+          }
+          @if (forcedStickyCell !== null) {
+            <view
+              (layout)="handleCellLayout(forcedStickyCell.measure, $event)"
+              [style]="cellStyle"
+            >
+              <ng-container
+                [vListOutlet]="itemDir?.templateRef"
+                [vListOutletContext]="forcedStickyCell.context"
+              ></ng-container>
+            </view>
+          }
+          @if (gapSpacerStyle !== null) {
+            <view [style]="gapSpacerStyle"></view>
+          }
+          @for (cell of windowCells; track cell.key) {
+            <view
+              (layout)="handleCellLayout(cell.measure, $event)"
+              [style]="cellStyle"
+            >
+              <ng-container
+                [vListOutlet]="itemDir?.templateRef"
+                [vListOutletContext]="cell.context"
+              ></ng-container>
+              @if (cell.separatorContext !== undefined) {
+                <ng-container
+                  [vListOutlet]="separatorDir?.templateRef"
+                  [vListOutletContext]="cell.separatorContext"
+                ></ng-container>
+              }
+            </view>
+          }
+          @if (trailingSpacerStyle !== null) {
+            <view [style]="trailingSpacerStyle"></view>
+          }
+        }
+
+        @if (footerDir !== undefined) {
+          <view>
+            <ng-container [vListOutlet]="footerDir.templateRef"></ng-container>
+          </view>
+        }
+      </horizontal-scroll-view>
+    } @else {
+      <scroll-view #scrollHost [symbioteHostProps]="scrollViewBag()">
+        @if (shouldRenderRefreshControl) {
+          <refresh-control
+            [symbioteHostProps]="refreshControlBag()"
+          ></refresh-control>
+        }
+
+        @if (headerDir !== undefined) {
+          <view>
+            <ng-container [vListOutlet]="headerDir.templateRef"></ng-container>
+          </view>
+        }
+
+        @if (itemCount === 0) {
+          @if (emptyDir !== undefined) {
+            <view>
+              <ng-container [vListOutlet]="emptyDir.templateRef"></ng-container>
+            </view>
+          }
+        } @else {
+          @if (leadingSpacerStyle !== null) {
+            <view [style]="leadingSpacerStyle"></view>
+          }
+          @if (forcedStickyCell !== null) {
+            <view
+              (layout)="handleCellLayout(forcedStickyCell.measure, $event)"
+              [style]="cellStyle"
+            >
+              <ng-container
+                [vListOutlet]="itemDir?.templateRef"
+                [vListOutletContext]="forcedStickyCell.context"
+              ></ng-container>
+            </view>
+          }
+          @if (gapSpacerStyle !== null) {
+            <view [style]="gapSpacerStyle"></view>
+          }
+          <!-- The separator sits INSIDE the measuring view, as RN's own cell renderer places it
+               (VirtualizedListCellRenderer.js:218-221). As a sibling it is an extra flex child, so
+               the chrome between two cells is gap + separator + gap while a spacer collapsing that
+               region replaces it with a single gap — every cell below the leading spacer then lands
+               short by (separator + gap) and the content jumps by that much whenever the window's
+               first index moves. Measured at exactly 17px on device 2026-08-19; see
+               .claude/rules/list-geometry-feedback-loop.md. -->
+          @for (cell of windowCells; track cell.key) {
+            <view
+              (layout)="handleCellLayout(cell.measure, $event)"
+              [style]="cellStyle"
+            >
+              <ng-container
+                [vListOutlet]="itemDir?.templateRef"
+                [vListOutletContext]="cell.context"
+              ></ng-container>
+              @if (cell.separatorContext !== undefined) {
+                <ng-container
+                  [vListOutlet]="separatorDir?.templateRef"
+                  [vListOutletContext]="cell.separatorContext"
+                ></ng-container>
+              }
+            </view>
+          }
+          @if (trailingSpacerStyle !== null) {
+            <view [style]="trailingSpacerStyle"></view>
+          }
+        }
+
+        @if (footerDir !== undefined) {
+          <view>
+            <ng-container [vListOutlet]="footerDir.templateRef"></ng-container>
+          </view>
+        }
+      </scroll-view>
+    }
   `,
 })
 export class VirtualizedList<ItemT = unknown>
@@ -369,7 +385,7 @@ export class VirtualizedList<ItemT = unknown>
 {
   // The list's edge/viewability/failure events as real Angular events: `(endReached)="…"`, not
   // `[onEndReached]="…"`. See handleRefresh/accessibility*Tick below for how the still-callback-
-  // shaped ScrollView/RefreshControl @Input()s are fed from these.
+  // shaped scroll-view/refresh-control bag keys are fed from these.
   @Output() readonly endReached = new EventEmitter<{
     distanceFromEnd: number;
   }>();
@@ -493,10 +509,24 @@ export class VirtualizedList<ItemT = unknown>
   @ContentChild(VListSeparatorDirective)
   separatorDir?: VListSeparatorDirective<ItemT>;
 
-  // The composed inner scroll view. Its instance IS an IScrollViewHandle (scrollTo / scrollToEnd /
-  // flashScrollIndicators / getScrollNode), so the imperative handle delegates straight to it.
-  // Available from ngAfterViewInit on; the handle reads the node lazily and no-ops before commit.
-  @ViewChild(ScrollView) private scrollView?: ScrollView;
+  // The inner scroll TAG's own engine node — a template ref on a bare intrinsic hands back the
+  // host node directly (`isSymbioteNode(elementRef.nativeElement)`, matching `anchorHostStyle`'s
+  // own reader below), so there is no wrapper component left to read a handle off. Present from
+  // whichever branch (`scroll-view` / `horizontal-scroll-view`) is currently mounted, once the
+  // template has run at least one CD pass.
+  @ViewChild('scrollHost', { read: ElementRef })
+  private scrollHostRef?: ElementRef<unknown>;
+
+  private get scrollNode(): ISymbioteNode | null {
+    const node = this.scrollHostRef?.nativeElement;
+    return isSymbioteNode(node) ? node : null;
+  }
+
+  // `buildScrollViewHandle` reads the node lazily through the getter above and no-ops before
+  // commit — the same function every other adapter feeds from its own host-instance accessor.
+  private readonly scrollHandle: IScrollViewHandle = buildScrollViewHandle(
+    () => this.scrollNode,
+  );
 
   // --- template-bound view state, assembled in ngDoCheck (recomputeView) ---
   itemCount = EMPTY_OFFSET;
@@ -578,13 +608,13 @@ export class VirtualizedList<ItemT = unknown>
 
   private readonly cdr = inject(ChangeDetectorRef);
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT `scrollView` above, which targets the real
-  // inner `<ScrollView>` one level down (itself its own separate anchor host).
+  // onto (see anchorHostStyle's doc comment) — NOT `scrollHostRef` above, which targets the real
+  // inner `<scroll-view>`/`<horizontal-scroll-view>` tag one level down.
   private readonly elementRef = inject(ElementRef);
 
-  // Bridges the non-reactive @Input fields into the reactive graph so the computed below can
-  // memoize a bag derived from them (the same bridge ScrollView's shared.ts uses - read its comment
-  // for why signal inputs are not an option while this package's unit suite runs on JIT).
+  // Bridges the non-reactive @Input fields into the reactive graph so `foldedAccessibility` below
+  // can memoize a bag derived from them (read its own comment for why signal inputs are not an
+  // option while this package's unit suite runs on JIT).
   //
   // ONLY safe for a bag whose every dependency is an @Input. This list's window machinery
   // (listState, renderVersion, windowCells, the measured metrics) is driven from scroll/layout
@@ -593,12 +623,13 @@ export class VirtualizedList<ItemT = unknown>
   // instead of widening this one.
   private readonly inputsRevision = signal(0);
 
-  // MEASURED: the template feeds 20 separate <ScrollView> inputs off this one bag, and Angular does
-  // not cache a getter across binding expressions - as a getter it rebuilt the object 20 times per
-  // refresh, and every consumer saw a fresh reference, so all 20 reported "changed" and wrote
-  // through to the ScrollView. A computed evaluates once and hands back the SAME object until an
-  // input actually changes. Every dependency below is an @Input, which is what makes
-  // inputsRevision a complete dependency set here.
+  // MEASURED (while ScrollView was still a wrapper): the template fed 20 separate inputs off this
+  // one bag, and Angular does not cache a getter across binding expressions - as a getter it
+  // rebuilt the object 20 times per refresh, and every consumer saw a fresh reference, so all 20
+  // reported "changed" and wrote through. A computed evaluates once and hands back the SAME object
+  // until an input actually changes. Every dependency below is an @Input, which is what makes
+  // inputsRevision a complete dependency set here — `scrollViewBag()` reuses this result rather
+  // than re-running the fold.
   readonly foldedAccessibility = computed<
     IAccessibilityProps & IAriaProps & Record<string, unknown>
   >(() => {
@@ -648,6 +679,57 @@ export class VirtualizedList<ItemT = unknown>
     return this.refreshRequested ?? this.refresh.observed;
   }
 
+  // The flat bag fed to the scroll tag via `[symbioteHostProps]`. A plain method, not `computed()`:
+  // most of these fields (resolvedStyle, renderedStickyIndices, commandedOffset, …) are recomputed
+  // in ngDoCheck/dispatch as ordinary fields, not signals, so a computed() memoized only against
+  // `inputsRevision` would go stale the moment one of them changed outside an @Input() write. The
+  // directive itself diffs per key before writing to the engine (`primitives/shared.ts`), so a
+  // fresh object every CD pass costs nothing beyond the literal allocation.
+  scrollViewBag(): Record<string, unknown> {
+    return {
+      ...this.foldedAccessibility(),
+      style: this.resolvedStyle,
+      contentContainerStyle: this.resolvedContentContainerStyle,
+      onScroll: this.onScrollTick,
+      onLayout: this.onLayoutTick,
+      onScrollBeginDrag: this.onScrollBeginDrag,
+      onScrollEndDrag: this.onScrollEndDrag,
+      onMomentumScrollBegin: this.onMomentumScrollBegin,
+      onMomentumScrollEnd: this.onMomentumScrollEnd,
+      scrollEventThrottle: this.scrollEventThrottle,
+      keyboardShouldPersistTaps: this.keyboardShouldPersistTaps,
+      keyboardDismissMode: this.keyboardDismissMode,
+      contentOffset: this.commandedOffset,
+      stickyHeaderIndices: this.renderedStickyIndices,
+      maintainVisibleContentPosition:
+        this.resolvedMaintainVisibleContentPosition,
+      // The four boolean-gated Fabric events (`.claude/rules/fabric-boolean-event-gates.md`): the
+      // TAG has no `.observed` of its own, so `wantsGate` (own subscriber, or the demand from
+      // whatever wraps this list) is what decides whether the flag reaches Fabric at all.
+      onAccessibilityAction: this.wantsGate('accessibilityAction')
+        ? this.accessibilityActionTick
+        : undefined,
+      onAccessibilityTap: this.wantsGate('accessibilityTap')
+        ? this.accessibilityTapTick
+        : undefined,
+      onMagicTap: this.wantsGate('magicTap') ? this.magicTapTick : undefined,
+      onAccessibilityEscape: this.wantsGate('accessibilityEscape')
+        ? this.accessibilityEscapeTick
+        : undefined,
+    };
+  }
+
+  // The `refresh-control` tag's own bag — an ordinary first child, re-parented per platform by the
+  // scroll-view behavior (`../refresh-control-props.ts`). `onRefresh` is a plain listener prop, not
+  // a gated one: RefreshControl's `refresh` is unaffected by `fabric-boolean-event-gates.md`.
+  refreshControlBag(): Record<string, unknown> {
+    return {
+      refreshing: this.refreshing ?? false,
+      progressViewOffset: this.progressViewOffset,
+      onRefresh: this.handleRefresh,
+    };
+  }
+
   get isHorizontal(): boolean {
     return this.horizontal === true;
   }
@@ -675,9 +757,10 @@ export class VirtualizedList<ItemT = unknown>
     return this.onStartReachedThreshold ?? DEFAULT_START_REACHED_THRESHOLD;
   }
 
-  // ScrollView's onScroll stays an @Input() callback (an Animated.event(...) target must be able to
-  // flow through it, which an @Output() can't carry), so this is a stable arrow field passed
-  // straight to [onScroll]. onLayout is a real @Output() now, bound via (layout)="onLayoutTick($event)".
+  // onScroll stays a plain callback bag key (an Animated.event(...) target must be able to flow
+  // through it, which an @Output() can't carry), so this is a stable arrow field read straight into
+  // scrollViewBag()'s `onScroll`. onLayout is unconditional too — this list always needs its own
+  // layout for windowing, regardless of whether an app subscribes to anything.
   onScrollTick = (event: ISymbioteEvent): void => {
     countAngular('scrollTicks');
     const offset = readScrollOffset(event, this.isHorizontal);
@@ -697,9 +780,9 @@ export class VirtualizedList<ItemT = unknown>
     this.dispatch({ kind: 'layout', length });
   };
 
-  // RefreshControl's refresh and ScrollView's accessibility events are real @Output()s now, bound
-  // via (refresh)="handleRefresh()" / (accessibilityAction)="accessibilityActionTick($event)" etc.
-  // — these fields just adapt VirtualizedList's own @Output() into a plain re-emit callback.
+  // RefreshControl's refresh and the scroll tag's accessibility events reach here as plain
+  // listener-prop values in scrollViewBag()/refreshControlBag() — these fields just adapt
+  // VirtualizedList's own @Output() into a plain re-emit callback.
   handleRefresh = (): void => {
     this.refresh.emit();
   };
@@ -1263,23 +1346,23 @@ export class VirtualizedList<ItemT = unknown>
   }
 
   flashScrollIndicators(): void {
-    this.scrollView?.flashScrollIndicators();
+    this.scrollHandle.flashScrollIndicators();
   }
 
   getNativeScrollRef(): IScrollViewHandle | null {
-    return this.scrollView ?? null;
+    return this.scrollNode !== null ? this.scrollHandle : null;
   }
 
   getScrollableNode(): IScrollViewHandle | null {
-    return this.scrollView ?? null;
+    return this.scrollNode !== null ? this.scrollHandle : null;
   }
 
   getScrollResponder(): IScrollViewHandle | null {
-    return this.scrollView ?? null;
+    return this.scrollNode !== null ? this.scrollHandle : null;
   }
 
   getScrollNode(): ISymbioteNode | null {
-    return this.scrollView?.getScrollNode() ?? null;
+    return this.scrollHandle.getScrollNode();
   }
 
   recordInteraction(): void {
@@ -1291,11 +1374,11 @@ export class VirtualizedList<ItemT = unknown>
     const target = this.isHorizontal
       ? { x: clamped, y: EMPTY_OFFSET }
       : { x: EMPTY_OFFSET, y: clamped };
-    if (this.scrollView !== undefined) {
+    if (this.scrollNode !== null) {
       dlog(
         `Angular VirtualizedList scrollTo offset=${clamped} animated=${animated} (horizontal=${this.isHorizontal})`,
       );
-      this.scrollView.scrollTo({ x: target.x, y: target.y, animated });
+      this.scrollHandle.scrollTo({ x: target.x, y: target.y, animated });
       return;
     }
     dlog(`Angular VirtualizedList scrollTo offset=${clamped} pending-ref`);

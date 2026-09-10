@@ -24,7 +24,7 @@ export {
 } from './shared';
 
 @Component({
-  selector: 'view, View',
+  selector: 'view',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
@@ -41,7 +41,7 @@ export class ViewHost extends SymbiotePrimitiveHost {}
  * 'tail' would silently overwrite an explicit `ellipsizeMode="clip"`.
  */
 @Component({
-  selector: 'text, Text',
+  selector: 'text',
   standalone: true,
   template: '<ng-content></ng-content>',
 })

@@ -34,29 +34,20 @@ const expectSourceToDeclare = (source: string, snippet: string): void => {
 // (they read a file and grep it) — no Positive/Negative split applies; each test is its own
 // named regression fence instead.
 describe('Angular adapter gap regressions', () => {
-  // why: VirtualizedList wraps ScrollView (angular-adapter's component-parity model) — if it
-  // declares the accessibility/aria @Input()s but forgets to forward them into
-  // foldedAccessibility, or forgets one of the @Input()s entirely, an app passing
+  // why: VirtualizedList feeds its scroll TAG through scrollViewBag() (`[symbioteHostProps]`,
+  // since 2026-09-11 — ScrollView is no longer a component to bind individual @Input()s onto) —
+  // if it declares the accessibility/aria @Input()s but forgets to spread foldedAccessibility()
+  // into that bag, or forgets one of the @Input()s entirely, an app passing
   // accessibilityLabel/ariaBusy to <VirtualizedList> silently loses it one layer down.
-  it('VirtualizedList exposes accessibility and aria inputs and forwards them to ScrollView', () => {
+  it('VirtualizedList exposes accessibility and aria inputs and forwards them to the scroll tag', () => {
     const source = readSource(
       'adapters/angular/src/components/virtualized-list/index.ts',
     );
 
     expectSourceToDeclare(source, '@Input() accessibilityLabel?: string');
     expectSourceToDeclare(source, '@Input() ariaBusy?: boolean');
-    expectSourceToDeclare(
-      source,
-      '[accessibilityLabel]="foldedAccessibility().accessibilityLabel"',
-    );
-    expectSourceToDeclare(
-      source,
-      '[accessibilityState]="foldedAccessibility().accessibilityState"',
-    );
-    expectSourceToDeclare(
-      source,
-      '[accessibilityRole]="foldedAccessibility().accessibilityRole"',
-    );
+    expectSourceToDeclare(source, '...this.foldedAccessibility()');
+    expectSourceToDeclare(source, '[symbioteHostProps]="scrollViewBag()"');
   });
 
   // why: angular-adapter §0/§6 — Angular has NO runtime component synthesis under AOT/Metro, so
@@ -90,9 +81,11 @@ describe('Angular adapter gap regressions', () => {
       componentSource,
       'if (base === IMAGE_TAG) return AnimatedImage',
     );
+    // Same move as Image: ScrollView is a tag now too, so the dispatcher compares against its
+    // tag string, not a class identity.
     expectSourceToDeclare(
       componentSource,
-      'if (base === ScrollView) return AnimatedScrollView',
+      'if (base === SCROLL_VIEW_TAG) return AnimatedScrollView',
     );
     expectSourceToDeclare(
       componentSource,

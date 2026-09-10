@@ -66,8 +66,10 @@ export type {
   IAngularKeyboardAvoidingViewProps,
   IKeyboardAvoidingBehavior,
 } from './components/keyboard-avoiding-view';
-export { RefreshControl } from './components/refresh-control';
-export type { IAngularRefreshControlProps } from './components/refresh-control';
+// `RefreshControl` is a TAG — `<refresh-control>`, matched by `RefreshControlElement` — and there
+// is nothing to import in its place. The controlled-spinner handshake is
+// `registerRefreshControlBehavior` (`../register.ts`); only the prop type stays.
+export type { IAngularRefreshControlProps } from './components/refresh-control-props';
 // `TextInput` is a TAG — `<text-input>` / `<text-input-multiline>`, matched by `TextInputElement`
 // and `MultilineTextInputElement` — and there is nothing to import in its place. RN gives it no
 // statics, so the name exports nothing at all now; `[(value)]` is handled by the renderer,
@@ -108,12 +110,15 @@ export type {
 // name exports nothing now; an app's `imports: [TouchableWithoutFeedback]` becomes
 // `imports: [TouchableWithoutFeedbackElement]`. Only the prop type stays.
 export type { IAngularTouchableWithoutFeedbackProps } from './components/touchable-without-feedback/touchable-without-feedback-props';
-export { ScrollView, ScrollViewStickyHeader } from './components/scroll-view';
+// `ScrollView` is a TAG — `<scroll-view>` / `<horizontal-scroll-view>`, matched by
+// `ScrollViewElement` / `HorizontalScrollViewElement` — and there is nothing to import in its
+// place. The engine owns the content node, sticky headers and the refresh-control claim
+// (`registerScrollViewBehavior`, `../register.ts`); the imperative handle comes from
+// `buildScrollViewHandle` over the node a template ref hands back. Only the prop types stay.
 export type {
   IAngularScrollViewProps,
   IScrollViewHandle,
-  IStickyHeaderComponentType,
-} from './components/scroll-view';
+} from './components/scroll-view-props';
 // `Button` is a TAG — `<button>`, matched by `ButtonElement` — and there is nothing to import in
 // its place. RN's Button has no statics, so the name exports nothing at all now; the prop type
 // stays, for a component forwarding a bag.
@@ -198,6 +203,6 @@ export {
   stableAnchorStyle,
 } from './primitives/index';
 
-// Public ergonomic aliases: <View> and <Text> resolve directly to the primitive hosts
+// Public ergonomic aliases: <view> and <text> resolve directly to the primitive hosts
 // (no extra Angular bookkeeping anchor), while the internal symbiote-* selectors remain
 // available for composed adapter templates.

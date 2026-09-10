@@ -19,6 +19,9 @@ import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
+// registerScrollViewBehavior() is what builds the content container the assertions below read —
+// the tag has no content node of its own without it.
+import '../../register';
 import { mount, unmount } from '../../render';
 import { VirtualizedList } from './index';
 import { VListItemDirective, VListSeparatorDirective } from './directives';

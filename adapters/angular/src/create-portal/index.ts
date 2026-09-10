@@ -29,7 +29,7 @@
 //
 // THE MARKER GOES ON AN `<ng-container>` INSIDE THE TARGET, never on the target element. A
 // ViewContainerRef anchors AT its host and `createEmbeddedView` inserts after that anchor, so
-// `<View portalOutlet>` delivers a SIBLING where React's `createPortal(node, host)` and Vue's
+// `<view portalOutlet>` delivers a SIBLING where React's `createPortal(node, host)` and Vue's
 // `<Teleport to>` deliver a child. Device-reported 2026-09-02: a card portaled into an absolutely
 // positioned overlay laid out in the scroll flow, since the overlay cannot centre a node that is
 // not in it.
@@ -53,9 +53,9 @@ import { isAnchor, isSymbioteNode } from '@symbiote-native/engine';
  *  variable as `*portal`'s target:
  *
  *  ```html
- *  <View class="overlay-host">
+ *  <view class="overlay-host">
  *    <ng-container portalOutlet #overlayHost="portalOutlet"></ng-container>
- *  </View>
+ *  </view>
  *  ```
  */
 @Directive({
@@ -74,8 +74,8 @@ export class PortalOutletDirective {
       throw new Error(
         'portalOutlet must sit on an <ng-container> inside the target host, not on the host ' +
           'element: a ViewContainerRef anchored at an element inserts AFTER it, so the ported ' +
-          'content would become the host\'s sibling. Write <View class="…">' +
-          '<ng-container portalOutlet #x="portalOutlet"></ng-container></View>.',
+          'content would become the host\'s sibling. Write <view class="…">' +
+          '<ng-container portalOutlet #x="portalOutlet"></ng-container></view>.',
       );
     }
   }

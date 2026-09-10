@@ -48,7 +48,7 @@ function committed(testID: string): IFakeNode | undefined {
   selector: 'symbiote-text-defaults-plain',
   standalone: true,
   imports: [TextHost],
-  template: `<Text testID="plain">clamped</Text>`,
+  template: `<text testID="plain">clamped</text>`,
 })
 class PlainHost {}
 
@@ -56,26 +56,26 @@ class PlainHost {}
   selector: 'symbiote-text-defaults-explicit',
   standalone: true,
   imports: [TextHost],
-  template: `<Text
+  template: `<text
     testID="explicit"
     ellipsizeMode="clip"
     [allowFontScaling]="false"
-    >clamped</Text
+    >clamped</text
   >`,
 })
 class ExplicitHost {}
 
 // THE LOWERED SPELLING, and the arm this file was missing for as long as it has existed.
 //
-// Everything above mounts `<Text>`, the @Component — the path that already folds the defaults. A
+// Everything above mounts `<text>`, the @Component — the path that already folds the defaults. A
 // LOWERED `<text>` has no component behind it: `resolveTextProps` lives in
 // `../primitives`, which is exactly what lowering routes around. So the two tests above were green
 // while the lowered path shipped text that truncates with no ellipsis, device-observed once
 // already on examples/svelte.
 //
 // `schemas: [CUSTOM_ELEMENTS_SCHEMA]` with `TextHost` absent from `imports` is load-bearing and is
-// the whole reason this needs its own component: Angular's primitives carry a DUAL selector
-// (`'text, Text'`) and directive matching is resolved per TEMPLATE, so importing TextHost
+// the whole reason this needs its own component: Angular's primitive host matches the tag itself
+// (`selector: 'text'`) and directive matching is resolved per TEMPLATE, so importing TextHost
 // anywhere in this template would make `<text>` resolve straight back to the component
 // and the test would assert the wrapper path twice under two spellings
 // (`.claude/rules/host-primitive-tier.md`).

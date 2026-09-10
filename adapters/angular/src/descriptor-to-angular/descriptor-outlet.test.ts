@@ -285,11 +285,11 @@ describe('DescriptorOutlet', () => {
         standalone: true,
         imports: [ViewHost, DescriptorOutlet],
         template: `
-          <View testID="parent">
+          <view testID="parent">
             @if (visible()) {
               <symbiote-descriptor-outlet [node]="node()" />
             }
-          </View>
+          </view>
         `,
       })
       class ConditionalHost {

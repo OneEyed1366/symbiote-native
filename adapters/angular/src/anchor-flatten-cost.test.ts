@@ -63,15 +63,15 @@ function makeRows(from: number, count: number): IRow[] {
   standalone: true,
   imports: [PressableElement, Text, View],
   template: `
-    <View [style]="rowStyle">
-      <Text>{{ rowId }}</Text>
+    <view [style]="rowStyle">
+      <text>{{ rowId }}</text>
       <pressable>
-        <Text>{{ row.label }}</Text>
+        <text>{{ row.label }}</text>
       </pressable>
       <pressable>
-        <Text>x</Text>
+        <text>x</text>
       </pressable>
-    </View>
+    </view>
   `,
 })
 class BenchmarkRow {
@@ -94,11 +94,11 @@ let mounted: List | undefined;
   standalone: true,
   imports: [BenchmarkRow, View],
   template: `
-    <View testID="list">
+    <view testID="list">
       @for (row of rows(); track row.id) {
         <BenchmarkRow [row]="row" [isSelected]="row.id === selectedId()" />
       }
-    </View>
+    </view>
   `,
 })
 class List {

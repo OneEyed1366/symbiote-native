@@ -294,8 +294,8 @@ describe('what the element directives commit', () => {
     expect(propsOf(all, 'sw').value).toBe(false);
   });
 
-  // why: the transitional state, and it is reachable today — `ViewHost` is exported as `View` and
-  // carries the DUAL selector `'view, View'`, so an app that has both in `imports` has a component
+  // why: the transitional state, and it is reachable today — `ViewHost` matches the tag itself and is exported as `View` for an app's `imports:`, so
+  // an app that has both in `imports` has a component
   // AND a directive matching one tag. Angular allows that, and both write the same prop through
   // the same renderer, so the node must not end up with a doubled or dropped payload.
   it('coexists with the primitive host component on the same tag', async () => {

@@ -160,7 +160,7 @@ describe('a bare intrinsic tag, hand-written, no lowering transform', () => {
       NO_ERRORS_SCHEMA,
     );
     expect(node?.viewName).toBe('RCTView');
-    // The alias is the renderer's, not a wrapper's — the composed `<View>` has no `id` @Input at
+    // The alias is the renderer's, not a wrapper's — the composed `<view>` has no `id` @Input at
     // all, so this is the one fold the bare path has and the component path lacks.
     expect(node?.props).toMatchObject({
       nativeID: 'probe-id',

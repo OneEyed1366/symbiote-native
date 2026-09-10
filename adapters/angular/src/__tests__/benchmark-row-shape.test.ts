@@ -111,46 +111,46 @@ const ROW_CLASS_SELECTED = 'bench-row bench-row-selected';
 // (`.claude/rules/fabric-boolean-event-gates.md`). Not fenced against the screen — see the `it`
 // at the end for why fencing a fixture with no literal counterpart would just go vacuous.
 const COMPOSED_ROW_TEMPLATE = `
-    <View [class]="rowClass">
-      <Text class="bench-row-id">{{ rowId }}</Text>
+    <view [class]="rowClass">
+      <text class="bench-row-id">{{ rowId }}</text>
       <pressable class="flex1" (press)="select.emit(row.id)">
-        <Text class="bench-row-label">{{ row.label }}</Text>
+        <text class="bench-row-label">{{ row.label }}</text>
       </pressable>
       <pressable class="bench-row-remove" (press)="remove.emit(row.id)">
-        <Text class="bench-row-remove-text">×</Text>
+        <text class="bench-row-remove-text">×</text>
       </pressable>
-    </View>
+    </view>
   `;
 
 // THE SCREEN'S ONLY ROW as of 2026-09-01 (formerly its `ROW_CONTENT.WithInput` arm; the toggle
 // that picked between this and `COMPOSED_ROW_TEMPLATE` above is gone, and this is what stayed).
 // The one constant here still fenced against the screen — see the `it` at the end.
 const WITH_INPUT_ROW_TEMPLATE = `
-    <View [class]="rowClass">
-      <Text class="bench-row-id">{{ rowId }}</Text>
+    <view [class]="rowClass">
+      <text class="bench-row-id">{{ rowId }}</text>
       <pressable class="flex1" (press)="select.emit(row.id)">
-        <Text class="bench-row-label">{{ row.label }}</Text>
+        <text class="bench-row-label">{{ row.label }}</text>
       </pressable>
       <pressable class="bench-row-remove" (press)="remove.emit(row.id)">
-        <Text class="bench-row-remove-text">×</Text>
+        <text class="bench-row-remove-text">×</text>
       </pressable>
       <text-input class="bench-row-input" [value]="row.label"></text-input>
-    </View>
+    </view>
   `;
 
 // FIXTURE ONLY as of 2026-09-01, same reasoning as COMPOSED_ROW_TEMPLATE above — the screen's
 // `flat` row shape (zero composed components) is gone entirely, not merged into anything. Kept
 // for the same adapter-property tests; not fenced against the screen.
 const FLAT_ROW_TEMPLATE = `
-            <View [class]="rowClassFor(row)">
-              <Text class="bench-row-id">{{ row.id }}</Text>
-              <View class="flex1" (press)="onSelect(row.id)">
-                <Text class="bench-row-label">{{ row.label }}</Text>
-              </View>
-              <View class="bench-row-remove" (press)="onRemove(row.id)">
-                <Text class="bench-row-remove-text">×</Text>
-              </View>
-            </View>
+            <view [class]="rowClassFor(row)">
+              <text class="bench-row-id">{{ row.id }}</text>
+              <view class="flex1" (press)="onSelect(row.id)">
+                <text class="bench-row-label">{{ row.label }}</text>
+              </view>
+              <view class="bench-row-remove" (press)="onRemove(row.id)">
+                <text class="bench-row-remove-text">×</text>
+              </view>
+            </view>
 `;
 
 @Component({
@@ -205,7 +205,7 @@ const selectedSignal = signal<number | undefined>(undefined);
   standalone: true,
   imports: [BenchmarkRow, View],
   template: `
-    <View>
+    <view>
       @for (row of rows(); track row.id) {
         <BenchmarkRow
           [row]="row"
@@ -214,7 +214,7 @@ const selectedSignal = signal<number | undefined>(undefined);
           (remove)="onRemove($event)"
         />
       }
-    </View>
+    </view>
   `,
 })
 class ComposedRowHost {
@@ -235,7 +235,7 @@ class ComposedRowHost {
   standalone: true,
   imports: [BenchmarkRowWithInput, View],
   template: `
-    <View>
+    <view>
       @for (row of rows(); track row.id) {
         <BenchmarkRowWithInput
           [row]="row"
@@ -244,7 +244,7 @@ class ComposedRowHost {
           (remove)="onRemove($event)"
         />
       }
-    </View>
+    </view>
   `,
 })
 class WithInputRowHost {
@@ -265,11 +265,11 @@ class WithInputRowHost {
   standalone: true,
   imports: [Text, View],
   template: `
-    <View>
+    <view>
       @for (row of rows(); track row.id) {
         ${FLAT_ROW_TEMPLATE}
       }
-    </View>
+    </view>
   `,
 })
 class FlatRowHost {
@@ -328,7 +328,7 @@ type ICommittedShape = {
 // comparison alone would not have told the two failure directions apart.
 // Subtracted from BOTH sides, and unlike the four above this one is not debt. RN makes a pressable
 // accessible unless the app opts out (`Pressable.js:252`), so a composed `<Pressable>` commits
-// `accessible: true` while the flat row's stand-in — a bare `<View (press)>` — correctly does not:
+// `accessible: true` while the flat row's stand-in — a bare `<view (press)>` — correctly does not:
 // RN's View has no such default. It is the first prop on which the flat row's deliberate surrender
 // of Pressable's accessibility fold is VISIBLE, every earlier one being absent-when-unset. That the
 // composed side really does commit it is pinned by pressable.test.ts and lowering-equivalence.test.ts,
@@ -336,7 +336,7 @@ type ICommittedShape = {
 // Pressable.
 // `focusable` joined it 2026-09-09 for the identical reason and it is the sharper case: RN's
 // Touchable* formula (TouchableOpacity.js:336-340) needs a press handler and a non-disabled state,
-// and the composed row supplies both — while a bare `<View (press)>` has no Pressable to compute
+// and the composed row supplies both — while a bare `<view (press)>` has no Pressable to compute
 // anything. Same non-debt reading, same deletion condition.
 const PRESSABLE_ONLY_DEFAULTS = ['accessible', 'focusable'];
 

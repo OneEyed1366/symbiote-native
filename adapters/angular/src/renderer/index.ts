@@ -38,12 +38,6 @@ import {
   noteAngularCreate,
   noteAngularWrite,
 } from '../diagnostics';
-import {
-  flushScrollViewProjections,
-  getScrollViewProjection,
-  removeScrollViewProjectedChild,
-} from '../components/scroll-view/projection';
-
 // Angular host nodes are all SymbioteNode (elements, raw text, anchors). The mount
 // container is the surface, so a parent can be either a node or the surface root.
 type IHostNode = ISymbioteNode;
@@ -96,7 +90,7 @@ function textDefaultFor(el: IHostElement, key: string): unknown {
 
 // RN's `id` is the modern W3C-named alias for `nativeID` (core/components/host-primitives.cjs's
 // `ID_ALIAS`) — View.js/Text.js copy it over unconditionally, so the two name ONE native prop.
-// React/Solid/Svelte fold it in a wrapper or transform; Angular had it nowhere, so `<View
+// React/Solid/Svelte fold it in a wrapper or transform; Angular had it nowhere, so `<view
 // id="x">`/`[id]="x"` reached Fabric with an unknown `id` key and no `nativeID` — silently, on
 // device only. Lives in the renderer (mirroring Vue's `PROP_ALIASES`) so it covers every path
 // that can set a prop — `setAttribute`, `setProperty`, and (should a future lowering emit one) a
@@ -181,17 +175,13 @@ const PRIMITIVE_SELECTOR_ALIAS: Record<string, string> = {
 // leaf module ../anchor-host-registry (imported above as isAnchorHostComponent) — see its header
 // for why the registry must NOT sit in this require-cyclic renderer module.
 
-// Inserting a bare raw-text node anywhere but inside a <Text> is invalid in Fabric (a
-// stray RCTRawText would paint). Angular's ɵɵtext only ever lands text inside a <Text>,
+// Inserting a bare raw-text node anywhere but inside a <text> is invalid in Fabric (a
+// stray RCTRawText would paint). Angular's ɵɵtext only ever lands text inside a <text>,
 // but guard anyway for parity with the Vue adapter and to fail loudly on a bad template.
-// `removeScrollViewProjectedChild` takes a remove callback and uses it only when the child turns
-// out to be projected, which almost none are — so the engine's own `removeChild` is passed by
-// reference rather than wrapped in an arrow. The wrapper was allocated on EVERY removed node:
-// 10 000 closures on a Clear whose engine window is 0.1 ms.
 function assertTextPlacement(child: ISymbioteNode, parent: IHostElement): void {
   if (isRawText(child) && (isSurface(parent) || !parent.isText)) {
     throw new Error(
-      `Text string "${String(child.props.text)}" must be rendered inside a <Text>`,
+      `Text string "${String(child.props.text)}" must be rendered inside a <text>`,
     );
   }
 }
@@ -225,7 +215,7 @@ export class SymbioteRenderer implements Renderer2 {
     // prefix. The anchor registry is keyed on lowercased selectors — Angular lowercases a
     // dynamically-mounted component's selector at runtime, so it must be — and the composed
     // wrappers are named after the primitives they render: `Text`.toLowerCase() IS the tag `text`.
-    // While both layers exist, every `<Text>` would anchor instead of painting.
+    // While both layers exist, every `<text>` would anchor instead of painting.
     //
     // Derived from the descriptor table rather than an exclusion list, so it cannot go stale; and
     // it disappears on its own when the wrappers do, which is what this migration is for. The
@@ -294,19 +284,15 @@ export class SymbioteRenderer implements Renderer2 {
       }
       parent.appendChild(newChild);
     } else {
-      const projection = getScrollViewProjection(parent);
+      // The engine's own `appendChild` already redirects through `parent.childHost` when the
+      // primitive's behavior builds one (ScrollView's content node, e.g.) — the adapter-side
+      // projection bridge this used to route through is gone with the ScrollView component.
       if (isDebug()) {
         dlog(
-          `Angular renderer appendChild parent=${describeHost(parent)} child=${describeHost(newChild)} projection=${projection !== undefined}`,
+          `Angular renderer appendChild parent=${describeHost(parent)} child=${describeHost(newChild)}`,
         );
       }
-      if (projection !== undefined) {
-        projection.appendProjectedChild(parent, newChild, (target, child) =>
-          appendChild(target, child),
-        );
-      } else {
-        appendChild(parent, newChild);
-      }
+      appendChild(parent, newChild);
     }
     this.surface.requestCommit();
   }
@@ -328,27 +314,13 @@ export class SymbioteRenderer implements Renderer2 {
       if (refChild) parent.insertBefore(newChild, refChild);
       else parent.appendChild(newChild);
     } else {
-      const projection = getScrollViewProjection(parent);
       if (isDebug()) {
         dlog(
-          `Angular renderer insertBefore parent=${describeHost(parent)} child=${describeHost(newChild)} ref=${refChild ? describeHost(refChild) : 'null'} projection=${projection !== undefined}`,
+          `Angular renderer insertBefore parent=${describeHost(parent)} child=${describeHost(newChild)} ref=${refChild ? describeHost(refChild) : 'null'}`,
         );
       }
-      if (projection !== undefined) {
-        projection.insertProjectedChild(
-          parent,
-          newChild,
-          refChild,
-          (target, child, before) => {
-            if (before === undefined) appendChild(target, child);
-            else insertBefore(target, child, before);
-          },
-        );
-      } else if (refChild) {
-        insertBefore(parent, newChild, refChild);
-      } else {
-        appendChild(parent, newChild);
-      }
+      if (refChild) insertBefore(parent, newChild, refChild);
+      else appendChild(parent, newChild);
     }
     this.surface.requestCommit();
   }
@@ -358,20 +330,17 @@ export class SymbioteRenderer implements Renderer2 {
     // surface.children with no parent). Angular's `parent` arg is ignored in favor of the
     // authoritative link, mirroring the Vue adapter's remove.
     countAngular('nodesRemoved');
-    const wasProjected = removeScrollViewProjectedChild(oldChild, removeChild);
     if (isDebug()) {
       const angularParent = _parent !== null ? describeHost(_parent) : 'null';
       const retainedParent =
         oldChild.parent !== undefined ? describeHost(oldChild.parent) : 'none';
       dlog(
-        `Angular renderer removeChild angularParent=${angularParent} retainedParent=${retainedParent} child=${describeHost(oldChild)} viaProjection=${wasProjected}`,
+        `Angular renderer removeChild angularParent=${angularParent} retainedParent=${retainedParent} child=${describeHost(oldChild)}`,
       );
     }
-    if (!wasProjected) {
-      const parent = oldChild.parent;
-      if (parent !== undefined) removeChild(parent, oldChild);
-      else this.surface.removeChild(oldChild);
-    }
+    const parent = oldChild.parent;
+    if (parent !== undefined) removeChild(parent, oldChild);
+    else this.surface.removeChild(oldChild);
     this.surface.requestCommit();
   }
 
@@ -562,13 +531,10 @@ export class SymbioteRendererFactory implements RendererFactory2 {
     return (this.renderer ??= new SymbioteRenderer(this.surface));
   }
 
-  // Not commit coalescing (requestCommit owns that) — this is the one moment where a ScrollView's
-  // two input channels are known to be consistent: Angular has finished writing every `@Input` AND
-  // the renderer has finished every projected insert/remove for this pass, while the surface's
-  // commit is still only queued. Sticky projection reconciles are batched to here for both reasons;
-  // see flushScrollViewProjections.
+  // Not commit coalescing (requestCommit owns that) — a per-CD-pass counter only, now that the
+  // ScrollView projection bridge this used to also flush is gone (`../register.ts`'s
+  // `registerScrollViewBehavior` owns the content node and the sticky seam for every adapter).
   end(): void {
     countAngular('cdPasses');
-    flushScrollViewProjections();
   }
 }

@@ -7,7 +7,7 @@
 import '@angular/compiler';
 import { ElementRef, Injector, runInInjectionContext } from '@angular/core';
 import { describe, expect, it } from 'vitest';
-import { Image, ScrollView, Text, View } from './components';
+import { Image, Text, View } from './components';
 import {
   VirtualizedList,
   VListItemDirective,
@@ -149,19 +149,19 @@ describe('Angular source imports under Vitest', () => {
     // why: angular-adapter §0/§6 and the source's own header explain WHY this must throw rather
     // than attempt anything: Angular has no runtime JIT under Metro's AOT build, so
     // createAnimatedComponent can only dispatch to the handful of PRE-AUTHORED standalone
-    // wrappers (View/Text/Image/ScrollView) — an arbitrary custom component has no such wrapper
-    // and there is no way to synthesize one at runtime. Silently returning the base component
-    // unanimated, or returning undefined, would both be worse than a loud, actionable throw
-    // naming the real fix ("author an explicit standalone @Component").
+    // wrappers (View/Text/'image'/'scroll-view') — an arbitrary custom component has no such
+    // wrapper and there is no way to synthesize one at runtime. Silently returning the base
+    // component unanimated, or returning undefined, would both be worse than a loud, actionable
+    // throw naming the real fix ("author an explicit standalone @Component").
     it('keeps createAnimatedComponent limited to pre-authored AOT-safe Angular wrappers', () => {
       class CustomComponent {}
 
       expect(createAnimatedComponent(View)).toBe(AnimatedView);
       expect(createAnimatedComponent(Text)).toBe(AnimatedText);
-      // The tag, not a component: `<image>` has no wrapper any more, so the statics namespace
-      // exported as `Image` is not what an app would hand this.
+      // The tag, not a component: neither `<image>` nor `<scroll-view>` has a wrapper any more —
+      // the statics namespace exported as `Image` is not what an app would hand this either.
       expect(createAnimatedComponent('image')).toBe(AnimatedImage);
-      expect(createAnimatedComponent(ScrollView)).toBe(AnimatedScrollView);
+      expect(createAnimatedComponent('scroll-view')).toBe(AnimatedScrollView);
       expect(() => createAnimatedComponent(CustomComponent)).toThrow(
         /Angular cannot synthesize a component at runtime \(no JIT compiler under AOT\/Metro\)/,
       );

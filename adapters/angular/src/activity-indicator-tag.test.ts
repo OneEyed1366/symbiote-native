@@ -1,5 +1,5 @@
 // `activity-indicator` as a TAG, measured through Angular's own renderer. RN's ActivityIndicator is
-// a centering `<View>` around a native spinner (ActivityIndicator.js:112) and takes no children, so
+// a centering `<view>` around a native spinner (ActivityIndicator.js:112) and takes no children, so
 // the wrapper this replaces was composition the engine behavior now owns
 // (`core/components/src/behaviors/activity-indicator/`).
 //

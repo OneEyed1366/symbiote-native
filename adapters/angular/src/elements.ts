@@ -59,8 +59,8 @@ import type {
   IAngularTouchableOpacityProps,
 } from './components/touchable-props';
 // Type-only, so none of these components enters the bundle of an app that writes bare tags.
-import type { IAngularRefreshControlProps } from './components/refresh-control';
-import type { IAngularScrollViewProps } from './components/scroll-view';
+import type { IAngularRefreshControlProps } from './components/refresh-control-props';
+import type { IAngularScrollViewProps } from './components/scroll-view-props';
 
 /**
  * The shared half of every element directive: the prop surface all tags accept, and the ONE
@@ -336,7 +336,9 @@ export class ImageBackgroundElement extends SymbioteElement {
 
 @Directive({ selector: 'scroll-view', standalone: true })
 export class ScrollViewElement extends SymbioteElement {
-  @Input() horizontal?: IAngularScrollViewProps['horizontal'];
+  // No `horizontal` @Input: the axis is the TAG you write, never a prop — see
+  // `../components/scroll-view-props.ts`'s header. `HorizontalScrollViewElement` below is the
+  // other spelling, not a variant of this one.
   @Input() scrollEnabled?: IAngularScrollViewProps['scrollEnabled'];
   @Input() scrollEventThrottle?: IAngularScrollViewProps['scrollEventThrottle'];
   @Input()

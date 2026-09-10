@@ -513,10 +513,10 @@ describe('Angular SymbioteRenderer drives the engine', () => {
 });
 
 // Negative: the one throwing path in this whole seam. A bare RCTRawText landing directly under
-// the surface (or under a non-<Text> host) would actually paint in real Fabric — assertTextPlacement
+// the surface (or under a non-<text> host) would actually paint in real Fabric — assertTextPlacement
 // exists specifically to fail loudly at the seam instead of shipping an invalid native tree.
-describe('Angular SymbioteRenderer rejects text placed outside a <Text> host', () => {
-  // why: Angular's own ɵɵtext only ever lands inside a <Text> in a correct template, but a bug
+describe('Angular SymbioteRenderer rejects text placed outside a <text> host', () => {
+  // why: Angular's own ɵɵtext only ever lands inside a <text> in a correct template, but a bug
   // (or a hand-authored createElement/appendChild sequence like this test's) could still hand a
   // raw text node to a View or the surface directly — that must throw immediately with an
   // actionable message, not silently commit an invalid tree RN's native side then mishandles.
@@ -524,20 +524,20 @@ describe('Angular SymbioteRenderer rejects text placed outside a <Text> host', (
     const { surface, renderer } = setup();
     const raw = renderer.createText('stray');
     expect(() => renderer.appendChild(surface, raw)).toThrow(
-      /must be rendered inside a <Text>/,
+      /must be rendered inside a <text>/,
     );
   });
 
   // why: the same guard must apply to insertBefore, not just appendChild — a raw text node
   // dropped via `insertBefore` into a non-text host is exactly as invalid a Fabric tree as via
   // appendChild, and Angular's own codegen can reach either call for structural insertion.
-  it('throws when a raw text node is inserted directly under a non-<Text> View host', () => {
+  it('throws when a raw text node is inserted directly under a non-<text> View host', () => {
     const { surface, renderer } = setup();
     const view = renderer.createElement('view');
     renderer.appendChild(surface, view);
     const raw = renderer.createText('stray');
     expect(() => renderer.insertBefore(view, raw, null)).toThrow(
-      /must be rendered inside a <Text>/,
+      /must be rendered inside a <text>/,
     );
   });
 });
