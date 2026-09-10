@@ -31,7 +31,11 @@ function CapabilityRow(props: {
   status: ICapabilityStatus;
 }) {
   const text = () =>
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
     <View testID={props.testID} class="capability-row">
       <Text class="capability-label">{props.label}</Text>
@@ -54,7 +58,8 @@ export function SecureStoreScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SecureStore];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [isAvailable, setIsAvailable] = createSignal<ICapabilityStatus>('checking');
+  const [isAvailable, setIsAvailable] =
+    createSignal<ICapabilityStatus>('checking');
   const [canUseBiometrics, setCanUseBiometrics] =
     createSignal<ICapabilityStatus>('checking');
   const [inputText, setInputText] = createSignal('');
@@ -114,7 +119,9 @@ export function SecureStoreScreen() {
         setStoredValue(null);
         setLastResult('deleted');
       })
-      .catch((error: Error) => setLastResult(`delete failed: ${error.message}`));
+      .catch((error: Error) =>
+        setLastResult(`delete failed: ${error.message}`),
+      );
   };
 
   return (
@@ -182,7 +189,7 @@ export function SecureStoreScreen() {
           <TextInput
             testID="secure-store-input"
             value={inputText()}
-            onValueChange={setInputText}
+            onValueChange={event => setInputText(event.text)}
             placeholder="Value to store"
             placeholderTextColor="#41506a"
             class="text-input"

@@ -24,7 +24,11 @@ export function TrackingTransparencyScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TrackingTransparency];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const { status, request: requestPermission, get: getPermission } = createPermissions();
+  const {
+    status,
+    request: requestPermission,
+    get: getPermission,
+  } = createPermissions();
   // getAdvertisingId() is a synchronous native read (unlike the async permission fetch above), so
   // seeding the signal once in the component body - which runs exactly once - is the whole thing.
   const [advertisingId] = createSignal<string | null>(getAdvertisingId());

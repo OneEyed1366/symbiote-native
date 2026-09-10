@@ -29,9 +29,9 @@ export function SystemUiScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SystemUi];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [backgroundColor, setBackgroundColorValue] = createSignal<string | null>(
-    null,
-  );
+  const [backgroundColor, setBackgroundColorValue] = createSignal<
+    string | null
+  >(null);
 
   const refresh = () => {
     getBackgroundColorAsync().then(color => {

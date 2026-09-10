@@ -190,7 +190,7 @@ export function SecureStoreScreen() {
           <TextInput
             testID="secure-store-input"
             value={inputText}
-            onValueChange={setInputText}
+            onValueChange={event => setInputText(event.text)}
             placeholder="Value to store"
             placeholderTextColor="#41506a"
             className="text-input"

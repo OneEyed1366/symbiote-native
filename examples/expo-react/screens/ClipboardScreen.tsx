@@ -165,7 +165,7 @@ export function ClipboardScreen() {
           <TextInput
             testID="clipboard-copy-input"
             value={inputText}
-            onValueChange={setInputText}
+            onValueChange={event => setInputText(event.text)}
             placeholder="Type something to copy"
             placeholderTextColor="#41506a"
             className="text-input"
@@ -197,7 +197,7 @@ export function ClipboardScreen() {
             <TextInput
               testID="clipboard-url-input"
               value={urlText}
-              onValueChange={setUrlText}
+              onValueChange={event => setUrlText(event.text)}
               placeholder="https://example.com"
               placeholderTextColor="#41506a"
               className="text-input"

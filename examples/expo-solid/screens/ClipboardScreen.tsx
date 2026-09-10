@@ -1,5 +1,12 @@
 import { createEffect, createSignal } from 'solid-js';
-import { Platform, SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/solid';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/solid';
 import {
   getStringAsync,
   getUrlAsync,
@@ -21,7 +28,11 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 
 function CapabilityBadge(props: { status: ICapabilityStatus }) {
   const label = () =>
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
     <View class={`status-badge status-badge-${props.status}`}>
       <Text class="status-badge-text">{label()}</Text>
@@ -69,12 +80,14 @@ export function ClipboardScreen() {
   createEffect(() => {
     clipboardEvent();
     let isCurrent = true;
-    Promise.all([getStringAsync(), hasStringAsync()]).then(([text, hasText]) => {
-      if (isCurrent) {
-        setClipboardText(text);
-        setHasString(toCapabilityStatus(hasText));
-      }
-    });
+    Promise.all([getStringAsync(), hasStringAsync()]).then(
+      ([text, hasText]) => {
+        if (isCurrent) {
+          setClipboardText(text);
+          setHasString(toCapabilityStatus(hasText));
+        }
+      },
+    );
     return () => {
       isCurrent = false;
     };
@@ -153,7 +166,7 @@ export function ClipboardScreen() {
           <TextInput
             testID="clipboard-copy-input"
             value={inputText()}
-            onValueChange={setInputText}
+            onValueChange={event => setInputText(event.text)}
             placeholder="Type something to copy"
             placeholderTextColor="#41506a"
             class="text-input"
@@ -174,7 +187,9 @@ export function ClipboardScreen() {
             <View class="capability-row">
               <Text class="capability-label">Clipboard URL</Text>
               <Text class="value-text">
-                {clipboardUrl() === null ? 'checking…' : clipboardUrl() || '(none)'}
+                {clipboardUrl() === null
+                  ? 'checking…'
+                  : clipboardUrl() || '(none)'}
               </Text>
             </View>
             <CapabilityRow
@@ -185,7 +200,7 @@ export function ClipboardScreen() {
             <TextInput
               testID="clipboard-url-input"
               value={urlText()}
-              onValueChange={setUrlText}
+              onValueChange={event => setUrlText(event.text)}
               placeholder="https://example.com"
               placeholderTextColor="#41506a"
               class="text-input"

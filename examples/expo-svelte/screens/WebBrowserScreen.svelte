@@ -4,6 +4,7 @@
   // and exposes the Android-only Custom Tabs service trio behind a Platform guard. Svelte twin of
   // ../../expo-vue-sfc/screens/WebBrowserScreen.vue.
   import { Platform, ScrollView } from '@symbiote-native/svelte';
+  import type { ITextInputChangeEvent } from '@symbiote-native/svelte';
   import {
     coolDownAsync,
     dismissBrowser,
@@ -118,7 +119,7 @@
       <text-input
         testID="web-browser-url-input"
         value={url}
-        onValueChange={next => (url = next)}
+        onValueChange={(event: ITextInputChangeEvent) => (url = event.text)}
         placeholder="https://example.com"
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"

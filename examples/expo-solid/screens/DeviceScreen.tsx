@@ -70,7 +70,9 @@ export function DeviceScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Device];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [asyncDeviceType, setAsyncDeviceType] = createSignal<string | null>(null);
+  const [asyncDeviceType, setAsyncDeviceType] = createSignal<string | null>(
+    null,
+  );
   const [uptime, setUptime] = createSignal<number | null>(null);
   const [isRooted, setIsRooted] = createSignal<boolean | null>(null);
 
@@ -146,7 +148,9 @@ export function DeviceScreen() {
             onPress={handleGetUptime}
             color={lineColor}
           />
-          {uptime() !== null && <ValueRow label="Uptime" value={`${uptime()}ms`} />}
+          {uptime() !== null && (
+            <ValueRow label="Uptime" value={`${uptime()}ms`} />
+          )}
           <ActionButton
             testID="device-rooted-button"
             title="Check rooted/jailbroken"

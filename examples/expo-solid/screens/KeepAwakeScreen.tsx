@@ -73,7 +73,11 @@ export function KeepAwakeScreen() {
           <ValueRow
             label="Available"
             value={
-              isAvailable() === null ? 'checking…' : isAvailable() ? 'Yes' : 'No'
+              isAvailable() === null
+                ? 'checking…'
+                : isAvailable()
+                  ? 'Yes'
+                  : 'No'
             }
           />
           <View testID="keep-awake-toggle-row" class="capability-row">
@@ -81,7 +85,7 @@ export function KeepAwakeScreen() {
             <Switch
               testID="keep-awake-switch"
               value={isKeepAwakeOn()}
-              onValueChange={setIsKeepAwakeOn}
+              onValueChange={event => setIsKeepAwakeOn(event.value)}
               trackColor={{ true: lineColor }}
             />
           </View>

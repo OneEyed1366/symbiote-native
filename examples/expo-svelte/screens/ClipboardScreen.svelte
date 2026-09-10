@@ -6,6 +6,7 @@
   // row, and an iOS-only URL get/set/has row. Svelte twin of
   // ../../expo-vue-sfc/screens/ClipboardScreen.vue.
   import { Platform, ScrollView } from '@symbiote-native/svelte';
+  import type { ITextInputChangeEvent } from '@symbiote-native/svelte';
   import {
     getStringAsync,
     getUrlAsync,
@@ -142,7 +143,7 @@
       <text-input
         testID="clipboard-input"
         value={inputText}
-        onValueChange={next => (inputText = next)}
+        onValueChange={(event: ITextInputChangeEvent) => (inputText = event.text)}
         placeholder="Type something to copy…"
         placeholderTextColor={PLACEHOLDER_TEXT_COLOR}
         class="text-input"
@@ -162,7 +163,7 @@
         <text-input
           testID="clipboard-url-input"
           value={urlInput}
-          onValueChange={next => (urlInput = next)}
+          onValueChange={(event: ITextInputChangeEvent) => (urlInput = event.text)}
           placeholder="https://…"
           placeholderTextColor={PLACEHOLDER_TEXT_COLOR}
           class="text-input"

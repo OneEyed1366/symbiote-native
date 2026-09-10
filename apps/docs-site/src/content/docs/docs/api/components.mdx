@@ -114,7 +114,7 @@ differs is the framework-shaped surface:
   `IAccessibilityProps`/`IAriaProps` on Svelte, so `testID` and
   `accessibilityLabel` have no effect on a Svelte list today, unlike React.
   Solid's `renderItem` is `(info: Accessor<{ item, index, separators }>) =>
-  JSX.Element`, an accessor-taking render prop, called once untracked, same
+JSX.Element`, an accessor-taking render prop, called once untracked, same
   reasoning as `Pressable`'s child. `SectionList`/`VirtualizedSectionList` and
   multi-column `FlatList` are implemented and execution-tested, and
   `IVirtualizedListProps` extends `IAccessibilityProps`/`IAriaProps`, so
@@ -286,6 +286,7 @@ sugar.
     <Pressable onPress={event => console.log(event)} />
     <Switch value={enabled()} onValueChange={setEnabled} />
     ```
+
   </TabItem>
 </Tabs>
 

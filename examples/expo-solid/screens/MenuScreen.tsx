@@ -1,5 +1,11 @@
 import { For } from 'solid-js';
-import { Pressable, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import {
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/solid';
 import { useStackNavigation } from '@symbiote-native/navigation/solid';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';

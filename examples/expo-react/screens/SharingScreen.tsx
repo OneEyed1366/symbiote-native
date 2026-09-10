@@ -123,7 +123,7 @@ export function SharingScreen() {
           <TextInput
             testID="sharing-uri-input"
             value={fileUri}
-            onValueChange={setFileUri}
+            onValueChange={event => setFileUri(event.text)}
             placeholder="file:///path/to/file.pdf"
             placeholderTextColor="#41506a"
             autoCapitalize="none"

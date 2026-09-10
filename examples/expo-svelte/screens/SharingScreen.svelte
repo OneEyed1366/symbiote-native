@@ -3,6 +3,7 @@
   // driving shareAsync against a file URI the user types in. Svelte twin of
   // ../../expo-vue-sfc/screens/SharingScreen.vue.
   import { ScrollView } from '@symbiote-native/svelte';
+  import type { ITextInputChangeEvent } from '@symbiote-native/svelte';
   import {
     isAvailableAsync,
     shareAsync,
@@ -107,7 +108,7 @@
       <text-input
         testID="sharing-uri-input"
         value={fileUri}
-        onValueChange={next => (fileUri = next)}
+        onValueChange={(event: ITextInputChangeEvent) => (fileUri = event.text)}
         placeholder="file:///path/to/file.pdf"
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"

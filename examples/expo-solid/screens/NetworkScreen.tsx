@@ -45,7 +45,9 @@ export function NetworkScreen() {
 
   const networkState = createNetworkState();
   const [ipAddress, setIpAddress] = createSignal<string | null>(null);
-  const [isAirplaneMode, setIsAirplaneMode] = createSignal<boolean | null>(null);
+  const [isAirplaneMode, setIsAirplaneMode] = createSignal<boolean | null>(
+    null,
+  );
 
   // Tracked read of networkState() at the top re-runs this every time the live state changes,
   // matching the React source's useEffect(fn, [networkState]) dependency.

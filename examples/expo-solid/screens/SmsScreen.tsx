@@ -23,7 +23,11 @@ function CapabilityRow(props: {
   status: ICapabilityStatus;
 }) {
   const text = () =>
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
     <View testID={props.testID} class="capability-row">
       <Text class="capability-label">{props.label}</Text>
@@ -46,7 +50,8 @@ export function SmsScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Sms];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [isAvailable, setIsAvailable] = createSignal<ICapabilityStatus>('checking');
+  const [isAvailable, setIsAvailable] =
+    createSignal<ICapabilityStatus>('checking');
   const [recipients, setRecipients] = createSignal('');
   const [message, setMessage] = createSignal('Sent from the Symbiote canary');
   const [lastResult, setLastResult] = createSignal('idle');
@@ -123,7 +128,7 @@ export function SmsScreen() {
           <TextInput
             testID="sms-recipients-input"
             value={recipients()}
-            onValueChange={setRecipients}
+            onValueChange={event => setRecipients(event.text)}
             placeholder="0123456789, 9876543210"
             placeholderTextColor="#41506a"
             autoCapitalize="none"
@@ -132,7 +137,7 @@ export function SmsScreen() {
           <TextInput
             testID="sms-message-input"
             value={message()}
-            onValueChange={setMessage}
+            onValueChange={event => setMessage(event.text)}
             placeholder="Message"
             placeholderTextColor="#41506a"
             class="text-input"

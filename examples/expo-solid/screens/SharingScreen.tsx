@@ -23,7 +23,11 @@ function CapabilityRow(props: {
   status: ICapabilityStatus;
 }) {
   const text = () =>
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
     <View testID={props.testID} class="capability-row">
       <Text class="capability-label">{props.label}</Text>
@@ -46,7 +50,8 @@ export function SharingScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Sharing];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [isAvailable, setIsAvailable] = createSignal<ICapabilityStatus>('checking');
+  const [isAvailable, setIsAvailable] =
+    createSignal<ICapabilityStatus>('checking');
   const [fileUri, setFileUri] = createSignal('');
   const [lastResult, setLastResult] = createSignal('idle');
 
@@ -117,7 +122,7 @@ export function SharingScreen() {
           <TextInput
             testID="sharing-uri-input"
             value={fileUri()}
-            onValueChange={setFileUri}
+            onValueChange={event => setFileUri(event.text)}
             placeholder="file:///path/to/file.pdf"
             placeholderTextColor="#41506a"
             autoCapitalize="none"

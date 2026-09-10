@@ -1,5 +1,8 @@
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
-import { createCalendars, createLocales } from '@symbiote-native/localization/solid';
+import {
+  createCalendars,
+  createLocales,
+} from '@symbiote-native/localization/solid';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -81,7 +84,10 @@ export function LocalizationScreen() {
                   : 'No'
             }
           />
-          <ValueRow label="Time zone" value={calendar().timeZone ?? 'unknown'} />
+          <ValueRow
+            label="Time zone"
+            value={calendar().timeZone ?? 'unknown'}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>

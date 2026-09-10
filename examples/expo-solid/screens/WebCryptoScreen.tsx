@@ -41,9 +41,8 @@ export function WebCryptoScreen() {
   const lineColor = LINE_COLOR[lineInfo.line];
 
   const [randomBytesHex, setRandomBytesHex] = createSignal<string | null>(null);
-  const [isPolyfillInstalled, setIsPolyfillInstalled] = createSignal(
-    hasGlobalCrypto(),
-  );
+  const [isPolyfillInstalled, setIsPolyfillInstalled] =
+    createSignal(hasGlobalCrypto());
 
   const handleGenerateRandomBytes = () => {
     const bytes = webCrypto.getRandomValues(new Uint8Array(RANDOM_BYTE_COUNT));
@@ -90,7 +89,9 @@ export function WebCryptoScreen() {
             color={lineColor}
           />
           <Show when={randomBytesHex()}>
-            {(value: Accessor<string>) => <ValueRow label="Bytes (hex)" value={value()} />}
+            {(value: Accessor<string>) => (
+              <ValueRow label="Bytes (hex)" value={value()} />
+            )}
           </Show>
         </View>
 

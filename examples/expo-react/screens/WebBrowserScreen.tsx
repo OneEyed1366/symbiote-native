@@ -149,7 +149,7 @@ export function WebBrowserScreen() {
           <TextInput
             testID="web-browser-url-input"
             value={url}
-            onValueChange={setUrl}
+            onValueChange={event => setUrl(event.text)}
             placeholder="https://example.com"
             placeholderTextColor="#41506a"
             autoCapitalize="none"

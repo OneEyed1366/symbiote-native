@@ -246,10 +246,10 @@ Plus the `ExpoKeepAwakeTag` constant (the shared default tag string, `'ExpoKeepA
 
 ### `useKeepAwake()` config
 
-| Field                       | Type                            | Default                           | Description                                                                                                                                                                                                                                                     |
-| --------------------------- | ------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field                       | Type                            | Default                           | Description                                                                                                                                                                                                                                                            |
+| --------------------------- | ------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tag` (first argument)      | `string \| undefined`           | a per-instance auto-generated tag | The lock tag to activate/deactivate. React derives its default from `useId()`; Vue, Angular, Svelte, and Solid fall back to a monotonically-incrementing module-local counter (`keep-awake-tag-1`, `keep-awake-tag-2`, …), since none of them has a `useId` equivalent |
-| `options` (second argument) | `KeepAwakeOptions \| undefined` | `undefined`                       | `{ listener?, suppressDeactivateWarnings? }` — see below                                                                                                                                                                                                        |
+| `options` (second argument) | `KeepAwakeOptions \| undefined` | `undefined`                       | `{ listener?, suppressDeactivateWarnings? }` — see below                                                                                                                                                                                                               |
 
 ### `KeepAwakeOptions`
 

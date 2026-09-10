@@ -3,6 +3,7 @@
   // opens the system SMS composer prefilled with the recipients and message typed below. Svelte
   // twin of ../../expo-vue-sfc/screens/SmsScreen.vue.
   import { ScrollView } from '@symbiote-native/svelte';
+  import type { ITextInputChangeEvent } from '@symbiote-native/svelte';
   import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/svelte';
   import ActionButton from '../components/ActionButton.svelte';
   import { ROUTE_NAME } from '../routes';
@@ -100,7 +101,7 @@
       <text-input
         testID="sms-recipients-input"
         value={recipients}
-        onValueChange={next => (recipients = next)}
+        onValueChange={(event: ITextInputChangeEvent) => (recipients = event.text)}
         placeholder="Recipients, comma-separated"
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"
@@ -110,7 +111,7 @@
       <text-input
         testID="sms-message-input"
         value={message}
-        onValueChange={next => (message = next)}
+        onValueChange={(event: ITextInputChangeEvent) => (message = event.text)}
         placeholder="Message"
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"

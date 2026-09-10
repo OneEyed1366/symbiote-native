@@ -74,7 +74,9 @@ export function WebBrowserScreen() {
           `warmed up: ${result.servicePackage ?? '(no service package)'}`,
         );
       })
-      .catch((error: Error) => setLastResult(`warm-up failed: ${error.message}`));
+      .catch((error: Error) =>
+        setLastResult(`warm-up failed: ${error.message}`),
+      );
   };
 
   const handleMayInit = () => {
@@ -84,7 +86,9 @@ export function WebBrowserScreen() {
           `may-init: ${result.servicePackage ?? '(no service package)'}`,
         ),
       )
-      .catch((error: Error) => setLastResult(`may-init failed: ${error.message}`));
+      .catch((error: Error) =>
+        setLastResult(`may-init failed: ${error.message}`),
+      );
   };
 
   const handleCoolDown = () => {
@@ -145,7 +149,7 @@ export function WebBrowserScreen() {
           <TextInput
             testID="web-browser-url-input"
             value={url()}
-            onValueChange={setUrl}
+            onValueChange={event => setUrl(event.text)}
             placeholder="https://example.com"
             placeholderTextColor="#41506a"
             autoCapitalize="none"

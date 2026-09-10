@@ -129,7 +129,7 @@ export function SmsScreen() {
           <TextInput
             testID="sms-recipients-input"
             value={recipients}
-            onValueChange={setRecipients}
+            onValueChange={event => setRecipients(event.text)}
             placeholder="0123456789, 9876543210"
             placeholderTextColor="#41506a"
             autoCapitalize="none"
@@ -138,7 +138,7 @@ export function SmsScreen() {
           <TextInput
             testID="sms-message-input"
             value={message}
-            onValueChange={setMessage}
+            onValueChange={event => setMessage(event.text)}
             placeholder="Message"
             placeholderTextColor="#41506a"
             className="text-input"

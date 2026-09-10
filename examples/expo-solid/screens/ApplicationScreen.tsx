@@ -1,5 +1,11 @@
 import { createSignal } from 'solid-js';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/solid';
 import {
   applicationId,
   applicationName,
@@ -35,7 +41,9 @@ export function ApplicationScreen() {
 
   const [installedAt, setInstalledAt] = createSignal<string | null>(null);
   const [androidId, setAndroidId] = createSignal<string | null>(null);
-  const [installReferrer, setInstallReferrer] = createSignal<string | null>(null);
+  const [installReferrer, setInstallReferrer] = createSignal<string | null>(
+    null,
+  );
   const [iosVendorId, setIosVendorId] = createSignal<string | null>(null);
   const [iosReleaseType, setIosReleaseType] = createSignal<string | null>(null);
 

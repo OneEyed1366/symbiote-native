@@ -1,5 +1,11 @@
 import { Show, createSignal, onCleanup, type Accessor } from 'solid-js';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/solid';
 import {
   AuthenticationType,
   SecurityLevel,
@@ -61,7 +67,11 @@ function securityLevelLabel(level: SecurityLevel): string {
 
 function CapabilityBadge(props: { status: ICapabilityStatus }) {
   const label = () =>
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
     <View class={`auth-status-badge auth-status-badge-${props.status}`}>
       <Text class="auth-status-text">{label()}</Text>
@@ -100,11 +110,18 @@ export function LocalAuthScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.LocalAuth];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [hasHardware, setHasHardware] = createSignal<ICapabilityStatus>('checking');
-  const [isEnrolled, setIsEnrolled] = createSignal<ICapabilityStatus>('checking');
-  const [enrolledLevel, setEnrolledLevel] = createSignal<SecurityLevel | null>(null);
-  const [supportedTypes, setSupportedTypes] = createSignal<AuthenticationType[] | null>(null);
-  const [authResult, setAuthResult] = createSignal<ILocalAuthenticationResult | null>(null);
+  const [hasHardware, setHasHardware] =
+    createSignal<ICapabilityStatus>('checking');
+  const [isEnrolled, setIsEnrolled] =
+    createSignal<ICapabilityStatus>('checking');
+  const [enrolledLevel, setEnrolledLevel] = createSignal<SecurityLevel | null>(
+    null,
+  );
+  const [supportedTypes, setSupportedTypes] = createSignal<
+    AuthenticationType[] | null
+  >(null);
+  const [authResult, setAuthResult] =
+    createSignal<ILocalAuthenticationResult | null>(null);
   const [isAuthenticating, setIsAuthenticating] = createSignal(false);
 
   let disposed = false;
@@ -232,9 +249,12 @@ export function LocalAuthScreen() {
                 class={`auth-result auth-result-${result().success ? 'success' : 'error'}`}
               >
                 <Text class="auth-result-text">
-                  {(value => (value.success
-                    ? 'Success'
-                    : `Failed: ${value.error}${value.warning ? ` (${value.warning})` : ''}`))(result())}
+                  {(value =>
+                    value.success
+                      ? 'Success'
+                      : `Failed: ${value.error}${value.warning ? ` (${value.warning})` : ''}`)(
+                    result(),
+                  )}
                 </Text>
               </View>
             )}

@@ -4,6 +4,7 @@
   // demo key. Kill and relaunch the app to prove the value survives outside the JS heap. Svelte
   // twin of examples/expo-vue-sfc/screens/SecureStoreScreen.vue.
   import { ScrollView } from '@symbiote-native/svelte';
+  import type { ITextInputChangeEvent } from '@symbiote-native/svelte';
   import {
     canUseBiometricAuthentication,
     deleteItemAsync,
@@ -162,7 +163,7 @@
       <text-input
         testID="secure-store-input"
         value={inputText}
-        onValueChange={next => (inputText = next)}
+        onValueChange={(event: ITextInputChangeEvent) => (inputText = event.text)}
         placeholder="Value to store"
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"

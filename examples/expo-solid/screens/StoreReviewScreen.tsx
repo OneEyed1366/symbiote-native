@@ -83,7 +83,11 @@ export function StoreReviewScreen() {
           <ValueRow
             label="Native flow available"
             value={
-              isAvailable() === null ? 'checking…' : isAvailable() ? 'Yes' : 'No'
+              isAvailable() === null
+                ? 'checking…'
+                : isAvailable()
+                  ? 'Yes'
+                  : 'No'
             }
           />
           <ValueRow

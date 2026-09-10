@@ -1,5 +1,11 @@
 import { For, Show, createSignal, type Accessor } from 'solid-js';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/solid';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -13,13 +19,14 @@ import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-const IMPACT_STYLES: readonly { label: string; style: ImpactFeedbackStyle }[] = [
-  { label: 'Light', style: ImpactFeedbackStyle.Light },
-  { label: 'Medium', style: ImpactFeedbackStyle.Medium },
-  { label: 'Heavy', style: ImpactFeedbackStyle.Heavy },
-  { label: 'Rigid', style: ImpactFeedbackStyle.Rigid },
-  { label: 'Soft', style: ImpactFeedbackStyle.Soft },
-];
+const IMPACT_STYLES: readonly { label: string; style: ImpactFeedbackStyle }[] =
+  [
+    { label: 'Light', style: ImpactFeedbackStyle.Light },
+    { label: 'Medium', style: ImpactFeedbackStyle.Medium },
+    { label: 'Heavy', style: ImpactFeedbackStyle.Heavy },
+    { label: 'Rigid', style: ImpactFeedbackStyle.Rigid },
+    { label: 'Soft', style: ImpactFeedbackStyle.Soft },
+  ];
 
 const NOTIFICATION_TYPES: readonly {
   label: string;
@@ -75,7 +82,10 @@ export function HapticsScreen() {
     setLastFired(`impactAsync(${label})`);
   };
 
-  const handleNotification = (type: NotificationFeedbackType, label: string) => {
+  const handleNotification = (
+    type: NotificationFeedbackType,
+    label: string,
+  ) => {
     notificationAsync(type);
     setLastFired(`notificationAsync(${label})`);
   };

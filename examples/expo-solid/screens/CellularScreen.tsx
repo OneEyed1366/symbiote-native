@@ -1,5 +1,11 @@
 import { createSignal, onCleanup } from 'solid-js';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/solid';
 import {
   CellularGeneration,
   allowsVoipAsync,
@@ -46,12 +52,18 @@ export function CellularScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Cellular];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [generation, setGeneration] = createSignal<CellularGeneration | null>(null);
+  const [generation, setGeneration] = createSignal<CellularGeneration | null>(
+    null,
+  );
   const [allowsVoip, setAllowsVoip] = createSignal<boolean | null>(null);
   const [isoCountryCode, setIsoCountryCode] = createSignal<string | null>(null);
   const [carrierName, setCarrierName] = createSignal<string | null>(null);
-  const [mobileCountryCode, setMobileCountryCode] = createSignal<string | null>(null);
-  const [mobileNetworkCode, setMobileNetworkCode] = createSignal<string | null>(null);
+  const [mobileCountryCode, setMobileCountryCode] = createSignal<string | null>(
+    null,
+  );
+  const [mobileNetworkCode, setMobileNetworkCode] = createSignal<string | null>(
+    null,
+  );
   const permissions = createPermissions();
 
   let disposed = false;
@@ -111,7 +123,9 @@ export function CellularScreen() {
           <View class="capability-row">
             <Text class="capability-label">Generation</Text>
             <Text class="value-text">
-              {generation() === null ? 'checking…' : generationLabel(generation()!)}
+              {generation() === null
+                ? 'checking…'
+                : generationLabel(generation()!)}
             </Text>
           </View>
           {Platform.OS === 'android' && (
@@ -149,9 +163,7 @@ export function CellularScreen() {
             <Text class="feature-card-title">Permission</Text>
           </View>
           <View class="capability-row">
-            <Text class="capability-label">
-              Phone-state permission status
-            </Text>
+            <Text class="capability-label">Phone-state permission status</Text>
             <Text class="value-text">{permissionLabel()}</Text>
           </View>
           <ActionButton

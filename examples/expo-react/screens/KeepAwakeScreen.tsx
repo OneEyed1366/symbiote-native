@@ -84,7 +84,7 @@ export function KeepAwakeScreen() {
             <Switch
               testID="keep-awake-switch"
               value={isKeepAwakeOn}
-              onValueChange={setIsKeepAwakeOn}
+              onValueChange={event => setIsKeepAwakeOn(event.value)}
               trackColor={{ true: lineColor }}
             />
           </View>

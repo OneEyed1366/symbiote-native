@@ -1,4 +1,10 @@
-import { Show, createSignal, onCleanup, type Accessor, type JSX } from 'solid-js';
+import {
+  Show,
+  createSignal,
+  onCleanup,
+  type Accessor,
+  type JSX,
+} from 'solid-js';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
 import {
   Accelerometer,
@@ -77,9 +83,7 @@ function resolveSensorStatus(
 function SensorStatusBadge(props: { status: ISensorStatus }) {
   return (
     <View class={`sensor-status-badge sensor-status-badge-${props.status}`}>
-      <Text class="sensor-status-text">
-        {SENSOR_STATUS_TEXT[props.status]}
-      </Text>
+      <Text class="sensor-status-text">{SENSOR_STATUS_TEXT[props.status]}</Text>
     </View>
   );
 }
@@ -187,7 +191,10 @@ export function SensorsScreen() {
           <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
         <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: LINE_COLOR.sensors }}>
+          <View
+            class="hero-badge"
+            style={{ backgroundColor: LINE_COLOR.sensors }}
+          >
             <Text class="hero-badge-text">{lineInfo.code}</Text>
           </View>
           <View class="hero-copy">
@@ -195,8 +202,8 @@ export function SensorsScreen() {
             <Text class="hero-body">
               @symbiote-native/sensors — live readings from five
               expo-sensors-backed primitives. A simulator reports every
-              CoreMotion/CMPedometer-backed sensor as unavailable; a real
-              device is needed to see live readings.
+              CoreMotion/CMPedometer-backed sensor as unavailable; a real device
+              is needed to see live readings.
             </Text>
           </View>
         </View>
@@ -280,7 +287,10 @@ export function SensorsScreen() {
         >
           <Show when={pedometer()}>
             {(reading: Accessor<IPedometerResult>) => (
-              <Text testID="sensors-pedometer-steps" class="sensor-reading-value">
+              <Text
+                testID="sensors-pedometer-steps"
+                class="sensor-reading-value"
+              >
                 {`${reading().steps} steps`}
               </Text>
             )}

@@ -1,5 +1,11 @@
 import { createSignal, onCleanup } from 'solid-js';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/solid';
 import {
   BatteryState,
   isAvailableAsync,
@@ -21,7 +27,11 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 
 function CapabilityBadge(props: { status: ICapabilityStatus }) {
   const label = () =>
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
     <View class={`status-badge status-badge-${props.status}`}>
       <Text class="status-badge-text">{label()}</Text>
@@ -73,7 +83,8 @@ export function BatteryScreen() {
   const batteryState = createBatteryState();
   const lowPowerMode = createLowPowerMode();
 
-  const [isAvailable, setIsAvailable] = createSignal<ICapabilityStatus>('checking');
+  const [isAvailable, setIsAvailable] =
+    createSignal<ICapabilityStatus>('checking');
   const [isBatteryOptimizationEnabled, setIsBatteryOptimizationEnabled] =
     createSignal<ICapabilityStatus>('checking');
 
@@ -116,8 +127,8 @@ export function BatteryScreen() {
             <Text class="hero-body">
               @symbiote-native/battery — live battery level, charging state, and
               low-power mode via three subscription-backed primitives. A
-              simulator reports the battery API as unavailable; a real device
-              is needed to see live readings.
+              simulator reports the battery API as unavailable; a real device is
+              needed to see live readings.
             </Text>
           </View>
         </View>
@@ -132,9 +143,7 @@ export function BatteryScreen() {
           </View>
           <View class="capability-row">
             <Text class="capability-label">Battery state</Text>
-            <Text class="value-text">
-              {batteryStateLabel(batteryState())}
-            </Text>
+            <Text class="value-text">{batteryStateLabel(batteryState())}</Text>
           </View>
           <View class="capability-row">
             <Text class="capability-label">Low power mode</Text>

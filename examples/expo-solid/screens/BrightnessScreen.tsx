@@ -1,5 +1,11 @@
 import { For, createSignal, onCleanup } from 'solid-js';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/solid';
 import {
   BrightnessMode,
   addBrightnessListener,
@@ -19,7 +25,11 @@ type ICapabilityStatus = 'checking' | 'yes' | 'no';
 
 function CapabilityBadge(props: { status: ICapabilityStatus }) {
   const label = () =>
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
     <View class={`status-badge status-badge-${props.status}`}>
       <Text class="status-badge-text">{label()}</Text>
@@ -60,7 +70,8 @@ export function BrightnessScreen() {
   const [systemMode, setSystemMode] = createSignal<BrightnessMode>(
     BrightnessMode.UNKNOWN,
   );
-  const [isUsingSystem, setIsUsingSystem] = createSignal<ICapabilityStatus>('checking');
+  const [isUsingSystem, setIsUsingSystem] =
+    createSignal<ICapabilityStatus>('checking');
   const permissions = createPermissions();
 
   let disposed = false;
