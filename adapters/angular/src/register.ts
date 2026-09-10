@@ -24,11 +24,19 @@ import {
   registerPressableBehavior,
   registerSwitchBehavior,
   registerTextInputBehavior,
+  registerTouchableHighlightBehavior,
   registerTouchableNativeFeedbackBehavior,
+  registerTouchableOpacityBehavior,
   registerTouchableWithoutFeedbackBehavior,
 } from '@symbiote-native/components';
 
 registerPressableBehavior();
+// The fade and the underlay swap, both engine-side style layers over the responder. Safe because
+// their wrappers are GONE in this same commit — each rendered its own `Pressable` around a faded or
+// underlaid view, so registering while they stood would have put a second press machine on every
+// touchable in every app.
+registerTouchableOpacityBehavior();
+registerTouchableHighlightBehavior();
 // No `-managed` twin and none possible: this tag commits no node, so there is nothing for a second
 // spelling to name. It is safe because the wrapper is GONE in this same commit — while five
 // wrappers still rendered their own `Pressable` around a feedback view, registering here would have

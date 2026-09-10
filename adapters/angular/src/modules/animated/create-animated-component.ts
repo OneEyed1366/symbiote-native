@@ -38,7 +38,7 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { selectScrollIntrinsics } from '@symbiote-native/components';
-import { Image, ScrollView, Text, View } from '../../components';
+import { ScrollView, Text, View } from '../../components';
 import {
   anchorHostStyle,
   ImageHost,
@@ -55,10 +55,13 @@ import {
   ImageBase,
   isImageEventCallback,
   resolveImageProps,
-} from '../../components/image/shared';
+} from '../../components/image-shared';
 import type { IGatedAccessibilityEvent } from '../../gate-demand';
 import { SectionList } from '../../components/section-list';
 import { AnimatedLeafBinder } from './animated-leaf-binder';
+
+// The intrinsic `createAnimatedComponent` accepts in place of the deleted `Image` component.
+const IMAGE_TAG = 'image';
 
 // RN's prop carrying explicit (already-rasterized) values that override the animated prop in
 // the COMMITTED props (sticky-header passthrough). Named once so the directive input and the
@@ -441,12 +444,16 @@ export const AnimatedSectionList = SectionList;
 export function createAnimatedComponent(base: unknown): Type<unknown> {
   if (base === View) return AnimatedView;
   if (base === Text) return AnimatedText;
-  if (base === Image) return AnimatedImage;
   if (base === ScrollView) return AnimatedScrollView;
+  // The TAG, not a component identity: `Image` is the statics namespace now
+  // (`modules/image`), so there is no class to compare against — the same move React made
+  // (`createAnimatedComponent('image')`). A tag string is also what portable app code can pass on
+  // every adapter.
+  if (base === IMAGE_TAG) return AnimatedImage;
   throw new Error(
     'createAnimatedComponent: Angular cannot synthesize a component at runtime (no JIT compiler ' +
       'under AOT/Metro). Author an explicit standalone @Component extending AnimatedComponentBase ' +
-      'instead. The built-in primitives View / Text / Image / ScrollView map to ' +
-      'AnimatedView / AnimatedText / AnimatedImage / AnimatedScrollView.',
+      "instead. The built-in primitives View / Text / ScrollView and the tag 'image' map to " +
+      'AnimatedView / AnimatedText / AnimatedScrollView / AnimatedImage.',
   );
 }

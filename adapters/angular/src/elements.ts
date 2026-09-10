@@ -27,8 +27,17 @@
 // EVENTS ARE NOT DECLARED. `(press)` / `(layout)` on a tag a directive matches still compiles and
 // still reaches `Renderer2.listen` -> the engine; an `@Output` would CONSUME the binding the same
 // way an `@Input` consumes a prop. Measured both halves — see `elements.test.ts`.
-import { Directive, ElementRef, Input, Renderer2, inject } from '@angular/core';
-import type { OnChanges, SimpleChanges } from '@angular/core';
+import {
+  Directive,
+  ElementRef,
+  Input,
+  Renderer2,
+  forwardRef,
+  inject,
+} from '@angular/core';
+import type { OnChanges, OnDestroy, SimpleChanges } from '@angular/core';
+import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
+import { VALUE_CHANGE_EVENT } from './renderer/value-change';
 import type {
   IActivityIndicatorProps,
   IImageProps,
@@ -44,8 +53,12 @@ import type {
   ITextElementProps,
 } from './element-props';
 import type { IAngularImageBackgroundProps } from './components/image-background-props';
+import type { IAngularPressableProps } from './components/pressable-props';
+import type {
+  IAngularTouchableHighlightProps,
+  IAngularTouchableOpacityProps,
+} from './components/touchable-props';
 // Type-only, so none of these components enters the bundle of an app that writes bare tags.
-import type { IAngularPressableProps } from './components/pressable';
 import type { IAngularRefreshControlProps } from './components/refresh-control';
 import type { IAngularScrollViewProps } from './components/scroll-view';
 
@@ -460,6 +473,101 @@ export class SwitchElement extends SymbioteElement {
 @Directive({ selector: 'switch-managed', standalone: true })
 export class ManagedSwitchElement extends SwitchElement {}
 
+/**
+ * `[(ngModel)]` / `formControlName` on a `<text-input>` or a `<switch>`.
+ *
+ * The wrappers provided `NG_VALUE_ACCESSOR` themselves; a tag has no class for @angular/forms to
+ * call into, so the accessor moves onto a directive of its own rather than being dropped — the
+ * shape Angular's own `DefaultValueAccessor` takes for `<input>`. Providing it unconditionally is
+ * safe: @angular/forms looks the accessor up only when an `ngModel` / `formControl*` directive sits
+ * on the SAME element, so a plain `<switch [(value)]>` never reaches it.
+ *
+ * Everything below goes through `Renderer2`, which is the adapter's own — `setProperty` lands in
+ * `routeProp` and `listen('valueChange')` is already unwrapped to a bare value there, so this
+ * directive holds no fold of its own.
+ */
+@Directive()
+abstract class SymbioteValueAccessor
+  implements ControlValueAccessor, OnDestroy
+{
+  private readonly renderer = inject(Renderer2);
+  private readonly host = inject(ElementRef);
+  private unlisten?: () => void;
+
+  // The prop that spells "not editable" for this tag: RN's TextInput has no `disabled`, it has
+  // `editable` (inverted), while Switch takes `disabled` straight.
+  protected abstract writeDisabled(isDisabled: boolean): void;
+
+  protected setProp(name: string, value: unknown): void {
+    this.renderer.setProperty(this.host.nativeElement, name, value);
+  }
+
+  writeValue(value: unknown): void {
+    this.setProp('value', value ?? undefined);
+  }
+
+  registerOnChange(fn: (value: unknown) => void): void {
+    this.unlisten?.();
+    this.unlisten = this.renderer.listen(
+      this.host.nativeElement,
+      VALUE_CHANGE_EVENT,
+      (value: unknown) => {
+        fn(value);
+      },
+    );
+  }
+
+  // Native has no blur-driven "touched" signal distinct from `blur`, and RN's own onBlur is what an
+  // app binds — so touched is driven off the same event rather than a second channel.
+  registerOnTouched(fn: () => void): void {
+    this.setProp('onBlur', () => fn());
+  }
+
+  setDisabledState(isDisabled: boolean): void {
+    this.writeDisabled(isDisabled);
+  }
+
+  ngOnDestroy(): void {
+    this.unlisten?.();
+  }
+}
+
+@Directive({
+  selector:
+    'text-input[ngModel], text-input[formControl], text-input[formControlName], text-input-multiline[ngModel], text-input-multiline[formControl], text-input-multiline[formControlName]',
+  standalone: true,
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => TextInputValueAccessor),
+      multi: true,
+    },
+  ],
+})
+export class TextInputValueAccessor extends SymbioteValueAccessor {
+  protected override writeDisabled(isDisabled: boolean): void {
+    this.setProp('editable', !isDisabled);
+  }
+}
+
+@Directive({
+  selector:
+    'switch[ngModel], switch[formControl], switch[formControlName], switch-managed[ngModel], switch-managed[formControl], switch-managed[formControlName]',
+  standalone: true,
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => SwitchValueAccessor),
+      multi: true,
+    },
+  ],
+})
+export class SwitchValueAccessor extends SymbioteValueAccessor {
+  protected override writeDisabled(isDisabled: boolean): void {
+    this.setProp('disabled', isDisabled);
+  }
+}
+
 // The HOST — RN's centering RCTView (ActivityIndicator.js:112), which is the tag an app writes.
 // The four spinner props are declared here because that is where the app writes them; the engine's
 // behavior redirects them onto the spinner it builds underneath (`slotProps`).
@@ -562,6 +670,11 @@ export const SYMBIOTE_ELEMENTS = [
   RefreshControlElement,
   StickyHeaderElement,
   InputAccessoryViewElement,
+  // Not tags — the `[(ngModel)]` / `formControl*` accessors for the two controlled ones. They ride
+  // this list so an app that already imports it keeps the forms integration the deleted wrappers
+  // provided, and `elements.test.ts` subtracts them from its tag-coverage check by name.
+  TextInputValueAccessor,
+  SwitchValueAccessor,
 ] as const;
 
 // A prop this file forgets is not a silent gap — it is `Can't bind to 'x'` in the app that tries
@@ -581,6 +694,20 @@ type IMissingInputs<TProps, TDirective, TIgnored extends PropertyKey = never> =
 const DECLARES_EVERY_PROP: {
   view: IMissingInputs<IElementProps, ViewElement>;
   pressable: IMissingInputs<IAngularPressableProps, PressableElement, 'style'>;
+  // The two touchables, added when their wrappers were deleted (2026-09-11). They inherit
+  // `PressableElement`, so the rows above would pass whatever these declared — what they pin is the
+  // per-touchable surface (`activeOpacity`, `underlayColor`, the three timing knobs), which used to
+  // be fenced by a source-text assertion over the wrapper's template in `angular-gaps.test.ts`.
+  touchableOpacity: IMissingInputs<
+    IAngularTouchableOpacityProps,
+    TouchableOpacityElement,
+    'style'
+  >;
+  touchableHighlight: IMissingInputs<
+    IAngularTouchableHighlightProps,
+    TouchableHighlightElement,
+    'style'
+  >;
   text: IMissingInputs<ITextElementProps, TextElement>;
   image: IMissingInputs<IImageProps, ImageElement, 'style'>;
   imageBackground: IMissingInputs<
@@ -615,6 +742,8 @@ const DECLARES_EVERY_PROP: {
 } = {
   view: true,
   pressable: true,
+  touchableOpacity: true,
+  touchableHighlight: true,
   text: true,
   image: true,
   imageBackground: true,

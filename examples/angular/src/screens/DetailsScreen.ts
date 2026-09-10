@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { SafeAreaView, Text, View } from '@symbiote-native/angular';
+import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
 import {
   injectRoute,
   injectStackNavigation,
@@ -20,9 +20,9 @@ function openedFromLabel(params: unknown): string {
 @Component({
   selector: 'DetailsScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <View class="section">
         <Text class="section-label">Navigation demo · Details screen</Text>
         <Text class="info-text">{{ 'route.params: ' + paramsLabel }}</Text>
@@ -36,7 +36,7 @@ function openedFromLabel(params: unknown): string {
           [color]="lineColorPrimitives"
         ></ActionButton>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class DetailsScreen {

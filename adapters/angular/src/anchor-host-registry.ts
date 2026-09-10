@@ -47,12 +47,9 @@ const ANCHOR_HOST_COMPONENTS: Set<string> = new Set(
     'symbiote-descriptor-outlet',
     'tunnel-out',
     'Image',
-    'InputAccessoryView',
     'KeyboardAvoidingView',
     'Modal',
-    'Pressable',
     'RefreshControl',
-    'SafeAreaView',
     'ScrollView',
     'ScrollViewStickyHeader',
     'SectionList',
@@ -60,14 +57,8 @@ const ANCHOR_HOST_COMPONENTS: Set<string> = new Set(
     'StatusBar',
     'Switch',
     'Text',
-    'TextInput',
-    'TouchableHighlight',
-    'TouchableOpacity',
     'VirtualizedList',
     'VirtualizedSectionList',
-    // 'pressable' deliberately NOT here — see Pressable's own @Component comment
-    // (components/pressable/index.ts). It is the host-behavior registry's tag, never a spelling
-    // of the composed component now, so it must resolve to a real, painting node.
   ].map(selector => selector.toLowerCase()),
 );
 

@@ -56,11 +56,11 @@ import {
 } from '@angular/core/rxjs-interop';
 import { interval, map, timer } from 'rxjs';
 import {
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   SymbioteHostPropsDirective,
   Text,
-  TextInput,
+  TextInputElement,
   View,
 } from '@symbiote-native/angular';
 import { ActionButton } from '../components/ActionButton';
@@ -131,18 +131,18 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
     PlaygroundLifecycleLogger,
     PlaygroundQueryItemDirective,
     PlaygroundShoutPipe,
-    SafeAreaView,
+    SafeAreaViewElement,
     ScrollView,
     SlicePipe,
     SymbioteHostPropsDirective,
     Text,
-    TextInput,
+    TextInputElement,
     TitleCasePipe,
     UpperCasePipe,
     View,
   ],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="pg-scroll"
         class="screen"
@@ -493,12 +493,12 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
             class="pg-swatch"
             testID="pg-ngstyle"
           ></View>
-          <TextInput
+          <text-input
             testID="pg-ngmodel"
             placeholder="type here"
             [(ngModel)]="ngModelValue"
             class="text-input"
-          />
+          ></text-input>
           <Text testID="pg-ngmodel-readout" class="info-text">{{
             'ngModel value: ' + ngModelValue
           }}</Text>
@@ -818,7 +818,7 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
           >
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class ApiPlaygroundScreen implements AfterViewInit {

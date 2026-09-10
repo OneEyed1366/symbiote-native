@@ -1,5 +1,10 @@
 import { Component, signal } from '@angular/core';
-import { SafeAreaView, Text, TextInput, View } from '@symbiote-native/angular';
+import {
+  SafeAreaViewElement,
+  Text,
+  TextInputElement,
+  View,
+} from '@symbiote-native/angular';
 import { resolveRouteFromUrl } from '@symbiote-native/navigation';
 import { ActionButton } from '../components/ActionButton';
 import {
@@ -19,9 +24,9 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 @Component({
   selector: 'DeepLinkingScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, Text, TextInput, View],
+  imports: [ActionButton, SafeAreaViewElement, Text, TextInputElement, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <View class="section">
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
@@ -46,13 +51,13 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           >Details → details/:id · HeaderOptions → header-options · TabsDemo →
           tabs</Text
         >
-        <TextInput
+        <text-input
           testID="deep-link-input"
           [(value)]="url"
           placeholder="symbiotecanaryangular://details/42"
           placeholderTextColor="#41506a"
           class="text-input"
-        />
+        ></text-input>
         <ActionButton
           testID="deep-link-resolve"
           title="Resolve"
@@ -65,7 +70,7 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           }}</Text>
         </View>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class DeepLinkingScreen {

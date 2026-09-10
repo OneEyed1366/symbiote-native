@@ -7,7 +7,7 @@ import {
   SectionList,
   SymbioteHostPropsDirective,
   Text,
-  TextInput,
+  TextInputElement,
   View,
   VListItemDirective,
   VSectionHeaderDirective,
@@ -69,7 +69,7 @@ const paritySections: ISection<ISectionEntry>[] = [
     View,
     Text,
     ButtonElement,
-    TextInput,
+    TextInputElement,
     FlatList,
     SectionList,
     VListItemDirective,
@@ -93,14 +93,14 @@ const paritySections: ISection<ISectionEntry>[] = [
       }}</Text>
 
       <!-- Keyboard.dismiss: blurs whatever input holds focus without needing a ref -->
-      <TextInput
+      <text-input
         testID="focus-input"
         placeholder="focus me…"
         placeholderTextColor="#41506a"
         (focus)="handleFocus()"
         (blur)="handleBlur()"
         class="focus-input"
-      />
+      ></text-input>
       <Text testID="dismiss-msg" class="note-text">{{ dismissMsg }}</Text>
       <button
         testID="hide-keyboard-btn"

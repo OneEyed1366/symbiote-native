@@ -532,8 +532,8 @@ function formatDuration(durationMs: number | undefined): string {
 
 /**
  * The row — Angular's only shape now, the same one every other adapter's column mounts: a row
- * component and two real `<Pressable>`s, plus an unconditional `<TextInput>` last, after the
- * remove-Pressable — never bound to `multiline`, no change handler, no ref, no functional style.
+ * component and two real `<pressable>` tags, plus an unconditional `<text-input>` last, after the
+ * remove-pressable — never bound to `multiline`, no change handler, no ref, no functional style.
  * No row-shape switch, no with/without toggle: this benchmark measures ONE row shape everywhere,
  * the same instrument as every other adapter's canary (root CLAUDE.md, "Where we stand against
  * stock React Native").
@@ -541,17 +541,17 @@ function formatDuration(durationMs: number | undefined): string {
 @Component({
   selector: 'BenchmarkRow',
   standalone: true,
-  imports: [Pressable, Text, TextInput, View],
+  imports: [PressableElement, Text, TextInputElement, View],
   template: `
     <View [class]="rowClass">
       <Text class="bench-row-id">{{ rowId }}</Text>
-      <Pressable class="flex1" (press)="select.emit(row.id)">
+      <pressable class="flex1" (press)="select.emit(row.id)">
         <Text class="bench-row-label">{{ row.label }}</Text>
-      </Pressable>
-      <Pressable class="bench-row-remove" (press)="remove.emit(row.id)">
+      </pressable>
+      <pressable class="bench-row-remove" (press)="remove.emit(row.id)">
         <Text class="bench-row-remove-text">×</Text>
-      </Pressable>
-      <TextInput class="bench-row-input" [value]="row.label" />
+      </pressable>
+      <text-input class="bench-row-input" [value]="row.label"></text-input>
     </View>
   `,
 })

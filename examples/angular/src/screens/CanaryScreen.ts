@@ -15,8 +15,8 @@ import {
   AppState,
   ColorSchemeService,
   FlatList,
-  Image,
   ImageBackgroundElement,
+  ImageElement,
   KEYBOARD_EVENT,
   Keyboard,
   KeyboardAvoidingView,
@@ -26,16 +26,16 @@ import {
   Platform,
   PortalDirective,
   PortalOutletDirective,
-  Pressable,
+  PressableElement,
   RefreshControl,
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Share,
   StatusBar,
   StyleSheet,
-  Switch,
+  SwitchElement,
   Text,
-  TextInput,
+  TextInputElement,
   TunnelInDirective,
   TunnelOut,
   VListItemDirective,
@@ -105,8 +105,8 @@ const overlayTunnel = createTunnel();
     AnimatedScrollView,
     AnimatedView,
     FlatList,
-    Image,
     ImageBackgroundElement,
+    ImageElement,
     KeyboardAvoidingView,
     Modal,
     NativeModulesDemo,
@@ -114,16 +114,16 @@ const overlayTunnel = createTunnel();
     PlatformColorDemo,
     PortalDirective,
     PortalOutletDirective,
-    Pressable,
+    PressableElement,
     RefApiDemo,
     RefreshControl,
     ResponderDemo,
-    SafeAreaView,
+    SafeAreaViewElement,
     ScrollView,
     Slider,
-    Switch,
+    SwitchElement,
     Text,
-    TextInput,
+    TextInputElement,
     TunnelInDirective,
     TunnelOut,
     View,
@@ -131,7 +131,7 @@ const overlayTunnel = createTunnel();
     VListSeparatorDirective,
   ],
   template: `
-    <SafeAreaView testID="angular-safe-area" class="screen">
+    <safe-area-view testID="angular-safe-area" class="screen">
       <ScrollView
         testID="angular-canary-scroll"
         class="screen"
@@ -263,7 +263,7 @@ const overlayTunnel = createTunnel();
           color="#dd0031"
         ></ActionButton>
 
-        <Pressable
+        <pressable
           testID="angular-counter-card"
           class="counter-card"
           (press)="increment()"
@@ -271,27 +271,27 @@ const overlayTunnel = createTunnel();
           <Text testID="angular-counter-value" class="counter-text"
             >tapped {{ count }}×</Text
           >
-        </Pressable>
+        </pressable>
 
-        <TextInput
+        <text-input
           testID="angular-greeting-input"
           [(value)]="name"
           placeholder="type your name…"
           placeholderTextColor="#6b7280"
           class="text-input"
-        />
+        ></text-input>
         <Text testID="angular-greeting-output" class="greeting">{{
           name ? 'Hello, ' + name : 'Hello, stranger'
         }}</Text>
 
         <View testID="angular-switch-row" class="switch-row">
           <Text class="switch-label">spinner</Text>
-          <Switch
+          <switch
             testID="angular-spinner-switch"
             [(value)]="spinning"
             [trackColor]="switchTrackColor"
             thumbColor="#ffffff"
-          />
+          ></switch>
         </View>
         <activity-indicator
           testID="angular-spinner-indicator"
@@ -339,14 +339,14 @@ const overlayTunnel = createTunnel();
         <CompoundClassDemo></CompoundClassDemo>
         <ParityDemo></ParityDemo>
 
-        <Pressable
+        <pressable
           testID="angular-pressable"
           (press)="increment()"
           [style]="pressableStyle"
           accessibilityLabel="Angular pressable counter"
         >
           <Text class="pressable-label">press me (also +1)</Text>
-        </Pressable>
+        </pressable>
 
         <Text class="section-label"> FlatList · 24 chips, windowed </Text>
         <FlatList
@@ -368,7 +368,7 @@ const overlayTunnel = createTunnel();
             STAYS highlighted (inside the measured rect + 80px bottom retention). Drag UP
             off the top: highlight drops. Proves measured-rect retention rather than a
             symmetric-radius approximation. -->
-        <Pressable
+        <pressable
           testID="angular-retention-pressable"
           [hitSlop]="{ top: 0, bottom: 40, left: 0, right: 0 }"
           [pressRetentionOffset]="{ top: 0, bottom: 80, left: 0, right: 0 }"
@@ -378,7 +378,7 @@ const overlayTunnel = createTunnel();
           <Text testID="angular-retention-readout" class="info-text">
             drag me · dx {{ retentionMove.dx }} · dy {{ retentionMove.dy }}
           </Text>
-        </Pressable>
+        </pressable>
 
         <Text class="section-label">MVCP · prepend without jump</Text>
         <FlatList
@@ -479,14 +479,14 @@ const overlayTunnel = createTunnel();
 
         <!-- Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
             width/height→style); a screen reader reads "Angular logo" (alt→accessibilityLabel). -->
-        <Image
+        <image
           testID="angular-image"
           [src]="angularLogoUri"
           alt="Angular logo"
           [width]="48"
           [height]="48"
           class="web-image"
-        />
+        ></image>
 
         <!-- KeyboardAvoidingView enabled toggle. PASS: with enabled ON, focusing the field
             lifts it above the keyboard AND the keyboard is the email layout (proves

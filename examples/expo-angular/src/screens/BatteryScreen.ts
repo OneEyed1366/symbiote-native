@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import {
   Platform,
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
   View,
@@ -49,9 +49,9 @@ function formatBatteryState(state: BatteryState): string {
 @Component({
   selector: 'BatteryScreen',
   standalone: true,
-  imports: [SafeAreaView, ScrollView, Text, View],
+  imports: [SafeAreaViewElement, ScrollView, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="battery-scroll"
         class="screen"
@@ -116,7 +116,7 @@ function formatBatteryState(state: BatteryState): string {
           }
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class BatteryScreen {

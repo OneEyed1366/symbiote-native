@@ -1,5 +1,10 @@
 import { Component, signal } from '@angular/core';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  SafeAreaViewElement,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   DeviceType,
   brand,
@@ -63,9 +68,9 @@ function deviceTypeLabel(type: DeviceType | null): string {
 @Component({
   selector: 'DeviceScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollView, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="device-scroll"
         class="screen"
@@ -158,7 +163,7 @@ function deviceTypeLabel(type: DeviceType | null): string {
           }}</Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class DeviceScreen {

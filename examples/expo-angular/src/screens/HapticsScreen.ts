@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import {
   Platform,
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
   View,
@@ -78,7 +78,7 @@ const ANDROID_HAPTIC_OPTIONS: readonly IAndroidHapticOption[] = [
   standalone: true,
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="haptics-scroll"
         class="screen"
@@ -164,7 +164,7 @@ const ANDROID_HAPTIC_OPTIONS: readonly IAndroidHapticOption[] = [
           }}</Text>
         }
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class HapticsScreen {

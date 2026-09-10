@@ -42,11 +42,7 @@ import {
 import './register';
 import { mount, unmount } from './render';
 import { ViewHost, TextHost } from './primitives';
-import { Image } from './components/image';
-import { InputAccessoryView } from './components/input-accessory-view';
-import { Pressable } from './components/pressable';
-import { Switch } from './components/switch';
-import { TextInput } from './components/text-input';
+import { RefreshControl } from './components/refresh-control';
 
 const require_ = createRequire(import.meta.url);
 const { HOST_PRIMITIVES } = require_(
@@ -150,42 +146,14 @@ const CASES: Record<string, ICase> = {
     expected: { ...FOLDED, ellipsizeMode: 'tail', allowFontScaling: true },
     discriminates: false,
   },
-  Pressable: {
-    tag: 'Pressable',
-    imports: [Pressable],
+  // No `knownDifferences`: RefreshControl is the ONE wrapper of the seven that declares `id` and
+  // passes it into its host bag, so the renderer folds it on the component path too and the two
+  // arms already agree key for key.
+  RefreshControl: {
+    tag: 'RefreshControl',
+    imports: [RefreshControl],
     expected: FOLDED,
     discriminates: true,
-  },
-  TextInput: {
-    tag: 'TextInput',
-    imports: [TextInput],
-    expected: FOLDED,
-    discriminates: true,
-    knownDifferences: missingIdFold('RCTSinglelineTextInputView'),
-  },
-  Image: {
-    tag: 'Image',
-    imports: [Image],
-    extra: `[source]="{ uri: 'x' }"`,
-    // The array shape `normalizeSource` guarantees — the fold that lives in the BEHAVIOR rather
-    // than in `foldHostBag`, and is therefore reachable only through `register.ts`.
-    expected: { ...FOLDED, source: [{ uri: 'x' }] },
-    discriminates: true,
-    knownDifferences: missingIdFold('RCTImageView'),
-  },
-  InputAccessoryView: {
-    tag: 'InputAccessoryView',
-    imports: [InputAccessoryView],
-    expected: FOLDED,
-    discriminates: true,
-    knownDifferences: missingIdFold('RCTInputAccessoryView'),
-  },
-  Switch: {
-    tag: 'Switch',
-    imports: [Switch],
-    expected: FOLDED,
-    discriminates: true,
-    knownDifferences: missingIdFold('Switch'),
   },
 };
 

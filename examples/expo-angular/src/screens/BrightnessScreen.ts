@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import {
   Platform,
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
   View,
@@ -60,7 +60,7 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
   standalone: true,
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="brightness-scroll"
         class="screen"
@@ -156,7 +156,7 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
           ></ActionButton>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class BrightnessScreen {

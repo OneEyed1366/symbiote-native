@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import {
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   SymbioteHostPropsDirective,
   Text,
@@ -138,7 +138,7 @@ type IAxisSensorCard = {
   standalone: true,
   imports: [SafeAreaView, ScrollView, SymbioteHostPropsDirective, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="sensors-scroll"
         class="screen"
@@ -302,7 +302,7 @@ type IAxisSensorCard = {
           }
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class SensorsScreen {

@@ -1,5 +1,10 @@
 import { Component, effect, inject, signal } from '@angular/core';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  SafeAreaViewElement,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   NetworkStateService,
   NetworkStateType,
@@ -48,9 +53,9 @@ function yesNoLabel(value: boolean | undefined): string {
 @Component({
   selector: 'NetworkScreen',
   standalone: true,
-  imports: [SafeAreaView, ScrollView, Text, View],
+  imports: [SafeAreaViewElement, ScrollView, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="network-scroll"
         class="screen"
@@ -102,7 +107,7 @@ function yesNoLabel(value: boolean | undefined): string {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class NetworkScreen {

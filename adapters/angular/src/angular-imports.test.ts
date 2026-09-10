@@ -158,7 +158,9 @@ describe('Angular source imports under Vitest', () => {
 
       expect(createAnimatedComponent(View)).toBe(AnimatedView);
       expect(createAnimatedComponent(Text)).toBe(AnimatedText);
-      expect(createAnimatedComponent(Image)).toBe(AnimatedImage);
+      // The tag, not a component: `<image>` has no wrapper any more, so the statics namespace
+      // exported as `Image` is not what an app would hand this.
+      expect(createAnimatedComponent('image')).toBe(AnimatedImage);
       expect(createAnimatedComponent(ScrollView)).toBe(AnimatedScrollView);
       expect(() => createAnimatedComponent(CustomComponent)).toThrow(
         /Angular cannot synthesize a component at runtime \(no JIT compiler under AOT\/Metro\)/,

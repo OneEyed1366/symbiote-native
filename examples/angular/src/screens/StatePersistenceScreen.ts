@@ -1,5 +1,5 @@
 import { Component, signal } from '@angular/core';
-import { SafeAreaView, Text, View } from '@symbiote-native/angular';
+import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
 import {
   deserializeNavigatorState,
   serializeNavigatorState,
@@ -35,9 +35,9 @@ function isResettableHandle(
 @Component({
   selector: 'StatePersistenceScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <View class="section">
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
@@ -78,7 +78,7 @@ function isResettableHandle(
           }}</Text>
         </View>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class StatePersistenceScreen {

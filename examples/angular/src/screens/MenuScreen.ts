@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import {
-  Pressable,
-  SafeAreaView,
+  PressableElement,
+  SafeAreaViewElement,
   ScrollView,
   Text,
   View,
@@ -98,9 +98,9 @@ const MENU_ITEMS: readonly IMenuItem[] = [
 @Component({
   selector: 'MenuScreen',
   standalone: true,
-  imports: [Pressable, SafeAreaView, ScrollView, Text, View],
+  imports: [PressableElement, SafeAreaViewElement, ScrollView, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="menu-scroll"
         class="screen"
@@ -118,7 +118,7 @@ const MENU_ITEMS: readonly IMenuItem[] = [
           </Text>
         </View>
         @for (item of menuItems; track item.route) {
-          <Pressable
+          <pressable
             [testID]="'menu-row-' + item.route"
             [class]="rowClass(item)"
             (press)="navigation.push(item.route)"
@@ -130,10 +130,10 @@ const MENU_ITEMS: readonly IMenuItem[] = [
               <Text class="menu-row-label">{{ item.label }}</Text>
               <Text [class]="hintClass(item)">{{ item.hint }}</Text>
             </View>
-          </Pressable>
+          </pressable>
         }
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class MenuScreen {

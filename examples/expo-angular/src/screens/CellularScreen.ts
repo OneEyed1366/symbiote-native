@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import {
   Platform,
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
   View,
@@ -54,7 +54,7 @@ function valueLabel(value: string | boolean | null): string {
   standalone: true,
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="cellular-scroll"
         class="screen"
@@ -126,7 +126,7 @@ function valueLabel(value: string | boolean | null): string {
           ></ActionButton>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class CellularScreen {

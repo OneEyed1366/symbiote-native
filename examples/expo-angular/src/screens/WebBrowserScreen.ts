@@ -1,10 +1,10 @@
 import { Component, signal } from '@angular/core';
 import {
   Platform,
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
-  TextInput,
+  TextInputElement,
   View,
 } from '@symbiote-native/angular';
 import {
@@ -33,9 +33,16 @@ const DEMO_URL = 'https://symbiote-native.dev';
 @Component({
   selector: 'WebBrowserScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, TextInput, View],
+  imports: [
+    ActionButton,
+    SafeAreaViewElement,
+    ScrollView,
+    Text,
+    TextInputElement,
+    View,
+  ],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="web-browser-scroll"
         class="screen"
@@ -60,14 +67,14 @@ const DEMO_URL = 'https://symbiote-native.dev';
 
         <View testID="web-browser-open-card" class="web-browser-card">
           <Text class="web-browser-card-title">Open a URL</Text>
-          <TextInput
+          <text-input
             testID="web-browser-url-input"
             class="text-input"
             placeholder="https://…"
             placeholderTextColor="#41506a"
             [value]="url()"
             (valueChange)="url.set($event)"
-          ></TextInput>
+          ></text-input>
           <ActionButton
             testID="web-browser-open-button"
             title="Open"
@@ -173,7 +180,7 @@ const DEMO_URL = 'https://symbiote-native.dev';
           </View>
         }
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class WebBrowserScreen {

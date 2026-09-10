@@ -84,9 +84,11 @@ describe('Angular adapter gap regressions', () => {
       componentSource,
       'if (base === Text) return AnimatedText',
     );
+    // The TAG, not a component identity — `Image` is the statics namespace now, so there is no
+    // class to compare against.
     expectSourceToDeclare(
       componentSource,
-      'if (base === Image) return AnimatedImage',
+      'if (base === IMAGE_TAG) return AnimatedImage',
     );
     expectSourceToDeclare(
       componentSource,
@@ -133,111 +135,23 @@ describe('Angular adapter gap regressions', () => {
     expectSourceToDeclare(source, '(error)="handleError($event)"');
   });
 
-  // why: guards the OTHER direction of the previous test — that plain Image's own imageProps
-  // bag routes through the SAME resolveImageProps function AnimatedImage calls, so the two
-  // components can never structurally drift apart into two different prop-resolution rules.
-  // `imageProps` is a memoized computed() over the overridable buildImageProps(), not a getter.
-  it('Image prop resolution is shared with AnimatedImage', () => {
-    const imageSource = readSource(
-      'adapters/angular/src/components/image/shared.ts',
-    );
+  // The OTHER direction of the test above — that plain `Image`'s own bag routed through the same
+  // `resolveImageProps` — stood here until `image` became a TAG. There is no second component to
+  // drift from any more: the tag's fold is `registerImageBehavior`, whose oracle is the COMMITTED
+  // payload (`core/components/src/behaviors/image.test.ts`) rather than source text.
 
-    expectSourceToDeclare(imageSource, 'export function resolveImageProps');
-    expectSourceToDeclare(
-      imageSource,
-      'readonly imageProps = computed<Record<string, unknown>>',
-    );
-    expectSourceToDeclare(imageSource, 'return this.buildImageProps()');
-    expectSourceToDeclare(
-      imageSource,
-      'return resolveImageProps(this.imageInputProps)',
-    );
-  });
-
-  // why: the FULL accessibility + TV-focus prop set (<adapters_reach_full_feature_parity>, P0) has
-  // to survive on TWO components in two different forwarding shapes: Touchable's individual
-  // `[prop]="expr"` bindings, and Pressable's DIFFERENT shape — a single `[symbioteHostProps]` bag
-  // (angular-adapter §10's escape hatch for undeclared/dynamic bindings on a bare primitive) rather
-  // than one binding per key. A silent drop on either would ship a component that is
-  // accessible-by-eye but broken for assistive tech or TV remote navigation, with no compiler
-  // signal (see the file-level comment above).
+  // The FULL accessibility + TV-focus surface of `Pressable`, `TouchableOpacity` and
+  // `TouchableHighlight` was fenced here as SOURCE TEXT — a list of `[prop]="expr"` bindings that
+  // had to appear in each wrapper's template — until all three became TAGS (2026-09-11). There is
+  // no Angular source to fence any more, and the replacement is strictly stronger in both halves:
   //
-  // A THIRD arm stood here, for Button's own copy of those bindings, until `button` became a TAG:
-  // there is no Angular source to fence any more, and the surface reaches Fabric through
-  // `routeProp` like any other tag's. Its own coverage is `src/button-tag.test.ts` and
-  // `core/components/src/behaviors/button.test.ts`, which assert the COMMITTED payload rather than
-  // source text — a stronger oracle this file cannot use for a template.
-  it('Touchable and Pressable forward their full accessibility and TV-focus surface', () => {
-    const touchableSource = readSource(
-      'adapters/angular/src/components/touchable/index.ts',
-    );
-    const pressableSource = readSource(
-      'adapters/angular/src/components/pressable/index.ts',
-    );
-
-    for (const binding of [
-      // Previously pinned `[accessible]="accessible"`, i.e. a raw forward. That was a divergence:
-      // RN defaults it ON in each Touchable (`TouchableOpacity.js:303`,
-      // `TouchableHighlight.js:337`, `TouchableWithoutFeedback.js:255`).
-      '[accessible]="accessible !== false"',
-      '[accessibilityLabelledBy]="accessibilityLabelledBy"',
-      '[importantForAccessibility]="importantForAccessibility"',
-      '[accessibilityLiveRegion]="accessibilityLiveRegion"',
-      '[screenReaderFocusable]="screenReaderFocusable"',
-      '[accessibilityViewIsModal]="accessibilityViewIsModal"',
-      '[accessibilityElementsHidden]="accessibilityElementsHidden"',
-      '[accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"',
-      '[accessibilityLanguage]="accessibilityLanguage"',
-      '[accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"',
-      '[accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"',
-      '[accessibilityLargeContentTitle]="accessibilityLargeContentTitle"',
-      '(accessibilityAction)="accessibilityAction.emit($event)"',
-      '(accessibilityTap)="accessibilityTap.emit($event)"',
-      '(magicTap)="magicTap.emit($event)"',
-      '(accessibilityEscape)="accessibilityEscape.emit($event)"',
-      '[ariaModal]="ariaModal"',
-      '[ariaValueMax]="ariaValueMax"',
-      '[ariaValueMin]="ariaValueMin"',
-      '[ariaValueNow]="ariaValueNow"',
-      '[ariaValueText]="ariaValueText"',
-      '[hasTVPreferredFocus]="hasTVPreferredFocus"',
-      '[nextFocusDown]="nextFocusDown"',
-      '[nextFocusForward]="nextFocusForward"',
-      '[nextFocusLeft]="nextFocusLeft"',
-      '[nextFocusRight]="nextFocusRight"',
-      '[nextFocusUp]="nextFocusUp"',
-    ]) {
-      expectSourceToDeclare(touchableSource, binding);
-    }
-
-    // Pressable forwards its resolved props through the shared SymbioteHostPropsDirective
-    // (adapters/angular/src/primitives/shared.ts) rather than one `[prop]="x"` binding per
-    // key, so the contract to check is: the binding exists, and the `hostProps` bag it
-    // reads from actually assembles `accessible` / the folded accessibility bag / TV-focus.
-    // `hostProps` is a computed(), hence the call parens — the binding text changed shape but
-    // the contract did not.
-    expectSourceToDeclare(pressableSource, '[symbioteHostProps]="hostProps()"');
-    // Previously pinned the bare `accessible: this.accessible` — a raw forward, and a divergence
-    // from RN, which defaults it ON unless the app opts out (`Pressable.js:252`). The bare form is
-    // still a substring of this one, so it could never have caught the default going missing.
-    expectSourceToDeclare(
-      pressableSource,
-      'accessible: this.accessible !== false',
-    );
-    expectSourceToDeclare(pressableSource, '...this.foldedAccessibility');
-    expectSourceToDeclare(
-      pressableSource,
-      'hasTVPreferredFocus: this.hasTVPreferredFocus',
-    );
-    // The four accessibility gate events moved OFF the template and into this same bag
-    // (2026-09-01, `.claude/rules/fabric-boolean-event-gates.md`) — a template binding here bound
-    // unconditionally on every instance, lighting the Fabric gate whether or not an app ever
-    // subscribed. The handler takes the event NAME rather than the emitter (2026-09-02) because
-    // the gate is no longer decided by `.observed` alone: a wrapper rendering this Pressable is
-    // itself a subscriber, so an injected demand answers for it (`gate-demand.ts`).
-    expectSourceToDeclare(
-      pressableSource,
-      "onAccessibilityAction: this.accessibilityEmitterHandler('accessibilityAction',)",
-    );
-  });
+  //   the PROP SURFACE   `DECLARES_EVERY_PROP` in `elements.ts` resolves each element directive
+  //                      against its own prop interface under `tsc --build`, so a missing name is a
+  //                      compile error rather than a text mismatch — and it is DERIVED, where the
+  //                      list here was hand-written and could only go stale in the safe direction.
+  //   the `accessible`   RN's `accessible !== false` default now lives in the shared press
+  //   DEFAULT           behavior's fold (`core/components/src/behaviors/pressable.ts`), whose
+  //                      oracle is the committed payload rather than a template string.
+  //
+  // Same retirement, same reasoning, as Button's own arm one release earlier.
 });

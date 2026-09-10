@@ -106,9 +106,9 @@ function textDefaultFor(el: IHostElement, key: string): unknown {
 // throws inside change detection). Under any other name it is an ordinary property binding and
 // arrives here.
 // Angular's two-way sugar `[(value)]` compiles to a `(valueChange)` binding; the engine knows the
-// same fold as the function prop `onValueChange`. See `listen()`.
-const VALUE_CHANGE_EVENT = 'valueChange';
-const VALUE_CHANGE_PROP = 'onValueChange';
+// same fold as the function prop `onValueChange`. See `listen()`. The two names live in a leaf
+// module so `elements.ts`'s ControlValueAccessor can name them without importing this cyclic file.
+import { VALUE_CHANGE_EVENT, VALUE_CHANGE_PROP } from './value-change';
 
 const PROP_ALIASES: ReadonlyMap<string, string> = new Map([
   ['id', 'nativeID'],

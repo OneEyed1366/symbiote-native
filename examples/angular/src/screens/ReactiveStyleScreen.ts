@@ -6,15 +6,15 @@ import {
   FlatList,
   ImageBackgroundElement,
   KeyboardAvoidingView,
-  Pressable,
-  SafeAreaView,
+  PressableElement,
+  SafeAreaViewElement,
   ScrollView,
   SectionList,
   Text,
-  TextInput,
-  TouchableHighlight,
+  TextInputElement,
+  TouchableHighlightElement,
   TouchableNativeFeedbackElement,
-  TouchableOpacity,
+  TouchableOpacityElement,
   View,
   VirtualizedList,
   VirtualizedSectionList,
@@ -87,15 +87,15 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
     FlatList,
     ImageBackgroundElement,
     KeyboardAvoidingView,
-    Pressable,
-    SafeAreaView,
+    PressableElement,
+    SafeAreaViewElement,
     ScrollView,
     SectionList,
     Text,
-    TextInput,
-    TouchableHighlight,
+    TextInputElement,
+    TouchableHighlightElement,
     TouchableNativeFeedbackElement,
-    TouchableOpacity,
+    TouchableOpacityElement,
     View,
     VirtualizedList,
     VirtualizedSectionList,
@@ -104,7 +104,7 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
     VSectionItemDirective,
   ],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="rstyle-scroll"
         class="screen"
@@ -141,18 +141,18 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
         <Text class="section-label">class= axis</Text>
         <View class="rstyle-grid">
           <View class="rstyle-cell">
-            <Pressable testID="rstyle-class-pressable" [class]="tileClass">
+            <pressable testID="rstyle-class-pressable" [class]="tileClass">
               <Text class="rstyle-tile-text">control</Text>
-            </Pressable>
+            </pressable>
             <Text class="rstyle-caption">Pressable</Text>
           </View>
           <View class="rstyle-cell">
-            <TouchableHighlight
+            <touchable-highlight
               testID="rstyle-class-highlight"
               [class]="tileClass"
             >
               <Text class="rstyle-tile-text">control</Text>
-            </TouchableHighlight>
+            </touchable-highlight>
             <Text class="rstyle-caption">TouchableHighlight</Text>
           </View>
           <View class="rstyle-cell">
@@ -162,9 +162,12 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <Text class="rstyle-caption">ScrollView</Text>
           </View>
           <View class="rstyle-cell">
-            <TouchableOpacity testID="rstyle-class-opacity" [class]="tileClass">
+            <touchable-opacity
+              testID="rstyle-class-opacity"
+              [class]="tileClass"
+            >
               <Text class="rstyle-tile-text">tile</Text>
-            </TouchableOpacity>
+            </touchable-opacity>
             <Text class="rstyle-caption">TouchableOpacity</Text>
           </View>
           <View class="rstyle-cell">
@@ -186,12 +189,12 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <Text class="rstyle-caption">Button</Text>
           </View>
           <View class="rstyle-cell">
-            <TextInput
+            <text-input
               testID="rstyle-class-textinput"
               placeholder="tile"
               [placeholderTextColor]="tileTextColor"
               [class]="tileClass"
-            />
+            ></text-input>
             <Text class="rstyle-caption">TextInput</Text>
           </View>
           <View class="rstyle-cell">
@@ -295,23 +298,23 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
         <Text class="section-label">[style] axis</Text>
         <View class="rstyle-grid">
           <View class="rstyle-cell">
-            <Pressable
+            <pressable
               testID="rstyle-style-pressable"
               class="rstyle-tile"
               [style]="tileStyle"
             >
               <Text class="rstyle-tile-text">control</Text>
-            </Pressable>
+            </pressable>
             <Text class="rstyle-caption">Pressable</Text>
           </View>
           <View class="rstyle-cell">
-            <TouchableHighlight
+            <touchable-highlight
               testID="rstyle-style-highlight"
               class="rstyle-tile"
               [style]="tileStyle"
             >
               <Text class="rstyle-tile-text">control</Text>
-            </TouchableHighlight>
+            </touchable-highlight>
             <Text class="rstyle-caption">TouchableHighlight</Text>
           </View>
           <View class="rstyle-cell">
@@ -325,13 +328,13 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <Text class="rstyle-caption">ScrollView</Text>
           </View>
           <View class="rstyle-cell">
-            <TouchableOpacity
+            <touchable-opacity
               testID="rstyle-style-opacity"
               class="rstyle-tile"
               [style]="tileStyle"
             >
               <Text class="rstyle-tile-text">tile</Text>
-            </TouchableOpacity>
+            </touchable-opacity>
             <Text class="rstyle-caption">TouchableOpacity</Text>
           </View>
           <View class="rstyle-cell">
@@ -355,13 +358,13 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <Text class="rstyle-caption">Button</Text>
           </View>
           <View class="rstyle-cell">
-            <TextInput
+            <text-input
               testID="rstyle-style-textinput"
               placeholder="tile"
               [placeholderTextColor]="tileTextColor"
               class="rstyle-tile"
               [style]="tileStyle"
-            />
+            ></text-input>
             <Text class="rstyle-caption">TextInput</Text>
           </View>
           <View class="rstyle-cell">
@@ -473,7 +476,7 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class ReactiveStyleScreen {

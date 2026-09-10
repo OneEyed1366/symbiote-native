@@ -1,9 +1,9 @@
 import { Component, signal } from '@angular/core';
 import {
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
-  TextInput,
+  TextInputElement,
   View,
 } from '@symbiote-native/angular';
 import {
@@ -35,9 +35,16 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 @Component({
   selector: 'SecureStoreScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, TextInput, View],
+  imports: [
+    ActionButton,
+    SafeAreaViewElement,
+    ScrollView,
+    Text,
+    TextInputElement,
+    View,
+  ],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="secure-store-scroll"
         class="screen"
@@ -100,14 +107,14 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 
         <View testID="secure-store-write-card" class="secure-store-card">
           <Text class="secure-store-card-title">Write, read, delete</Text>
-          <TextInput
+          <text-input
             testID="secure-store-input"
             [value]="inputText()"
             (valueChange)="inputText.set($event)"
             placeholder="Value to store"
             placeholderTextColor="#41506a"
             class="text-input"
-          ></TextInput>
+          ></text-input>
           <ActionButton
             testID="secure-store-save-button"
             title="Save"
@@ -134,7 +141,7 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           ></ActionButton>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class SecureStoreScreen {

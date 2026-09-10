@@ -1,9 +1,14 @@
+// The input surface and prop fold `AnimatedImage` builds on. The `Image` COMPONENT that used to
+// share it is gone (2026-09-10) — the primitive is the `<image>` tag, matched by `ImageElement`,
+// and `registerImageBehavior` folds its source on that path. `Animated.Image` is not a primitive
+// and stays a component, so what it needs from here survived the deletion; the folder collapsed to
+// this one flat file with it (`symbiote-file-layout`).
 import { EventEmitter, computed, signal } from '@angular/core';
 import {
   gateWanted,
   injectGateDemand,
   type IGatedAccessibilityEvent,
-} from '../../gate-demand';
+} from '../gate-demand';
 import {
   imageStatics,
   renderImage,

@@ -1,5 +1,10 @@
 import { Component } from '@angular/core';
-import { Pressable, SafeAreaView, Text, View } from '@symbiote-native/angular';
+import {
+  PressableElement,
+  SafeAreaViewElement,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   Drawer,
   DrawerScreenDirective,
@@ -18,9 +23,9 @@ const drawerLineTagLabel = `${drawerLineInfo.code} · ${drawerLineInfo.label}`;
 @Component({
   selector: 'DrawerHomeScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <View class="section">
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
@@ -54,7 +59,7 @@ const drawerLineTagLabel = `${drawerLineInfo.code} · ${drawerLineInfo.label}`;
           [color]="lineColorStructure"
         ></ActionButton>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class DrawerHomeScreen {
@@ -77,9 +82,9 @@ export class DrawerHomeScreen {
 @Component({
   selector: 'DrawerSettingsScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <View class="section">
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
@@ -92,7 +97,7 @@ export class DrawerHomeScreen {
           [color]="lineColorStructure"
         ></ActionButton>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class DrawerSettingsScreen {
@@ -120,7 +125,13 @@ export class DrawerSettingsScreen {
 @Component({
   selector: 'DrawerDemoScreen',
   standalone: true,
-  imports: [Drawer, DrawerScreenDirective, Pressable, SafeAreaView, Text],
+  imports: [
+    Drawer,
+    DrawerScreenDirective,
+    PressableElement,
+    SafeAreaViewElement,
+    Text,
+  ],
   template: `
     <Drawer
       initialRouteName="Home"
@@ -141,10 +152,13 @@ export class DrawerSettingsScreen {
         [options]="settingsOptions"
       ></ng-template>
       <ng-template #drawerContent let-ctx>
-        <SafeAreaView testID="drawer-panel" class="section-tight drawer-panel">
+        <safe-area-view
+          testID="drawer-panel"
+          class="section-tight drawer-panel"
+        >
           <Text class="section-label">Menu</Text>
           @for (route of ctx.state.routes; track route.key) {
-            <Pressable
+            <pressable
               [testID]="'drawer-menu-' + route.name"
               class="menu-row"
               (press)="ctx.navigation.jumpTo(route.name)"
@@ -152,9 +166,9 @@ export class DrawerSettingsScreen {
               <Text class="menu-row-label">{{
                 drawerLabelFor(ctx.descriptors, route)
               }}</Text>
-            </Pressable>
+            </pressable>
           }
-        </SafeAreaView>
+        </safe-area-view>
       </ng-template>
     </Drawer>
   `,

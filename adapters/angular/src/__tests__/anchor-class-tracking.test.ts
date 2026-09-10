@@ -21,8 +21,7 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 import { FlatList } from '../components/flat-list';
-import { TextInput } from '../components/text-input';
-import { ImageBackgroundElement } from '../elements';
+import { ImageBackgroundElement, TextInputElement } from '../elements';
 import {
   VirtualizedList,
   VListItemDirective,
@@ -86,12 +85,12 @@ let fixture: AnchorClassFixture | undefined;
   imports: [
     FlatList,
     ImageBackgroundElement,
-    TextInput,
+    TextInputElement,
     VirtualizedList,
     VListItemDirective,
   ],
   template: `
-    <TextInput [testID]="'anchor-text-input'" [class.dark]="dark" />
+    <text-input [testID]="'anchor-text-input'" [class.dark]="dark"></text-input>
     <image-background [testID]="'anchor-image-bg'" src="x" [class.dark]="dark">
       <text>Hi</text>
     </image-background>

@@ -1,5 +1,5 @@
 import { Component, type Signal } from '@angular/core';
-import { SafeAreaView, Text, View } from '@symbiote-native/angular';
+import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
 import {
   Tab,
   TabScreenDirective,
@@ -15,9 +15,9 @@ const tabLineTagLabel = `${tabsLineInfo.code} · ${tabsLineInfo.label}`;
 @Component({
   selector: 'TabHomeScreen',
   standalone: true,
-  imports: [SafeAreaView, Text, View],
+  imports: [SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <View class="section">
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
@@ -36,7 +36,7 @@ const tabLineTagLabel = `${tabsLineInfo.code} · ${tabsLineInfo.label}`;
         </View>
         <Text class="info-text">{{ 'focused: ' + isFocused() }}</Text>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class TabHomeScreen {
@@ -53,9 +53,9 @@ export class TabHomeScreen {
 @Component({
   selector: 'TabSearchScreen',
   standalone: true,
-  imports: [SafeAreaView, Text, View],
+  imports: [SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <View class="section">
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
@@ -63,7 +63,7 @@ export class TabHomeScreen {
         <Text class="section-label">Search tab</Text>
         <Text class="info-text">{{ 'focused: ' + isFocused() }}</Text>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class TabSearchScreen {
@@ -79,9 +79,9 @@ export class TabSearchScreen {
 @Component({
   selector: 'TabProfileScreen',
   standalone: true,
-  imports: [SafeAreaView, Text, View],
+  imports: [SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <View class="section">
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
@@ -89,7 +89,7 @@ export class TabSearchScreen {
         <Text class="section-label">Profile tab</Text>
         <Text class="info-text">{{ 'focused: ' + isFocused() }}</Text>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class TabProfileScreen {

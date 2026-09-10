@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { SafeAreaView, Text, View } from '@symbiote-native/angular';
+import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
 import {
   Tab,
   TabScreenDirective,
@@ -20,9 +20,9 @@ function canPop(handle: unknown): handle is { pop: () => void } {
 @Component({
   selector: 'NestedTabHomeScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <View class="section">
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
@@ -52,7 +52,7 @@ function canPop(handle: unknown): handle is { pop: () => void } {
           [color]="lineColorStructure"
         ></ActionButton>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class NestedTabHomeScreen {
@@ -81,9 +81,9 @@ export class NestedTabHomeScreen {
 @Component({
   selector: 'NestedTabInfoScreen',
   standalone: true,
-  imports: [SafeAreaView, Text, View],
+  imports: [SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <View class="section">
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
@@ -94,7 +94,7 @@ export class NestedTabHomeScreen {
           normally.</Text
         >
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class NestedTabInfoScreen {

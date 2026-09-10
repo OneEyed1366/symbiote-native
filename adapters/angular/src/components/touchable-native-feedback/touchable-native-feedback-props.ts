@@ -12,7 +12,7 @@
 // commits.
 import type { INativeFeedbackBackground } from '@symbiote-native/components';
 
-import type { IAngularPressableInputs } from '../pressable';
+import type { IAngularPressableInputs } from '../pressable-props';
 
 export type IAngularTouchableNativeFeedbackProps = Omit<
   IAngularPressableInputs,

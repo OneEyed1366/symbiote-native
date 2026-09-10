@@ -40,9 +40,8 @@ import {
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
-import { Pressable } from '../components/pressable';
 import { TextHost as Text, ViewHost as View } from '../primitives';
-import { TextInput } from '../components/text-input';
+import { PressableElement, TextInputElement } from '../elements';
 import { registerComposedComponent } from '../anchor-host-registry';
 
 const ROOT_TAG = 4242;
@@ -51,7 +50,10 @@ const SCREEN_PATH = 'examples/angular/src/screens/BenchmarkScreen.ts';
 // What the row shape is supposed to cost, per row, on each side of the toggle. NATIVE_VIEWS is
 // the canary row every adapter builds: 1 View + 3x(Text + RawText) + 2 press targets.
 const NATIVE_VIEWS_PER_ROW = 9;
-const COMPOSED_NODES_PER_ROW = 12;
+// Was 12 while `Pressable` was a component: the row's own host anchor plus one per Pressable.
+// `<pressable>` is a TAG since 2026-09-11 and commits a real painting node, so the only anchor left
+// is the row component's own — which is what this A/B was built to isolate in the first place.
+const COMPOSED_NODES_PER_ROW = 10;
 const FLAT_NODES_PER_ROW = 9;
 // The with-input arm's own view count: NATIVE_VIEWS_PER_ROW + one real <TextInput> — see
 // examples/angular's ROW_CONTENT.
@@ -111,12 +113,12 @@ const ROW_CLASS_SELECTED = 'bench-row bench-row-selected';
 const COMPOSED_ROW_TEMPLATE = `
     <View [class]="rowClass">
       <Text class="bench-row-id">{{ rowId }}</Text>
-      <Pressable class="flex1" (press)="select.emit(row.id)">
+      <pressable class="flex1" (press)="select.emit(row.id)">
         <Text class="bench-row-label">{{ row.label }}</Text>
-      </Pressable>
-      <Pressable class="bench-row-remove" (press)="remove.emit(row.id)">
+      </pressable>
+      <pressable class="bench-row-remove" (press)="remove.emit(row.id)">
         <Text class="bench-row-remove-text">×</Text>
-      </Pressable>
+      </pressable>
     </View>
   `;
 
@@ -126,13 +128,13 @@ const COMPOSED_ROW_TEMPLATE = `
 const WITH_INPUT_ROW_TEMPLATE = `
     <View [class]="rowClass">
       <Text class="bench-row-id">{{ rowId }}</Text>
-      <Pressable class="flex1" (press)="select.emit(row.id)">
+      <pressable class="flex1" (press)="select.emit(row.id)">
         <Text class="bench-row-label">{{ row.label }}</Text>
-      </Pressable>
-      <Pressable class="bench-row-remove" (press)="remove.emit(row.id)">
+      </pressable>
+      <pressable class="bench-row-remove" (press)="remove.emit(row.id)">
         <Text class="bench-row-remove-text">×</Text>
-      </Pressable>
-      <TextInput class="bench-row-input" [value]="row.label" />
+      </pressable>
+      <text-input class="bench-row-input" [value]="row.label"></text-input>
     </View>
   `;
 
@@ -154,7 +156,7 @@ const FLAT_ROW_TEMPLATE = `
 @Component({
   selector: 'BenchmarkRow',
   standalone: true,
-  imports: [Pressable, Text, View],
+  imports: [PressableElement, Text, View],
   template: COMPOSED_ROW_TEMPLATE,
 })
 class BenchmarkRow {
@@ -175,7 +177,7 @@ class BenchmarkRow {
 @Component({
   selector: 'BenchmarkRowWithInput',
   standalone: true,
-  imports: [Pressable, Text, TextInput, View],
+  imports: [PressableElement, Text, TextInputElement, View],
   template: WITH_INPUT_ROW_TEMPLATE,
 })
 class BenchmarkRowWithInput {
@@ -454,10 +456,6 @@ describe('benchmark row shapes', () => {
         composedFew.engineNodes - composedFew.anchors,
         composedMany.engineNodes - composedMany.anchors,
       ),
-      composedFlattens: perRow(
-        composedFew.childFlattens,
-        composedMany.childFlattens,
-      ),
       flatNodes: perRow(flatFew.engineNodes, flatMany.engineNodes),
       flatAnchors: perRow(flatFew.anchors, flatMany.anchors),
       flatRenderable: perRow(
@@ -469,25 +467,32 @@ describe('benchmark row shapes', () => {
       flatFew.childFlattens,
       flatMany.childFlattens,
     );
+    const composedFlattensPerRow = perRow(
+      composedFew.childFlattens,
+      composedMany.childFlattens,
+    );
 
     expect(measured).toEqual({
-      // The claim under test: same renderable tree, three extra retained nodes per row, and all
-      // three of them anchors - the row component's host plus one per Pressable.
+      // The claim under test: same renderable tree, ONE extra retained node per row, and it is an
+      // anchor — the row component's own host. The two Pressable anchors left with the wrapper.
       composedNodes: COMPOSED_NODES_PER_ROW,
       composedAnchors: COMPOSED_NODES_PER_ROW - FLAT_NODES_PER_ROW,
       composedRenderable: FLAT_NODES_PER_ROW,
-      // What an anchor costs the walk even though it never paints: two parents per row whose
-      // children hold one (the row's own host, and the row View holding the two Pressables), so
-      // renderableChildren's fast path is defeated and re-allocates on both.
-      composedFlattens: 2,
       flatNodes: FLAT_NODES_PER_ROW,
       flatAnchors: 0,
       flatRenderable: FLAT_NODES_PER_ROW,
     });
-    // Flat's own flatten count is not in that table because it does not scale with rows at all -
-    // the fixture's @for anchor defeats one scan whatever the row count, and the per-row delta is
-    // noise around zero. Growth is the property under test.
+    // Neither flatten count is in that table, because neither scales with rows — the fixture's
+    // @for anchor defeats one scan whatever the row count, and the per-row delta is noise around
+    // zero. Growth is the property under test, and composed no longer has any.
+    //
+    // Composed's USED to be 2/row, and both of those were Pressable's: the row View held two
+    // anchor children, so `renderableChildren` re-allocated there once per row. `<pressable>` is a
+    // tag now and paints, so the only anchor left is the row component's own host — and every
+    // row's sits under ONE parent (the list View), which flattens once per commit rather than once
+    // per row. Deleting the wrapper removed a per-row cost from the commit WALK, not just a node.
     expect(flatFlattensPerRow).toBeLessThanOrEqual(0);
+    expect(composedFlattensPerRow).toBeLessThanOrEqual(1);
   });
 
   // ROW_CONTENT.WithInput: one extra native view, and NOTHING else moves — same view names as
@@ -506,16 +511,13 @@ describe('benchmark row shapes', () => {
     expect(withInputMany.viewNames).toHaveLength(
       WITH_INPUT_VIEWS_PER_ROW * MANY_ROWS + FIXTURE_CHROME_VIEWS,
     );
-    // Engine side costs MORE than the one Fabric view: TextInput's own composed template is
-    // `@if (isMultiline) {…} @else {…}`, and (measured directly, headless, walking the engine
-    // tree of a lone <TextInput>) that costs its own host anchor PLUS one anchor per @if branch —
-    // 3 anchors total for 1 renderable native view, the same "@if reserves a structural slot
-    // whether or not it renders" cost BenchmarkRowWithInput's own comment names, just paid inside
-    // TextInput's implementation instead of this screen's. So the delta is +4 nodes / +3 anchors,
-    // not +1 — this is Angular's un-lowered TextInput being expensive on the engine side even
-    // where Fabric sees only one more view.
-    const TEXT_INPUT_ENGINE_NODES = 4;
-    const TEXT_INPUT_ANCHORS = 3;
+    // Engine side now costs exactly the one Fabric view, and the delta is the whole point of the
+    // tag migration. While `<TextInput>` was a component its template was
+    // `@if (isMultiline) {…} @else {…}`, so it cost its own host anchor PLUS one per @if branch —
+    // +4 nodes / +3 anchors for one painting view. `<text-input>` is a tag: the multiline choice is
+    // the ENGINE's (`intrinsicWhen`), there is no template and no branch, so it is +1 / +0.
+    const TEXT_INPUT_ENGINE_NODES = 1;
+    const TEXT_INPUT_ANCHORS = 0;
     expect(perRow(withInputFew.engineNodes, withInputMany.engineNodes)).toBe(
       COMPOSED_NODES_PER_ROW + TEXT_INPUT_ENGINE_NODES,
     );

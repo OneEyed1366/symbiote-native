@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import {
   Platform,
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
   View,
@@ -78,7 +78,7 @@ function securityLevelLabel(level: SecurityLevel): string {
   standalone: true,
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="local-auth-scroll"
         class="screen"
@@ -181,7 +181,7 @@ function securityLevelLabel(level: SecurityLevel): string {
           }
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class LocalAuthScreen {

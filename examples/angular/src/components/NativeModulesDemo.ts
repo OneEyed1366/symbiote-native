@@ -9,6 +9,7 @@ import {
   ButtonElement,
   I18nManager,
   Image,
+  ImageElement,
   Settings,
   Text,
   View,
@@ -22,14 +23,14 @@ import './NativeModulesDemo.css';
 const LOGO_URI = 'https://angular.io/assets/images/logos/angular/angular.png';
 // A distinct cache key for the prefetch demo: same asset, different URL (query
 // string), so nothing has loaded it yet. The cache starts cold and the button
-// visibly warms it, unlike LOGO_URI, which getSize + the <Image> already pulled in.
+// visibly warms it, unlike LOGO_URI, which getSize + the <image> already pulled in.
 const PREFETCH_URI = LOGO_URI + '?warm=symbiote';
 const TAP_KEY = 'symbiote.tapCount';
 
 @Component({
   selector: 'NativeModulesDemo',
   standalone: true,
-  imports: [View, Text, ButtonElement, Image],
+  imports: [View, Text, ButtonElement, ImageElement],
   template: `
     <View class="section-nested">
       <Text class="section-label"
@@ -61,7 +62,7 @@ const TAP_KEY = 'symbiote.tapCount';
       ></button>
 
       <View class="row-align-center">
-        <Image [source]="{ uri: LOGO_URI }" class="logo-thumb" />
+        <image [source]="{ uri: LOGO_URI }" class="logo-thumb"></image>
         <Text testID="logo-size" class="info-text-flex">{{
           'logo size: ' + imageSize
         }}</Text>

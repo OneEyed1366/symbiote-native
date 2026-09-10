@@ -1,9 +1,9 @@
 import { Component, signal } from '@angular/core';
 import {
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
-  TextInput,
+  TextInputElement,
   View,
 } from '@symbiote-native/angular';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/angular';
@@ -26,9 +26,16 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 @Component({
   selector: 'SharingScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, TextInput, View],
+  imports: [
+    ActionButton,
+    SafeAreaViewElement,
+    ScrollView,
+    Text,
+    TextInputElement,
+    View,
+  ],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="sharing-scroll"
         class="screen"
@@ -74,14 +81,14 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
             this app can read. There is no file-system package here to create
             one, so paste a path that already exists on the device.
           </Text>
-          <TextInput
+          <text-input
             testID="sharing-uri-input"
             class="text-input"
             placeholder="file:///path/to/file.png"
             placeholderTextColor="#41506a"
             [value]="fileUri()"
             (valueChange)="fileUri.set($event)"
-          ></TextInput>
+          ></text-input>
           <ActionButton
             testID="sharing-share-button"
             title="Share"
@@ -100,7 +107,7 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class SharingScreen {

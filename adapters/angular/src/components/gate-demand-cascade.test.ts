@@ -35,7 +35,13 @@ import { mount, unmount } from '../render';
 // "Can't construct a query … since the query selector wasn't defined", plus NG0919 on the
 // projection fixture. The barrel evaluates the graph in one fixed order, so the fixtures below no
 // longer depend on which of them happens to be imported first.
-import { Pressable, SectionList, TouchableOpacity } from '../components';
+import {
+  SectionList,
+  VirtualizedList,
+  VListItemDirective,
+} from '../components';
+import { provideGateDemand } from '../gate-demand';
+import { registerComposedComponent } from '../anchor-host-registry';
 import { VSectionItemDirective } from './virtualized-section-list/directives';
 
 const ROOT_TAG = 979;
@@ -48,18 +54,52 @@ const GATE_KEYS = [
   'onAccessibilityEscape',
 ] as const;
 
-// The app writes its OWN Pressable and projects it through a wrapper. Under `providers` this
-// Pressable would inherit the wrapper's demand; under `viewProviders` it must not, and must answer
-// from its own `.observed` exactly as it would standing alone.
+// The projection boundary. A wrapper that DEMANDS NOTHING, with an app-authored consumer projected
+// INTO it: under `providers` the consumer would inherit that empty demand and light no gate; under
+// `viewProviders` it must answer from its own `.observed` exactly as it would standing alone.
+//
+// The wrapper is local rather than shipped, and that is forced rather than convenient: every
+// wrapper this file used to reach for — `Button`, `TouchableOpacity`, `Pressable` — is a TAG now,
+// and a tag provides nothing and consumes nothing. It still exercises the shipped pair
+// (`provideGateDemand` here, `injectGateDemandAbove` inside `VirtualizedList`), which is the whole
+// mechanism; what it stands in for is only the wrapper's IDENTITY.
+@Component({
+  selector: 'gate-cascade-wrapper',
+  standalone: true,
+  viewProviders: [provideGateDemand(() => GateCascadeWrapper)],
+  template: '<ng-content></ng-content>',
+})
+class GateCascadeWrapper {}
+
+registerComposedComponent('gate-cascade-wrapper');
+
+const PROJECTED_ROWS = ['row'];
+
 @Component({
   selector: 'gate-cascade-projected',
   standalone: true,
-  imports: [TouchableOpacity, Pressable],
-  template: `<TouchableOpacity [testID]="'outer'">
-    <Pressable [testID]="'mine'" (accessibilityTap)="onTap()"></Pressable>
-  </TouchableOpacity>`,
+  imports: [GateCascadeWrapper, VirtualizedList, VListItemDirective],
+  template: `
+    <gate-cascade-wrapper>
+      <VirtualizedList
+        [testID]="'mine'"
+        [data]="rows"
+        [getItem]="getRow"
+        [getItemCount]="countRows"
+        (accessibilityTap)="onTap()"
+      >
+        <ng-template vListItem let-item>
+          <text>{{ item }}</text>
+        </ng-template>
+      </VirtualizedList>
+    </gate-cascade-wrapper>
+  `,
 })
-class ProjectedPressableFixture {
+class ProjectedConsumerFixture {
+  rows = PROJECTED_ROWS;
+  getRow = (data: unknown, index: number): string =>
+    PROJECTED_ROWS[index] ?? '';
+  countRows = (): number => PROJECTED_ROWS.length;
   onTap(): void {}
 }
 
@@ -151,10 +191,10 @@ describe('a wrapper answers the gate for the component it renders', () => {
     });
 
     // why: the projection boundary, which is the whole reason the provider is `viewProviders` and
-    // not `providers`. An app's own Pressable must behave as it would standing alone — under
+    // not `providers`. An app's own component must behave as it would standing alone — under
     // `providers` this reads `[]`, because the wrapper's demand says nobody asked.
-    it('leaves an app’s own projected Pressable answering for itself', async () => {
-      mount(ROOT_TAG, ProjectedPressableFixture);
+    it('leaves an app’s own projected consumer answering for itself', async () => {
+      mount(ROOT_TAG, ProjectedConsumerFixture);
       await settle();
 
       expect(litGates('mine')).toEqual(['onAccessibilityTap']);

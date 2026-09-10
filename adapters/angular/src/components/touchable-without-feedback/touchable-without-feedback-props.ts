@@ -12,7 +12,7 @@
 // `elementProps`, so on the tag it would sit on a node that never commits.
 import type { IPressTimingProps } from '@symbiote-native/components';
 
-import type { IAngularPressableInputs } from '../pressable';
+import type { IAngularPressableInputs } from '../pressable-props';
 
 export type IAngularTouchableWithoutFeedbackProps = Omit<
   IAngularPressableInputs,

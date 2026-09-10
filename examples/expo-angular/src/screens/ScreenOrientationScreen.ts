@@ -1,5 +1,10 @@
 import { Component, inject } from '@angular/core';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  SafeAreaViewElement,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   Orientation,
   OrientationLock,
@@ -23,9 +28,9 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 @Component({
   selector: 'ScreenOrientationScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollView, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="screen-orientation-scroll"
         class="screen"
@@ -88,7 +93,7 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class ScreenOrientationScreen {

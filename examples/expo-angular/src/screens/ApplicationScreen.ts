@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import {
   Platform,
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
   View,
@@ -34,7 +34,7 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
   standalone: true,
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="application-scroll"
         class="screen"
@@ -150,7 +150,7 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           </View>
         }
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class ApplicationScreen {

@@ -13,25 +13,18 @@ export {
   HorizontalScrollContentView,
   HorizontalScrollView,
   Image,
-  InputAccessoryView,
   KeyboardAvoidingView,
   Modal,
-  Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollContentView,
   ScrollView,
   ScrollViewStickyHeader,
   SectionList,
   stableAnchorStyle,
-  Switch,
   SymbioteHostPropsDirective,
   SymbioteStyleInputDirective,
   Text,
-  TextInput,
-  TouchableHighlight,
   TouchableNativeFeedback,
-  TouchableOpacity,
   View,
   VirtualizedList,
   VirtualizedSectionList,
@@ -71,6 +64,7 @@ export {
 export { createAnimatedComponent } from './modules/animated';
 export type {
   IActivityIndicatorProps,
+  IAngularPressableInputs,
   IAngularImageBackgroundProps,
   IAngularInputAccessoryViewProps,
   IAngularKeyboardAvoidingViewProps,
@@ -162,6 +156,11 @@ export {
   SwitchElement,
   TextElement,
   TextInputElement,
+  // The `[(ngModel)]` / `formControl*` accessors for the two controlled tags — where the deleted
+  // wrappers' `NG_VALUE_ACCESSOR` went. Both ride `SYMBIOTE_ELEMENTS`; named separately for an app
+  // that imports narrowly.
+  SwitchValueAccessor,
+  TextInputValueAccessor,
   // The three the list omitted while their components still existed. These are now the ONLY
   // replacements for their deleted components in an app's `imports`, so a narrower import has to be
   // able to name them.

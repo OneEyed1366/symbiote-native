@@ -12,7 +12,7 @@ import {
 import {
   Animated,
   AnimatedView,
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
   View,
@@ -132,7 +132,7 @@ export class ShowcaseTile {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     AnimatedView,
-    SafeAreaView,
+    SafeAreaViewElement,
     ScrollView,
     ShowcaseTile,
     ShowcaseToggle,
@@ -140,7 +140,7 @@ export class ShowcaseTile {
     View,
   ],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="style-showcase-scroll"
         class="screen"
@@ -565,7 +565,7 @@ export class ShowcaseTile {
           </Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class StyleShowcaseScreen implements OnInit, OnDestroy {

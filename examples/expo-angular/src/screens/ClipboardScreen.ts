@@ -1,10 +1,10 @@
 import { Component, Injector, effect, inject, signal } from '@angular/core';
 import {
   Platform,
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
-  TextInput,
+  TextInputElement,
   View,
 } from '@symbiote-native/angular';
 import {
@@ -38,9 +38,16 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 @Component({
   selector: 'ClipboardScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, TextInput, View],
+  imports: [
+    ActionButton,
+    SafeAreaViewElement,
+    ScrollView,
+    Text,
+    TextInputElement,
+    View,
+  ],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="clipboard-scroll"
         class="screen"
@@ -81,13 +88,13 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 
         <View testID="clipboard-copy-card" class="capability-card">
           <Text class="capability-card-title">Copy text</Text>
-          <TextInput
+          <text-input
             testID="clipboard-input"
             class="text-input"
             placeholder="Type text to copy"
             [value]="inputText()"
             (valueChange)="inputText.set($event)"
-          ></TextInput>
+          ></text-input>
           <ActionButton
             testID="clipboard-copy-button"
             title="Copy text"
@@ -99,13 +106,13 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
         @if (Platform.OS === 'ios') {
           <View testID="clipboard-url-card" class="capability-card">
             <Text class="capability-card-title">URL</Text>
-            <TextInput
+            <text-input
               testID="clipboard-url-input"
               class="text-input"
               placeholder="https://…"
               [value]="inputUrl()"
               (valueChange)="inputUrl.set($event)"
-            ></TextInput>
+            ></text-input>
             <View class="button-row">
               <ActionButton
                 testID="clipboard-url-get-button"
@@ -141,7 +148,7 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           </View>
         }
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class ClipboardScreen {

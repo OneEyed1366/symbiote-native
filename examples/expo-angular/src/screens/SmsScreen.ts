@@ -1,9 +1,9 @@
 import { Component, signal } from '@angular/core';
 import {
-  SafeAreaView,
+  SafeAreaViewElement,
   ScrollView,
   Text,
-  TextInput,
+  TextInputElement,
   View,
 } from '@symbiote-native/angular';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/angular';
@@ -25,9 +25,16 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 @Component({
   selector: 'SmsScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, TextInput, View],
+  imports: [
+    ActionButton,
+    SafeAreaViewElement,
+    ScrollView,
+    Text,
+    TextInputElement,
+    View,
+  ],
   template: `
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="sms-scroll"
         class="screen"
@@ -68,22 +75,22 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 
         <View testID="sms-compose-card" class="sms-card">
           <Text class="sms-card-title">Compose</Text>
-          <TextInput
+          <text-input
             testID="sms-recipients-input"
             class="text-input"
             placeholder="Recipients, comma separated"
             placeholderTextColor="#41506a"
             [value]="recipients()"
             (valueChange)="recipients.set($event)"
-          ></TextInput>
-          <TextInput
+          ></text-input>
+          <text-input
             testID="sms-message-input"
             class="text-input"
             placeholder="Message"
             placeholderTextColor="#41506a"
             [value]="message()"
             (valueChange)="message.set($event)"
-          ></TextInput>
+          ></text-input>
           <ActionButton
             testID="sms-send-button"
             title="Open composer"
@@ -107,7 +114,7 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           </Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   `,
 })
 export class SmsScreen {
