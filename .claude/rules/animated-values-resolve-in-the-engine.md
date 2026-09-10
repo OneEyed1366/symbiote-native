@@ -51,7 +51,7 @@ React, Vue and Angular ports. **This is the list the adapter-deletion pass is sc
 | 12 | Ref forwarding / `useMergeRefs` | N/A — the app's ref IS the engine node |
 | 13 | `getScrollableNode` unwrap (`resolveHostNode`) | N/A — `routeProp` already holds the node |
 | 14 | `displayName` | N/A |
-| 15 | **`Animated.event` native attach/detach** | **GAP — still wrapper-only** |
+| 15 | `Animated.event` native attach/detach | engine (`bindAnimatedEvent`) — **the GAP recorded here was already closed when it was written** |
 | 16 | **`passthroughAnimatedPropExplicitValues`** | **GAP for an app; the one in-repo consumer (sticky headers) is already a behavior** |
 | 17 | `scheduleUpdate` / the 48 ms Fiber↔ShadowTree resync | N/A by design — we write `node.props`, there is no second tree |
 | 18 | `onUserDrivenAnimationEnded` re-pull | not covered, and no adapter covers it either |
@@ -74,3 +74,22 @@ Nothing the bind does needs a Fabric tag on the spot: `setNativeView` only store
 `connectToView` defers itself through `pendingViewConnects` + the post-commit hook, and
 `attachNativeEventHandler` wraps its own `whenCommitted`. A deferral here was written, found
 unfalsifiable, and removed.
+
+## Row 15 was recorded as a GAP and was never one — check a table's own file before quoting it
+
+Corrected 2026-09-10, while pricing the deletion of Svelte's ScrollView wrapper. Row 15 said
+`Animated.event` native attach was "still wrapper-only", which made `Animated.ScrollView` look like
+the one member of the namespace with a real job. `bindAnimatedEvent` is called from `setEventListener`
+(`core/engine/src/node.ts`, under `if (hasAnimatedNodes())`) for ANY `on*` prop on ANY node, and
+`host-binding.ts` carries its `reattachAnimatedEvents` re-arm beside the value one. Both were in this
+file's own subject when the row was written.
+
+Two things generalise, and they are this repo's own rules pointed at a table rather than at a comment:
+
+- **A row saying GAP is a claim about code, and it decays like any other.** The rest of the table was
+  re-derived when the wrapper was deleted; this row was inherited. `command grep -rn "bindAnimatedEvent" core/engine/src`
+  is the whole check and it is one line.
+- **A stale GAP scopes work DOWN and nothing ever fails.** Believing it, the honest conclusion was
+  "a scroll wrapper must survive for `Animated.event`" — a wrapper kept, a feature not shipped, and
+  no test anywhere to contradict it. That is the same asymmetry `adapter-parity-audit.md` records for
+  an impossibility claim: a wrong "already done" costs a read, a wrong "still open" costs the repair.

@@ -48,6 +48,20 @@ Lowering a composition would need a behavior that CREATES a child — new engine
 child-creating behavior is a machine, which fails check (2) below anyway. Treat "the render fn
 returns a tree" as "not in this batch", not as "needs a bigger fold".
 
+**The last paragraph aged out on 2026-09-09, and the sentence that survived it is the one before.**
+`IHostBehavior.buildStructure` IS that new engine surface — it landed for ScrollView, and
+`core/components/src/behaviors/activity-indicator/` is now built on it, spinner and centering
+container both. The prediction that a child-creating behavior must be a machine was also wrong:
+this one owns no timer, no listener and no native handshake, so its `attach`/`detach` are empty and
+the whole thing is two `payloadFold`s plus a `slotProps` redirect.
+
+What still holds is the FIRST half — "MANUFACTURING a container is a disqualification" is a correct
+statement about a FOLD-ONLY recipe, which is what this file is. A composed primitive is simply not
+fold-only; it is a `buildStructure` primitive, a category that did not exist when this was written.
+So the row belongs in a different batch, not out of scope. `.claude/rules/host-primitive-tier.md`'s
+own disqualifier section carries the general form: an impossibility claim owes a subject and a
+phase, or it reads as permanent and scopes work down with nothing ever going red.
+
 ### And a per-platform view NAME does not imply a platform-invariant fold — on ActivityIndicator both differ
 
 **This was assumed the other way and the assumption was wrong**, which is why the step says check
@@ -146,9 +160,22 @@ across ~50 call sites and keeps ONE fold implementation for both paths.
 
 ## 5. Register it — and note who registers
 
-`adapters/{angular,solid,svelte,vue}/src/register.ts`, one call each. **React registers nothing** and
-does not need to: it folds in its host config via `foldHostBag`. A new fold-only primitive therefore
-touches four files, not five, and a recipe that says "every adapter" is wrong.
+**All FIVE `adapters/*/src/register.ts`, one call each.** This section read "React registers
+nothing and does not need to: it folds in its host config via `foldHostBag`" — true when it was
+written and false since `adapters/react/src/register.ts` landed, whose own header says React "had no
+registration at all until this file" and that every bare tag committed inert without it. `foldHostBag`
+is the ALIAS/DEFAULT half only; a behavior's `foldPayload`, machine and hooks come from the registry
+and nothing else.
+
+It was relayed as fact into a work brief on 2026-09-09 and cost a round. **The check is one command,
+and it beats any prose in this file:**
+
+```bash
+ls adapters/*/src/register.ts
+```
+
+Five paths is the answer. Same instrument this repo prescribes everywhere else — count the members
+against what is on disk rather than against a sentence.
 
 ## 6. Prove it before the key exists
 
@@ -188,6 +215,28 @@ fold-only and this recipe is the wrong one — ScrollView, Modal, Switch and Ref
 four that carry state or a handle.
 
 ## PARKED: what to do about a primitive whose native view is inherently wrapped
+
+> **SETTLED 2026-09-09, and the answer is option B — the one this section talks itself out of.**
+> `ActivityIndicator` is a tag on all five adapters, its five wrappers are deleted, and
+> `render-activity-indicator.ts` is gone. `ImageBackground` followed on the same shape.
+>
+> **Every cost B is charged with here turned out to be already paid or simply wrong.** "A new engine
+> capability — a behavior that CREATES a node" is `IHostBehavior.buildStructure`, which landed for
+> ScrollView. "A new tag for the container" cost one line in `ISymbioteIntrinsic`. And "a
+> child-creating behavior needs the child's props kept in step, which is a commit hook, which is a
+> machine" is false twice over: the child keeps its own pure `payloadFold` reading the owner, and
+> this behavior owns no timer, no listener and no native handshake — its `attach`/`detach` are empty.
+>
+> A was recommended on the argument that spinners are rare, so the instance cost is not measurably
+> paid. That is still true and it was never the point: what B actually bought was RN parity. The
+> passthrough belongs on the SPINNER (`ActivityIndicator.js:99`) and all five wrappers had put it on
+> the wrapper since the day they were written — a divergence no audit here could see, because both
+> paths agreed with each other.
+>
+> **The reusable half: an option priced as "needs a new engine capability" is priced against one
+> afternoon's engine.** Three of the five costs above expired within a fortnight of being written.
+> When parking a decision on that basis, name the capability so a later reader can check whether it
+> now exists, rather than re-reading the whole trade-off.
 
 `ActivityIndicator` is the first, and the decision is an architecture call rather than a build task.
 RN itself wraps the spinner in a centering `<View>` (`ActivityIndicator.js:112`), so the second node

@@ -26,6 +26,23 @@ What that costs is one thing per adapter, and only Svelte's was a correctness de
 closed (`svelte-shim-element-global-must-be-an-ancestor.md`). Do not quote the sections below that
 price "keeping the transform"; they answer a question that is no longer open.
 
+**The benchmark canary cannot show this migration's win, and expecting it to is the wrong test.**
+Every `BenchmarkRow` in every example was written deliberately lowering-friendly BEFORE this
+migration — no `ref`, no spread, no functional (non-pressed-only) `style`, so the compile-time
+lowering transform ALWAYS lowered every node in it. Writing the tag directly commits the identical
+Fabric tree the transform already produced, so a device A/B on this row reads as parity — measured
+2026-09-10 on Svelte: Create 205.0→202.5, Append 223.1→200.4 (better), Replace 214.0→244.3 (worse,
+but Replace is this project's noisiest, least-reproducible row — see `perf-claims-need-numbers.md`
+— and needs a same-sitting repeat before reading anything into it). This migration's actual payoff
+is invisible on a row built to already be at the lowering ceiling: it is (a) real app call sites
+that the OLD transform used to REFUSE (a `ref`, a spread, a functional style reading unrelated
+state) and therefore left as full components — those now get the tag path too, for the first time
+— and (b) deleting the transform layer itself (4 per-adapter plugins, the shared spec, the fixture
+table, `REFUSAL_CATEGORIES`) as a maintenance/correctness win, independent of any ms. Before
+promising a device speedup from a "components to tags" change, check whether the canary being
+measured was already lowering-friendly under the OLD system — if so, parity is the CORRECT
+prediction, not a regression to explain.
+
 **DONE 2026-09-08.** All four transforms, the Angular Metro wrapper, the shared verdict table, the
 `specialize-state-style` compiler and the `state-style` runtime helper it emitted are deleted, and
 the wiring is out of `solid/babel-preset.cjs`, `vue/babel-jsx.cjs`, `vue/metro-vue-transformer.cjs`,
@@ -88,3 +105,67 @@ capability audit has to reach `packages/*`, not just the five adapters.
 - **Engine-side state-style resolution must land BEFORE any adapter renames.** A functional `style`
   on a bare tag misses `setEventListener`, lands in `setProp` as a function, and `fabricProps`
   drops function props — the commit carries NO style, with nothing red.
+
+
+## A single-word HTML tag name IS available on Svelte — the escape hatch is a pair, and we use one half
+
+Measured 2026-09-09 while pricing `Button` as a tag, and recorded because the first answer was WRONG
+in the direction that kills a feature: "`button` collides with HTML and there is no fix."
+
+The mistake was reading `svelte/elements.d.ts`, which types `button: HTMLButtonAttributes` against
+`view/text/image/switch: SVGAttributes<…>` and makes the two look categorically different. That file
+is the RUNTIME types. The one that decides is `svelte2tsx/svelte-jsx-v4.d.ts`, and
+`intrinsic-elements.ts` already says so in its own header — the read went one layer off the file it
+had been told to open (`.claude/rules/verify-the-deciding-side.md`, applied to a dependency).
+
+```
+svelte2tsx/svelte-jsx-v4.d.ts
+  31   // in case someone enhanced the typings from svelte/elements HTMLAttributes/SVGAttributes
+  32   interface HTMLAttributes<T extends EventTarget = any> {}     <- the half nobody used
+  33   interface SVGAttributes<T extends EventTarget = any> {}      <- the half we enhance today
+  38   type HTMLProps<Property, Override> =
+  39     Omit<SvelteHTMLElements[Property], keyof Override> & Override;
+  57   button: HTMLProps<'button', HTMLAttributes>;
+2035   view:   HTMLProps<'view',   SVGAttributes>;
+```
+
+Identical shape, and BOTH escape interfaces are empty and enhanceable, by the same comment. So
+enhancing `svelteHTML.HTMLAttributes` beside the `SVGAttributes` we already patch costs three lines
+and makes every single-word HTML name typable: the index signature makes `keyof Override`
+`string | number`, `Omit` erases the whole HTML surface, and ours is what remains. The existing
+file's own justification transfers verbatim — an RN app has no HTML elements either.
+
+**So the tag alphabet is not constrained to SVG-named and hyphenated members.** The constraint was
+an artifact of only ever having hit SVG collisions. Measured on Svelte only; React and Solid own
+their JSX namespaces now, Vue keys on `isCustomElement`, and Angular matches by directive selector —
+none of those were checked in this pass, so treat them as open per adapter rather than cleared.
+
+### What actually prices `Button` as a tag
+
+Not the name. Two things, and the second is an argument FOR the tag rather than against:
+
+- **`slotDerived` marks `node.childHost` and nothing else** (`core/engine/src/node.ts:683-685`), so a
+  primitive with two internal nodes — Button's view and its text — has no declarative way to re-fold
+  both when an owner prop moves. The memo half of the answer is right: without style objects
+  MEMOIZED on their inputs, `setProp`'s `Object.is` never fires and the node re-commits forever
+  (`list-geometry-feedback-loop`).
+
+  **The `afterCommit` half was measured FALSE on 2026-09-09, and it fails on exactly the props this
+  is about.** `title` and `color` are stripped from the host's payload by its own fold, so a write to
+  either produces a byte-identical payload, and `commitContainer` returns on a no-op ABOVE
+  `runDeferredAttaches` — the beat never happens. The label re-folds only if some unrelated real
+  prop moves in the same commit. `commit.ts` documents this at the return itself ("TRAP FOR BEHAVIOR
+  AUTHORS"); `host-behavior.ts`'s `afterCommit` comment did not, until this cost a design round.
+
+  The general form: **a lifecycle hook that runs "after the commit" does not run when your own fold
+  made the commit empty.** Before designing on one, ask whether the prop you are reacting to reaches
+  Fabric at all.
+- **RN swaps the touchable itself on Android** (`TouchableNativeFeedback`, Button.js:280-283). As a
+  component that is a platform branch in five templates. As a TAG it is one branch inside the
+  behavior picking a different intrinsic per platform — which is exactly what ScrollView already
+  does with `horizontal-scroll-view`, so the precedent is built.
+
+And the reason the first verdict also got the COST wrong: "Button is rare" was measured on
+`examples/*` and on this project's own habits. That is a fact about us, not about consumer apps,
+where a Button in a list row is ordinary. A sample drawn from the repo cannot answer a question
+about the repo's users.

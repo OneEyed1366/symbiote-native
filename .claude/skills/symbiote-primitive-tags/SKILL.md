@@ -2450,3 +2450,255 @@ interface commented "in case someone enhanced the typings", and its entries are
 `Omit<SvelteHTMLElements[tag], keyof SVGAttributes> & SVGAttributes` — so an index signature there makes
 `keyof` become `string | number`, the `Omit` erases the whole SVG surface, and ours is what remains. Blunt
 (it reaches every SVG tag) and free (a React Native app has none).
+
+## TouchableHighlight ported to a tag, Svelte-only (2026-09-10) — the wiring checklist, reusable
+
+Done via TDD (test file first, watched fail, then the implementation). Unlike
+`TouchableNativeFeedback`/`TouchableWithoutFeedback` (anchor tags, commit nothing, clone onto the child)
+and `TouchableOpacity` (one node, an eased `AnimatedValue` fade), `TouchableHighlight` needed a genuinely
+new composition: one committed node carrying a press machine (`touchable-opacity`'s shape) PLUS a
+discrete underlay show/hide state machine with real hold timers pinned to RN's actual three-callback
+Pressability semantics (`TouchableHighlight.js`) — no existing tag had that combination. The underlay
+machine itself was NOT new: `createHighlightUnderlayHandlers`/`createHighlightUnderlayRuntime`/
+`resolveHighlightExtraStyles`/`hasTouchablePressHandler` (`core/components/src/state/touchable.ts`,
+`core/components/src/view/render-touchable-highlight.ts`) were already framework-agnostic, written when
+the Svelte WRAPPER was built — the port only had to consume them.
+
+**Style-change mechanism, and why it is NOT `setAnimatedBehaviorStyle`.** A discrete boolean toggle
+(shown/hidden) with no easing publishes through `markPropsDirty`+`requestCommitFor` — the same pair
+`./pressable`'s `setPressed` composer uses to force a re-fold after an internal state change —
+`foldPayload` re-reads the WeakMap-held `shown` flag on the next fold. `setAnimatedBehaviorStyle` exists
+for a continuously-driven `AnimatedValue`/eased fade (`touchable-opacity`'s shape) and is the wrong tool
+here.
+
+**Kept the wrapper's own simplification rather than "fixing" it.** RN's real TouchableHighlight commits a
+container (backgroundColor, accessibility, the responder) and separately `cloneElement`s an opacity style
+onto its single CHILD — closer to TNF's clone-onto-child shape than to a true single node. Every wrapper
+(Svelte included, per its own "ITEM 7 IS DELIBERATELY NOT FIXED HERE" comment) folds both the underlay
+color AND the child opacity onto the ONE node instead, because a framework component holding an opaque
+children snippet/slot cannot safely reach a child to clone onto. The tag keeps that same
+already-cross-adapter (Solid and Angular made the same call) simplification —
+`render-touchable-highlight.ts`'s own header says the shared layer "takes no position on where they
+land", so this is a legitimate placement choice, not a shortcut being reopened. A tag COULD reach the
+real child (the anchor+`payloadFold` mechanism TNF/TWF use proves the engine can), but doing so here would
+be new, untested composition work with no product ask behind it — noted as a possible future
+correctness improvement, not attempted.
+
+**The bug the tests caught, and it generalizes to every future Touchable-family tag:** the first draft
+forgot `minPressDuration: 0` in the composed Pressability config. RN's real TouchableHighlight explicitly
+overrides Pressability's own 130ms default floor to 0 (`TouchableHighlight.js:203`, verbatim same as
+`TouchableOpacity.js:195`). Without it, `deactivate()`'s `wait > 0` branch
+(`core/components/src/state/pressable.ts`) defers the WHOLE `onPressOut` — and everything composed in
+front of it, here the underlay-hide logic — behind a real 130ms timer nothing in a naive test simulation
+waits for. 4 of 11 first-draft tests failed this way (underlay never hiding, app callbacks never firing).
+Fix was one line in `refine`'s returned config, mirroring `./touchable-opacity`'s own `refine` exactly.
+**Before writing any new `createPressBehavior`-composed tag, grep `minPressDuration: 0` across the
+sibling `touchable-*.ts` files and confirm the new one sets it too.**
+
+**Second, smaller lesson the tests surfaced:** a props diff that CLEARS a previously-set key on THIS
+engine commits as an explicit `null`, never an omitted/`undefined` key
+(`core/engine/src/commit.ts:209`: `if (!(key in next)) out[key] = null;`). A test expecting
+`toBeUndefined()` after a show→hide style transition is wrong; expect `toBeNull()`. Same fact already
+recorded in `.claude/rules/test-harness-false-greens.md` ("a prop REMOVED on a clone reads as `null`, not
+`undefined`") — this is a second confirmation, not a new finding.
+
+**The reusable wiring checklist**, derived from doing this twice now (TNF/TWF, then TouchableHighlight):
+
+1. Add the tag name to `ISymbioteIntrinsic` in `core/components/src/component-names/shared.ts`, with a
+   comment explaining what it resolves to and why.
+2. Add the Fabric view-name mapping to BOTH `index.ios.ts` and `index.android.ts` in the same directory.
+3. Write the host behavior in `core/components/src/behaviors/<name>.ts` — TDD, test file first.
+4. Export `register<Name>Behavior`/`<NAME>_TAG` from `core/components/src/index.ts`.
+5. Call `register<Name>Behavior()` in the adapter's `register.ts`, with a comment stating WHY it's safe
+   now (wrapper deleted in the same commit — no double-registration risk).
+6. Delete the wrapper source + its own test.
+7. Update the adapter's components barrel comment (what the deleted name resolves to now).
+8. Remove the VALUE export (keep the TYPE export) from the adapter's public `index.ts`.
+9. Grep the whole example app for remaining USAGE of the old component name; migrate every call site to
+   the tag.
+10. **Grep for any smoke/integration test elsewhere that hardcoded the OLD wrapper as its "any component
+    that owns a bare tag" test subject.** This has now happened twice on Svelte — the subject moved
+    TouchableWithoutFeedback → TouchableHighlight → RefreshControl across two sessions
+    (`adapters/svelte/src/runes/attachments.smoke.test.ts`). Rehome it to a component likely to REMAIN a
+    wrapper for a while, to reduce future churn.
+
+Svelte's `intrinsic-elements.ts` needs NO manual edit for a new tag — its
+`Record<ISymbioteIntrinsic, …>` is fully derived from the union, so step 1 alone is sufficient.
+
+Scope: Svelte only. TouchableHighlight is still a live wrapper component on react/vue/solid/angular; no
+parity claim is made about them.
+
+## Svelte BenchmarkScreen redesign — DESIGN SETTLED 2026-09-10, NOT YET BUILT
+
+Decided via a grill-me interview; no screen code has been written. Recorded here so the design survives
+a context reset before implementation starts.
+
+**Goal:** measure each primitive in isolation (vs stock, and set up for a later vs-older-published-version
+comparison) and see per-primitive cost, which the existing mixed 10-tag `BenchmarkRow` cannot show.
+
+**Scope: Svelte adapter ONLY.** The other four adapters and `examples/bare-rn` (stock baseline) are
+untouched, deliberately, for now.
+
+**Shape:** one NEW section per primitive, additive — the existing mixed `BenchmarkRow` (10 tags in one
+row, all the historical CLAUDE.md numbers) stays exactly as it is. Each new section is a homogeneous row
+of **N=1000** identical bare tags, run through the SAME 8-step suite the existing screen already uses
+(Create/Replace/Update/Select/Swap/Remove/Append/Clear — all 8, not a reduced subset; the runner is
+already generic and cheap to reuse).
+
+**Final 13-primitive section list** (all already tag-only on Svelte as of 2026-09-10): `view`, `text`,
+`image`, `pressable`, `text-input`, `switch`, `button`, `activity-indicator`, `image-background`,
+`touchable-opacity`, `touchable-without-feedback`, `touchable-native-feedback`, `touchable-highlight`.
+
+**Explicitly excluded, and why:**
+- `scroll-view`, `modal`, `section-list`, `virtualized-list`, `virtualized-section-list`,
+  `keyboard-avoiding-view`, `safe-area-view` — structural/wrapping primitives, not naturally "N repeated
+  instances" the way a row of Pressables is.
+- `refresh-control`, `input-accessory-view` — attach-only; neither renders its own node in a list, so
+  there is nothing to repeat 1000 times.
+
+**Form: TAG ONLY, no dual-arm.** The original ask ("see the tag-vs-component difference") is answered a
+DIFFERENT way than a live dual-render: checkout an older commit / older published npm version (still
+all-components) and re-measure separately, out of band. The redesigned screen itself only ever renders
+today's tag form.
+
+**UI: a Run button on every section, plus one "run all" button at the top** that iterates every section
+sequentially.
+
+**Explicitly skipped, not forgotten:** converting ~4 plain `<ScrollView>` component-form container usages
+in `examples/svelte/screens/*.svelte` to the `<scroll-view>` tag was approved mid-interview as a
+prerequisite cleanup, then dropped once `scroll-view` was excluded from the final section list — its
+only reason to exist evaporated. If a future session adds a ScrollView section after all, do that
+cleanup first.
+
+Next step when resumed: build the 13 new sections in `examples/svelte/screens/BenchmarkScreen.svelte` (or
+a sibling file), reusing the existing suite-runner/profiling code as-is.
+
+## RefreshControl deleted, Svelte-only (2026-09-10) — real consumers were internal, not app-level
+
+Checked before assuming "zero consumers": `examples/svelte` never wrote `<RefreshControl>` directly
+(apps pass a plain `refreshControl={{...}}` OBJECT to `ScrollView`/`FlatList`, RN's own prop shape) —
+but `scroll-view/index.svelte` and `virtualized-list/index.svelte` both imported the real component
+internally to turn that object into a child. Both migrated to `<refresh-control p={refreshControlProps}>`.
+The wrapper itself was already a pure passthrough (`resolveAccessibilityProps` already runs in
+`fabricProps` on every path per the behavior file's own header — "there is nothing left for a
+`foldPayload` here to do"), so no new engine code was needed, unlike TouchableHighlight.
+
+**The real cost was 7 test files carrying a `readFileSync(.../'RefreshControl.svelte')` +
+import-specifier-rewrite dance**, because no `.svelte`-aware loader exists in this repo's Vitest, so
+any suite compiling ScrollView/VirtualizedList/FlatList/SectionList/animated-list-family from source had
+to ALSO pre-compile RefreshControl and rewrite the compiled parent's import to point at it. Deleting the
+wrapper without touching these breaks them with `ENOENT` on the deleted file, not a clean red — grep
+`readFileSync.*RefreshControl\.svelte` across the WHOLE adapter (not just the two real import sites)
+before considering a wrapper deletion done. All 7 simplified to a plain `compileToFile` of the real
+source (no rewrite needed once nothing imports the deleted file), same committed-tree assertions kept
+unchanged since the engine behavior didn't move.
+
+**The smoke test's "any component that owns a bare tag" subject moved a third time**, from
+TouchableHighlight to RefreshControl to `modal/index.svelte` — Modal is now the subject because it is
+documented as PERMANENTLY un-lowerable (`.claude/rules/host-primitive-tier.md`, "a hidden modal
+commits zero nodes, so lowering it would be a regression"), unlike every previous subject.
+
+## ScrollView deleted, Svelte-only (2026-09-10) — a wrapper's header outlived both of its reasons
+
+The file said it survived for two things and both had expired, one of them for months. It was quoted
+back to the user twice as settled before anyone opened the code, which is the reusable half.
+
+```
+"Animated.ScrollView needs a real component"   Animated.View/Text/Image were deleted and NOTHING
+                                               replaced them. Animated.ScrollView was `ScrollView`
+                                               by identity — an alias, not a wrapper. The engine
+                                               resolves an AnimatedNode in any prop, AND binds a
+                                               native `Animated.event` on any node
+                                               (bindAnimatedEvent, node.ts, from setEventListener).
+"bind:this exposes the imperative handle"      scrollTo/scrollToEnd/flashScrollIndicators are on
+                                               ISymbioteNode's PROTOTYPE, and `IHostInstance =
+                                               ISymbioteNode` is a bare type alias — so
+                                               `hostInstance(bind:this)` already types all three.
+                                               node.ts says why in its own comment: "a lowered
+                                               primitive hands the app its engine NODE, so anything
+                                               the wrapper's handle offered has to be reachable
+                                               from here or the surface silently shrinks."
+```
+
+**Deleting the wrapper TURNED A FEATURE ON, which no audit here would have predicted.** The wrapper
+destructured `stickyHeaderIndices` out of its passthrough and dlogged "not honored by this adapter" —
+true when a component's only view of its children was an opaque Snippet, and false since the behavior
+started walking the COMMITTED children (`behaviors/scroll-view/sticky-indices.test.ts`, "the
+COMPATIBILITY half"). So a wrapper was suppressing RN's own API on this adapter. The content-owner
+test's sticky case flipped `0 pins -> 1` on deletion, and that flip is now the assertion.
+
+**Ask what a wrapper SUBTRACTS, not only what it adds.** Every audit in this repo compares what two
+paths produce; a prop a wrapper destructures away never reaches either path and is invisible to all
+of them.
+
+**Cost was far below RefreshControl's**: zero internal `.svelte` consumers (the barrel and the
+`Animated` namespace only), zero test files pre-compiling it as a dependency. Two suites named it as
+their SUBJECT and were retargeted at `<scroll-view>` — both passed unchanged in substance, which is
+the evidence that licensed the deletion: a suite that survives its subject being deleted was testing
+the behavior, not the wrapper. Seven app call sites migrated, five of them a pure rename.
+
+Two markup facts worth not re-deriving, both measured through the real compiler:
+
+- **A valueless attribute on a hyphenated tag arrives RAW, not stringified.**
+  `<scroll-view nestedScrollEnabled scrollEventThrottle={16}>` emits
+  `set_custom_element_data(el, 'nestedScrollEnabled', true)` and `…, 16`. The shim's `setAttribute`
+  takes `value: unknown` and stores it as-is, so `?? true` folds still work. The worry that it would
+  land as `""` and defeat a nullish default was unfounded.
+- `refreshControl={{…}}` as a PROP becomes `<refresh-control p={{…}} />` as an ordinary CHILD — the
+  scroll behavior claims it and places it per platform. That is a markup-shape change, not a rename,
+  and it is the only one of the seven call sites that was.
+
+### The vendor read settled `horizontal` and found a gap nobody was looking for
+
+`horizontal` is one input in RN and drives three outputs — the native component
+(`HScrollViewNativeComponents.js`), the row `contentContainerStyle`, and the payload flag, which
+`...otherProps` forwards (`ScrollView.js:1644-1656`). They cannot disagree. Our input is the TAG, so
+the tag must be the only input too: `ownerFold` now deletes an app-written `horizontal` and dlogs.
+Without that, `<scroll-view horizontal>` produces a shape RN cannot make — on iOS both tags ARE
+RCTScrollView, so the stray flag really does turn the scroller, over a vertical content node with no
+row style.
+
+**And reading the vendor for one prop turned up a second, unrelated defect on every adapter.** RN
+derives the bounce pair from the axis (`ScrollView.js:1753-1761`):
+`alwaysBounceHorizontal ?? horizontal`, `alwaysBounceVertical ?? !horizontal`. In this repo
+`alwaysBounce*` occurred 20 times and **all 20 were prop-type DECLARATIONS** in the five adapters —
+the value was computed nowhere, so a vertical scroll view had never bounced by default on iOS. Same
+finding shape as `focusable` (`adapter-parity-audit.md`): grep where a value is COMPUTED, never where
+the name appears. The pair is ASYMMETRIC on purpose — RN falls back to `this.props.horizontal`, unset
+on a vertical scroll view, so the horizontal key resolves to `undefined` and never reaches the
+payload. Copying that beats tidying it: writing `false` means the same to native and costs a prop key
+on every vertical scroll view.
+
+## Where a primitive's STATICS go once it becomes a tag (2026-09-10)
+
+A tag is a string and a string carries no properties, so an API RN hangs off the component value has
+to land somewhere. Two survive on Svelte — `Image.getSize`/`prefetch`/… and
+`TouchableNativeFeedback.Ripple`/`.SelectableBackground`/… — and both had been left in
+`components/`, which is the only reason they read as components.
+
+**Keep the NAMESPACE, move the BUCKET.** `modules/` is the documented home
+(`<adapter_src_follows_framework_idioms>`: "imperative RN-API namespaces with no view — Alert,
+Share, Animated, StatusBar"). The prop type stays in `components/<name>/`, the runtime does not —
+the same split ScrollView got.
+
+**Do not convert them to bare helpers, and the bundle-size argument for doing so is void here:
+Metro performs NO tree shaking** (facebook/metro#227; the only escape is the experimental
+`@rnx-kit/metro-serializer-esbuild`, not wired in this repo). A namespace object and five named
+exports cost the same. What is left is two reasons to keep the namespace and none to split it:
+`Alert`/`Share`/`Linking`/`Vibration`/`AppState` are all `export const X = {…}`, so bare
+`getImageSize` would be the only export of its shape; and an app porting from RN writes
+`Image.getSize(...)` verbatim, which is P0.
+
+**Check the surface did not move**, since this is a reorganisation and nothing else: resolve the
+barrel through the compiler (`adapter-parity-audit.md`'s tsc audit) and confirm every affected name
+is still present. Here `Image` · `IImageStatics` · `IImageProps` · `TouchableNativeFeedback` ·
+`ITouchableNativeFeedbackProps` all resolved unchanged, 226 exports total.
+
+**And do not "modernise" a comment that is right.** `TouchableNativeFeedback`'s doc said an app
+"would have no way to build a ripple dict at all" without these, and the first plan was to soften it
+because RN points new code at `Pressable android_ripple` — which the pressable behavior really does
+resolve (`behaviors/pressable.ts`, `asRippleConfig`). But the `touchable-native-feedback` TAG folds
+`background`, and nothing else produces that value, so the sentence was accurate for its own subject.
+Both facts got recorded instead of one replacing the other. Same shape as
+`verify-the-deciding-side.md`'s "a refuted rationale is not a refuted verdict", applied to a
+recommendation rather than a refusal.
