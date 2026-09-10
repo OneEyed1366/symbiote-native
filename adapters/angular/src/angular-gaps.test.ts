@@ -154,19 +154,20 @@ describe('Angular adapter gap regressions', () => {
     );
   });
 
-  // why: RN's real Button surface includes the FULL accessibility + TV-focus prop set
-  // (<adapters_reach_full_feature_parity>, P0) — this asserts that surface exists on THREE
-  // related components in three different forwarding shapes: Button's own individual
-  // `[prop]="expr"` bindings, Touchable's identical individual bindings (Button wraps
-  // TouchableOpacity), and Pressable's DIFFERENT shape — a single `[symbioteHostProps]`
-  // bag (angular-adapter §10's escape hatch for undeclared/dynamic bindings on a bare
-  // primitive) rather than one binding per key. A silent drop on any of the three would ship a
-  // Button/Touchable/Pressable that's accessible-by-eye but broken for assistive tech or TV
-  // remote navigation, with no compiler signal (see the file-level comment above).
-  it('Button forwards its full accessibility and TV-focus surface through TouchableOpacity', () => {
-    const buttonSource = readSource(
-      'adapters/angular/src/components/button.ts',
-    );
+  // why: the FULL accessibility + TV-focus prop set (<adapters_reach_full_feature_parity>, P0) has
+  // to survive on TWO components in two different forwarding shapes: Touchable's individual
+  // `[prop]="expr"` bindings, and Pressable's DIFFERENT shape — a single `[symbioteHostProps]` bag
+  // (angular-adapter §10's escape hatch for undeclared/dynamic bindings on a bare primitive) rather
+  // than one binding per key. A silent drop on either would ship a component that is
+  // accessible-by-eye but broken for assistive tech or TV remote navigation, with no compiler
+  // signal (see the file-level comment above).
+  //
+  // A THIRD arm stood here, for Button's own copy of those bindings, until `button` became a TAG:
+  // there is no Angular source to fence any more, and the surface reaches Fabric through
+  // `routeProp` like any other tag's. Its own coverage is `src/button-tag.test.ts` and
+  // `core/components/src/behaviors/button.test.ts`, which assert the COMMITTED payload rather than
+  // source text — a stronger oracle this file cannot use for a template.
+  it('Touchable and Pressable forward their full accessibility and TV-focus surface', () => {
     const touchableSource = readSource(
       'adapters/angular/src/components/touchable/index.ts',
     );
@@ -175,39 +176,10 @@ describe('Angular adapter gap regressions', () => {
     );
 
     for (const binding of [
-      '[accessible]="true"',
-      '[accessibilityLabelledBy]="accessibilityLabelledBy"',
-      '[importantForAccessibility]="importantForAccessibility"',
-      '[accessibilityLiveRegion]="accessibilityLiveRegion"',
-      '[screenReaderFocusable]="screenReaderFocusable"',
-      '[accessibilityViewIsModal]="accessibilityViewIsModal"',
-      '[accessibilityElementsHidden]="accessibilityElementsHidden"',
-      '[accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"',
-      '[accessibilityLanguage]="accessibilityLanguage"',
-      '[accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"',
-      '[accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"',
-      '[accessibilityLargeContentTitle]="accessibilityLargeContentTitle"',
-      '(accessibilityAction)="accessibilityAction.emit($event)"',
-      '(accessibilityTap)="accessibilityTap.emit($event)"',
-      '(magicTap)="magicTap.emit($event)"',
-      '(accessibilityEscape)="accessibilityEscape.emit($event)"',
-      '[ariaModal]="ariaModal"',
-      '[ariaValueMax]="ariaValueMax"',
-      '[ariaValueMin]="ariaValueMin"',
-      '[ariaValueNow]="ariaValueNow"',
-      '[ariaValueText]="ariaValueText"',
-      '[hasTVPreferredFocus]="hasTVPreferredFocus"',
-      '[nextFocusDown]="nextFocusDown"',
-      '[nextFocusForward]="nextFocusForward"',
-      '[nextFocusLeft]="nextFocusLeft"',
-      '[nextFocusRight]="nextFocusRight"',
-      '[nextFocusUp]="nextFocusUp"',
-    ]) {
-      expectSourceToDeclare(buttonSource, binding);
-    }
-
-    for (const binding of [
-      '[accessible]="accessible"',
+      // Previously pinned `[accessible]="accessible"`, i.e. a raw forward. That was a divergence:
+      // RN defaults it ON in each Touchable (`TouchableOpacity.js:303`,
+      // `TouchableHighlight.js:337`, `TouchableWithoutFeedback.js:255`).
+      '[accessible]="accessible !== false"',
       '[accessibilityLabelledBy]="accessibilityLabelledBy"',
       '[importantForAccessibility]="importantForAccessibility"',
       '[accessibilityLiveRegion]="accessibilityLiveRegion"',
@@ -245,7 +217,13 @@ describe('Angular adapter gap regressions', () => {
     // `hostProps` is a computed(), hence the call parens — the binding text changed shape but
     // the contract did not.
     expectSourceToDeclare(pressableSource, '[symbioteHostProps]="hostProps()"');
-    expectSourceToDeclare(pressableSource, 'accessible: this.accessible');
+    // Previously pinned the bare `accessible: this.accessible` — a raw forward, and a divergence
+    // from RN, which defaults it ON unless the app opts out (`Pressable.js:252`). The bare form is
+    // still a substring of this one, so it could never have caught the default going missing.
+    expectSourceToDeclare(
+      pressableSource,
+      'accessible: this.accessible !== false',
+    );
     expectSourceToDeclare(pressableSource, '...this.foldedAccessibility');
     expectSourceToDeclare(
       pressableSource,

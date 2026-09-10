@@ -434,9 +434,7 @@
    * formatting does not produce one.
    */
   import {
-    ActivityIndicator,
     FlatList,
-    ScrollView,
     SectionList,
     type ISection,
   } from '@symbiote-native/svelte';
@@ -894,7 +892,7 @@
 </script>
 
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="benchmark-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
@@ -964,7 +962,7 @@
 
     {#if progress !== undefined}
       <view testID="bench-suite-progress" class="bench-progress">
-        <ActivityIndicator color={accent} />
+        <activity-indicator color={accent} />
         <text class="bench-progress-text">
           {`${progress.mode === MOUNT_MODE.All ? 'All mounted' : 'Virtualized'} · ${progress.label}`}
         </text>
@@ -1065,10 +1063,11 @@
       by an index. The ScrollView host behavior registers that tag, each header finds this
       ScrollView by walking up, and the collision point — the y at which one pin is pushed off by
       the next — comes from the owner's DOCUMENT order, so nothing here computes or forwards an
-      index. `stickyHeaderIndices` is deliberately NOT passed: the `<ScrollView>` component strips
-      it and dlogs, because Svelte hands a component an opaque Snippet rather than an indexable
-      child list (scroll-view-props.ts). -->
-    <ScrollView
+      index. `stickyHeaderIndices` WOULD work here too, since 2026-09-10 — the behavior walks the
+      committed children, so deleting the ScrollView component (which used to strip the prop) turned
+      RN's own API on. This path stays index-free on purpose: an index has to be kept in step with
+      the children, and a tag does not. -->
+    <scroll-view
       testID="benchmark-sticky-scroll"
       class="bench-sticky"
       scrollEventThrottle={SCROLL_EVENT_THROTTLE_MS}
@@ -1083,7 +1082,7 @@
           <text class="list-row-text">{entry.text}</text>
         {/if}
       {/each}
-    </ScrollView>
+    </scroll-view>
     <text class="note-text">
       {`${STICKY_SECTION_COUNT} sections, every row mounted — no virtualization in the frame.`}
     </text>
@@ -1200,5 +1199,5 @@
         </text>
       {/each}
     {/if}
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>

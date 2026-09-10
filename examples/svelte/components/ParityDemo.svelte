@@ -58,8 +58,10 @@
     Parity checks · longPress · dismiss · animated scroll · sticky · a11y focus
   </text>
   <text
-    onLongPress={() => (longPressMsg = 'long press! (tap was suppressed)')}
-    onPress={() => (longPressMsg = 'tap')}
+    p={{
+      onLongPress: () => (longPressMsg = 'long press! (tap was suppressed)'),
+      onPress: () => (longPressMsg = 'tap'),
+    }}
     class="long-press-row"
   >
     {longPressMsg}
@@ -67,8 +69,10 @@
   <text-input
     placeholder="focus me…"
     placeholderTextColor="#41506a"
-    onFocus={() => (dismissMsg = 'keyboard up — tap Hide keyboard')}
-    onBlur={() => (dismissMsg = 'blurred (keyboard down)')}
+    p={{
+      onFocus: () => (dismissMsg = 'keyboard up — tap Hide keyboard'),
+      onBlur: () => (dismissMsg = 'blurred (keyboard down)'),
+    }}
     class="focus-input"
   ></text-input>
   <text class="note-text">{dismissMsg}</text>

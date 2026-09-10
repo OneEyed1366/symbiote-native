@@ -116,9 +116,8 @@ function asStyle(value: unknown): IStyleProp<IViewStyle> | undefined {
     @if (isHorizontal) {
       @if (hasProjectedRefreshControl) {
         <refresh-control
-          #refreshHost="symbioteHost"
           [symbioteHostProps]="androidRefreshControlProps"
-          (refresh)="handleProjectedRefresh(refreshHost.node)"
+          (refresh)="handleProjectedRefresh()"
         >
           <horizontal-scroll-view
             #host="symbioteHost"
@@ -152,9 +151,8 @@ function asStyle(value: unknown): IStyleProp<IViewStyle> | undefined {
     } @else {
       @if (hasProjectedRefreshControl) {
         <refresh-control
-          #refreshHost="symbioteHost"
           [symbioteHostProps]="androidRefreshControlProps"
-          (refresh)="handleProjectedRefresh(refreshHost.node)"
+          (refresh)="handleProjectedRefresh()"
         >
           <scroll-view
             #host="symbioteHost"

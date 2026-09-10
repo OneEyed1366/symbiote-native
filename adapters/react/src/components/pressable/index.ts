@@ -28,6 +28,7 @@ import {
   rippleProps,
   buildPressableListeners,
   resolveDisabledAccessibilityState,
+  resolvePressableFocusable,
   noteHoverNoop,
   DEFAULT_DELAY_LONG_PRESS_MS,
   DEFAULT_MIN_PRESS_DURATION_MS,
@@ -66,6 +67,9 @@ export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   onLongPress?: IPressHandler;
   delayLongPress?: number;
   disabled?: boolean;
+  // Whether a non-touch input device (hardware keyboard, TV remote) may focus this. RN resolves it
+  // rather than forwarding it — see the `focusable` line in the View props below.
+  focusable?: boolean;
   // false refuses to yield the responder when another view (e.g. a parent ScrollView) asks to
   // take over. RN forwards this to onResponderTerminationRequest, default true.
   cancelable?: boolean;
@@ -222,6 +226,14 @@ const PressableImpl: FC<IConfiguredPressableProps> = props => {
 
   const viewProps: Record<string, unknown> = {
     ...accessibilityRest,
+    // RN makes every pressable accessible unless the app opts OUT (Pressable.js:252,
+    // TouchableOpacity.js:303, TouchableHighlight.js:337). `!== false`, not `?? true`: an explicit
+    // `undefined` still reads as accessible. After the spread, so it wins over the raw prop.
+    // The whole Touchable* family composes over this component, so this is their fold too.
+    accessible: props.accessible !== false,
+    // Pressable.js:258 — focusable unless the app opts out. A Touchable* has already resolved its
+    // own three-leg formula and handed the answer down as this prop, which `!== false` preserves.
+    focusable: resolvePressableFocusable(props.focusable),
     // The ref is the handle the retention measure reaches through (measure on grant).
     ref: viewRef,
     style: resolveStyle(style, state),

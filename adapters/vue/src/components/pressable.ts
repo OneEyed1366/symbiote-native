@@ -28,6 +28,7 @@ import {
   rippleProps,
   buildPressableListeners,
   resolveDisabledAccessibilityState,
+  resolvePressableFocusable,
   noteHoverNoop,
   resolveAccessibilityProps,
   DEFAULT_DELAY_LONG_PRESS_MS,
@@ -102,6 +103,9 @@ export function emitPressableEvents(
 export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   delayLongPress?: number;
   disabled?: boolean;
+  // Whether a non-touch input device (hardware keyboard, TV remote) may focus this. Resolved rather
+  // than forwarded — see the `focusable` line in the View props below.
+  focusable?: boolean;
   cancelable?: boolean;
   hitSlop?: IRectOffset;
   pressRetentionOffset?: IRectOffset;
@@ -309,6 +313,15 @@ export const Pressable = defineComponent(
       const viewProps = resolveAccessibilityProps(forwarded);
       viewProps.ref = setNodeRef;
       viewProps.style = resolveStyle(attrs.style, state);
+      // RN makes a pressable accessible unless the app opts OUT (Pressable.js:252). `!== false`,
+      // never `?? true`: only a literal false opts out. After the forward, so it wins over the raw
+      // attr it also reads.
+      viewProps.accessible = attrs.accessible !== false;
+      // Pressable.js:258, same shape and the same reason it sits after the forward. A Touchable*
+      // has already resolved its own three-leg formula into this attr; `!== false` preserves it.
+      viewProps.focusable = resolvePressableFocusable(
+        typeof attrs.focusable === 'boolean' ? attrs.focusable : undefined,
+      );
       if (typeof attrs.android_disableSound === 'boolean')
         viewProps.android_disableSound = attrs.android_disableSound;
       Object.assign(

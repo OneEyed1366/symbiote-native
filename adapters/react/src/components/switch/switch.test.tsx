@@ -1,7 +1,9 @@
 // Proves the Switch primitive: the Fabric view name `Switch`, the
 // `value` prop as a strict boolean, the trackColor/thumbColor/ios_backgroundColor ->
-// native prop mapping, onValueChange's (value, event) derivation from nativeEvent.value,
-// and the controlled snap-back: a rejected toggle commands the JS value back down via
+// native prop mapping, onValueChange's derivation from nativeEvent.value (one argument, the
+// event, with `value` carried as a field — not a second `(value, event)` argument, which
+// crashes Svelte's `target_handler` on an individual attribute), and the controlled snap-back: a
+// rejected toggle commands the JS value back down via
 // a `setValue` view command. No simulator: a failure here is in JS, not native.
 //
 // SCOPE: `switchReducer`/`valueFromChange`/`shouldSnapBack` (core/components/src/state/switch.ts)
@@ -88,8 +90,8 @@ describe('React Switch on the engine', () => {
     expect(props.backgroundColor).toBe('#3e3e3e');
   });
 
-  // why: RN's onValueChange hands the caller both the derived boolean and the raw event — a
-  // consumer that only reads `event.nativeEvent.value` (RN's older pattern) must still work.
+  // why: onValueChange hands the caller ONE event, with the derived boolean carried as `.value`
+  // on it — a consumer that reads `event.nativeEvent.value` (RN's own event shape) must still work.
   it('derives onValueChange with both the value and the raw event from nativeEvent.value', () => {
     let changedValue: boolean | undefined;
     let rawEventValue: unknown;
@@ -97,8 +99,8 @@ describe('React Switch on the engine', () => {
       ROOT_TAG,
       <Switch
         value={false}
-        onValueChange={(v, event) => {
-          changedValue = v;
+        onValueChange={event => {
+          changedValue = event.value;
           rawEventValue = event.nativeEvent.value;
         }}
       />,
@@ -164,7 +166,9 @@ describe('React Switch on the engine', () => {
   it('issues no snap-back command when the parent accepts the toggle', () => {
     function Accepting(): ReactElement {
       const [value, setValue] = useState(false);
-      return <Switch value={value} onValueChange={setValue} />;
+      return (
+        <Switch value={value} onValueChange={event => setValue(event.value)} />
+      );
     }
     mount(ROOT_TAG, <Accepting />);
     fabric.fireEvent(switchNode().instanceHandle, 'topChange', { value: true });

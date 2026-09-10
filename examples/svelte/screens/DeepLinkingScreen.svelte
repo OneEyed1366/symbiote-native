@@ -5,6 +5,7 @@
   // app without needing an actual OS-level deep link. Svelte twin of
   // examples/vue-sfc/screens/DeepLinkingScreen.vue.
   import { resolveRouteFromUrl } from '@symbiote-native/navigation';
+  import type { ITextInputChangeEvent } from '@symbiote-native/svelte';
   import ActionButton from '../components/ActionButton.svelte';
   import {
     APP_LINKING_CONFIG,
@@ -55,7 +56,7 @@
     <text-input
       testID="deep-link-input"
       value={url}
-      onValueChange={(next: string) => (url = next)}
+      onValueChange={(event: ITextInputChangeEvent) => (url = event.text)}
       placeholder="symbiotecanarysvelte://details/42"
       placeholderTextColor={PLACEHOLDER_COLOR}
       class="text-input"

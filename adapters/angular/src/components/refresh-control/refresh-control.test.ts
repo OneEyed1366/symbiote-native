@@ -1,8 +1,10 @@
 // RefreshControl forwards every native prop straight through (no shared render fn — see
-// index.ts's header comment) and its controlled-value handshake is written once in this file's
-// class, not in @symbiote-native/components, so it IS the unit under test here (not shared,
-// nothing to defer to core). `refreshing` is a controlled prop: native starts the spinner before
-// JS runs, so handleRefresh must force it back to the JS value if the caller's onRefresh doesn't
+// index.ts's header comment). The controlled-value handshake is NO LONGER this class's: it lives
+// in `core/components/src/behaviors/refresh-control.ts` and is exercised there. What this file
+// still owns is that the wrapper reaches it — the template's `refresh-control` tag is what the
+// behavior attaches to, and the @Output() must fire from inside the behavior's own dispatcher.
+// `refreshing` is a controlled prop: native starts the spinner before JS runs, so the pull must
+// force it back to the JS value if the caller's handler doesn't
 // flip `refreshing` itself — the same controlled-native-spinner contract
 // scroll-view-projection.test.ts's "renders iOS RefreshControl before content and syncs the
 // controlled native spinner" case exercises through a ScrollView composition; this file proves
@@ -11,7 +13,12 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
+import {
+  clearGlobalStyles,
+  clearHostBehaviors,
+  registerRules,
+} from '@symbiote-native/engine';
+import { registerRefreshControlBehavior } from '@symbiote-native/components';
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -49,10 +56,14 @@ class RefreshControlHostFixture {
 beforeEach(() => {
   capturedHost = undefined;
   fabric.reset();
+  // `adapters/angular/src/render` does not import `../../register`, so the behavior has to be
+  // installed here — the same shape every other behavior-backed Angular test uses.
+  registerRefreshControlBehavior();
 });
 afterEach(() => {
   unmount(ROOT_TAG);
   clearGlobalStyles();
+  clearHostBehaviors();
 });
 
 // why: contract-accurate group name — nothing here throws. A pull gesture always resolves to an

@@ -65,7 +65,7 @@ export function DeepLinkingScreen() {
         <TextInput
           testID="deep-link-input"
           value={url()}
-          onValueChange={next => setUrl(next)}
+          onValueChange={event => setUrl(event.text)}
           placeholder="symbiotecanarysolid://details/42"
           placeholderTextColor={PLACEHOLDER_COLOR}
           autoCapitalize="none"

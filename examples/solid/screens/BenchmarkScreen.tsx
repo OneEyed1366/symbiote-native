@@ -37,7 +37,6 @@ import {
 } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -1083,7 +1082,7 @@ export function BenchmarkScreen() {
         <Show when={progress()}>
           {(running: Accessor<ISuiteProgress>) => (
             <View testID="bench-suite-progress" class="bench-progress">
-              <ActivityIndicator color={accent} />
+              <activity-indicator color={accent} />
               <Text class="bench-progress-text">
                 {`${running().mode === MOUNT_MODE.All ? 'All mounted' : 'Virtualized'} · ${running().label}`}
               </Text>

@@ -28,11 +28,14 @@ import {
 import { HOST_PRIMITIVES } from '../../host-primitives.cjs';
 
 import { descriptorFor } from '../component-names/index';
+import { registerButtonBehavior } from './button';
 import { registerImageBehavior } from './image';
 import { registerInputAccessoryViewBehavior } from './input-accessory-view';
 import { registerPressableBehavior } from './pressable';
+import { registerRefreshControlBehavior } from './refresh-control';
 import { registerSwitchBehavior } from './switch';
 import { registerTextInputBehavior } from './text-input';
+import { registerTouchableNativeFeedbackBehavior } from './touchable-native-feedback';
 
 const fabric = installFabric();
 
@@ -53,8 +56,11 @@ beforeEach(() => {
   registerPressableBehavior();
   registerTextInputBehavior();
   registerSwitchBehavior();
+  registerRefreshControlBehavior();
   registerImageBehavior();
   registerInputAccessoryViewBehavior();
+  registerTouchableNativeFeedbackBehavior();
+  registerButtonBehavior();
 });
 
 describe('every name a behavior owns is routable to its stash', () => {
@@ -78,8 +84,15 @@ describe('every name a behavior owns is routable to its stash', () => {
     // The harness has to be shown to be doing work: an empty `dead` list means the same thing as a
     // run that examined nothing, and the tag/name derivation is exactly where that could happen.
     expect({ dead, checked }).toEqual({ dead: [], checked });
-    // 15 pairs today: the press machine's 8, TextInput's 3 on each of its two tags, Switch's 1.
+    // 33 pairs today: the press machine's 8, TextInput's 3 on each of its two tags, Switch's 1,
+    // TouchableNativeFeedback's 10 (the same 8 plus `layout`/`accessibilityAction`, which it
+    // forwards through trampolines on the child), and Button's 8 — it composes the same machine.
     // Image and InputAccessoryView own no listeners — they are prop folds only.
+    //
+    // A behavior missing from the `beforeEach` above is SILENT here: its tag resolves to no
+    // behavior, the inner loop runs zero times, and `checked` simply does not grow. That is what
+    // `checked` is asserted for, and it is why a new `register*` belongs in that list on the day
+    // the primitive joins `HOST_PRIMITIVES`.
     expect(checked).toBeGreaterThan(0);
   });
 });

@@ -106,11 +106,15 @@ const calendars = useCalendars(); // Ref<Calendar[]>
 ```svelte
 <!-- Svelte -->
 <script lang="ts">
-  import { useLocales, useCalendars } from '@symbiote-native/localization/svelte';
+  import {
+    useLocales,
+    useCalendars,
+  } from '@symbiote-native/localization/svelte';
 
   const locales = useLocales(); // { readonly current: Locale[] }
   const calendars = useCalendars(); // { readonly current: Calendar[] }
 </script>
+
 <Text>{locales.current[0].languageTag}</Text>
 <Text>{calendars.current[0].timeZone}</Text>
 ```

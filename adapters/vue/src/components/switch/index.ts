@@ -4,4 +4,8 @@
 // state half (the reducer) into the Vue adapter: render-and-state, not render-only.
 
 export * from './index.ios';
-export type { ISwitchProps, ISwitchTrackColor } from './shared';
+export type {
+  ISwitchProps,
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from './shared';

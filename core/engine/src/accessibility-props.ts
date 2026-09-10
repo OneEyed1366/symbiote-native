@@ -57,7 +57,11 @@ const ROLE_TO_ACCESSIBILITY_ROLE: Readonly<Record<string, string>> = {
   toolbar: 'toolbar',
 };
 
-const ARIA_KEYS: readonly string[] = [
+// Exported so a behavior that folds a DIFFERENT node's bag can name them without restating the
+// list. `slotDerived` (host-behavior.ts) takes prop NAMES, so a primitive whose payload derives
+// from an owner's aria props has to enumerate them — and a second hand-written copy is exactly what
+// `.claude/rules/adapter-parity-audit.md` records going stale one member at a time.
+export const ARIA_ALIAS_KEYS: readonly string[] = [
   'role',
   'aria-label',
   'aria-labelledby',
@@ -78,8 +82,8 @@ const ARIA_KEYS: readonly string[] = [
 // An indexed loop rather than `.some(key => …)`: the callback captures `props`, so a closure is
 // allocated per call, and this is the gate on a path that runs once per node.
 function hasAnyAriaKey(props: Readonly<Record<string, unknown>>): boolean {
-  for (let index = 0; index < ARIA_KEYS.length; index += 1) {
-    if (props[ARIA_KEYS[index]] !== undefined) return true;
+  for (let index = 0; index < ARIA_ALIAS_KEYS.length; index += 1) {
+    if (props[ARIA_ALIAS_KEYS[index]] !== undefined) return true;
   }
   return false;
 }
@@ -137,8 +141,8 @@ export function foldAriaProps(
   const ariaValueNow = bag['aria-valuenow'];
   const ariaValueText = bag['aria-valuetext'];
 
-  for (let index = 0; index < ARIA_KEYS.length; index += 1) {
-    bag[ARIA_KEYS[index]] = undefined;
+  for (let index = 0; index < ARIA_ALIAS_KEYS.length; index += 1) {
+    bag[ARIA_ALIAS_KEYS[index]] = undefined;
   }
 
   // RULE ONE, for every scalar: the explicit prop WINS, the alias only fills a hole.

@@ -31,8 +31,6 @@
   // between siblings never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b), and
   // svelte.config.js's collapseTextWhitespace() folds a sentence wrapped across source lines.
   import {
-    ScrollView,
-    ActivityIndicator,
     Modal,
     FlatList,
     KeyboardAvoidingView,
@@ -55,6 +53,8 @@
     useWindowDimensions,
     useColorScheme,
     type ISymbioteEvent,
+    type ITextInputChangeEvent,
+    type ISwitchChangeEvent,
   } from '@symbiote-native/svelte';
   // A third-party native view via symbiote's own wrapper (not the library's React component); the
   // engine derives RNCSlider's events + tint processors from its ViewConfig. Same wrapper as React.
@@ -319,12 +319,14 @@
 </script>
 
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="canary-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
-    refreshControl={{ refreshing, onRefresh, tintColor: accent }}
   >
+    <!-- An ordinary CHILD, not a prop: the scroll behavior CLAIMS a `refresh-control` and places it
+      per platform — beside the content view on iOS, wrapping the scroll view on Android. -->
+    <refresh-control p={{ refreshing, onRefresh, tintColor: accent }} />
     <!-- JS->native: StatusBar renders nothing; it drives the OS status bar imperatively. -->
     <StatusBar
       barStyle={darkStatusBar ? 'dark-content' : 'light-content'}
@@ -440,7 +442,7 @@
     -->
     {#if refreshing}
       <view class="refresh-row">
-        <ActivityIndicator color={accent} />
+        <activity-indicator color={accent} />
         <text class="accent-note">Refreshing…</text>
       </view>
     {:else}
@@ -450,7 +452,7 @@
     {/if}<!-- View + press-to-increment -->
     <view
       testID="counter-card"
-      onPress={() => (count += 1)}
+      p={{ onPress: () => (count += 1) }}
       class="counter-card"
     >
       <text testID="counter-value" class="counter-text">
@@ -461,7 +463,7 @@
     <text-input
       testID="greeting-input"
       value={name}
-      onValueChange={(next: string) => (name = next)}
+      onValueChange={(event: ITextInputChangeEvent) => (name = event.text)}
       placeholder="type your name…"
       placeholderTextColor={PLACEHOLDER_COLOR}
       class="text-input"
@@ -475,11 +477,11 @@
       <switch
         testID="spinner-switch"
         value={spinning}
-        onValueChange={(next: boolean) => (spinning = next)}
+        onValueChange={(event: ISwitchChangeEvent) => (spinning = event.value)}
         trackColor={{ false: HAIRLINE, true: accent }}
       />
     </view>
-    <ActivityIndicator
+    <activity-indicator
       testID="spinner-indicator"
       animating={spinning}
       color={accent}
@@ -541,9 +543,11 @@
          which is what any app wanting to style a descendant has to do.
     -->
     <pressable
-      onPress={() => (count += 1)}
-      onPressIn={() => (cardPressed = true)}
-      onPressOut={() => (cardPressed = false)}
+      p={{
+        onPress: () => (count += 1),
+        onPressIn: () => (cardPressed = true),
+        onPressOut: () => (cardPressed = false),
+      }}
       class="pressable-card"
       style={({ pressed }: { pressed: boolean }) => ({
         backgroundColor: pressed ? SURFACE_PRESSED : SURFACE,
@@ -599,7 +603,7 @@
     <pressable
       hitSlop={{ top: 0, bottom: 40, left: 0, right: 0 }}
       pressRetentionOffset={{ top: 0, bottom: 80, left: 0, right: 0 }}
-      onPressMove={onRetentionMove}
+      p={{ onPressMove: onRetentionMove }}
       class="retention-card"
       style={({ pressed }: { pressed: boolean }) => ({
         backgroundColor: pressed ? accent : SURFACE,
@@ -611,7 +615,7 @@
     </pressable>
     <!-- maintainVisibleContentPosition. PASS: scroll down a bit, tap Prepend: the rows you are
          looking at DO NOT jump; new items appear above without shifting the viewport. FAIL: the
-         list jumps to the top. box-list160 is shared with the Animated.ScrollView below.
+         list jumps to the top. box-list160 is shared with the scroll-driven header demo below.
     -->
     <text class="section-label">MVCP · prepend without jump</text>
     <FlatList
@@ -660,9 +664,11 @@
       onPress={onToggleTextLines}
     />
     <!--
-      Animated.ScrollView scroll-driven header (native driver). PASS: drag INSIDE the box below
-      (not the page): the bright bar above SMOOTHLY fades to near-invisible and lifts, on the UI
-      thread (no jank, no per-frame JS). Proves Animated.ScrollView + Animated.event native attach.
+      Scroll-driven header on the native driver. PASS: drag INSIDE the box below (not the page):
+      the bright bar above SMOOTHLY fades to near-invisible and lifts, on the UI thread (no jank,
+      no per-frame JS). There is no `Animated.ScrollView` any more and nothing replaced it — a
+      native-driven `Animated.event` binds through `bindAnimatedEvent` on ANY host node, so the
+      bare tag below is the whole API.
     -->
     <view
       class="parity-header"
@@ -674,17 +680,17 @@
       <text class="parity-header-text">HEADER — fades as you scroll ↓</text>
     </view>
     <!-- box-list160 is shared with the MVCP FlatList above. -->
-    <Animated.ScrollView
+    <scroll-view
       class="box-list160"
       scrollEventThrottle={SCROLL_EVENT_THROTTLE_MS}
-      onScroll={onParityScroll}
+      p={{ onScroll: onParityScroll }}
     >
       {#each scrollRows as row (row)}
         <view class="scroll-demo-row">
           <text class="list-row-text">{`scroll me · row ${row}`}</text>
         </view>
       {/each}
-    </Animated.ScrollView>
+    </scroll-view>
     <text class="tiny-center">
       ↑ drag inside the box — the bar above reacts
     </text>
@@ -752,7 +758,7 @@
       <text class="switch-label">avoid keyboard</text>
       <switch
         value={kavEnabled}
-        onValueChange={(next: boolean) => (kavEnabled = next)}
+        onValueChange={(event: ISwitchChangeEvent) => (kavEnabled = event.value)}
         trackColor={{ false: HAIRLINE, true: accent }}
       />
     </view>
@@ -828,7 +834,7 @@
         {/snippet}
       </TunnelIn>
     {/if}
-  </ScrollView>
+  </scroll-view>
   <!-- The tunnel target: a persistent, empty View sitting above the scroll content.
        pointerEvents="box-none" lets touches pass through everywhere except an actual ported child
        (the toast card). -->

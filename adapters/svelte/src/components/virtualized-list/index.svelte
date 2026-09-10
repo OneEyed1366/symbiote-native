@@ -10,9 +10,10 @@
   // (`listState`), runs the returned EFFECTS with Svelte primitives, and renders the windowed slice
   // with `{#each plan.cells}` (Lists have no Descriptor render fn, per svelte-adapter-dom-shim §15).
   //
-  // This file authors the raw `scroll-view` intrinsic directly rather than rendering <ScrollView>:
-  // unlike ScrollView.svelte it walks an indexable `plan.cells` list instead of an opaque children
-  // Snippet, so it can mark sticky cells itself.
+  // This file authors the raw `scroll-view` intrinsic directly, and needs to: it walks an indexable
+  // `plan.cells` list rather than taking an opaque children Snippet, so it can mark sticky cells
+  // itself. (There is no ScrollView component to render instead — it was deleted 2026-09-10 and an
+  // app writes the tag too.)
   //
   // It does NOT author the CONTENT node. `registerScrollViewBehavior()` puts a `buildStructure` on
   // the scroll tags, and exactly one thing may build `RCTScrollContentView` — emitting one here as
@@ -74,7 +75,6 @@
     type ISymbioteNode,
   } from '@symbiote-native/engine';
   import type { ShimElement } from '../../dom-shim';
-  import RefreshControl from '../RefreshControl.svelte';
   import {
     pickAccessibilityProps,
     type IVirtualizedListProps as IProps,
@@ -602,7 +602,7 @@
              alongside the scroll tags, and its behavior finds this ScrollView by walking up. The
              collision point comes from the owner's DOCUMENT order, so nothing here computes or
              forwards an index. `onLayout` is forwarded by the behavior, not replaced. -->
-        <sticky-header onLayout={makeCellMeasure(cell.index)}>
+        <sticky-header p={{ onLayout: makeCellMeasure(cell.index) }}>
           {@render props.item({
             item: narrowed.getItem(narrowed.data, cell.index),
             index: cell.index,
@@ -670,7 +670,7 @@
   after it lands in the content node the behavior built.
 -->
   {#if refreshControlProps !== undefined}
-    <RefreshControl {...refreshControlProps} />
+    <refresh-control p={refreshControlProps} />
   {/if}
   {@render listBody()}
 {/snippet}

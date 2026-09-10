@@ -4,7 +4,11 @@
 
 import { createSwitch } from './shared';
 
-export type { ISwitchProps, ISwitchTrackColor } from './shared';
+export type {
+  ISwitchProps,
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from './shared';
 
 export const Switch = createSwitch({
   snapBackCommand: 'setNativeValue',

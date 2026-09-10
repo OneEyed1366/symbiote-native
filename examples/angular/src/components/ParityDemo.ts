@@ -1,7 +1,7 @@
 import { Component, ViewChild } from '@angular/core';
 import {
   AccessibilityInfo,
-  Button,
+  ButtonElement,
   FlatList,
   Keyboard,
   SectionList,
@@ -68,7 +68,7 @@ const paritySections: ISection<ISectionEntry>[] = [
   imports: [
     View,
     Text,
-    Button,
+    ButtonElement,
     TextInput,
     FlatList,
     SectionList,
@@ -102,12 +102,12 @@ const paritySections: ISection<ISectionEntry>[] = [
         class="focus-input"
       />
       <Text testID="dismiss-msg" class="note-text">{{ dismissMsg }}</Text>
-      <Button
+      <button
         testID="hide-keyboard-btn"
         title="Hide keyboard"
         (press)="hideKeyboard()"
         color="#dd0031"
-      ></Button>
+      ></button>
 
       <!-- animated VirtualizedList scroll: smooth vs instant -->
       <Text class="section-label">FlatList · animated scrollToOffset</Text>
@@ -126,20 +126,20 @@ const paritySections: ISection<ISectionEntry>[] = [
       </FlatList>
       <View class="row">
         <View class="flex-1">
-          <Button
+          <button
             testID="scroll-down-animated-btn"
             title="Scroll ▼ animated"
             (press)="scrollDown()"
             color="#dd0031"
-          ></Button>
+          ></button>
         </View>
         <View class="flex-1">
-          <Button
+          <button
             testID="scroll-top-btn"
             title="Top · instant"
             (press)="scrollTop()"
             color="#dd0031"
-          ></Button>
+          ></button>
         </View>
       </View>
 
@@ -165,12 +165,12 @@ const paritySections: ISection<ISectionEntry>[] = [
       </SectionList>
 
       <!-- a11y focus: node-based sendAccessibilityEvent routes through the Fabric slot on both platforms -->
-      <Button
+      <button
         testID="focus-title-btn"
         title="Focus the panel title (a11y)"
         (press)="focusTitle()"
         color="#dd0031"
-      ></Button>
+      ></button>
     </View>
   `,
 })

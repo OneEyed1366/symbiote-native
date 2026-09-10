@@ -6,7 +6,7 @@ import {
   inject,
 } from '@angular/core';
 import {
-  Button,
+  ButtonElement,
   I18nManager,
   Image,
   Settings,
@@ -29,7 +29,7 @@ const TAP_KEY = 'symbiote.tapCount';
 @Component({
   selector: 'NativeModulesDemo',
   standalone: true,
-  imports: [View, Text, Button, Image],
+  imports: [View, Text, ButtonElement, Image],
   template: `
     <View class="section-nested">
       <Text class="section-label"
@@ -41,24 +41,24 @@ const TAP_KEY = 'symbiote.tapCount';
           ' · swap L/R: ' +
           (rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no')
       }}</Text>
-      <Button
+      <button
         testID="force-rtl-btn"
         [title]="
           rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'
         "
         (press)="onForceRtl()"
         color="#dd0031"
-      ></Button>
+      ></button>
 
       <Text testID="persist-count" class="info-text">{{
         'persisted taps: ' + persisted + ' · survives relaunch'
       }}</Text>
-      <Button
+      <button
         testID="persist-btn"
         title="Persist a tap"
         (press)="persistTap()"
         color="#dd0031"
-      ></Button>
+      ></button>
 
       <View class="row-align-center">
         <Image [source]="{ uri: LOGO_URI }" class="logo-thumb" />
@@ -69,12 +69,12 @@ const TAP_KEY = 'symbiote.tapCount';
       <Text testID="cache-state" class="info-text">{{
         'prefetch cache: ' + cacheState
       }}</Text>
-      <Button
+      <button
         testID="prefetch-btn"
         title="Prefetch logo"
         (press)="prefetchLogo()"
         color="#dd0031"
-      ></Button>
+      ></button>
     </View>
   `,
 })

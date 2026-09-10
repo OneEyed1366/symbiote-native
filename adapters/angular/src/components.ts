@@ -4,8 +4,10 @@
 // real Angular input so RN `StyleProp` arrays/objects are flattened and forwarded through the
 // custom renderer, instead of being misinterpreted by Angular's CSS style engine.
 
-export { ActivityIndicator } from './components/activity-indicator';
-export type { IActivityIndicatorProps } from './components/activity-indicator';
+// `ActivityIndicator` is a TAG — `<activity-indicator>`, matched by `ActivityIndicatorElement` — and there is nothing to import in its
+// place. RN's ActivityIndicator has no statics, so the name exports nothing at all now; the prop
+// type stays, for a component forwarding a bag.
+export type { IActivityIndicatorProps } from './components/activity-indicator-props';
 export { Image, setImageSourceResolver } from './components/image';
 export { InputAccessoryView } from './components/input-accessory-view';
 export type { IAngularInputAccessoryViewProps } from './components/input-accessory-view';
@@ -30,9 +32,15 @@ export type { IAngularPressableProps } from './components/pressable';
 export { SafeAreaView } from './components/safe-area-view';
 export type { IAngularSafeAreaViewProps } from './components/safe-area-view';
 export { Switch } from './components/switch';
-export type { ISwitchProps, ISwitchTrackColor } from './components/switch';
-export { ImageBackground } from './components/image-background';
-export type { IAngularImageBackgroundProps } from './components/image-background';
+export type {
+  ISwitchProps,
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from './components/switch';
+// `ImageBackground` is a TAG — `<image-background>`, matched by `ImageBackgroundElement` in
+// `elements.ts` — and there is nothing to import in its place. The prop type stays, for a
+// component forwarding a bag and for that directive's own input types.
+export type { IAngularImageBackgroundProps } from './components/image-background-props';
 export { KeyboardAvoidingView } from './components/keyboard-avoiding-view';
 export type {
   IAngularKeyboardAvoidingViewProps,
@@ -48,32 +56,40 @@ export type {
   ISubmitBehavior,
   ITextInputHandle,
   ITextInputSelection,
+  ITextInputChangeEvent,
 } from './components/text-input';
-export { TouchableNativeFeedback } from './components/touchable-native-feedback';
+// `TouchableNativeFeedback` is now RN's STATIC NAMESPACE, not a component: the element is the tag
+// `<touchable-native-feedback>`, matched by `TouchableNativeFeedbackElement` (../elements), which
+// commits no node of its own and clones onto its single child. `.Ripple(…)` /
+// `.SelectableBackground(…)` are unchanged; an app's `imports: [TouchableNativeFeedback]` becomes
+// `imports: [TouchableNativeFeedbackElement]`.
+export { TouchableNativeFeedback } from '@symbiote-native/components';
 export type {
-  IAngularTouchableNativeFeedbackProps,
   INativeFeedbackBackground,
   IRippleBackground,
   IThemeAttrBackground,
-} from './components/touchable-native-feedback';
-export {
-  TouchableHighlight,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-} from './components/touchable';
+} from '@symbiote-native/components';
+export type { IAngularTouchableNativeFeedbackProps } from './components/touchable-native-feedback/touchable-native-feedback-props';
+export { TouchableHighlight, TouchableOpacity } from './components/touchable';
 export type {
   IAngularTouchableHighlightProps,
   IAngularTouchableOpacityProps,
-  IAngularTouchableWithoutFeedbackProps,
 } from './components/touchable';
+// `TouchableWithoutFeedback` is a TAG — `<touchable-without-feedback>`, matched by
+// `TouchableWithoutFeedbackElement` (../elements) — and RN gives it no statics, so like `Button` the
+// name exports nothing now; an app's `imports: [TouchableWithoutFeedback]` becomes
+// `imports: [TouchableWithoutFeedbackElement]`. Only the prop type stays.
+export type { IAngularTouchableWithoutFeedbackProps } from './components/touchable-without-feedback/touchable-without-feedback-props';
 export { ScrollView, ScrollViewStickyHeader } from './components/scroll-view';
 export type {
   IAngularScrollViewProps,
   IScrollViewHandle,
   IStickyHeaderComponentType,
 } from './components/scroll-view';
-export { Button } from './components/button';
-export type { IButtonProps } from './components/button';
+// `Button` is a TAG — `<button>`, matched by `ButtonElement` — and there is nothing to import in
+// its place. RN's Button has no statics, so the name exports nothing at all now; the prop type
+// stays, for a component forwarding a bag.
+export type { IButtonProps } from './components/button-props';
 export {
   VirtualizedList,
   VListEmptyDirective,

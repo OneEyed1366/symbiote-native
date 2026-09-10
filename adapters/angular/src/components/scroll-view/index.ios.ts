@@ -57,9 +57,8 @@ export type { IAngularScrollViewProps, IScrollViewHandle } from './shared';
     <scroll-view #host="symbioteHost" [symbioteHostProps]="scrollProps()">
       @if (hasProjectedRefreshControl) {
         <refresh-control
-          #refreshHost="symbioteHost"
           [symbioteHostProps]="iosRefreshControlProps"
-          (refresh)="handleProjectedRefresh(refreshHost.node)"
+          (refresh)="handleProjectedRefresh()"
         ></refresh-control>
       }
       <scroll-content

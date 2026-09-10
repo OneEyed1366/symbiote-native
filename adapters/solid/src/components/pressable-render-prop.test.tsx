@@ -23,8 +23,11 @@ import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// SIDE-EFFECT IMPORT: the alternating sibling below is the `activity-indicator` TAG, and its
+// spinner exists only because the behavior built it. An app reaches this through the package
+// barrel; a test importing the renderer directly does not.
+import '../register';
 import { mount, unmount } from '../render';
-import { ActivityIndicator } from './activity-indicator';
 import { Pressable } from './pressable';
 import { Text } from './text';
 
@@ -32,7 +35,7 @@ const ROOT_TAG = 815;
 const TARGET = 'render-prop-target';
 const TOUCH_START = 'topTouchStart';
 const TOUCH_END = 'topTouchEnd';
-// The native view name the iOS-resolved ActivityIndicator paints its spinner as.
+// The native view name the iOS-resolved `activity-indicator` builds its spinner as.
 const SPINNER_VIEW = 'ActivityIndicatorView';
 
 const fabric = installFabric();
@@ -216,7 +219,7 @@ describe('Pressable with a function child, across repeated press cycles', () => 
         {state => (
           <>
             <Text>{state().pressed ? 'down' : 'up'}</Text>
-            {busy() ? <ActivityIndicator /> : <Text>off</Text>}
+            {busy() ? <activity-indicator /> : <Text>off</Text>}
           </>
         )}
       </Pressable>
@@ -279,7 +282,7 @@ describe('Pressable with a function child, across repeated press cycles', () => 
         {state => (
           <>
             <Text>{state().pressed ? 'down' : 'up'}</Text>
-            {busy() ? <ActivityIndicator /> : <Text>off</Text>}
+            {busy() ? <activity-indicator /> : <Text>off</Text>}
           </>
         )}
       </Pressable>

@@ -60,16 +60,9 @@ if (globalThis.navigator === undefined) {
 }
 
 const ROOT_TAG = 91_101;
-// index.svelte statically imports the REAL RefreshControl.svelte (gap 2's RefreshControl wiring —
-// see index.svelte's header comment). No `.svelte`-aware loader is wired into this repo's Vitest
-// (scroll-view.smoke.test.ts's own header comment first established this), so RefreshControl must
-// ALSO be pre-compiled to a co-located sibling `.mjs`, with the compiled VirtualizedList's import
-// specifier rewritten to point at it.
-const COMPONENTS_DIR = join(__dirname, '..');
-const REFRESH_CONTROL_OUT = join(
-  COMPONENTS_DIR,
-  '.smoke-compiled-refresh-control-for-virtualized-list.mjs',
-);
+// `refreshControlProps` renders a bare `<refresh-control>` TAG now (deleted 2026-09-10 — see
+// scroll-view.smoke.test.ts's equivalent note), so index.svelte needs no sibling component
+// pre-compiled and no import specifier rewritten.
 const LIST_OUT = join(__dirname, '.smoke-compiled-virtualized-list.mjs');
 const ROOT_OUT = join(__dirname, '.smoke-compiled-list-root.mjs');
 const REFRESH_ROOT_OUT = join(__dirname, '.smoke-compiled-refresh-root.mjs');
@@ -88,7 +81,6 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(REFRESH_CONTROL_OUT, { force: true });
   rmSync(LIST_OUT, { force: true });
   rmSync(ROOT_OUT, { force: true });
   rmSync(REFRESH_ROOT_OUT, { force: true });
@@ -114,31 +106,16 @@ function compileToFile(
 const ITEM_COUNT = 100;
 const DEFAULT_INITIAL_NUM_TO_RENDER = 10;
 
-function compileVirtualizedListWithRefreshControl(): void {
-  const refreshControlSource = readFileSync(
-    join(COMPONENTS_DIR, 'RefreshControl.svelte'),
-    'utf8',
-  );
+function compileVirtualizedList(): void {
   compileToFile(
-    refreshControlSource,
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
+    readFileSync(join(__dirname, 'index.svelte'), 'utf8'),
+    'VirtualizedList.svelte',
+    LIST_OUT,
   );
-
-  const listSource = readFileSync(join(__dirname, 'index.svelte'), 'utf8');
-  const result = compile(listSource, {
-    ...COMPILE_OPTIONS,
-    filename: 'VirtualizedList.svelte',
-  });
-  const rewritten = result.js.code.replace(
-    "from '../RefreshControl.svelte'",
-    "from '../.smoke-compiled-refresh-control-for-virtualized-list.mjs'",
-  );
-  writeFileSync(LIST_OUT, rewritten);
 }
 
 async function loadMountable(): Promise<Component> {
-  compileVirtualizedListWithRefreshControl();
+  compileVirtualizedList();
 
   // A root that hands VirtualizedList a 100-item array and an empty cell snippet — the cell
   // WRAPPER view VirtualizedList itself creates around each cell is what the assertion
@@ -179,7 +156,7 @@ async function loadMountableWithSeparator(
   rows: number,
   windowSize: number,
 ): Promise<Component> {
-  compileVirtualizedListWithRefreshControl();
+  compileVirtualizedList();
   compileToFile(
     `<script>
        import VirtualizedList from './.smoke-compiled-virtualized-list.mjs';
@@ -217,7 +194,7 @@ async function loadMountableWithSeparator(
 // `window.__listHandle` via `bind:this`, same pattern scroll-view.smoke.test.ts uses to drive
 // ScrollView's own handle from outside the compiled tree.
 async function loadMountableWithHandle(): Promise<Component> {
-  compileVirtualizedListWithRefreshControl();
+  compileVirtualizedList();
   compileToFile(
     `<script>
        import VirtualizedList from './.smoke-compiled-virtualized-list.mjs';
@@ -282,8 +259,9 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       expect(scrollView).toBeDefined();
       // Android nested-scroll gesture arbitration: without this, a FlatList/SectionList nested
       // inside a page ScrollView never gets its own scroll gesture — only the outer page scrolls.
-      // ScrollView.svelte defaults this on; this file hand-rolls the raw intrinsic instead of
-      // rendering <ScrollView>, so it must default it itself too.
+      // Defaulted by the scroll tag's own behavior (`ownerFold`), not by this list — so what this
+      // pins is that hand-authoring the intrinsic still gets the fold, exactly as an app's own
+      // `<scroll-view>` does.
       expect(scrollView?.props.nestedScrollEnabled).toBe(true);
     });
 
@@ -323,10 +301,10 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
     });
 
     // why: VirtualizedList hand-rolls its own scroll-view host node (unlike FlatList, which just
-    // forwards) — accessibility props and RefreshControl composition are its OWN wiring
+    // forwards) — accessibility props and refresh-control composition are its OWN wiring
     // responsibility here, not inherited "for free" from a wrapped <ScrollView>.
-    it('forwards testID and wires a real RefreshControl (gaps 1 and 2)', async () => {
-      compileVirtualizedListWithRefreshControl();
+    it('forwards testID and wires a real refresh-control (gaps 1 and 2)', async () => {
+      compileVirtualizedList();
       compileToFile(
         `<script>
          import VirtualizedList from './.smoke-compiled-virtualized-list.mjs';
@@ -368,7 +346,7 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       ).toBeDefined();
       expect(scrollView?.viewName).toBe('RCTScrollView');
 
-      // Gap 2: onRefresh/refreshing produce a REAL RefreshControl (PullToRefreshView) as a sibling
+      // Gap 2: onRefresh/refreshing produce a REAL refresh-control (PullToRefreshView) as a sibling
       // of the content container inside the scroll view (iOS sibling attachment) — not an inert prop.
       const refresh = findLive(
         fabric.appRoot(),
@@ -376,7 +354,7 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       );
       expect(
         refresh,
-        'a real RefreshControl.svelte painted PullToRefreshView',
+        'refresh-control painted PullToRefreshView',
       ).toBeDefined();
       expect(refresh?.props.refreshing).toBe(true);
       expect(
@@ -390,7 +368,7 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
     // on the native scroll view, which honors `stickyHeaderIndices` only by numbering its own paint
     // children — a numbering a windowed list cannot supply, which is why the tag exists.
     it('marks a stickyHeaderIndices-flagged windowed cell with the sticky-header tag', async () => {
-      compileVirtualizedListWithRefreshControl();
+      compileVirtualizedList();
       compileToFile(
         `<script>
          import VirtualizedList from './.smoke-compiled-virtualized-list.mjs';

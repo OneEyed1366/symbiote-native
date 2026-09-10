@@ -173,8 +173,7 @@ function ClipboardScreen() {
     if (clipboardEvent() !== null) refresh();
   });
 
-  const handleCopy = (input: string) =>
-    setStringAsync(input).then(refresh);
+  const handleCopy = (input: string) => setStringAsync(input).then(refresh);
 
   return <Text>{text()}</Text>;
 }

@@ -6,7 +6,7 @@ import {
   inject,
 } from '@angular/core';
 import {
-  ActivityIndicator,
+  ActivityIndicatorElement,
   Alert,
   ActionSheetIOS,
   Animated,
@@ -16,7 +16,7 @@ import {
   ColorSchemeService,
   FlatList,
   Image,
-  ImageBackground,
+  ImageBackgroundElement,
   KEYBOARD_EVENT,
   Keyboard,
   KeyboardAvoidingView,
@@ -98,7 +98,7 @@ const overlayTunnel = createTunnel();
   imports: [
     AccessibilityDemo,
     ActionButton,
-    ActivityIndicator,
+    ActivityIndicatorElement,
     AnimatedDemo,
     AnimatedParityDemo,
     CompoundClassDemo,
@@ -106,7 +106,7 @@ const overlayTunnel = createTunnel();
     AnimatedView,
     FlatList,
     Image,
-    ImageBackground,
+    ImageBackgroundElement,
     KeyboardAvoidingView,
     Modal,
     NativeModulesDemo,
@@ -293,22 +293,22 @@ const overlayTunnel = createTunnel();
             thumbColor="#ffffff"
           />
         </View>
-        <ActivityIndicator
+        <activity-indicator
           testID="angular-spinner-indicator"
           [animating]="spinning"
           color="#dd0031"
           size="large"
-        />
+        ></activity-indicator>
 
         <View testID="angular-native-row" class="native-row">
-          <ActivityIndicator
+          <activity-indicator
             testID="angular-small-spinner"
             [animating]="true"
             color="#dd0031"
             size="small"
             [hidesWhenStopped]="true"
             class="spinner"
-          />
+          ></activity-indicator>
           <Text class="native-row-text">
             host intrinsics exported from @symbiote-native/angular
           </Text>
@@ -603,7 +603,7 @@ const overlayTunnel = createTunnel();
           </View>
         }
 
-        <ImageBackground
+        <image-background
           testID="angular-image-bg"
           [src]="angularLogoUri"
           alt="Angular image background"
@@ -614,7 +614,7 @@ const overlayTunnel = createTunnel();
           <Text testID="angular-image-bg-label" class="image-background-label">
             Angular children paint on top of the image
           </Text>
-        </ImageBackground>
+        </image-background>
       </ScrollView>
 
       <!-- The portal target: a persistent, empty View sitting above the scroll content.

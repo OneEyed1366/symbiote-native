@@ -180,10 +180,10 @@ describe('Solid TextInput on the engine', () => {
       mount(ROOT_TAG, () => (
         <TextInput
           value={value()}
-          onValueChange={(text, event: ISymbioteEvent) => {
-            seen = text;
+          onValueChange={event => {
+            seen = event.text;
             rawCount = event.nativeEvent.eventCount;
-            setValue(text);
+            setValue(event.text);
           }}
         />
       ));
@@ -247,7 +247,10 @@ describe('Solid TextInput on the engine', () => {
     it('issues no command when the handler accepts the change', async () => {
       const [value, setValue] = createSignal('a');
       mount(ROOT_TAG, () => (
-        <TextInput value={value()} onValueChange={setValue} />
+        <TextInput
+          value={value()}
+          onValueChange={event => setValue(event.text)}
+        />
       ));
       await tick();
 

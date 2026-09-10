@@ -14,6 +14,12 @@ import {
 
 export interface IRefreshControlProps extends IAccessibilityProps, IAriaProps {
   refreshing: boolean;
+  // `id` — RN's W3C-named alias for `nativeID`, folded by the spec entry's ID_ALIAS. Upstream's
+  // RefreshControl spreads `...ViewProps` (RefreshControl.js:70), so RN accepts it and none of our
+  // five wrappers did. Declared on all five in the same change as the alias: the alias without the
+  // prop folds a key nobody can pass, and the prop without the alias sends a raw `id` to a view
+  // whose ViewConfig declares no such key.
+  id?: string;
   // RN's onRefresh is `() => void | Promise<void>`, the handler may be async; the
   // promise is fire-and-forget (native already starts refreshing on the gesture).
   onRefresh?: () => void | Promise<void>;

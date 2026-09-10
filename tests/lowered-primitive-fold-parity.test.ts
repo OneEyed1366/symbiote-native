@@ -108,6 +108,16 @@ interface ILoweredPrimitive {
   readonly wrapperOnly: Readonly<Record<string, string>>;
 }
 
+// A primitive with NO wrapper left on ANY adapter cannot appear here, and that is not a coverage
+// gap to file: the comparison is wrapper-against-behavior, so with zero wrappers there is nothing
+// to compare and `wrapperPathFor` correctly returns nothing for all five. `TouchableNativeFeedback`
+// and `Button` are both in that state as of 2026-09-09; their fold coverage is the committed
+// payload asserted in `core/components/src/behaviors/<name>.test.ts` plus each adapter's own
+// `src/<name>-tag.test.*`, which is a STRONGER oracle than the import proxy below.
+//
+// Their type-only `components/<name>-props.ts` files do not trip the locator — it matches the stem
+// `<name>`, not `<name>-props` — which is the "a locator miss reads as agreement" hazard this
+// file's own header warns about, checked rather than assumed.
 const LOWERED: Readonly<Record<string, ILoweredPrimitive>> = {
   Pressable: {
     behavior: 'core/components/src/behaviors/pressable.ts',

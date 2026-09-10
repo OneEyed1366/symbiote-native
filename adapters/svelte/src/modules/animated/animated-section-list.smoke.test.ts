@@ -37,10 +37,6 @@ globalThis.nativeModuleProxy = undefined;
 
 const ROOT_TAG = 91_108;
 const COMPONENTS_DIR = join(__dirname, '..', '..', 'components');
-const REFRESH_CONTROL_OUT = join(
-  COMPONENTS_DIR,
-  '.smoke-compiled-refresh-control-for-animated-section-list.mjs',
-);
 const VIRTUALIZED_LIST_OUT = join(
   COMPONENTS_DIR,
   'virtualized-list',
@@ -72,7 +68,6 @@ beforeEach(() => {
 afterEach(() => {
   unmount(ROOT_TAG);
   for (const out of [
-    REFRESH_CONTROL_OUT,
     VIRTUALIZED_LIST_OUT,
     VIRTUALIZED_SECTION_LIST_OUT,
     SECTION_LIST_OUT,
@@ -134,20 +129,12 @@ function liveScrollView(): IFakeNode {
 
 function compileChain(): void {
   compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8'),
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
-  );
-  compileRewritten(
-    join(COMPONENTS_DIR, 'virtualized-list', 'index.svelte'),
+    readFileSync(
+      join(COMPONENTS_DIR, 'virtualized-list', 'index.svelte'),
+      'utf8',
+    ),
     'VirtualizedList.svelte',
     VIRTUALIZED_LIST_OUT,
-    [
-      [
-        "from '../RefreshControl.svelte'",
-        "from '../.smoke-compiled-refresh-control-for-animated-section-list.mjs'",
-      ],
-    ],
   );
   compileRewritten(
     join(COMPONENTS_DIR, 'virtualized-section-list', 'index.svelte'),

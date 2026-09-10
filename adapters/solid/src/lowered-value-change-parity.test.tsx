@@ -57,7 +57,8 @@ describe('lowered vs component TextInput: onValueChange', () => {
     type('ab', 1);
 
     expect(seen).toHaveBeenCalledTimes(1);
-    expect(seen.mock.calls[0][0]).toBe('ab');
+    // ONE argument, the event, with `text` carried on it — not `(text, event)`.
+    expect(seen.mock.calls[0][0]).toMatchObject({ text: 'ab' });
   });
 
   // The control. Without it a green row above cannot tell "the lowered path works" from "this
@@ -71,7 +72,7 @@ describe('lowered vs component TextInput: onValueChange', () => {
     type('ab', 1);
 
     expect(seen).toHaveBeenCalledTimes(1);
-    expect(seen.mock.calls[0][0]).toBe('ab');
+    expect(seen.mock.calls[0][0]).toMatchObject({ text: 'ab' });
   });
 
   // The canary's own shape, end to end: the callback drives a signal and a sibling reads it. This
@@ -80,7 +81,7 @@ describe('lowered vs component TextInput: onValueChange', () => {
   it('a lowered input drives a derived signal, as the canary does', async () => {
     const [name, setName] = createSignal('');
     mount(ROOT_TAG, () => (
-      <text-input value={name()} onValueChange={setName} />
+      <text-input value={name()} onValueChange={event => setName(event.text)} />
     ));
     await tick();
 

@@ -299,17 +299,13 @@
                   testID: 'sliderTrackMark-thumbImage',
                 }}
               >
-                <image
-                  p={{ source: thumbImage, style: THUMB_IMAGE_STYLE }}
-                />
+                <image p={{ source: thumbImage, style: THUMB_IMAGE_STYLE }} />
               </view>
             {/if}
           </view>
           {#if renderStepNumber}
             <view p={{ style: STEP_NUMBER_CONTAINER_STYLE }}>
-              <text
-                p={{ testID: `${index}th-step`, style: { fontSize } }}
-              >
+              <text p={{ testID: `${index}th-step`, style: { fontSize } }}>
                 {String(optionValue)}
               </text>
             </view>

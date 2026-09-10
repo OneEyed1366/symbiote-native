@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import {
-  ActivityIndicator,
+  ActivityIndicatorElement,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -677,7 +677,7 @@ export class StickySectionListBlock {
   standalone: true,
   imports: [
     ActionButton,
-    ActivityIndicator,
+    ActivityIndicatorElement,
     BenchmarkRow,
     FlatList,
     JsFrameRateMeter,
@@ -752,7 +752,7 @@ export class StickySectionListBlock {
 
         @if (progress() !== undefined) {
           <View testID="bench-suite-progress" class="bench-progress">
-            <ActivityIndicator [color]="accent" />
+            <activity-indicator [color]="accent"></activity-indicator>
             <Text class="bench-progress-text">{{ progressLine() }}</Text>
             <Text class="bench-progress-count">{{ progressCount() }}</Text>
           </View>

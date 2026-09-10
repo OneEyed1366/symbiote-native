@@ -11,6 +11,13 @@
 // `refreshing` is a controlled prop: the parent owns it and pushes it down each commit; native
 // reports the gesture via the direct `topRefresh` event, which the engine routes to the host's
 // `refresh` listener (Angular blocks [onX] property bindings; events flow through (event) only).
+//
+// THE CONTROLLED HANDSHAKE IS NOT HERE ANY MORE. This component used to carry its own
+// `lastNativeRefreshing` mirror and dispatch `setNativeRefreshing` when the app's value disagreed —
+// alone among the five adapters, so the other four silently spun forever on a no-op handler. It now
+// lives in `core/components/src/behaviors/refresh-control.ts`, attached to the `refresh-control`
+// tag this template renders, which gives every adapter the same correction. Keeping a copy here
+// would put TWO owners on one node and dispatch the command twice per rejected pull.
 
 import {
   CUSTOM_ELEMENTS_SCHEMA,
@@ -23,8 +30,6 @@ import {
   Input,
   Output,
   signal,
-  ViewChild,
-  type AfterViewInit,
   type DoCheck,
   type OnChanges,
   type OnInit,
@@ -37,10 +42,8 @@ import {
   type IAriaProps,
 } from '@symbiote-native/components';
 import {
-  dispatchViewCommand,
   dlog,
   isSymbioteEvent,
-  isSymbioteNode,
   type IStyleProp,
   type ISymbioteEvent,
   type IViewStyle,
@@ -63,6 +66,9 @@ type IHostProps = Record<string, unknown>;
 export interface IAngularRefreshControlProps
   extends IAccessibilityProps, IAriaProps {
   refreshing: boolean;
+  // `id` — RN's W3C alias for `nativeID`, folded by the spec entry's ID_ALIAS. See React's
+  // declaration for why the prop and the alias land together.
+  id?: string;
   // RN's onRefresh is `() => void | Promise<void>`, the handler may be async; the promise is
   // fire-and-forget (native already starts refreshing on the gesture).
   onRefresh?: () => void | Promise<void>;
@@ -106,7 +112,6 @@ export type IAngularRefreshControlInputs = Omit<
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <refresh-control
-      #host
       [symbioteHostProps]="hostProps()"
       (refresh)="handleRefresh()"
     >
@@ -115,12 +120,7 @@ export type IAngularRefreshControlInputs = Omit<
   `,
 })
 export class RefreshControl
-  implements
-    IAngularRefreshControlInputs,
-    OnInit,
-    OnChanges,
-    DoCheck,
-    AfterViewInit
+  implements IAngularRefreshControlInputs, OnInit, OnChanges, DoCheck
 {
   // Controlled prop the parent owns; required to match the React reference surface.
   @Input({ required: true }) refreshing!: boolean;
@@ -138,6 +138,7 @@ export class RefreshControl
   @Input() style?: IStyleProp<IViewStyle>;
   @Input() testID?: string;
   @Input() nativeID?: string;
+  @Input() id?: string;
   @Input() accessible?: boolean;
   @Input() accessibilityLabel?: string;
   @Input() accessibilityHint?: string;
@@ -178,17 +179,10 @@ export class RefreshControl
   @Input('aria-valuenow') ariaValueNow?: number;
   @Input('aria-valuetext') ariaValueText?: string;
 
-  // The inner refresh-control primitive — NOT this component's own anchor host. Used for
-  // the imperative dispatchViewCommand calls below.
-  @ViewChild('host') private host?: RefreshControlHost;
-
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
   // onto (see anchorHostStyle's doc comment) — distinct from `host` above, which targets the real
   // inner `refresh-control` primitive one level down.
   private readonly elementRef = inject(ElementRef);
-
-  private lastNativeRefreshing = false;
-  private refreshNativeNode: unknown;
 
   // Bridges the non-reactive @Input fields `hostProps` reads into the reactive graph, so it can
   // memoize. Plain fields read inside a computed() are UNTRACKED - something must signal "a
@@ -196,9 +190,15 @@ export class RefreshControl
   // is visible only to the AOT compiler and this package's unit suite runs on JIT (see the
   // `angular-adapter-change-detection` skill, §6); `signal()`/`computed()` are plain runtime APIs.
   // Safe here because `refreshing` is a CONTROLLED @Input - the parent owns it, nothing in this
-  // class assigns it. The internal `lastNativeRefreshing` / `refreshNativeNode` fields drive the
-  // native handshake only; neither is read by the bag, so neither may bump this.
-  private readonly hostPropsRevision = signal(0);
+  // class assigns it.
+  //
+  // PUBLIC because ScrollView projects this component rather than rendering its template: it reads
+  // these same plain fields off the instance to build its own `refresh-control`, and a plain field
+  // read registers no dependency, so its view was never dirtied when `refreshing` moved. Reading
+  // this signal there is what makes a projected control's inputs reach the node at all — the
+  // ScrollView's own comment predicted the need ("giving RefreshControl its own revision signal to
+  // read here") and the gap was invisible while the wrapper corrected native imperatively.
+  readonly hostPropsRevision = signal(0);
   // What the anchor's class-derived style was when the bag was last built (identity, not value).
   private lastAnchorStyle: unknown;
 
@@ -210,40 +210,16 @@ export class RefreshControl
     if (this.refresh.observed) dlog('RefreshControl refresh listener wired');
   }
 
-  ngAfterViewInit(): void {
-    this.lastNativeRefreshing = this.refreshing;
-  }
-
-  ngOnChanges(changes: SimpleChanges): void {
-    // Before the `refreshing`-only early-return below: this is the single moment Angular has
-    // finished writing every changed @Input, and `hostProps` depends on the whole input surface.
+  ngOnChanges(_changes: SimpleChanges): void {
+    // The single moment Angular has finished writing every changed @Input, and `hostProps` depends
+    // on the whole input surface.
     this.hostPropsRevision.update(revision => revision + 1);
-    const refreshing = changes.refreshing;
-    if (refreshing === undefined) return;
-    if (refreshing.firstChange) {
-      this.lastNativeRefreshing = this.refreshing;
-      return;
-    }
-    this.syncNativeRefreshing(
-      this.refreshNativeNode ?? this.host?.nativeElement,
-    );
   }
 
-  // Native starts the spinner before JS runs. Mirror RN's RefreshControl controlled-component
-  // handshake: remember that native is refreshing, call the user's callback, then after Angular has
-  // had a chance to propagate `[refreshing]`, force native back to the JS value if it stayed false.
-  handleRefresh(nativeNode: unknown = this.host?.nativeElement): void {
-    this.refreshNativeNode = nativeNode;
-    this.lastNativeRefreshing = true;
+  // Just the @Output(). The engine's behavior owns the mirror and the corrective command; it calls
+  // this listener from its own `refresh` dispatcher, so the emit still runs before the check.
+  handleRefresh(): void {
     this.refresh.emit();
-    queueMicrotask(() => this.syncNativeRefreshing(nativeNode));
-  }
-
-  private syncNativeRefreshing(nativeNode: unknown): void {
-    if (this.refreshing === this.lastNativeRefreshing) return;
-    if (!isSymbioteNode(nativeNode)) return;
-    dispatchViewCommand(nativeNode, 'setNativeRefreshing', [this.refreshing]);
-    this.lastNativeRefreshing = this.refreshing;
   }
 
   // Forward an engine event to the matching @Output(), narrowing the template's untyped $event
@@ -297,6 +273,7 @@ export class RefreshControl
       style: [anchorHostStyle(this.elementRef), this.style],
       testID: this.testID,
       nativeID: this.nativeID,
+      id: this.id,
       accessible: this.accessible,
       ...this.folded,
       onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),

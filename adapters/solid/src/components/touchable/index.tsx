@@ -32,6 +32,7 @@ import {
   createTouchableFeedbackHandlers,
   createTouchableFeedbackRuntime,
   hasTouchablePressHandler,
+  resolveTouchableFocusable,
   resolveHighlightExtraStyles,
   restingOpacityFromStyle,
   DEFAULT_ACTIVE_OPACITY,
@@ -206,6 +207,11 @@ export function TouchableOpacity(props: ITouchableOpacityProps): JSX.Element {
   return (
     <Pressable
       {...rest}
+      focusable={resolveTouchableFocusable(
+        rest.focusable,
+        rest.onPress !== undefined,
+        rest.disabled,
+      )}
       onPressIn={handlers().handlePressIn}
       onPressOut={handlers().handlePressOut}
     >
@@ -319,6 +325,13 @@ export function TouchableHighlight(
     <Pressable
       {...rest}
       style={containerStyle()}
+      // TouchableHighlight.js:370-374, off the APP's onPress — `handlePress` below is always
+      // defined, so resolving inside Pressable could never produce false.
+      focusable={resolveTouchableFocusable(
+        rest.focusable,
+        local.onPress !== undefined,
+        rest.disabled,
+      )}
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -328,57 +341,8 @@ export function TouchableHighlight(
   );
 }
 
-export type ITouchableWithoutFeedbackProps = ITouchableBaseProps;
-
-const TOUCHABLE_WITHOUT_FEEDBACK_HANDLED = [
-  'children',
-  'onPressIn',
-  'onPressOut',
-  'delayPressIn',
-  'delayPressOut',
-  'minPressDuration',
-] as const;
-
-export function TouchableWithoutFeedback(
-  props: ITouchableWithoutFeedbackProps,
-): JSX.Element {
-  const [local, rest] = splitProps(props, TOUCHABLE_WITHOUT_FEEDBACK_HANDLED);
-
-  // RN's TouchableWithoutFeedback builds a FULL Pressability config with delayPressIn /
-  // delayPressOut / minPressDuration: 0 — "without feedback" means no VISUAL, not no timing. The
-  // same shared machine TouchableOpacity uses runs here with the visual half left empty.
-  const runtime = createTouchableFeedbackRuntime();
-  const schedule = createTimeoutScheduler();
-
-  const handlers = createMemo(() =>
-    createTouchableFeedbackHandlers(
-      {
-        delayPressIn: local.delayPressIn ?? 0,
-        delayPressOut: local.delayPressOut ?? 0,
-        minPressDuration:
-          local.minPressDuration ?? TOUCHABLE_MIN_PRESS_DURATION_MS,
-        schedule,
-        now: Date.now,
-      },
-      runtime,
-      {
-        activate(event: ISymbioteEvent): void {
-          local.onPressIn?.(event);
-        },
-        deactivate(event: ISymbioteEvent): void {
-          local.onPressOut?.(event);
-        },
-      },
-    ),
-  );
-
-  return (
-    <Pressable
-      {...rest}
-      onPressIn={handlers().handlePressIn}
-      onPressOut={handlers().handlePressOut}
-    >
-      {local.children}
-    </Pressable>
-  );
-}
+// TouchableWithoutFeedback is a TAG — `<touchable-without-feedback>`. RN's own renders no view
+// (TouchableWithoutFeedback.js:229,286), so the wrapper's Pressable node was ours; the press
+// machine, the delayPressIn/delayPressOut scheduler and the clone onto the single child all live on
+// the engine node (`core/components/src/behaviors/touchable-without-feedback.ts`), wired by
+// `../../register`. The prop type stays, in `../touchable-without-feedback/`.

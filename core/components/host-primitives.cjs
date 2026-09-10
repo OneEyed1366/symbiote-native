@@ -93,6 +93,17 @@ const HOST_PRIMITIVES = {
     // a tag with no machine — the whole reason this entry landed last.
     observesState: true,
   },
+  // `TouchableOpacity` is DELIBERATELY ABSENT, and this note is here so the next reader does not
+  // add it as an oversight. Its tag exists (`touchable-opacity`) and its behavior is registered;
+  // what is not ready is the other four adapters' wrappers, which still build TWO nodes — a
+  // `pressable` around a faded `view` — where RN and the tag build ONE
+  // (`TouchableOpacity.js:302`). An entry here is a switch for every adapter at once: the
+  // equivalence arms demand a component spelling that commits what the tag commits, and today
+  // four of them cannot. It lands when the wrappers collapse to a forwarder over the tag.
+  //
+  // Until then the `id -> nativeID` alias this entry would carry is applied by the behavior's own
+  // `foldPayload` (`behaviors/touchable-opacity.ts`), so the tag is not missing the fold — it is
+  // getting it one layer down, on its own path only.
   // Landed 2026-08-31, on the second attempt. The first threw the switch with the runtime half
   // unwired and was reverted the same hour; both gaps it exposed are closed here, and the record is
   // kept because the SEQUENCE is the reusable part — an entry here is a switch for four transforms
@@ -148,6 +159,37 @@ const HOST_PRIMITIVES = {
     aliases: ID_ALIAS,
     defaults: {},
   },
+  // Filed as NOT LOWERABLE for a week under `.claude/rules/host-primitive-tier.md`'s "SECOND
+  // disqualifier" — its own node is a single element, but its POSITION is decided by the ScrollView
+  // and differs per platform (iOS a sibling before the content view, Android the scroll view's
+  // PARENT), and a per-node behavior cannot own a decision another component makes.
+  //
+  // That is settled and it was settled elsewhere: the ScrollView states the placement as DATA
+  // (`claimedChildren: { [REFRESH_CONTROL]: platform.claimMode }`, `behaviors/scroll-view/shared.ts`)
+  // and the ENGINE moves the node in `appendChild`. So the claim needs nothing from this primitive's
+  // own behavior — verified on a bare node with no wrapper anywhere, both platforms, in
+  // `behaviors/refresh-control.test.ts`.
+  //
+  // What the behavior owes is therefore only the CONTROLLED HANDSHAKE, and no fold at all: four of
+  // the five wrappers folded exactly `resolveAccessibilityProps`, which the engine already runs at
+  // `fabricProps` on every path — the same reason SafeAreaView has no behavior file.
+  //
+  // ID_ALIAS, and it is the SafeAreaView resolution rather than the SafeAreaView position: none of
+  // the five wrappers declared `id`, and upstream's RefreshControl spreads `...ViewProps`
+  // (RefreshControl.js:70), so that was a standing parity gap rather than a deliberate omission.
+  // The prop is declared on all five in the same change as this alias — half of it in either
+  // direction is broken (a fold for a key nobody can pass, or a raw `id` reaching a view whose
+  // ViewConfig declares none).
+  //
+  // No `-managed` twin: the behavior carries a machine, so it needs one owner per node, and it has
+  // one — the wrappers forward to this tag and none of them runs a mirror any more.
+  RefreshControl: {
+    intrinsic: 'refresh-control',
+    aliases: ID_ALIAS,
+    // None. RN seeds nothing: `refreshing` is required, and every other prop is per-platform
+    // styling the native view defaults itself.
+    defaults: {},
+  },
   Text: {
     intrinsic: 'text',
     aliases: ID_ALIAS,
@@ -181,6 +223,25 @@ const HOST_PRIMITIVES = {
   // proven against the wrapper's payload. Adding this key is what makes every transform start
   // lowering `Image` at once, so a fold that had not landed would surface as a raw `src` reaching
   // Fabric — a key no ViewConfig declares, which throws nothing and paints nothing.
+  // THE ENTRY IS NOT OPTIONAL HERE, and the reason has nothing to do with folds: this table is what
+  // `adapters/vue/intrinsic-tags.cjs` derives element-vs-component from, and a hyphenated tag it
+  // does not name compiles to `resolveComponent("image-background")` — children become a slot the
+  // element path never reads, so the subtree renders BLANK with no error. `image`/`view`/`text` are
+  // real SVG element names and survive that gap; this one is not.
+  //
+  // `aliases: ID_ALIAS` was MEASURED against the arm without it rather than reasoned about, because
+  // `behaviors/image-background.ts` folds `id` itself on the built image. Both arms commit
+  // `nativeID` on the image and no `id` anywhere, and the two compose because an alias DELETES its
+  // source key — so the second pass finds nothing. Kept for the property `foldHostBag` provides and
+  // the behavior cannot: the rename happens on the OWNER bag, before the redirect, so any adapter
+  // path that folds bags gets it whether or not the behavior ever runs.
+  ImageBackground: {
+    intrinsic: 'image-background',
+    aliases: ID_ALIAS,
+    // None. The absolute-fill style, the box-dimension proxy and the Image mapping are all derived
+    // from live props at commit, which a compile-time seed cannot express.
+    defaults: {},
+  },
   Image: {
     intrinsic: 'image',
     aliases: ID_ALIAS,
@@ -245,6 +306,97 @@ const HOST_PRIMITIVES = {
     // ViewProps surface, so RN accepts `id` where none of ours did. Half of this is not an option
     // in either direction: the alias without the prop folds a key nobody can pass, and the prop
     // without the alias sends a raw `id` to a view whose ViewConfig declares no such key.
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
+  // The one primitive that commits NO NODE: its intrinsic resolves to the engine's anchor, and the
+  // behavior (`src/behaviors/touchable-native-feedback.ts`) clones the owner's props onto the single
+  // child instead — RN's own shape (TouchableNativeFeedback.js:289,339). Entered in the same commit
+  // that deletes the five wrappers, because the registry is keyed by TAG: a wrapper still emitting
+  // its own `pressable` while the behavior is registered would put two press machines on one tree.
+  //
+  // ID_ALIAS, and it was proposed WITHOUT one on the reasoning that the behavior already reads
+  // `id ?? nativeID` itself (:373) so the shared alias would double-fold. Measured instead of
+  // reasoned (`behaviors/touchable-native-feedback.test.ts`, "folds `id` the same whichever layer
+  // renamed it"): the two compose idempotently — the alias renames on the OWNER, whose props never
+  // reach Fabric, and the behavior's `??` then reads the renamed key to the same answer. Declining
+  // the pair would have bought nothing and broken Solid's constant-pair fast path, whose guard
+  // (`adapters/solid/src/renderer-alias-fold.test.ts`) is what makes one string compare legal on
+  // 32 001 prop writes.
+  //
+  // No `defaults`: RN's TNF seeds nothing at all — every value it derives (`accessible`,
+  // `focusable`, `accessibilityState`, the ripple background) depends on ANOTHER prop or on a
+  // listener, which is a fold and not a default.
+  TouchableNativeFeedback: {
+    intrinsic: 'touchable-native-feedback',
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
+  // The SECOND primitive that commits no node, same anchor shape and same reason
+  // (TouchableWithoutFeedback.js:229,286). Its clone list is not TNF's: the passthrough half is
+  // copied only when SET (:281), there is no ripple, and `onBlur`/`onFocus` are cloned where TNF
+  // drops them — read `src/behaviors/touchable-without-feedback.ts`'s header rather than inheriting
+  // the neighbour's fold.
+  //
+  // ID_ALIAS for the reason measured on TNF: the alias renames on the OWNER, whose props never reach
+  // Fabric, and the behavior's own `id ?? nativeID` then reads the renamed key to the same answer.
+  // Upstream's passthrough loop lets an explicit `nativeID` win over `id` here (:280-284, unlike
+  // TNF's :373); NOT reproduced, because with the alias in place that quirk would depend on which
+  // adapter folds where. No `defaults` — every value TWF derives depends on another prop or on a
+  // listener, which is a fold and not a default.
+  TouchableWithoutFeedback: {
+    intrinsic: 'touchable-without-feedback',
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
+  // RN's Button is a touchable wrapping a View wrapping a Text and takes NO children — `title` is a
+  // string prop (Button.js:363-388) — so the behavior owns the whole subtree and the tag is the
+  // only spelling. Entered in the same commit that deletes the five wrappers: the registry is keyed
+  // by TAG, and a wrapper still building its own View/Text under a registered `button` would give
+  // every existing Button a second copy of the subtree.
+  //
+  // ID_ALIAS, and here it is REQUIRED rather than inherited — the one entry so far where declining
+  // it would have shipped a PLATFORM-DEPENDENT bug. Button's touchable is swapped by platform
+  // (Button.js:281-284), and only one of the two arms renames `id` itself: `touchable-opacity`'s
+  // own `foldPayload` does (it has no spec entry to do it for it), the bare press behavior does not
+  // (`Pressable`'s entry does it instead). Measured on the committed payload, no entry here:
+  //
+  //   iOS      nativeID: 'from-id'   id: absent      the touchable-opacity fold
+  //   Android  nativeID: undefined   id: 'from-id'   a key no ViewConfig declares -> dropped
+  //
+  // So the alias is what makes the two platforms agree, and it composes idempotently with the
+  // iOS-side fold exactly as TNF's does: the rename happens on the bag, so `Object.hasOwn(next,
+  // 'id')` one layer down finds nothing left to do.
+  //
+  // No `defaults`: every value RN's Button seeds is derived from another prop or from a listener
+  // (`accessible`, `focusable`, the greyed label, the uppercased title), which is a fold, not a
+  // default.
+  Button: {
+    intrinsic: 'button',
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
+  // RN wraps the native spinner in a centering `<View>` (ActivityIndicator.js:112), so this tag is
+  // that View and the behavior builds `activity-indicator-spinner` under it. Entered in the same
+  // commit that deletes the five wrappers: the registry is keyed by TAG, and a wrapper still
+  // painting its own spinner while the behavior is registered would give every indicator two.
+  //
+  // ID_ALIAS, and unlike Button's it is not platform-dependent — measured on the committed payload,
+  // both platform arms, with the entry absent:
+  //
+  //   iOS      spinner: id 'probe'   nativeID absent    ActivityIndicatorView declares no `id`
+  //   Android  spinner: id 'probe'   nativeID absent    AndroidProgressBar declares no `id`
+  //
+  // i.e. identically broken on both, because the platform half of this primitive is the spinner's
+  // COLOUR and native extras, and nothing about it touches the name fold. The alias renames on the
+  // OWNER's bag, before `slotPropsExcept` routes the survivor down — so the key that reaches the
+  // spinner is `nativeID`, which is where RN's `...restProps` puts it too (ActivityIndicator.js:99).
+  //
+  // No `defaults`: `animating` and `hidesWhenStopped` ARE `notFalse` folds, but they belong to the
+  // SPINNER, and this table's ops are applied to the tag's own bag before any slot routing. They
+  // live in the behavior's spinner fold instead, which is the only layer that can see that node.
+  ActivityIndicator: {
+    intrinsic: 'activity-indicator',
     aliases: ID_ALIAS,
     defaults: {},
   },

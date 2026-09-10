@@ -9,8 +9,13 @@
 // between the value graph and the node's Fabric tag, and both of those were already engine-side.
 //
 // Those three were aliases of the wrappers, and the wrappers are gone — a primitive is a tag now,
-// which is not a value `<Animated.X>` can call. The three names below that REMAIN are the ones
-// still backed by a real component (the scroll and list family), so they keep working unchanged.
+// which is not a value `<Animated.X>` can call. `Animated.ScrollView` left the same way on
+// 2026-09-10: `bindAnimatedEvent` (node.ts, from `setEventListener`) attaches a native-driven event
+// on ANY host node, which was the one job a scroll wrapper still looked like it had. The whole API
+// is `<scroll-view style={{ opacity: v }} p={{ onScroll: Animated.event(…) }}>`.
+//
+// The two below REMAIN because the LIST family is tier 3: a render prop decides their output shape
+// in JS, so there is no tag for `<Animated.X>` to be an alias of.
 //
 // A consumer animating their OWN component wraps nothing either: any component that forwards
 // `style` down to a Symbiote primitive accepts an AnimatedNode by construction.
@@ -40,7 +45,6 @@ import {
   forkEvent,
   unforkEvent,
 } from '@symbiote-native/engine';
-import ScrollView from '../../components/scroll-view/index.svelte';
 import FlatList from '../../components/flat-list/index.svelte';
 import SectionList from '../../components/section-list/index.svelte';
 
@@ -87,13 +91,11 @@ const drivers = Platform.isDisableAnimations ? AnimatedMock : liveDrivers;
 // Invisible to `tsc --build` — the declaration emit is its own stage (`pnpm pack` ->
 // `scripts/emit-svelte-declarations.mjs`), so this only fails at publish.
 interface IAnimatedNamespace {
-  ScrollView: typeof import('../../components/scroll-view/index.svelte').default;
   FlatList: typeof import('../../components/flat-list/index.svelte').default;
   SectionList: typeof import('../../components/section-list/index.svelte').default;
 }
 
 export const Animated: IAnimatedNamespace & typeof drivers = {
-  ScrollView,
   FlatList,
   SectionList,
   ...drivers,

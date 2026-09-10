@@ -7,7 +7,6 @@
 
 import { createSignal } from 'solid-js';
 import {
-  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -66,7 +65,7 @@ export function ControlsScreen() {
             <Text class="row-label">Wi-Fi — {wifi() ? 'on' : 'off'}</Text>
             <Toggle
               value={wifi()}
-              onValueChange={setWifi}
+              onValueChange={event => setWifi(event.value)}
               trackColor={{ true: '#2c4f82', false: '#3a3a3c' }}
             />
           </View>
@@ -89,7 +88,7 @@ export function ControlsScreen() {
                   {state().pressed ? 'Pressed…' : 'Tap to toggle the spinner'}
                 </Text>
                 {busy() ? (
-                  <ActivityIndicator size="small" color="#7aa2e3" />
+                  <activity-indicator size="small" color="#7aa2e3" />
                 ) : (
                   <Text class="row-label">off</Text>
                 )}
@@ -117,7 +116,7 @@ export function ControlsScreen() {
           <TextInput
             class="input"
             value={note()}
-            onValueChange={setNote}
+            onValueChange={event => setNote(event.text)}
             placeholder="Type here — the echo is the round trip"
             placeholderTextColor="#5b678f"
             autoCapitalize="none"

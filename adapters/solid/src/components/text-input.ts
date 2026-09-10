@@ -65,6 +65,7 @@ import { descriptorToSolid } from '../descriptor-to-solid';
 export type {
   ITextInputHandle,
   ITextInputSelection,
+  ITextInputChangeEvent,
 } from '@symbiote-native/components';
 
 // The agnostic base (the controlled value contract, the input-behavior props, the folded aliases,
@@ -155,7 +156,7 @@ export function TextInput(props: ITextInputProps): JSX.Element {
       // Ordering matters: record the text first, then bump the acknowledged count, so the count
       // never runs ahead of the text it stands for.
       lastNativeText = text;
-      local.onValueChange?.(text, event);
+      local.onValueChange?.(Object.assign(event, { text }));
     }
     const count = eventCountFromChange(event);
     if (count !== undefined) setMostRecentEventCount(count);

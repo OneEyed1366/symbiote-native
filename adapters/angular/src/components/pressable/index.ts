@@ -24,6 +24,7 @@ import {
   isTerminationAllowed,
   resolveAccessibilityProps,
   resolveDisabledAccessibilityState,
+  resolvePressableFocusable,
   rippleProps,
   shouldClaimResponder,
   shouldSuppressPress,
@@ -195,6 +196,9 @@ export class Pressable
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
   @Input() delayLongPress?: number;
   @Input() disabled?: boolean;
+  // Whether a non-touch input device (hardware keyboard, TV remote) may focus this. Resolved rather
+  // than forwarded — see the `focusable` line in `hostProps` below.
+  @Input() focusable?: boolean;
   @Input() cancelable?: boolean;
   @Input() hitSlop?: IRectOffset;
   @Input() pressRetentionOffset?: IRectOffset;
@@ -403,7 +407,12 @@ export class Pressable
       nextFocusRight: this.nextFocusRight,
       nextFocusUp: this.nextFocusUp,
       style: [this.anchorStyle(), this.resolvedStyle],
-      accessible: this.accessible,
+      // RN makes a pressable accessible unless the app opts OUT (`Pressable.js:252`). `!== false`
+      // rather than `?? true`: only a literal `false` opts out, an explicit `undefined` does not.
+      accessible: this.accessible !== false,
+      // Pressable.js:258 — the plain form, no press-handler or disabled leg. A Touchable* has
+      // already resolved its own three-leg formula into this input; `!== false` preserves it.
+      focusable: resolvePressableFocusable(this.focusable),
       ...this.foldedAccessibility,
       onAccessibilityAction: this.accessibilityEmitterHandler(
         'accessibilityAction',

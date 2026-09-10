@@ -12,6 +12,8 @@ import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
+import { clearHostBehaviors } from '@symbiote-native/engine';
+import { registerRefreshControlBehavior } from '@symbiote-native/components';
 import { mount, unmount } from '../../render';
 import { RefreshControl } from '../refresh-control';
 import { ScrollView as AndroidScrollView } from './index.android';
@@ -122,8 +124,14 @@ beforeEach(() => {
   CustomStickyHeader.instantiated = false;
   IOSRefreshProjectionApp.refreshes = 0;
   AndroidRefreshProjectionApp.refreshes = 0;
+  // The controlled-spinner handshake is the engine behavior's, not the wrapper's, and
+  // `../../render` does not import `../../register` — so it has to be installed here.
+  registerRefreshControlBehavior();
 });
-afterEach(() => unmount(ROOT_TAG));
+afterEach(() => {
+  unmount(ROOT_TAG);
+  clearHostBehaviors();
+});
 
 describe('Angular ScrollView projection parity', () => {
   // why: a projected child whose position matches stickyHeaderIndices must be wrapped in a real

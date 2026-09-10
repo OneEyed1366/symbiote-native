@@ -15,6 +15,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMPONENT_DESCRIPTORS } from '@symbiote-native/components';
+import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: `register.ts` installs the host behaviors, whose `foldPayload` is the bare
 // path's only source for the folds a wrapper would otherwise apply.
@@ -312,10 +313,25 @@ describe('what the element directives commit', () => {
         `<${tag} [testID]="'probe'"></${tag}>`,
       );
       const node = all.find(candidate => candidate.props.testID === 'probe');
+      // A tag whose descriptor names the ANCHOR component commits NOTHING by design — RN's
+      // TouchableNativeFeedback renders no view and clones onto its single child. Asserted as an
+      // absence rather than skipped, so a tag that starts committing a real view goes red here.
+      if (COMPONENT_DESCRIPTORS[tag]?.component === ANCHOR_COMPONENT) {
+        expect(node).toBeUndefined();
+        return;
+      }
       // An anchor host commits nothing, so `node` would be undefined — a bare viewName comparison
       // would then pass for both an anchor and a wrong view.
       expect(node).toBeDefined();
-      expect(node?.viewName).toBe(COMPONENT_DESCRIPTORS[tag]?.component);
+      // A COMPOSED primitive redirects every prop it does not keep — `testID` included — onto the
+      // node its behavior built, exactly as RN's wrappers do (`ImageBackground.js:81` spreads
+      // `...props` onto the inner Image, `ActivityIndicator.js:99` onto the spinner). So the probe
+      // may sit one level below the tag. ONE hop only: an ancestor walk would let any name pass,
+      // since the container root is an RCTView.
+      const parent = all.find(candidate => candidate.children.includes(node));
+      expect([node?.viewName, parent?.viewName]).toContain(
+        COMPONENT_DESCRIPTORS[tag]?.component,
+      );
     },
   );
 });

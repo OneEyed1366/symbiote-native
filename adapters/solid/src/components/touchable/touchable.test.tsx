@@ -30,11 +30,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { mount, unmount } from '../../render';
-import {
-  TouchableOpacity,
-  TouchableHighlight,
-  TouchableWithoutFeedback,
-} from './index';
+import { TouchableOpacity, TouchableHighlight } from './index';
 
 const ROOT_TAG = 821;
 const TARGET = 'touchable-target';
@@ -673,55 +669,74 @@ describe('Solid TouchableHighlight', () => {
   });
 });
 
-describe('Solid TouchableWithoutFeedback', () => {
-  // why: RN's TouchableWithoutFeedback is a pure press-wiring passthrough with NO visual reaction —
-  // proves it still synthesizes onPress (it is not an inert View) while deliberately never touching
-  // backgroundColor/opacity the way its two siblings do.
-  it('fires onPress with no visual feedback applied', async () => {
-    let presses = 0;
-    mount(ROOT_TAG, () => (
-      <TouchableWithoutFeedback
-        testID={TARGET}
-        style={{ width: BASE_WIDTH }}
-        onPress={() => {
-          presses++;
-        }}
-      />
-    ));
-    await flush();
+// TouchableWithoutFeedback's own block left with the wrapper: it is a tag now, and both its press
+// wiring and its delayPressIn/delayPressOut scheduler are covered against the COMMITTED tree in
+// `core/components/src/behaviors/touchable-without-feedback.test.ts`.
 
-    const handle = responderHandle();
-    fabric.fireEvent(handle, TOUCH_START);
-    await flush();
-    const pressed = feedbackProps();
-    expect(pressed.backgroundColor).toBeUndefined();
-    expect(pressed.opacity).toBeUndefined();
-    expect(pressed.width).toBe(BASE_WIDTH);
+// why: RN marks every touchable accessible unless the app opts out (TouchableOpacity.js:303,
+// TouchableHighlight.js:337, and Pressable.js:252 underneath all three). None of the three sets it
+// itself — they compose Pressable, which does — so this block is what says that composition
+// carries the default. Without it a touchable reaches a screen reader as a plain view, which no
+// visual test and no press test can see.
+describe('Solid Touchable* accessibility default', () => {
+  const VARIANTS = {
+    TouchableOpacity,
+    TouchableHighlight,
+  };
 
-    fabric.fireEvent(handle, TOUCH_END);
-    await flush();
-    expect(presses).toBe(1);
-  });
+  for (const [name, Variant] of Object.entries(VARIANTS)) {
+    it(`${name} is accessible by default`, async () => {
+      mount(ROOT_TAG, () => <Variant testID={TARGET} />);
+      await flush();
+      expect(committedResponderProps().accessible).toBe(true);
+    });
 
-  // why: RN's TouchableWithoutFeedback builds a FULL Pressability config with delayPressIn —
-  // "without feedback" means no VISUAL, not no timing. Every adapter here dropped the delay props
-  // on the floor, which is silent: the callback still fires, just at the wrong moment.
-  it('defers onPressIn past touch-down with delayPressIn', async () => {
-    let pressIns = 0;
-    mount(ROOT_TAG, () => (
-      <TouchableWithoutFeedback
-        testID={TARGET}
-        delayPressIn={PRESS_DELAY_MS}
-        onPressIn={() => {
-          pressIns++;
-        }}
-      />
-    ));
-    await flush();
+    // `!== false`, not `?? true`: a literal false is the only opt-out, and it is the one value the
+    // two spellings disagree on for a caller passing nothing.
+    it(`${name} honors accessible={false}`, async () => {
+      mount(ROOT_TAG, () => <Variant testID={TARGET} accessible={false} />);
+      await flush();
+      expect(committedResponderProps().accessible).toBe(false);
+    });
+  }
+});
 
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    expect(pressIns, 'fired before the delay elapsed').toBe(0);
-    await wait(PRESS_DELAY_MS + 20);
-    expect(pressIns).toBe(1);
-  });
+// TouchableOpacity.js:336-340, TouchableHighlight.js:370-374 and
+// TouchableWithoutFeedback.js:263-266 hold ONE expression with three legs, and no adapter computed
+// it until 2026-09-09 — so a disabled or handler-less touchable stayed in the focus order and a
+// keyboard, a TV remote or switch control could land on a control that cannot be pressed.
+//
+// Three separate mounts rather than one prop flip: a Solid body runs once, and the point here is
+// the resolved value rather than its reactivity.
+describe('Solid Touchable* focusable', () => {
+  const VARIANTS = {
+    TouchableOpacity,
+    TouchableHighlight,
+  };
+
+  for (const [name, Variant] of Object.entries(VARIANTS)) {
+    // Leg 2. The wrapper reads the APP's onPress, not the handler it hands Pressable — that one is
+    // always defined, so resolving one level down could never answer false.
+    it(`${name} stays out of the focus order without an onPress`, async () => {
+      mount(ROOT_TAG, () => <Variant testID={TARGET} />);
+      await flush();
+      expect(committedResponderProps().focusable).toBe(false);
+    });
+
+    it(`${name} focuses once it has an onPress`, async () => {
+      mount(ROOT_TAG, () => <Variant testID={TARGET} onPress={() => {}} />);
+      await flush();
+      expect(committedResponderProps().focusable).toBe(true);
+    });
+
+    // Leg 3, and the case a `focusable ?? computed` implementation gets wrong: `&&` means an
+    // explicit opt-IN still loses to `disabled`.
+    it(`${name} refuses focus while disabled, opt-in notwithstanding`, async () => {
+      mount(ROOT_TAG, () => (
+        <Variant testID={TARGET} onPress={() => {}} disabled focusable />
+      ));
+      await flush();
+      expect(committedResponderProps().focusable).toBe(false);
+    });
+  }
 });

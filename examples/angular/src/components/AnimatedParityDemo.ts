@@ -16,7 +16,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import {
   Animated,
   AnimatedView,
-  Button,
+  ButtonElement,
   PanResponder,
   Text,
   View,
@@ -35,7 +35,7 @@ const SCROLL_DURATION_MS = 180;
 @Component({
   selector: 'AnimatedParityDemo',
   standalone: true,
-  imports: [View, Text, Button, AnimatedView],
+  imports: [View, Text, ButtonElement, AnimatedView],
   template: `
     <View class="section-nested">
       <Text class="section-label"
@@ -66,12 +66,12 @@ const SCROLL_DURATION_MS = 180;
           [style]="{ transform: [{ translateX: follow }] }"
         ></AnimatedView>
       </View>
-      <Button
+      <button
         testID="track-btn"
         title="Move target (follower chases)"
         (press)="moveLead()"
         color="#dd0031"
-      ></Button>
+      ></button>
 
       <View class="collapse-frame">
         <AnimatedView
@@ -84,20 +84,20 @@ const SCROLL_DURATION_MS = 180;
       </View>
       <View class="row-tight">
         <View class="flex-1">
-          <Button
+          <button
             testID="scroll-down-btn"
             title="Scroll ↓"
             (press)="scrollBy(40)"
             color="#38b2ac"
-          ></Button>
+          ></button>
         </View>
         <View class="flex-1">
-          <Button
+          <button
             testID="scroll-up-btn"
             title="Scroll ↑"
             (press)="scrollBy(-40)"
             color="#38b2ac"
-          ></Button>
+          ></button>
         </View>
       </View>
     </View>

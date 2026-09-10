@@ -82,7 +82,7 @@ function mountModel(options: {
   initial: string;
   withDirective: boolean;
   modifiers?: Record<string, boolean>;
-  onValueChange?: (text: string, event: unknown) => void;
+  onValueChange?: (event: unknown) => void;
 }): IHarness {
   const model = ref(options.initial);
   let host: ISymbioteNode | null = null;
@@ -182,7 +182,8 @@ describe('v-model on a lowered TextInput', () => {
     await harness.type('typed');
 
     expect(onValueChange).toHaveBeenCalledTimes(1);
-    expect(onValueChange.mock.calls[0][0]).toBe('typed');
+    // ONE argument, the event, with `text` carried on it — not `(text, event)`.
+    expect(onValueChange.mock.calls[0][0]).toMatchObject({ text: 'typed' });
     expect(harness.model.value).toBe('typed');
   });
 

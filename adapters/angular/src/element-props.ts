@@ -62,6 +62,9 @@ export interface ITextElementProps {
   allowFontScaling?: boolean;
   maxFontSizeMultiplier?: number | null;
   selectionColor?: string;
+  // RN's Text carries it (Text.js) and Button hands it to the label so a screen reader announces
+  // the text as disabled along with the button holding it (Button.js:388).
+  disabled?: boolean;
 }
 
 /** The sticky-header wrapper RN builds in JS (ScrollViewStickyHeader.js). */

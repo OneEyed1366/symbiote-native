@@ -19,6 +19,7 @@ import {
   type ISwitchProps as ISwitchBaseProps,
   type ISwitchState,
   type ISwitchTrackColor,
+  type ISwitchChangeEvent,
 } from '@symbiote-native/components';
 import {
   dispatchViewCommand,
@@ -43,7 +44,7 @@ export type ISwitchProps = Omit<ISwitchBaseProps, 'onValueChange'> & {
   modelValue?: boolean;
   class?: IClassNameValue;
 };
-export type { ISwitchTrackColor };
+export type { ISwitchTrackColor, ISwitchChangeEvent };
 
 type ISwitchEmits = {
   valueChange: (value: boolean, event: ISymbioteEvent) => boolean;

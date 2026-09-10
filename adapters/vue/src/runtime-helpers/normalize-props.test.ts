@@ -103,6 +103,20 @@ async function commit(
   return props;
 }
 
+// Pressable's wrapper writes RN's `accessible` (Pressable.js:252) and `focusable`
+// (Pressable.js:258) defaults, and View has neither, so the payload differs by primitive. These
+// rows previously pinned their ABSENCE, i.e. a divergence from RN that the lowered path had
+// already closed.
+function expectedProps(
+  primitive: string,
+  style: Record<string, unknown>,
+): Record<string, unknown> {
+  const base = { testID: 'p', ...style };
+  return primitive === 'Pressable'
+    ? { ...base, accessible: true, focusable: true }
+    : base;
+}
+
 describe('a functional style survives v-bind', () => {
   // Both, because the defect is NOT stateful-only: measured identically on View, which observes no
   // press state at all. Scoping the override to Pressable would have left this arm broken.
@@ -113,7 +127,7 @@ describe('a functional style survives v-bind', () => {
 
       // `opacity: 1` is the callback resolved at `pressed: false` by routeProp. Before the
       // normalizeProps override this key was absent entirely — not wrong, missing.
-      expect(props).toEqual({ testID: 'p', opacity: 1 });
+      expect(props).toEqual(expectedProps(primitive, { opacity: 1 }));
     },
   );
 
@@ -124,7 +138,7 @@ describe('a functional style survives v-bind', () => {
     async primitive => {
       const props = await commit(primitive, FUNCTION_STYLE, sfcMerged);
 
-      expect(props).toEqual({ testID: 'p', opacity: 1 });
+      expect(props).toEqual(expectedProps(primitive, { opacity: 1 }));
     },
   );
 
@@ -145,7 +159,7 @@ import { ${primitive} } from '@symbiote-native/vue';
 <template><${primitive} testID="p" :style="${expr}" /></template>`,
     );
 
-    expect(props).toEqual({ testID: 'p', opacity: 1 });
+    expect(props).toEqual(expectedProps('Pressable', { opacity: 1 }));
   });
 
   // The control. Without it, "the style is present" cannot distinguish a working override from a
@@ -156,7 +170,7 @@ import { ${primitive} } from '@symbiote-native/vue';
     async primitive => {
       const props = await commit(primitive, '{ opacity: 0.3 }');
 
-      expect(props).toEqual({ testID: 'p', opacity: 0.3 });
+      expect(props).toEqual(expectedProps(primitive, { opacity: 0.3 }));
     },
   );
 });

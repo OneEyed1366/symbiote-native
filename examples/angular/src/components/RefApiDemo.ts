@@ -5,7 +5,12 @@ import {
   ViewChild,
   inject,
 } from '@angular/core';
-import { Button, Text, View, findNodeHandle } from '@symbiote-native/angular';
+import {
+  ButtonElement,
+  Text,
+  View,
+  findNodeHandle,
+} from '@symbiote-native/angular';
 
 // Static look lives in RefApiDemo.css, compiled at build time by @symbiote-native/css-parser.
 import './RefApiDemo.css';
@@ -17,7 +22,7 @@ import './RefApiDemo.css';
 @Component({
   selector: 'RefApiDemo',
   standalone: true,
-  imports: [View, Text, Button],
+  imports: [View, Text, ButtonElement],
   template: `
     <View class="section-nested">
       <Text class="section-label"
@@ -33,20 +38,20 @@ import './RefApiDemo.css';
       }}</Text>
       <View class="row">
         <View class="flex-1">
-          <Button
+          <button
             testID="measure-btn"
             title="Measure"
             (press)="onMeasure()"
             color="#dd0031"
-          ></Button>
+          ></button>
         </View>
         <View class="flex-1">
-          <Button
+          <button
             testID="flash-btn"
             title="Flash (setNativeProps)"
             (press)="onFlash()"
             color="#f6ad55"
-          ></Button>
+          ></button>
         </View>
       </View>
     </View>

@@ -21,7 +21,6 @@ import { For, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import {
   ActionSheetIOS,
-  ActivityIndicator,
   Alert,
   Animated,
   AppState,
@@ -401,7 +400,7 @@ export function CanaryScreen() {
           }
         >
           <View class="refresh-row">
-            <ActivityIndicator color={LINE_COLOR.primitives} />
+            <activity-indicator color={LINE_COLOR.primitives} />
             <Text class="accent-note">Refreshing…</Text>
           </View>
         </Show>
@@ -421,7 +420,7 @@ export function CanaryScreen() {
         <TextInput
           testID="greeting-input"
           value={name()}
-          onValueChange={setName}
+          onValueChange={event => setName(event.text)}
           placeholder="type your name…"
           placeholderTextColor="#7f8db3"
           class="text-input"
@@ -436,11 +435,11 @@ export function CanaryScreen() {
           <Switch
             testID="spinner-switch"
             value={spinning()}
-            onValueChange={setSpinning}
+            onValueChange={event => setSpinning(event.value)}
             trackColor={{ false: '#334155', true: LINE_COLOR.primitives }}
           />
         </View>
-        <ActivityIndicator
+        <activity-indicator
           testID="spinner-indicator"
           animating={spinning()}
           color={LINE_COLOR.primitives}
@@ -738,7 +737,7 @@ export function CanaryScreen() {
           <Text class="switch-label">avoid keyboard</Text>
           <Switch
             value={kavEnabled()}
-            onValueChange={setKavEnabled}
+            onValueChange={event => setKavEnabled(event.value)}
             trackColor={{ false: '#334155', true: '#2b6cb0' }}
           />
         </View>

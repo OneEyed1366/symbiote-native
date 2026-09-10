@@ -29,6 +29,7 @@ import {
   type ITextInputProps as ITextInputBaseProps,
   type ITextInputHandle,
   type ITextInputSelection,
+  type ITextInputChangeEvent,
 } from '@symbiote-native/components';
 import {
   dispatchViewCommand,
@@ -58,7 +59,7 @@ export type ITextInputProps = Omit<
   modelValue?: string;
   class?: IClassNameValue;
 };
-export type { ITextInputHandle };
+export type { ITextInputHandle, ITextInputChangeEvent };
 
 type ITextInputEmits = {
   valueChange: (text: string, event: ISymbioteEvent) => boolean;

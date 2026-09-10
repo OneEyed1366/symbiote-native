@@ -31,12 +31,13 @@
 // looked up by. One behavior per tag, each knowing its own content intrinsic. That is the same
 // shape `intrinsicWhen` gives TextInput's `multiline`, arrived at from the other side.
 //
-// NOT REGISTERED BY ANY ADAPTER, deliberately, and this is the whole reason the file is safe to
-// land. `scroll-view` is the tag the WRAPPERS already emit, and a wrapper builds its own content
-// node from `selectScrollIntrinsics` — as does `VirtualizedList`, which hand-authors the two
-// intrinsics on some adapters. Registering while either stands gives those trees a SECOND content
-// node: `RCTScrollView > RCTScrollContentView > RCTScrollContentView`, silently, on every existing
-// ScrollView.
+// REGISTERED BY SVELTE SINCE 2026-09-07 (`adapters/svelte/src/register.ts`), and by no other
+// adapter — this paragraph read "NOT REGISTERED BY ANY ADAPTER" for three days after that stopped
+// being true. The hazard still holds for the four that have not registered: `scroll-view` is the
+// tag their WRAPPERS emit, and a wrapper builds its own content node from `selectScrollIntrinsics`,
+// as does `VirtualizedList`. Registering while either stands silently gives those trees a SECOND
+// content node: `RCTScrollView > RCTScrollContentView > RCTScrollContentView`. So the precondition
+// per adapter is that nothing else builds the content node.
 //
 // A SECOND TAG IS NOT THE ANSWER, and this reverses what this header said until 2026-09-07. The
 // `text-input` / `text-input-managed` split is debt with a deletion date, not a technique
@@ -143,7 +144,26 @@ export function ownerFold(base: IViewStyle, horizontal: boolean): IPayloadFold {
       style: [base, props.style],
       nestedScrollEnabled: props.nestedScrollEnabled ?? true,
     };
+    // The tag is the ONLY axis input, which is what keeps the three halves of the axis from
+    // disagreeing. RN derives all three from one prop, so a mismatch is unrepresentable there, and
+    // on iOS both tags really are RCTScrollView — a stray `horizontal` would turn a vertical
+    // scroller over a content node with no row style, a shape RN cannot produce.
+    if (props.horizontal !== undefined && props.horizontal !== horizontal) {
+      dlog(
+        `ScrollView: horizontal=${String(props.horizontal)} ignored — the axis comes from the ` +
+          `tag; write <${horizontal ? SCROLL_VIEW_TAG : HORIZONTAL_SCROLL_VIEW_TAG}> instead`,
+      );
+    }
+    delete next.horizontal;
     if (horizontal) next.horizontal = true;
+    // The bounce pair is the axis's other consequence (`ScrollView.js:1753-1761`), ASYMMETRIC
+    // because RN falls back to `this.props.horizontal` — unset on a vertical view, so the
+    // horizontal key resolves to undefined and never reaches the payload. Both names are declared
+    // in every adapter's prop type and computed in none: vertical never bounced by default.
+    if (props.alwaysBounceHorizontal === undefined && horizontal)
+      next.alwaysBounceHorizontal = true;
+    if (props.alwaysBounceVertical === undefined)
+      next.alwaysBounceVertical = !horizontal;
     // Consumed by the behavior and declared by no ViewConfig — neither name appears anywhere under
     // `ReactCommon/react/renderer/components/scrollview`. `stickyHeaderIndices` decides which
     // children get a `sticky-header`, `invertStickyHeaders` feeds the pin. Every wrapper strips both

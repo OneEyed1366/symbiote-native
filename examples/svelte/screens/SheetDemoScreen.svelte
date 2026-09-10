@@ -7,7 +7,6 @@
   // see App.svelte's sheetDemoScreenOptions comment for react-native-screens' formSheet-sizing
   // rationale (the ScrollView below must be this screen's own first direct child). Svelte twin of
   // examples/vue-sfc/screens/SheetDemoScreen.vue.
-  import { ScrollView } from '@symbiote-native/svelte';
   import { useStackNavigation } from '@symbiote-native/navigation/svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -19,7 +18,7 @@
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
 </script>
 
-<ScrollView class="screen" contentContainerStyle="section">
+<scroll-view class="screen" contentContainerStyle="section">
   <view class={`line-tag line-tag-${lineInfo.line}`}>
     <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
   </view>
@@ -47,4 +46,4 @@
     onPress={() => navigation.current.pop()}
     color={LINE_COLOR.presentation}
   />
-</ScrollView>
+</scroll-view>

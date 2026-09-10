@@ -9,7 +9,6 @@
   // whitespace-only text node under a parent that takes no raw text to an anchor, so a gap
   // between siblings never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b), and
   // svelte.config.js's collapseTextWhitespace() folds a sentence wrapped across source lines.
-  import { ScrollView } from '@symbiote-native/svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
   import RunesDemo from '../components/api-playground/RunesDemo.svelte';
@@ -26,7 +25,7 @@
 </script>
 
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="api-playground-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
@@ -76,5 +75,5 @@
         exclusively; `$state`/`$derived`/`$effect`/`$props()` replace them.
       </text>
     </view>
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>

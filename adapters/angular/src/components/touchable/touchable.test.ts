@@ -14,11 +14,7 @@ import {
 } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
-import {
-  TouchableHighlight,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-} from './index';
+import { TouchableHighlight, TouchableOpacity } from './index';
 
 const ROOT_TAG = 940;
 const fabric = installFabric();
@@ -53,7 +49,6 @@ function installRequestAnimationFrame(): void {
 beforeEach(() => {
   underlayHost = undefined;
   opacityHost = undefined;
-  plainHost = undefined;
   pendingFrames.clear();
   nextFrameId = 1;
   frameClock = 0;
@@ -90,18 +85,6 @@ class TouchableOpacityHost {}
   `,
 })
 class TouchableHighlightHost {}
-
-@Component({
-  selector: 'symbiote-touchable-without-feedback-host',
-  standalone: true,
-  imports: [TouchableWithoutFeedback],
-  template: `
-    <TouchableWithoutFeedback [testID]="'without-feedback'" class="card">
-      <text>Press</text>
-    </TouchableWithoutFeedback>
-  `,
-})
-class TouchableWithoutFeedbackHost {}
 
 describe('TouchableOpacity', () => {
   it('resolves a class= on the TouchableOpacity use site onto the real committed view, not the anchor', async () => {
@@ -153,27 +136,9 @@ describe('TouchableHighlight', () => {
   });
 });
 
-describe('TouchableWithoutFeedback', () => {
-  // why: TouchableWithoutFeedback has no visual feedback wrapper at all (its entire point is
-  // "render children, add only a press responder") — its anchor fix has the least surrounding
-  // machinery of the three Touchables, so a regression here isolates cleanly to the anchor merge.
-  it('resolves a class= on the TouchableWithoutFeedback use site onto the real committed view, not the anchor', async () => {
-    registerRules([
-      {
-        tokens: ['card'],
-        specificity: [0, 1, 0],
-        order: 0,
-        style: { backgroundColor: 'red' },
-      },
-    ]);
-
-    mount(ROOT_TAG, TouchableWithoutFeedbackHost);
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-
-    const node = fabric.find(n => n.props.testID === 'without-feedback');
-    expect(node?.props.backgroundColor).toBe('red');
-  });
-});
+// TouchableWithoutFeedback's own block left with the wrapper: it is a tag now, with no anchor host
+// to merge a class onto. Its clone and its press timing are covered against the COMMITTED tree in
+// `core/components/src/behaviors/touchable-without-feedback.test.ts`.
 
 // A class toggled AFTER mount, with no @Input of the Touchable changing. The static cases above
 // only prove the anchor merge happens ONCE, at creation - they pass even when the merged style is
@@ -213,7 +178,7 @@ let toggleFixture: TouchableToggleFixture | undefined;
 @Component({
   selector: 'symbiote-touchable-toggle-host',
   standalone: true,
-  imports: [TouchableHighlight, TouchableOpacity, TouchableWithoutFeedback],
+  imports: [TouchableHighlight, TouchableOpacity],
   template: `
     <TouchableHighlight [testID]="'toggle-highlight'" [class.dark]="dark">
       <text>Press</text>
@@ -221,9 +186,6 @@ let toggleFixture: TouchableToggleFixture | undefined;
     <TouchableOpacity [testID]="'toggle-opacity'" [class.dark]="dark">
       <text>Press</text>
     </TouchableOpacity>
-    <TouchableWithoutFeedback [testID]="'toggle-plain'" [class.dark]="dark">
-      <text>Press</text>
-    </TouchableWithoutFeedback>
   `,
 })
 class TouchableToggleFixture {
@@ -247,8 +209,10 @@ describe('a Touchable class toggled after mount', () => {
   // that never changes means Pressable`s style @Input never reports a change, so Pressable never
   // refreshes and never re-invokes the arrow - the anchor`s new class-derived style is read once
   // at creation and then frozen. TouchableOpacity folds its class onto an inner AnimatedView, so
-  // it is covered here too; TouchableWithoutFeedback is the control, its getter rebuilds.
-  it.each([['toggle-highlight'], ['toggle-plain'], ['toggle-opacity']])(
+  // it is covered here too. TouchableWithoutFeedback used to be the third row and the CONTROL — it
+  // is a tag now, with no component view to freeze, so the control it provided is gone rather than
+  // moved: neither surviving row proves the harness can see a class that DOES track.
+  it.each([['toggle-highlight'], ['toggle-opacity']])(
     'reaches the committed view of %s',
     async testID => {
       registerRules([
@@ -529,54 +493,105 @@ describe('TouchableOpacity press timing', () => {
   });
 });
 
-let plainHost: PlainHost | undefined;
+// TouchableWithoutFeedback's press-timing block left with the wrapper. "Without feedback" still
+// means no VISUAL rather than no timing, and the tag keeps the delayPressIn/delayPressOut scheduler
+// — asserted against the COMMITTED tree in
+// `core/components/src/behaviors/touchable-without-feedback.test.ts`.
 
+// RN gives Pressable a ONE-leg `focusable` default (Pressable.js:258) and the Touchables a
+// THREE-leg one (TouchableOpacity.js:336-340, TouchableHighlight.js:370-374,
+// TouchableWithoutFeedback.js:263-266), so a wrapper composing Pressable resolves its own and
+// hands the answer down. Nothing computed it anywhere until 2026-09-09: a disabled touchable
+// stayed focusable, so a keyboard, a TV remote or switch control could land on a dead control.
+//
+// THREE HOSTS RATHER THAN PARAMETERS, because an Angular template cannot express the leg that
+// matters: `(press)` is a static binding, and its presence IS the app's intent — `press.observed`
+// is what stands in for RN's `onPress !== undefined`.
 @Component({
-  selector: 'symbiote-touchable-plain-timing-host',
+  selector: 'symbiote-focusable-unhandled-host',
   standalone: true,
-  imports: [TouchableWithoutFeedback],
+  imports: [TouchableOpacity, TouchableHighlight],
   template: `
-    <TouchableWithoutFeedback
-      [testID]="'plain-timed'"
-      [delayPressIn]="40"
-      (pressIn)="onPressIn($event)"
-    >
-      <text>Press</text>
-    </TouchableWithoutFeedback>
+    <TouchableOpacity [testID]="'f-to'"><text>a</text></TouchableOpacity>
+    <TouchableHighlight [testID]="'f-th'"><text>a</text></TouchableHighlight>
   `,
 })
-class PlainHost {
-  onPressIn = vi.fn();
+class FocusableUnhandledHost {}
 
-  constructor() {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    plainHost = this;
-  }
+@Component({
+  selector: 'symbiote-focusable-handled-host',
+  standalone: true,
+  imports: [TouchableOpacity, TouchableHighlight],
+  template: `
+    <TouchableOpacity [testID]="'f-to'" (press)="noop()">
+      <text>a</text>
+    </TouchableOpacity>
+    <TouchableHighlight [testID]="'f-th'" (press)="noop()">
+      <text>a</text>
+    </TouchableHighlight>
+  `,
+})
+class FocusableHandledHost {
+  noop(): void {}
 }
 
-describe('TouchableWithoutFeedback press timing', () => {
-  // why: "without feedback" means no VISUAL, not no timing - RN builds a full Pressability config
-  // with delayPressIn/delayPressOut there too. A straight passthrough would emit pressIn inside the
-  // touch dispatch, which is exactly what the synchronous assertion rules out.
-  it('runs the shared timing machine rather than forwarding press-in straight through', async () => {
-    mount(ROOT_TAG, PlainHost);
-    await waitUntil(
-      () => committedNode('plain-timed') !== undefined,
-      'the touchable committed',
-    );
+@Component({
+  selector: 'symbiote-focusable-disabled-host',
+  standalone: true,
+  imports: [TouchableOpacity, TouchableHighlight],
+  template: `
+    <TouchableOpacity
+      [testID]="'f-to'"
+      (press)="noop()"
+      [disabled]="true"
+      [focusable]="true"
+    >
+      <text>a</text>
+    </TouchableOpacity>
+    <TouchableHighlight
+      [testID]="'f-th'"
+      (press)="noop()"
+      [disabled]="true"
+      [focusable]="true"
+    >
+      <text>a</text>
+    </TouchableHighlight>
+  `,
+})
+class FocusableDisabledHost {
+  noop(): void {}
+}
 
-    touchAt(
-      fabric.find(n => n.props.testID === 'plain-timed')?.instanceHandle,
-      'topTouchStart',
-    );
-    expect(
-      plainHost?.onPressIn,
-      'delayPressIn must defer the emit',
-    ).not.toHaveBeenCalled();
+describe('Angular Touchable* focusable', () => {
+  const IDS = ['f-to', 'f-th'];
 
+  async function focusableValues(host: unknown): Promise<unknown[]> {
+    mount(ROOT_TAG, host);
     await waitUntil(
-      () => (plainHost?.onPressIn.mock.calls.length ?? 0) > 0,
-      'press-in emitted after the delay',
+      () => committedNode('f-th') !== undefined,
+      'the touchables committed',
     );
+    return IDS.map(id => committedNode(id)?.props.focusable);
+  }
+
+  // Leg 2.
+  it('stays out of the focus order without a press subscriber', async () => {
+    expect(await focusableValues(FocusableUnhandledHost)).toEqual([
+      false,
+      false,
+    ]);
+  });
+
+  it('focuses once the app subscribes to press', async () => {
+    expect(await focusableValues(FocusableHandledHost)).toEqual([true, true]);
+  });
+
+  // Leg 3, and the case a `focusable ?? computed` implementation gets wrong: `&&` means an
+  // explicit opt-IN still loses to `disabled`.
+  it('refuses focus while disabled, opt-in notwithstanding', async () => {
+    expect(await focusableValues(FocusableDisabledHost)).toEqual([
+      false,
+      false,
+    ]);
   });
 });

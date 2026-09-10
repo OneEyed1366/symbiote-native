@@ -4,15 +4,13 @@
 // adapters/vue/src/components/scroll-view/shared.ts) with Svelte's own idioms: `class` (not
 // `className`), `children` as a Snippet.
 //
-// KNOWN GAP — read before wiring `stickyHeaderIndices`: this adapter does NOT auto-wrap children
-// by index the way React (Children.toArray) / Vue (slots.default(), a real VNode[]) do. Svelte
-// hands a component only an opaque `Snippet` — a render FUNCTION, not an introspectable/indexable
-// list of elements — so there is no mechanical way to pull "child at index N" out of it and
-// re-wrap it. It is still typed here for interface parity (an app porting from React/Vue
-// type-checks against the same surface), but index.svelte dlogs a warning when it is supplied.
-// Mark the sections that should pin with the `sticky-header` TAG instead — the ScrollView host
-// behavior registers it, finds this ScrollView by walking up, and derives each header's collision
-// point from document order, so no index is involved on either side.
+// `stickyHeaderIndices` works here since the wrapper was deleted (2026-09-10) — deleting it is what
+// turned the feature on. It was unhonored while a component saw only an opaque `Snippet`, with no
+// "child at index N" to pull out of a render function; the behavior walks the COMMITTED children
+// instead (`behaviors/scroll-view/sticky-indices.test.ts`), which needs no Snippet at all.
+//
+// The `sticky-header` TAG is the other spelling and still the better one for markup you control: it
+// pins by document order, so no index has to stay in step with the children.
 //
 // `invertStickyHeaders` IS honored: it is an ordinary prop of the scroll node and the behavior
 // reads it off the owner when it builds a pin.
@@ -38,6 +36,10 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   // IClassNameValue union, since IStyleProp is itself an object/array and that would be
   // ambiguous with a real style (mirrors React's/Vue's own contentContainerStyle typing).
   contentContainerStyle?: IStyleProp<IViewStyle> | string;
+  // Typed for parity with React/Vue, and DELETED from the payload by the behavior's fold: the axis
+  // comes from which tag you wrote. RN derives the native component, the row content style and this
+  // flag from one prop so they cannot disagree; a prop contradicting the tag is dropped, with a
+  // dlog, rather than producing a shape RN cannot make.
   horizontal?: boolean;
   scrollEnabled?: boolean;
   showsVerticalScrollIndicator?: boolean;
@@ -68,7 +70,6 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   snapToStart?: boolean;
   snapToEnd?: boolean;
   disableIntervalMomentum?: boolean;
-  // See the KNOWN GAP note above — not auto-honored in this adapter.
   stickyHeaderIndices?: number[];
   invertStickyHeaders?: boolean;
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';

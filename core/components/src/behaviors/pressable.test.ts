@@ -63,8 +63,12 @@ function makePressable(): ISymbioteNode {
 
 // By testID, never by viewName: the committed tree carries container nodes of the same view name,
 // and a pressable's is `RCTView` like everything else.
-function committedStyleOf(testID: string): unknown {
-  const walk = (nodes: readonly IFakeNode[]): unknown => {
+function committedPropsOf(
+  testID: string,
+): Readonly<Record<string, unknown>> | undefined {
+  const walk = (
+    nodes: readonly IFakeNode[],
+  ): Readonly<Record<string, unknown>> | undefined => {
     for (const node of nodes) {
       if (node.props.testID === testID) return node.props;
       const hit = walk(node.children);
@@ -167,6 +171,25 @@ describe('pressable host behavior', () => {
     expect(onPressIn).not.toHaveBeenCalled();
   });
 
+  // THE OTHER SIDE OF BUTTON'S ASYMMETRY, pinned so nobody "fixes" it. RN's Pressable hands
+  // Pressability the RAW prop (`Pressable.js:266`) — `aria-disabled` reaches only the announced
+  // accessibilityState (`:229`) — so a bare pressable with `aria-disabled` STILL PRESSES. Button
+  // resolves the three spellings in the component and passes the answer down (`Button.js:337`),
+  // which is why the resolver is Button's and not the machine's (`./button`, KNOWN DIVERGENCES 2).
+  it('still presses under aria-disabled — only Button resolves that', () => {
+    registerPressableBehavior();
+    const onPressIn = vi.fn();
+    const node = makePressable();
+    routeProp(node, 'onPressIn', onPressIn);
+    routeProp(node, 'aria-disabled', true);
+    routeProp(node, 'accessibilityState', { disabled: true });
+    mount(node);
+
+    press(node);
+
+    expect(onPressIn).toHaveBeenCalledTimes(1);
+  });
+
   // Discriminates the same two hypotheses as the `disabled` case above, through the OTHER
   // observable difference: the machine also drives the pressed style, and a callback sitting
   // directly in the listener slot cannot. Both must move together.
@@ -248,9 +271,36 @@ describe('pressable host behavior', () => {
     press(node);
     await Promise.resolve();
 
-    expect(committedStyleOf(TEST_ID)).toMatchObject({
+    expect(committedPropsOf(TEST_ID)).toMatchObject({
       opacity: 0.6,
     });
+  });
+
+  // Pressable.js:258, and the whole reason there are TWO formulas rather than one. RN's Pressable
+  // has no press-handler and no disabled leg — a disabled Pressable with no callback stays in the
+  // focus order — so collapsing it onto the Touchable* formula would silently drop it out.
+  it('stays focusable while disabled and handler-less, and opts out only on a literal false', () => {
+    registerPressableBehavior();
+    const node = makePressable();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'disabled', true);
+    const surface = mount(node);
+
+    expect(committedPropsOf(TEST_ID)?.focusable).toBe(true);
+
+    routeProp(node, 'focusable', false);
+    surface.commit();
+    expect(committedPropsOf(TEST_ID)?.focusable).toBe(false);
+  });
+
+  // The control for the pair above: unregistered, nothing computes `focusable`, so neither reading
+  // can be an engine default.
+  it('writes no focusable when the behavior is not registered', () => {
+    const node = makePressable();
+    routeProp(node, 'testID', TEST_ID);
+    mount(node);
+
+    expect(committedPropsOf(TEST_ID)?.focusable).toBeUndefined();
   });
 
   // The other half of keying by tag, and the reason the fix is not "register under the Fabric

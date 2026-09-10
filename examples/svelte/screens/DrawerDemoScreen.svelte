@@ -38,7 +38,7 @@
         <pressable
           testID={`drawer-menu-${route.name}`}
           class="menu-row"
-          onPress={() => slot.navigation.jumpTo(route.name)}
+          p={{ onPress: () => slot.navigation.jumpTo(route.name) }}
         >
           <text class="menu-row-label">
             {slot.descriptors[route.key]?.options.drawerLabel ?? route.name}

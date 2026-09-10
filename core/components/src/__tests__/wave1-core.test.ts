@@ -9,7 +9,6 @@
 import { describe, expect, it } from 'vitest';
 import { flattenStyle } from '@symbiote-native/engine';
 import type { IDescriptor, IDescriptorChild } from '../descriptor';
-import { renderImageBackground } from '../view/render-image-background';
 import { renderInputAccessoryView } from '../view/render-input-accessory-view';
 import { renderModal } from '../view/render-modal';
 import {
@@ -24,59 +23,9 @@ function asDescriptor(child: IDescriptorChild | undefined): IDescriptor {
   return child;
 }
 
-describe('renderImageBackground', () => {
-  const wrapperStyle = { width: 100, height: 80 };
-  const wrapper = renderImageBackground({
-    style: wrapperStyle,
-    imageStyle: { opacity: 0.5 },
-    image: {
-      source: { uri: 'http://x/bg.png' },
-      resizeMode: 'cover',
-      passthrough: { testID: 'bg' },
-    },
-  });
-  const image = asDescriptor(wrapper.children[0]);
-  const imageStyle = flattenStyle(image.props.style);
-
-  it('wraps a view carrying the wrapper style and one structural child', () => {
-    expect(wrapper.type).toBe('view');
-    expect(wrapper.props.style).toBe(wrapperStyle);
-    expect(wrapper.children).toHaveLength(1);
-  });
-
-  it('makes the inner image an absolute-fill image', () => {
-    expect(image.type).toBe('image');
-    expect(imageStyle.position).toBe('absolute');
-    expect(imageStyle.left).toBe(0);
-  });
-
-  it('proxies the wrapper width/height onto the image and lets imageStyle win last', () => {
-    expect(imageStyle.width).toBe(100);
-    expect(imageStyle.height).toBe(80);
-    expect(imageStyle.opacity).toBe(0.5);
-  });
-
-  it('forwards source (resolved to a one-element array), resizeMode and passthrough', () => {
-    expect(Array.isArray(image.props.source)).toBe(true);
-    expect(image.props.source).toHaveLength(1);
-    expect(image.props.resizeMode).toBe('cover');
-    expect(image.props.testID).toBe('bg');
-  });
-
-  // why: RN's Image would otherwise collapse to its source's intrinsic size — the proxy exists
-  // ONLY to counter an explicit wrapper dimension; when the wrapper never set one (auto-sized
-  // wrapper), forcing a numeric 0 onto the image would incorrectly shrink it instead of leaving
-  // it free to size from the source.
-  it('leaves the proxied image dimension unset when the wrapper never set an explicit one', () => {
-    const auto = renderImageBackground({
-      image: { source: { uri: 'http://x/bg.png' }, passthrough: {} },
-    });
-    const autoImage = asDescriptor(auto.children[0]);
-    const autoStyle = flattenStyle(autoImage.props.style);
-    expect(autoStyle.width).toBeUndefined();
-    expect(autoStyle.height).toBeUndefined();
-  });
-});
+// ImageBackground left this file with its render fn: it is a TAG now, and the composition it used
+// to describe is built by the behavior. Its coverage moved to
+// `behaviors/image-background.test.ts`, which asserts the COMMITTED tree rather than a descriptor.
 
 describe('renderInputAccessoryView', () => {
   const style = { flex: 1 };

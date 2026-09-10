@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { hostBehaviorFor } from '@symbiote-native/engine';
 import {
+  BUTTON_TAG,
   HORIZONTAL_SCROLL_VIEW_TAG,
   IMAGE_TAG,
   INPUT_ACCESSORY_VIEW_TAG,
@@ -22,6 +23,7 @@ import {
   SWITCH_TAG,
   TEXT_INPUT_MULTILINE_TAG,
   TEXT_INPUT_TAG,
+  TOUCHABLE_NATIVE_FEEDBACK_TAG,
 } from '@symbiote-native/components';
 
 import './register';
@@ -43,6 +45,8 @@ describe('the React adapter registration', () => {
   it('installs a behavior on every tag it claims', () => {
     const registered = [
       PRESSABLE_TAG,
+      TOUCHABLE_NATIVE_FEEDBACK_TAG,
+      BUTTON_TAG,
       TEXT_INPUT_TAG,
       TEXT_INPUT_MULTILINE_TAG,
       SWITCH_TAG,
@@ -52,6 +56,8 @@ describe('the React adapter registration', () => {
 
     expect(registered).toEqual([
       PRESSABLE_TAG,
+      TOUCHABLE_NATIVE_FEEDBACK_TAG,
+      BUTTON_TAG,
       TEXT_INPUT_TAG,
       TEXT_INPUT_MULTILINE_TAG,
       SWITCH_TAG,

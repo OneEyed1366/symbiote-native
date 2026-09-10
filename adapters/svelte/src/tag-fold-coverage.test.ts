@@ -28,6 +28,8 @@ import {
   type IFakeNode,
 } from '@symbiote-native/test-utils';
 import { HOST_PRIMITIVES } from '@symbiote-native/components/host-primitives';
+import { descriptorFor } from '@symbiote-native/components';
+import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
 import './register';
 import { mount, unmount } from './render';
 
@@ -76,6 +78,20 @@ function expectedFoldOutput(name: string): Record<string, unknown> {
     expected[key] = rule.op === 'notFalse' ? true : rule.value;
   }
   return expected;
+}
+
+// A tag whose descriptor IS the anchor commits no node of its own and folds onto its SINGLE CHILD
+// instead (`touchable-native-feedback` — TouchableNativeFeedback.js:289,339). It still owes the
+// same folded payload; the payload just lands one level down, so the probe has to give it a child
+// to land on. Keyed on the descriptor rather than on the name, so the next such primitive is
+// covered by existing.
+//
+// The locator below still finds it by `testID`, which is one of the props RN's TNF CLONES (:389) —
+// so the child inherits the probe id and the row measures the same thing every other row does.
+function childOf(tag: string): string {
+  return descriptorFor(tag).component === ANCHOR_COMPONENT
+    ? '<view></view>'
+    : '';
 }
 
 async function mountProbe(
@@ -141,12 +157,12 @@ describe('a bare primitive tag commits the folds its spec declares', () => {
 
       const base = NAMES.indexOf(name) * 10 + 9_800;
       const attributes = await mountProbe(
-        `<${tag} id="${PROBE_ID}" testID="${PROBE_TEST_ID}"></${tag}>`,
+        `<${tag} id="${PROBE_ID}" testID="${PROBE_TEST_ID}">${childOf(tag)}</${tag}>`,
         `${name}Attributes.svelte`,
         base + 1,
       );
       const bag = await mountProbe(
-        `<${tag} p={{ id: "${PROBE_ID}", testID: "${PROBE_TEST_ID}" }}></${tag}>`,
+        `<${tag} p={{ id: "${PROBE_ID}", testID: "${PROBE_TEST_ID}" }}>${childOf(tag)}</${tag}>`,
         `${name}Bag.svelte`,
         base + 2,
       );

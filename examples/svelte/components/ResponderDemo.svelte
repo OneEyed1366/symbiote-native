@@ -42,53 +42,57 @@
     {transfer || 'transfer: —'}
   </text>
   <view
-    onMoveShouldSetResponder={(event: ISymbioteEvent) =>
-      grabbed !== null &&
-      Math.abs(firstTouchX(event) - startX) > RESPONDER_STEAL_DX}
-    onResponderGrant={(event: ISymbioteEvent) => {
-      transfer = `↯ strip stole the gesture from chip ${grabbed ?? '?'}`;
-      activeChip = null;
-      chipDx = 0;
-      panStartX = firstTouchX(event);
-      status = 'strip panning';
+    p={{
+      onMoveShouldSetResponder: (event: ISymbioteEvent) =>
+        grabbed !== null &&
+        Math.abs(firstTouchX(event) - startX) > RESPONDER_STEAL_DX,
+      onResponderGrant: (event: ISymbioteEvent) => {
+        transfer = `↯ strip stole the gesture from chip ${grabbed ?? '?'}`;
+        activeChip = null;
+        chipDx = 0;
+        panStartX = firstTouchX(event);
+        status = 'strip panning';
+      },
+      onResponderMove: (event: ISymbioteEvent) =>
+        (rowDx = firstTouchX(event) - panStartX),
+      onResponderRelease: () => {
+        rowDx = 0;
+        status = 'strip released';
+      },
+      onResponderTerminate: () => (rowDx = 0),
     }}
-    onResponderMove={(event: ISymbioteEvent) =>
-      (rowDx = firstTouchX(event) - panStartX)}
-    onResponderRelease={() => {
-      rowDx = 0;
-      status = 'strip released';
-    }}
-    onResponderTerminate={() => (rowDx = 0)}
     class="strip-box"
   >
     <view class="row-tight" style={{ transform: [{ translateX: rowDx }] }}>
       {#each RESPONDER_CHIPS as index (index)}
         <view
           testID={`resp-chip-${index}`}
-          onStartShouldSetResponder={() => true}
-          onResponderGrant={(event: ISymbioteEvent) => {
-            startX = firstTouchX(event);
-            grabbed = index;
-            activeChip = index;
-            chipDx = 0;
-            rowDx = 0;
-            transfer = '';
-            status = `chip ${index} grabbed`;
-          }}
-          onResponderMove={(event: ISymbioteEvent) => {
-            const dx = firstTouchX(event) - startX;
-            chipDx = dx;
-            status = `chip ${index} moving · dx=${Math.round(dx)}`;
-          }}
-          onResponderTerminationRequest={() => true}
-          onResponderTerminate={() => {
-            chipDx = 0;
-            activeChip = null;
-          }}
-          onResponderRelease={() => {
-            chipDx = 0;
-            activeChip = null;
-            status = `chip ${index} released`;
+          p={{
+            onStartShouldSetResponder: () => true,
+            onResponderGrant: (event: ISymbioteEvent) => {
+              startX = firstTouchX(event);
+              grabbed = index;
+              activeChip = index;
+              chipDx = 0;
+              rowDx = 0;
+              transfer = '';
+              status = `chip ${index} grabbed`;
+            },
+            onResponderMove: (event: ISymbioteEvent) => {
+              const dx = firstTouchX(event) - startX;
+              chipDx = dx;
+              status = `chip ${index} moving · dx=${Math.round(dx)}`;
+            },
+            onResponderTerminationRequest: () => true,
+            onResponderTerminate: () => {
+              chipDx = 0;
+              activeChip = null;
+            },
+            onResponderRelease: () => {
+              chipDx = 0;
+              activeChip = null;
+              status = `chip ${index} released`;
+            },
           }}
           class="chip"
           style={{

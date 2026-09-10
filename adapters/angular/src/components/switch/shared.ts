@@ -39,6 +39,7 @@ import {
 export type {
   ISwitchProps,
   ISwitchTrackColor,
+  ISwitchChangeEvent,
 } from '@symbiote-native/components';
 
 export type ISwitchInputs = Pick<

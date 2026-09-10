@@ -108,7 +108,7 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // proving the Angular renderer doesn't hand-roll its own descriptor mapping.
   it('maps additional symbiote intrinsics through the shared descriptor table', async () => {
     const { surface, renderer } = setup();
-    const spinner = renderer.createElement('activity-indicator');
+    const spinner = renderer.createElement('activity-indicator-spinner');
     renderer.setProperty(spinner, 'testID', 'spinner');
     renderer.setProperty(spinner, 'animating', true);
     const image = renderer.createElement('image');

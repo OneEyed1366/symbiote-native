@@ -1,7 +1,6 @@
 <script lang="ts" module>
   import type { Snippet } from 'svelte';
   import { setContext } from 'svelte';
-  import { TouchableOpacity } from '@symbiote-native/svelte';
   import { dlog } from '@symbiote-native/engine';
   import ActionButton from '../ActionButton.svelte';
   import TreeNode from './TreeNode.svelte';
@@ -41,10 +40,9 @@
     showSun = !showSun;
   }
 
-  // {@attach} on a COMPONENT, forwarded for free: TouchableOpacity owns no host tag of its own —
-  // it re-spreads `...rest` onto Pressable, and a symbol-keyed attachment prop survives that
-  // spread with zero forwarding code in TouchableOpacity itself (svelte-adapter-dom-shim skill
-  // §22c, category 2).
+  // {@attach} directly on the `<touchable-highlight>` TAG — no forwarding needed, unlike an
+  // attach on a component (svelte-adapter-dom-shim skill §22c, category 2), because there is no
+  // wrapper standing between this markup and the engine node any more.
   // The run counter is a plain closure variable, exactly as in RunesDemo's $effect: an
   // attachment body runs inside an effect, so `touchableAttachCount += 1` would READ the $state
   // it writes, and Svelte re-runs the effect on its own write forever
@@ -53,9 +51,7 @@
   let attachRunsRaw = 0;
   let touchableAttachCount = $state(0);
   function onTouchableAttach(): void {
-    dlog(
-      'api-playground: {@attach} forwarded through TouchableOpacity -> Pressable',
-    );
+    dlog('api-playground: {@attach} on touchable-highlight fired');
     attachRunsRaw += 1;
     touchableAttachCount = attachRunsRaw;
   }
@@ -97,17 +93,17 @@
     runes mode; kept here for completeness, not the house convention.
   </text>
   <text class="section-label">
-    {'{@attach}'} on a component — forwarded through TouchableOpacity
+    {'{@attach}'} on the touchable-highlight tag
   </text>
-  <TouchableOpacity
+  <touchable-highlight
     testID="composition-touchable"
-    onPress={() => {}}
+    p={{ onPress: () => {} }}
     {@attach onTouchableAttach}
   >
     <text class="pressable-label">
       press, or just mount, to fire the attach
     </text>
-  </TouchableOpacity>
+  </touchable-highlight>
   <text class="info-text" testID="composition-attach-readout">
     {`attach fired: ${touchableAttachCount} time(s)`}
   </text>

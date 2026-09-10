@@ -112,6 +112,50 @@ function reconcile(node: ISymbioteNode, binding: IBinding): void {
   setProp(node, 'collapsable', undefined);
 }
 
+// A style layer a HOST BEHAVIOR owns on its own node, composed OVER the app's style.
+//
+// WHY IT IS NOT AN ORDINARY PROP. TouchableOpacity's press fade is an AnimatedValue that has to
+// beat whatever `opacity` the caller's own style asks for, and `fabricProps` hoists the style slot
+// AFTER every plain prop — so a top-level `opacity` loses to `style={{opacity: 0.6}}`, silently and
+// only for the styled call sites. The layer has to sit INSIDE the style, above the author's.
+//
+// AND IT CANNOT SHARE `raw.style` WITH THE APP. The leaf keys its bound props by name, so the app's
+// next plain `style` write would find `raw.style` holding nothing animated and tear the behavior's
+// binding down. Composing here means that write still sees an animated style — ours — and
+// re-registers the pair instead.
+const behaviorStyles = new WeakMap<ISymbioteNode, unknown>();
+// The gate, matching `anyBinding`: one boolean read on the style branch of every prop write in an
+// app whose behaviors own no animated layer, which is nearly all of them.
+let anyBehaviorStyle = false;
+
+function withBehaviorStyle(node: ISymbioteNode, style: unknown): unknown {
+  if (!anyBehaviorStyle) return style;
+  const layer = behaviorStyles.get(node);
+  return layer === undefined ? style : [style, layer];
+}
+
+/**
+ * Give a node a behavior-owned animated style layer, or drop it by passing `undefined`.
+ *
+ * The seam a lowered `TouchableOpacity` needs: RN runs its press fade from an `Animated.View` whose
+ * style is `[props.style, {opacity: anim}]` (TouchableOpacity.js:302), and a tag has no such
+ * wrapper. The layer is bound to the leaf, never folded into `node.props.style` — so the behavior
+ * can still read the AUTHOR's resting opacity back without seeing its own fade.
+ */
+export function setAnimatedBehaviorStyle(
+  node: ISymbioteNode,
+  style: unknown,
+): void {
+  if (style === undefined) behaviorStyles.delete(node);
+  else {
+    behaviorStyles.set(node, style);
+    anyBehaviorStyle = true;
+  }
+  // Re-register against the style standing right now, so the pair the leaf holds is always
+  // (author, layer) whichever of the two moved last.
+  bindAnimatedValue(node, 'style', node.props.style);
+}
+
 /**
  * Resolve an animated value in a prop, returning what should be published for it.
  *
@@ -125,12 +169,11 @@ export function bindAnimatedValue(
   value: unknown,
 ): unknown {
   const existing = bindings.get(node);
-  const resolved =
-    value instanceof AnimatedNode ||
-    (key === 'style' && styleHoldsAnimated(value))
-      ? rasterize(key, value)
-      : undefined;
-  if (resolved === undefined) {
+  const bound = key === 'style' ? withBehaviorStyle(node, value) : value;
+  const isAnimated =
+    bound instanceof AnimatedNode ||
+    (key === 'style' && styleHoldsAnimated(bound));
+  if (!isAnimated) {
     // A prop that USED to be animated and no longer is: drop it, or the leaf keeps writing a
     // stale value over whatever the app just wrote.
     if (existing !== undefined && Object.hasOwn(existing.raw, key)) {
@@ -147,12 +190,16 @@ export function bindAnimatedValue(
     bindings.set(node, binding);
     anyBinding = true;
   }
-  binding.raw[key] = value;
+  binding.raw[key] = bound;
   // Fabric flattens a view whose props do not require one, and a flattened view has no tag for
   // the native driver to bind to. RN forces the same flag from `reduceAnimatedProps`.
   setProp(node, 'collapsable', false);
   reconcile(node, binding);
-  return resolved;
+  // The AUTHOR's value, rasterized — never the composed one. A behavior's layer reaches Fabric
+  // through the per-frame `setNativeProps` merge, and folding it in here would publish the fade's
+  // own output as the node's declarative style, which the behavior then reads back as resting.
+  const own = rasterize(key, value);
+  return own === undefined ? value : own;
 }
 
 // A handler from `Animated.event(…, { useNativeDriver: true })` written straight onto a tag —

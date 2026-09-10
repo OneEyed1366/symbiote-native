@@ -7,14 +7,53 @@
 
 // Every intrinsic our components.ts emits. A name table must cover exactly these keys,
 // so a missing/renamed primitive is a compile error, not a silent gap at runtime.
+//
+// PUBLIC AND INTERNAL TAGS SIT SIDE BY SIDE HERE WITH NOTHING MARKING WHICH, and a reader's
+// default is that everything in this union is something an app writes. It is not:
+// `scroll-content`, `horizontal-scroll-content`, `text-input-multiline` and
+// `activity-indicator-spinner` are built by a wrapper's render fn or by a behavior's
+// `buildStructure`, and no app names them. So a new entry's comment says which side it is on —
+// asked in a real reading of this file on 2026-09-09, when the spinner rename read as a new
+// tag the developer would have to type.
 export type ISymbioteIntrinsic =
   | 'view'
   // Resolves to the SAME RCTView as a plain view: the tag exists so the host-behavior registry
   // (keyed by tag, never by resolved name) can find the press machine. Registering under RCTView
   // instead would put a press machine on every View in the app.
   | 'pressable'
+  // RN's TouchableOpacity is ONE `Animated.View` carrying the responder handlers and
+  // `style={[props.style, {opacity: anim}]}` (TouchableOpacity.js:302) — not a responder wrapping a
+  // faded child, which is what our wrappers built. So this resolves to the same RCTView as
+  // `pressable` and exists for the same reason: the behavior registry is keyed by tag, and the
+  // opacity machine must not land on every Pressable in the app.
+  | 'touchable-opacity'
+  // The one intrinsic that resolves to NO Fabric view. RN's TouchableNativeFeedback renders
+  // nothing: it clones its props onto `React.Children.only(children)` and returns that
+  // (TouchableNativeFeedback.js:289,339). So the tag maps to the engine's ANCHOR component — a node
+  // the commit walk skips and whose children flatten into its parent — and the behavior registered
+  // for it configures the adopted child instead. Public: an app writes this one.
+  | 'touchable-native-feedback'
+  // Clones onto its single child exactly as TouchableNativeFeedback does
+  // (TouchableWithoutFeedback.js:229,286 — `Children.only` then `cloneElement`), so it resolves to
+  // the ANCHOR the same way and contributes no node of its own. INTERNAL only in the sense that an
+  // app writes the tag; nothing else emits it.
+  | 'touchable-without-feedback'
+  // RN's TouchableHighlight is a real container View (the responder, the underlay color, the
+  // whole accessibility fold) that also clones an extra opacity style onto its single child
+  // (TouchableHighlight.js:281-320). This tag keeps every wrapper's own already-shipped
+  // simplification of folding both styles onto the ONE node instead — resolves to the same RCTView
+  // as `pressable`/`touchable-opacity`, for the same registry-keyed-by-tag reason.
+  | 'touchable-highlight'
+  // RN's Button is a TouchableOpacity wrapping a View wrapping a Text (Button.js:384-390), so the
+  // host is an RCTView exactly like `touchable-opacity` — the behavior builds the other two. Same
+  // registry reason as `pressable`: keyed by tag, so the button's folds cannot land on every View.
+  | 'button'
   | 'text'
   | 'image'
+  // RN's ImageBackground is a View holding an absolutely-filled Image plus the app's children
+  // (ImageBackground.js:74-90), so the host is that View and the behavior builds the image under it.
+  // App-facing.
+  | 'image-background'
   | 'scroll-view'
   | 'scroll-content'
   // Horizontal scroll is a SEPARATE native ViewManager on Android (AndroidHorizontalScrollView),
@@ -48,7 +87,12 @@ export type ISymbioteIntrinsic =
   // and snap-back effect — renders this one instead, or the registry would attach a second,
   // redundant machine to a node whose lifecycle already owns it.
   | 'switch-managed'
+  // The lowered HOST — RN's centering wrapper View (ActivityIndicator.js:112), not the spinner.
+  // The plain name goes to the app-facing tag and the NATIVE view qualifies, the same direction
+  // `pressable` took and the opposite of `text-input-managed`, where the wrapper got there first.
   | 'activity-indicator'
+  // The native spinner itself, built by the host's `buildStructure` and by the wrapper's render fn.
+  | 'activity-indicator-spinner'
   | 'safe-area-view'
   | 'modal'
   | 'refresh-control'

@@ -127,11 +127,6 @@ const tick = (): Promise<void> =>
 // --- Svelte compile harness (same shape as virtualized-list.smoke.test.ts) --------------------
 // No .svelte-aware loader is wired into this repo's Vitest, so every .svelte component in the
 // tree is pre-compiled to a sibling .mjs, with static import specifiers rewritten to match.
-const COMPONENTS_DIR = join(__dirname, '..');
-const REFRESH_CONTROL_OUT = join(
-  COMPONENTS_DIR,
-  '.parity-compiled-refresh-control.mjs',
-);
 const LIST_OUT = join(__dirname, '.parity-compiled-virtualized-list.mjs');
 const ROOT_OUT = join(__dirname, '.parity-compiled-list-root.mjs');
 
@@ -154,18 +149,10 @@ function compileToFile(
 
 function compileSvelteList(): void {
   compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8'),
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
+    readFileSync(join(__dirname, 'index.svelte'), 'utf8'),
+    'VirtualizedList.svelte',
+    LIST_OUT,
   );
-  const list = compile(readFileSync(join(__dirname, 'index.svelte'), 'utf8'), {
-    ...COMPILE_OPTIONS,
-    filename: 'VirtualizedList.svelte',
-  }).js.code.replace(
-    "from '../RefreshControl.svelte'",
-    "from '../.parity-compiled-refresh-control.mjs'",
-  );
-  writeFileSync(LIST_OUT, list);
 }
 
 async function loadSvelteRoot(): Promise<Component> {
@@ -305,7 +292,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  for (const path of [REFRESH_CONTROL_OUT, LIST_OUT, ROOT_OUT]) {
+  for (const path of [LIST_OUT, ROOT_OUT]) {
     rmSync(path, { force: true });
   }
 });

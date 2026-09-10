@@ -3,7 +3,7 @@
   // {@render}/{@const}/{@debug}/{@attach} — every row is Yes. {@html} is the one No row in this
   // category (dead: no innerHTML equivalent, forbidden at build time by
   // preprocessor/forbid-web-only-constructs.ts), so it is not demoed.
-  import { dlog } from '@symbiote-native/engine';
+  import { dlog, whenCommitted } from '@symbiote-native/engine';
   import { hostInstance } from '@symbiote-native/svelte';
   import { isShimElement } from './shim-node-guard';
   import ActionButton from '../ActionButton.svelte';
@@ -65,15 +65,23 @@
     score += delta;
   }
 
-  // {@attach} — measures the box the moment it becomes the live, committed host node.
+  // {@attach} — measures the box once it becomes the live, COMMITTED host node. `{@attach}` fires
+  // the instant the element mounts into Svelte's own tree, which is earlier than the engine's own
+  // commit to Fabric (the same async-commit race `whenCommitted` exists to fix for Vue) — calling
+  // `.measure()` directly here no-ops silently (`measure skipped: node not committed`) and leaves
+  // `measuredWidth` stuck at `undefined` forever, with nothing on screen but "measuring…".
   let measuredWidth = $state<number | undefined>(undefined);
   function measureAttach(node: unknown): void {
     if (!isShimElement(node)) return;
-    dlog(
-      'api-playground: {@attach} received the committed host node, measuring',
-    );
-    hostInstance(node)?.measure((_x, _y, width) => {
-      measuredWidth = width;
+    const host = hostInstance(node);
+    if (host === undefined) return;
+    whenCommitted(host, () => {
+      dlog(
+        'api-playground: {@attach} received the committed host node, measuring',
+      );
+      host.measure((_x, _y, width) => {
+        measuredWidth = width;
+      });
     });
   }
 </script>

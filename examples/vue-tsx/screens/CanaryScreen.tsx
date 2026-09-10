@@ -9,9 +9,10 @@
 // component surface is template-agnostic.
 //
 // Every primitive here (View, Text, ScrollView, TextInput, Image, Switch, ActivityIndicator,
-// Button, Pressable, Modal, FlatList, SectionList, RefreshControl, …) comes from @symbiote-native/vue,
-// not react-native. Kept monolithic on purpose (unlike the React canary, which split each demo
-// section into its own components/*.tsx file) — this screen is a straight relocation of the
+// Pressable, Modal, FlatList, SectionList, RefreshControl, …) comes from @symbiote-native/vue,
+// not react-native — except `<button>`, which is a TAG and needs no import at all. Kept monolithic
+// on purpose (unlike the React canary, which split each demo section into its own
+// components/*.tsx file) — this screen is a straight relocation of the
 // pre-navigation App.tsx content, not a restructuring pass. Run with DEBUG=1 to watch each
 // interaction commit incrementally (only the touched branch clones) in Metro's logs.
 
@@ -31,8 +32,6 @@ import {
   TextInput,
   Image,
   Switch,
-  ActivityIndicator,
-  Button,
   Pressable,
   Modal,
   FlatList,
@@ -191,7 +190,7 @@ const AnimatedDemo = defineComponent({
             style={{ transform: [{ translateX: jsX }] }}
           />
         </View>
-        <Button
+        <button
           testID="slide-js-btn"
           title="Slide (JS driver)"
           onPress={() => slide(jsSlide, jsForward, false)}
@@ -206,7 +205,7 @@ const AnimatedDemo = defineComponent({
             style={{ transform: [{ translateX: nativeX }] }}
           />
         </View>
-        <Button
+        <button
           testID="slide-native-btn"
           title="Slide (native driver)"
           onPress={() => slide(nativeSlide, nativeForward, true)}
@@ -214,7 +213,7 @@ const AnimatedDemo = defineComponent({
         />
 
         {/* Freeze the JS thread 1.5s: native (pulse + green) keep moving, JS (orange) stalls */}
-        <Button title="Freeze JS 1.5s" onPress={freezeJs} color="#fc8181" />
+        <button title="Freeze JS 1.5s" onPress={freezeJs} color="#fc8181" />
       </View>
     );
   },
@@ -328,7 +327,7 @@ const AnimatedParityDemo = defineComponent({
             style={{ transform: [{ translateX: follow }] }}
           />
         </View>
-        <Button
+        <button
           testID="track-btn"
           title="Move target (follower chases)"
           onPress={moveLead}
@@ -350,14 +349,14 @@ const AnimatedParityDemo = defineComponent({
         </View>
         <View class="row-tight">
           <View class="flex1">
-            <Button
+            <button
               title="Scroll ↓"
               onPress={() => scrollBy(40)}
               color="#38b2ac"
             />
           </View>
           <View class="flex1">
-            <Button
+            <button
               title="Scroll ↑"
               onPress={() => scrollBy(-40)}
               color="#38b2ac"
@@ -453,7 +452,7 @@ const NativeModulesDemo = defineComponent({
         <Text class="info-text">
           {`RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`}
         </Text>
-        <Button
+        <button
           title={
             rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'
           }
@@ -465,7 +464,7 @@ const NativeModulesDemo = defineComponent({
         <Text testID="persist-count" class="info-text">
           {`persisted taps: ${persisted.value} · survives relaunch`}
         </Text>
-        <Button
+        <button
           testID="persist-btn"
           title="Persist a tap"
           onPress={persistTap}
@@ -481,7 +480,7 @@ const NativeModulesDemo = defineComponent({
         </View>
         {/* prefetch warms a cold url: not cached → (tap) → cached */}
         <Text class="info-text">{`prefetch cache: ${cacheState.value}`}</Text>
-        <Button title="Prefetch logo" onPress={prefetchLogo} color="#42b883" />
+        <button title="Prefetch logo" onPress={prefetchLogo} color="#42b883" />
       </View>
     );
   },
@@ -540,7 +539,7 @@ const RefApiDemo = defineComponent({
         >{`frame: ${frame.value}`}</Text>
         <View class="row">
           <View class="flex1">
-            <Button
+            <button
               testID="measure-btn"
               title="Measure"
               onPress={onMeasure}
@@ -548,7 +547,7 @@ const RefApiDemo = defineComponent({
             />
           </View>
           <View class="flex1">
-            <Button
+            <button
               title="Flash (setNativeProps)"
               onPress={onFlash}
               color="#f6ad55"
@@ -643,7 +642,7 @@ const CompoundClassDemo = defineComponent({
             ? 'dynamic badge carries both tokens — accent border, same pill shape'
             : 'dynamic badge carries only .badge — grey border'}
         </Text>
-        <Button
+        <button
           testID="compound-badge-toggle"
           title={isLoud.value ? 'Drop .loud' : 'Add .loud'}
           onPress={() => (isLoud.value = !isLoud.value)}
@@ -917,7 +916,7 @@ const ParityDemo = defineComponent({
           class="focus-input"
         />
         <Text class="note-text">{dismissMsg.value}</Text>
-        <Button
+        <button
           title="Hide keyboard"
           onPress={() => Keyboard.dismiss()}
           color="#42b883"
@@ -961,7 +960,7 @@ const ParityDemo = defineComponent({
         </FlatList>
         <View class="row">
           <View class="flex1">
-            <Button
+            <button
               title="Scroll ▼ animated"
               onPress={() =>
                 listRef.value?.scrollToOffset({
@@ -973,7 +972,7 @@ const ParityDemo = defineComponent({
             />
           </View>
           <View class="flex1">
-            <Button
+            <button
               title="Top · instant"
               onPress={() =>
                 listRef.value?.scrollToOffset({ offset: 0, animated: false })
@@ -1014,7 +1013,7 @@ const ParityDemo = defineComponent({
 
         {/* #14 a11y focus: node-based sendAccessibilityEvent routes through the Fabric
             slot on both platforms (enable TalkBack/VoiceOver to feel the focus jump) */}
-        <Button
+        <button
           title="Focus the panel title (a11y)"
           onPress={() => {
             if (titleRef.value !== null) {
@@ -1229,7 +1228,7 @@ export const CanaryScreen = defineComponent({
           {/* JS->native StatusBar controls: watch the top strip react */}
           <View class="row">
             <View class="flex1">
-              <Button
+              <button
                 title={
                   statusBarHidden.value ? 'Show status bar' : 'Hide status bar'
                 }
@@ -1240,7 +1239,7 @@ export const CanaryScreen = defineComponent({
               />
             </View>
             <View class="flex1">
-              <Button
+              <button
                 title={darkStatusBar.value ? 'Light text' : 'Dark text'}
                 onPress={() => {
                   darkStatusBar.value = !darkStatusBar.value;
@@ -1255,7 +1254,7 @@ export const CanaryScreen = defineComponent({
           {Platform.OS === 'android' && (
             <View class="row">
               <View class="flex1">
-                <Button
+                <button
                   title={statusBarRed.value ? 'BG default' : 'BG red'}
                   onPress={() => {
                     const next = !statusBarRed.value;
@@ -1269,7 +1268,7 @@ export const CanaryScreen = defineComponent({
                 />
               </View>
               <View class="flex1">
-                <Button
+                <button
                   title={statusBarTranslucent.value ? 'Opaque' : 'Translucent'}
                   onPress={() => {
                     const next = !statusBarTranslucent.value;
@@ -1285,13 +1284,13 @@ export const CanaryScreen = defineComponent({
             Each working button proves its module name resolved on the bridgeless host. */}
           <View class="row">
             <View class="flex1">
-              <Button title="Alert" onPress={onAlert} color="#42b883" />
+              <button title="Alert" onPress={onAlert} color="#42b883" />
             </View>
             {/* ActionSheetIOS drives the iOS-only ActionSheetManager; no Android native
               module exists, so the control is iOS-only by design (not a gap). */}
             {Platform.OS !== 'android' && (
               <View class="flex1">
-                <Button
+                <button
                   title="Action sheet"
                   onPress={onActionSheet}
                   color="#42b883"
@@ -1301,24 +1300,24 @@ export const CanaryScreen = defineComponent({
           </View>
           <View class="row">
             <View class="flex1">
-              <Button title="Share" onPress={onShare} color="#42b883" />
+              <button title="Share" onPress={onShare} color="#42b883" />
             </View>
             <View class="flex1">
-              <Button
+              <button
                 title="Vibrate"
                 onPress={() => Vibration.vibrate()}
                 color="#42b883"
               />
             </View>
           </View>
-          <Button title="Open vuejs.org" onPress={onOpenUrl} color="#42b883" />
+          <button title="Open vuejs.org" onPress={onOpenUrl} color="#42b883" />
 
           {/* The native UIRefreshControl spinner only shows while iOS holds the scroll
             view pulled-down; our full re-commit snaps the offset back, so we drive
             our OWN indicator from the same `refreshing` flag, guaranteed visible. */}
           {refreshing.value ? (
             <View class="refresh-row">
-              <ActivityIndicator color="#42b883" />
+              <activity-indicator color="#42b883" />
               <Text class="accent-note">Refreshing…</Text>
             </View>
           ) : (
@@ -1367,7 +1366,7 @@ export const CanaryScreen = defineComponent({
               trackColor={{ false: '#334155', true: '#369870' }}
             />
           </View>
-          <ActivityIndicator
+          <activity-indicator
             testID="spinner-indicator"
             animating={spinning.value}
             color="#42b883"
@@ -1425,7 +1424,7 @@ export const CanaryScreen = defineComponent({
           <ParityDemo />
 
           {/* Button opens a Modal */}
-          <Button
+          <button
             testID="modal-open"
             title="Open modal"
             onPress={() => {
@@ -1553,7 +1552,7 @@ export const CanaryScreen = defineComponent({
               } satisfies IFlatListSlots<{ id: string; label: string }>
             }
           </FlatList>
-          <Button
+          <button
             title="Prepend 5"
             color="#42b883"
             onPress={() => {
@@ -1601,7 +1600,7 @@ export const CanaryScreen = defineComponent({
             the box above DURING the freeze. If the bar keeps fading/lifting while JS is
             frozen, the scroll event drives parityScrollY on the UI thread (native attach).
             If it sticks until the thread frees, it was JS-driven. */}
-          <Button
+          <button
             title="Freeze JS 3s — then scroll the box ↑"
             color="#fc8181"
             onPress={() => {
@@ -1712,7 +1711,7 @@ export const CanaryScreen = defineComponent({
                   Rendered through ModalHostView — its own native window, same
                   Fabric tree.
                 </Text>
-                <Button
+                <button
                   testID="modal-close"
                   title="Close"
                   onPress={() => {
@@ -1729,7 +1728,7 @@ export const CanaryScreen = defineComponent({
               repaints on the ONE patch this tree already does. This file's metro.config.js
               aliases 'vue' straight to @vue/runtime-core, so Teleport is imported explicitly
               from @symbiote-native/vue/runtime-helpers (its validating wrapper), not from 'vue'. */}
-          <Button
+          <button
             testID="toast-open"
             title="Show toast (Teleport)"
             onPress={() => {
@@ -1742,7 +1741,7 @@ export const CanaryScreen = defineComponent({
               {toastVisible.value && (
                 <View testID="toast-card" class="modal-card">
                   <Text class="modal-body">Ported via Teleport ✦</Text>
-                  <Button
+                  <button
                     testID="toast-dismiss"
                     title="Dismiss"
                     onPress={() => {
@@ -1760,7 +1759,7 @@ export const CanaryScreen = defineComponent({
               below) reads it back through its OWN normal render, wherever that happens to be
               mounted, even a different surface. tunnelDemo is the module-level singleton from
               ../tunnel-demo.ts. */}
-          <Button
+          <button
             testID="tunnel-toast-open"
             title="Show toast (createTunnel)"
             onPress={() => {
@@ -1772,7 +1771,7 @@ export const CanaryScreen = defineComponent({
             <tunnelDemo.In>
               <View testID="tunnel-toast-card" class="modal-card">
                 <Text class="modal-body">Ported via createTunnel ✦</Text>
-                <Button
+                <button
                   testID="tunnel-toast-dismiss"
                   title="Dismiss"
                   onPress={() => {

@@ -115,16 +115,17 @@ describe('Solid Switch on the engine', () => {
       expect(props.accessibilityState).toEqual({ disabled: true });
     });
 
-    // why: RN's onValueChange hands the caller both the derived boolean and the raw event — a
-    // consumer reading `event.nativeEvent.value` (RN's older pattern) must still work.
+    // why: onValueChange hands the caller ONE event, with the derived boolean carried as
+    // `.value` — a consumer reading `event.nativeEvent.value` (RN's own event shape) must still
+    // work.
     it('derives onValueChange with both the value and the raw event', async () => {
       let changedValue: boolean | undefined;
       let rawEventValue: unknown;
       mount(ROOT_TAG, () => (
         <Switch
           value={false}
-          onValueChange={(next, event) => {
-            changedValue = next;
+          onValueChange={event => {
+            changedValue = event.value;
             rawEventValue = event.nativeEvent.value;
           }}
         />
@@ -200,7 +201,10 @@ describe('Solid Switch on the engine', () => {
     it('issues no snap-back command when the parent accepts the toggle', async () => {
       const [value, setValue] = createSignal(false);
       mount(ROOT_TAG, () => (
-        <Switch value={value()} onValueChange={setValue} />
+        <Switch
+          value={value()}
+          onValueChange={event => setValue(event.value)}
+        />
       ));
       await tick();
 

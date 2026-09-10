@@ -37,10 +37,6 @@ const SECTIONS = [
 // tree is pre-compiled to a sibling .mjs with its static import specifiers rewritten. The
 // `.section-smoke-` prefix keeps these artifacts distinct from the other suites' temp files.
 const COMPONENTS_DIR = join(__dirname, '..');
-const REFRESH_CONTROL_OUT = join(
-  COMPONENTS_DIR,
-  '.section-smoke-compiled-refresh-control.mjs',
-);
 const LIST_OUT = join(
   COMPONENTS_DIR,
   'virtualized-list',
@@ -82,22 +78,13 @@ function compileToFile(
 
 function compileSectionListTree(): void {
   compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8'),
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
-  );
-
-  const list = compile(
     readFileSync(
       join(COMPONENTS_DIR, 'virtualized-list', 'index.svelte'),
       'utf8',
     ),
-    { ...COMPILE_OPTIONS, filename: 'VirtualizedList.svelte' },
-  ).js.code.replace(
-    "from '../RefreshControl.svelte'",
-    "from '../.section-smoke-compiled-refresh-control.mjs'",
+    'VirtualizedList.svelte',
+    LIST_OUT,
   );
-  writeFileSync(LIST_OUT, list);
 
   const sectionList = compile(
     readFileSync(join(__dirname, 'index.svelte'), 'utf8'),
@@ -148,7 +135,6 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(REFRESH_CONTROL_OUT, { force: true });
   rmSync(LIST_OUT, { force: true });
   rmSync(SECTION_LIST_OUT, { force: true });
   rmSync(WRAPPER_OUT, { force: true });

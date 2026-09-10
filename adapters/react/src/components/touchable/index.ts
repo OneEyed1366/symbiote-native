@@ -7,8 +7,8 @@
 //   TouchableHighlight: the underlay machine drives a `shown` flag (NOT `pressed` — RN holds the
 //     underlay for delayPressOut past the tap); the container takes the underlay color and the
 //     child takes the lowered opacity, RN's split.
-//   TouchableWithoutFeedback: the same press-timing machine with the visual half left empty —
-//     "without feedback" means no VISUAL, not no timing.
+// TouchableWithoutFeedback and TouchableNativeFeedback have left this file: both render no view of
+// their own upstream, so both are tags now.
 
 import {
   Children,
@@ -28,6 +28,7 @@ import {
   createTouchableFeedbackRuntime,
   hasTouchablePressHandler,
   resolveHighlightExtraStyles,
+  resolveTouchableFocusable,
   restingOpacityFromStyle,
   DEFAULT_ACTIVE_OPACITY,
   OPACITY_ACTIVE_GRANT_DURATION_MS,
@@ -150,7 +151,20 @@ export const TouchableOpacity: FC<ITouchableOpacityProps> = props => {
 
   return createElement(
     Pressable,
-    { ...rest, disabled, onPressIn: handlePressIn, onPressOut: handlePressOut },
+    {
+      ...rest,
+      disabled,
+      // TouchableOpacity.js:336-340. Resolved HERE, from the app's own `onPress`, and handed down —
+      // Pressable sees a boolean and leaves it alone. Doing it inside Pressable would read the
+      // wrapped handlers this family always supplies and never resolve false.
+      focusable: resolveTouchableFocusable(
+        rest.focusable,
+        rest.onPress !== undefined,
+        disabled,
+      ),
+      onPressIn: handlePressIn,
+      onPressOut: handlePressOut,
+    },
     createElement(
       Animated.View,
       { style: [style, { opacity }], className },
@@ -241,6 +255,12 @@ export const TouchableHighlight: FC<ITouchableHighlightProps> = props => {
     {
       ...rest,
       style: extraStyles === undefined ? style : [style, extraStyles.underlay],
+      // TouchableHighlight.js:370-374 — see TouchableOpacity above for why it is resolved here.
+      focusable: resolveTouchableFocusable(
+        rest.focusable,
+        onPress !== undefined,
+        rest.disabled,
+      ),
       onPress: handlePress,
       onPressIn: handlePressIn,
       onPressOut: handlePressOut,
@@ -251,49 +271,8 @@ export const TouchableHighlight: FC<ITouchableHighlightProps> = props => {
   );
 };
 
-export type ITouchableWithoutFeedbackProps = ITouchableBaseProps;
-
-export const TouchableWithoutFeedback: FC<
-  ITouchableWithoutFeedbackProps
-> = props => {
-  const {
-    children,
-    onPressIn,
-    onPressOut,
-    delayPressIn = 0,
-    delayPressOut = 0,
-    minPressDuration = TOUCHABLE_MIN_PRESS_DURATION_MS,
-    ...rest
-  } = props;
-
-  // RN's TouchableWithoutFeedback builds a FULL Pressability config with delayPressIn /
-  // delayPressOut / minPressDuration: 0 — the same shared machine TouchableOpacity uses, with the
-  // visual half left empty. Spreading the delay props onto Pressable instead did nothing: it does
-  // not read them, and they leaked to the host as unknown props.
-  const runtime = useRef(createTouchableFeedbackRuntime()).current;
-
-  const { handlePressIn, handlePressOut } = createTouchableFeedbackHandlers(
-    {
-      delayPressIn,
-      delayPressOut,
-      minPressDuration,
-      schedule: scheduleTimeout,
-      now: Date.now,
-    },
-    runtime,
-    {
-      activate(event) {
-        onPressIn?.(event);
-      },
-      deactivate(event) {
-        onPressOut?.(event);
-      },
-    },
-  );
-
-  return createElement(
-    Pressable,
-    { ...rest, onPressIn: handlePressIn, onPressOut: handlePressOut },
-    children,
-  );
-};
+// TouchableWithoutFeedback is a TAG — `<touchable-without-feedback>`. RN's own renders no view
+// (TouchableWithoutFeedback.js:229,286), so the wrapper's Pressable node was ours; the press
+// machine, the delay scheduler and the clone all live on the engine node
+// (`core/components/src/behaviors/touchable-without-feedback.ts`), wired by `../../register`. The
+// prop type stays, in `../touchable-without-feedback/`.

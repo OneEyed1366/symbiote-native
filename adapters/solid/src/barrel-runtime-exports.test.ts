@@ -69,7 +69,6 @@ const ADAPTER_VALUES = [
   'SafeAreaView',
   'Image',
   'Pressable',
-  'ActivityIndicator',
   'Switch',
   'TextInput',
   'Modal',

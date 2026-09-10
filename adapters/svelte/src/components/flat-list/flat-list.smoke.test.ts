@@ -47,15 +47,6 @@ const LIST_OUT = join(
   'virtualized-list',
   '.smoke-compiled-virtualized-list-for-flat-list.mjs',
 );
-// VirtualizedList's index.svelte statically imports the REAL RefreshControl.svelte (gap 2). No
-// `.svelte`-aware loader is wired into this repo's Vitest, so it must ALSO be pre-compiled to a
-// co-located sibling `.mjs` here, with a name distinct from virtualized-list.smoke.test.ts's and
-// scroll-view.smoke.test.ts's own compiled-RefreshControl outputs for the same concurrency reason.
-const REFRESH_CONTROL_OUT = join(
-  __dirname,
-  '..',
-  '.smoke-compiled-refresh-control-for-flat-list.mjs',
-);
 const FLAT_OUT = join(__dirname, '.smoke-compiled-flat-list.mjs');
 const ROOT_OUT = join(__dirname, '.smoke-compiled-flat-root.mjs');
 const REFRESH_ROOT_OUT = join(
@@ -80,7 +71,6 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(REFRESH_CONTROL_OUT, { force: true });
   rmSync(LIST_OUT, { force: true });
   rmSync(FLAT_OUT, { force: true });
   rmSync(ROOT_OUT, { force: true });
@@ -107,35 +97,16 @@ const ITEM_COUNT = 60;
 const DEFAULT_INITIAL_NUM_TO_RENDER = 10;
 
 function compileFlatListWithVirtualizedList(): void {
-  // VirtualizedList's real source imports the REAL RefreshControl.svelte — compile it too, into
-  // the exact relative location ('../RefreshControl.svelte' from virtualized-list/'s own compiled
-  // sibling) so that import resolves, then rewrite the compiled VirtualizedList's specifier the
-  // same way scroll-view.smoke.test.ts / virtualized-list.smoke.test.ts do.
-  const refreshControlSource = readFileSync(
-    join(__dirname, '..', 'RefreshControl.svelte'),
-    'utf8',
-  );
-  compileToFile(
-    refreshControlSource,
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
-  );
-
   // FlatList's own compiled output imports '../virtualized-list/index.svelte' — compile the real
   // VirtualizedList into that exact relative location so the import resolves.
-  const listSource = readFileSync(
-    join(__dirname, '..', 'virtualized-list', 'index.svelte'),
-    'utf8',
+  compileToFile(
+    readFileSync(
+      join(__dirname, '..', 'virtualized-list', 'index.svelte'),
+      'utf8',
+    ),
+    'VirtualizedList.svelte',
+    LIST_OUT,
   );
-  const listResult = compile(listSource, {
-    ...COMPILE_OPTIONS,
-    filename: 'VirtualizedList.svelte',
-  });
-  const rewrittenListSource = listResult.js.code.replace(
-    "from '../RefreshControl.svelte'",
-    "from '../.smoke-compiled-refresh-control-for-flat-list.mjs'",
-  );
-  writeFileSync(LIST_OUT, rewrittenListSource);
 
   // Redirect FlatList's real `'../virtualized-list/index.svelte'` import to the compiled sibling
   // written above (compile() does not rewrite import specifiers, and plain Node ESM cannot import
@@ -331,7 +302,7 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       );
       expect(
         refresh,
-        'a real RefreshControl.svelte painted PullToRefreshView',
+        'refresh-control painted PullToRefreshView',
       ).toBeDefined();
       expect(refresh?.props.refreshing).toBe(true);
       expect(

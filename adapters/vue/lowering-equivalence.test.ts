@@ -182,7 +182,34 @@ async function tsxArm(name: string, lowered: boolean): Promise<IArm> {
   return { committed: await mountArm(evaluate(code)), code };
 }
 
-const NAMES = Object.keys(HOST_PRIMITIVES);
+// Primitives with NO component spelling left, so there is nothing for the tag arm to be equal TO.
+//
+// NAMED, and it replaced a derivation that looked stronger and was not: the filter here read
+// `descriptorFor(intrinsic).component !== ANCHOR_COMPONENT`, which described
+// `touchable-native-feedback` by ACCIDENT — that primitive is both wrapperless and nodeless, and
+// the filter keyed on the second. `Button` is wrapperless and an ordinary `RCTView`, so it walked
+// straight through and this file asked for a component that no longer exists. Wrapperlessness is
+// not visible in the descriptor table, and no other table in the repo carries it.
+//
+// Safe in BOTH directions, which is what a subtraction from a derived list buys: a NEW primitive is
+// not in here, joins `NAMES`, and fails below for want of a mount; a primitive whose wrapper is
+// deleted without an entry here fails on its component arm. Each member's own coverage is its
+// `src/*-tag.test.ts` (node count + a fold) plus the behavior's own suite in `core/components`.
+const TAG_ONLY: readonly string[] = [
+  'TouchableNativeFeedback',
+  'TouchableWithoutFeedback',
+  'Button',
+  'ImageBackground',
+  // Wrapperless since 2026-09-09, same shape as `Button`: the behavior builds RN's centering View
+  // plus the native spinner (ActivityIndicator.js:112), so there is no component spelling left to
+  // compare against. Coverage is `src/activity-indicator-tag.test.ts` (node count + the routing
+  // split) and `core/components/src/behaviors/activity-indicator/activity-indicator.test.ts`.
+  'ActivityIndicator',
+];
+
+const NAMES = Object.keys(HOST_PRIMITIVES).filter(
+  name => !TAG_ONLY.includes(name),
+);
 
 // Vue's substitute for the shared `assertArmsAreDistinct`, which is NOT usable here. That control
 // compares RETAINED NODE COUNTS, on the premise that a component form allocates a wrapper node the
@@ -226,6 +253,11 @@ describe('the spec still declares something worth comparing', () => {
   // spec that stopped declaring.
   it('carries primitives, and at least one fold to observe', () => {
     expect(NAMES.length).toBeGreaterThan(0);
+    // A `TAG_ONLY` member the spec no longer names excludes nothing and reads as a live exclusion.
+    expect(
+      TAG_ONLY.filter(name => HOST_PRIMITIVES[name] === undefined),
+      'a tag-only entry names no primitive — the exclusion is stale',
+    ).toEqual([]);
     expect(
       NAMES.filter(
         name => Object.keys(HOST_PRIMITIVES[name].aliases).length > 0,

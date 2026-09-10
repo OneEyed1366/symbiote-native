@@ -41,6 +41,7 @@ import { mount, unmount } from './render';
 import { Image } from './components/image';
 import { InputAccessoryView } from './components/input-accessory-view';
 import { Pressable } from './components/pressable';
+import { RefreshControl } from './components/refresh-control';
 import { SafeAreaView } from './components/safe-area-view';
 import { Switch } from './components/switch';
 import { Text } from './components/text';
@@ -101,6 +102,38 @@ afterEach(() => {
 const PROBE = { id: 'probe-id', testID: 'probe' };
 const FOLDED = { nativeID: 'probe-id', testID: 'probe' };
 
+// Primitives with NO component spelling left, so there is nothing for the tag arm to be equal TO.
+//
+// NAMED, and it replaced a derivation that looked stronger and was not: this read
+// `descriptorFor(intrinsic).component !== ANCHOR_COMPONENT`, which described
+// `touchable-native-feedback` by ACCIDENT — that primitive is both wrapperless and nodeless, and
+// the filter keyed on the second. `Button` is wrapperless and an ordinary `RCTView`, so it walked
+// straight through and this file asked for a component that no longer exists. Wrapperlessness is
+// not visible in the descriptor table, and no other table in the repo carries it.
+//
+// Safe in BOTH directions, which is what a subtraction from a derived list buys: a NEW primitive is
+// not in here, joins `PAIRED`, and fails the completeness row below; a primitive whose wrapper is
+// deleted without an entry here fails to compile its own `CASES` row. Each member's own coverage is
+// its `src/*-tag.test.tsx` (node count + a fold) plus the behavior's suite in `core/components`.
+const TAG_ONLY: readonly string[] = [
+  'TouchableNativeFeedback',
+  // The second anchor-backed primitive, same reason: it clones onto its single child and commits no
+  // node of its own (TouchableWithoutFeedback.js:229,286). Coverage is the behavior's own suite in
+  // `core/components/src/behaviors/touchable-without-feedback.test.ts`.
+  'TouchableWithoutFeedback',
+  'Button',
+  'ImageBackground',
+  // Wrapperless since 2026-09-09, same shape as `Button`: the behavior builds RN's centering View
+  // plus the native spinner (ActivityIndicator.js:112), so there is no component spelling left to
+  // compare against. Coverage is `src/activity-indicator-tag.test.tsx` (node count + the routing
+  // split) and `core/components/src/behaviors/activity-indicator/activity-indicator.test.ts`.
+  'ActivityIndicator',
+];
+
+const PAIRED = Object.keys(HOST_PRIMITIVES).filter(
+  name => !TAG_ONLY.includes(name),
+);
+
 interface ICase {
   component: () => JSX.Element;
   lowered: () => JSX.Element;
@@ -146,6 +179,14 @@ const CASES: Record<string, ICase> = {
     component: () => <InputAccessoryView {...PROBE} />,
     lowered: () => <input-accessory-view {...PROBE} />,
     expected: FOLDED,
+  },
+  // `refreshing` is required on the component and is the primitive's whole controlled surface, so
+  // it has to be in the probe on both arms — a case without it would compare two payloads that
+  // differ from a real one in exactly the key the behavior reads.
+  RefreshControl: {
+    component: () => <RefreshControl {...PROBE} refreshing={false} />,
+    lowered: () => <refresh-control {...PROBE} refreshing={false} />,
+    expected: { ...FOLDED, refreshing: false },
   },
   SafeAreaView: {
     component: () => <SafeAreaView {...PROBE} />,
@@ -193,10 +234,26 @@ describe('Solid: a lowered primitive commits what its component commits', () => 
 
   // §24: the list must GROW. Derived from the spec, so a ninth primitive fails here by name rather
   // than being silently uncovered.
-  it('declares a mount pair for every lowered primitive', () => {
-    expect(Object.keys(CASES).sort()).toEqual(
-      Object.keys(HOST_PRIMITIVES).sort(),
-    );
+  //
+  // MINUS the primitives that have no SECOND spelling to compare against, and that set is derived
+  // from the descriptor table rather than written down. A tag whose descriptor is the engine's
+  // ANCHOR commits no node at all — `touchable-native-feedback` clones onto its single child
+  // instead (TouchableNativeFeedback.js:289,339) — so there is no component wrapper, nothing for
+  // the lowered arm to be equal TO, and `assertCommittedSomething` would fail on an empty tree that
+  // is correct. Its own coverage is `touchable-native-feedback-tag.test.tsx` (node count + clone)
+  // and `core/components/src/behaviors/touchable-native-feedback.test.ts`.
+  it('declares a mount pair for every primitive that HAS two spellings', () => {
+    expect(Object.keys(CASES).sort()).toEqual(PAIRED.sort());
+  });
+
+  // Without this the exclusion could swallow the whole list and every row below would vanish.
+  it('control: the exclusion left something to compare', () => {
+    expect(PAIRED.length).toBeGreaterThan(0);
+    // A `TAG_ONLY` member the spec no longer names excludes nothing and reads as a live exclusion.
+    expect(
+      TAG_ONLY.filter(name => HOST_PRIMITIVES[name] === undefined),
+      'a tag-only entry names no primitive — the exclusion is stale',
+    ).toEqual([]);
   });
 
   describe.each(Object.keys(CASES))('%s', name => {

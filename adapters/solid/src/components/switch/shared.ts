@@ -37,7 +37,10 @@ import {
 } from '@symbiote-native/engine';
 import { descriptorToSolid } from '../../descriptor-to-solid';
 
-export type { ISwitchTrackColor } from '@symbiote-native/components';
+export type {
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from '@symbiote-native/components';
 
 // The agnostic base (the controlled value contract, colors, style, accessibility) is shared and
 // re-exported rather than redeclared; only the class-styling field is per-adapter, and Solid's
@@ -89,7 +92,7 @@ export function createSwitch(
         `Switch onChange value=${String(next)} eventCount=${String(event.nativeEvent.eventCount)}`,
       );
       if (next === undefined) return;
-      props.onValueChange?.(next, event);
+      props.onValueChange?.(Object.assign(event, { value: next }));
       setNativeReport(current =>
         switchReducer(current, { type: 'native-reported', value: next }),
       );

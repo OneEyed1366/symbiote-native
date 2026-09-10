@@ -41,10 +41,10 @@
 
 <view class={isSelected ? 'bench-row bench-row-selected' : 'bench-row'}>
   <text class="bench-row-id">{String(row.id)}</text>
-  <pressable class="flex1" onPress={() => onSelect(row.id)}>
+  <pressable class="flex1" p={{ onPress: () => onSelect(row.id) }}>
     <text class="bench-row-label">{row.label}</text>
   </pressable>
-  <pressable class="bench-row-remove" onPress={() => onRemove(row.id)}>
+  <pressable class="bench-row-remove" p={{ onPress: () => onRemove(row.id) }}>
     <text class="bench-row-remove-text">×</text>
   </pressable>
   <text-input class="bench-row-input" value={row.label}></text-input>

@@ -3,6 +3,8 @@
 // device-verify-pending: source-confirmed from RN's Android ViewManagers, proven on a
 // real host by the absence of a "Can't find ViewManager '<name>'" red box.
 
+import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
+
 import {
   buildDescriptors,
   makeDescriptorFor,
@@ -13,8 +15,15 @@ export type { ISymbioteIntrinsic, IComponentDescriptor } from './shared';
 const ANDROID_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   view: 'RCTView',
   pressable: 'RCTView',
+  'touchable-opacity': 'RCTView',
+  // NOT a view name — TNF commits nothing at all, on either platform. See `shared.ts`.
+  'touchable-native-feedback': ANCHOR_COMPONENT,
+  'touchable-without-feedback': ANCHOR_COMPONENT,
+  'touchable-highlight': 'RCTView',
+  button: 'RCTView',
   text: 'RCTText',
   image: 'RCTImageView',
+  'image-background': 'RCTView',
   'scroll-view': 'RCTScrollView',
   // RN's VScrollContentViewNativeComponent is `Platform.OS === 'android' ? View : …`,
   // so a vertical scroll's content is a plain RCTView on Android, not RCTScrollContentView.
@@ -35,7 +44,8 @@ const ANDROID_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   // The wrapper's tag — same native view, a tag the behavior registry does not carry. See
   // `shared.ts` for why the wrapper may not share the lowered tag.
   'switch-managed': 'AndroidSwitch',
-  'activity-indicator': 'AndroidProgressBar',
+  'activity-indicator': 'RCTView',
+  'activity-indicator-spinner': 'AndroidProgressBar',
   // KNOWN DIVERGENCE FROM REACT NATIVE, and it is in our favour — recorded 2026-09-01 because it
   // was arrived at by accident, not decided. Upstream `SafeAreaView.js` is
   // `Platform.select({ ios: RCTSafeAreaViewNativeComponent, default: View })`, so RN's own JS

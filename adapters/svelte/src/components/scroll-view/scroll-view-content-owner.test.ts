@@ -38,11 +38,6 @@ const COMPONENTS_DIR = join(__dirname, '..');
 // Names distinct from every other suite's compiled output: these files sit in the REAL source
 // directories (so each compiled module's own relative imports keep resolving) and the suites run
 // concurrently, so a shared name is a race.
-const REFRESH_CONTROL_OUT = join(
-  COMPONENTS_DIR,
-  '.owner-compiled-refresh-control.mjs',
-);
-const SCROLL_VIEW_OUT = join(__dirname, '.owner-compiled-scroll-view.mjs');
 const LIST_OUT = join(
   COMPONENTS_DIR,
   'virtualized-list',
@@ -67,12 +62,7 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  for (const path of [
-    REFRESH_CONTROL_OUT,
-    SCROLL_VIEW_OUT,
-    LIST_OUT,
-    ...ROOT_NAMES.map(rootOutFor),
-  ]) {
+  for (const path of [LIST_OUT, ...ROOT_NAMES.map(rootOutFor)]) {
     rmSync(path, { force: true });
   }
 });
@@ -96,32 +86,12 @@ function compileToFile(
 
 function compileTree(): void {
   compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8'),
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
-  );
-  writeFileSync(
-    SCROLL_VIEW_OUT,
-    compile(readFileSync(join(__dirname, 'index.svelte'), 'utf8'), {
-      ...COMPILE_OPTIONS,
-      filename: 'ScrollView.svelte',
-    }).js.code.replace(
-      "from '../RefreshControl.svelte'",
-      "from '../.owner-compiled-refresh-control.mjs'",
+    readFileSync(
+      join(COMPONENTS_DIR, 'virtualized-list', 'index.svelte'),
+      'utf8',
     ),
-  );
-  writeFileSync(
+    'VirtualizedList.svelte',
     LIST_OUT,
-    compile(
-      readFileSync(
-        join(COMPONENTS_DIR, 'virtualized-list', 'index.svelte'),
-        'utf8',
-      ),
-      { ...COMPILE_OPTIONS, filename: 'VirtualizedList.svelte' },
-    ).js.code.replace(
-      "from '../RefreshControl.svelte'",
-      "from '../.owner-compiled-refresh-control.mjs'",
-    ),
   );
 }
 
@@ -130,7 +100,6 @@ async function loadRoot(name: string, body: string): Promise<Component> {
   compileTree();
   compileToFile(
     `<script>
-       import ScrollView from './.owner-compiled-scroll-view.mjs';
        import VirtualizedList from '../virtualized-list/.owner-compiled-virtualized-list.mjs';
        const DATA = [{ id: 0 }, { id: 1 }, { id: 2 }];
        function getItem(source, index) { return source[index]; }
@@ -200,29 +169,32 @@ async function mountRoot(name: string, body: string): Promise<void> {
 }
 
 describe('the engine is the only builder of a ScrollView content node', () => {
-  it('ScrollView, vertical', async () => {
+  it('scroll-view, vertical', async () => {
     await mountRoot(
       'sv-v',
-      '<ScrollView><text p={{ text: "sv-v" }}></text></ScrollView>',
+      '<scroll-view><text p={{ text: "sv-v" }}></text></scroll-view>',
     );
     assertSingleContentNode('sv-v');
   });
 
-  it('ScrollView, horizontal', async () => {
+  // The AXIS comes from the tag, never from a prop — that is what keeps the native component, the
+  // row content style and the payload flag from disagreeing (RN derives all three from one prop,
+  // so the mismatch is unrepresentable there).
+  it('horizontal-scroll-view', async () => {
     await mountRoot(
       'sv-h',
-      '<ScrollView horizontal><text p={{ text: "sv-h" }}></text></ScrollView>',
+      '<horizontal-scroll-view><text p={{ text: "sv-h" }}></text></horizontal-scroll-view>',
     );
     assertSingleContentNode('sv-h');
   });
 
-  // A RefreshControl is CLAIMED by the owner and kept beside the content view. It is the one child
+  // A refresh-control is CLAIMED by the owner and kept beside the content view. It is the one child
   // that must not add a box of its own to the count.
-  it('ScrollView with a RefreshControl beside the content view', async () => {
+  it('scroll-view with a refresh-control beside the content view', async () => {
     await mountRoot(
       'sv-r',
-      '<ScrollView refreshControl={{ refreshing: false }}>' +
-        '<text p={{ text: "sv-r" }}></text></ScrollView>',
+      '<scroll-view><refresh-control p={{ refreshing: false }} />' +
+        '<text p={{ text: "sv-r" }}></text></scroll-view>',
     );
     assertSingleContentNode('sv-r');
     expect(byViewName('PullToRefreshView').length).toBe(1);
@@ -230,25 +202,26 @@ describe('the engine is the only builder of a ScrollView content node', () => {
 
   // The behavior grew an index path that synthesizes a pin wrapper around a flagged paint child.
   // A synthesized wrapper is a node this file did not put there, so the count has to survive it.
-  it('ScrollView, a stickyHeaderIndices child adds no second content node', async () => {
+  it('scroll-view, a stickyHeaderIndices child adds no second content node', async () => {
     await mountRoot(
       'sv-s',
-      '<ScrollView stickyHeaderIndices={[0]}>' +
+      '<scroll-view p={{ stickyHeaderIndices: [0] }}>' +
         '<text p={{ text: "sv-s" }}></text>' +
-        '<text p={{ text: "sv-s2" }}></text></ScrollView>',
+        '<text p={{ text: "sv-s2" }}></text></scroll-view>',
     );
     assertSingleContentNode('sv-s');
-    // MEASURED 2026-09-07 and stated rather than asserted: no pin is committed for this prop on the
-    // wrapper — `collect(…, zIndex === STICKY_HEADER_Z_INDEX)` finds nothing. The index path is
-    // being built in `core/components/src/behaviors/scroll-view`, so the verdict on whether that is
-    // correct belongs to whoever finishes it; the KNOWN GAP note in scroll-view-props.ts still
-    // stands, and this case exists to keep the COUNT honest if a synthesized wrapper later appears.
+    // The pin IS committed now, and the flip is the point. The deleted wrapper destructured
+    // `stickyHeaderIndices` out of its passthrough and dlogged that Svelte could not honour it —
+    // true when a Snippet was the only view of the children, and false since the behavior started
+    // walking the COMMITTED children instead (`sticky-indices.test.ts`, "the COMPATIBILITY half").
+    // So the wrapper had been suppressing a working engine feature, and deleting it restored RN's
+    // own API on this adapter. A zero here means the index walk stopped running.
     expect(
       collect(
         fabric.committed,
         node => node.props.zIndex === STICKY_HEADER_Z_INDEX,
       ).length,
-    ).toBe(0);
+    ).toBe(1);
   });
 
   // The list family is the SECOND owner this guard exists for: `virtualized-list/index.svelte`

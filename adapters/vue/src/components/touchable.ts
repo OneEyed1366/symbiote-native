@@ -9,7 +9,8 @@
 //     style's own opacity on press-out.
 //   TouchableHighlight: the underlay machine flipping a `shown` ref; underlayColor lands on the
 //     container, the lowered opacity on the cloned child.
-//   TouchableWithoutFeedback: the same press-scheduling machine with the visual half empty.
+// TouchableWithoutFeedback and TouchableNativeFeedback have left this file: both render no view of
+// their own upstream, so both are tags now.
 //
 // Inputs arrive as attrs (untyped), narrowed with runtime guards. The handlers read attrs LIVE
 // (they fire on events, not render) so a re-supplied callback / timing is always honored.
@@ -31,6 +32,7 @@ import {
   createTouchableFeedbackRuntime,
   hasTouchablePressHandler,
   resolveHighlightExtraStyles,
+  resolveTouchableFocusable,
   restingOpacityFromStyle,
   DEFAULT_ACTIVE_OPACITY,
   OPACITY_ACTIVE_GRANT_DURATION_MS,
@@ -74,8 +76,6 @@ export interface ITouchableHighlightProps extends ITouchableBaseProps {
   underlayColor?: string;
 }
 
-export type ITouchableWithoutFeedbackProps = ITouchableBaseProps;
-
 // RN's onShowUnderlay / onHideUnderlay are wrapper-SYNTHESIZED (the underlay machine decides the
 // transition), so they are emits, not passthrough attrs — the vue-adapter-events rule 1 split.
 export type ITouchableHighlightEmits = IPressableEmits & {
@@ -99,6 +99,33 @@ function numberOr(value: unknown, fallback: number): number {
 function scheduleTimeout(callback: () => void, ms: number): () => void {
   const id = setTimeout(callback, ms);
   return () => clearTimeout(id);
+}
+
+// TouchableOpacity.js:336-340, TouchableHighlight.js:370-374,
+// TouchableWithoutFeedback.js:263-266 — one expression, three call sites.
+//
+// `onPress` is a DECLARED EMIT here, so Vue strips it from `$attrs` — it is readable only off the
+// instance's own vnode props, the shape TouchableHighlight already uses for `hasPressHandler`. It
+// must be the APP's, never the wrapped handler this family hands Pressable: that one is always
+// defined, so resolving inside Pressable could never produce false.
+function touchableFocusable(
+  attrs: Record<string, unknown>,
+  onPress: unknown,
+): boolean {
+  return resolveTouchableFocusable(
+    typeof attrs.focusable === 'boolean' ? attrs.focusable : undefined,
+    onPress !== undefined,
+    attrs.disabled === true ? true : undefined,
+  );
+}
+
+// Read lazily rather than captured: `instance.vnode` is reassigned on every update, so a value
+// snapshotted in setup would freeze at the mount-time listener set.
+function appPressListener(
+  instance: ReturnType<typeof getCurrentInstance>,
+): unknown {
+  const vnodeProps = instance?.vnode.props;
+  return vnodeProps == null ? undefined : vnodeProps.onPress;
 }
 
 function forwardExcept(
@@ -141,6 +168,8 @@ export const TouchableOpacity = defineComponent<
     // The shared press-scheduling cell (delayPressIn timer + activation clock), persisted across
     // renders in setup scope; the handlers are rebuilt each render over live attrs.
     const runtime = createTouchableFeedbackRuntime();
+    // Captured in SETUP, which is the only place `getCurrentInstance` resolves to this component.
+    const instance = getCurrentInstance();
 
     function setOpacityTo(toValue: number, duration: number): void {
       dlog(`TouchableOpacity opacity -> ${toValue} over ${duration}ms`);
@@ -209,6 +238,10 @@ export const TouchableOpacity = defineComponent<
         __minPressDuration: 0,
         ...forwardExcept(attrs, TOUCHABLE_OPACITY_HANDLED),
         ...emitPressableEvents(emit),
+        // TouchableOpacity.js:303 — accessible unless the app opts out. `!== false`, never
+        // `?? true`, so only a literal false opts out; after the spread, so it wins.
+        accessible: attrs.accessible !== false,
+        focusable: touchableFocusable(attrs, appPressListener(instance)),
         onPressIn: handlePressIn,
         onPressOut: handlePressOut,
       };
@@ -341,6 +374,9 @@ export const TouchableHighlight = defineComponent<
         __minPressDuration: 0,
         ...forwardExcept(attrs, TOUCHABLE_HIGHLIGHT_HANDLED),
         ...emitPressableEvents(emit),
+        // TouchableHighlight.js:337 — same default as its siblings.
+        accessible: attrs.accessible !== false,
+        focusable: touchableFocusable(attrs, appPressListener(instance)),
         style: containerStyle,
         // Visual first, then the caller's callback — RN's order in _createPressabilityConfig.
         onPress: (event: ISymbioteEvent) => {
@@ -366,61 +402,8 @@ export const TouchableHighlight = defineComponent<
   },
 );
 
-// RN's TouchableWithoutFeedback builds a FULL Pressability config — "without feedback" means no
-// VISUAL, not no timing — so the delay props are consumed by the shared machine here instead of
-// forwarding to the host as unknown Fabric props.
-const TOUCHABLE_WITHOUT_FEEDBACK_HANDLED = [
-  'delayPressIn',
-  'delayPressOut',
-  'minPressDuration',
-];
-
-export const TouchableWithoutFeedback = defineComponent<
-  ITouchableWithoutFeedbackProps,
-  IPressableEmits
->(
-  (_props, { slots, attrs: rawAttrs, emit }) => {
-    const runtime = createTouchableFeedbackRuntime();
-
-    return () => {
-      const attrs = normalizeVueAttrs(rawAttrs);
-      // The same machine TouchableOpacity runs, with the visual half left empty.
-      const { handlePressIn, handlePressOut } = createTouchableFeedbackHandlers(
-        {
-          delayPressIn: numberOr(attrs.delayPressIn, 0),
-          delayPressOut: numberOr(attrs.delayPressOut, 0),
-          minPressDuration: numberOr(
-            attrs.minPressDuration,
-            TOUCHABLE_MIN_PRESS_DURATION_MS,
-          ),
-          schedule: scheduleTimeout,
-          now: Date.now,
-        },
-        runtime,
-        {
-          activate(event: ISymbioteEvent): void {
-            emit('pressIn', event);
-          },
-          deactivate(event: ISymbioteEvent): void {
-            emit('pressOut', event);
-          },
-        },
-      );
-      const pressableProps: Record<string, unknown> = {
-        __minPressDuration: 0,
-        ...forwardExcept(attrs, TOUCHABLE_WITHOUT_FEEDBACK_HANDLED),
-        ...emitPressableEvents(emit),
-        onPressIn: handlePressIn,
-        onPressOut: handlePressOut,
-      };
-      const children: VNode[] =
-        slots.default !== undefined ? slots.default() : [];
-      return h(Pressable, pressableProps, { default: () => children });
-    };
-  },
-  {
-    name: 'TouchableWithoutFeedback',
-    inheritAttrs: false,
-    emits: PRESSABLE_EMITS,
-  },
-);
+// TouchableWithoutFeedback is a TAG — `<touchable-without-feedback>`. RN's own renders no view
+// (TouchableWithoutFeedback.js:229,286), so the wrapper's Pressable node was ours; the press
+// machine, the delayPressIn/delayPressOut scheduler and the clone onto the single child all live on
+// the engine node (`core/components/src/behaviors/touchable-without-feedback.ts`), wired by
+// `../register`. The prop type stays, in `./touchable-without-feedback-props`.

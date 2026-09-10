@@ -18,17 +18,12 @@ import {
   View,
   Text,
   Image,
-  ImageBackground,
   ScrollView,
   TextInput,
   Switch,
-  ActivityIndicator,
-  Button,
   Pressable,
   TouchableOpacity,
   TouchableHighlight,
-  TouchableWithoutFeedback,
-  TouchableNativeFeedback,
   SafeAreaView,
   Modal,
   KeyboardAvoidingView,
@@ -73,10 +68,13 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
   ['Text', id => createElement(Text, { testID: id }, 'x')],
   ['Image', id => createElement(Image, { testID: id, source: { uri: 'x' } })],
   [
-    'ImageBackground',
+    // The TAG. RN spreads `...props` onto the inner Image (ImageBackground.js:81), so the id lands
+    // on the IMAGE rather than the box it is written on — which is what "some committed node
+    // carries it" is phrased to allow, and what every wrapper did before the tag.
+    'image-background',
     id =>
       createElement(
-        ImageBackground,
+        'image-background',
         { testID: id, source: { uri: 'x' } },
         createElement(Text, {}, 'x'),
       ),
@@ -88,8 +86,19 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
   ],
   ['TextInput', id => createElement(TextInput, { testID: id })],
   ['Switch', id => createElement(Switch, { testID: id, value: false })],
-  ['ActivityIndicator', id => createElement(ActivityIndicator, { testID: id })],
-  ['Button', id => createElement(Button, { testID: id, title: 'x' })],
+  [
+    // The TAG. RN spreads `...restProps` onto the spinner (ActivityIndicator.js:99), so the id
+    // lands on the SPINNER rather than the centering host — which is what "some committed node
+    // carries it" is phrased to allow.
+    'activity-indicator',
+    id => createElement('activity-indicator', { testID: id }),
+  ],
+  [
+    // The TAG, not a component. RN's Button takes no children, so the behavior builds the whole
+    // subtree and `testID` stays on the root it is written on.
+    'button',
+    id => createElement('button', { testID: id, title: 'x' }),
+  ],
   [
     'Pressable',
     id =>
@@ -114,19 +123,24 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       ),
   ],
   [
-    'TouchableWithoutFeedback',
+    // The other clone-onto-the-child TAG, and the same route as the row below it
+    // (TouchableWithoutFeedback.js:153, in the passthrough list rather than the unconditional half).
+    'touchable-without-feedback',
     id =>
       createElement(
-        TouchableWithoutFeedback,
+        'touchable-without-feedback',
         { testID: id },
         createElement(View, {}),
       ),
   ],
   [
-    'TouchableNativeFeedback',
+    // The TAG, not a component — and the id reaches the committed tree by a different route than
+    // every other row here: this tag commits no node, so `testID` lands via the behavior's clone
+    // onto the single child (TouchableNativeFeedback.js:389).
+    'touchable-native-feedback',
     id =>
       createElement(
-        TouchableNativeFeedback,
+        'touchable-native-feedback',
         { testID: id },
         createElement(Text, {}, 'x'),
       ),

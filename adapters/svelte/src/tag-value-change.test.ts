@@ -53,7 +53,7 @@ const TEXT_INPUT_TAG = HOST_PRIMITIVES.TextInput.intrinsic;
 
 const SOURCE = [
   `<view>`,
-  `  <${TEXT_INPUT_TAG} p={{ value: "", onValueChange: next => globalThis.${SINK}.push(next) }} />`,
+  `  <${TEXT_INPUT_TAG} p={{ value: "", onValueChange: event => globalThis.${SINK}.push(event.text) }} />`,
   `</view>`,
 ].join('\n');
 
@@ -93,5 +93,64 @@ describe('a bare text-input tag hands the app its text', () => {
 
     expect(sink).toEqual([TYPED_TEXT]);
     unmount(ROOT_TAG);
+  });
+});
+
+// Switch's twin of the file header's proof, for the same reason: `switch.ts`'s `onChange` reads
+// `node.props.onValueChange` exactly like `text-input.ts`'s `callValueChange` — same fold, same
+// engine routing, and the same device-only failure shape (`bare-tag-authored.test.ts`'s crash test)
+// when an app writes it as an individual attribute instead of through `p={{…}}`.
+const SWITCH_PROBE_OUT = join(
+  __dirname,
+  '.smoke-compiled-switch-value-change-probe.mjs',
+);
+const SWITCH_ROOT_TAG = 9_302;
+const SWITCH_VIEW_NAME = 'Switch';
+const REPORTED_VALUE = true;
+
+const SWITCH_SINK = '__symbioteSwitchValueChangeSink';
+const switchSink: boolean[] = [];
+Object.assign(globalThis, { [SWITCH_SINK]: switchSink });
+
+const SWITCH_TAG = HOST_PRIMITIVES.Switch.intrinsic;
+
+const SWITCH_SOURCE = [
+  `<view>`,
+  `  <${SWITCH_TAG} p={{ value: false, onValueChange: event => globalThis.${SWITCH_SINK}.push(event.value) }} />`,
+  `</view>`,
+].join('\n');
+
+afterAll(() => rmSync(SWITCH_PROBE_OUT, { force: true }));
+
+describe('a bare switch tag hands the app its value', () => {
+  it('calls onValueChange from the host behavior', async () => {
+    writeFileSync(
+      SWITCH_PROBE_OUT,
+      compile(SWITCH_SOURCE, {
+        generate: 'client',
+        fragments: 'tree',
+        css: 'external',
+        filename: 'SwitchValueChangeProbe.svelte',
+      }).js.code,
+    );
+    const { default: Probe } = (await import(`file://${SWITCH_PROBE_OUT}`)) as {
+      default: Component;
+    };
+    mount(SWITCH_ROOT_TAG, Probe, {});
+    await tick();
+    await tick();
+
+    const node = fabric.find(n => n.viewName === SWITCH_VIEW_NAME);
+    expect(node, 'the tag committed a Switch').toBeDefined();
+    if (node === undefined) return;
+
+    fabric.fireEvent(node.instanceHandle, 'topChange', {
+      value: REPORTED_VALUE,
+    });
+    await tick();
+    await tick();
+
+    expect(switchSink).toEqual([REPORTED_VALUE]);
+    unmount(SWITCH_ROOT_TAG);
   });
 });

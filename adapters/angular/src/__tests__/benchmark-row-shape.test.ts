@@ -324,12 +324,30 @@ type ICommittedShape = {
 // negative control (a Pressable with no listener commits none of the four; one with exactly
 // `(accessibilityAction)` commits only that key) before deleting the subtraction — a green
 // comparison alone would not have told the two failure directions apart.
+// Subtracted from BOTH sides, and unlike the four above this one is not debt. RN makes a pressable
+// accessible unless the app opts out (`Pressable.js:252`), so a composed `<Pressable>` commits
+// `accessible: true` while the flat row's stand-in — a bare `<View (press)>` — correctly does not:
+// RN's View has no such default. It is the first prop on which the flat row's deliberate surrender
+// of Pressable's accessibility fold is VISIBLE, every earlier one being absent-when-unset. That the
+// composed side really does commit it is pinned by pressable.test.ts and lowering-equivalence.test.ts,
+// so subtracting it here loses no coverage. Delete this when the flat row stops standing in for a
+// Pressable.
+// `focusable` joined it 2026-09-09 for the identical reason and it is the sharper case: RN's
+// Touchable* formula (TouchableOpacity.js:336-340) needs a press handler and a non-disabled state,
+// and the composed row supplies both — while a bare `<View (press)>` has no Pressable to compute
+// anything. Same non-debt reading, same deletion condition.
+const PRESSABLE_ONLY_DEFAULTS = ['accessible', 'focusable'];
+
 function shapeOf(nodes: readonly IFakeNode[]): ICommittedShape[] {
-  return nodes.map(node => ({
-    viewName: node.viewName,
-    props: node.props,
-    children: shapeOf(node.children),
-  }));
+  return nodes.map(node => {
+    const props = { ...node.props };
+    for (const key of PRESSABLE_ONLY_DEFAULTS) delete props[key];
+    return {
+      viewName: node.viewName,
+      props,
+      children: shapeOf(node.children),
+    };
+  });
 }
 
 function viewNamesOf(nodes: readonly IFakeNode[]): string[] {

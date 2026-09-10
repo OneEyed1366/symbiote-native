@@ -23,7 +23,7 @@
   <pressable
     testID={testID && `${testID}-decrement`}
     class="action-button"
-    onPress={() => (value -= 1)}
+    p={{ onPress: () => (value -= 1) }}
   >
     <text class="action-button-text">−</text>
   </pressable>
@@ -33,7 +33,7 @@
   <pressable
     testID={testID && `${testID}-increment`}
     class="action-button"
-    onPress={() => (value += 1)}
+    p={{ onPress: () => (value += 1) }}
   >
     <text class="action-button-text">+</text>
   </pressable>

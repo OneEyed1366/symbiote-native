@@ -191,7 +191,11 @@ const CASES: readonly IFoldCase[] = [
     sfc: '<Pressable id="p" />',
     jsx: '<Pressable id="p" />',
     component: () => h(PressableComponent, { id: 'p' }),
-    expected: [{ nativeID: 'p' }],
+    // `accessible` (Pressable.js:252) and `focusable` (Pressable.js:258) are RN's own defaults;
+    // this previously pinned their absence, i.e. a divergence from RN that every adapter shared.
+    // `focusable` is the ONE-leg Pressable form — a Touchable* resolves its own three-leg version
+    // (TouchableOpacity.js:336-340) and hands the answer down as this prop.
+    expected: [{ nativeID: 'p', accessible: true, focusable: true }],
   },
   {
     // The aria/role fold, which the engine now applies in `fabricProps` — the one point that sees

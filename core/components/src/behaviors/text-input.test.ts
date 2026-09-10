@@ -156,7 +156,7 @@ describe('text input host behavior', () => {
   });
 
   // THE WRAPPER-DERIVED CALLBACK, and the reason it is asserted here rather than in an adapter.
-  // `onValueChange(text, event)` is not a Fabric event — it is a fold the component wrapper did over
+  // `onValueChange(event)` is not a Fabric event — it is a fold the component wrapper did over
   // the raw `change` payload. A LOWERED element has no wrapper, so before this the app's callback
   // reached `node.props` as a function key, `fabricProps` dropped it, and nothing ever called it:
   // the field echoed keystrokes natively while every derived value in the app stayed frozen. Found
@@ -175,7 +175,8 @@ describe('text input host behavior', () => {
     listenerOf(node, 'change')(changeEvent('ab', NATIVE_EVENT_COUNT));
 
     expect(onValueChange).toHaveBeenCalledTimes(1);
-    expect(onValueChange.mock.calls[0][0]).toBe('ab');
+    // ONE argument, the event, with `text` carried on it — not `(text, event)`.
+    expect(onValueChange.mock.calls[0][0]).toMatchObject({ text: 'ab' });
   });
 
   // The negative half, and it is not decoration: `textFromChange` returns undefined for a payload

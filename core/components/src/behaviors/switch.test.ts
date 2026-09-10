@@ -122,7 +122,10 @@ describe('switch host behavior', () => {
     await flush();
 
     expect(onValueChange).toHaveBeenCalledTimes(1);
-    expect(onValueChange).toHaveBeenCalledWith(true, expect.anything());
+    // ONE argument, the event, with `value` carried on it — not `(value, event)`.
+    expect(onValueChange).toHaveBeenCalledWith(
+      expect.objectContaining({ value: true }),
+    );
     const setValue = commandsNamed('setValue');
     expect(setValue, 'a setValue command after a rejected toggle').toHaveLength(
       1,
@@ -140,7 +143,8 @@ describe('switch host behavior', () => {
     routeProp(node, 'testID', TEST_ID);
     routeProp(node, 'value', false);
     const surface = mount(node);
-    routeProp(node, 'onValueChange', (next: boolean) => {
+    routeProp(node, 'onValueChange', (event: ISymbioteEvent) => {
+      const next = Reflect.get(event, 'value');
       routeProp(node, 'value', next);
       surface.commit();
     });
@@ -168,7 +172,8 @@ describe('switch host behavior', () => {
     routeProp(node, 'testID', TEST_ID);
     routeProp(node, 'value', false);
     const surface = mount(node);
-    routeProp(node, 'onValueChange', (next: boolean) => {
+    routeProp(node, 'onValueChange', (event: ISymbioteEvent) => {
+      const next = Reflect.get(event, 'value');
       // The app's own scheduling, enqueued WHILE onChange's synchronous portion is still running —
       // e.g. a Promise-based store, or any framework whose commit is itself microtask-timed.
       queueMicrotask(() => {

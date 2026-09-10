@@ -85,6 +85,36 @@ export interface IHostBehavior {
   // `contentContainerStyle` (the wrapper writes `[contentContainerStyle, {flexDirection:'row'}]`),
   // and precedence is a property of the fold, not of the routing.
   readonly slotProps?: Readonly<Record<string, string>>;
+  // The COMPLEMENT of `slotProps`: when set, every prop NOT named here routes to the slot under its
+  // own name. `slotProps` still wins where both could answer, so an explicit rename stays a rename.
+  //
+  // WHY A COMPLEMENT AND NOT A LONGER MAP. RN's ActivityIndicator hands the spinner `...restProps`
+  // and keeps only `onLayout` and `style` on its wrapper (`ActivityIndicator.js:99,113`), so the set
+  // that moves is OPEN — every accessibility prop, every aria alias, `testID`, and whatever an app
+  // writes next. A name map cannot express that, and the four adapters that wrote the passthrough
+  // onto the wrapper instead had diverged from RN for as long as the component existed.
+  //
+  // It is a REDIRECT, so nothing has to be marked dirty afterwards: the write lands on the slot and
+  // marks the slot. That is the whole reason this is not spelled as a `slotDerived` wildcard.
+  readonly slotPropsExcept?: readonly string[];
+  // The slot is a built SIBLING, not a container: the app's children stay on the OWNER and land
+  // AFTER it.
+  //
+  // WHY IT EXISTS. `childHost` answers two questions at once — which node an owner prop redirects
+  // onto, and which node the app's children go under — and every primitive before ImageBackground
+  // gave the same answer to both. RN's ImageBackground gives different ones: the absolutely-filled
+  // `<Image>` takes `imageStyle` and the whole `...props` spread (ImageBackground.js:80-101), while
+  // `{children}` sit BESIDE it in the View (ImageBackground.js:102) so they paint on top.
+  //
+  // And it is not a JSX preference upstream could have collapsed. Android's `<Image>` is a
+  // `ReactImageView extends ImageView`, which is not a `ViewGroup`, so a child mounted inside it is
+  // an `addView` crash — the reason `ImageBackground` exists at all rather than `<Image>` taking
+  // children as it did before RN 0.50.
+  //
+  // Read only where `childHost` already decides placement (`hostFor` / `indexFor` in node.ts), both
+  // of which sit behind the slot branch, so a primitive without a slot pays nothing and one with an
+  // ordinary slot pays a probe `hostFor` was making anyway.
+  readonly slotTakesNoChildren?: boolean;
   // Owner prop names the SLOT's payload is derived from. Writing one marks the slot's props dirty.
   //
   // The third case in the owner/slot family, and the one neither of the other two can express. A
@@ -119,6 +149,20 @@ export interface IHostBehavior {
   // owner, so `PullToRefreshView` / `AndroidSwipeRefreshLayout` is unambiguous there and the node
   // needs no field carrying its intrinsic tag.
   readonly claimedChildren?: Readonly<Record<string, IClaimMode>>;
+  // Runs after an APP child has been placed under this node — the counterpart of `buildStructure`,
+  // which owns the structure the behavior builds for itself.
+  //
+  // WHY IT EXISTS. RN's TouchableNativeFeedback renders no view of its own: it clones its props
+  // onto `React.Children.only(children)` (TouchableNativeFeedback.js:289,339). A tag reproducing
+  // that has nothing to do at `attach` — the node it must configure does not exist yet, and it is
+  // the framework's, not the behavior's. This is the only beat at which it appears.
+  //
+  // The node is placed by the time this runs, so a behavior may adopt it as `node.childHost`
+  // (which is what makes `slotDerived` reach it) and write on it through the ordinary mutation API.
+  //
+  // Fires for EVERY app child, so a behavior taking only the first says so itself. And it costs one
+  // WeakMap probe per append, beside the WeakSet probe `reattachHostBehaviors` already pays there.
+  onChildInserted?(node: ISymbioteNode, child: ISymbioteNode): void;
   // Builds the primitive's OWN internal subtree, once, and returns the node the app's children
   // belong under — or undefined when they belong directly on the host.
   //
@@ -203,6 +247,12 @@ export interface IHostBehavior {
   // whose behavior asked for it — zero for every app that registers none.
   //
   // Reads `node.props`, which by here holds the values this commit published.
+  //
+  // AND IT DOES NOT RUN WHEN YOUR OWN FOLD MADE THE COMMIT EMPTY — `commitContainer` returns on a
+  // no-op ABOVE `runDeferredAttaches` (the "TRAP FOR BEHAVIOR AUTHORS" note at that return in
+  // `commit.ts`). So a prop a behavior STRIPS from the payload — Button's `title` and `color` — can
+  // never wake this hook: the payload is byte-identical, and the beat arrives only if some unrelated
+  // real prop moved in the same commit. Measured 2026-09-09, after it was designed on twice.
   afterCommit?(node: ISymbioteNode): void;
   // Runs once the node is known to have left the tree for good. Must release everything `attach`
   // took — a timer left behind outlives the tree that owned it.
@@ -274,7 +324,51 @@ export function slotPropNameFor(
   node: ISymbioteNode,
   key: string,
 ): string | undefined {
-  return attached.get(node)?.slotProps?.[key];
+  const behavior = attached.get(node);
+  if (behavior === undefined) return undefined;
+  const named = behavior.slotProps?.[key];
+  if (named !== undefined) return named;
+  const except = behavior.slotPropsExcept;
+  if (except !== undefined && !except.includes(key)) return key;
+  return undefined;
+}
+
+// Does this owner's slot host the app's children, or is it a built sibling they land beside? See
+// `slotTakesNoChildren`. Same `node.childHost` gate as every other probe here: the two callers ask
+// only after the field said there is a slot at all.
+export function slotTakesChildren(node: ISymbioteNode): boolean {
+  return attached.get(node)?.slotTakesNoChildren !== true;
+}
+
+// Nodes a behavior built that are NOT the slot, and whose payloads derive from the owner's props.
+//
+// `slotDerived` marks `node.childHost` and nothing else, which is one hop — enough for ScrollView,
+// whose only derived node IS the slot, and not enough for a primitive whose `buildStructure` builds
+// a chain. Button builds view > text > raw text and folds two of them from the same three owner
+// props; without this the deeper nodes freeze at their mount values, and the workaround is to write
+// them from inside a fold whose contract says it MUST be pure.
+//
+// A WeakMap rather than a field, for the reason `stashed` is one: this exists only for the handful
+// of nodes a composed behavior built, and a field costs a shape transition on every node in every
+// app. It is read only inside the `slotDerived` branch, which has already paid a WeakMap probe.
+const derived = new WeakMap<ISymbioteNode, ISymbioteNode[]>();
+
+// Called from `buildStructure` for each node past the slot. Not idempotent-checked: structure is
+// built exactly once (`attachHostBehavior`, never `reattachSubtree`), so a second call would be a
+// bug worth seeing rather than one worth absorbing.
+export function addDerivedNode(
+  owner: ISymbioteNode,
+  node: ISymbioteNode,
+): void {
+  const existing = derived.get(owner);
+  if (existing === undefined) derived.set(owner, [node]);
+  else existing.push(node);
+}
+
+export function derivedNodesOf(
+  owner: ISymbioteNode,
+): readonly ISymbioteNode[] | undefined {
+  return derived.get(owner);
 }
 
 // Called from `setEventListener` on a PRESENCE flip of an owned name, and only there — the caller
@@ -285,6 +379,14 @@ export function notifyOwnedListenerChange(
   wired: boolean,
 ): void {
   attached.get(node)?.onOwnedListenerChange?.(node, name, wired);
+}
+
+// Called from the two inserts once the child is in place. See `onChildInserted`.
+export function notifyChildInserted(
+  node: ISymbioteNode,
+  child: ISymbioteNode,
+): void {
+  attached.get(node)?.onChildInserted?.(node, child);
 }
 
 // Called from the two structural entry points when a wrap claim lands or leaves. See
@@ -480,9 +582,6 @@ function detachSubtree(
   // a strong reference to a dead subtree. A leak, not a wrong result, and this file's break-test
   // discipline correctly reports it as unfalsifiable.
   awaitingCommit.delete(node);
-  // The recurring hook stops with the node, and unlike the deferral above this one has a visible
-  // consequence if forgotten: a torn-down node would keep being asked to reconcile props against a
-  // subtree that has left the tree, on every commit, forever.
   // The recurring hook stops with the node, and unlike the deferral above this one has a visible
   // consequence if forgotten: a torn-down node would keep being asked to reconcile props against a
   // subtree that has left the tree, on every commit, forever.

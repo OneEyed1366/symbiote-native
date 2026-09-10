@@ -167,10 +167,22 @@ export const vShow: ObjectDirective<ISymbioteNode, boolean> = {
 //
 // The two channels below are the machine's, not the DOM's: the value goes down as the `value` prop
 // that `core/components/src/behaviors/text-input.ts` reads for its controlled write, and the text
-// comes back through `onValueChange`, the fold that behavior does over the raw `change` payload.
+// comes back through `onValueChange`, the fold that behavior does over the raw `change` payload —
+// as a single event argument carrying `text`/`value` as a FIELD (`ITextInputChangeEvent` /
+// `ISwitchChangeEvent`), not a second positional argument.
 
-type IValueChangeListener = (text: string, event: ISymbioteEvent) => void;
-type IModelAssign = (value: string | number) => void;
+type IValueChangeListener = (event: ISymbioteEvent) => void;
+type IModelAssign = (value: string | number | boolean) => void;
+
+function textFromChangeEvent(event: ISymbioteEvent): string | undefined {
+  const text = Reflect.get(event, 'text');
+  return typeof text === 'string' ? text : undefined;
+}
+
+function valueFromChangeEvent(event: ISymbioteEvent): boolean | undefined {
+  const value = Reflect.get(event, 'value');
+  return typeof value === 'boolean' ? value : undefined;
+}
 
 interface IModelState {
   // `onUpdate:modelValue` off the vnode, refreshed every beat: Vue re-creates the arrow on each
@@ -237,9 +249,15 @@ function modelStateFor(el: ISymbioteNode): IModelState {
     appListener: undefined,
     trim: false,
     number: false,
-    listener: (text, event) => {
-      state.appListener?.(text, event);
-      state.assign?.(applyModelModifiers(state, text));
+    listener: event => {
+      state.appListener?.(event);
+      const text = textFromChangeEvent(event);
+      if (text !== undefined) {
+        state.assign?.(applyModelModifiers(state, text));
+        return;
+      }
+      const value = valueFromChangeEvent(event);
+      if (value !== undefined) state.assign?.(value);
     },
   };
   modelStates.set(el, state);
@@ -272,8 +290,9 @@ function isSwitchNode(el: ISymbioteNode): boolean {
 }
 
 function syncModelValue(el: ISymbioteNode, value: unknown): void {
-  // The READ half needs no branch: the behavior calls `onValueChange(value, event)` for both
-  // primitives, and `applyModelModifiers` passes a non-string through untouched.
+  // The READ half needs no branch: the behavior calls `onValueChange(event)` for both primitives
+  // with `text`/`value` carried on the event, and `applyModelModifiers` passes a non-string through
+  // untouched.
   if (isSwitchNode(el)) {
     setProp(el, 'value', value === true);
     requestCommitFor(el);

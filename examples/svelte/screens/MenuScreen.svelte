@@ -12,7 +12,6 @@
   // whitespace-only text node under a parent that takes no raw text to an anchor, so a gap
   // between siblings never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b), and
   // svelte.config.js's collapseTextWhitespace() folds a sentence wrapped across source lines.
-  import { ScrollView } from '@symbiote-native/svelte';
   import { useStackNavigation } from '@symbiote-native/navigation/svelte';
   import { ROUTE_NAME } from '../routes';
   import type { ITourRouteName } from '../navigation-lines';
@@ -94,7 +93,7 @@
 </script>
 
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="menu-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
@@ -114,7 +113,7 @@
       <pressable
         testID={`menu-row-${item.route}`}
         class={`menu-row menu-row-${lineInfo.line}`}
-        onPress={() => navigation.current.push(item.route)}
+        p={{ onPress: () => navigation.current.push(item.route) }}
       >
         <view class={`menu-badge menu-badge-${lineInfo.line}`}>
           <text class="menu-badge-text">{lineInfo.code}</text>
@@ -127,5 +126,5 @@
         </view>
       </pressable>
     {/each}
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>

@@ -1,6 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -1061,7 +1060,7 @@ export function BenchmarkScreen() {
 
         {progress !== undefined && (
           <View testID="bench-suite-progress" className="bench-progress">
-            <ActivityIndicator color={accent} />
+            <activity-indicator color={accent} />
             <Text className="bench-progress-text">
               {`${progress.mode === MOUNT_MODE.All ? 'All mounted' : 'Virtualized'} · ${progress.label}`}
             </Text>

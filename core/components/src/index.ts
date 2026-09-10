@@ -44,20 +44,13 @@ export type {
   IComponentDescriptor,
 } from './component-names/shared';
 
-export { renderActivityIndicator } from './view/render-activity-indicator';
-export type {
-  IActivityIndicatorProps,
-  IActivityIndicatorViewProps,
-  IActivityIndicatorPlatform,
-  IActivityIndicatorSize,
-} from './view/render-activity-indicator';
-
 export { renderSwitch } from './view/render-switch';
 export type {
   ISwitchProps,
   ISwitchViewProps,
   ISwitchPlatform,
   ISwitchTrackColor,
+  ISwitchChangeEvent,
 } from './view/render-switch';
 
 // Gesture-responder props, the framework-agnostic base of every adapter's View props.
@@ -152,8 +145,8 @@ export type {
 export { imageStatics, setImageSourceResolver } from '@symbiote-native/engine';
 
 // ImageBackground: render-only composition (absolute-fill image behind, children on top).
-export { renderImageBackground } from './view/render-image-background';
-export type { IImageBackgroundViewProps } from './view/render-image-background';
+// No render fn: the only composition this primitive had is the two nodes the behavior builds, so
+// `view/render-image-background.ts` went with the wrappers — same as ActivityIndicator's.
 
 // InputAccessoryView: render-only host assembly (nativeID/backgroundColor).
 export { renderInputAccessoryView } from './view/render-input-accessory-view';
@@ -234,6 +227,8 @@ export {
   shouldSuppressPress,
   shouldClaimResponder,
   isTerminationAllowed,
+  resolvePressableFocusable,
+  resolveTouchableFocusable,
 } from './view/render-pressable';
 
 // Touchable*: shared press-timing constants + the deactivation-floor math (the Animated feedback
@@ -279,6 +274,9 @@ export {
   selectableBackground,
   selectableBackgroundBorderless,
   rippleBackground,
+  // RN's own static namespace, the only part of the deleted wrappers with nowhere else to go: the
+  // element is a tag now, and a tag is a string that cannot carry `.Ripple`.
+  TouchableNativeFeedback,
 } from './view/render-touchable-native-feedback';
 export type {
   INativeFeedbackBackground,
@@ -286,12 +284,18 @@ export type {
   IRippleBackground,
 } from './view/render-touchable-native-feedback';
 
-// Button: shared base text style, role constant, and color fold (the adapter composes its own
-// TouchableOpacity + Text).
+// Button: the role constant plus every platform fold RN's Button.js performs (the adapter composes
+// its own touchable + view + text around them). The VIEW style is the half that was missing until
+// 2026-09-09 and it is the whole Android look.
 export {
   BUTTON_ACCESSIBILITY_ROLE,
   buttonTextStyle,
+  buttonViewStyle,
+  resolveButtonDisabled,
+  resolveButtonImportantForAccessibility,
   resolveButtonTextStyle,
+  resolveButtonTitle,
+  resolveButtonViewStyle,
 } from './view/render-button';
 export type { IButtonProps } from './view/render-button';
 
@@ -322,6 +326,7 @@ export type {
   IInputMode,
   IEnterKeyHint,
   ISubmitBehavior,
+  ITextInputChangeEvent,
 } from './state/text-input';
 export { keyboardTypeForInputMode } from './state/text-input';
 export { renderTextInput } from './view/render-text-input';
@@ -442,10 +447,59 @@ export {
   PRESSABLE_TAG,
 } from './behaviors/pressable';
 export {
+  registerTouchableOpacityBehavior,
+  TOUCHABLE_OPACITY_TAG,
+} from './behaviors/touchable-opacity';
+export {
+  registerTouchableHighlightBehavior,
+  TOUCHABLE_HIGHLIGHT_TAG,
+} from './behaviors/touchable-highlight';
+export { registerButtonBehavior, BUTTON_TAG } from './behaviors/button';
+
+// Registered by ALL FIVE adapters since 2026-09-09, in the same commit that deleted the five
+// wrappers — which is what makes it safe. While those wrappers still rendered a `Pressable` around
+// a feedback `View`, registering would have put a second responder on every existing
+// TouchableNativeFeedback. The ActivityIndicator and ScrollView blocks below are still in the
+// withheld state this one just left.
+export {
+  registerTouchableNativeFeedbackBehavior,
+  TOUCHABLE_NATIVE_FEEDBACK_TAG,
+} from './behaviors/touchable-native-feedback';
+
+// The second tag that commits no node, and registered by all five adapters in the same commit that
+// deleted their five wrappers — while those wrappers still rendered a `Pressable` around the app's
+// children, registering would have put a second responder on every TouchableWithoutFeedback.
+export {
+  registerTouchableWithoutFeedbackBehavior,
+  TOUCHABLE_WITHOUT_FEEDBACK_TAG,
+} from './behaviors/touchable-without-feedback';
+
+// Registered by all five adapters since 2026-09-09, in the same commit that deleted the five
+// wrappers — the tag builds its own spinner, so a surviving wrapper would have painted a second one.
+// The prop type rides along: there is no `view/render-activity-indicator.ts` any more, because the
+// only render this primitive had was the two nodes the behavior now builds.
+export {
+  ACTIVITY_INDICATOR_SPINNER_TAG,
+  ACTIVITY_INDICATOR_TAG,
+  registerActivityIndicatorBehavior,
+} from './behaviors/activity-indicator';
+export type {
+  IActivityIndicatorProps,
+  IActivityIndicatorSize,
+} from './behaviors/activity-indicator';
+export {
   foldImagePayload,
   IMAGE_TAG,
   registerImageBehavior,
 } from './behaviors/image';
+
+// Registered by all five adapters since 2026-09-09, in the same commit that deleted the five
+// wrappers — the tag builds the background image itself, so a surviving wrapper would have
+// committed a second one under it.
+export {
+  IMAGE_BACKGROUND_TAG,
+  registerImageBackgroundBehavior,
+} from './behaviors/image-background';
 
 export {
   foldInputAccessoryViewPayload,
@@ -461,6 +515,11 @@ export {
 } from './behaviors/text-input';
 
 export { registerSwitchBehavior, SWITCH_TAG } from './behaviors/switch';
+
+export {
+  registerRefreshControlBehavior,
+  REFRESH_CONTROL_TAG,
+} from './behaviors/refresh-control';
 
 // Exported as a FUNCTION, not as a side-effect module, which is what keeps it safe on a barrel:
 // Metro's inlineRequires only defers a re-export until its binding is named as a VALUE, and a

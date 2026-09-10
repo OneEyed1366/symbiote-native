@@ -33,6 +33,9 @@ import { withStableKeys } from '../utils/stable-keys';
 // for the same reason, and an adapter never imports another adapter's types.
 export interface IRefreshControlProps extends IAccessibilityProps, IAriaProps {
   refreshing: boolean;
+  // `id` — RN's W3C alias for `nativeID`, folded by the spec entry's ID_ALIAS. See React's
+  // declaration for why the prop and the alias land together.
+  id?: string;
   // RN types this `() => void | Promise<void>` — the handler may be async, and the promise is
   // fire-and-forget because native has already started refreshing off the gesture.
   onRefresh?: () => void | Promise<void>;

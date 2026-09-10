@@ -13,7 +13,6 @@ import {
   TextInput,
   Image,
   Switch,
-  ActivityIndicator,
   Pressable,
   Modal,
   FlatList,
@@ -358,7 +357,7 @@ export function CanaryScreen() {
           our OWN indicator from the same `refreshing` flag, guaranteed visible. */}
         {refreshing ? (
           <View className="refresh-row">
-            <ActivityIndicator color={LINE_COLOR.primitives} />
+            <activity-indicator color={LINE_COLOR.primitives} />
             <Text className="accent-note">Refreshing…</Text>
           </View>
         ) : (
@@ -382,7 +381,7 @@ export function CanaryScreen() {
         <TextInput
           testID="greeting-input"
           value={name}
-          onValueChange={setName}
+          onValueChange={event => setName(event.text)}
           placeholder="type your name…"
           placeholderTextColor="#41506a"
           className="text-input"
@@ -397,11 +396,11 @@ export function CanaryScreen() {
           <Switch
             testID="spinner-switch"
             value={spinning}
-            onValueChange={setSpinning}
+            onValueChange={event => setSpinning(event.value)}
             trackColor={{ false: '#334155', true: LINE_COLOR.primitives }}
           />
         </View>
-        <ActivityIndicator
+        <activity-indicator
           testID="spinner-indicator"
           animating={spinning}
           color={LINE_COLOR.primitives}
@@ -709,7 +708,7 @@ export function CanaryScreen() {
           <Text className="switch-label">avoid keyboard</Text>
           <Switch
             value={kavEnabled}
-            onValueChange={setKavEnabled}
+            onValueChange={event => setKavEnabled(event.value)}
             trackColor={{ false: '#334155', true: '#2b6cb0' }}
           />
         </View>

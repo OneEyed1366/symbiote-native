@@ -146,8 +146,8 @@ describe('TextInput', () => {
       ROOT_TAG,
       <TextInput
         value="hi"
-        onValueChange={text => {
-          changedText = text;
+        onValueChange={event => {
+          changedText = event.text;
         }}
       />,
     );
@@ -220,7 +220,7 @@ describe('TextInput', () => {
       return (
         <TextInput
           value={value}
-          onValueChange={text => setValue(text.toUpperCase())}
+          onValueChange={event => setValue(event.text.toUpperCase())}
         />
       );
     }

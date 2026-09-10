@@ -69,7 +69,7 @@ export function HooksPerformanceDemo() {
         testID="hooks-perf-query"
         className="text-input"
         value={query}
-        onValueChange={setQuery}
+        onValueChange={event => setQuery(event.text)}
         placeholder="filter primitives…"
       />
       <Text testID="hooks-perf-results" className="info-text">

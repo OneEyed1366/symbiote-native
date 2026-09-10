@@ -9,7 +9,8 @@
 //   TouchableHighlight: paint underlayColor + lower child opacity while the underlay is SHOWN.
 //     RN drives that from onPressIn/onPress/onPressOut and holds it past the tap for delayPressOut,
 //     NOT from Pressable's pressed flag — a tap too fast to see is already un-pressed by then.
-//   TouchableWithoutFeedback: no visual change, but RN still runs the full press-timing machine.
+// TouchableWithoutFeedback and TouchableNativeFeedback have left this file: both render no view of
+// their own upstream, so both are tags now.
 //
 // Every Touchable's own press/hover/accessibility events are now real @Output() EventEmitters too,
 // matching Pressable (which they wrap) — `(press)="handler($event)"`, never `[onPress]="handler"`.
@@ -17,7 +18,10 @@
 // Accessibility EVENTS forward straight through to Pressable's own outputs
 // (`(accessibilityAction)="accessibilityAction.emit($event)"`); accessibility STATE folds the web
 // aria-*/role aliases and merges `disabled` into the a11y state on Pressable's own host — no re-fold
-// here (the a11y host is Pressable's view, mirroring React's `...rest` -> Pressable). No JS-side
+// here (the a11y host is Pressable's view, mirroring React's `...rest` -> Pressable). `accessible`
+// is the one exception: RN defaults it ON in each Touchable rather than forwarding it raw
+// (`TouchableOpacity.js:303`, `TouchableHighlight.js:337`, `TouchableWithoutFeedback.js:255`), and
+// `!== false` is the RN spelling — only a literal `false` opts out. No JS-side
 // platform branch, so this stays a flat single file, mirroring React/Vue. Each Touchable
 // forwards the Angular Pressable surface verbatim; parity is against that surface, exactly as
 // React's Touchable parity is against
@@ -44,6 +48,7 @@ import {
   createTouchableFeedbackHandlers,
   createTouchableFeedbackRuntime,
   hasTouchablePressHandler,
+  resolveTouchableFocusable,
   resolveHighlightExtraStyles,
   restingOpacityFromStyle,
   DEFAULT_ACTIVE_OPACITY,
@@ -99,7 +104,27 @@ export type IAngularTouchableHighlightProps = IAngularTouchableBaseProps & {
   underlayColor?: string;
 };
 
-export type IAngularTouchableWithoutFeedbackProps = IAngularTouchableBaseProps;
+// TouchableOpacity.js:336-340, TouchableHighlight.js:370-374,
+// TouchableWithoutFeedback.js:263-266 — one expression, three components.
+//
+// `press.observed` stands in for RN's `onPress !== undefined`, which is the only leg an Angular
+// template cannot express directly: the `(press)` binding is unconditional, so the app's intent is
+// readable only off the emitter. A WRAPPER that binds `(press)` eagerly therefore reads as a
+// subscriber here — the standing debt `gate-demand.ts` answers for the accessibility gates, and the
+// failure direction is the safe one (focusable where RN would drop it, never the reverse).
+//
+// Structural rather than a base class: the three components share no ancestor.
+function touchableFocusable(touchable: {
+  focusable?: boolean;
+  disabled?: boolean;
+  press: EventEmitter<ISymbioteEvent>;
+}): boolean {
+  return resolveTouchableFocusable(
+    touchable.focusable,
+    touchable.press.observed,
+    touchable.disabled,
+  );
+}
 
 // The real timers both shared machines schedule on — core/components carries no timer globals, so
 // scheduling is the adapter's half. Every canceller is retained so ngOnDestroy cancels what is
@@ -156,6 +181,7 @@ function createTimerScheduler(): ITimerScheduler {
       [delayHoverIn]="delayHoverIn"
       [delayHoverOut]="delayHoverOut"
       [disabled]="disabled"
+      [focusable]="resolvedFocusable"
       [cancelable]="cancelable"
       [hitSlop]="hitSlop"
       [pressRetentionOffset]="pressRetentionOffset"
@@ -170,7 +196,7 @@ function createTimerScheduler(): ITimerScheduler {
       [nextFocusLeft]="nextFocusLeft"
       [nextFocusRight]="nextFocusRight"
       [nextFocusUp]="nextFocusUp"
-      [accessible]="accessible"
+      [accessible]="accessible !== false"
       [accessibilityLabel]="accessibilityLabel"
       [accessibilityHint]="accessibilityHint"
       [accessibilityRole]="accessibilityRole"
@@ -252,6 +278,10 @@ export class TouchableOpacity
   @Input() delayHoverIn?: number;
   @Input() delayHoverOut?: number;
   @Input() disabled?: boolean;
+  @Input() focusable?: boolean;
+  get resolvedFocusable(): boolean {
+    return touchableFocusable(this);
+  }
   @Input() cancelable?: boolean;
   @Input() hitSlop?: IRectOffset;
   @Input() pressRetentionOffset?: IRectOffset;
@@ -457,6 +487,7 @@ export class TouchableOpacity
       [delayHoverIn]="delayHoverIn"
       [delayHoverOut]="delayHoverOut"
       [disabled]="disabled"
+      [focusable]="resolvedFocusable"
       [cancelable]="cancelable"
       [hitSlop]="hitSlop"
       [pressRetentionOffset]="pressRetentionOffset"
@@ -471,7 +502,7 @@ export class TouchableOpacity
       [nextFocusLeft]="nextFocusLeft"
       [nextFocusRight]="nextFocusRight"
       [nextFocusUp]="nextFocusUp"
-      [accessible]="accessible"
+      [accessible]="accessible !== false"
       [accessibilityLabel]="accessibilityLabel"
       [accessibilityHint]="accessibilityHint"
       [accessibilityRole]="accessibilityRole"
@@ -555,6 +586,10 @@ export class TouchableHighlight
   @Input() delayHoverIn?: number;
   @Input() delayHoverOut?: number;
   @Input() disabled?: boolean;
+  @Input() focusable?: boolean;
+  get resolvedFocusable(): boolean {
+    return touchableFocusable(this);
+  }
   @Input() cancelable?: boolean;
   @Input() hitSlop?: IRectOffset;
   @Input() pressRetentionOffset?: IRectOffset;
@@ -721,236 +756,9 @@ export class TouchableHighlight
   }
 }
 
-@Component({
-  selector: 'TouchableWithoutFeedback',
-  standalone: true,
-  viewProviders: [provideGateDemand(() => TouchableWithoutFeedback)],
-  hostDirectives: [
-    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
-  ],
-  imports: [Pressable],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <Pressable
-      [__minPressDuration]="0"
-      [style]="mergedStyle"
-      (press)="press.emit($event)"
-      (pressIn)="handlePressIn($event)"
-      (pressOut)="handlePressOut($event)"
-      (pressMove)="pressMove.emit($event)"
-      (longPress)="longPress.emit($event)"
-      (hoverIn)="hoverIn.emit($event)"
-      (hoverOut)="hoverOut.emit($event)"
-      [delayLongPress]="delayLongPress"
-      [delayHoverIn]="delayHoverIn"
-      [delayHoverOut]="delayHoverOut"
-      [disabled]="disabled"
-      [cancelable]="cancelable"
-      [hitSlop]="hitSlop"
-      [pressRetentionOffset]="pressRetentionOffset"
-      [unstable_pressDelay]="unstable_pressDelay"
-      [android_ripple]="android_ripple"
-      [android_disableSound]="android_disableSound"
-      [testID]="testID"
-      [nativeID]="nativeID"
-      [hasTVPreferredFocus]="hasTVPreferredFocus"
-      [nextFocusDown]="nextFocusDown"
-      [nextFocusForward]="nextFocusForward"
-      [nextFocusLeft]="nextFocusLeft"
-      [nextFocusRight]="nextFocusRight"
-      [nextFocusUp]="nextFocusUp"
-      [accessible]="accessible"
-      [accessibilityLabel]="accessibilityLabel"
-      [accessibilityHint]="accessibilityHint"
-      [accessibilityRole]="accessibilityRole"
-      [accessibilityState]="accessibilityState"
-      [accessibilityValue]="accessibilityValue"
-      [accessibilityActions]="accessibilityActions"
-      [accessibilityLabelledBy]="accessibilityLabelledBy"
-      [importantForAccessibility]="importantForAccessibility"
-      [accessibilityLiveRegion]="accessibilityLiveRegion"
-      [screenReaderFocusable]="screenReaderFocusable"
-      [accessibilityViewIsModal]="accessibilityViewIsModal"
-      [accessibilityElementsHidden]="accessibilityElementsHidden"
-      [accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"
-      [accessibilityLanguage]="accessibilityLanguage"
-      [accessibilityRespondsToUserInteraction]="
-        accessibilityRespondsToUserInteraction
-      "
-      [accessibilityShowsLargeContentViewer]="
-        accessibilityShowsLargeContentViewer
-      "
-      [accessibilityLargeContentTitle]="accessibilityLargeContentTitle"
-      (accessibilityAction)="accessibilityAction.emit($event)"
-      (accessibilityTap)="accessibilityTap.emit($event)"
-      (magicTap)="magicTap.emit($event)"
-      (accessibilityEscape)="accessibilityEscape.emit($event)"
-      [ariaLabel]="ariaLabel"
-      [ariaBusy]="ariaBusy"
-      [ariaChecked]="ariaChecked"
-      [ariaDisabled]="ariaDisabled"
-      [ariaExpanded]="ariaExpanded"
-      [ariaHidden]="ariaHidden"
-      [ariaLabelledBy]="ariaLabelledBy"
-      [ariaLive]="ariaLive"
-      [ariaSelected]="ariaSelected"
-      [ariaModal]="ariaModal"
-      [ariaValueMax]="ariaValueMax"
-      [ariaValueMin]="ariaValueMin"
-      [ariaValueNow]="ariaValueNow"
-      [ariaValueText]="ariaValueText"
-      [id]="id"
-      [role]="role"
-    >
-      <ng-content></ng-content>
-    </Pressable>
-  `,
-})
-export class TouchableWithoutFeedback
-  implements DoCheck, OnDestroy, IAngularTouchableWithoutFeedbackProps
-{
-  // RN's TouchableWithoutFeedback builds a FULL Pressability config with delayPressIn /
-  // delayPressOut / minPressDuration: 0 — "without feedback" means no VISUAL, not no timing. So the
-  // same shared machine TouchableOpacity uses runs here, with the visual half left empty: the
-  // pressIn/pressOut EMIT is what gets deferred and floored.
-  @Output() readonly press = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly pressIn = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly pressOut = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly pressMove = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly longPress = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly hoverIn = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly hoverOut = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly accessibilityAction = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
-  @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
-
-  // This wrapper binds the four gated accessibility events on the component it renders, which
-  // Angular forces to be unconditional and which would light that component's gates on every
-  // instance. It answers for them instead — see `gate-demand.ts`.
-  private readonly gateDemandAbove = injectGateDemandAbove();
-
-  wantsGate(name: IGatedAccessibilityEvent): boolean {
-    return gateWanted(this.gateDemandAbove, name, this[name]);
-  }
-
-  @Input() delayPressIn?: number;
-  @Input() delayPressOut?: number;
-  @Input() minPressDuration?: number;
-  @Input() style?: IStyleProp<IViewStyle>;
-  @Input() delayLongPress?: number;
-  @Input() delayHoverIn?: number;
-  @Input() delayHoverOut?: number;
-  @Input() disabled?: boolean;
-  @Input() cancelable?: boolean;
-  @Input() hitSlop?: IRectOffset;
-  @Input() pressRetentionOffset?: IRectOffset;
-  @Input() unstable_pressDelay?: number;
-  @Input() android_ripple?: IPressableAndroidRippleConfig;
-  @Input() android_disableSound?: boolean;
-  @Input() testID?: string;
-  @Input() nativeID?: string;
-  @Input() hasTVPreferredFocus?: boolean;
-  @Input() nextFocusDown?: number;
-  @Input() nextFocusForward?: number;
-  @Input() nextFocusLeft?: number;
-  @Input() nextFocusRight?: number;
-  @Input() nextFocusUp?: number;
-  @Input() accessible?: boolean;
-  @Input() accessibilityLabel?: string;
-  @Input() accessibilityHint?: string;
-  @Input() accessibilityRole?: IAccessibilityProps['accessibilityRole'];
-  @Input() accessibilityState?: IAccessibilityStateValue;
-  @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
-  @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
-  @Input() accessibilityLabelledBy?: string | string[];
-  @Input()
-  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input()
-  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
-  @Input() screenReaderFocusable?: boolean;
-  @Input() accessibilityViewIsModal?: boolean;
-  @Input() accessibilityElementsHidden?: boolean;
-  @Input() accessibilityIgnoresInvertColors?: boolean;
-  @Input() accessibilityLanguage?: string;
-  @Input() accessibilityRespondsToUserInteraction?: boolean;
-  @Input() accessibilityShowsLargeContentViewer?: boolean;
-  @Input() accessibilityLargeContentTitle?: string;
-  @Input() ariaLabel?: string;
-  @Input() ariaBusy?: boolean;
-  @Input() ariaChecked?: boolean | 'mixed';
-  @Input() ariaDisabled?: boolean;
-  @Input() ariaExpanded?: boolean;
-  @Input() ariaHidden?: boolean;
-  @Input() ariaLabelledBy?: string;
-  @Input() ariaLive?: IAriaProps['aria-live'];
-  @Input() ariaSelected?: boolean;
-  @Input() ariaModal?: boolean;
-  @Input() ariaValueMax?: number;
-  @Input() ariaValueMin?: number;
-  @Input() ariaValueNow?: number;
-  @Input() ariaValueText?: string;
-  @Input() id?: string;
-  @Input() role?: IAriaProps['role'];
-
-  // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT the Pressable one level down.
-  private readonly elementRef = inject(ElementRef);
-
-  // The shared press-scheduling cell (delayPressIn timer + activation clock), persisted on the
-  // instance; the machine's handlers are rebuilt per event over live @Input()s.
-  private readonly runtime = createTouchableFeedbackRuntime();
-  private readonly timers = createTimerScheduler();
-
-  // The anchor's class-derived style goes first, then the explicit style, so an explicit [style]
-  // still beats the ambient class.
-  get mergedStyle(): IStyleProp<IViewStyle> {
-    return [this.anchorStyle(), this.style];
-  }
-
-  private feedbackHandlers(): ITouchableFeedbackHandlers {
-    return createTouchableFeedbackHandlers(
-      {
-        delayPressIn: this.delayPressIn ?? 0,
-        delayPressOut: this.delayPressOut ?? 0,
-        minPressDuration:
-          this.minPressDuration ?? TOUCHABLE_MIN_PRESS_DURATION_MS,
-        schedule: this.timers.schedule,
-        now: Date.now,
-      },
-      this.runtime,
-      {
-        activate: (event: ISymbioteEvent): void => this.pressIn.emit(event),
-        deactivate: (event: ISymbioteEvent): void => this.pressOut.emit(event),
-      },
-    );
-  }
-
-  handlePressIn(event: ISymbioteEvent): void {
-    this.feedbackHandlers().handlePressIn(event);
-  }
-
-  handlePressOut(event: ISymbioteEvent): void {
-    this.feedbackHandlers().handlePressOut(event);
-  }
-
-  ngOnDestroy(): void {
-    this.timers.cancelAll();
-  }
-
-  // The anchor's class-derived style is written by the renderer's addClass/removeClass at the USE
-  // SITE - it never appears in SimpleChanges, and nothing about it dirties THIS component's view.
-  // A `class=` present at creation therefore worked, while one toggled later did not: the parent
-  // refreshed, the class landed on the anchor, and this component's own view was never refreshed,
-  // so whatever merged the anchor style in was never re-evaluated. Polling it into a signal from
-  // ngDoCheck fixes both halves: ngDoCheck runs during the PARENT's refresh even when this view is
-  // skipped, and the signal write is what then marks this view for refresh. `signal.set`'s own
-  // Object.is makes an unchanged poll a no-op, so there is no loop.
-  private readonly anchorStyle = signal<IStyleProp<IViewStyle> | undefined>(
-    undefined,
-  );
-
-  ngDoCheck(): void {
-    this.anchorStyle.set(anchorStyleProp<IViewStyle>(this.elementRef));
-  }
-}
+// TouchableWithoutFeedback is a TAG — `<touchable-without-feedback>`, matched by
+// `TouchableWithoutFeedbackElement` (../../elements). RN's own renders no view
+// (TouchableWithoutFeedback.js:229,286), so the wrapper's Pressable node was ours; the press
+// machine, the delayPressIn/delayPressOut scheduler and the clone onto the single child all live on
+// the engine node (`core/components/src/behaviors/touchable-without-feedback.ts`), wired by
+// `../../register`. The prop type stays, in `../touchable-without-feedback/`.

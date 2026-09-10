@@ -30,24 +30,14 @@ export type {
   ITaskCancelProvider,
 } from './modules/app-registry';
 
-// Eight names are deliberately absent and there is nothing to import in their place: `view`,
-// `text`, `safe-area-view`, `pressable`, `text-input`, `switch`, `image` and
-// `input-accessory-view` are INTRINSIC TAGS an app writes directly. `Image` survives as the
-// statics namespace (`Image.getSize`), which is where RN's own statics hang too. See
-// ./components/index.ts for where each deleted wrapper's body went.
+// Nine names are deliberately absent and there is nothing to import in their place: `view`, `text`,
+// `safe-area-view`, `pressable`, `text-input`, `switch`, `image`, `input-accessory-view` and
+// `activity-indicator` are INTRINSIC TAGS an app writes directly. What survives of `Image` and
+// `TouchableNativeFeedback` is a STATICS namespace each, exported with the other imperative
+// namespaces below. See ./components/index.ts for where each deleted wrapper's body went.
 export {
-  ActivityIndicator,
-  Image,
-  ImageBackground,
   KeyboardAvoidingView,
   Modal,
-  RefreshControl,
-  TouchableOpacity,
-  TouchableHighlight,
-  TouchableWithoutFeedback,
-  TouchableNativeFeedback,
-  Button,
-  ScrollView,
   VirtualizedList,
   FlatList,
   VirtualizedSectionList,
@@ -58,14 +48,15 @@ export type {
   ITextProps,
   IActivityIndicatorProps,
   IImageProps,
-  IImageStatics,
   IImageBackgroundProps,
   IInputAccessoryViewProps,
   IKeyboardAvoidingViewProps,
   IKeyboardAvoidingBehavior,
   ISwitchProps,
+  ISwitchChangeEvent,
   ITextInputProps,
   ITextInputHandle,
+  ITextInputChangeEvent,
   IModalProps,
   ISafeAreaViewProps,
   IRefreshControlProps,
@@ -173,6 +164,15 @@ export type {
   IOpaqueColorValue,
   IDynamicColorIOSTuple,
 } from '@symbiote-native/engine';
+
+// The two namespaces left behind by primitives that became tags, here rather than in the component
+// block above for one reason: they carry no view. `Image` gets an adapter file only because it
+// renames the shared `imageStatics`; TNF's four are pure dict producers and come straight from the
+// shared package. RN points NEW code at `<pressable p={{ android_ripple: {…} }}>`, but they are not
+// redundant — the `touchable-native-feedback` tag folds `background`, and nothing else builds it.
+export { Image } from './modules/image';
+export type { IImageStatics } from './modules/image';
+export { TouchableNativeFeedback } from '@symbiote-native/components';
 
 // Imperative runtime modules: the SAME module every adapter shares, re-exported straight from
 // @symbiote-native/engine so app code names only @symbiote-native/svelte (RN's single import
@@ -345,7 +345,7 @@ export {
   type IClassEntry,
 } from './class-value';
 
-// Animated: the drivers, plus View/Text/Image/ScrollView/FlatList/SectionList as ALIASES of the
-// plain components. There is no `createAnimatedComponent` — the engine resolves an AnimatedNode in
-// any prop of any host node, so nothing needs wrapping (modules/animated/index.ts).
+// Animated: the drivers, plus FlatList/SectionList as ALIASES of the plain components. There is no
+// `createAnimatedComponent` — the engine resolves an AnimatedNode in any prop of any host node, so
+// nothing needs wrapping (modules/animated/index.ts).
 export { Animated } from './modules/animated';

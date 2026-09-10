@@ -38,7 +38,7 @@ describe('mountDescriptorChildren', () => {
 
       const children: IDescriptorChild[] = [
         {
-          type: 'activity-indicator',
+          type: 'activity-indicator-spinner',
           props: { animating: true },
           children: [],
         },
@@ -61,7 +61,7 @@ describe('mountDescriptorChildren', () => {
 
       const mounted = mountDescriptorChildren(root, [
         {
-          type: 'activity-indicator',
+          type: 'activity-indicator-spinner',
           props: { animating: true, color: 'red' },
           children: [],
         },
@@ -71,7 +71,7 @@ describe('mountDescriptorChildren', () => {
 
       mounted.update([
         {
-          type: 'activity-indicator',
+          type: 'activity-indicator-spinner',
           props: { animating: false, color: 'red' },
           children: [],
         },

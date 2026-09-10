@@ -8,14 +8,11 @@
 import './register';
 
 export {
-  ActivityIndicator,
   anchorHostStyle,
-  Button,
   FlatList,
   HorizontalScrollContentView,
   HorizontalScrollView,
   Image,
-  ImageBackground,
   InputAccessoryView,
   KeyboardAvoidingView,
   Modal,
@@ -35,7 +32,6 @@ export {
   TouchableHighlight,
   TouchableNativeFeedback,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
   VirtualizedList,
   VirtualizedSectionList,
@@ -130,8 +126,10 @@ export type {
   ISection,
   ISwitchProps,
   ISwitchTrackColor,
+  ISwitchChangeEvent,
   ITextInputHandle,
   ITextInputSelection,
+  ITextInputChangeEvent,
 } from './components';
 export { setImageSourceResolver } from './components';
 // The element directives that make a HAND-WRITTEN intrinsic tag (`<view>`, `<text-input>`, ...)
@@ -143,8 +141,11 @@ export {
   SYMBIOTE_ELEMENTS,
   SymbioteElement,
   ActivityIndicatorElement,
+  ActivityIndicatorSpinnerElement,
+  ButtonElement,
   HorizontalScrollContentElement,
   HorizontalScrollViewElement,
+  ImageBackgroundElement,
   ImageElement,
   InputAccessoryViewElement,
   ManagedMultilineTextInputElement,
@@ -161,6 +162,13 @@ export {
   SwitchElement,
   TextElement,
   TextInputElement,
+  // The three the list omitted while their components still existed. These are now the ONLY
+  // replacements for their deleted components in an app's `imports`, so a narrower import has to be
+  // able to name them.
+  TouchableHighlightElement,
+  TouchableNativeFeedbackElement,
+  TouchableOpacityElement,
+  TouchableWithoutFeedbackElement,
   ViewElement,
 } from './elements';
 export type {

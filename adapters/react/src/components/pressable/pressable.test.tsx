@@ -18,7 +18,7 @@
 // (a Positive contract — completes without error, callback just never fires), it never rejects.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, Pressable, Button } from '@symbiote-native/react';
+import { mount, unmount, Pressable } from '@symbiote-native/react';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
@@ -351,13 +351,14 @@ describe('React Pressable on the engine', () => {
     expect(props.testID).toBe('save-btn');
   });
 
-  // why: Button is a thin Pressable wrapper; a screen reader must announce it as a button and
-  // as disabled when `disabled` is set — this proves that mapping survives Button → Pressable →
-  // View, not just Pressable's own accessibilityState fold tested above.
-  it('gives Button role=button, accessible, and a disabled a11y state', () => {
+  // why: `button` is a TAG whose behavior composes the press machine, so this proves the a11y fold
+  // survives React's renderer -> `./register` -> the behavior, not just Pressable's own
+  // accessibilityState fold tested above. It is also the arm that fails if the registration is
+  // dropped: an unregistered `button` commits a bare view with no role at all.
+  it('gives button role=button, accessible, and a disabled a11y state', () => {
     mount(
       ROOT_TAG,
-      <Button title="OK" disabled accessibilityLabel="confirm" />,
+      <button title="OK" disabled accessibilityLabel="confirm" />,
     );
     const props = responderProps();
     expect(props.accessibilityRole).toBe('button');
@@ -366,11 +367,11 @@ describe('React Pressable on the engine', () => {
     expect(props.accessibilityLabel).toBe('confirm');
   });
 
-  // why: the disabled-fold above must not leak — an enabled Button must NOT report
+  // why: the disabled-fold above must not leak — an enabled button must NOT report
   // accessibilityState.disabled just because `disabled` was folded through Pressable's logic
   // (the fold is untouched, not defaulted-to-true, when `disabled` is unset).
-  it('keeps an enabled Button role=button and not disabled', () => {
-    mount(ROOT_TAG, <Button title="Go" onPress={() => {}} />);
+  it('keeps an enabled button role=button and not disabled', () => {
+    mount(ROOT_TAG, <button title="Go" onPress={() => {}} />);
     const props = responderProps();
     expect(props.accessibilityRole).toBe('button');
     expect(accessibilityDisabled(props)).not.toBe(true);
@@ -601,7 +602,7 @@ describe('React Pressable on the engine', () => {
     mount(
       ROOT_TAG,
       <Pressable android_ripple={{ color: '#f00' }} onPress={() => {}}>
-        <Button title="inner" />
+        <button title="inner" />
       </Pressable>,
     );
     const rippleCarrier = fabric.find(
@@ -610,5 +611,19 @@ describe('React Pressable on the engine', () => {
         n.props.nativeForegroundAndroid !== undefined,
     );
     expect(rippleCarrier).toBeUndefined();
+  });
+
+  // why: RN marks every pressable accessible unless the app opts OUT (Pressable.js:252), so a
+  // Pressable that never writes the prop must still reach a screen reader as one element rather
+  // than a plain view. Asserted on the COMMITTED payload — the gap this closes was invisible in
+  // JS and device-only. The `false` case pins `!== false` against a `?? true` regression.
+  it('marks the responder accessible when the app says nothing', () => {
+    mount(ROOT_TAG, <Pressable onPress={() => {}} />);
+    expect(responderProps().accessible).toBe(true);
+  });
+
+  it('lets a literal false opt out (not `?? true`)', () => {
+    mount(ROOT_TAG, <Pressable accessible={false} onPress={() => {}} />);
+    expect(responderProps().accessible).toBe(false);
   });
 });

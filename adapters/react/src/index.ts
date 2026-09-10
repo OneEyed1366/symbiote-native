@@ -34,8 +34,9 @@ export type {
   IImageSize,
   IImageCacheStatus,
 } from './components/image';
-export { ImageBackground } from './components/image-background';
-export type { IImageBackgroundProps } from './components/image-background';
+// `ImageBackground` is a TAG — `<image-background>` — and there is nothing to import in its place.
+// The prop type stays, for a component forwarding a bag.
+export type { IImageBackgroundProps } from './components/image-background-props';
 export { ScrollView } from './components/scroll-view';
 export type {
   IScrollViewProps,
@@ -45,6 +46,7 @@ export { TextInput } from './components/text-input';
 export type {
   ITextInputProps,
   ITextInputHandle,
+  ITextInputChangeEvent,
 } from './components/text-input';
 export { InputAccessoryView } from './components/input-accessory-view';
 export type { IInputAccessoryViewProps } from './components/input-accessory-view';
@@ -57,9 +59,15 @@ export { StatusBar } from './modules/status-bar';
 export type { IStatusBarProps, IStatusBarStyle } from './modules/status-bar';
 
 export { Switch } from './components/switch';
-export type { ISwitchProps, ISwitchTrackColor } from './components/switch';
-export { ActivityIndicator } from './components/activity-indicator';
-export type { IActivityIndicatorProps } from './components/activity-indicator';
+export type {
+  ISwitchProps,
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from './components/switch';
+// `ActivityIndicator` is a TAG — `<activity-indicator>` — and there is nothing to import in its
+// place. RN's ActivityIndicator has no statics, so the name exports nothing at all now; the prop
+// type stays, for a component forwarding a bag.
+export type { IActivityIndicatorProps } from './components/activity-indicator-props';
 export { SafeAreaView } from './components/safe-area-view';
 export type { ISafeAreaViewProps } from './components/safe-area-view';
 export { RefreshControl } from './components/refresh-control';
@@ -74,18 +82,19 @@ export type {
 
 export { Pressable } from './components/pressable';
 export type { IPressableProps, IPressState } from './components/pressable';
-export {
-  TouchableOpacity,
-  TouchableHighlight,
-  TouchableWithoutFeedback,
-} from './components/touchable';
+export { TouchableOpacity, TouchableHighlight } from './components/touchable';
 export type {
   ITouchableOpacityProps,
   ITouchableHighlightProps,
-  ITouchableWithoutFeedbackProps,
 } from './components/touchable';
-export { Button } from './components/button';
-export type { IButtonProps } from './components/button';
+// `TouchableWithoutFeedback` is a TAG — `<touchable-without-feedback>` — and RN gives it no statics,
+// so like `Button` the name exports nothing now; only the prop type stays, for a component
+// forwarding a bag.
+export type { ITouchableWithoutFeedbackProps } from './components/touchable-without-feedback/touchable-without-feedback-props';
+// `Button` is a TAG — `<button>` — and there is nothing to import in its place. RN's Button has no
+// statics (unlike `TouchableNativeFeedback`), so the name exports nothing at all now; the
+// prop type stays, for a component forwarding a bag.
+export type { IButtonProps } from './components/button-props';
 
 export { FlatList } from './components/flat-list';
 export type { IFlatListProps, IFlatListHandle } from './components/flat-list';
@@ -293,13 +302,16 @@ export type {
 // Android-only surface (the second-platform pass): a thin JS shim over an Android Fabric view,
 // inert on iOS (no native view -> degrades to a plain container). The Android-only MODULES
 // (ToastAndroid, PermissionsAndroid, BackHandler) sit in the engine block above.
-export { TouchableNativeFeedback } from './components/touchable-native-feedback';
+// `TouchableNativeFeedback` is now RN's STATIC NAMESPACE, not a component: the element is the tag
+// `<touchable-native-feedback>`, which commits no node of its own and clones onto its single child.
+// `TouchableNativeFeedback.Ripple(…)` / `.SelectableBackground(…)` are unchanged.
+export { TouchableNativeFeedback } from '@symbiote-native/components';
 export type {
-  ITouchableNativeFeedbackProps,
   INativeFeedbackBackground,
   IThemeAttrBackground,
   IRippleBackground,
-} from './components/touchable-native-feedback';
+} from '@symbiote-native/components';
+export type { ITouchableNativeFeedbackProps } from './components/touchable-native-feedback/touchable-native-feedback-props';
 export type {
   ISymbioteEvent,
   ISymbioteNode,

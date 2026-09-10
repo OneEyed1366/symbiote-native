@@ -5,8 +5,9 @@
 // before it becomes a host prop, so any link that copies or normalizes the bag would drop the
 // node — this is where that would show.
 //
-// The compile chain: FlatList -> VirtualizedList -> RefreshControl + ScrollViewStickyHeader ->
-// View. Every link is pre-compiled to a co-located sibling `.mjs` with its specifier rewritten,
+// The compile chain: FlatList -> VirtualizedList -> View (refresh-control is a bare tag now, no
+// sibling component to pre-compile). Every remaining link is pre-compiled to a co-located sibling
+// `.mjs` with its specifier rewritten,
 // the same technique flat-list.smoke.test.ts uses; the output names are unique to this file
 // because Vitest runs suites concurrently.
 //
@@ -40,10 +41,6 @@ globalThis.nativeModuleProxy = undefined;
 
 const ROOT_TAG = 91_107;
 const COMPONENTS_DIR = join(__dirname, '..', '..', 'components');
-const REFRESH_CONTROL_OUT = join(
-  COMPONENTS_DIR,
-  '.smoke-compiled-refresh-control-for-animated-flat-list.mjs',
-);
 const VIRTUALIZED_LIST_OUT = join(
   COMPONENTS_DIR,
   'virtualized-list',
@@ -66,12 +63,7 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  for (const out of [
-    REFRESH_CONTROL_OUT,
-    VIRTUALIZED_LIST_OUT,
-    FLAT_LIST_OUT,
-    PARENT_OUT,
-  ]) {
+  for (const out of [VIRTUALIZED_LIST_OUT, FLAT_LIST_OUT, PARENT_OUT]) {
     rmSync(out, { force: true });
   }
 });
@@ -128,20 +120,12 @@ function liveScrollView(): IFakeNode {
 
 function compileChain(): void {
   compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8'),
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
-  );
-  compileRewritten(
-    join(COMPONENTS_DIR, 'virtualized-list', 'index.svelte'),
+    readFileSync(
+      join(COMPONENTS_DIR, 'virtualized-list', 'index.svelte'),
+      'utf8',
+    ),
     'VirtualizedList.svelte',
     VIRTUALIZED_LIST_OUT,
-    [
-      [
-        "from '../RefreshControl.svelte'",
-        "from '../.smoke-compiled-refresh-control-for-animated-flat-list.mjs'",
-      ],
-    ],
   );
   compileRewritten(
     join(COMPONENTS_DIR, 'flat-list', 'index.svelte'),

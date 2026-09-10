@@ -38,7 +38,10 @@ import { resolveAccessibilityProps } from '@symbiote-native/components';
 // ISwitchProps is otherwise framework-agnostic (the controlled value contract, no ref /
 // children), so its base lives in @symbiote-native/components; React supplies only the hook
 // (useReducer + the snap-back useLayoutEffect) and the descriptor bridge.
-export type { ISwitchTrackColor } from '@symbiote-native/components';
+export type {
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from '@symbiote-native/components';
 
 // className is React's own field (framework-specific, not part of the shared agnostic prop
 // base); not destructured below, so it falls into `...passthrough` and lands on the single
@@ -82,7 +85,7 @@ export function useSwitchLogic(
         `Switch onChange value=${String(next)} eventCount=${String(event.nativeEvent.eventCount)}`,
       );
       if (next === undefined) return;
-      onValueChange?.(next, event);
+      onValueChange?.(Object.assign(event, { value: next }));
       dispatch({ type: 'native-reported', value: next });
     },
     [onValueChange],

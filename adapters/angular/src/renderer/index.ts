@@ -14,6 +14,7 @@ import {
   getExplicitStyle,
   insertBefore,
   isDebug,
+  isSymbioteEvent,
   isSymbioteNode,
   removeChild,
   routeProp,
@@ -523,12 +524,22 @@ export class SymbioteRenderer implements Renderer2 {
     // `valueChange` as an engine event would wait forever for a Fabric event of that name.
     //
     // The lowered path already carries the same fold under RN's own spelling: both behaviors call
-    // `node.props.onValueChange(value, event)` — a plain function PROP, not an event
-    // (`behaviors/switch.ts`, `behaviors/text-input.ts`). So this is a rename, not a mechanism:
-    // route the binding to that prop and `[(value)]` behaves identically on both paths. Without it
-    // the transform had to refuse to lower the two primitives whose idiomatic spelling this is.
+    // `node.props.onValueChange(event)` — a plain function PROP, not an event
+    // (`behaviors/switch.ts`, `behaviors/text-input.ts`), with `text`/`value` carried as a FIELD on
+    // the event object rather than a second argument (Svelte forces every individual `on*` prop
+    // through a native listener that calls with exactly one argument, always a real object). So
+    // Angular's own `[(value)]` sugar needs one extra step its React/Vue/Solid counterparts do not:
+    // unwrap that field back to a bare value before handing it to Angular's callback, or `text =
+    // $event` would assign the whole event object instead of the typed string/boolean.
     if (eventName === VALUE_CHANGE_EVENT) {
-      routeProp(target, VALUE_CHANGE_PROP, callback);
+      const forwardValue = (event: unknown): boolean | void => {
+        if (isSymbioteEvent(event)) {
+          if ('text' in event) return callback(event.text);
+          if ('value' in event) return callback(event.value);
+        }
+        return callback(event);
+      };
+      routeProp(target, VALUE_CHANGE_PROP, forwardValue);
       return () => routeProp(target, VALUE_CHANGE_PROP, undefined);
     }
     setEventListener(target, eventName, callback);

@@ -16,8 +16,10 @@ export type { IImageProps } from './components/image';
 export { Pressable } from './components/pressable';
 export type { IPressableProps } from './components/pressable';
 
-export { ActivityIndicator } from './components/activity-indicator';
-export type { IActivityIndicatorProps } from './components/activity-indicator';
+// `ActivityIndicator` is a TAG — `<activity-indicator>` — and there is nothing to import in its
+// place. RN's ActivityIndicator has no statics, so the name exports nothing at all now; the prop
+// type stays, for a component forwarding a bag.
+export type { IActivityIndicatorProps } from './components/activity-indicator-props';
 
 // Agnostic detail types every other adapter's barrel also carries, taken STRAIGHT from the shared
 // package rather than routed through a component module: a pure passthrough belongs in a barrel,
@@ -31,13 +33,18 @@ export type {
 } from '@symbiote-native/components';
 
 export { Switch } from './components/switch';
-export type { ISwitchProps, ISwitchTrackColor } from './components/switch';
+export type {
+  ISwitchProps,
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from './components/switch';
 
 export { TextInput } from './components/text-input';
 export type {
   ITextInputProps,
   ITextInputHandle,
   ITextInputSelection,
+  ITextInputChangeEvent,
 } from './components/text-input';
 
 export { Modal } from './components/modal';
@@ -122,36 +129,38 @@ export type {
 
 // The Touchable family, all composed over Pressable exactly as React's and Vue's are — so the
 // press machine, the aria fold and the class+style merge each happen once, in Pressable/View.
-export {
-  TouchableOpacity,
-  TouchableHighlight,
-  TouchableWithoutFeedback,
-} from './components/touchable';
+export { TouchableOpacity, TouchableHighlight } from './components/touchable';
 export type {
   ITouchableOpacityProps,
   ITouchableHighlightProps,
-  ITouchableWithoutFeedbackProps,
 } from './components/touchable';
+// `TouchableWithoutFeedback` is a TAG — `<touchable-without-feedback>` — and RN gives it no statics,
+// so like `Button` the name exports nothing now; only the prop type stays, for a component
+// forwarding a bag.
+export type { ITouchableWithoutFeedbackProps } from './components/touchable-without-feedback/touchable-without-feedback-props';
 
-// Android's native ripple/theme-attr feedback. The background factories are the SHARED functions
-// hung on the component value, not adapter wrappers, so every adapter offers the identical set.
-export { TouchableNativeFeedback } from './components/touchable-native-feedback';
+// Android's native ripple/theme-attr feedback. `TouchableNativeFeedback` is now RN's STATIC
+// NAMESPACE, not a component: the element is the tag `<touchable-native-feedback>`, which commits no
+// node of its own and clones onto its single child. `.Ripple(…)` / `.SelectableBackground(…)` are
+// unchanged, and are the SHARED functions every adapter already offered.
+export { TouchableNativeFeedback } from '@symbiote-native/components';
 export type {
-  ITouchableNativeFeedbackProps,
   INativeFeedbackBackground,
   IThemeAttrBackground,
   IRippleBackground,
-} from './components/touchable-native-feedback';
+} from '@symbiote-native/components';
+export type { ITouchableNativeFeedbackProps } from './components/touchable-native-feedback/touchable-native-feedback-props';
 
-// IButtonProps is agnostic and lives in @symbiote-native/components; this re-exports it rather
-// than redeclaring it, matching react/vue/svelte/angular (CLAUDE.md prop-type split).
-export { Button } from './components/button';
-export type { IButtonProps } from './components/button';
+// `Button` is a TAG — `<button>` — and there is nothing to import in its place. RN's Button has no
+// statics (unlike `TouchableNativeFeedback` next to it), so the name exports nothing at all now;
+// the prop type stays, for a component forwarding a bag.
+export type { IButtonProps } from './components/button-props';
 
 // Both take `children`, a framework value, so their public prop types are declared per-adapter
 // over the shared agnostic field base — never imported from another adapter.
-export { ImageBackground } from './components/image-background';
-export type { IImageBackgroundProps } from './components/image-background';
+//
+// `ImageBackground` is a TAG — `<image-background>` — and there is nothing to import in its place.
+export type { IImageBackgroundProps } from './components/image-background-props';
 
 export { InputAccessoryView } from './components/input-accessory-view';
 export type { IInputAccessoryViewProps } from './components/input-accessory-view';

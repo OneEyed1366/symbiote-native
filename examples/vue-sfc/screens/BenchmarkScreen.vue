@@ -130,7 +130,6 @@ function buildRows(count: number): IBenchmarkRow[] {
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue';
 import {
-  ActivityIndicator,
   FlatList,
   SafeAreaView,
   ScrollView,
@@ -925,7 +924,7 @@ const rowItemLayout = (
         testID="bench-suite-progress"
         class="bench-progress"
       >
-        <ActivityIndicator :color="accent" />
+        <activity-indicator :color="accent" />
         <Text class="bench-progress-text">{{
           `${progress.mode === MOUNT_MODE.All ? 'All mounted' : 'Virtualized'} · ${progress.label}`
         }}</Text>

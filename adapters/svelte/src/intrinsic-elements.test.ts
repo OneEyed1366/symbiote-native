@@ -33,9 +33,23 @@ const INTRINSIC_UNION = join(
 // depend on it, so a resolution failure must be loud rather than a silently skipped arm.
 const SVELTE_JSX = require.resolve('svelte2tsx/svelte-jsx-v4.d.ts');
 
-// The four tag names that are also real SVG elements, and therefore the only ones svelte2tsx
-// declares itself. Derived by intersecting our union with the shim's own members below, never
-// stated — the shim's element list is not ours to predict.
+// The tag names svelte2tsx declares ITSELF, and therefore the ones our `extends Record<…>` base is
+// outranked on. Derived from where the property is DECLARED, never stated — the shim's element list
+// is not ours to predict, and it was written out as four SVG names until `button` joined the
+// alphabet and made the list wrong by one.
+function shimOwnedTags(
+  checker: ts.TypeChecker,
+  elements: ts.Type,
+  tags: readonly string[],
+): string[] {
+  return tags.filter(tag => {
+    const property = checker.getPropertyOfType(elements, tag);
+    return (property?.declarations ?? []).some(declaration =>
+      declaration.getSourceFile().fileName.endsWith('svelte-jsx-v4.d.ts'),
+    );
+  });
+}
+
 function symbioteTags(checker: ts.TypeChecker, program: ts.Program): string[] {
   const source = program.getSourceFile(INTRINSIC_UNION);
   if (source === undefined)
@@ -130,9 +144,10 @@ describe('the svelteHTML tag alphabet', () => {
 
   // The EFFECT half, and the one the first attempt failed. A tag whose name svelte2tsx also owns
   // must end up carrying OUR shape: `p` present, and a string index signature, which only appears
-  // once the `Omit<…, keyof SVGAttributes>` in its entry has erased the SVG surface.
-  it.each(['view', 'text', 'image', 'switch'])(
-    "gives %s our attributes rather than SVG's",
+  // once the `Omit<…, keyof SVGAttributes>` — or `keyof HTMLAttributes` — in its entry has erased
+  // the DOM surface.
+  it.each(shimOwnedTags(checker, elements, tags))(
+    "gives %s our attributes rather than the DOM's",
     tag => {
       const attributes = attributesOf(checker, elements, tag);
       const names = checker
@@ -141,15 +156,23 @@ describe('the svelteHTML tag alphabet', () => {
       expect(names, `${tag} must accept the prop bag`).toContain('p');
       expect(
         checker.getIndexInfoOfType(attributes, ts.IndexKind.String),
-        `${tag} still carries SVG's closed attribute set`,
+        `${tag} still carries the DOM's closed attribute set`,
       ).toBeDefined();
     },
   );
 
-  // Without this the row above could pass on a shim that never declared those four, which is the
-  // world in which the SVGAttributes half is dead code rather than the load-bearing seam.
-  it('is checked against a shim that really owns those four', () => {
+  // Without this the row above could pass on a shim that never declared those tags, which is the
+  // world in which the two escape interfaces are dead code rather than the load-bearing seam. BOTH
+  // halves are named: the four SVG-element names went through `SVGAttributes` from the start, and
+  // `button` — the first tag here that is a real HTML element — needed `HTMLAttributes`, the second
+  // empty interface the shim offers one line above it.
+  it('is checked against a shim that really owns those tags, on both seams', () => {
     const shim = program.getSourceFile(SVELTE_JSX);
     expect(shim?.text).toContain("view: HTMLProps<'view', SVGAttributes>");
+    expect(shim?.text).toContain("button: HTMLProps<'button', HTMLAttributes>");
+    // A tag alphabet with nothing on one of the two seams leaves that half unproven, and a
+    // reader would take the row above as covering it.
+    expect(shimOwnedTags(checker, elements, tags)).toContain('button');
+    expect(shimOwnedTags(checker, elements, tags)).toContain('view');
   });
 });

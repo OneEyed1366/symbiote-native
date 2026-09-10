@@ -5,7 +5,11 @@ import { descriptorToReact } from '../../descriptor-to-react';
 import { useSwitchLogic } from './shared';
 import type { ISwitchHostPlatform, ISwitchProps } from './shared';
 
-export type { ISwitchProps, ISwitchTrackColor } from './shared';
+export type {
+  ISwitchProps,
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from './shared';
 
 const PLATFORM: ISwitchHostPlatform = {
   snapBackCommand: 'setValue',

@@ -24,6 +24,9 @@ import { normalizeVueAttrs } from '../utils/normalize-attrs';
 // node, which reads what it understands and ignores the rest.
 export interface IRefreshControlProps extends IAccessibilityProps, IAriaProps {
   refreshing: boolean;
+  // `id` — RN's W3C alias for `nativeID`, folded by the spec entry's ID_ALIAS. See React's
+  // declaration for why the prop and the alias land together.
+  id?: string;
   tintColor?: string;
   title?: string;
   titleColor?: string;

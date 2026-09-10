@@ -42,6 +42,7 @@ import {
   resolveTextInputProps,
   shouldCommandText,
   textFromChange,
+  type ITextInputChangeEvent,
   type ITextInputHandle,
 } from '../state/text-input';
 
@@ -99,7 +100,7 @@ function callAppListener(
   if (typeof listener === 'function') listener(event);
 }
 
-// `onValueChange(text, event)` is NOT a Fabric event — it is a fold the component wrapper used to do
+// `onValueChange(event)` is NOT a Fabric event — it is a fold the component wrapper used to do
 // over the raw `change` payload, so it lives in `node.props` as a plain function key and
 // `fabricProps` drops it on the way to native. A lowered element has no wrapper to run that fold, so
 // before this the callback was simply never called: the field echoed keystrokes natively (native
@@ -110,13 +111,20 @@ function callAppListener(
 // fork, where all five adapters inherit it. Refusing to lower an element carrying the prop was the
 // other candidate and is strictly worse — it makes the optimisation opt out of the idiom the
 // ecosystem actually writes, to avoid a fold the runtime can do in three lines.
+//
+// The listener takes ONE argument, `text` carried on the event itself (`ITextInputChangeEvent`),
+// not `(text, event)` — Svelte's compiler forces every individual `on*` attribute through a native
+// listener wrapper that calls with exactly one argument, always a real object, so a second
+// argument is silently dropped and a bare string as the sole argument crashes.
 function callValueChange(
   node: ISymbioteNode,
   text: string,
   event: ISymbioteEvent,
 ): void {
   const listener = node.props.onValueChange;
-  if (typeof listener === 'function') listener(text, event);
+  if (typeof listener !== 'function') return;
+  const changeEvent: ITextInputChangeEvent = Object.assign(event, { text });
+  listener(changeEvent);
 }
 
 // The W3C/legacy alias fold the WRAPPER runs in its component body — `inputMode` -> `keyboardType`,

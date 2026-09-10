@@ -320,6 +320,62 @@ describe('the horizontal tag sets the C++ axis flag, not just the style', () => 
   });
 });
 
+// why: in RN the axis has ONE input. `horizontal` picks the native component, the row
+// contentContainerStyle and the payload key together (`ScrollView.js:1644-1656`), so the three can
+// never disagree. Our input is the TAG, which reopens the disagreement the wrapper used to close:
+// an app writing `horizontal` on the vertical tag would otherwise ship a combination RN cannot
+// produce — RCTScrollView with the axis flipped, a vertical content node and no row style. On iOS
+// both tags ARE RCTScrollView, so the stray prop really does turn the scroller.
+describe('the tag is the only axis input, as the prop is in RN', () => {
+  it('eats an app-written horizontal on the vertical tag', () => {
+    const { commit } = mountScroll(SCROLL_VIEW_TAG, { horizontal: true });
+    expect(Object.hasOwn(commit().owner.props, 'horizontal')).toBe(false);
+  });
+
+  // The control: the same fold on the other tag must still write the flag, so a fold that deleted
+  // the key unconditionally fails here rather than passing the case above for the wrong reason.
+  it('still writes the flag from the horizontal tag when the app also wrote it', () => {
+    const { commit } = mountScroll(HORIZONTAL_SCROLL_VIEW_TAG, {
+      horizontal: false,
+    });
+    expect(commit().owner.props.horizontal).toBe(true);
+  });
+});
+
+// why: RN derives the bounce pair from the axis and nothing else does
+// (`ScrollView.js:1753-1761`): `alwaysBounceHorizontal ?? horizontal`,
+// `alwaysBounceVertical ?? !horizontal`. Both names are DECLARED in all five adapters' prop types
+// and COMPUTED in none of them, so a vertical scroll view has never bounced by default on iOS —
+// a gap on the wrapper path too, which is why no parity oracle reported it.
+describe('the bounce pair defaults from the axis, as RN derives it', () => {
+  // The pair is ASYMMETRIC, and copying it rather than tidying it is the point: RN's fallback is
+  // `this.props.horizontal`, which a vertical ScrollView leaves UNSET, so the horizontal key
+  // resolves to undefined and never reaches the payload at all. Writing `false` there instead
+  // would mean the same thing to native and one more prop key on every vertical scroll view.
+  it('vertical: bounces vertically, and writes no horizontal key', () => {
+    const { commit } = mountScroll(SCROLL_VIEW_TAG);
+    expect(commit().owner.props.alwaysBounceVertical).toBe(true);
+    expect(Object.hasOwn(commit().owner.props, 'alwaysBounceHorizontal')).toBe(
+      false,
+    );
+  });
+
+  it('horizontal: bounces horizontally and not vertically', () => {
+    const { commit } = mountScroll(HORIZONTAL_SCROLL_VIEW_TAG);
+    expect(commit().owner.props.alwaysBounceHorizontal).toBe(true);
+    expect(commit().owner.props.alwaysBounceVertical).toBe(false);
+  });
+
+  it('lets an explicit value win on both keys', () => {
+    const { commit } = mountScroll(SCROLL_VIEW_TAG, {
+      alwaysBounceHorizontal: true,
+      alwaysBounceVertical: false,
+    });
+    expect(commit().owner.props.alwaysBounceHorizontal).toBe(true);
+    expect(commit().owner.props.alwaysBounceVertical).toBe(false);
+  });
+});
+
 // Every wrapper writes `nestedScrollEnabled ?? true` on every ScrollView, both platforms — RN
 // itself only defaults it on Android's RefreshControl WRAP path (`ScrollView.js:1862`), and it is
 // the WRAPPER a lowered element replaces. Without it an Android list nested in a scroll view does

@@ -27,7 +27,7 @@
   // that takes no raw text to an anchor, so a gap between siblings never reaches Fabric as an
   // RCTRawText (svelte-adapter-dom-shim §16b), and svelte.config.js's collapseTextWhitespace()
   // folds a sentence wrapped across source lines.
-  import { Animated, ScrollView } from '@symbiote-native/svelte';
+  import { Animated } from '@symbiote-native/svelte';
   import StyleShowcaseTile from '../components/StyleShowcaseTile.svelte';
   import StyleShowcaseToggle from '../components/StyleShowcaseToggle.svelte';
   import { ROUTE_NAME } from '../routes';
@@ -118,7 +118,7 @@
 </script>
 
 <safe-area-view class="screen">
-  <ScrollView
+  <scroll-view
     testID="style-showcase-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
@@ -549,5 +549,5 @@
         the file that declares them, write literals.
       </text>
     </view>
-  </ScrollView>
+  </scroll-view>
 </safe-area-view>

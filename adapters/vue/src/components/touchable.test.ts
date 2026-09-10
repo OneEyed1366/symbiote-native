@@ -36,7 +36,6 @@ import {
   Text,
   TouchableOpacity,
   TouchableHighlight,
-  TouchableWithoutFeedback,
 } from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
@@ -701,62 +700,54 @@ describe('Vue TouchableHighlight', () => {
   });
 });
 
-describe('Vue TouchableWithoutFeedback', () => {
-  // why: a pure press-wiring passthrough with NO visual reaction — proves it still synthesizes the
-  // press events (it is not an inert View) while never touching backgroundColor/opacity.
-  it('fires press with no visual feedback applied', async () => {
-    const events: string[] = [];
+// TouchableWithoutFeedback's own block left with the wrapper: it is a tag now, and both its press
+// wiring and its delayPressIn/delayPressOut scheduler are covered against the COMMITTED tree in
+// `core/components/src/behaviors/touchable-without-feedback.test.ts`.
+
+// RN gives Pressable a ONE-leg focusable default (Pressable.js:258) and the Touchables a THREE-leg
+// one (TouchableOpacity.js:336-340, TouchableHighlight.js:370-374,
+// TouchableWithoutFeedback.js:263-266), so a wrapper composing Pressable has to resolve its own and
+// hand the answer down. Nothing computed it anywhere until 2026-09-09: a disabled touchable stayed
+// focusable, so a keyboard, a TV remote or switch control could land on a dead control.
+describe('Vue Touchable* focusable', () => {
+  const VARIANTS = {
+    TouchableOpacity,
+    TouchableHighlight,
+  };
+
+  async function mountWith(
+    variant: (typeof VARIANTS)[keyof typeof VARIANTS],
+    props: Record<string, unknown>,
+  ): Promise<void> {
     const App = defineComponent({
-      setup: () => (): VNode =>
-        h(
-          TouchableWithoutFeedback,
-          {
-            testID: TARGET,
-            style: { width: BASE_WIDTH },
-            onPress: () => events.push('press'),
-            onPressIn: () => events.push('pressIn'),
-            onPressOut: () => events.push('pressOut'),
-          },
-          () => [h(Text, () => ['x'])],
-        ),
+      setup: () => (): VNode => h(variant, { testID: TARGET, ...props }),
     });
     mount(ROOT_TAG, App);
     await flush();
+  }
 
-    const handle = responderHandle();
-    fabric.fireEvent(handle, TOUCH_START);
-    await flush();
-    expect(committedProps(TARGET).backgroundColor).toBeUndefined();
-    expect(committedProps(TARGET).opacity).toBeUndefined();
-    expect(committedProps(TARGET).width).toBe(BASE_WIDTH);
-
-    fabric.fireEvent(handle, TOUCH_END);
-    await flush();
-    expect(events).toEqual(['pressIn', 'press', 'pressOut']);
-  });
-
-  // why: RN's TouchableWithoutFeedback builds a FULL Pressability config — "without feedback"
-  // means no VISUAL, not no timing. Before the audit this adapter spread the delay props straight
-  // through, so delayPressIn did nothing at all AND reached Fabric as an unknown native prop.
-  it('honors delayPressIn and keeps the delay props off the host', async () => {
-    let pressIns = 0;
-    const App = defineComponent({
-      setup: () => (): VNode =>
-        h(TouchableWithoutFeedback, {
-          testID: TARGET,
-          delayPressIn: PRESS_DELAY_MS,
-          onPressIn: () => {
-            pressIns++;
-          },
-        }),
+  for (const [name, variant] of Object.entries(VARIANTS)) {
+    // Leg 2, read off the APP's `onPress` attr — the wrapped handler the family hands Pressable is
+    // always defined, so resolving one level down could never answer false.
+    it(`${name} stays out of the focus order without an onPress`, async () => {
+      await mountWith(variant, {});
+      expect(committedProps(TARGET).focusable).toBe(false);
     });
-    mount(ROOT_TAG, App);
-    await flush();
-    expect(committedProps(TARGET).delayPressIn).toBeUndefined();
 
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    expect(pressIns, 'fired before the delay elapsed').toBe(0);
-    await wait(PRESS_DELAY_MS + 20);
-    expect(pressIns).toBe(1);
-  });
+    it(`${name} focuses once it has an onPress`, async () => {
+      await mountWith(variant, { onPress: () => {} });
+      expect(committedProps(TARGET).focusable).toBe(true);
+    });
+
+    // Leg 3, and the case a `focusable ?? computed` implementation gets wrong: `&&` means an
+    // explicit opt-IN still loses to `disabled`.
+    it(`${name} refuses focus while disabled, opt-in notwithstanding`, async () => {
+      await mountWith(variant, {
+        onPress: () => {},
+        disabled: true,
+        focusable: true,
+      });
+      expect(committedProps(TARGET).focusable).toBe(false);
+    });
+  }
 });

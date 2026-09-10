@@ -42,15 +42,15 @@ const ACTION_OUT = join(
 );
 // Each compiled file sits next to its real source so that source's own relative imports still
 // resolve; a name unique to THIS suite keeps concurrently-running suites from racing on the path.
-const TOUCHABLE_OUT = join(
+const BARE_TAG_OWNER_OUT = join(
   COMPONENTS_DIR,
-  'touchable-opacity',
-  '.smoke-compiled-attachments-touchable.mjs',
+  'modal',
+  '.smoke-compiled-attachments-modal.mjs',
 );
-const TOUCHABLE_PARENT_OUT = join(
+const BARE_TAG_OWNER_PARENT_OUT = join(
   COMPONENTS_DIR,
-  'touchable-opacity',
-  '.smoke-compiled-attachments-touchable-parent.mjs',
+  'modal',
+  '.smoke-compiled-attachments-modal-parent.mjs',
 );
 
 const COMPILE_OPTIONS = {
@@ -161,8 +161,8 @@ afterEach(() => {
   rmSync(HOST_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
   rmSync(ACTION_OUT, { force: true });
-  rmSync(TOUCHABLE_OUT, { force: true });
-  rmSync(TOUCHABLE_PARENT_OUT, { force: true });
+  rmSync(BARE_TAG_OWNER_OUT, { force: true });
+  rmSync(BARE_TAG_OWNER_PARENT_OUT, { force: true });
 });
 
 describe('Positive — createAttachmentsSync', () => {
@@ -180,8 +180,8 @@ describe('Positive — createAttachmentsSync', () => {
   });
 });
 
-// The forwarding helper the list family and Animated.ScrollView rely on: those rebuild their
-// child's props by name (or through a string-keyed Record), which drops symbol keys silently.
+// The forwarding helper the list family relies on: those rebuild their child's props by name (or
+// through a string-keyed Record), which drops symbol keys silently.
 describe('Positive — pickAttachmentProps', () => {
   it('carries the attachment keys across and leaves everything else behind', () => {
     const attachmentKey = createAttachmentKey();
@@ -260,31 +260,35 @@ describe('Positive — {@attach} on a Symbiote component', () => {
     expect(events[2].node).toBe(events[0].node);
   });
 
-  // why: TouchableOpacity owns its host node as a bare `pressable` TAG — there is no Pressable
-  // component left to spread onto, so the forwarding it used to get for free is now its own four
-  // lines of `createAttachmentsSync`. This is the case that proves those lines are wired: a real
-  // shipped component, compiled from source, reaching its committed node.
+  // why: Modal owns its host node as a bare `modal` TAG, so the attach forwarding it needs is its
+  // own four lines of `createAttachmentsSync`, not something a wrapped-component ancestor supplies
+  // for free. This is the case that proves those lines are wired: a real shipped component,
+  // compiled from source, reaching its committed node.
+  //
+  // Modal is the subject on purpose, not RefreshControl or either Touchable variant that filled
+  // this role before: Modal is structurally UNLOWERABLE (`.claude/rules/host-primitive-tier.md`,
+  // "the disqualifier: a render that SYNTHESIZES a node" — a hidden modal commits zero nodes, so
+  // lowering it would be a regression, not an optimisation). Any component that renders a bare tag
+  // AND calls `createAttachmentsSync` serves, but this one will not need rehoming the next time a
+  // wrapper is deleted.
   it('reaches the committed host node of a component that owns a bare tag', async () => {
     compileToFile(
-      readFileSync(
-        join(COMPONENTS_DIR, 'touchable-opacity', 'index.svelte'),
-        'utf8',
-      ),
-      'TouchableOpacity.svelte',
-      TOUCHABLE_OUT,
+      readFileSync(join(COMPONENTS_DIR, 'modal', 'index.svelte'), 'utf8'),
+      'Modal.svelte',
+      BARE_TAG_OWNER_OUT,
     );
     compileToFile(
       `<script>
-         import TouchableOpacity from './.smoke-compiled-attachments-touchable.mjs';
+         import Modal from './.smoke-compiled-attachments-modal.mjs';
          let { onEvent } = $props();
          const mark = (node) => { onEvent('attach:touchable', node); };
        </script>
-       <TouchableOpacity testID="touchable-target" {@attach mark} />`,
-      'TouchableParent.svelte',
-      TOUCHABLE_PARENT_OUT,
+       <Modal testID="touchable-target" visible={true} {@attach mark} />`,
+      'BareTagOwnerParent.svelte',
+      BARE_TAG_OWNER_PARENT_OUT,
     );
 
-    const Parent = await loadComponent(TOUCHABLE_PARENT_OUT);
+    const Parent = await loadComponent(BARE_TAG_OWNER_PARENT_OUT);
     mount(ROOT_TAG, Parent, { onEvent: record });
     await tick();
     await tick();

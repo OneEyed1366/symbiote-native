@@ -395,4 +395,70 @@ describe('a callback prop a behavior reads off node.props', () => {
     unmount(9_827);
     await settle();
   });
+
+  // why: the case above proves ROUTING — the handler lands on `node.props.onValueChange` rather
+  // than in the listener stash. This proves it is actually CALLABLE from a native event.
+  // `target_handler` (Svelte's own listener wrapper — `$.event()` calls `create_event`, which
+  // builds `target_handler` and passes THAT to `dom.addEventListener`, never the app's raw closure;
+  // `svelte-shim-element-global-must-be-an-ancestor.md`, "the fifth door") ALWAYS calls with exactly
+  // one argument, a real object, and mutates it internally
+  // (`Object.defineProperty(event, 'currentTarget', …)`, then `event[event_symbol] = …`). A
+  // two-argument `(text, event)` callback used to crash the moment `text` — a bare string — landed
+  // in that sole argument slot. `callValueChange` (`core/components/src/behaviors/text-input.ts`)
+  // now calls `listener(event)` with `text` (or `value`, for Switch) carried as a FIELD on that same
+  // real object, which survives both of `target_handler`'s mutation attempts. Device-reproduced
+  // crash fixed 2026-09-10.
+  //
+  // `onPress`/`onFocus`/responder callbacks never had this problem — their sole argument already IS
+  // the event object, so `target_handler(event)` merely reroutes the call through Svelte's own
+  // dispatch before invoking the real handler.
+  it('calls the app fn through the compiled wrapper, text carried on the event', async () => {
+    const received: unknown[] = [];
+    Object.assign(globalThis, {
+      __onValueChangeProbe: (next: unknown) => received.push(next),
+    });
+    await mountSource(
+      [
+        '<script>',
+        '  const onValueChange = (event) => globalThis.__onValueChangeProbe(event.text);',
+        '</script>',
+        '<text-input id="typed" value="" onValueChange={onValueChange}></text-input>',
+      ].join('\n'),
+      9_828,
+    );
+
+    const node = engineNodeFor('typed');
+    expect(() =>
+      fabric.fireEvent(node, 'topChange', { text: 'ab', eventCount: 1 }),
+    ).not.toThrow();
+    expect(received).toEqual(['ab']);
+
+    unmount(9_828);
+    await settle();
+  });
+
+  it('calls the app fn through the compiled wrapper for a switch toggle', async () => {
+    const received: unknown[] = [];
+    Object.assign(globalThis, {
+      __onSwitchValueChangeProbe: (next: unknown) => received.push(next),
+    });
+    await mountSource(
+      [
+        '<script>',
+        '  const onValueChange = (event) => globalThis.__onSwitchValueChangeProbe(event.value);',
+        '</script>',
+        '<switch id="toggled" value={false} onValueChange={onValueChange}></switch>',
+      ].join('\n'),
+      9_829,
+    );
+
+    const node = engineNodeFor('toggled');
+    expect(() =>
+      fabric.fireEvent(node, 'topChange', { value: true }),
+    ).not.toThrow();
+    expect(received).toEqual([true]);
+
+    unmount(9_829);
+    await settle();
+  });
 });

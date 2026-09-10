@@ -66,6 +66,15 @@ declare global {
     // other position.
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
     interface SVGAttributes extends ISymbioteHostAttributes {}
+
+    // And the HTML half, for the same reason and through the same seam. `button` is a real HTML
+    // element name, so svelte2tsx owns it as `HTMLProps<'button', HTMLAttributes>` and the derived
+    // base above is outranked exactly as it is for the four SVG names. `HTMLAttributes` is the
+    // second empty interface its own comment offers for enhancement, one line above `SVGAttributes`
+    // in `svelte-jsx-v4.d.ts` — so the tag alphabet was never limited to SVG-named and hyphenated
+    // members; nobody had needed the other half yet.
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+    interface HTMLAttributes extends ISymbioteHostAttributes {}
   }
 }
 

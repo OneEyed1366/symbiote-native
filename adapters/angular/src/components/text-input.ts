@@ -15,9 +15,10 @@
 // Two Angular-specific seams. (1) Events: Angular forbids [onX] property bindings, so the host's
 // change/focus/blur + the remaining native events ride the structural (event) channel and route
 // to real @Output() EventEmitters (valueChange is DERIVED from change, never a native event —
-// React/Vue fold both into one onValueChange(text, event) callback, but Angular's EventEmitter
-// only carries one value, so valueChange stays text-only to keep [(value)] banana-in-a-box
-// working; `change` stays a second, separate @Output() for the raw event). The
+// React/Vue/Solid/Svelte fold both into one onValueChange(event) callback with `text` carried as
+// a field on it, but Angular's EventEmitter only carries one value, so valueChange stays
+// text-only to keep [(value)] banana-in-a-box working; `change` stays a second, separate
+// @Output() for the raw event). The
 // non-function props travel the flat-bag path via the host-props directive. (2) Commit timing:
 // Angular's change detection is async/batched (zoneless), so a native command wired at lifecycle
 // time has no Fabric tag yet; the controlled write + autoFocus defer through whenCommitted, the
@@ -63,6 +64,7 @@ import {
   type ITextInputEventHandler,
   type ITextInputHandle,
   type ITextInputSelection,
+  type ITextInputChangeEvent,
 } from '@symbiote-native/components';
 import {
   blurTextInput,
@@ -100,6 +102,7 @@ export type {
   IInputMode,
   IEnterKeyHint,
   ISubmitBehavior,
+  ITextInputChangeEvent,
 };
 
 // Mirrors React's ITextInputProps minus nothing (TextInput has no children) — declared

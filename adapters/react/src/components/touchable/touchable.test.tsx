@@ -28,7 +28,6 @@ import {
   View,
   TouchableOpacity,
   TouchableHighlight,
-  TouchableWithoutFeedback,
 } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
@@ -556,56 +555,108 @@ describe('React TouchableHighlight underlay feedback', () => {
   });
 });
 
-describe('React TouchableWithoutFeedback', () => {
-  // why: RN's TouchableWithoutFeedback is a pure press-wiring passthrough with NO visual
-  // reaction at all — proves it still synthesizes onPress (it is not merely an inert View) while
-  // deliberately never touching backgroundColor/opacity the way its Highlight/Opacity siblings do.
-  it('fires onPress with no visual feedback applied', () => {
-    let presses = 0;
+// TouchableWithoutFeedback's own block left with the wrapper: it is a tag now, and both its press
+// wiring and its delayPressIn scheduler are covered against the COMMITTED tree in
+// `core/components/src/behaviors/touchable-without-feedback.test.ts`.
+
+// RN sets `accessible={this.props.accessible !== false}` on each Touchable itself
+// (TouchableOpacity.js:303, TouchableHighlight.js:337). Here the whole family composes over
+// Pressable, which owns that fold — so this pins the COMPOSITION, not a second implementation:
+// a variant that stopped forwarding `accessible` through its rest spread would go red here.
+describe('React Touchable* accessibility default', () => {
+  function responderProps(): Record<string, unknown> {
+    const view = fabric.find(
+      n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+    );
+    if (!view) throw new Error('no RCTView (Pressable responder) was created');
+    return view.props;
+  }
+
+  const variants: [string, (child: ReactElement) => ReactElement][] = [
+    [
+      'TouchableOpacity',
+      c => <TouchableOpacity onPress={() => {}}>{c}</TouchableOpacity>,
+    ],
+    [
+      'TouchableHighlight',
+      c => <TouchableHighlight onPress={() => {}}>{c}</TouchableHighlight>,
+    ],
+  ];
+
+  for (const [name, render] of variants) {
+    it(`${name} marks its responder accessible by default`, () => {
+      mount(ROOT_TAG, render(<View />));
+      expect(responderProps().accessible).toBe(true);
+    });
+  }
+
+  it('a literal false still opts out through the composition', () => {
     mount(
       ROOT_TAG,
-      <TouchableWithoutFeedback
-        style={{ width: 10 }}
-        onPress={() => {
-          presses++;
-        }}
-      >
-        <></>
-      </TouchableWithoutFeedback>,
+      <TouchableOpacity accessible={false} onPress={() => {}}>
+        <View />
+      </TouchableOpacity>,
     );
-    const handle = responderHandle();
-    fabric.fireEvent(handle, TOUCH_START);
-    const pressed = feedbackProps();
-    expect(pressed.backgroundColor).toBeUndefined();
-    expect(pressed.opacity).toBeUndefined();
-    fabric.fireEvent(handle, TOUCH_END);
-    expect(presses).toBe(1);
+    expect(responderProps().accessible).toBe(false);
   });
+});
 
-  // why: RN's TouchableWithoutFeedback builds a FULL Pressability config — delayPressIn /
-  // delayPressOut / minPressDuration — because "without feedback" means no VISUAL, not no timing.
-  // Before phase two the adapter spread those props straight onto Pressable, which does not read
-  // them, so every one was silently inert (and leaked to the host as unknown props).
-  it('honors delayPressIn through the shared press machine', async () => {
-    const DELAY = 30;
-    let deferredPressIns = 0;
-
-    mount(
-      ROOT_TAG,
-      <TouchableWithoutFeedback
-        delayPressIn={DELAY}
-        onPressIn={() => {
-          deferredPressIns++;
-        }}
-        onPress={() => {}}
-      >
-        <></>
-      </TouchableWithoutFeedback>,
+// `focusable` is the OTHER half of that fold and it does NOT compose the same way: RN gives
+// Pressable a one-leg default (Pressable.js:258) and the Touchables a three-leg one
+// (TouchableOpacity.js:336-340, TouchableHighlight.js:370-374,
+// TouchableWithoutFeedback.js:263-266), so the wrapper has to resolve it and hand the answer down.
+// Nothing computed it anywhere until 2026-09-09 — a disabled touchable stayed focusable, so a
+// keyboard or TV remote could land on a control that cannot be pressed.
+describe('React Touchable* focusable', () => {
+  function responderProps(): Record<string, unknown> {
+    const view = fabric.find(
+      n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
     );
+    if (!view) throw new Error('no RCTView (Pressable responder) was created');
+    return view.props;
+  }
 
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    expect(deferredPressIns).toBe(0);
-    await new Promise(resolve => setTimeout(resolve, DELAY + 20));
-    expect(deferredPressIns).toBe(1);
-  });
+  const variants: [string, (props: Record<string, unknown>) => ReactElement][] =
+    [
+      [
+        'TouchableOpacity',
+        p => (
+          <TouchableOpacity {...p}>
+            <View />
+          </TouchableOpacity>
+        ),
+      ],
+      [
+        'TouchableHighlight',
+        p => (
+          <TouchableHighlight {...p}>
+            <View />
+          </TouchableHighlight>
+        ),
+      ],
+    ];
+
+  for (const [name, render] of variants) {
+    // Leg 2, read off the APP's onPress — the handler the wrapper hands Pressable is always
+    // defined, so resolving one level down could never answer false.
+    it(`${name} stays out of the focus order without an onPress`, () => {
+      mount(ROOT_TAG, render({}));
+      expect(responderProps().focusable).toBe(false);
+    });
+
+    it(`${name} focuses once it has an onPress`, () => {
+      mount(ROOT_TAG, render({ onPress: () => {} }));
+      expect(responderProps().focusable).toBe(true);
+    });
+
+    // Leg 3, and the case a `focusable ?? computed` implementation gets wrong: `&&` means an
+    // explicit opt-IN still loses to `disabled`.
+    it(`${name} refuses focus while disabled, opt-in notwithstanding`, () => {
+      mount(
+        ROOT_TAG,
+        render({ onPress: () => {}, disabled: true, focusable: true }),
+      );
+      expect(responderProps().focusable).toBe(false);
+    });
+  }
 });

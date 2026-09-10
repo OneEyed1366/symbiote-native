@@ -11,6 +11,7 @@
 // those by name would break an adapter's thin wrapper over a third-party native view, which
 // resolves by view name through this same function.
 import { describe, expect, it } from 'vitest';
+import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
 import {
   buildDescriptors,
   makeDescriptorFor,
@@ -18,11 +19,18 @@ import {
 } from '../component-names/shared';
 
 // The iOS table, inline rather than imported: `component-names/index.ios.ts` is platform-selected
-// and vitest resolves the base file, so importing it would silently test the wrong table. These are
-// the two names that collide, plus enough neighbours for the derivation to be exercised.
+// and vitest resolves the base file, so importing it would silently test the wrong table.
+//
+// EXHAUSTIVE, and the type is what says so — but nothing enforces it, because every package's
+// tsconfig excludes `*.test.ts` (`.claude/rules/test-harness-false-greens.md` §32). It had drifted
+// five keys behind the union by 2026-09-09 and only an editor reported it. When adding an
+// intrinsic, add it here too; `tsc --build` will not tell you.
 const IOS_NAMES: Record<ISymbioteIntrinsic, string> = {
   view: 'RCTView',
   pressable: 'RCTView',
+  'touchable-opacity': 'RCTView',
+  'touchable-native-feedback': ANCHOR_COMPONENT,
+  button: 'RCTView',
   text: 'RCTText',
   image: 'RCTImageView',
   'scroll-view': 'RCTScrollView',
@@ -34,10 +42,13 @@ const IOS_NAMES: Record<ISymbioteIntrinsic, string> = {
   'text-input-managed': 'RCTSinglelineTextInputView',
   'text-input-multiline-managed': 'RCTMultilineTextInputView',
   switch: 'Switch',
-  'activity-indicator': 'ActivityIndicatorView',
+  'switch-managed': 'Switch',
+  'activity-indicator': 'RCTView',
+  'activity-indicator-spinner': 'ActivityIndicatorView',
   'safe-area-view': 'SafeAreaView',
   modal: 'ModalHostView',
   'refresh-control': 'PullToRefreshView',
+  'sticky-header': 'RCTView',
   'input-accessory-view': 'RCTInputAccessoryView',
 };
 

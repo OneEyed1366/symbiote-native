@@ -1,10 +1,10 @@
 import { Component } from '@angular/core';
 import {
-  ActivityIndicator,
+  ActivityIndicatorElement,
   AnimatedView,
-  Button,
+  ButtonElement,
   FlatList,
-  ImageBackground,
+  ImageBackgroundElement,
   KeyboardAvoidingView,
   Pressable,
   SafeAreaView,
@@ -13,8 +13,8 @@ import {
   Text,
   TextInput,
   TouchableHighlight,
+  TouchableNativeFeedbackElement,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
   VirtualizedList,
   VirtualizedSectionList,
@@ -81,11 +81,11 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
   standalone: true,
   imports: [
     ActionButton,
-    ActivityIndicator,
+    ActivityIndicatorElement,
     AnimatedView,
-    Button,
+    ButtonElement,
     FlatList,
-    ImageBackground,
+    ImageBackgroundElement,
     KeyboardAvoidingView,
     Pressable,
     SafeAreaView,
@@ -94,8 +94,8 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
     Text,
     TextInput,
     TouchableHighlight,
+    TouchableNativeFeedbackElement,
     TouchableOpacity,
-    TouchableWithoutFeedback,
     View,
     VirtualizedList,
     VirtualizedSectionList,
@@ -168,21 +168,21 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <Text class="rstyle-caption">TouchableOpacity</Text>
           </View>
           <View class="rstyle-cell">
-            <TouchableWithoutFeedback
+            <touchable-native-feedback
               testID="rstyle-class-plain"
               [class]="tileClass"
             >
               <Text class="rstyle-tile-text">tile</Text>
-            </TouchableWithoutFeedback>
-            <Text class="rstyle-caption">TouchableWithoutFeedback</Text>
+            </touchable-native-feedback>
+            <Text class="rstyle-caption">TouchableNativeFeedback</Text>
           </View>
           <View class="rstyle-cell">
-            <Button
+            <button
               testID="rstyle-class-button"
               title="tile"
               [color]="tileTextColor"
               [class]="tileClass"
-            ></Button>
+            ></button>
             <Text class="rstyle-caption">Button</Text>
           </View>
           <View class="rstyle-cell">
@@ -198,16 +198,16 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <!-- Spinning on purpose: the native animation has to survive a class swap. Keep
                  hidesWhenStopped false alongside it - a stopped indicator hides its view, and a
                  vanished tile reads as a pass. -->
-            <ActivityIndicator
+            <activity-indicator
               testID="rstyle-class-spinner"
               [animating]="true"
               [hidesWhenStopped]="false"
               [class]="tileClass"
-            />
+            ></activity-indicator>
             <Text class="rstyle-caption">ActivityIndicator</Text>
           </View>
           <View class="rstyle-cell">
-            <ImageBackground
+            <image-background
               testID="rstyle-class-imagebg"
               [src]="angularLogoUri"
               alt="Angular logo"
@@ -215,7 +215,7 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
               [class]="tileClass"
             >
               <Text class="rstyle-tile-text">tile</Text>
-            </ImageBackground>
+            </image-background>
             <Text class="rstyle-caption">ImageBackground</Text>
           </View>
           <View class="rstyle-cell">
@@ -335,23 +335,23 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <Text class="rstyle-caption">TouchableOpacity</Text>
           </View>
           <View class="rstyle-cell">
-            <TouchableWithoutFeedback
+            <touchable-native-feedback
               testID="rstyle-style-plain"
               class="rstyle-tile"
               [style]="tileStyle"
             >
               <Text class="rstyle-tile-text">tile</Text>
-            </TouchableWithoutFeedback>
-            <Text class="rstyle-caption">TouchableWithoutFeedback</Text>
+            </touchable-native-feedback>
+            <Text class="rstyle-caption">TouchableNativeFeedback</Text>
           </View>
           <View class="rstyle-cell">
-            <Button
+            <button
               testID="rstyle-style-button"
               title="tile"
               [color]="tileTextColor"
               class="rstyle-tile"
               [style]="tileStyle"
-            ></Button>
+            ></button>
             <Text class="rstyle-caption">Button</Text>
           </View>
           <View class="rstyle-cell">
@@ -365,17 +365,17 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
             <Text class="rstyle-caption">TextInput</Text>
           </View>
           <View class="rstyle-cell">
-            <ActivityIndicator
+            <activity-indicator
               testID="rstyle-style-spinner"
               [animating]="true"
               [hidesWhenStopped]="false"
               class="rstyle-tile"
               [style]="tileStyle"
-            />
+            ></activity-indicator>
             <Text class="rstyle-caption">ActivityIndicator</Text>
           </View>
           <View class="rstyle-cell">
-            <ImageBackground
+            <image-background
               testID="rstyle-style-imagebg"
               [src]="angularLogoUri"
               alt="Angular logo"
@@ -384,7 +384,7 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
               [style]="tileStyle"
             >
               <Text class="rstyle-tile-text">tile</Text>
-            </ImageBackground>
+            </image-background>
             <Text class="rstyle-caption">ImageBackground</Text>
           </View>
           <View class="rstyle-cell">

@@ -15,7 +15,11 @@ import {
   SymbioteStyleInputDirective,
 } from '../../primitives';
 import { SwitchBase } from './shared';
-export type { ISwitchProps, ISwitchTrackColor } from './shared';
+export type {
+  ISwitchProps,
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from './shared';
 
 @Component({
   selector: 'Switch',

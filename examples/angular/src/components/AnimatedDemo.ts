@@ -13,7 +13,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import {
   Animated,
   AnimatedView,
-  Button,
+  ButtonElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -28,7 +28,7 @@ const FREEZE_MS = 1500;
 @Component({
   selector: 'AnimatedDemo',
   standalone: true,
-  imports: [View, Text, Button, AnimatedView],
+  imports: [View, Text, ButtonElement, AnimatedView],
   template: `
     <View class="section-nested">
       <Text class="section-label">Animated · JS vs native driver</Text>
@@ -51,12 +51,12 @@ const FREEZE_MS = 1500;
           [style]="{ transform: [{ translateX: jsX }] }"
         ></AnimatedView>
       </View>
-      <Button
+      <button
         testID="slide-js-btn"
         title="Slide (JS driver)"
         (press)="slideJsDriver()"
         color="#dd0031"
-      ></Button>
+      ></button>
 
       <View class="slide-track">
         <AnimatedView
@@ -65,19 +65,19 @@ const FREEZE_MS = 1500;
           [style]="{ transform: [{ translateX: nativeX }] }"
         ></AnimatedView>
       </View>
-      <Button
+      <button
         testID="slide-native-btn"
         title="Slide (native driver)"
         (press)="slideNativeDriver()"
         color="#68d391"
-      ></Button>
+      ></button>
 
-      <Button
+      <button
         testID="freeze-js-btn"
         title="Freeze JS 1.5s"
         (press)="freezeJs()"
         color="#fc8181"
-      ></Button>
+      ></button>
     </View>
   `,
 })

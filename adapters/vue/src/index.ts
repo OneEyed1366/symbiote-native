@@ -50,10 +50,16 @@ export type {
   IImageSize,
   IImageCacheStatus,
 } from './components/image';
-export { ActivityIndicator } from './components/activity-indicator';
-export type { IActivityIndicatorProps } from './components/activity-indicator';
+// `ActivityIndicator` is a TAG — `<activity-indicator>` — and there is nothing to import in its
+// place. RN's ActivityIndicator has no statics, so the name exports nothing at all now; the prop
+// type stays, for a component forwarding a bag.
+export type { IActivityIndicatorProps } from './components/activity-indicator-props';
 export { Switch } from './components/switch';
-export type { ISwitchProps, ISwitchTrackColor } from './components/switch';
+export type {
+  ISwitchProps,
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from './components/switch';
 export { ScrollView } from './components/scroll-view';
 export type {
   IScrollViewProps,
@@ -67,29 +73,34 @@ export type {
   IPressState,
   IPressableAndroidRippleConfig,
 } from './components/pressable';
-export {
-  TouchableOpacity,
-  TouchableHighlight,
-  TouchableWithoutFeedback,
-} from './components/touchable';
+export { TouchableOpacity, TouchableHighlight } from './components/touchable';
 export type {
   ITouchableOpacityProps,
   ITouchableHighlightProps,
-  ITouchableWithoutFeedbackProps,
 } from './components/touchable';
-export { TouchableNativeFeedback } from './components/touchable-native-feedback';
+// `TouchableWithoutFeedback` is a TAG — `<touchable-without-feedback>` — and RN gives it no statics,
+// so like `Button` the name exports nothing now; only the prop type stays, for a component
+// forwarding a bag.
+export type { ITouchableWithoutFeedbackProps } from './components/touchable-without-feedback-props';
+// `TouchableNativeFeedback` is now RN's STATIC NAMESPACE, not a component: the element is the tag
+// `<touchable-native-feedback>`, which commits no node of its own and clones onto its single child.
+// `TouchableNativeFeedback.Ripple(…)` / `.SelectableBackground(…)` are unchanged.
+export { TouchableNativeFeedback } from '@symbiote-native/components';
 export type {
   INativeFeedbackBackground,
   IThemeAttrBackground,
   IRippleBackground,
-  ITouchableNativeFeedbackProps,
-} from './components/touchable-native-feedback';
-export { Button } from './components/button';
-export type { IButtonProps } from './components/button';
+} from '@symbiote-native/components';
+export type { ITouchableNativeFeedbackProps } from './components/touchable-native-feedback-props';
+// `Button` is a TAG — `<button>` — and there is nothing to import in its place. RN's Button has no
+// statics (unlike `TouchableNativeFeedback` next to it), so the name exports nothing at all now;
+// the prop type stays, for a component forwarding a bag.
+export type { IButtonProps } from './components/button-props';
 export { TextInput } from './components/text-input';
 export type {
   ITextInputProps,
   ITextInputHandle,
+  ITextInputChangeEvent,
 } from './components/text-input';
 export { VirtualizedList } from './components/virtualized-list';
 export type {
@@ -144,8 +155,9 @@ export { resolveModelValue, emitModelUpdate } from './utils/model-binding';
 export { createSymbioteRenderer } from './renderer';
 export { Animated, createAnimatedComponent } from './modules/animated';
 
-export { ImageBackground } from './components/image-background';
-export type { IImageBackgroundProps } from './components/image-background';
+// `ImageBackground` is a TAG — `<image-background>` — and there is nothing to import in its place.
+// The prop type stays, for a component forwarding a bag.
+export type { IImageBackgroundProps } from './components/image-background-props';
 export { InputAccessoryView } from './components/input-accessory-view';
 export type { IInputAccessoryViewProps } from './components/input-accessory-view';
 export { Modal } from './components/modal';

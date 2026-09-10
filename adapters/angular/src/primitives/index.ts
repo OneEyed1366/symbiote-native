@@ -155,6 +155,10 @@ export class SwitchHost extends SymbiotePrimitiveHost {}
 })
 export class ManagedSwitchHost extends SymbiotePrimitiveHost {}
 
+// The centering RCTView RN wraps the spinner in (ActivityIndicator.js:112), not the spinner —
+// which is what this tag resolved to until 2026-09-09. The native view moved to
+// `activity-indicator-spinner`, built by the engine's ActivityIndicator behavior, so nothing writes
+// it in a template and it needs no host here.
 @Component({
   selector: 'activity-indicator',
   standalone: true,

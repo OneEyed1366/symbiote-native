@@ -3,6 +3,8 @@
 // Fabric names are the codegen spec's registered name (the new-arch name), not the legacy
 // paperComponentName (RCTSwitch, …).
 
+import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
+
 import {
   buildDescriptors,
   makeDescriptorFor,
@@ -13,8 +15,17 @@ export type { ISymbioteIntrinsic, IComponentDescriptor } from './shared';
 const IOS_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   view: 'RCTView',
   pressable: 'RCTView',
+  'touchable-opacity': 'RCTView',
+  // NOT a view name — TNF commits nothing at all. See `shared.ts`. Platform-invariant, unlike
+  // every other entry here: RN's TNF renders no view on either platform, it only stops CLONING a
+  // background off Android (TouchableNativeFeedback.js:402).
+  'touchable-native-feedback': ANCHOR_COMPONENT,
+  'touchable-without-feedback': ANCHOR_COMPONENT,
+  'touchable-highlight': 'RCTView',
+  button: 'RCTView',
   text: 'RCTText',
   image: 'RCTImageView',
+  'image-background': 'RCTView',
   'scroll-view': 'RCTScrollView',
   'scroll-content': 'RCTScrollContentView',
   // iOS uses one scroll view for both axes; horizontal is RCTScrollView with the
@@ -31,7 +42,8 @@ const IOS_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   // The wrapper's tag — same native view, a tag the behavior registry does not carry. See
   // `shared.ts` for why the wrapper may not share the lowered tag.
   'switch-managed': 'Switch',
-  'activity-indicator': 'ActivityIndicatorView',
+  'activity-indicator': 'RCTView',
+  'activity-indicator-spinner': 'ActivityIndicatorView',
   'safe-area-view': 'SafeAreaView',
   modal: 'ModalHostView',
   'refresh-control': 'PullToRefreshView',

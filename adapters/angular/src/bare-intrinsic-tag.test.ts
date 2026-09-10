@@ -25,6 +25,7 @@ import {
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
 import { COMPONENT_DESCRIPTORS } from '@symbiote-native/components';
 // SIDE-EFFECT IMPORT. `register.ts` installs the host behaviors, and a behavior's `foldPayload` is
 // the bare path's ONLY source for the folds a wrapper would otherwise apply — without it
@@ -76,6 +77,28 @@ async function flushUntilSettled(): Promise<void> {
 // the AppContainer and reports every probe below as absent.
 function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
   return nodes.flatMap(node => [node, ...flatten(node.children)]);
+}
+
+// The view names the TAG could legitimately have committed, given the node its probe `testID`
+// landed on — the probe itself, and the node holding it.
+//
+// The two are one node for a simple primitive and two for a COMPOSED one: a behavior with a slot
+// redirects every prop it does not keep — `testID` included — onto the node it built, exactly as
+// RN's own wrappers do (`ImageBackground.js:81` spreads `...props` onto the inner Image,
+// `ActivityIndicator.js:99` onto the spinner). So a row reading the probe's OWN view name reports a
+// composed primitive as committing the wrong native view.
+//
+// ONE hop, not an ancestor walk: widening it to the whole chain would let any name pass, since the
+// container root is an RCTView and most descriptors name one.
+function committedViewNames(
+  all: readonly IFakeNode[],
+  probe: IFakeNode | undefined,
+): string[] {
+  if (probe === undefined) return [];
+  const parent = all.find(candidate => candidate.children.includes(probe));
+  return parent === undefined
+    ? [probe.viewName]
+    : [probe.viewName, parent.viewName];
 }
 
 let nextRoot = 8_600;
@@ -217,19 +240,48 @@ describe('no intrinsic is swallowed by the anchor-host registry', () => {
     ),
   ].sort();
 
-  it('control: the spec yielded a non-empty tag list', () => {
+  // A tag whose descriptor IS the anchor is not a swallowed intrinsic — it is one this project
+  // deliberately gives no Fabric view (`touchable-native-feedback`, which clones onto its single
+  // child instead: TouchableNativeFeedback.js:289,339). Partitioned off the descriptor table rather
+  // than by name, so the two lists cannot disagree with what the renderer will do.
+  const paints = intrinsics.filter(
+    tag => COMPONENT_DESCRIPTORS[tag]?.component !== ANCHOR_COMPONENT,
+  );
+  const anchored = intrinsics.filter(
+    tag => COMPONENT_DESCRIPTORS[tag]?.component === ANCHOR_COMPONENT,
+  );
+
+  it('control: the spec yielded a non-empty tag list, fully partitioned', () => {
     expect(intrinsics.length).toBeGreaterThan(0);
+    expect(paints.length + anchored.length).toBe(intrinsics.length);
+    // Without this the painting list could empty out and every row below would vanish silently.
+    expect(paints.length).toBeGreaterThan(0);
   });
 
-  it.each(intrinsics)('<%s> paints its own native view', async tag => {
-    const { node } = await mountTemplate(
+  it.each(paints)('<%s> paints its own native view', async tag => {
+    const { node, all } = await mountTemplate(
       `<${tag} testID="probe"></${tag}>`,
       NO_ERRORS_SCHEMA,
     );
     // An anchor commits nothing, so `node` would be undefined — a bare `toBe(undefined)` on the
     // viewName would pass for both an anchor and a wrong view.
     expect(node).toBeDefined();
-    expect(node?.viewName).toBe(COMPONENT_DESCRIPTORS[tag]?.component);
+    expect(committedViewNames(all, node)).toContain(
+      COMPONENT_DESCRIPTORS[tag]?.component,
+    );
+  });
+
+  // The inverse, so the partition costs no coverage: an anchor-descriptor tag must commit NOTHING.
+  // `all` is what makes this an observation rather than the absence of one — a mount that threw
+  // would also leave `node` undefined.
+  it.each(anchored)('<%s> commits no node of its own', async tag => {
+    const { node, all, thrown } = await mountTemplate(
+      `<${tag} testID="probe"></${tag}>`,
+      NO_ERRORS_SCHEMA,
+    );
+    expect(thrown).toBe('');
+    expect(all.length).toBeGreaterThan(0);
+    expect(node).toBeUndefined();
   });
 });
 

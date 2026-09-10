@@ -763,8 +763,12 @@ export abstract class ScrollViewBase
     return this.refreshControlProps(outer);
   }
 
-  protected handleProjectedRefresh(nativeNode: unknown): void {
-    this.projectedRefreshControl?.handleRefresh(nativeNode);
+  // No node argument any more: it existed only so the projected RefreshControl could dispatch
+  // `setNativeRefreshing` at a node it does not own. That handshake is the engine behavior's now
+  // (`core/components/src/behaviors/refresh-control.ts`), and the behavior already holds the node
+  // it is attached to.
+  protected handleProjectedRefresh(): void {
+    this.projectedRefreshControl?.handleRefresh();
   }
 
   private refreshControlProps(
@@ -772,6 +776,12 @@ export abstract class ScrollViewBase
   ): Record<string, unknown> {
     const refresh = this.projectedRefreshControl;
     if (refresh === undefined) return {};
+    // Every field below is a plain @Input on ANOTHER component, and a plain field read registers no
+    // dependency — so this view was never dirtied when the app moved `refreshing`, and the
+    // committed prop stayed at its first value forever. This read is the dependency. It was hidden
+    // for as long as RefreshControl corrected native imperatively from its own ngOnChanges; with
+    // that handshake moved to the engine behavior, the stale prop is the whole bug.
+    refresh.hostPropsRevision();
     return compact({
       ...refresh.folded,
       refreshing: refresh.refreshing,
@@ -786,6 +796,7 @@ export abstract class ScrollViewBase
       style,
       testID: refresh.testID,
       nativeID: refresh.nativeID,
+      id: refresh.id,
       accessible: refresh.accessible,
       onAccessibilityAction: this.emitterCallback(refresh.accessibilityAction),
       onAccessibilityTap: this.emitterCallback(refresh.accessibilityTap),

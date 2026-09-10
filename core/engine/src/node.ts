@@ -29,12 +29,15 @@ import {
   claimModeFor,
   hasHostBehaviors,
   markDetachCandidate,
+  notifyChildInserted,
   notifyOwnedListenerChange,
   notifyWrapChange,
   ownsListener,
   reattachHostBehaviors,
+  derivedNodesOf,
   slotDerivesFrom,
   slotPropNameFor,
+  slotTakesChildren,
   stashAppListener,
   type IPayloadFold,
 } from './host-behavior';
@@ -682,6 +685,10 @@ export function setProp(
   // writing an unchanged value costs them nothing. See `IHostBehavior.slotDerived`.
   if (node.childHost !== undefined && slotDerivesFrom(node, key)) {
     markPropsDirty(node.childHost);
+    // Past the slot: a `buildStructure` that builds a CHAIN registers the deeper nodes here, and
+    // each keeps its own pure fold reading the owner. See `addDerivedNode`.
+    const derived = derivedNodesOf(node);
+    if (derived !== undefined) for (const each of derived) markPropsDirty(each);
     if (node.wrapper !== undefined) markPropsDirty(node.wrapper);
   }
   propStats.writes += 1;
@@ -1263,6 +1270,9 @@ function detach(child: ISymbioteNode): void {
 function hostFor(parent: ISymbioteNode, child: ISymbioteNode): ISymbioteNode {
   const slot = parent.childHost;
   if (slot === undefined) return parent;
+  // A slot that is a built SIBLING rather than a container — ImageBackground's absolutely-filled
+  // image — keeps the app's children on the owner. See `IHostBehavior.slotTakesNoChildren`.
+  if (!slotTakesChildren(parent)) return parent;
   return claimModeFor(parent, child.component) === undefined ? slot : parent;
 }
 
@@ -1328,7 +1338,11 @@ function indexFor(
   beforeChild: ISymbioteNode | null | undefined,
 ): number {
   const slot = host.childHost;
-  if (slot !== undefined) return host.children.indexOf(slot);
+  // A sibling slot is the OPPOSITE placement: RN paints the background image first and the app's
+  // children over it (ImageBackground.js:80-102), so they append past it rather than in front of
+  // it. Falls through to the ordinary index below, which is what leaves their relative order alone.
+  if (slot !== undefined && slotTakesChildren(host))
+    return host.children.indexOf(slot);
   // `null` is Solid's spelling of "append"; `undefined` is `appendChild`'s own. Both end up here.
   if (beforeChild === undefined || beforeChild === null)
     return host.children.length;
@@ -1352,9 +1366,10 @@ export function appendChild(
   placed.parent = parent;
   if (parent.childHost !== undefined) {
     parent.children.splice(indexFor(parent, undefined), 0, placed);
-    return;
+  } else {
+    parent.children.push(placed);
   }
-  parent.children.push(placed);
+  if (hasHostBehaviors()) notifyChildInserted(parent, placed);
 }
 
 // `beforeChild` is genuinely nullable and the signature used to say otherwise: Solid's renderer
@@ -1379,6 +1394,7 @@ export function insertBefore(
     0,
     placed,
   );
+  if (hasHostBehaviors()) notifyChildInserted(parent, placed);
 }
 
 // Removal only NOMINATES a behavior for teardown; the commit sweep decides. A framework may spell
@@ -1399,6 +1415,13 @@ export function removeChild(
     if (hasHostBehaviors() || hasAnimatedBindings()) markDetachCandidate(child);
     return;
   }
+  // A slot that IS the child being removed stops being one. Only a behavior that adopts an APP
+  // child as its slot can reach this (`onChildInserted`); a `buildStructure` slot is internal and
+  // no framework removes it. Without the clear, `hostFor` below redirects the removal INTO the very
+  // node being removed, `indexOf` misses, the splice no-ops, and the child stays committed under a
+  // parent the framework believes it left — and the NEXT child appended nests inside the orphan.
+  if (requestedParent.childHost === child)
+    requestedParent.childHost = undefined;
   const parent = hostFor(requestedParent, child);
   if (hasHostBehaviors() || hasAnimatedBindings()) markDetachCandidate(child);
   markStructureDirty(parent);

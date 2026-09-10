@@ -39,7 +39,6 @@ import {
   TextInput,
   Image,
   Switch,
-  ActivityIndicator,
   Pressable,
   Modal,
   FlatList,
@@ -470,7 +469,7 @@ const rotationStyle = {
       <!-- The native UIRefreshControl spinner only shows while iOS holds the pull-down; our full
            re-commit snaps the offset back, so we drive our OWN indicator from `refreshing`. -->
       <View v-if="refreshing" class="refresh-row">
-        <ActivityIndicator :color="LINE_COLOR.primitives" />
+        <activity-indicator :color="LINE_COLOR.primitives" />
         <Text class="accent-note">Refreshing…</Text>
       </View>
       <Text v-else class="muted-center">{{
@@ -505,7 +504,7 @@ const rotationStyle = {
           :track-color="{ false: '#334155', true: LINE_COLOR.primitives }"
         />
       </View>
-      <ActivityIndicator
+      <activity-indicator
         testID="spinner-indicator"
         :animating="spinning"
         :color="LINE_COLOR.primitives"

@@ -32,6 +32,7 @@ import type { OnChanges, SimpleChanges } from '@angular/core';
 import type {
   IActivityIndicatorProps,
   IImageProps,
+  INativeFeedbackBackground,
   IInputAccessoryViewViewProps,
   IModalViewProps,
   ISwitchProps,
@@ -42,6 +43,7 @@ import type {
   IStickyHeaderElementProps,
   ITextElementProps,
 } from './element-props';
+import type { IAngularImageBackgroundProps } from './components/image-background-props';
 // Type-only, so none of these components enters the bundle of an app that writes bare tags.
 import type { IAngularPressableProps } from './components/pressable';
 import type { IAngularRefreshControlProps } from './components/refresh-control';
@@ -191,6 +193,60 @@ export class PressableElement extends SymbioteElement {
   @Input() nextFocusUp?: IAngularPressableProps['nextFocusUp'];
 }
 
+// RN's TouchableOpacity is a Pressable that also fades, and both halves are on the engine node —
+// so it takes the same inputs and adds only the fade's own knob.
+@Directive({ selector: 'touchable-opacity', standalone: true })
+export class TouchableOpacityElement extends PressableElement {
+  @Input() activeOpacity?: number;
+  @Input() delayPressIn?: number;
+  @Input() delayPressOut?: number;
+  @Input() minPressDuration?: number;
+}
+
+// RN's TouchableHighlight is a Pressable that swaps its own background while pressed
+// (TouchableHighlight.js), and the underlay machine runs on the engine node — so the tag takes the
+// press surface plus the two knobs that describe the underlay. `onShowUnderlay`/`onHideUnderlay`
+// need no @Input: they are events, bound as `(showUnderlay)` through the renderer's own listen.
+@Directive({ selector: 'touchable-highlight', standalone: true })
+export class TouchableHighlightElement extends PressableElement {
+  @Input() activeOpacity?: number;
+  @Input() underlayColor?: string;
+  @Input() delayPressIn?: number;
+  @Input() delayPressOut?: number;
+  @Input() minPressDuration?: number;
+}
+
+// RN's TouchableNativeFeedback is a Pressable that CLONES onto its single child instead of
+// rendering anything (TouchableNativeFeedback.js:339) — so the tag takes the press surface plus the
+// two props that pick the Android ripple drawable. The tag itself commits no native view; the
+// behavior configures the child, which is why `elements.test.ts` reads it as an anchor.
+@Directive({ selector: 'touchable-native-feedback', standalone: true })
+export class TouchableNativeFeedbackElement extends PressableElement {
+  @Input() background?: INativeFeedbackBackground;
+  @Input() useForeground?: boolean;
+}
+
+// RN's TouchableWithoutFeedback clones onto its single child the same way
+// (TouchableWithoutFeedback.js:286) and installs no drawable, so it takes the press surface plus the
+// three timing knobs it forwards to Pressability (:186-190) and nothing else. Like the tag above it
+// commits no native view; `elements.test.ts` reads it as an anchor.
+@Directive({ selector: 'touchable-without-feedback', standalone: true })
+export class TouchableWithoutFeedbackElement extends PressableElement {
+  @Input() delayPressIn?: number;
+  @Input() delayPressOut?: number;
+  @Input() minPressDuration?: number;
+}
+
+// RN's Button IS a TouchableOpacity (Button.js:384), and the behavior builds the view and the
+// label under it — so the tag takes the touchable's surface plus the four props Button owns. There
+// is no `style`: RN's Button has no such prop, and the label/background come from `color`.
+@Directive({ selector: 'button', standalone: true })
+export class ButtonElement extends TouchableOpacityElement {
+  @Input() title?: string;
+  @Input() color?: string;
+  @Input() touchSoundDisabled?: boolean;
+}
+
 @Directive({ selector: 'text', standalone: true })
 export class TextElement extends SymbioteElement {
   @Input() numberOfLines?: ITextElementProps['numberOfLines'];
@@ -201,10 +257,44 @@ export class TextElement extends SymbioteElement {
   @Input() allowFontScaling?: ITextElementProps['allowFontScaling'];
   @Input() maxFontSizeMultiplier?: ITextElementProps['maxFontSizeMultiplier'];
   @Input() selectionColor?: ITextElementProps['selectionColor'];
+  @Input() disabled?: ITextElementProps['disabled'];
 }
 
 @Directive({ selector: 'image', standalone: true })
 export class ImageElement extends SymbioteElement {
+  @Input() source?: IImageProps['source'];
+  @Input() src?: IImageProps['src'];
+  @Input() srcSet?: IImageProps['srcSet'];
+  @Input() alt?: IImageProps['alt'];
+  @Input() width?: IImageProps['width'];
+  @Input() height?: IImageProps['height'];
+  @Input() resizeMode?: IImageProps['resizeMode'];
+  @Input() resizeMethod?: IImageProps['resizeMethod'];
+  @Input() defaultSource?: IImageProps['defaultSource'];
+  @Input() loadingIndicatorSource?: IImageProps['loadingIndicatorSource'];
+  @Input() blurRadius?: IImageProps['blurRadius'];
+  @Input() capInsets?: IImageProps['capInsets'];
+  @Input() crossOrigin?: IImageProps['crossOrigin'];
+  @Input() referrerPolicy?: IImageProps['referrerPolicy'];
+  @Input() fadeDuration?: IImageProps['fadeDuration'];
+  @Input()
+  progressiveRenderingEnabled?: IImageProps['progressiveRenderingEnabled'];
+  @Input() tintColor?: IImageProps['tintColor'];
+  @Input() onLoad?: IImageProps['onLoad'];
+  @Input() onLoadStart?: IImageProps['onLoadStart'];
+  @Input() onLoadEnd?: IImageProps['onLoadEnd'];
+  @Input() onError?: IImageProps['onError'];
+  @Input() onProgress?: IImageProps['onProgress'];
+  @Input() onPartialLoad?: IImageProps['onPartialLoad'];
+}
+
+// The box, not the image. Every Image prop below rides the engine's `slotPropsExcept` redirect onto
+// the absolutely-filled image the behavior builds, exactly as RN's own `...props` spread does
+// (ImageBackground.js:81) — so this directive declares them to make the BINDING legal, and the
+// engine decides which node each lands on.
+@Directive({ selector: 'image-background', standalone: true })
+export class ImageBackgroundElement extends SymbioteElement {
+  @Input() imageStyle?: IAngularImageBackgroundProps['imageStyle'];
   @Input() source?: IImageProps['source'];
   @Input() src?: IImageProps['src'];
   @Input() srcSet?: IImageProps['srcSet'];
@@ -370,6 +460,9 @@ export class SwitchElement extends SymbioteElement {
 @Directive({ selector: 'switch-managed', standalone: true })
 export class ManagedSwitchElement extends SwitchElement {}
 
+// The HOST — RN's centering RCTView (ActivityIndicator.js:112), which is the tag an app writes.
+// The four spinner props are declared here because that is where the app writes them; the engine's
+// behavior redirects them onto the spinner it builds underneath (`slotProps`).
 @Directive({ selector: 'activity-indicator', standalone: true })
 export class ActivityIndicatorElement extends SymbioteElement {
   @Input() animating?: IActivityIndicatorProps['animating'];
@@ -377,6 +470,12 @@ export class ActivityIndicatorElement extends SymbioteElement {
   @Input() size?: IActivityIndicatorProps['size'];
   @Input() hidesWhenStopped?: IActivityIndicatorProps['hidesWhenStopped'];
 }
+
+// The native spinner. Built by the behavior's `buildStructure` and by the wrapper's render fn, never
+// written in an app template — declared only so the tag alphabet stays covered, the same as
+// `scroll-content`.
+@Directive({ selector: 'activity-indicator-spinner', standalone: true })
+export class ActivityIndicatorSpinnerElement extends ActivityIndicatorElement {}
 
 @Directive({ selector: 'safe-area-view', standalone: true })
 export class SafeAreaViewElement extends SymbioteElement {}
@@ -438,8 +537,14 @@ export class InputAccessoryViewElement extends SymbioteElement {
 export const SYMBIOTE_ELEMENTS = [
   ViewElement,
   PressableElement,
+  TouchableOpacityElement,
+  TouchableHighlightElement,
+  TouchableNativeFeedbackElement,
+  TouchableWithoutFeedbackElement,
+  ButtonElement,
   TextElement,
   ImageElement,
+  ImageBackgroundElement,
   ScrollViewElement,
   HorizontalScrollViewElement,
   ScrollContentElement,
@@ -451,6 +556,7 @@ export const SYMBIOTE_ELEMENTS = [
   SwitchElement,
   ManagedSwitchElement,
   ActivityIndicatorElement,
+  ActivityIndicatorSpinnerElement,
   SafeAreaViewElement,
   ModalElement,
   RefreshControlElement,
@@ -477,6 +583,11 @@ const DECLARES_EVERY_PROP: {
   pressable: IMissingInputs<IAngularPressableProps, PressableElement, 'style'>;
   text: IMissingInputs<ITextElementProps, TextElement>;
   image: IMissingInputs<IImageProps, ImageElement, 'style'>;
+  imageBackground: IMissingInputs<
+    IAngularImageBackgroundProps,
+    ImageBackgroundElement,
+    'style'
+  >;
   scrollView: IMissingInputs<
     IAngularScrollViewProps,
     ScrollViewElement,
@@ -506,6 +617,7 @@ const DECLARES_EVERY_PROP: {
   pressable: true,
   text: true,
   image: true,
+  imageBackground: true,
   scrollView: true,
   textInput: true,
   switch: true,

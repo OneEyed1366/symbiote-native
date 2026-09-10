@@ -8,8 +8,12 @@
 // onValueChange/onFocus/onBlur as plain callback props (Svelte 5's idiomatic shape, same as
 // React) rather than Omit-ing them for an emit-based surface, so the base type is reused as-is.
 //
-// `value` is declared `$bindable()` in index.svelte (`bind:value` sugar) — pure Svelte
-// compile-time behavior on the destructuring site, so `value?: string` here is unchanged.
+// `bind:value` is NOT available on this primitive: Svelte's `bind:` directive only targets a
+// hardcoded list of native tag names (`compiler/phases/bindings.js`'s `valid_elements`), so it is a
+// compile error on our custom element, and `$bindable()` needs an actual component to destructure
+// it out of `$props()` — this primitive is a bare tag, not one. Two-way binding is the plain
+// controlled-prop pattern instead, same as every other adapter and RN itself: `value={x}
+// onValueChange={(e) => (x = e.text)}`.
 import type { IClassNameValue } from '@symbiote-native/engine';
 import type { ITextInputProps as ITextInputBaseProps } from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../../class-value';

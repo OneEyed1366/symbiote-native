@@ -1,6 +1,5 @@
 import { defineComponent, onMounted, onUnmounted, ref, shallowRef } from 'vue';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -1124,7 +1123,7 @@ export const BenchmarkScreen = defineComponent(
 
             {progress.value !== undefined && (
               <View testID="bench-suite-progress" class="bench-progress">
-                <ActivityIndicator color={accent} />
+                <activity-indicator color={accent} />
                 <Text class="bench-progress-text">
                   {`${progress.value.mode === MOUNT_MODE.All ? 'All mounted' : 'Virtualized'} · ${progress.value.label}`}
                 </Text>

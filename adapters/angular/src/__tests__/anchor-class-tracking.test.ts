@@ -20,10 +20,9 @@ import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
-import { ActivityIndicator } from '../components/activity-indicator';
 import { FlatList } from '../components/flat-list';
-import { ImageBackground } from '../components/image-background';
 import { TextInput } from '../components/text-input';
+import { ImageBackgroundElement } from '../elements';
 import {
   VirtualizedList,
   VListItemDirective,
@@ -33,8 +32,10 @@ const ROOT_TAG = 981;
 const fabric = installFabric();
 
 // The class-derived style lands neither reliably ON the testID node nor reliably below it:
-// ImageBackground and FlatList commit it onto the wrapper that CONTAINS theirs (verified by dumping
-// the committed tree). So search outward - node, subtree, then ancestors nearest-first. A plain
+// FlatList commits it onto the wrapper that CONTAINS theirs, and `image-background` puts the
+// testID on the inner image while the class styles the box ABOVE it (RN spreads `...props` onto
+// the Image, ImageBackground.js:81). So search outward - node, subtree, then ancestors
+// nearest-first. A plain
 // global search would match a sibling tile and pass while the component under test was frozen.
 function nearestStyled(testID: string, prop: string): unknown {
   const pathTo = (node: IFakeNode): IFakeNode[] | undefined => {
@@ -83,24 +84,17 @@ let fixture: AnchorClassFixture | undefined;
   selector: 'symbiote-anchor-class-host',
   standalone: true,
   imports: [
-    ActivityIndicator,
     FlatList,
-    ImageBackground,
+    ImageBackgroundElement,
     TextInput,
     VirtualizedList,
     VListItemDirective,
   ],
   template: `
     <TextInput [testID]="'anchor-text-input'" [class.dark]="dark" />
-    <ActivityIndicator
-      [testID]="'anchor-spinner'"
-      [animating]="false"
-      [hidesWhenStopped]="false"
-      [class.dark]="dark"
-    />
-    <ImageBackground [testID]="'anchor-image-bg'" src="x" [class.dark]="dark">
+    <image-background [testID]="'anchor-image-bg'" src="x" [class.dark]="dark">
       <text>Hi</text>
-    </ImageBackground>
+    </image-background>
     <!-- FlatList's own [testID] does not reach the committed tree (it is not forwarded down to the
          inner VirtualizedList/ScrollView), so the tile is anchored by a wrapper View instead. -->
     <view [testID]="'anchor-flat-list'">
@@ -153,7 +147,6 @@ afterEach(() => {
 describe('a class toggled after mount', () => {
   it.each([
     ['anchor-text-input'],
-    ['anchor-spinner'],
     ['anchor-image-bg'],
     ['anchor-flat-list'],
     ['anchor-vlist'],

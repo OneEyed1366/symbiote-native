@@ -49,7 +49,10 @@ import type {
 } from '@symbiote-native/components';
 import { descriptorToReact } from '../../descriptor-to-react';
 
-export type { ITextInputHandle } from '@symbiote-native/components';
+export type {
+  ITextInputHandle,
+  ITextInputChangeEvent,
+} from '@symbiote-native/components';
 
 // ITextInputProps is otherwise framework-agnostic, so its base lives in @symbiote-native/components;
 // className is React's own field (framework-specific, not part of the shared agnostic prop
@@ -138,7 +141,7 @@ export const TextInput = forwardRef<ITextInputHandle, ITextInputProps>(
         const text = textFromChange(event);
         if (text !== undefined) {
           lastNativeText.current = text;
-          onValueChange?.(text, event);
+          onValueChange?.(Object.assign(event, { text }));
         }
         // Ordering matters: record the text first, then bump the acknowledged count, so the count
         // never runs ahead of the text it stands for.

@@ -109,7 +109,9 @@ describe('a bare tag commits what its wrapper commits', () => {
 
     expect(wrapper).toEqual([
       'RCTView{flex,pointerEvents}',
-      'RCTView{accessibilityLabel,testID}',
+      // `accessible` (Pressable.js:252) and `focusable` (Pressable.js:258) are RN's defaults. Both
+      // previously pinned a divergence: only the tag path folded them, because no wrapper set them.
+      'RCTView{accessibilityLabel,accessible,focusable,testID}',
     ]);
     expect(tag).toEqual(wrapper);
   });

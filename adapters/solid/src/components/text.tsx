@@ -52,6 +52,9 @@ export interface ITextProps extends IAccessibilityProps, IAriaProps {
   numberOfLines?: number;
   ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
   selectable?: boolean;
+  // RN's Text carries it (Text.js) and Button hands it to the label so a screen reader announces
+  // the text as disabled along with the button holding it (Button.js:388).
+  disabled?: boolean;
   adjustsFontSizeToFit?: boolean;
   minimumFontScale?: number;
   allowFontScaling?: boolean;
