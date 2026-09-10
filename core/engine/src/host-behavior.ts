@@ -248,11 +248,13 @@ export interface IHostBehavior {
   //
   // Reads `node.props`, which by here holds the values this commit published.
   //
-  // AND IT DOES NOT RUN WHEN YOUR OWN FOLD MADE THE COMMIT EMPTY — `commitContainer` returns on a
-  // no-op ABOVE `runDeferredAttaches` (the "TRAP FOR BEHAVIOR AUTHORS" note at that return in
-  // `commit.ts`). So a prop a behavior STRIPS from the payload — Button's `title` and `color` — can
-  // never wake this hook: the payload is byte-identical, and the beat arrives only if some unrelated
-  // real prop moved in the same commit. Measured 2026-09-09, after it was designed on twice.
+  // IT DOES RUN WHEN YOUR OWN FOLD MADE THE COMMIT EMPTY, since 2026-09-10 — and until then it did
+  // not, which is the opposite of what a behavior needs. A prop a behavior STRIPS from the payload
+  // (TouchableOpacity's `disabled`, Button's `title`/`color`) commits byte-identically, and
+  // `commitContainer` used to return on that above the drain: the hook that must react to the flip
+  // was the one the flip could not wake. The two drains are split now, and only the tag-dependent
+  // half (`attachAfterCommit`) is still gated on a commit that reached Fabric. See
+  // `runCommittedHooks`.
   afterCommit?(node: ISymbioteNode): void;
   // Runs once the node is known to have left the tree for good. Must release everything `attach`
   // took — a timer left behind outlives the tree that owned it.
@@ -489,18 +491,36 @@ const awaitingCommit = new Set<ISymbioteNode>();
 export function runDeferredAttaches(
   isCommitted: (node: ISymbioteNode) => boolean,
 ): void {
-  // The gate: an app registering no behavior pays two Set-size reads per commit, matching the
+  // The gate: an app registering no behavior pays one Set-size read per commit, matching the
   // discipline `hasBehaviors` sets for `createElement`.
-  if (awaitingCommit.size === 0 && committedEachTime.size === 0) return;
-  // SETUP BEFORE THE RECURRING BEAT, and the order is load-bearing on the FIRST commit, where a
-  // node carrying both hooks is drained by both. `attachAfterCommit` is where a behavior seeds the
-  // mirrors that `afterCommit` then compares against; run them the other way round and the first
-  // beat compares against nothing and commands a redundant write down to native.
+  if (awaitingCommit.size === 0) return;
   for (const node of awaitingCommit) {
     if (!isCommitted(node)) continue;
     awaitingCommit.delete(node);
     attached.get(node)?.attachAfterCommit?.(node);
   }
+}
+
+/**
+ * The recurring beat. Split from `runDeferredAttaches` because the two answer different questions:
+ * `attachAfterCommit` needs a FRESH FABRIC TAG, so it belongs below `completeRoot` and must not run
+ * on a commit that made no native call; `afterCommit` needs only "props were published", which a
+ * no-op commit satisfies just as well.
+ *
+ * Keeping them together made `afterCommit` unreachable for exactly the props a behavior owns: a fold
+ * that STRIPS a prop makes its own commit byte-identical, `commitContainer` returns above the drain,
+ * and the hook never sees the flip. TouchableOpacity's re-settle on `disabled` is the case
+ * (`disabled` is a MACHINE_ONLY key), Button's `title`/`color` the other.
+ *
+ * SETUP STILL RUNS BEFORE THE BEAT on the first commit, and the order is load-bearing: a node
+ * carrying both hooks has `attachAfterCommit` seed the mirrors `afterCommit` compares against. The
+ * caller preserves it by calling this AFTER `runDeferredAttaches` on the changed path — the no-op
+ * path has no setup to run, since a node with no Fabric tag has not committed at all.
+ */
+export function runCommittedHooks(
+  isCommitted: (node: ISymbioteNode) => boolean,
+): void {
+  if (committedEachTime.size === 0) return;
   for (const node of committedEachTime) {
     if (!isCommitted(node)) continue;
     attached.get(node)?.afterCommit?.(node);
@@ -560,14 +580,32 @@ export function sweepDetachedBehaviors(
   detachCandidates.clear();
 }
 
+// Tear a subtree down unconditionally — the SURFACE teardown path, where there is nothing to
+// decide: `disposeRoot` drops the root container, so every node under it has left for good whatever
+// any framework intended.
+//
+// It exists because the sweep above cannot answer this. The sweep only sees nodes a `removeChild`
+// NOMINATED, and an unmount removes nothing — the adapter drops the whole surface. So before this,
+// `disposeRoot` touched no node at all: `committedOf` reads `node.committed`, a field on the node,
+// so every node of a dead surface still answered `isCommitted` and stayed in `committedEachTime`,
+// drained on every later commit anywhere in the process, with its timers still armed.
+export function teardownSubtree(
+  node: ISymbioteNode,
+  onDetached: (node: ISymbioteNode) => void,
+): void {
+  detachSubtree(node, new Set(), onDetached);
+}
+
 // `seen` guards the one overlap the candidate set can contain: a removed parent and a removed
-// descendant of it are both nominated, and without it the descendant is detached twice.
+// descendant of it are both nominated, and without it the descendant is detached twice. `tornDown`
+// guards the same overlap ACROSS calls — a node the sweep already released and that `disposeRoot`
+// then walks again, which is the ordinary shape of an unmount after the framework emptied the tree.
 function detachSubtree(
   node: ISymbioteNode,
   seen: Set<ISymbioteNode>,
   onDetached: (node: ISymbioteNode) => void,
 ): void {
-  if (seen.has(node)) return;
+  if (seen.has(node) || tornDown.has(node)) return;
   seen.add(node);
   onDetached(node);
   // Marked whether or not THIS node carries a behavior: the mark is what tells a later insert to

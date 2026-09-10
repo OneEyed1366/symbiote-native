@@ -150,16 +150,22 @@ Not the name. Two things, and the second is an argument FOR the tag rather than 
   MEMOIZED on their inputs, `setProp`'s `Object.is` never fires and the node re-commits forever
   (`list-geometry-feedback-loop`).
 
-  **The `afterCommit` half was measured FALSE on 2026-09-09, and it fails on exactly the props this
-  is about.** `title` and `color` are stripped from the host's payload by its own fold, so a write to
-  either produces a byte-identical payload, and `commitContainer` returns on a no-op ABOVE
-  `runDeferredAttaches` — the beat never happens. The label re-folds only if some unrelated real
-  prop moves in the same commit. `commit.ts` documents this at the return itself ("TRAP FOR BEHAVIOR
-  AUTHORS"); `host-behavior.ts`'s `afterCommit` comment did not, until this cost a design round.
+  **The `afterCommit` half was measured FALSE on 2026-09-09 and FIXED on 2026-09-10 — read the
+  paragraph below as history, and do not design around it.** `title` and `color` are stripped from
+  the host's payload by its own fold, so a write to either produced a byte-identical payload, and
+  `commitContainer` returned on a no-op ABOVE `runDeferredAttaches` — the beat never happened.
 
-  The general form: **a lifecycle hook that runs "after the commit" does not run when your own fold
-  made the commit empty.** Before designing on one, ask whether the prop you are reacting to reaches
-  Fabric at all.
+  The repair is a SPLIT, not a hoist, and the split is the reusable part. Three hooks had been
+  grouped by when they run and they ask different questions: `runPostCommitHooks` and
+  `attachAfterCommit` need a fresh FABRIC TAG, which a commit making zero native calls never
+  assigns, so they stay below the early return. `afterCommit` needs only that PROPS WERE PUBLISHED,
+  so it now drains on both paths (`runCommittedHooks`, `core/engine/src/host-behavior.ts`). It had
+  been sharing their gate by accident.
+
+  The general form, restated as the question to ask rather than as the trap: **a hook grouped with
+  others by WHEN it fires inherits their preconditions.** Before adding one to an existing drain,
+  say what it needs — a tag, a published payload, a laid-out frame — and check the drain's gate
+  answers that and not a neighbour's.
 - **RN swaps the touchable itself on Android** (`TouchableNativeFeedback`, Button.js:280-283). As a
   component that is a platform branch in five templates. As a TAG it is one branch inside the
   behavior picking a different intrinsic per platform — which is exactly what ScrollView already

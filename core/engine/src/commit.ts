@@ -43,7 +43,12 @@ import { registerPostCommit, runPostCommitHooks } from './post-commit';
 import { fabricProps } from './fabric-props';
 import { isRecord } from './type-guards';
 import { isAriaAliasKey } from './accessibility-props';
-import { runDeferredAttaches, sweepDetachedBehaviors } from './host-behavior';
+import {
+  runCommittedHooks,
+  runDeferredAttaches,
+  sweepDetachedBehaviors,
+  teardownSubtree,
+} from './host-behavior';
 import { detachAnimatedProps } from './animated/host-binding';
 
 // Re-exported from ./platform-color so callers don't need to change their import path.
@@ -238,6 +243,13 @@ function jsonEqual(a: unknown, b: unknown): boolean {
 // itself, in node.ts - see the `committed` field there for why the side table was collapsed into a
 // field, and committedOf's doc comment for the node-identity check that replaced the WeakMap miss.
 // Everything below reads it exclusively through committedOf and writes it as `node.committed`.
+
+// The predicate both behavior drains take. Passed in rather than imported by `host-behavior.ts`,
+// keeping that dependency one-directional — this module already imports from it, and a cycle is a
+// live hazard under Metro's `inlineRequires`. Hoisted to module scope because two call sites need
+// the identical question.
+const isNodeCommitted = (node: ISymbioteNode): boolean =>
+  committedOf(node) !== undefined;
 
 interface IReconciled {
   handle: IFabricNode;
@@ -631,8 +643,15 @@ export function disposeRoot(rootTag: IRootTag): void {
   // Drop any setNativeProps writes still queued for this surface: their flush is a microtask away
   // and would otherwise commit into a container that no longer exists, re-creating it from scratch.
   pendingByRoot.delete(rootTag);
-  if (rootContainers.delete(rootTag))
-    dlog(`root container disposed root=${rootTag}`);
+  const container = rootContainers.get(rootTag);
+  if (container === undefined) return;
+  // BEFORE the delete, which is the only reason the subtree is still reachable. An unmount removes
+  // no child, so `sweepDetachedBehaviors` never hears about these nodes — without this every one of
+  // them keeps its `afterCommit` registration and its timers, and a restarted surface's commits
+  // drain the dead one's hooks forever (`.claude/rules/unmount-does-not-sweep-host-behaviors.md`).
+  teardownSubtree(container, detachAnimatedProps);
+  rootContainers.delete(rootTag);
+  dlog(`root container disposed root=${rootTag}`);
 }
 
 export function commitChildren(
@@ -693,20 +712,23 @@ function commitContainer(rootTag: IRootTag): void {
   // The container's identity is stable, so its un-cloned flag is the no-op signal:
   // an over-scheduled commit that touched nothing makes zero native calls.
   //
-  // TRAP FOR BEHAVIOR AUTHORS, and it cost two iterations to find: this return is ALSO the gate on
-  // `runDeferredAttaches` and `runPostCommitHooks` below. A host behavior that calls
-  // `requestCommitFor(node)` WITHOUT writing a prop therefore never reaches its `afterCommit` /
-  // `attachAfterCommit` half — the commit it asked for is a no-op, and a no-op returns here.
+  // TRAP FOR BEHAVIOR AUTHORS, and it cost two iterations to find: this return is the gate on
+  // `runPostCommitHooks` and `runDeferredAttaches` below. Both exist to retry once FRESH FABRIC TAGS
+  // are assigned, and a commit that made zero native calls assigned none — so gating them here is
+  // correct, and hoisting them above this line would run every deferred hook on every
+  // over-scheduled commit, which is the common case.
   //
-  // That is correct for what the hooks are FOR: they exist to retry once fresh Fabric tags are
-  // assigned, and a commit that made zero native calls assigned none. So the fix is not to hoist
-  // them above this line — that would run every deferred hook on every over-scheduled commit, which
-  // is the common case. A behavior needing a turn of the loop with nothing to write should schedule
-  // its own (`queueMicrotask`, as Switch's snap-back and Angular's `snapBackIfNeeded` both do) and
-  // keep `afterCommit` registered for the case a microtask cannot reach: a prop change with no
-  // preceding native event.
+  // `afterCommit` is NOT in that group and was gated with them by accident until 2026-09-10. It asks
+  // only "props were published", which a no-op commit satisfies, and gating it made it unreachable
+  // for exactly the props a behavior OWNS: a fold that strips a prop (TouchableOpacity's `disabled`,
+  // Button's `title`/`color`) makes its own commit byte-identical, so the hook that must react to
+  // the flip is the one the flip cannot wake. It is drained on both paths now.
+  //
+  // A behavior needing a turn of the loop with nothing to write at all may still schedule its own
+  // (`queueMicrotask`, as Switch's snap-back and Angular's `snapBackIfNeeded` both do).
   if (!result.changed) {
     dlog(`commit root=${rootTag} no-op (skipped completeRoot)`);
+    runCommittedHooks(isNodeCommitted);
     return;
   }
 
@@ -722,10 +744,12 @@ function commitContainer(rootTag: IRootTag): void {
 
   // The same moment, for the half of a host behavior that could not run at `attach`. A behavior
   // whose setup needs a Fabric tag (a view command, a native Animated binding, an event attach)
-  // declares `attachAfterCommit` and is drained here. `committedOf` is passed as the predicate
-  // rather than imported by `host-behavior.ts`, keeping that dependency one-directional — this
-  // module already imports from it, and a cycle is a live hazard under Metro's `inlineRequires`.
-  runDeferredAttaches(node => committedOf(node) !== undefined);
+  // declares `attachAfterCommit` and is drained here.
+  runDeferredAttaches(isNodeCommitted);
+
+  // After the setup half, never before it: a node carrying both hooks has `attachAfterCommit` seed
+  // the mirrors `afterCommit` then compares against. See `runCommittedHooks`.
+  runCommittedHooks(isNodeCommitted);
 
   if (isDebug()) {
     const mode =

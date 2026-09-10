@@ -93,3 +93,27 @@ Two things generalise, and they are this repo's own rules pointed at a table rat
   "a scroll wrapper must survive for `Animated.event`" — a wrapper kept, a feature not shipped, and
   no test anywhere to contradict it. That is the same asymmetry `adapter-parity-audit.md` records for
   an impossibility claim: a wrong "already done" costs a read, a wrong "still open" costs the repair.
+
+## A full commit DURING a fade transiently drops the animated key — OPEN, unverified on device
+
+Measured 2026-09-10 while instrumenting `touchable-opacity`'s press-in, three arms (no style,
+`{width:40}`, `{opacity:0.6}`), reading the COMMITTED payload with no await after the touch:
+
+```
+[nostyle] at rest   committed.opacity=1      props.style={"opacity":1}
+[nostyle] pressed*  committed.opacity=null   props.style={"opacity":0.2}
+[faded]   pressed*  committed.opacity=0.6    props.style={"opacity":0.2}   stale, not null
+```
+
+The animated value lands on the node synchronously (`OPACITY_ACTIVE_GRANT_DURATION_MS` is 0, so the
+timing sets it inside `.start()`). What lags is the PAYLOAD: the fade publishes through
+`setNativeProps`, whose flush is a microtask away, so a full `commitContainer` landing in between
+commits the pre-press value — `null` where the author gave no `opacity`, the stale resting value
+where they did. On device that predicts a one-frame flash to full opacity at press-in. Not
+reproduced on a device; nobody has looked.
+
+**The test-harness half is the part that has already cost time.** A suite reading the committed
+node with no `await flushFrames()` after a touch reads the pre-press value, so a press assertion can
+fail for a reason that has nothing to do with the behavior. That was reported once as an adapter
+divergence correlated with carrying a `style` prop; the real discriminator is whether the test
+awaits frames. Before blaming a fade, add the await and re-read.
