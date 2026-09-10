@@ -28,6 +28,7 @@ import {
   clearHostBehaviors,
   createElement,
   isSymbioteNode,
+  propOf,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -218,8 +219,8 @@ describe('vModelText on a lowered switch', () => {
   };
 
   it('writes the boolean the behavior actually reads', () => {
-    expect(created(true).props.value).toBe(true);
-    expect(created(false).props.value).toBe(false);
+    expect(propOf(created(true), 'value')).toBe(true);
+    expect(propOf(created(false), 'value')).toBe(false);
   });
 
   // The control that keeps the branch honest: a text input must still be stringified, which is
@@ -236,6 +237,6 @@ describe('vModelText on a lowered switch', () => {
       { props: { 'onUpdate:modelValue': () => {} } } as never,
       null as never,
     );
-    expect(el.props.value).toBe('42');
+    expect(propOf(el, 'value')).toBe('42');
   });
 });

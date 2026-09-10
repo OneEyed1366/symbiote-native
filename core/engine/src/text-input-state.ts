@@ -3,7 +3,7 @@
 // Keyboard.dismiss can blur whatever holds focus without a ref, exactly how RN's
 // dismissKeyboard() works (blurTextInput(currentlyFocusedInput())).
 
-import { dispatchViewCommand } from './commit';
+import { dispatchViewCommand } from './imperative';
 import { dlog } from './debug';
 import type { ISymbioteNode } from './node';
 

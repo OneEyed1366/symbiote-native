@@ -10,7 +10,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { processBoxShadow } from './index';
 import { processFilter } from '../process-filter';
-import { setColorProcessor } from '../commit';
+import { setColorProcessor } from '../platform-color';
 
 const PROCESSED_COLOR = 0x7f_b5_ff_d9;
 
@@ -24,6 +24,36 @@ function installRealisticColorProcessor(): void {
   });
 }
 
+const ROTATED = 0xff_ff_00_00;
+
+// why: a numeric color is the app author's own literal (`color: 0xff0000ff`, rrggbbaa), not an
+// already-resolved platform int - so it owes the same processColor hop a string owes. RN's
+// processColor range-checks it and rotates rrggbbaa into aarrggbb; skipping the hop commits
+// opaque RED as 0xff0000ff, which native reads as aarrggbb, i.e. blue.
+describe('a numeric color goes through the platform processor, exactly like a string', () => {
+  function installNumberRotatingProcessor(): void {
+    setColorProcessor(value =>
+      value === 0xff_00_00_ff ? ROTATED : PROCESSED_COLOR,
+    );
+  }
+
+  it('processBoxShadow routes a numeric shadow color', () => {
+    installNumberRotatingProcessor();
+    expect(
+      processBoxShadow([{ offsetX: 0, offsetY: 2, color: 0xff_00_00_ff }]),
+    ).toEqual([{ offsetX: 0, offsetY: 2, color: ROTATED }]);
+  });
+
+  it('processFilter routes a numeric drop-shadow color', () => {
+    installNumberRotatingProcessor();
+    expect(
+      processFilter([
+        { dropShadow: { offsetX: 0, offsetY: 2, color: 0xff_00_00_ff } },
+      ]),
+    ).toEqual([{ dropShadow: { offsetX: 0, offsetY: 2, color: ROTATED } }]);
+  });
+});
+
 // Reset so the identity processor (the engine default) is restored for any later test.
 afterAll(() => {
   setColorProcessor(value => value);
@@ -34,14 +64,21 @@ describe('processBoxShadow', () => {
     expect(processBoxShadow(undefined)).toEqual([]);
   });
 
-  describe('array form — identity processColor passes the color object through', () => {
+  // processBoxShadow now imports RN's own implementation, which calls RN's `processColor`
+  // directly - so the injected `setColorProcessor` seam no longer governs a colour INSIDE a
+  // shadow, and these assertions read the real platform int rather than a stub's sentinel.
+  // 0.85 alpha rounds to 217 (0xd9), so rgba(127,181,255,0.85) is 0xd97fb5ff as aarrggbb.
+  const RGBA_SAMPLE = 'rgba(127,181,255,0.85)';
+  const RGBA_SAMPLE_PROCESSED = 0xd9_7f_b5_ff;
+
+  describe('array form — the colour is processed, not passed through', () => {
     const [shadow] = processBoxShadow([
       {
         offsetX: 0,
         offsetY: 0,
         blurRadius: 22,
         spreadDistance: 3,
-        color: 'rgba(127,181,255,0.85)',
+        color: RGBA_SAMPLE,
       },
     ]);
 
@@ -55,8 +92,10 @@ describe('processBoxShadow', () => {
       expect(shadow.spreadDistance).toBe(3);
     });
 
-    it('passes the color through untouched', () => {
-      expect(shadow.color).toBe('rgba(127,181,255,0.85)');
+    // why: the whole point of the JS parse. A CSS string reaching Fabric unprocessed is what made
+    // shadows paint nothing on device; the payload must carry the platform int.
+    it('resolves the colour to a platform int', () => {
+      expect(shadow.color).toBe(RGBA_SAMPLE_PROCESSED);
     });
 
     it('keeps a boolean inset field as-is', () => {
@@ -99,18 +138,18 @@ describe('processBoxShadow', () => {
   });
 
   describe('string form — realistic processColor (null for lengths, int for colors)', () => {
+    // why: the string parser decides which whitespace-separated arg is the COLOUR by asking
+    // processColor and taking the one that resolves - so this exercises the parse and the colour
+    // hop together. No stub is installed: upstream calls RN's processColor itself.
     it('parses every component of a full shadow string', () => {
-      installRealisticColorProcessor();
-      const shadows = processBoxShadow(
-        '0px 0px 22px 3px rgba(127,181,255,0.85)',
-      );
+      const shadows = processBoxShadow(`0px 0px 22px 3px ${RGBA_SAMPLE}`);
       expect(shadows).toHaveLength(1);
       const [shadow] = shadows;
       expect(shadow.offsetX).toBe(0);
       expect(shadow.offsetY).toBe(0);
       expect(shadow.blurRadius).toBe(22);
       expect(shadow.spreadDistance).toBe(3);
-      expect(shadow.color).toBe(PROCESSED_COLOR);
+      expect(shadow.color).toBe(RGBA_SAMPLE_PROCESSED);
     });
 
     it('zeroes the whole list on an invalid primitive (web semantics: paint none)', () => {

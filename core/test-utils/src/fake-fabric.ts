@@ -7,6 +7,9 @@
 // not deleted, so a test can tell "explicitly reset" apart from "never set". `*Children`
 // variants reset children (the engine re-appends).
 
+import { setTreeHost } from '@symbiote-native/engine';
+import { forgetCommittedRoots, treeApplierHost } from './tree-applier';
+
 export interface IFakeNode {
   tag: number;
   viewName: string;
@@ -24,8 +27,28 @@ export type IEventHandler = (
 ) => void;
 
 export interface IFabricRecorder {
-  /** The child set handed to the most recent `completeRoot`. */
+  /**
+   * The child set handed to the most recent `completeRoot` — WHICHEVER root that was.
+   *
+   * Right for one mounted surface and a trap for two: it reports the last writer, not the surface
+   * a test is asking about. Measured 2026-09-08, `create-tunnel.test.ts` asked whether tunnelled
+   * content had left surface B and was answered by surface A's tree. Use `committedAll` whenever
+   * more than one surface is mounted.
+   */
   committed: IFakeNode[];
+  /**
+   * Every mounted root's current child set, concatenated in first-commit order.
+   *
+   * The oracle for a multi-surface test. Deliberately NOT what `committed` returns: ~60 tests mount
+   * a fresh rootTag per case without resetting between, and rely on the overwrite to discard the
+   * previous case's tree.
+   */
+  committedAll: IFakeNode[];
+  /**
+   * One root's current child set — the oracle for "is this content on THAT surface", which is the
+   * question every cross-surface test is actually asking and the one `committed` cannot answer.
+   */
+  committedFor(rootTag: number): IFakeNode[];
   /** Every node ever `createNode`'d this run (clones excluded). */
   created: IFakeNode[];
   /** Every imperative command dispatched at a committed Fabric node. */
@@ -112,7 +135,12 @@ function adoptChildren(
 }
 
 export function installFabric(): IFabricRecorder {
+  // The engine holds no tree, so a headless run needs one installed the same way it needs a fake
+  // `nativeFabricUIManager`: `tree-applier.ts` is the TypeScript stand-in for what native does on
+  // device, and this is the one place that binds it.
+  setTreeHost(treeApplierHost);
   let committed: IFakeNode[] = [];
+  const roots = new Map<number, IFakeNode[]>();
   const created: IFakeNode[] = [];
   const commands: Array<{
     node: IFakeNode;
@@ -189,9 +217,10 @@ export function installFabric(): IFabricRecorder {
     appendChildToSet(childSet: IFakeNode[], child: IFakeNode): void {
       childSet.push(child);
     },
-    completeRoot(_rootTag: number, childSet: IFakeNode[]): void {
+    completeRoot(rootTag: number, childSet: IFakeNode[]): void {
       counts.completeRoot += 1;
       committed = childSet;
+      roots.set(rootTag, childSet);
     },
     registerEventHandler(handler: IEventHandler): void {
       eventHandler = handler;
@@ -220,6 +249,12 @@ export function installFabric(): IFabricRecorder {
     get committed() {
       return committed;
     },
+    get committedAll(): IFakeNode[] {
+      return [...roots.values()].flat();
+    },
+    committedFor(rootTag: number): IFakeNode[] {
+      return roots.get(rootTag) ?? [];
+    },
     created,
     commands,
     counts,
@@ -245,6 +280,11 @@ export function installFabric(): IFabricRecorder {
     },
     reset(): void {
       committed = [];
+      roots.clear();
+      // The tree outlives this call, and it declines to complete a root whose child set it already
+      // handed over. Clearing only this side would leave a mounted surface memoized against a
+      // recorder that has forgotten it, so the next commit skips and `committed` stays empty.
+      forgetCommittedRoots();
       created.length = 0;
       commands.length = 0;
       // Every counter, not a subset: `appendChild` and `clone` were left out, so any assertion

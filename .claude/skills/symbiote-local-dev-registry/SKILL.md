@@ -86,6 +86,39 @@ the untracking the second inspects only `bare-rn`, which can never fail it — a
 permanently clean subject. Both lockfile rows are derived from `examples/` on disk, so the next
 example is covered the day its folder exists.
 
+### And there is a THIRD channel, created BY the untracking: `ios/Podfile.lock`
+
+Observed 2026-09-07, one `registry:sync` plus the `pod install` it obliges:
+
+```
+examples/react/ios/Podfile.lock    react-native-safe-area-context 5.8.0 -> 5.9.1, 17 lines
+```
+
+Nothing about `@symbiote-native` and no `localhost` anywhere, so both lockfile rows of the guard
+above are blind to it — and it is tracked in **all thirteen** examples, `bare-rn` included, while
+`package-lock.json` is now tracked in `bare-rn` alone.
+
+The two facts are one fact. Untracking the JS lock removed the pin on THIRD-PARTY versions too, so
+a caret range is free to float on any reinstall; `Podfile.lock` sits downstream of that resolution
+and is the only tracked file that records the drift. The local loop therefore still dirties tracked
+state — just one layer further down than the channel that was closed, and through a file whose diff
+reads as an ordinary dependency bump rather than as local dev residue.
+
+Not necessarily a defect: a floating third-party version is what an untracked lock MEANS, and the
+untracking was deliberate and correct for its own reason. What is wrong is that it is invisible —
+`git status` after a refresh shows a pod version change with nothing saying a refresh caused it.
+
+So: **after any `registry:refresh` + `pod install`, read `git diff examples/*/ios/Podfile.lock`
+before staging anything**, and decide the bump on its merits rather than sweeping it into an
+unrelated commit. And when a native lock moves with no JS lock beside it to explain why, this is
+the mechanism — do not go looking for a podspec change.
+
+The general form, and it is this skill's own lesson repeated a third time: **closing one channel of
+local-dev contamination relocates it rather than removing it.** `file:` in the manifest ->
+`localhost` in `package-lock.json` -> a floated version in `Podfile.lock`. Each fix was right and
+each left a quieter successor, so the question to ask of the next one is not "is the manifest clean"
+but "what tracked file does an install still reach".
+
 ## What it does NOT fix — measured, not assumed
 
 npm's lockfile still short-circuits. Publish new bytes under the SAME version, run a plain
@@ -158,6 +191,60 @@ which beats reasoning about whose config is set.
 CI was never exposed: `release.yml` carries `id-token: write` and an explicit
 `registry-url: https://registry.npmjs.org` on `setup-node`, and the OIDC exchange does not read a
 registry URL from config at all.
+
+## The container outlives a config MOVE, and dies on its next restart — exit 127
+
+Measured 2026-09-07. A publish hung, and `registry:status` said `DOWN`. The container had exited
+**127** nine minutes earlier, and its logs end mid-work with no error at all — the last lines are
+ordinary bcrypt timings, which reads like resource starvation and is not.
+
+`docker inspect` carries the whole answer, and it is the only place it appears:
+
+```
+failed to create shim task: … error mounting
+"…/symbiote/.verdaccio/config.yaml" to rootfs at "/verdaccio/conf/config.yaml":
+cannot create subdirectories in "…": not a directory:
+Are you trying to mount a directory onto a file (or vice-versa)?
+```
+
+The config moved from `.verdaccio/` to `scripts/verdaccio/` long ago (git cannot track a file under
+a dot-directory — that reason is recorded below). **A RUNNING container keeps its old bind mount, so
+nothing failed until something restarted it** — here a colima or daemon restart, months later. On
+that restart docker found no file at the stale path, created a DIRECTORY there, and the mount became
+permanently impossible: the container can never start again.
+
+Fix, and it is safe because storage is a named volume (`verdaccio-storage`) that the container does
+not own:
+
+```bash
+docker rm verdaccio && pnpm run registry:setup
+```
+
+Nothing published is lost. The stray `.verdaccio/config.yaml/` DIRECTORY docker created is junk and
+can be deleted.
+
+**Two things generalise, and the second is the one that cost the time.**
+
+A long-lived container is a snapshot of the paths that existed when it was CREATED. Any repo
+reorganisation that moves a mounted file leaves a container that works until its next restart and
+then never again — so after moving anything a container binds, recreate it rather than trusting the
+running one.
+
+And **`docker logs` is the wrong instrument for a container that failed to START.** The logs are the
+last successful run's, so they end normally and invite a resource-pressure story; the start failure
+lives in `docker inspect --format '{{.State.Error}}'`. The climbing `took 1893ms to verify` lines
+were read as starvation and were simply the previous session's tail. Read `.State.ExitCode` and
+`.State.Error` FIRST — 127 means the process was never launched, which already rules out anything
+that happens while running.
+
+## Diagnosing a publish that hangs: check the registry is UP before anything else
+
+`registry:publish` runs `pnpm pack` / `npm unpublish` / `npm publish` with `stdio: 'ignore'`, so a
+dead registry produces silence rather than an error. The same session had earlier guessed a pnpm
+store lock for exactly this symptom, on no evidence, and that guess was wrong.
+
+`pnpm run registry:status` is the first command, always. It costs nothing and it distinguishes the
+two states the silence cannot.
 
 ## Setup details worth not re-deriving
 

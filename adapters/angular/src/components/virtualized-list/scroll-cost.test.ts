@@ -390,9 +390,9 @@ describe('the cost of a FLING frame on PATH B geometry', () => {
         `outletDestroys=${per(angular.outletDestroys)}`,
       `  per frame: nodesCreated=${per(angular.nodesCreated)} nodesInserted=${per(angular.nodesInserted)} ` +
         `nodesRemoved=${per(angular.nodesRemoved)}`,
-      `  per frame: engine commits=${per(commit.commits)} nodesVisited=${per(commit.nodesVisited)} ` +
-        `propWrites=${per(commit.propWrites)} propNoops=${per(commit.propNoops)} ` +
-        `childScans=${per(commit.childScans)} childFlattens=${per(commit.childFlattens)}`,
+      // Two numbers, not seven: the walk counters died with the walk. JS holds no tree, so
+      // nodesVisited / propNoops / childScans / childFlattens are not observable from here.
+      `  per frame: engine commits=${per(commit.commits)} propWrites=${per(commit.propWrites)}`,
       `  per frame: deriveMetrics=${per(frames.length)} windowWidth=${meanWidth.toFixed(1)} ` +
         `cellsRebuilt=${per(frames.length * meanWidth)}`,
       `  per frame: isWindowSettled scan steps=${per(settleSteps)} (of ${ENTRY_COUNT} entries)`,

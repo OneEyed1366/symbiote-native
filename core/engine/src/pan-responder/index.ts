@@ -13,6 +13,8 @@
 // those directly while keeping RN's accumulate-deltas-over-time behavior.
 
 import { dlog } from '../debug';
+// @ts-expect-error - untyped Flow source. Metro compiles it; vitest.config.ts strips the types.
+import TouchHistoryMath from 'react-native/Libraries/Interaction/TouchHistoryMath';
 import type { ISymbioteEvent } from '../node';
 import { isRecord } from '../type-guards';
 
@@ -173,18 +175,6 @@ function mostRecentTimestamp(touches: ITouchPoint[]): number {
 // that invoke the handlers directly (no shared, no store) carry no touchHistory and fall
 // back to the centroid path below, which keeps single-touch behavior.
 
-function isTouchRecord(value: unknown): value is ITouchRecord {
-  return (
-    isRecord(value) &&
-    typeof value.touchActive === 'boolean' &&
-    typeof value.currentPageX === 'number' &&
-    typeof value.currentPageY === 'number' &&
-    typeof value.currentTimeStamp === 'number' &&
-    typeof value.previousPageX === 'number' &&
-    typeof value.previousPageY === 'number'
-  );
-}
-
 function isTouchHistory(value: unknown): value is ITouchHistory {
   return (
     isRecord(value) &&
@@ -200,85 +190,60 @@ function touchHistoryOf(event: ISymbioteEvent): ITouchHistory | undefined {
   return isTouchHistory(raw) ? raw : undefined;
 }
 
-// Ported from RN Interaction/TouchHistoryMath.js:centroidDimension (lines 30-85). Mean
-// of one coordinate over the touches that moved after `touchesChangedAfter`, taking each
-// touch's current or previous position. The single-active-touch fast path uses a strict
-// `>`; the multi-touch scan uses `>=`, both kept from RN.
-function centroidDimension(
-  touchHistory: ITouchHistory,
-  touchesChangedAfter: number,
-  isXAxis: boolean,
-  ofCurrent: boolean,
-): number {
-  const { touchBank } = touchHistory;
-  let total = 0;
-  let count = 0;
-
-  const single =
-    touchHistory.numberActiveTouches === SINGLE_TOUCH_COUNT
-      ? touchBank[touchHistory.indexOfSingleActiveTouch]
-      : undefined;
-
-  if (isTouchRecord(single)) {
-    if (single.touchActive && single.currentTimeStamp > touchesChangedAfter) {
-      total += dimensionOf(single, isXAxis, ofCurrent);
-      count = 1;
-    }
-  } else {
-    for (const record of touchBank) {
-      if (
-        isTouchRecord(record) &&
-        record.touchActive &&
-        record.currentTimeStamp >= touchesChangedAfter
-      ) {
-        total += dimensionOf(record, isXAxis, ofCurrent);
-        count++;
-      }
-    }
-  }
-  return count > 0 ? total / count : NO_CENTROID;
-}
-
-const NO_CENTROID = -1;
-
-function dimensionOf(
-  record: ITouchRecord,
-  isXAxis: boolean,
-  ofCurrent: boolean,
-): number {
-  if (ofCurrent) return isXAxis ? record.currentPageX : record.currentPageY;
-  return isXAxis ? record.previousPageX : record.previousPageY;
-}
-
+// The six readings PanResponder needs, under this file's shorter names. Upstream's own module is
+// imported rather than re-derived: it has no dependencies, no native access, and its two scans -
+// a strict `>` on the single-active-touch fast path, `>=` on the multi-touch loop - are
+// load-bearing and easy to reproduce subtly wrong.
+//
+// The per-record runtime guard that used to sit here went with it. It was forced by `nativeEvent`
+// being a Record<string, unknown>; `touchHistoryOf` above already validates the bank at the
+// boundary, and the records inside it are written by our own touch-history.ts.
 function currentCentroidXOfChanged(
   touchHistory: ITouchHistory,
   after: number,
 ): number {
-  return centroidDimension(touchHistory, after, true, true);
+  return TouchHistoryMath.currentCentroidXOfTouchesChangedAfter(
+    touchHistory,
+    after,
+  );
 }
+
 function currentCentroidYOfChanged(
   touchHistory: ITouchHistory,
   after: number,
 ): number {
-  return centroidDimension(touchHistory, after, false, true);
+  return TouchHistoryMath.currentCentroidYOfTouchesChangedAfter(
+    touchHistory,
+    after,
+  );
 }
+
 function previousCentroidXOfChanged(
   touchHistory: ITouchHistory,
   after: number,
 ): number {
-  return centroidDimension(touchHistory, after, true, false);
+  return TouchHistoryMath.previousCentroidXOfTouchesChangedAfter(
+    touchHistory,
+    after,
+  );
 }
+
 function previousCentroidYOfChanged(
   touchHistory: ITouchHistory,
   after: number,
 ): number {
-  return centroidDimension(touchHistory, after, false, false);
+  return TouchHistoryMath.previousCentroidYOfTouchesChangedAfter(
+    touchHistory,
+    after,
+  );
 }
+
 function currentCentroidXAll(touchHistory: ITouchHistory): number {
-  return centroidDimension(touchHistory, 0, true, true);
+  return TouchHistoryMath.currentCentroidX(touchHistory);
 }
+
 function currentCentroidYAll(touchHistory: ITouchHistory): number {
-  return centroidDimension(touchHistory, 0, false, true);
+  return TouchHistoryMath.currentCentroidY(touchHistory);
 }
 
 // RN PanResponder._updateGestureStateOnMove (Interaction/PanResponder.js lines 330-366):
@@ -456,8 +421,17 @@ const PanResponder = {
           : centroidY(touches);
         gestureState.dx = 0;
         gestureState.dy = 0;
-        // The grant frame is already accounted for, so the first move's velocity
-        // is measured from here, not from time 0.
+        // Two deliberate divergences from upstream's onResponderGrant (PanResponder.js:459),
+        // which sets x0/y0/dx/dy and nothing else. Both are decisions, not drift - recorded here
+        // because the first one spent months living in a comment nobody audited against upstream.
+        //
+        // 1. The grant frame is already accounted for, so the first move's velocity is measured
+        //    from here, not from time 0. packages/navigation's drawer reads vx through
+        //    resolveSwipeIntent with a 0.5 flick threshold, and upstream's version makes the first
+        //    move look instantaneous.
+        // 2. numberActiveTouches is refreshed at grant. Upstream leaves whatever the previous
+        //    gesture's onResponderEnd left behind - usually 0 - so an app reading it inside
+        //    onPanResponderGrant gets a stale count there and a correct one everywhere else.
         gestureState._accountsForMovesUpTo = frameTimestampOf(event, touches);
         gestureState.numberActiveTouches =
           touchHistory?.numberActiveTouches ?? touches.length;

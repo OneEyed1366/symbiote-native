@@ -59,7 +59,7 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Animated scroll-driven animation', () => {
-  it('mounts Animated.ScrollView and drives the bound translateY from a scroll event', () => {
+  it('mounts Animated.ScrollView and drives the bound translateY from a scroll event', async () => {
     const scrollY = new Animated.Value(0);
     // The canonical handler, held by reference so the test can fire it the way the native scroll
     // event would. onScroll is registered through React's event system, not committed as a prop.
@@ -88,6 +88,9 @@ describe('Animated scroll-driven animation', () => {
 
     // firing onScroll drives scrollY -> re-paints translateY
     onScroll({ nativeEvent: { contentOffset: { y: 88, x: 0 } } });
+    // setNativeProps queues; the frame reaches Fabric at the microtask boundary
+    // (core/engine/src/imperative.ts), same as the setValue path in animated-component.test.tsx.
+    await Promise.resolve();
 
     const boundViewAfter = findTransformView(fabric.committed);
     expect(boundViewAfter).toBeDefined();

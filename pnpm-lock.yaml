@@ -30,6 +30,9 @@ catalogs:
     '@babel/core':
       specifier: ^7.25.2
       version: 7.29.7
+    '@babel/plugin-transform-flow-strip-types':
+      specifier: ^7.25.2
+      version: 7.29.7
     '@changesets/changelog-github':
       specifier: ^1.0.0
       version: 1.0.0
@@ -48,6 +51,9 @@ catalogs:
     '@react-native/metro-babel-transformer':
       specifier: 0.86.0
       version: 0.86.0
+    '@react-native/normalize-colors':
+      specifier: 0.86.2
+      version: 0.86.2
     '@react-native/typescript-config':
       specifier: 0.86.0
       version: 0.86.0
@@ -87,6 +93,9 @@ catalogs:
     astro:
       specifier: ^7.0.3
       version: 7.0.6
+    babel-plugin-syntax-hermes-parser:
+      specifier: ^0.36.0
+      version: 0.36.0
     babel-preset-solid:
       specifier: ^1.9.12
       version: 1.9.12
@@ -245,6 +254,12 @@ importers:
 
   .:
     devDependencies:
+      '@babel/core':
+        specifier: 'catalog:'
+        version: 7.29.7
+      '@babel/plugin-transform-flow-strip-types':
+        specifier: 'catalog:'
+        version: 7.29.7(@babel/core@7.29.7)
       '@changesets/changelog-github':
         specifier: 'catalog:'
         version: 1.0.0
@@ -257,6 +272,9 @@ importers:
       '@eslint/json':
         specifier: 'catalog:'
         version: 2.0.1
+      babel-plugin-syntax-hermes-parser:
+        specifier: 'catalog:'
+        version: 0.36.0
       eslint:
         specifier: 'catalog:'
         version: 10.6.0(jiti@2.7.0)
@@ -556,6 +574,9 @@ importers:
 
   core/engine:
     dependencies:
+      '@react-native/normalize-colors':
+        specifier: 'catalog:'
+        version: 0.86.2
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
@@ -564,7 +585,11 @@ importers:
         specifier: workspace:*
         version: link:../test-utils
 
-  core/test-utils: {}
+  core/test-utils:
+    dependencies:
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../engine
 
   packages/android:
     dependencies:

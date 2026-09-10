@@ -179,9 +179,9 @@ describe('CONTROL: the cost of a FLING frame on PATH B geometry (Solid)', () => 
       [
         `SOLID (control) fling, ${FLING_FRAMES} frames of ${FLING_STEP}px over ${ENTRY_COUNT} entries`,
         `  per frame: cellBodyRuns=${per(renderItemCalls)}`,
-        `  per frame: engine commits=${per(commit.commits)} nodesVisited=${per(commit.nodesVisited)} ` +
-          `propWrites=${per(commit.propWrites)} propNoops=${per(commit.propNoops)} ` +
-          `childScans=${per(commit.childScans)} childFlattens=${per(commit.childFlattens)}`,
+        // The walk numbers (nodesVisited / childScans / childFlattens) and propNoops are gone with
+        // the JS tree — the host owns the tree now, and its cost is not observable from here.
+        `  per frame: engine commits=${per(commit.commits)} propWrites=${per(commit.propWrites)}`,
         `  per frame: deriveMetrics=${per(frames.length)} windowWidth=${meanWidth.toFixed(1)} ` +
           `cellsRebuilt=${per(frames.length * meanWidth)}`,
         '',

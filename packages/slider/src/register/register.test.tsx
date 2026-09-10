@@ -27,6 +27,20 @@ vi.mock(
 const ROOT_TAG = 313;
 const SLIDER_VIEW = 'RNCSlider';
 
+// A real `processColor` answers with a platform INT and never with a string, and that is not
+// cosmetic here: `thumbTintColor` is in BOTH this package's own processors and the engine's
+// built-in colour list, so the value passes two conversion sites. Each one guards by asking
+// whether the value is still a CSS string, so an int makes the second a no-op — the same guard the
+// C++ payload builder uses (`processColorValue` returns early on a non-string). A stand-in that
+// answered with a string would convert twice and hide that the guard is what makes the overlap
+// safe.
+const PROCESSED: Record<string, number> = {
+  '#ff0000': 0xffff0000,
+  '#00ff00': 0xff00ff00,
+  '#0000ff': 0xff0000ff,
+};
+const UNKNOWN_COLOR = 0;
+
 const fabric = installFabric();
 
 function sliderNode(): IFakeNode {
@@ -45,7 +59,7 @@ beforeEach(() => {
   // Simulates the registry-miss case the module comment describes: no RN ViewConfig registry
   // metadata is available, so anything that resolves must come from THIS package's own fallback.
   setNativeViewConfigSource(() => undefined);
-  setColorProcessor(value => `processed(${String(value)})`);
+  setColorProcessor(value => PROCESSED[String(value)] ?? UNKNOWN_COLOR);
 });
 
 afterEach(() => {
@@ -72,9 +86,11 @@ describe('RNCSlider package registration', () => {
       );
 
       const props = sliderNode().props;
-      expect(props.minimumTrackTintColor).toBe('processed(#ff0000)');
-      expect(props.maximumTrackTintColor).toBe('processed(#00ff00)');
-      expect(props.thumbTintColor).toBe('processed(#0000ff)');
+      expect(props.minimumTrackTintColor).toBe(0xffff0000);
+      expect(props.maximumTrackTintColor).toBe(0xff00ff00);
+      // Converted ONCE, though this key is claimed by both this package's processors and the
+      // engine's built-in colour list. See PROCESSED for why an int is what makes that safe.
+      expect(props.thumbTintColor).toBe(0xff0000ff);
     });
 
     it('routes slider native value events without RN ViewConfig registry metadata', () => {

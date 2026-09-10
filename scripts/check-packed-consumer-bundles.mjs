@@ -26,6 +26,13 @@ import { publishablePackageEntries } from './lib/publishable-packages.mjs';
 export const INTERNAL_PREFIX = '@symbiote-native/';
 export const KNOWN_FRAMEWORKS = ['react', 'vue', 'svelte', 'angular', 'solid'];
 export const PLATFORMS = ['ios', 'android'];
+
+// Keyed by ARM, which is not the same thing as a framework: one adapter can have more than one
+// canary, and `vue` has two. The key names the disposable directory and is what
+// SYMBIOTE_CONSUMER_FRAMEWORKS selects on; the FRAMEWORK an arm belongs to is derived from its
+// `adapter` (see `ownFrameworkOf`), because that is the only one of the two the foreign-file check
+// may use. Keying the whole table on the framework is why `examples/vue-tsx` was in no CI list at
+// all until 2026-09-10 — see scripts/lib/canary-examples.mjs.
 export const FRAMEWORK_EXAMPLES = {
   react: {
     dir: 'examples/react',
@@ -34,6 +41,11 @@ export const FRAMEWORK_EXAMPLES = {
   },
   vue: {
     dir: 'examples/vue-sfc',
+    adapter: '@symbiote-native/vue',
+    verify: ['npm', ['run', 'typecheck']],
+  },
+  'vue-tsx': {
+    dir: 'examples/vue-tsx',
     adapter: '@symbiote-native/vue',
     verify: ['npm', ['run', 'typecheck']],
   },
@@ -92,8 +104,8 @@ function run(command, args, options = {}) {
 // Non-blocking counterpart of `run`, so independent frameworks can install/verify/bundle
 // concurrently instead of one at a time (execFileSync blocks the whole event loop, so wrapping it
 // in Promise.all buys nothing — only an async child process yields the loop while it waits on I/O).
-// `stdio: 'inherit'` isn't available here (execFile always captures), which is a wash: five
-// frameworks writing 'inherit' at once would interleave into unreadable output anyway. Captured
+// `stdio: 'inherit'` isn't available here (execFile always captures), which is a wash: every arm
+// writing 'inherit' at once would interleave into unreadable output anyway. Captured
 // output is instead surfaced by the caller, attributed to its framework, only on failure or once
 // the step completes — see `processExample`'s `log` array below.
 async function runAsync(command, args, options = {}) {
@@ -155,6 +167,16 @@ export function rewriteInternalDependencies(manifest, tarballs) {
     );
   }
   return rewritten;
+}
+
+// The framework an arm belongs to, derived from the adapter it consumes rather than from its own
+// key. The two agree for every single-canary arm and DIVERGE for `vue-tsx`, whose adapter is
+// `@symbiote-native/vue` — and only this value may reach `findForeignFrameworkLeaks`, which
+// compares by identity. Handing it the arm key instead would report every legitimate
+// `.../navigation/build/vue/index.js` in that bundle as a foreign-framework leak: a guaranteed red
+// on a correct build.
+export function ownFrameworkOf(example) {
+  return example.adapter.slice(INTERNAL_PREFIX.length);
 }
 
 export function findForeignFrameworkLeaks(
@@ -335,10 +357,10 @@ async function bundleSources(exampleRoot, platform) {
   }
 }
 
-// One framework's full pipeline (install -> verify -> bundle both platforms), run concurrently
-// with every other framework's — each works in its own disposable directory, so nothing here is
-// shared mutable state. Output is captured (see runAsync) and printed as one block per framework
-// once the whole pipeline finishes, so five concurrent frameworks don't interleave their logs.
+// One arm's full pipeline (install -> verify -> bundle both platforms), run concurrently with
+// every other arm's — each works in its own disposable directory, so nothing here is shared
+// mutable state. Output is captured (see runAsync) and printed as one block per arm once the whole
+// pipeline finishes, so concurrent arms don't interleave their logs.
 async function processExample(
   framework,
   example,
@@ -365,13 +387,21 @@ async function processExample(
     log.push(`${framework}: installing fresh tarball consumer ...`);
     await runAsync(
       'npm',
-      ['install', '--package-lock=false', '--no-audit', '--no-fund', '--prefer-offline'],
+      [
+        'install',
+        '--package-lock=false',
+        '--no-audit',
+        '--no-fund',
+        '--prefer-offline',
+      ],
       { cwd: exampleRoot, env: npmEnvironment },
     );
     verifyInstalledTarballs(exampleRoot, directPackages, tarballs);
 
     const [verifyCommand, verifyArgs] = example.verify;
-    log.push(`${framework}: running ${verifyCommand} ${verifyArgs.join(' ')} ...`);
+    log.push(
+      `${framework}: running ${verifyCommand} ${verifyArgs.join(' ')} ...`,
+    );
     await runAsync(verifyCommand, verifyArgs, {
       cwd: exampleRoot,
       env: verifyCommand === 'npm' ? npmEnvironment : process.env,
@@ -389,7 +419,7 @@ async function processExample(
         const leaks = findForeignFrameworkLeaks(
           sources,
           multiFrameworkPackages,
-          framework,
+          ownFrameworkOf(example),
         );
         if (leaks.length > 0) {
           const details = leaks
@@ -407,7 +437,9 @@ async function processExample(
       }),
     );
 
-    log.push(`${framework}: done in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+    log.push(
+      `${framework}: done in ${((Date.now() - started) / 1000).toFixed(1)}s`,
+    );
     console.log(log.join('\n'));
   } catch (error) {
     // Flush whatever progress this framework logged before failing — Promise.all rejects on the
@@ -460,9 +492,9 @@ async function main() {
     const tarballs = packPackages(packageNames, packDirectory);
     const multiFrameworkPackages = discoverMultiFrameworkPackages();
 
-    // Every framework works in its own disposable directory with no shared mutable state, so
-    // there is nothing to serialize here — running them concurrently turns wall time from "sum of
-    // all five" into "roughly the slowest one" instead.
+    // Every arm works in its own disposable directory with no shared mutable state, so there is
+    // nothing to serialize here — running them concurrently turns wall time from "sum of all arms"
+    // into "roughly the slowest one" instead.
     await Promise.all(
       selectedExamples.map(([framework, example]) =>
         processExample(

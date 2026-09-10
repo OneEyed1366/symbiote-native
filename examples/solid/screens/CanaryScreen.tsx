@@ -556,6 +556,49 @@ export function CanaryScreen() {
           )}
         />
 
+        {/* Five fills, five sources, one row. The chips above were invisible for a day because the
+            C++ payload builder parsed only `#hex` and comma-`rgb()` and let every other spelling
+            through as a STRING — and iOS answers a string colour with `clearColor()`. Squares 2 and
+            5 are the ones that were black; they are here so a colour grammar that quietly narrows
+            again shows up as a hole in a row rather than as a screen nobody can explain.
+            `SymbioteFabricProps.cpp` now uses React Native's own parser. */}
+        <Text class="section-label">probe A · fill sources</Text>
+        <View style={{ flexDirection: 'row', height: 56 }}>
+          {/* 1 inline hex */}
+          <View
+            style={{
+              width: 48,
+              height: 48,
+              marginRight: 8,
+              backgroundColor: '#ff5555',
+            }}
+          />
+          {/* 2 inline hsl, the spelling the chips use */}
+          <View
+            style={{
+              width: 48,
+              height: 48,
+              marginRight: 8,
+              backgroundColor: 'hsl(120 70% 55%)',
+            }}
+          />
+          {/* 3 fill from a class, no inline style at all */}
+          <View class="probe-fill" style={{ marginRight: 8 }} />
+          {/* 4 and 5 the same two fills, but produced inside a For */}
+          <For each={['#5599ff', 'hsl(280 70% 55%)']}>
+            {fill => (
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  marginRight: 8,
+                  backgroundColor: fill,
+                }}
+              />
+            )}
+          </For>
+        </View>
+
         {/* ===== feature-parity device checks ===== */}
 
         {/* Press-retention measured rect. PASS: press, then drag DOWN ~100px: the panel STAYS

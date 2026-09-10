@@ -10,9 +10,12 @@
 // mergeProps memos absorbed it; the wrapper was acting as a memoization barrier.
 //
 // Asserted TWICE per case, because the two halves fail in opposite directions. `writes` proves the
-// write was turned away; `nodesVisited` on a following commit proves the node was not MARKED — and
-// that is the half that catches an over-eager guard, since a guard that swallowed a real change
+// write was turned away; the CLONE count on the following commit proves the node was not MARKED —
+// and that is the half that catches an over-eager guard, since a guard that swallowed a real change
 // would leave `writes` looking correct while the screen silently kept the old value.
+//
+// Clones, not `nodesVisited`: JS holds no tree and walks nothing, so the only observable left is
+// what Fabric was asked to do. A dirty node is cloned with its new props; a clean one is not.
 import { describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
 import {
@@ -20,24 +23,24 @@ import {
   clearGlobalStyles,
   createElement,
   createSurface,
-  readCommitProfile,
+  propOf,
   registerRules,
   routeProp,
+  setNativeProps,
   type ISymbioteNode,
 } from '../index';
 import { takePropStats } from '../node';
 
-installFabric();
+const fabric = installFabric();
 const ROOT_TAG = 91;
 const surface = createSurface(ROOT_TAG);
 
 // Every case mounts its own node and commits it, so "the walk found nothing to do" is measured
 // against a settled tree rather than against the initial mount.
 //
-// The node gets a CHILD, and that is load-bearing for the nodesVisited half: a node hanging
-// directly off the container is looked at on every commit whether it is dirty or not, so it can
-// never show a difference. The child is what the walk descends into when the parent is dirty and
-// skips when it is clean.
+// The node gets a CHILD so the subject is a node Fabric can clone in place: a childless node under
+// the container still clones, but its parent's child set has to be rebuilt around it, which muddles
+// the count the second half of each case reads.
 function mountSettled(): ISymbioteNode {
   const node = createElement('RCTView');
   appendChild(node, createElement('RCTView'));
@@ -48,16 +51,16 @@ function mountSettled(): ISymbioteNode {
 
 interface IEffect {
   readonly writes: number;
-  readonly visited: number;
+  readonly clones: number;
 }
 
 function effectOf(action: () => void): IEffect {
   takePropStats();
-  readCommitProfile();
+  fabric.reset();
   action();
   const writes = takePropStats().writes;
   surface.commit();
-  return { writes, visited: readCommitProfile().nodesVisited };
+  return { writes, clones: fabric.counts.clone };
 }
 
 describe('republishing an unchanged class or style', () => {
@@ -101,7 +104,7 @@ describe('republishing an unchanged class or style', () => {
     const settled = effectOf(() => {});
     const changed = effectOf(() => routeProp(node, 'class', 'row sel'));
     expect(changed.writes).toBe(1);
-    expect(changed.visited).toBeGreaterThan(settled.visited);
+    expect(changed.clones).toBeGreaterThan(settled.clones);
     clearGlobalStyles();
   });
 
@@ -117,18 +120,22 @@ describe('republishing an unchanged class or style', () => {
   });
 
   // The restore path, and the whole reason the guard keys on the published ARRAY rather than on
-  // the parts alone. setNativeProps writes node.props.style directly as a flattened OBJECT
-  // (commit.ts), clobbering the declarative style; the next declarative write is what puts it back.
-  // A parts-only guard would skip that write and leave the Animated frame on screen forever.
-  it('writes again after something bypassed the parts and overwrote node.props.style', () => {
+  // the parts alone. setNativeProps writes the style slot past the parts as a flattened OBJECT,
+  // clobbering the declarative style; the next declarative write is what puts it back. A
+  // parts-only guard would skip that write and leave the Animated frame on screen forever.
+  //
+  // Driven through setNativeProps rather than by writing the slot by hand: it is the one caller of
+  // clearPublishedStyle, so a hand-written slot would test a bypass nothing performs.
+  it('writes again after setNativeProps overwrote the style slot', () => {
     const hoisted = { margin: 2 };
     const node = mountSettled();
     routeProp(node, 'style', hoisted);
     surface.commit();
 
-    node.props.style = { margin: 2, opacity: 0.5 };
+    setNativeProps(node, { style: { opacity: 0.5 } });
+    expect(propOf(node, 'style')).toEqual({ margin: 2, opacity: 0.5 });
 
     expect(effectOf(() => routeProp(node, 'style', hoisted)).writes).toBe(1);
-    expect(node.props.style).toEqual([undefined, hoisted]);
+    expect(propOf(node, 'style')).toEqual([undefined, hoisted]);
   });
 });

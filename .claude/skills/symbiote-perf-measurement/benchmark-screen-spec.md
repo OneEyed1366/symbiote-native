@@ -3,8 +3,8 @@
 ## Why this document exists
 
 The benchmark screen is a **RULER**. The point of having one per example is to run the same
-measurement under React, Vue, Svelte and Angular and read the differences as differences *in the
-adapter*. A difference caused by the screens having drifted apart is worse than no measurement at
+measurement under React, Vue, Svelte and Angular and read the differences as differences _in the
+adapter_. A difference caused by the screens having drifted apart is worse than no measurement at
 all: it is indistinguishable from a real finding, and it will be acted on.
 
 So this is not "port the screen, use your judgement". Everything under INVARIANTS is copied
@@ -23,7 +23,10 @@ never quietly substituted.
 The clock **must** stop in the engine's post-commit hook:
 
 ```ts
-import { registerPostCommit, unregisterPostCommit } from '@symbiote-native/engine';
+import {
+  registerPostCommit,
+  unregisterPostCommit,
+} from '@symbiote-native/engine';
 ```
 
 Register on mount, unregister on unmount. Start the clock immediately before the mutation, stop it
@@ -32,34 +35,40 @@ inside the hook.
 **Do NOT use the framework's own after-render hook** — not `nextTick`, not `tick()`, not
 `afterNextRender`, not `useLayoutEffect`. React commits synchronously inside its own commit phase
 while Vue / Svelte / Angular schedule `completeRoot` on a microtask, so each framework's hook fires
-at a *different point relative to the native commit*. Four different hooks measure four different
+at a _different point relative to the native commit_. Four different hooks measure four different
 quantities under one name and the cross-adapter table becomes fiction. `registerPostCommit` is one
 definition of done everywhere: `completeRoot` has returned.
 
 The row count is **passed into** the measure call, never read back from state afterwards — the hook
 is registered once and would otherwise close over stale state:
 
-| op | rowCount passed |
-|---|---|
-| Create · Replace | `ROW_BATCH` |
-| CreateLots | `ROW_BATCH_LARGE` |
-| Append | `rows.length + ROW_BATCH` |
-| Remove | `rows.length - 1` |
-| Clear | `0` |
-| Select · Swap · Update | `rows.length` |
+| op                     | rowCount passed           |
+| ---------------------- | ------------------------- |
+| Create · Replace       | `ROW_BATCH`               |
+| CreateLots             | `ROW_BATCH_LARGE`         |
+| Append                 | `rows.length + ROW_BATCH` |
+| Remove                 | `rows.length - 1`         |
+| Clear                  | `0`                       |
+| Select · Swap · Update | `rows.length`             |
 
-## INVARIANT 2 — nine native views per row, exactly
+## INVARIANT 2 — ten native views per row, exactly
 
-`BenchmarkRow` expands to **9** native views:
+`BenchmarkRow` expands to **10** native views:
 
 ```
 View                        1
 Text + RawText   x3         6     (id, label, remove-glyph)
 Pressable -> View x2        2
+TextInput                   1     one element, no children — its text is the `text` PROP
 ```
 
-A port that produces 8 or 10 puts every number on that screen ~11% off the others. Count them, do
-not assume. Keep `NATIVE_VIEWS_PER_ROW = 9` and the markup identical: outer `View.bench-row` (plus
+It was NINE until 2026-09-01, when the row gained its unconditional `TextInput`. Any number quoted
+against a nine-view row is not comparable to one taken since — that is what made a stock arm read
+1.31x for a while, measuring nine nodes against ten. Read `createNode` and the prop-key count before
+reading any ms.
+
+A port that produces 9 or 11 puts every number on that screen ~10% off the others. Count them, do
+not assume. Keep `NATIVE_VIEWS_PER_ROW = 10` and the markup identical: outer `View.bench-row` (plus
 `.bench-row-selected` when selected), `Text.bench-row-id`, `Pressable.flex1` wrapping
 `Text.bench-row-label`, `Pressable.bench-row-remove` wrapping `Text.bench-row-remove-text`.
 
@@ -68,7 +77,7 @@ not assume. Keep `NATIVE_VIEWS_PER_ROW = 9` and the markup identical: outer `Vie
 ```
 ROW_BATCH                        1000
 ROW_BATCH_LARGE                  10000
-NATIVE_VIEWS_PER_ROW             9
+NATIVE_VIEWS_PER_ROW             10
 BENCH_ROW_HEIGHT                 44
 UPDATE_STRIDE                    10
 UPDATE_SUFFIX                    ' !!!'
@@ -87,9 +96,9 @@ SECTION_LIST_FOOTER_HEIGHT       0
 ```
 
 Meter: `FRAME_BUDGET_MS = 1000/60`, `DROPPED_FRAME_THRESHOLD_MS = FRAME_BUDGET_MS * 1.5`,
-`SUSPENDED_FRAME_MS = 1000`, `SAMPLE_WINDOW_MS = 500`. It reports **% of window · nodes/commit ·
-ms/commit** — never a µs/node figure, which stopped being meaningful once dirty-marking let the
-walk skip nodes (the denominator collapsed while the numerator did not).
+`SUSPENDED_FRAME_MS = 1000`, `SAMPLE_WINDOW_MS = 500`. It reports **commits · prop writes** for the
+window. It used to report % of window / nodes/commit / ms/commit, and none of those three survives:
+there is no walk to take a share of the window, no JS node count and no ms.
 
 ## INVARIANT 4 — deterministic row data
 
@@ -153,9 +162,10 @@ TIMED   Clear                            from 1,000
 
 Required properties, all of which a port gets wrong by default:
 
-- **No step may be a no-op — this is a HANG, not a slow number.** `commitContainer` returns early
-  when a commit produced no native change: in `core/engine/src/commit.ts`,
-  `if (!result.changed) { …; return; }` sits ABOVE `runPostCommitHooks()`. So a mutation that
+- **No step may be a no-op — this is a HANG, not a slow number.** The post-commit hooks run only
+  after a commit that reached the host, and the host declines to complete a root whose child set
+  came back identical (`core/test-utils/src/tree-applier.ts`, mirrored in `SymbioteTree.cpp`). So a
+  mutation that
   changes nothing never fires the post-commit hook, its `await` never resolves, and the suite
   stalls until the per-step timeout with the screen stuck on "Running suite…".
 
@@ -170,6 +180,7 @@ Required properties, all of which a port gets wrong by default:
   on a freshly mounted screen and then run the suite, and `resetRowData()` + `fill` reproduces the
   identical rows, making the warm-up itself the no-op. Caught during the vue-tsx port, fixed in
   all five flavors.
+
 - **`resetRowData()` at the start**, rewinding BOTH the LCG seed and `nextRowId`. They are module
   state and drift with every press, so without the rewind two runs are not the same input.
 - **All-mounted only, and no 10,000-row step.** 10 000 rows is 90 000 native views, which the host
@@ -214,9 +225,15 @@ Row-count line: `rows: N · <views> native views mounted · selected: <id|none>`
 
 `benchmark-scroll` · `bench-op-<opId>` · `bench-result-<opId>` · `bench-row-count` ·
 `bench-mount-mode` · `bench-rows-virtualized` · `benchmark-sticky-scroll` ·
-`benchmark-sticky-section-list` · `bench-fps` · `bench-dropped` · `bench-walk-share` ·
-`bench-walk-nodes-per-commit` · `bench-walk-ms-per-commit` · `bench-fps-reset` ·
+`benchmark-sticky-section-list` · `bench-fps` · `bench-dropped` · `bench-commits` ·
+`bench-commit-writes` · `bench-fps-reset` ·
 `bench-run-suite` · `bench-suite-empty` · `bench-suite-<opId>` (one per timed step)
+
+The meter's engine cells were `bench-walk-share` / `bench-walk-nodes-per-commit` /
+`bench-walk-ms-per-commit` until 2026-09-08. They are gone, and not renamed: there is no reconcile
+walk to share a window with, no JS node count and no ms. The tree lives in C++ and JS fills a
+command buffer, so what a window can still report is how many commits it took and how many prop
+writes went into them — sizing the engine's own cost now means instrumenting the host.
 
 ## Packaging — required; the prop and the seam are unreleased
 
@@ -283,10 +300,10 @@ So "eslint clean" on those two flavors is vacuous, and quoting it as verificatio
 unlinted screen ships looking checked. It is not an ignore-file problem; `--no-ignore` changes
 nothing.
 
-| flavor | linted by eslint? | the real gates |
-| --- | --- | --- |
-| react (`.tsx`) · vue-tsx (`.tsx`) · angular (`.ts`) | yes | `npm run typecheck` + eslint + prettier |
-| vue-sfc (`.vue`) · svelte (`.svelte`) | **no** | `npm run typecheck` (`vue-tsc` / `svelte-check`) + prettier |
+| flavor                                              | linted by eslint? | the real gates                                              |
+| --------------------------------------------------- | ----------------- | ----------------------------------------------------------- |
+| react (`.tsx`) · vue-tsx (`.tsx`) · angular (`.ts`) | yes               | `npm run typecheck` + eslint + prettier                     |
+| vue-sfc (`.vue`) · svelte (`.svelte`)               | **no**            | `npm run typecheck` (`vue-tsc` / `svelte-check`) + prettier |
 
 Report: files added/changed, how many native views the row expands to **and how that was counted**,
 which hook stops the clock, and the actual verification output. Any invariant that could not be met

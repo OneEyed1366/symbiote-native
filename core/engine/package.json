@@ -1,7 +1,7 @@
 {
   "name": "@symbiote-native/engine",
   "version": "0.4.0",
-  "description": "SymbioteNative's retained shadow-tree engine — clone-on-write commit path + event normalization over React Native Fabric, shared by every framework adapter.",
+  "description": "SymbioteNative's retained shadow-tree engine \u2014 clone-on-write commit path + event normalization over React Native Fabric, shared by every framework adapter.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,11 +28,31 @@
     "cross-platform"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./mutation-buffer": "./src/mutation-buffer.ts"
   },
   "files": [
-    "build"
+    "build",
+    "cpp",
+    "ios",
+    "android",
+    "codegen-specs",
+    "symbiote-engine.podspec",
+    "react-native.config.cjs"
   ],
+  "codegenConfig": {
+    "name": "SymbioteEngineSpec",
+    "type": "modules",
+    "jsSrcsDir": "codegen-specs",
+    "android": {
+      "javaPackageName": "dev.symbiotenative.engine"
+    },
+    "ios": {
+      "modulesProvider": {
+        "SymbioteEngine": "SymbioteEngineModule"
+      }
+    }
+  },
   "publishConfig": {
     "access": "public",
     "main": "./build/index.js",
@@ -42,12 +62,19 @@
       ".": {
         "types": "./build/index.d.ts",
         "default": "./build/index.js"
+      },
+      "./mutation-buffer": {
+        "types": "./build/mutation-buffer.d.ts",
+        "default": "./build/mutation-buffer.js"
       }
     }
   },
   "scripts": {
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "@react-native/normalize-colors": "catalog:"
   },
   "peerDependencies": {
     "react-native": ">=0.86"

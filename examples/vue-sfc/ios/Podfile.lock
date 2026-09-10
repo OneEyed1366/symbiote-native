@@ -1823,7 +1823,29 @@ PODS:
     - React-utils (= 0.86.0)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.0)
-  - symbiote-navigation (2.2.0):
+  - symbiote-engine (0.4.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - symbiote-navigation (3.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1845,9 +1867,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-navigation/common (= 2.2.0)
+    - symbiote-navigation/common (= 3.0.0)
     - Yoga
-  - symbiote-navigation/common (2.2.0):
+  - symbiote-navigation/common (3.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1870,7 +1892,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-slider (5.2.0):
+  - symbiote-slider (6.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1891,9 +1913,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-slider/common (= 5.2.0)
+    - symbiote-slider/common (= 6.0.0)
     - Yoga
-  - symbiote-slider/common (5.2.0):
+  - symbiote-slider/common (6.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1915,7 +1937,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-splash-screen (3.2.0):
+  - symbiote-splash-screen (4.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2015,6 +2037,7 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios/ReactCodegen`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - ReactNativeDependencies (from `../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
+  - "symbiote-engine (from `../node_modules/@symbiote-native/engine`)"
   - "symbiote-navigation (from `../node_modules/@symbiote-native/navigation`)"
   - "symbiote-slider (from `../node_modules/@symbiote-native/slider`)"
   - "symbiote-splash-screen (from `../node_modules/@symbiote-native/splash-screen`)"
@@ -2170,6 +2193,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   ReactNativeDependencies:
     :podspec: "../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
+  symbiote-engine:
+    :path: "../node_modules/@symbiote-native/engine"
   symbiote-navigation:
     :path: "../node_modules/@symbiote-native/navigation"
   symbiote-slider:
@@ -2181,7 +2206,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: c2d0031d22bf4983930573a4efc80f2b9ba7b277
+  hermes-engine: 65ac01d05b4feb193584d3b0962c9bfa7df46ff0
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
   RCTSwiftUI: 5aaf0b07e747ba749dc6acc94d8bd41eea4b570f
@@ -2254,9 +2279,10 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-navigation: ed9345c478012062c4ab6e5954028e5b29d32283
-  symbiote-slider: 0437538c19de7d463a9c5c00f437982832c0c093
-  symbiote-splash-screen: 029fcc03b4f4ac8332a5ab47664286feb9aab35f
+  symbiote-engine: 5d3a500bcfb9124e09d4250fa78a7e01f40db6cf
+  symbiote-navigation: 311fd010bdc9a73c98045b195430ca6d36e71fa0
+  symbiote-slider: 750fa6d7adc4b18bbd694fa45a8191303896e748
+  symbiote-splash-screen: 082b03d52ce7abc1d965eb356d808eae3cccba66
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
 PODFILE CHECKSUM: 52535ff777e36b58e86c45571b57df53c0378d71

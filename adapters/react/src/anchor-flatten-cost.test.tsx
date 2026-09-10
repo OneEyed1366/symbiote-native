@@ -18,6 +18,7 @@ import { useState } from 'react';
 import {
   censusRetainedTree,
   dlog,
+  parentOf,
   isSymbioteNode,
   readCommitProfile,
   type ISymbioteNode,
@@ -109,7 +110,11 @@ function retainedRoot(): ISymbioteNode {
   if (!isSymbioteNode(handle))
     throw new Error('the list node carries no retained handle');
   let current: ISymbioteNode = handle;
-  while (current.parent !== undefined) current = current.parent;
+  let above = parentOf(current);
+  while (above !== undefined) {
+    current = above;
+    above = parentOf(current);
+  }
   return current;
 }
 

@@ -30,6 +30,7 @@ import {
 import {
   censusRetainedTree,
   isSymbioteNode,
+  parentOf,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { HOST_PRIMITIVES } from '@symbiote-native/components/host-primitives';
@@ -156,7 +157,11 @@ function retainedNodeCount(): number {
   const handle: unknown = seed.instanceHandle;
   if (!isSymbioteNode(handle)) return 0;
   let current: ISymbioteNode = handle;
-  while (current.parent !== undefined) current = current.parent;
+  let above = parentOf(current);
+  while (above !== undefined) {
+    current = above;
+    above = parentOf(current);
+  }
   return censusRetainedTree([current]).nodes;
 }
 

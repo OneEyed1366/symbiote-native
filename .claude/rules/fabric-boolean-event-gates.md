@@ -130,6 +130,19 @@ static attribute list and does not know runtime values (`.claude/rules/adapter-p
 is cosmetic; `render-input-accessory-view.ts` guards `nativeID`/`backgroundColor` and writes `style`
 unconditionally one line above, which is the tell.
 
+### The same collapse did NOT hold one layer down, in the payload
+
+`setProp` collapses an undefined VALUE to an absent key. `fabricProps` did not: it skipped an
+undefined INPUT (`if (value === undefined) continue`) and then assigned the processor's RESULT
+unconditionally, so a processor that REFUSES its input handed Fabric an explicit `undefined` for a
+prop the app never set. Measured 2026-09-10 on `transformOrigin: null` and `aspectRatio: '1/2/3'`;
+it belongs to every refusing processor, not those two.
+
+Invisible headless until you look for it, because every payload assertion in this repo reads by
+VALUE, and `props.transformOrigin` is undefined whether the key was assigned or never written.
+Read `Object.keys(...)` instead — `core/engine/src/__tests__/processor-undefined-is-absent.test.ts`,
+which carries a positive control so a probe that matched nothing cannot pass as agreement.
+
 ## It is not "a template-copying fact" — it is nearly every Angular component. Counted, 2026-09-01
 
 `Pressable` and `TextInput` were named above as the two known sites; a third (`SafeAreaView`) was

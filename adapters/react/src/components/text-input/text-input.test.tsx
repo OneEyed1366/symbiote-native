@@ -1,7 +1,8 @@
-// Proves the TextInput primitive, the controlled-value / event-count handshake, over a
-// fake Fabric slot. This file keeps a PURPOSE-BUILT slot rather than the shared
-// `installFabric()` harness because TextInput drives a `dispatchCommand`
-// (setTextAndSelection / blur) view command, which the shared recorder does not capture.
+// Proves the TextInput primitive, the controlled-value / event-count handshake, over the
+// shared `installFabric()` harness — which records `dispatchCommand` calls, so the
+// purpose-built slot this file used to carry bought nothing and cost the TREE HOST that
+// harness installs alongside the slot (without one the engine's ops go nowhere and the
+// mount commits no node at all).
 // It checks the fold (value/defaultValue -> private `text` + mostRecentEventCount), the
 // the native change -> onValueChange derivation, the multiline intrinsic, a forced controlled write
 // that goes down as a setTextAndSelection command carrying the acknowledged event count,
@@ -24,89 +25,10 @@ import {
   unmount,
   type ITextInputHandle,
 } from '@symbiote-native/react';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
-interface IFakeNode {
-  tag: number;
-  viewName: string;
-  props: Record<string, unknown>;
-  children: IFakeNode[];
-  instanceHandle: unknown;
-}
-
-type IEventHandler = (
-  instanceHandle: unknown,
-  topLevelType: string,
-  nativeEvent: Record<string, unknown>,
-) => void;
-
-interface ICommandCall {
-  handle: unknown;
-  name: string;
-  args: readonly unknown[];
-}
-
-let committed: IFakeNode[] = [];
-let eventHandler: IEventHandler | undefined;
-const allCreated: IFakeNode[] = [];
-const commands: ICommandCall[] = [];
-
-const slot = {
-  createNode(
-    tag: number,
-    viewName: string,
-    _rootTag: number,
-    props: Record<string, unknown>,
-    instanceHandle: unknown,
-  ): IFakeNode {
-    const node: IFakeNode = {
-      tag,
-      viewName,
-      props,
-      children: [],
-      instanceHandle,
-    };
-    allCreated.push(node);
-    return node;
-  },
-  cloneNodeWithNewProps: (
-    node: IFakeNode,
-    newProps: Record<string, unknown>,
-  ): IFakeNode => ({
-    ...node,
-    props: newProps,
-  }),
-  cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({
-    ...node,
-    children: [],
-  }),
-  cloneNodeWithNewChildrenAndProps: (
-    node: IFakeNode,
-    newProps: Record<string, unknown>,
-  ): IFakeNode => ({ ...node, props: newProps, children: [] }),
-  createChildSet: (): IFakeNode[] => [],
-  appendChild(parent: IFakeNode, child: IFakeNode): IFakeNode {
-    parent.children.push(child);
-    return parent;
-  },
-  appendChildToSet(childSet: IFakeNode[], child: IFakeNode): void {
-    childSet.push(child);
-  },
-  completeRoot(_rootTag: number, childSet: IFakeNode[]): void {
-    committed = childSet;
-  },
-  registerEventHandler(handler: IEventHandler): void {
-    eventHandler = handler;
-  },
-  dispatchCommand(
-    handle: unknown,
-    name: string,
-    args: readonly unknown[],
-  ): void {
-    commands.push({ handle, name, args });
-  },
-};
-
-Object.assign(globalThis, { nativeFabricUIManager: slot });
+const fabric = installFabric();
+const commands = fabric.commands;
 
 const SINGLELINE = 'RCTSinglelineTextInputView';
 const MULTILINE = 'RCTMultilineTextInputView';
@@ -114,7 +36,7 @@ const ACK_COUNT = 7;
 const ROOT_TAG = 300;
 
 function inputNode(viewName: string): IFakeNode {
-  const node = allCreated.find(n => n.viewName === viewName);
+  const node = fabric.find(n => n.viewName === viewName);
   expect(node, `a ${viewName} was created`).toBeDefined();
   return node!;
 }
@@ -123,17 +45,12 @@ function fireChange(
   node: IFakeNode,
   nativeEvent: Record<string, unknown>,
 ): void {
-  expect(eventHandler, 'an event handler was registered').toBeDefined();
-  eventHandler!(node.instanceHandle, 'topChange', nativeEvent);
+  fabric.fireEvent(node.instanceHandle, 'topChange', nativeEvent);
 }
 
 // The event handler is registered once for the whole slot, so reset keeps it.
 // Only the per-mount node/command bookkeeping is cleared.
-beforeEach(() => {
-  committed = [];
-  allCreated.length = 0;
-  commands.length = 0;
-});
+beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('TextInput', () => {
@@ -233,7 +150,7 @@ describe('TextInput', () => {
       selection: { start: 2, end: 2 },
     });
 
-    const setText = commands.find(c => c.name === 'setTextAndSelection');
+    const setText = commands.find(c => c.commandName === 'setTextAndSelection');
     expect(
       setText,
       'a setTextAndSelection command was dispatched',
@@ -249,16 +166,15 @@ describe('TextInput', () => {
     mount(ROOT_TAG, <TextInput value="focus me" />);
 
     const node = inputNode(SINGLELINE);
-    expect(eventHandler, 'an event handler was registered').toBeDefined();
     // Native reports focus -> TextInput records this node as the focused one.
-    eventHandler!(node.instanceHandle, 'topFocus', {});
+    fabric.fireEvent(node.instanceHandle, 'topFocus', {});
     Keyboard.dismiss();
-    expect(commands.some(c => c.name === 'blur')).toBe(true);
+    expect(commands.some(c => c.commandName === 'blur')).toBe(true);
 
     // A second dismiss has nothing focused -> must be a no-op (no new blur command).
     commands.length = 0;
     Keyboard.dismiss();
-    expect(commands.some(c => c.name === 'blur')).toBe(false);
+    expect(commands.some(c => c.commandName === 'blur')).toBe(false);
   });
 
   // why: inputMode/enterKeyHint/readOnly are the W3C-standard HTML attribute names — native
@@ -340,12 +256,12 @@ describe('TextInput', () => {
   // would be a real UX bug: it would pop the keyboard over a field the user never touched).
   it('commands focus once on mount when autoFocus is set, and not when unset', () => {
     mount(ROOT_TAG, <TextInput value="x" autoFocus />);
-    expect(commands.filter(c => c.name === 'focus')).toHaveLength(1);
+    expect(commands.filter(c => c.commandName === 'focus')).toHaveLength(1);
 
     commands.length = 0;
     unmount(ROOT_TAG);
     mount(ROOT_TAG, <TextInput value="x" />);
-    expect(commands.some(c => c.name === 'focus')).toBe(false);
+    expect(commands.some(c => c.commandName === 'focus')).toBe(false);
   });
 
   // why: RN exposes an imperative ref (focus/blur/clear/isFocused/setSelection) for the common
@@ -370,12 +286,12 @@ describe('TextInput', () => {
 
     it('focus() dispatches a focus command', () => {
       mountHandle().focus();
-      expect(commands.some(c => c.name === 'focus')).toBe(true);
+      expect(commands.some(c => c.commandName === 'focus')).toBe(true);
     });
 
     it('blur() dispatches a blur command', () => {
       mountHandle().blur();
-      expect(commands.some(c => c.name === 'blur')).toBe(true);
+      expect(commands.some(c => c.commandName === 'blur')).toBe(true);
     });
 
     // why: clear() must reset native to an EMPTY string via the same acked-count command path
@@ -383,7 +299,9 @@ describe('TextInput', () => {
     // bookkeeping right after clear() must see the field as genuinely empty.
     it('clear() commands setTextAndSelection with an empty string', () => {
       mountHandle().clear();
-      const setText = commands.find(c => c.name === 'setTextAndSelection');
+      const setText = commands.find(
+        c => c.commandName === 'setTextAndSelection',
+      );
       expect(
         setText,
         'a setTextAndSelection command was dispatched',
@@ -398,10 +316,10 @@ describe('TextInput', () => {
       expect(handle.isFocused()).toBe(false);
 
       const node = inputNode(SINGLELINE);
-      eventHandler!(node.instanceHandle, 'topFocus', {});
+      fabric.fireEvent(node.instanceHandle, 'topFocus', {});
       expect(handle.isFocused()).toBe(true);
 
-      eventHandler!(node.instanceHandle, 'topBlur', {});
+      fabric.fireEvent(node.instanceHandle, 'topBlur', {});
       expect(handle.isFocused()).toBe(false);
     });
 
@@ -410,7 +328,9 @@ describe('TextInput', () => {
     // programmatically must not accidentally erase what the user typed.
     it('setSelection(start, end) commands setTextAndSelection carrying the current text', () => {
       mountHandle().setSelection(1, 3);
-      const setText = commands.find(c => c.name === 'setTextAndSelection');
+      const setText = commands.find(
+        c => c.commandName === 'setTextAndSelection',
+      );
       expect(
         setText,
         'a setTextAndSelection command was dispatched',

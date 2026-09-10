@@ -6,6 +6,7 @@
 // host function, so we read each method once and cache a plain facade.
 
 import { dlog } from './debug';
+import { installNativeTreeHost } from './native-tree-host';
 
 export type IRootTag = number;
 
@@ -144,6 +145,27 @@ declare global {
 
 let cached: IFabricSlot | undefined;
 
+// BATCHING IS GONE, and it is worth one paragraph because the idea recurs. `batching-slot.ts`
+// recorded this slot's calls and replayed them once per commit — three ways, the last handing the
+// bytes to `SymbioteApplier` in C++. It existed to remove per-call JSI crossings from a JS walk that
+// worked out the Fabric operations. That walk no longer exists: adapters record their own mutations
+// and the tree host derives everything, so there are no per-call crossings left to batch. Removed
+// 2026-09-08 along with `setBatchedCommits`, the C++ applier and their differential. Root CLAUDE.md
+// keeps the measurement that made it uninteresting even on the old path — Create 256.8 on / 258.5
+// off, i.e. it demonstrably worked and bought nothing.
+
+/**
+ * Test seam: forget the bound slot, so a fixture can install a different host and be believed.
+ *
+ * `getSlot` caches the facade for the life of the module — the live binding re-mints a host function
+ * on every property read, so caching is not an optimisation but the difference between reading each
+ * method once and reading it per call. The cache has no invalidation in production because the
+ * global is installed once, before anything commits.
+ */
+export function resetSlot(): void {
+  cached = undefined;
+}
+
 export function getSlot(): IFabricSlot {
   if (cached) return cached;
 
@@ -215,5 +237,17 @@ export function getSlot(): IFabricSlot {
       measureLayout(node, relativeToNode, onFail, onSuccess),
   };
   dlog('slot bound to nativeFabricUIManager');
+  // Resolve our own native module here, once, for its SIDE EFFECT: `RCTTurboModuleManager` runs
+  // `installJSIBindingsWithRuntime:` when it CREATES a module, so without this call the module is
+  // never created, the hook never runs, and `global.__symbioteEngineNative` is absent on a device
+  // carrying a perfectly working binary. A capability that is unreachable until its first consumer
+  // lands is indistinguishable from one that is broken, and the difference costs a build to find out.
+  //
+  // This is the right seam rather than a convenient one, and now for two reasons: binding the Fabric
+  // slot is the moment the engine has established it is on a native host at all, AND it is the last
+  // moment before a commit can happen — the tree host has to be in before `commitSurfaceOps` runs or
+  // the ops it names stay pending. It cannot throw: with no module `installNativeTreeHost()` is a
+  // no-op, which is most places (see `native-engine.ts`'s header).
+  installNativeTreeHost();
   return cached;
 }

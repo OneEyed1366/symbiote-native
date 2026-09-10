@@ -7,10 +7,36 @@ paths:
 
 # A new mutation entry point owes a `markDirty` — forget it and the screen goes stale silently
 
-`reconcile` skips any subtree whose root is not `dirty`. So ANY new code that writes
+`reconcile` skips any subtree whose root has no pending work. So ANY new code that writes
 `node.props`, `node.children`, or reparents a node must call `markDirty` — otherwise the
 change never reaches Fabric: no crash, no error, nothing to grep for. Add a row to
 `core/engine/src/__tests__/dirty-marking.test.ts` proving the new mutator survives a commit.
+
+## The record moved off the node into a BUFFER (2026-09-05) — every rule below is unchanged
+
+`dirty`, `propsDirty` and `structureDirty` are no longer fields on `ISymbioteNode`. The three
+questions now live as three `Set`s in `core/engine/src/edit-buffer.ts`, read with `hasPendingWork`
+/ `hasPendingProps` / `hasPendingStructure` and consumed with the matching `clearPending*`. The
+`markDirty` / `markPropsDirty` / `markStructureDirty` names are UNCHANGED and are still the
+mutation-side vocabulary every rule here is written in — nothing below needs re-reading, and a new
+mutator still calls exactly the same function.
+
+Why, since the behaviour is identical by construction: a node is meant to carry an ADDRESS and
+nothing the framework did not already allocate, and a walk over per-node flags cannot be handed to
+a native module where a drained buffer can (`symbiote-fabric-cxx-surface` §9). This is step one of
+two — the buffer currently holds WHICH nodes were touched, not WHAT the edit was.
+
+**The one genuinely new obligation, and it has no equivalent in the flag era: a removal must
+NOMINATE.** A boolean died with its node; a `Set` pins it. So `nominateDroppedEdits(child)` is owed
+by every path that cuts a parent link — `node.ts`'s `detach` and `removeChild`, `surface.ts`'s
+`detach`, `removeChild` and `clear` — and `sweepDroppedEdits` decides at commit which nominees
+really left. Forget it and `Clear` on a thousand ten-node rows pins ten thousand nodes for the life
+of the process, with byte-identical Fabric output and every test in the repo green.
+
+It cannot be done at removal instead, for the same reason `sweepDetachedBehaviors` exists one file
+over: an adapter spells a MOVE as remove-then-reinsert, and dropping a moved child's entries loses
+a prop written in the same tick — the silent-stale-UI failure this whole file guards. Covered by
+`core/engine/src/__tests__/edit-buffer.test.ts`, whose header records which break reddens which row.
 
 ## Structural ops must mark BEFORE they mutate, not after (2026-08-23)
 
@@ -68,6 +94,34 @@ Four traps, each already paid for once (full rationale: `symbiote-perf-measureme
   every Animated / `setNativeProps` test.
 - **Anchors are cleared in `renderableChildren`** — they are flattened out of the walk and
   reach `reconcile` never, so a permanently-dirty anchor would swallow its subtree's marks.
+
+## `node.parent` is GONE (2026-09-07, item 8b) — and a FIELD is total where a TABLE is not
+
+The bubble climbs `parentOf` (tree.ts), which now answers from flat `Int32Array`s in
+`core/engine/src/node-table.ts` keyed by `node.tid`. Nothing about marking changed. Two things about
+READING it did, and both produced the silent-stale-UI failure this whole file guards.
+
+**A field tolerates being read on a foreign object; an id-indexed table does not.** `parentOf` is
+handed things that are not nodes — Angular's renderer passes the `SymbioteSurface` itself while
+tearing the root down — and `node.parent` answered `undefined` for those, so every caller was
+written against a TOTAL function. The table read `parentTid[undefined]`, which is also `undefined`
+— but that is not the `NO_PARENT` sentinel (`-1`), so the sentinel check fell through and the
+lookup resolved a garbage row. The write side is worse: a typed array coerces `undefined` to `0` on
+assignment, so linking against a rowless parent records row 0, a real node, as the parent.
+
+The symptom was three layers away and named nothing: a Svelte census reporting 9001 renderable nodes
+instead of 9002. One `parentOf` answering wrong stopped a bubble early, an ancestor went unmarked,
+and its subtree never committed. **Whenever a sentinel-valued lookup replaces a field, check what the
+lookup returns for an input the field accepted** — the bounds check is the contract, not a
+defensive nicety.
+
+**And seven adapter TESTS were climbing `current.parent` directly**, outside the seam. They compile
+(the field's type was on `ISymbioteNode` until this change) and they are invisible to
+`tsc --build`, since every package tsconfig excludes `*.test.ts`. With the field gone the climb
+silently becomes a no-op and censuses one leaf — a green-looking test measuring nothing.
+`tests/engine-structure-seam.test.ts` does not catch this: it scans `core/engine/src`, so adapter
+tests are outside its reach. When deleting a field off `ISymbioteNode`, grep `adapters/*/src` for it
+too, and read a census that came back suspiciously small as a possible dead climb.
 
 ## The other half: a no-op commit fires NO post-commit hook
 

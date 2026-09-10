@@ -16,6 +16,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
+import { propOf } from '@symbiote-native/engine';
 import { createAttachmentKey } from 'svelte/attachments';
 import { mount, unmount } from '../render';
 import { createAttachmentsSync, pickAttachmentProps } from './attachments';
@@ -137,6 +138,12 @@ function record(name: string, node: ShimElement, value?: unknown): void {
   events.push({ name, node, value });
 }
 
+// Through the engine's accessor: a node's props live in the host now, not on the node.
+function hostProp(element: ShimElement, key: string): unknown {
+  const node = element.engineNode;
+  return node === undefined ? undefined : propOf(node, key);
+}
+
 function captureSetter(setter: ISetter): void {
   setValue = setter;
 }
@@ -219,7 +226,7 @@ describe('Positive — {@attach} on a Symbiote component', () => {
     // creates an engine node on insertion into a live tree, and the fake Fabric only hands out a
     // tag for a node it actually created.
     expect(node.engineNode).toBeDefined();
-    expect(node.engineNode?.props.testID).toBe('attach-target');
+    expect(hostProp(node, 'testID')).toBe('attach-target');
 
     unmount(ROOT_TAG);
     expect(events.map(entry => entry.name)).toEqual([
@@ -304,7 +311,7 @@ describe('Positive — {@attach} on a Symbiote component', () => {
     await tick();
 
     expect(events.map(entry => entry.name)).toEqual(['attach:touchable']);
-    expect(events[0].node.engineNode?.props.testID).toBe('touchable-target');
+    expect(hostProp(events[0].node, 'testID')).toBe('touchable-target');
   });
 
   // why: `fromAction` is the sanctioned bridge for a third-party Svelte ACTION (the ecosystem's
@@ -320,7 +327,7 @@ describe('Positive — {@attach} on a Symbiote component', () => {
 
     expect(events.map(entry => entry.name)).toEqual(['action:init']);
     expect(events[0].value).toBe('one');
-    expect(events[0].node.engineNode?.props.testID).toBe('action-target');
+    expect(hostProp(events[0].node, 'testID')).toBe('action-target');
 
     setValue?.('two');
     await tick();

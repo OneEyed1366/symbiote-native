@@ -28,8 +28,11 @@ export interface IOpaqueColorValue {
   };
 }
 
-// What a color-valued style prop accepts: a CSS string or an opaque platform color.
-export type IColorValue = string | IOpaqueColorValue;
+// What a color-valued style prop accepts: a CSS string, a platform int, or an opaque platform
+// color. The number belongs here for the same reason RN's own processColor takes one - it is the
+// APP AUTHOR's literal (`color: 0xff0000ff`), which still needs the range check and the
+// 0xrrggbbaa -> 0xaarrggbb rotation before Fabric reads it.
+export type IColorValue = string | number | IOpaqueColorValue;
 
 export function PlatformColor(...names: string[]): IOpaqueColorValue {
   return { semantic: names };
@@ -81,9 +84,18 @@ export function processColor(color: IColorValue): unknown {
   return colorProcessor(color);
 }
 
-// A color-keyed value the platform processor must convert before Fabric: a CSS string, or an
-// opaque PlatformColor / DynamicColorIOS object. Numbers (already platform ints) and undefined
-// are left untouched.
+// A color-keyed value the platform processor must convert before Fabric: a CSS string, a numeric
+// literal, or an opaque PlatformColor / DynamicColorIOS object. `undefined` is left untouched.
+//
+// A number used to be excluded here on the reasoning that it was "already a resolved platform
+// int". Nothing in the pipeline produces one: the CSS parser emits hex STRINGS, and fabricProps
+// builds a fresh payload object instead of writing the resolved value back into node.props, so a
+// number reaching this guard is always the author's own literal. Excluding it committed
+// `color: 0xff0000ff` (opaque red, rrggbbaa) unrotated, and native reads that as aarrggbb: blue.
 export function isProcessableColor(value: unknown): value is IColorValue {
-  return typeof value === 'string' || isOpaqueColorValue(value);
+  return (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    isOpaqueColorValue(value)
+  );
 }
