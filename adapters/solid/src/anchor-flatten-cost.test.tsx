@@ -13,7 +13,7 @@ import {
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
-import { View, Text, Pressable } from './components';
+import { Pressable } from './components';
 
 const ROOT_TAG = 8802;
 const ROWS = 1000;
@@ -49,15 +49,15 @@ function BenchmarkRow(props: {
   isSelected: boolean;
 }): ReturnType<typeof View> {
   return (
-    <View style={props.isSelected ? { backgroundColor: 'blue' } : undefined}>
-      <Text>{String(props.row.id)}</Text>
+    <view style={props.isSelected ? { backgroundColor: 'blue' } : undefined}>
+      <text>{String(props.row.id)}</text>
       <Pressable>
-        <Text>{props.row.label}</Text>
+        <text>{props.row.label}</text>
       </Pressable>
       <Pressable>
-        <Text>x</Text>
+        <text>x</text>
       </Pressable>
-    </View>
+    </view>
   );
 }
 
@@ -66,11 +66,11 @@ function List(): ReturnType<typeof View> {
   const [selectedId, setSelectedId] = createSignal(-1);
   driver = { setRows, setSelectedId, rows };
   return (
-    <View testID="list">
+    <view testID="list">
       <For each={rows()}>
         {row => <BenchmarkRow row={row} isSelected={row.id === selectedId()} />}
       </For>
-    </View>
+    </view>
   );
 }
 

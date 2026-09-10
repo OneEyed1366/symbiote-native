@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import { ScrollView } from '@symbiote-native/solid';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -15,10 +15,10 @@ const RANDOM_BYTE_COUNT = 16;
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="capability-row">
-      <Text class="capability-label">{props.label}</Text>
-      <Text class="value-text">{props.value}</Text>
-    </View>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -52,33 +52,33 @@ export function CryptoScreen() {
   };
 
   return (
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="crypto-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Crypto</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Crypto</text>
+            <text class="hero-body">
               @symbiote-native/crypto — cryptographically secure random bytes,
               randomUUID, and string digest hashing (SHA-1/256/384/512,
               MD2/4/5).
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="crypto-uuid-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Random UUID</Text>
-          </View>
+        <view testID="crypto-uuid-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Random UUID</text>
+          </view>
           <ActionButton
             testID="crypto-uuid-button"
             title="Generate UUID"
@@ -86,12 +86,12 @@ export function CryptoScreen() {
             color={lineColor}
           />
           {uuid() !== null && <ValueRow label="UUID" value={uuid()!} />}
-        </View>
+        </view>
 
-        <View testID="crypto-digest-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Digest</Text>
-          </View>
+        <view testID="crypto-digest-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Digest</text>
+          </view>
           <ActionButton
             testID="crypto-digest-button"
             title="Digest SHA-256"
@@ -99,12 +99,12 @@ export function CryptoScreen() {
             color={lineColor}
           />
           {digest() !== null && <ValueRow label="SHA-256" value={digest()!} />}
-        </View>
+        </view>
 
-        <View testID="crypto-random-bytes-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Random bytes</Text>
-          </View>
+        <view testID="crypto-random-bytes-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Random bytes</text>
+          </view>
           <ActionButton
             testID="crypto-random-bytes-button"
             title="Get 16 random bytes"
@@ -114,8 +114,8 @@ export function CryptoScreen() {
           {randomBytes() !== null && (
             <ValueRow label="Bytes" value={randomBytes()!} />
           )}
-        </View>
+        </view>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

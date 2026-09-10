@@ -7,16 +7,12 @@
 
 import { createSignal } from 'solid-js';
 import {
-  Image,
   KeyboardAvoidingView,
   Modal,
   Pressable,
   RefreshControl,
   ScrollView,
-  Switch as Toggle,
-  Text,
   TextInput,
-  View,
 } from '@symbiote-native/solid';
 
 const REFRESH_MS = 1_200;
@@ -47,36 +43,36 @@ export function ControlsScreen() {
           />
         }
       >
-        <View class="card">
+        <view class="card">
           {/* No hand-written resolveImageSource any more: the shared render fn resolves the asset
               inside the render accessor, which runs after bootstrapHost installed the resolver. */}
-          <Image
+          <image
             class="logo"
             source={require('../assets/bootsplash/logo.png')}
             resizeMode="contain"
           />
-          <Text class="title">SymbioteNative</Text>
-          <Text class="subtitle">
+          <text class="title">SymbioteNative</text>
+          <text class="subtitle">
             Solid adapter — static paint through solid-js/universal, with
             React's renderer nowhere in the path.
-          </Text>
+          </text>
 
-          <View class="row">
-            <Text class="row-label">Wi-Fi — {wifi() ? 'on' : 'off'}</Text>
-            <Toggle
+          <view class="row">
+            <text class="row-label">Wi-Fi — {wifi() ? 'on' : 'off'}</text>
+            <switch
               value={wifi()}
               onValueChange={event => setWifi(event.value)}
               trackColor={{ true: '#2c4f82', false: '#3a3a3c' }}
             />
-          </View>
+          </view>
 
           {/* The snap-back probe: this parent REFUSES the toggle, but native has already flipped
               its own grip by the time onValueChange fires, so JS must command the old value back
               down. */}
-          <View class="row">
-            <Text class="row-label">Locked — must spring back</Text>
-            <Toggle value={false} onValueChange={() => {}} />
-          </View>
+          <view class="row">
+            <text class="row-label">Locked — must spring back</text>
+            <switch value={false} onValueChange={() => {}} />
+          </view>
 
           {/* The state arrives as an ACCESSOR, unlike React/Vue/Svelte. Calling it inside the leaf
               is the point: this function runs once, and Solid's `insert` replaces a subtree rather
@@ -84,35 +80,35 @@ export function ControlsScreen() {
           <Pressable class="row" onPress={() => setBusy(current => !current)}>
             {state => (
               <>
-                <Text class="row-label">
+                <text class="row-label">
                   {state().pressed ? 'Pressed…' : 'Tap to toggle the spinner'}
-                </Text>
+                </text>
                 {busy() ? (
                   <activity-indicator size="small" color="#7aa2e3" />
                 ) : (
-                  <Text class="row-label">off</Text>
+                  <text class="row-label">off</text>
                 )}
               </>
             )}
           </Pressable>
-        </View>
+        </view>
 
         {/* Filler, so the scroll offset is genuinely native-owned rather than a no-op. */}
-        <View class="card">
-          <Text class="section">
+        <view class="card">
+          <text class="section">
             Scroll me — the offset lives on the native side
-          </Text>
-          <Text class="subtitle">
+          </text>
+          <text class="subtitle">
             Pull down past the top to fire RefreshControl; the spinner clears
             itself after a moment.
-          </Text>
-          <View class="filler" />
-        </View>
+          </text>
+          <view class="filler" />
+        </view>
 
         {/* The controlled handshake: native has already painted the keystroke by the time JS sees
             it, so the echo below proves the round trip rather than the keyboard's own display. */}
-        <View class="card">
-          <Text class="section">TextInput</Text>
+        <view class="card">
+          <text class="section">TextInput</text>
           <TextInput
             class="input"
             value={note()}
@@ -123,13 +119,13 @@ export function ControlsScreen() {
             autoCorrect={false}
             returnKeyType="done"
           />
-          <Text class="row-label">
+          <text class="row-label">
             echo: {note() === '' ? '(empty)' : note()}
-          </Text>
-        </View>
+          </text>
+        </view>
 
         <Pressable class="card" onPress={() => setSheetOpen(true)}>
-          {() => <Text class="section">Open the Modal</Text>}
+          {() => <text class="section">Open the Modal</text>}
         </Pressable>
       </ScrollView>
 
@@ -139,18 +135,18 @@ export function ControlsScreen() {
         transparent
         onRequestClose={() => setSheetOpen(false)}
       >
-        <View class="sheet-backdrop">
-          <View class="sheet">
-            <Text class="section">A second native window</Text>
-            <Text class="subtitle">
+        <view class="sheet-backdrop">
+          <view class="sheet">
+            <text class="section">A second native window</text>
+            <text class="subtitle">
               Not a JS overlay — RCTModalHostView commits through the same
               childSet as the rest of the tree.
-            </Text>
+            </text>
             <Pressable class="row" onPress={() => setSheetOpen(false)}>
-              {() => <Text class="row-label">Close</Text>}
+              {() => <text class="row-label">Close</text>}
             </Pressable>
-          </View>
-        </View>
+          </view>
+        </view>
       </Modal>
     </KeyboardAvoidingView>
   );

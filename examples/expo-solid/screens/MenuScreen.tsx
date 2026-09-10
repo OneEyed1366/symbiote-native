@@ -1,11 +1,5 @@
 import { For } from 'solid-js';
-import {
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/solid';
+import { Pressable, ScrollView } from '@symbiote-native/solid';
 import { useStackNavigation } from '@symbiote-native/navigation/solid';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
@@ -139,22 +133,22 @@ const MENU_ITEMS: readonly IMenuItem[] = [
 export function MenuScreen() {
   const navigation = useStackNavigation();
   return (
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="menu-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class="menu-hero">
-          <Text class="menu-eyebrow">EXPO MODULES DEMOS</Text>
-          <Text class="menu-hero-title">
+        <view class="menu-hero">
+          <text class="menu-eyebrow">EXPO MODULES DEMOS</text>
+          <text class="menu-hero-title">
             Expo-SDK ports on a real native stack
-          </Text>
-          <Text class="menu-hero-subtitle">
+          </text>
+          <text class="menu-hero-subtitle">
             Each row below demos a different @symbiote-native package built on
             expo-modules-core.
-          </Text>
-        </View>
+          </text>
+        </view>
         <For each={MENU_ITEMS}>
           {item => {
             const lineInfo = ROUTE_LINE_INFO[item.route];
@@ -166,17 +160,17 @@ export function MenuScreen() {
               >
                 {() => (
                   <>
-                    <View class={`menu-badge menu-badge-${lineInfo.line}`}>
-                      <Text class="menu-badge-text">{lineInfo.code}</Text>
-                    </View>
-                    <View class="menu-row-copy">
-                      <Text class="menu-row-label">{item.label}</Text>
-                      <Text
+                    <view class={`menu-badge menu-badge-${lineInfo.line}`}>
+                      <text class="menu-badge-text">{lineInfo.code}</text>
+                    </view>
+                    <view class="menu-row-copy">
+                      <text class="menu-row-label">{item.label}</text>
+                      <text
                         class={`menu-row-hint menu-row-hint-${lineInfo.line}`}
                       >
                         {item.hint}
-                      </Text>
-                    </View>
+                      </text>
+                    </view>
                   </>
                 )}
               </Pressable>
@@ -184,6 +178,6 @@ export function MenuScreen() {
           }}
         </For>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

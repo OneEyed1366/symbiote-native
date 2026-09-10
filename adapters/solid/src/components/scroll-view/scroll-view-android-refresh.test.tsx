@@ -11,9 +11,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// SIDE-EFFECT IMPORT: the refresh-control tag's behavior owns the controlled-spinner handshake,
+// and only this module installs it. An app reaches it through the package barrel; a test does not.
+import '../../register';
 import { mount, unmount } from '../../render';
-import { View } from '../view';
-import { RefreshControl } from '../refresh-control';
 import { ScrollView } from './index.android';
 
 const ROOT_TAG = 820;
@@ -50,8 +51,8 @@ describe('Solid ScrollView on Android with a RefreshControl', () => {
     // failed to insert view … at index 1" — a hard native crash the iOS build never sees.
     it('nests the scroll view INSIDE the refresh control', async () => {
       mount(ROOT_TAG, () => (
-        <ScrollView refreshControl={<RefreshControl refreshing={false} />}>
-          <View testID="row" />
+        <ScrollView refreshControl={<refresh-control refreshing={false} />}>
+          <view testID="row" />
         </ScrollView>
       ));
       await tick();
@@ -73,9 +74,9 @@ describe('Solid ScrollView on Android with a RefreshControl', () => {
       mount(ROOT_TAG, () => (
         <ScrollView
           style={{ flex: 1, backgroundColor: '#123456' }}
-          refreshControl={<RefreshControl refreshing={false} />}
+          refreshControl={<refresh-control refreshing={false} />}
         >
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -102,9 +103,9 @@ describe('Solid ScrollView on Android with a RefreshControl', () => {
       mount(ROOT_TAG, () => (
         <ScrollView
           class="screen"
-          refreshControl={<RefreshControl refreshing={false} />}
+          refreshControl={<refresh-control refreshing={false} />}
         >
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -121,9 +122,9 @@ describe('Solid ScrollView on Android with a RefreshControl', () => {
       mount(ROOT_TAG, () => (
         <ScrollView
           nestedScrollEnabled={false}
-          refreshControl={<RefreshControl refreshing={false} />}
+          refreshControl={<refresh-control refreshing={false} />}
         >
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -137,7 +138,7 @@ describe('Solid ScrollView on Android with a RefreshControl', () => {
     it('adds no wrapper when no refreshControl is supplied', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView style={{ flex: 1 }}>
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();

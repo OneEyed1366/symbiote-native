@@ -60,7 +60,8 @@ import {
 } from '@symbiote-native/engine';
 import type { IHostInstance } from '../host-instance';
 import { setHostPressed } from '../renderer';
-import { View, type IViewProps } from './view';
+import { withStableKeys } from '../utils/stable-keys';
+import type { IViewProps } from './view-props';
 
 export type {
   IPressState,
@@ -79,7 +80,7 @@ type IPressableStyle =
 // The shape follows Solid core's own render props (`<For>{(item, index) => …}`, `<Index>{item =>
 // …}`): the argument that changes over time is a function you CALL inside the leaf that needs it.
 //
-//   <Pressable onPress={…}>{state => <Text>{state().pressed ? 'Pressed…' : 'Tap me'}</Text>}</Pressable>
+//   <Pressable onPress={…}>{state => <text>{state().pressed ? 'Pressed…' : 'Tap me'}</text>}</Pressable>
 type IPressableChildren =
   JSX.Element | ((state: Accessor<IPressState>) => JSX.Element);
 
@@ -285,7 +286,7 @@ function PressableImpl(
       bag.android_disableSound = local.android_disableSound;
     }
     // Last, so the synthesized responder listeners win over anything of the same name in `rest`.
-    // When disabled the bag is EMPTY — every listener key vanishes, and View's withStableKeys
+    // When disabled the bag is EMPTY — every listener key vanishes, and `stableViewProps` below
     // widens it back to `undefined`, which routeProp treats as a delete. Without that widening a
     // Pressable that became disabled would keep its old listeners on the native view forever
     // (.claude/rules/solid-descriptor-bridge.md §1).
@@ -298,6 +299,11 @@ function PressableImpl(
     );
     return bag;
   });
+
+  // The half `View` used to supply, now that the host is a bare tag: `resolveAccessibilityProps`
+  // has two branches with DIFFERENT key sets and the listener bag empties on `disabled`, so the
+  // widening is what turns a VANISHED key into an explicit `undefined` for routeProp to delete.
+  const stableViewProps = withStableKeys(viewProps);
 
   // A memo, not a bare `() => ({ pressed: pressed() })`: two leaves reading `state()` in the same
   // press must see the same object, and an unchanged press must not hand out a fresh one.
@@ -341,9 +347,9 @@ function PressableImpl(
   };
 
   return (
-    <View ref={attachRef} {...viewProps()}>
+    <view ref={attachRef} {...stableViewProps()}>
       {renderContent()}
-    </View>
+    </view>
   );
 }
 

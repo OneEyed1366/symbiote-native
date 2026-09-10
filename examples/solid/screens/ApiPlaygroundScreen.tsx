@@ -14,7 +14,7 @@
 //   - `Switch`/`Match` come from solid-js, not from @symbiote-native/solid: RN's toggle component
 //     owns the `Switch` name in that barrel. ShowSwitchDemo carries the note on screen.
 
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import { ScrollView } from '@symbiote-native/solid';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 import { SignalMemoDemo } from '../components/api-playground/SignalMemoDemo';
@@ -39,26 +39,26 @@ const ACCENT = LINE_COLOR.primitives;
 
 export function ApiPlaygroundScreen() {
   return (
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="api-playground-scroll"
         class="screen"
         contentContainerStyle="ap-content"
       >
-        <View class="ap-line-tag" style={{ borderColor: ACCENT }}>
-          <Text class="ap-line-tag-text" style={{ color: ACCENT }}>
+        <view class="ap-line-tag" style={{ borderColor: ACCENT }}>
+          <text class="ap-line-tag-text" style={{ color: ACCENT }}>
             {`${lineInfo.code} · ${lineInfo.label}`}
-          </Text>
-        </View>
+          </text>
+        </view>
 
-        <View class="ap-hero">
-          <Text class="ap-hero-title">API Playground</Text>
-          <Text class="ap-hero-body">
+        <view class="ap-hero">
+          <text class="ap-hero-title">API Playground</text>
+          <text class="ap-hero-body">
             Solid's own reactivity, control flow, stores, async primitives and
             ownership model — driving real native views through
             @symbiote-native/solid's universal renderer.
-          </Text>
-        </View>
+          </text>
+        </view>
 
         <SignalMemoDemo />
         <EffectTimingDemo />
@@ -74,6 +74,6 @@ export function ApiPlaygroundScreen() {
         <ContextDemo />
         <PropsUtilsDemo />
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

@@ -12,7 +12,6 @@
 import { describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
-import { View } from './components/view';
 
 const fabric = installFabric();
 const TARGET = 'spread-parity';
@@ -50,7 +49,7 @@ const BAG = { id: 'anchor', testID: TARGET, accessible: true };
 describe('a spread on a lowered element', () => {
   it('commits the same payload the wrapper does', async () => {
     const lowered = await committed(() => <view {...BAG} />);
-    const component = await committed(() => <View {...BAG} />);
+    const component = await committed(() => <view {...BAG} />);
 
     expect(Object.keys(lowered).sort()).toEqual(Object.keys(component).sort());
     expect(lowered).toEqual(component);
@@ -58,7 +57,7 @@ describe('a spread on a lowered element', () => {
 
   it('folds id to nativeID through the spread, on both', async () => {
     const lowered = await committed(() => <view {...BAG} />);
-    const component = await committed(() => <View {...BAG} />);
+    const component = await committed(() => <view {...BAG} />);
 
     for (const arm of [lowered, component]) {
       expect(arm.nativeID).toBe('anchor');

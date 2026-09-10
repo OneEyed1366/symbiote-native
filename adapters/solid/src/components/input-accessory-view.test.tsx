@@ -1,12 +1,10 @@
 // Solid twin of adapters/react/src/components/input-accessory-view/input-accessory-view.test.tsx.
 // Drives REAL compiled Solid JSX through the universal renderer into the fake Fabric slot.
 //
-// Coverage scope: the SOLID-SIDE half per <components_split_logic_view_lifecycle>.
-// renderInputAccessoryView itself (nativeID/backgroundColor/style forwarding, the passthrough
-// merge, "no structural children") is framework-agnostic and unit-tested in
-// core/components/src/__tests__/wave1-core.test.ts; what is Solid's own is the literal-tag bridge,
-// the aria fold, the live children, and the two things no other adapter can break — a prop read
-// frozen at mount, and a key that vanishes from the bag between runs.
+// THE SUBJECT IS THE BARE TAG. There is no InputAccessoryView component any more — an app writes
+// `<input-accessory-view>` and the nativeID/backgroundColor/style mapping runs in the tag's own
+// behavior, so what this file proves is that the tag reaches it, keeps its host identity across an
+// update, and hosts a live Solid subtree.
 //
 // Every assertion reads fabric.committed, never fabric.find: the creation log records a node's
 // props at FIRST commit and never reflects a later clone, so a component frozen at mount would
@@ -18,11 +16,13 @@
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// SIDE-EFFECT IMPORT: the nativeID/backgroundColor/style mapping lives in the tag's behavior, and
+// only this module installs it. An app reaches it through the package barrel; a test does not.
+import '../register';
 import { mount, unmount } from '../render';
-import { Text } from './text';
 import { TextInput } from './text-input';
-import { View } from './view';
-import { InputAccessoryView } from './input-accessory-view';
+// SIDE-EFFECT IMPORT, and the suite is worthless without it: `input-accessory-view` gets its
+// nativeID / backgroundColor / style mapping from a host behavior, and only `register` installs it.
 
 const ROOT_TAG = 831;
 const ACCESSORY_VIEW = 'RCTInputAccessoryView';
@@ -61,7 +61,7 @@ describe('Solid InputAccessoryView on the engine', () => {
     // the host flattened, which is the engine's job on the way through.
     it('commits a real RCTInputAccessoryView carrying nativeID, backgroundColor and a flattened style', async () => {
       mount(ROOT_TAG, () => (
-        <InputAccessoryView
+        <input-accessory-view
           nativeID={NATIVE_ID}
           backgroundColor={BACKGROUND_COLOR}
           style={{ flex: 1 }}
@@ -80,9 +80,9 @@ describe('Solid InputAccessoryView on the engine', () => {
     // the literal tag hosts the live subtree instead of dropping it.
     it('nests the caller-supplied children directly under the host', async () => {
       mount(ROOT_TAG, () => (
-        <InputAccessoryView nativeID={NATIVE_ID}>
-          <Text>Done</Text>
-        </InputAccessoryView>
+        <input-accessory-view nativeID={NATIVE_ID}>
+          <text>Done</text>
+        </input-accessory-view>
       ));
       await tick();
 
@@ -96,10 +96,10 @@ describe('Solid InputAccessoryView on the engine', () => {
     // component's own prop routing mutates or drops that id when both are mounted together.
     it('keeps the nativeID <-> inputAccessoryViewID docking pair intact', async () => {
       mount(ROOT_TAG, () => (
-        <View>
+        <view>
           <TextInput inputAccessoryViewID={NATIVE_ID} />
-          <InputAccessoryView nativeID={NATIVE_ID} />
-        </View>
+          <input-accessory-view nativeID={NATIVE_ID} />
+        </view>
       ));
       await tick();
 
@@ -115,7 +115,7 @@ describe('Solid InputAccessoryView on the engine', () => {
     // unlabelled for a screen reader.
     it('folds aria aliases into the canonical accessibility props', async () => {
       mount(ROOT_TAG, () => (
-        <InputAccessoryView aria-label="toolbar" aria-busy={true} />
+        <input-accessory-view aria-label="toolbar" aria-busy={true} />
       ));
       await tick();
 
@@ -132,7 +132,7 @@ describe('Solid InputAccessoryView on the engine', () => {
     it('re-commits the same host node when backgroundColor changes after mount', async () => {
       const [color, setColor] = createSignal(BACKGROUND_COLOR);
       mount(ROOT_TAG, () => (
-        <InputAccessoryView nativeID={NATIVE_ID} backgroundColor={color()} />
+        <input-accessory-view nativeID={NATIVE_ID} backgroundColor={color()} />
       ));
       await tick();
       const createdAtMount = fabric.counts.createNode;
@@ -157,7 +157,7 @@ describe('Solid InputAccessoryView on the engine', () => {
         BACKGROUND_COLOR,
       );
       mount(ROOT_TAG, () => (
-        <InputAccessoryView nativeID={NATIVE_ID} backgroundColor={color()} />
+        <input-accessory-view nativeID={NATIVE_ID} backgroundColor={color()} />
       ));
       await tick();
       expect(accessory().props.backgroundColor).toBe(BACKGROUND_COLOR);

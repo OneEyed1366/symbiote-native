@@ -1,11 +1,5 @@
 import { createSignal, onCleanup } from 'solid-js';
-import {
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/solid';
+import { ScrollView, TextInput } from '@symbiote-native/solid';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
@@ -37,12 +31,12 @@ function CapabilityRow(props: {
         ? 'YES'
         : 'NO';
   return (
-    <View testID={props.testID} class="capability-row">
-      <Text class="capability-label">{props.label}</Text>
-      <View class={`status-badge status-badge-${props.status}`}>
-        <Text class="status-badge-text">{text()}</Text>
-      </View>
-    </View>
+    <view testID={props.testID} class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <view class={`status-badge status-badge-${props.status}`}>
+        <text class="status-badge-text">{text()}</text>
+      </view>
+    </view>
   );
 }
 
@@ -125,33 +119,33 @@ export function SecureStoreScreen() {
   };
 
   return (
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="secure-store-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Secure Store</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Secure Store</text>
+            <text class="hero-body">
               @symbiote-native/secure-store — encrypted key/value storage in the
               iOS Keychain and the Android Keystore. Save a value, kill the app,
               relaunch, and read it back.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="secure-store-capability-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Capabilities</Text>
-          </View>
+        <view testID="secure-store-capability-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Capabilities</text>
+          </view>
           <CapabilityRow
             testID="secure-store-available"
             label="Available"
@@ -162,30 +156,30 @@ export function SecureStoreScreen() {
             label="Biometrics usable"
             status={canUseBiometrics()}
           />
-        </View>
+        </view>
 
-        <View testID="secure-store-value-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Stored value</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">{DEMO_KEY}</Text>
-            <Text testID="secure-store-value" class="value-text">
+        <view testID="secure-store-value-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Stored value</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">{DEMO_KEY}</text>
+            <text testID="secure-store-value" class="value-text">
               {storedValue() === null ? '(no entry)' : storedValue()}
-            </Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Last result</Text>
-            <Text testID="secure-store-result" class="value-text">
+            </text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Last result</text>
+            <text testID="secure-store-result" class="value-text">
               {lastResult()}
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="secure-store-write-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Write, read, delete</Text>
-          </View>
+        <view testID="secure-store-write-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Write, read, delete</text>
+          </view>
           <TextInput
             testID="secure-store-input"
             value={inputText()}
@@ -218,8 +212,8 @@ export function SecureStoreScreen() {
             onPress={handleDelete}
             color={lineColor}
           />
-        </View>
+        </view>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

@@ -14,7 +14,6 @@
 
 import { Match, Show, Switch as SwitchFlow, createSignal } from 'solid-js';
 import type { Accessor } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -40,15 +39,15 @@ export function ShowSwitchDemo() {
     visible() ? PROFILES[index() % PROFILES.length] : undefined;
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">Show · Switch · Match</Text>
+    <view class="section-nested">
+      <text class="section-label">Show · Switch · Match</text>
 
       <Show
         when={selected()}
         fallback={
-          <Text class="subtle" testID="show-fallback">
+          <text class="subtle" testID="show-fallback">
             fallback — `when` is undefined
-          </Text>
+          </text>
         }
       >
         {/* The annotation is REQUIRED, and the reason is the JSX namespace: <Show>'s children
@@ -57,45 +56,45 @@ export function ShowSwitchDemo() {
             signature to infer from and noImplicitAny fires
             (.claude/rules/solid-jsx-namespace.md). Every render-prop child in this app needs one. */}
         {(profile: Accessor<IProfile>) => (
-          <View class="ap-panel">
-            <Text class="ap-value" testID="show-nonkeyed">
+          <view class="ap-panel">
+            <text class="ap-value" testID="show-nonkeyed">
               {`non-keyed child · accessor → ${profile().label} (#${profile().id})`}
-            </Text>
-          </View>
+            </text>
+          </view>
         )}
       </Show>
 
       <Show when={selected()} keyed>
         {(profile: IProfile) => (
-          <Text class="ap-value" testID="show-keyed">
+          <text class="ap-value" testID="show-keyed">
             {`keyed child · plain value → ${profile.label} (this subtree is rebuilt on every change)`}
-          </Text>
+          </text>
         )}
       </Show>
 
       <SwitchFlow
         fallback={
-          <Text class="subtle">no Match matched — Switch fallback</Text>
+          <text class="subtle">no Match matched — Switch fallback</text>
         }
       >
         <Match when={phase() === 'idle'}>
-          <Text class="ap-value" testID="switch-idle">
+          <text class="ap-value" testID="switch-idle">
             Match: idle
-          </Text>
+          </text>
         </Match>
         <Match when={phase() === 'running'}>
-          <Text class="ap-value" testID="switch-running">
+          <text class="ap-value" testID="switch-running">
             Match: running
-          </Text>
+          </text>
         </Match>
         <Match when={phase() === 'done'}>
-          <Text class="ap-value" testID="switch-done">
+          <text class="ap-value" testID="switch-done">
             Match: done
-          </Text>
+          </text>
         </Match>
       </SwitchFlow>
 
-      <View class="ap-wrap">
+      <view class="ap-wrap">
         <ActionButton
           testID="show-next"
           title="next profile"
@@ -119,13 +118,13 @@ export function ShowSwitchDemo() {
             )
           }
         />
-      </View>
+      </view>
 
-      <Text class="ap-note" testID="switch-name-note">
+      <text class="ap-note" testID="switch-name-note">
         `Switch`/`Match` come from `solid-js` directly: @symbiote-native/solid
         gives the `Switch` name to RN's toggle component, so the control-flow
         pair keeps its canonical home and is aliased at the import.
-      </Text>
-    </View>
+      </text>
+    </view>
   );
 }

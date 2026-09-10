@@ -38,15 +38,8 @@ import {
 import './register';
 import type { JSX } from './jsx-runtime';
 import { mount, unmount } from './render';
-import { Image } from './components/image';
-import { InputAccessoryView } from './components/input-accessory-view';
 import { Pressable } from './components/pressable';
-import { RefreshControl } from './components/refresh-control';
-import { SafeAreaView } from './components/safe-area-view';
-import { Switch } from './components/switch';
-import { Text } from './components/text';
 import { TextInput } from './components/text-input';
-import { View } from './components/view';
 
 const require_ = createRequire(import.meta.url);
 const { HOST_PRIMITIVES } = require_(
@@ -128,6 +121,24 @@ const TAG_ONLY: readonly string[] = [
   // compare against. Coverage is `src/activity-indicator-tag.test.tsx` (node count + the routing
   // split) and `core/components/src/behaviors/activity-indicator/activity-indicator.test.ts`.
   'ActivityIndicator',
+  // Wrapperless since 2026-09-10: the wrapper forwarded a bag and nothing else, so deleting it
+  // left one path. Coverage is `src/components/input-accessory-view.test.tsx`, which now drives
+  // the tag, plus `core/components/src/behaviors/input-accessory-view.test.ts`.
+  'InputAccessoryView',
+  // Wrapperless since 2026-09-10 too, and its whole `renderImage` fold is the behavior's. Coverage
+  // is `src/components/image.test.tsx`, which now drives the tag, plus
+  // `core/components/src/behaviors/image.test.ts`.
+  'Image',
+  // Wrapperless since 2026-09-10: the controlled handshake moved into the tag's behavior, so the
+  // `switch-managed` spelling has no author left. Coverage is `src/components/switch.test.tsx`.
+  'Switch',
+  // Wrapperless since 2026-09-10: the wrapper forwarded a bag, and the controlled handshake is the
+  // tag's behavior. Coverage is `src/components/refresh-control.test.tsx`.
+  'RefreshControl',
+  // Wrapperless since 2026-09-10: the host owns the inset math and every fold the wrapper called
+  // runs below the adapter, so the component held nothing. Coverage is
+  // `src/components/safe-area-view.test.tsx`, which now drives the tag.
+  'SafeAreaView',
 ];
 
 const PAIRED = Object.keys(HOST_PRIMITIVES).filter(
@@ -147,12 +158,12 @@ interface ICase {
 
 const CASES: Record<string, ICase> = {
   View: {
-    component: () => <View {...PROBE} />,
+    component: () => <view {...PROBE} />,
     lowered: () => <view {...PROBE} />,
     expected: FOLDED,
   },
   Text: {
-    component: () => <Text {...PROBE} />,
+    component: () => <text {...PROBE} />,
     lowered: () => <text {...PROBE} />,
     // Text is the primitive whose defaults the renderer seeds, so its absolute expectation is the
     // one that would catch `seedTextDefaults` dying — which no arm comparison could.
@@ -166,36 +177,6 @@ const CASES: Record<string, ICase> = {
   TextInput: {
     component: () => <TextInput {...PROBE} />,
     lowered: () => <text-input {...PROBE} />,
-    expected: FOLDED,
-  },
-  Image: {
-    component: () => <Image {...PROBE} source={{ uri: 'x' }} />,
-    lowered: () => <image {...PROBE} source={{ uri: 'x' }} />,
-    // The array shape `normalizeSource` guarantees — the fold that lives in the BEHAVIOR rather
-    // than in `foldHostBag`, and is therefore invisible to any adapter that registers no behavior.
-    expected: { ...FOLDED, source: [{ uri: 'x' }] },
-  },
-  InputAccessoryView: {
-    component: () => <InputAccessoryView {...PROBE} />,
-    lowered: () => <input-accessory-view {...PROBE} />,
-    expected: FOLDED,
-  },
-  // `refreshing` is required on the component and is the primitive's whole controlled surface, so
-  // it has to be in the probe on both arms — a case without it would compare two payloads that
-  // differ from a real one in exactly the key the behavior reads.
-  RefreshControl: {
-    component: () => <RefreshControl {...PROBE} refreshing={false} />,
-    lowered: () => <refresh-control {...PROBE} refreshing={false} />,
-    expected: { ...FOLDED, refreshing: false },
-  },
-  SafeAreaView: {
-    component: () => <SafeAreaView {...PROBE} />,
-    lowered: () => <safe-area-view {...PROBE} />,
-    expected: FOLDED,
-  },
-  Switch: {
-    component: () => <Switch {...PROBE} />,
-    lowered: () => <switch {...PROBE} />,
     expected: FOLDED,
   },
 };

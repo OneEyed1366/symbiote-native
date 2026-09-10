@@ -13,7 +13,6 @@
 
 import { children, createSignal, mergeProps, splitProps } from 'solid-js';
 import type { JSX } from '@symbiote-native/solid/jsx-runtime';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -39,12 +38,12 @@ function Badge(props: IBadgeProps) {
   const [own, rest] = splitProps(merged, ['tone', 'label']);
 
   return (
-    <View
+    <view
       class={own.tone === 'loud' ? 'ap-pill ap-pill-on' : 'ap-pill'}
       {...rest}
     >
-      <Text class="ap-pill-text">{own.label}</Text>
-    </View>
+      <text class="ap-pill-text">{own.label}</text>
+    </view>
   );
 }
 
@@ -54,12 +53,12 @@ function Panel(props: { children?: JSX.Element }) {
   const resolved = children(() => props.children);
 
   return (
-    <View class="ap-panel">
-      <Text class="subtle" testID="props-children-count">
+    <view class="ap-panel">
+      <text class="subtle" testID="props-children-count">
         {`children() resolved ${resolved.toArray().length} node(s)`}
-      </Text>
+      </text>
       {resolved()}
-    </View>
+    </view>
   );
 }
 
@@ -80,22 +79,22 @@ export function PropsUtilsDemo() {
   });
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">mergeProps · splitProps · children()</Text>
+    <view class="section-nested">
+      <text class="section-label">mergeProps · splitProps · children()</text>
 
-      <View class="ap-wrap">
+      <view class="ap-wrap">
         <Badge testID="props-badge-default" />
         <Badge testID="props-badge-live" tone={tone()} label={label()} />
-      </View>
+      </view>
 
-      <Text class="ap-value" testID="props-merge-result">
+      <text class="ap-value" testID="props-merge-result">
         {`mergeProps → "${viaMerge.label}"`}
-      </Text>
-      <Text class="ap-value" testID="props-spread-result">
+      </text>
+      <text class="ap-value" testID="props-spread-result">
         {`object spread → "${String(viaSpread().label)}"`}
-      </Text>
+      </text>
 
-      <View class="ap-wrap">
+      <view class="ap-wrap">
         <ActionButton
           testID="props-clear-label"
           title={
@@ -114,12 +113,12 @@ export function PropsUtilsDemo() {
             setTone(current => (current === 'muted' ? 'loud' : 'muted'))
           }
         />
-      </View>
+      </view>
 
       <Panel>
-        <Text class="ap-value">first child, supplied by PropsUtilsDemo</Text>
-        <Text class="ap-value">second child — children() counts both</Text>
+        <text class="ap-value">first child, supplied by PropsUtilsDemo</text>
+        <text class="ap-value">second child — children() counts both</text>
       </Panel>
-    </View>
+    </view>
   );
 }

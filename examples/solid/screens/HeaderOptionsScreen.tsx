@@ -11,7 +11,6 @@
 // push-time params forever. useRoute() hands back an ACCESSOR precisely so the read can be a memo.
 
 import { createMemo } from 'solid-js';
-import { SafeAreaView, Text, View } from '@symbiote-native/solid';
 import { useRoute } from '@symbiote-native/navigation/solid';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -42,49 +41,49 @@ export function HeaderOptionsScreen() {
   });
 
   return (
-    <SafeAreaView class="screen">
-      <View class="demo-section">
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">
+    <safe-area-view class="screen">
+      <view class="demo-section">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">
             {`${lineInfo.code} · ${lineInfo.label}`}
-          </Text>
-        </View>
-        <View class="hero-card">
-          <View
+          </text>
+        </view>
+        <view class="hero-card">
+          <view
             class="hero-badge"
             style={{ backgroundColor: LINE_COLOR.presentation }}
           >
-            <Text class="hero-badge-text">HD</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Header options</Text>
-            <Text class="hero-body">
+            <text class="hero-badge-text">HD</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Header options</text>
+            <text class="hero-body">
               Bar buttons, a right-side menu, a native search bar, and
               headerLargeTitle — every headerSearchBarOptions callback wired to
               a live control below.
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">
+            </text>
+          </view>
+        </view>
+        <text class="info-text">
           headerLargeTitle · headerTintColor · headerStyle.backgroundColor
-        </Text>
-        <Text testID="header-last-action" class="info-text">
+        </text>
+        <text testID="header-last-action" class="info-text">
           {`last header action: ${params().lastHeaderAction ?? 'none yet — tap a bar button or menu item'}`}
-        </Text>
-        <Text testID="header-search-text" class="info-text">
+        </text>
+        <text testID="header-search-text" class="info-text">
           {`last search text: ${params().lastSearchText ?? 'none yet — pull down and type'}`}
-        </Text>
-        <Text testID="header-search-submitted" class="info-text">
+        </text>
+        <text testID="header-search-submitted" class="info-text">
           {`last search submitted: ${params().lastSearchSubmitted ?? 'none yet — type and press search'}`}
-        </Text>
-        <Text testID="header-search-event" class="info-text">
+        </text>
+        <text testID="header-search-event" class="info-text">
           {`last search bar event: ${params().lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar'}`}
-        </Text>
-        <Text class="note-text">
+        </text>
+        <text class="note-text">
           Pull down to reveal the search bar (headerSearchBarOptions), or use
           the buttons below to drive it imperatively through its
           SearchBarCommands ref.
-        </Text>
+        </text>
         <ActionButton
           testID="search-bar-focus"
           title="Focus search bar"
@@ -109,7 +108,7 @@ export function HeaderOptionsScreen() {
           onPress={() => searchBarRef.current?.cancelSearch()}
           color={LINE_COLOR.presentation}
         />
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   );
 }

@@ -129,7 +129,6 @@ import {
   spread,
 } from '../../renderer';
 import { withStableKeys } from '../../utils/stable-keys';
-import { RefreshControl } from '../refresh-control';
 import { ScrollViewStickyHeader } from '../scroll-view/sticky-header';
 import type { IScrollViewHostPlatform } from '../scroll-view/shared';
 
@@ -1038,7 +1037,7 @@ export function createVirtualizedList(
       if (onRefresh === undefined) return undefined;
       dlog('VirtualizedList wiring RefreshControl (onRefresh provided)');
       const element = (
-        <RefreshControl
+        <refresh-control
           refreshing={props.refreshing ?? false}
           onRefresh={onRefresh}
           progressViewOffset={props.progressViewOffset}

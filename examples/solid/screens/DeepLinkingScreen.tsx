@@ -8,7 +8,7 @@
 // from /solid — it is a pure function over the config, owning no reactivity to wire.
 
 import { createSignal } from 'solid-js';
-import { SafeAreaView, Text, TextInput, View } from '@symbiote-native/solid';
+import { TextInput } from '@symbiote-native/solid';
 import { resolveRouteFromUrl } from '@symbiote-native/navigation';
 import { ActionButton } from '../components/ActionButton';
 import {
@@ -35,33 +35,33 @@ export function DeepLinkingScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
 
   return (
-    <SafeAreaView class="screen">
-      <View class="demo-section">
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View
+    <safe-area-view class="screen">
+      <view class="demo-section">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view
             class="hero-badge"
             style={{ backgroundColor: LINE_COLOR.routing }}
           >
-            <Text class="hero-badge-text">DL</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Deep linking</Text>
-            <Text class="hero-body">
+            <text class="hero-badge-text">DL</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Deep linking</text>
+            <text class="hero-body">
               A typed URL resolved to a route through resolveRouteFromUrl, the
               same path a real deep link or push notification would take.
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">
+            </text>
+          </view>
+        </view>
+        <text class="info-text">
           prefixes: symbiotecanarysolid:// · https://canary.symbiote-native.dev
-        </Text>
-        <Text class="note-text">
+        </text>
+        <text class="note-text">
           Details → details/:id · HeaderOptions → header-options · TabsDemo →
           tabs
-        </Text>
+        </text>
         <TextInput
           testID="deep-link-input"
           value={url()}
@@ -78,12 +78,12 @@ export function DeepLinkingScreen() {
           onPress={onResolve}
           color={LINE_COLOR.routing}
         />
-        <View class="deep-link-result">
-          <Text testID="deep-link-result" class="deep-link-result-text">
+        <view class="deep-link-result">
+          <text testID="deep-link-result" class="deep-link-result-text">
             {resolved() ?? 'tap Resolve to see the parsed route'}
-          </Text>
-        </View>
-      </View>
-    </SafeAreaView>
+          </text>
+        </view>
+      </view>
+    </safe-area-view>
   );
 }

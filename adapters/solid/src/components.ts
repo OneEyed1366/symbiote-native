@@ -1,17 +1,22 @@
 // The component re-export barrel, flat at the package root like every other adapter's. Grouping
 // under components/ is internal; this file plus src/index.ts is the whole public surface.
 
-export { View } from './components/view';
-export type { IViewProps } from './components/view';
+// `View` and `Text` are TAGS — `<view>` and `<text>` — and there is nothing to import in their
+// place. Both wrappers only forwarded a bag: the `id -> nativeID` alias and Text's RN defaults are
+// seeded in the renderer, the aria/role fold in the engine's `fabricProps`, and the
+// RCTText/RCTVirtualText choice was always the engine's commit walk. The prop types stay — they are
+// what a component forwarding a bag types itself against.
+export type { IViewProps } from './components/view-props';
+export type { ITextProps } from './components/text-props';
 
-export { Text } from './components/text';
-export type { ITextProps } from './components/text';
+// `SafeAreaView` is a TAG — `<safe-area-view>` — and there is nothing to import in its place. The
+// host owns the inset math; the wrapper only forwarded a bag.
+export type { ISafeAreaViewProps } from './components/safe-area-view-props';
 
-export { SafeAreaView } from './components/safe-area-view';
-export type { ISafeAreaViewProps } from './components/safe-area-view';
-
-export { Image } from './components/image';
-export type { IImageProps } from './components/image';
+// `Image` is a TAG — `<image>` — and there is nothing to import in its place. The whole
+// `renderImage` fold runs in the tag's own behavior; the STATICS (`getSize`, `prefetch`, …) moved
+// to `./modules/image`, an imperative API with no view, and are re-exported from `./index`.
+export type { IImageProps } from './components/image-props';
 
 export { Pressable } from './components/pressable';
 export type { IPressableProps } from './components/pressable';
@@ -32,12 +37,14 @@ export type {
   IPressableAndroidRippleConfig,
 } from '@symbiote-native/components';
 
-export { Switch } from './components/switch';
+// `Switch` is a TAG — `<switch>` — and there is nothing to import in its place. The controlled
+// handshake (the lastNativeReport mirror and the platform snap-back command) is the tag's own
+// behavior now.
 export type {
   ISwitchProps,
   ISwitchTrackColor,
   ISwitchChangeEvent,
-} from './components/switch';
+} from './components/switch-props';
 
 export { TextInput } from './components/text-input';
 export type {
@@ -62,8 +69,9 @@ export type {
   IKeyboardAvoidingBehavior,
 } from './components/keyboard-avoiding-view';
 
-export { RefreshControl } from './components/refresh-control';
-export type { IRefreshControlProps } from './components/refresh-control';
+// `RefreshControl` is a TAG — `<refresh-control>` — and there is nothing to import in its place.
+// The wrapper forwarded a bag; the controlled-spinner handshake is the tag's own behavior.
+export type { IRefreshControlProps } from './components/refresh-control-props';
 
 // ScrollViewStickyHeader is NOT exported, matching react-native itself: it lives at
 // Libraries/Components/ScrollView/ScrollViewStickyHeader.js and is absent from RN's public
@@ -162,5 +170,7 @@ export type { IButtonProps } from './components/button-props';
 // `ImageBackground` is a TAG — `<image-background>` — and there is nothing to import in its place.
 export type { IImageBackgroundProps } from './components/image-background-props';
 
-export { InputAccessoryView } from './components/input-accessory-view';
-export type { IInputAccessoryViewProps } from './components/input-accessory-view';
+// `InputAccessoryView` is a TAG — `<input-accessory-view>` — and there is nothing to import in its
+// place. The wrapper only forwarded a bag: the nativeID / backgroundColor / style mapping is the
+// tag's own behavior and the aria fold is the engine's, so nothing was left to host.
+export type { IInputAccessoryViewProps } from './components/input-accessory-view-props';

@@ -9,7 +9,6 @@
 // throw has to be cleared first, which is why the reset button below does both.
 
 import { ErrorBoundary, Show, catchError, createSignal } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -38,15 +37,15 @@ export function ErrorBoundaryDemo() {
   };
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">ErrorBoundary · catchError</Text>
+    <view class="section-nested">
+      <text class="section-label">ErrorBoundary · catchError</text>
 
       <ErrorBoundary
         fallback={(error: unknown, reset: () => void) => (
-          <View class="ap-panel">
-            <Text class="ap-note" testID="boundary-fallback">
+          <view class="ap-panel">
+            <text class="ap-note" testID="boundary-fallback">
               {`ErrorBoundary caught: ${error instanceof Error ? error.message : String(error)}`}
-            </Text>
+            </text>
             <ActionButton
               testID="boundary-reset"
               title="clear the cause, then reset()"
@@ -56,22 +55,22 @@ export function ErrorBoundaryDemo() {
                 reset();
               }}
             />
-          </View>
+          </view>
         )}
       >
         <Show
           when={exploding()}
           fallback={
-            <Text class="ap-value" testID="boundary-content">
+            <text class="ap-value" testID="boundary-content">
               subtree is healthy
-            </Text>
+            </text>
           }
         >
           <Exploder />
         </Show>
       </ErrorBoundary>
 
-      <View class="ap-wrap">
+      <view class="ap-wrap">
         <ActionButton
           testID="boundary-throw"
           title="throw during render"
@@ -84,10 +83,10 @@ export function ErrorBoundaryDemo() {
           color={ACCENT}
           onPress={throwInsideHandler}
         />
-      </View>
-      <Text class="subtle" testID="boundary-caught">
+      </view>
+      <text class="subtle" testID="boundary-caught">
         {`catchError saw: ${caught()}`}
-      </Text>
-    </View>
+      </text>
+    </view>
   );
 }

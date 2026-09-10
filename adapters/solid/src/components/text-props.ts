@@ -1,24 +1,19 @@
-// Text — the Solid host primitive for RN's <Text>. Same children/ref idiom as ./view.tsx; read
-// that file's header first, it carries the reasoning both share.
+// The `<text>` tag's prop surface. Same story as `./view-props.ts` — the wrapper forwarded a bag
+// and its two folds live below the adapter now, with one addition: RN's `Text` DEFAULTS
+// (`ellipsizeMode`, `allowFontScaling`) are seeded by the renderer at `createElement` and re-seeded
+// on a patch that clears them, so a bare tag carries them exactly as the component did.
 //
-// THE NESTING (`RCTText` vs `RCTVirtualText`) IS NOT THIS FILE'S JOB, and that is worth stating
-// because it is the one place React's own renderer needs a context. React Native tracks a
-// TextAncestor context so a <Text> inside another <Text> renders as a virtual span instead of a
-// paragraph host. Here the retained tree already knows: the engine's commit walk carries a
-// `hasTextAncestor` flag down and picks the view name itself
-// (`viewNameFor` in core/engine/src/commit.ts — `node.isText && hasTextAncestor` -> RCTVirtualText),
-// and it re-creates the node from scratch when that kind flips. So there is no Solid context, no
-// provider, and nothing for an adapter to thread; every adapter emits the same flat
-// `text` and the engine resolves the position-dependent name for all of them. The
-// Solid equivalent of TextAncestorContext is deliberately ABSENT, not missing.
+// THE NESTING (`RCTText` vs `RCTVirtualText`) was never this file's job and still is not. React
+// Native tracks a TextAncestor context so a Text inside another Text renders as a virtual span;
+// here the engine's commit walk carries `hasTextAncestor` down and picks the view name itself
+// (`viewNameFor`, core/engine/src/commit.ts), re-creating the node when the kind flips. Every
+// adapter emits the same flat `text` and the engine resolves it for all of them.
 
-import { splitProps, type Ref } from 'solid-js';
+import type { Ref } from 'solid-js';
 import type { JSX } from '../jsx-runtime';
-import {
-  resolveAccessibilityProps,
-  type IAccessibilityProps,
-  type IAriaProps,
-  resolveTextProps,
+import type {
+  IAccessibilityProps,
+  IAriaProps,
 } from '@symbiote-native/components';
 import type {
   IClassNameValue,
@@ -27,8 +22,6 @@ import type {
   ITextStyle,
 } from '@symbiote-native/engine';
 import type { IHostInstance } from '../host-instance';
-import { applyHostRef } from '../utils/host-ref';
-import { withStableKeys } from '../utils/stable-keys';
 
 // Per-adapter for the same reason IViewProps is (children + ref are framework values); the
 // agnostic field base is shared. No IResponderProps here, matching every other adapter's
@@ -64,22 +57,4 @@ export interface ITextProps extends IAccessibilityProps, IAriaProps {
   selectionColor?: string;
   ref?: Ref<IHostInstance>;
   children?: JSX.Element;
-}
-
-export function Text(props: ITextProps): JSX.Element {
-  const [local, rest] = splitProps(props, ['children', 'ref']);
-
-  const bag = withStableKeys(() =>
-    resolveTextProps({ ...resolveAccessibilityProps(rest) }),
-  );
-
-  const attachRef = (node: IHostInstance): void => {
-    applyHostRef(local.ref, node);
-  };
-
-  return (
-    <text ref={attachRef} {...bag()}>
-      {local.children}
-    </text>
-  );
 }

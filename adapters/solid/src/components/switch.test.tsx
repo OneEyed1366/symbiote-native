@@ -4,18 +4,22 @@
 // slot: the Fabric view name, the strict-boolean value fold, the color/accessibility prop mapping,
 // the onValueChange derivation, and the controlled snap-back.
 //
-// Two cases have no counterpart in the React file and exist because Solid's lifecycle is the one
-// thing NOT shared with it: props are getters read once unless every read sits inside an accessor,
-// so "the value prop updates after mount" and "the snap-back watches the CURRENT value" are real,
-// silently-breakable claims here, not tautologies.
+// THE SUBJECT IS THE BARE TAG — there is no Switch component any more. Two cases still have no
+// counterpart in the React file: a Solid prop is an accessor read where it is used, so "the value
+// prop updates after mount" and "the snap-back watches the CURRENT value" remain real,
+// silently-breakable claims about this adapter's wiring rather than tautologies.
 //
 // Negative group: a native change payload that carries no boolean.
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import { mount, unmount } from '../../render';
-import { Switch } from './index';
+// SIDE-EFFECT IMPORT: the controlled handshake lives in the tag's behavior, and only this module
+// installs it. An app reaches it through the package barrel; a test importing render does not.
+import '../register';
+import { mount, unmount } from '../render';
+// SIDE-EFFECT IMPORT, and the suite is worthless without it: the value fold, the track-colour
+// mapping and the snap-back all reach `<switch>` through `registerSwitchBehavior`.
 
 const ROOT_TAG = 812;
 const SWITCH_VIEW = 'Switch';
@@ -30,6 +34,19 @@ const tick = (): Promise<void> =>
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
+
+// SCOPED TO ONE NODE, and that is not tidiness. The machine lives on the engine node now, and a
+// behavior declaring `afterCommit` is held in a process-wide set until it is swept
+// (`core/engine/src/host-behavior.ts`, `committedEachTime`). `unmount` disposes the surface's root
+// container without a removal commit, so an earlier test's switch is never swept and keeps
+// evaluating its snap-back on every LATER commit in the process — reported as an engine finding.
+// A whole-log assertion therefore reads those as commands of the case under test. Each command
+// case below carries its own testID so the oracle names the node it is about.
+function commandsFor(testId: string): readonly string[] {
+  return fabric.commands
+    .filter(command => command.node.props.testID === testId)
+    .map(command => `${command.commandName}:${JSON.stringify(command.args)}`);
+}
 
 function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
   for (const node of nodes) {
@@ -60,7 +77,7 @@ describe('Solid Switch on the engine', () => {
     // why: RN's real Switch view name is `Switch` — a wrong native view name means the host never
     // resolves a component, which no JS-level check would otherwise catch.
     it('emits the Fabric view name Switch and passes value through as a strict boolean', async () => {
-      mount(ROOT_TAG, () => <Switch value />);
+      mount(ROOT_TAG, () => <switch value />);
       await tick();
       expect(committedSwitch().props.value).toBe(true);
     });
@@ -68,7 +85,7 @@ describe('Solid Switch on the engine', () => {
     // why: RN sends `value === true` to native (Switch.js) — an absent `value` must fold to a real
     // `false`, not ride through as `undefined`, which native would misread.
     it('folds an undefined value to a strict false', async () => {
-      mount(ROOT_TAG, () => <Switch />);
+      mount(ROOT_TAG, () => <switch />);
       await tick();
       expect(committedSwitch().props.value).toBe(false);
     });
@@ -80,7 +97,7 @@ describe('Solid Switch on the engine', () => {
     // instead of guessing from an `on` prefix.
     it('maps color + disabled props to the native iOS prop names', async () => {
       mount(ROOT_TAG, () => (
-        <Switch
+        <switch
           value
           disabled
           trackColor={{ false: TRACK_OFF, true: TRACK_ON }}
@@ -106,7 +123,7 @@ describe('Solid Switch on the engine', () => {
     // Fabric as a meaningless prop and the switch unlabelled for a screen reader.
     it('folds aria aliases into the canonical accessibility props', async () => {
       mount(ROOT_TAG, () => (
-        <Switch value={false} aria-label="wifi" aria-disabled />
+        <switch value={false} aria-label="wifi" aria-disabled />
       ));
       await tick();
 
@@ -122,7 +139,7 @@ describe('Solid Switch on the engine', () => {
       let changedValue: boolean | undefined;
       let rawEventValue: unknown;
       mount(ROOT_TAG, () => (
-        <Switch
+        <switch
           value={false}
           onValueChange={event => {
             changedValue = event.value;
@@ -137,12 +154,18 @@ describe('Solid Switch on the engine', () => {
       });
       expect(changedValue).toBe(true);
       expect(rawEventValue).toBe(true);
+      // The handler above does not move `value`, so the behavior's deferred snap-back is CORRECT
+      // and still pending. Draining it here rather than letting it land in the next test: it is
+      // scheduled on a microtask by the machine itself, so nothing about unmounting cancels it,
+      // and a stray `setValue` arriving after `fabric.reset()` reads as a spurious command in a
+      // test that never toggled anything.
+      await tick();
     });
 
     // why: onValueChange is plain JS, not a ViewConfig prop — leaking it onto the native prop bag
     // crashes Android's folly::dynamic serializer the moment it tries to stringify a function.
     it('never forwards onValueChange itself onto the native prop bag', async () => {
-      mount(ROOT_TAG, () => <Switch value={false} onValueChange={() => {}} />);
+      mount(ROOT_TAG, () => <switch value={false} onValueChange={() => {}} />);
       await tick();
       expect('onValueChange' in committedSwitch().props).toBe(false);
     });
@@ -152,7 +175,7 @@ describe('Solid Switch on the engine', () => {
     // freeze the Switch at its mount-time value while every other test in this file still passed.
     it('re-commits the same native node when the parent updates value after mount', async () => {
       const [value, setValue] = createSignal(false);
-      mount(ROOT_TAG, () => <Switch value={value()} />);
+      mount(ROOT_TAG, () => <switch value={value()} />);
       await tick();
       const createdAtMount = fabric.counts.createNode;
       expect(committedSwitch().props.value).toBe(false);
@@ -170,9 +193,11 @@ describe('Solid Switch on the engine', () => {
     // the mount-time effect run must not misread the pre-report `null` as a disagreement and issue a
     // spurious command before any real toggle.
     it('issues no snap-back command on initial mount', async () => {
-      mount(ROOT_TAG, () => <Switch value onValueChange={() => {}} />);
+      mount(ROOT_TAG, () => (
+        <switch testID="mount-probe" value onValueChange={() => {}} />
+      ));
       await tick();
-      expect(fabric.commands).toHaveLength(0);
+      expect(commandsFor('mount-probe')).toEqual([]);
     });
 
     // why: native flips its own grip optimistically before JS approves — with a no-op handler the
@@ -181,7 +206,11 @@ describe('Solid Switch on the engine', () => {
     it('snaps native back via setValue when a no-op handler rejects the toggle', async () => {
       const [value] = createSignal(false);
       mount(ROOT_TAG, () => (
-        <Switch value={value()} onValueChange={() => {}} />
+        <switch
+          testID="reject-probe"
+          value={value()}
+          onValueChange={() => {}}
+        />
       ));
       await tick();
 
@@ -190,9 +219,7 @@ describe('Solid Switch on the engine', () => {
       });
       await tick();
 
-      expect(fabric.commands).toHaveLength(1);
-      expect(fabric.commands[0]?.commandName).toBe('setValue');
-      expect(fabric.commands[0]?.args).toEqual([false]);
+      expect(commandsFor('reject-probe')).toEqual(['setValue:[false]']);
     });
 
     // why: the counterpart — an always-fire snap-back would fight every legitimate toggle right
@@ -201,7 +228,8 @@ describe('Solid Switch on the engine', () => {
     it('issues no snap-back command when the parent accepts the toggle', async () => {
       const [value, setValue] = createSignal(false);
       mount(ROOT_TAG, () => (
-        <Switch
+        <switch
+          testID="accept-probe"
           value={value()}
           onValueChange={event => setValue(event.value)}
         />
@@ -214,7 +242,7 @@ describe('Solid Switch on the engine', () => {
       await tick();
 
       expect(committedSwitch().props.value).toBe(true);
-      expect(fabric.commands).toHaveLength(0);
+      expect(commandsFor('accept-probe')).toEqual([]);
     });
   });
 
@@ -225,7 +253,8 @@ describe('Solid Switch on the engine', () => {
     it('ignores a change event whose nativeEvent.value is not a boolean', async () => {
       let calls = 0;
       mount(ROOT_TAG, () => (
-        <Switch
+        <switch
+          testID="ignore-probe"
           value={false}
           onValueChange={() => {
             calls++;
@@ -240,7 +269,7 @@ describe('Solid Switch on the engine', () => {
       await tick();
 
       expect(calls).toBe(0);
-      expect(fabric.commands).toHaveLength(0);
+      expect(commandsFor('ignore-probe')).toEqual([]);
     });
   });
 });

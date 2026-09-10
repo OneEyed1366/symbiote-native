@@ -1,5 +1,5 @@
 import { createSignal, onCleanup } from 'solid-js';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import { ScrollView } from '@symbiote-native/solid';
 import {
   hasAction,
   isAvailableAsync,
@@ -11,10 +11,10 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="capability-row">
-      <Text class="capability-label">{props.label}</Text>
-      <Text class="value-text">{props.value}</Text>
-    </View>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -54,32 +54,32 @@ export function StoreReviewScreen() {
   };
 
   return (
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="store-review-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Store Review</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Store Review</text>
+            <text class="hero-body">
               @symbiote-native/store-review — prompts the platform's native
               in-app review flow.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="store-review-capability-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Capability</Text>
-          </View>
+        <view testID="store-review-capability-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Capability</text>
+          </view>
           <ValueRow
             label="Native flow available"
             value={
@@ -100,33 +100,33 @@ export function StoreReviewScreen() {
                   : 'No'
             }
           />
-        </View>
+        </view>
 
-        <View testID="store-review-action-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Request review</Text>
-          </View>
+        <view testID="store-review-action-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Request review</text>
+          </view>
           <ActionButton
             testID="store-review-request-button"
             title="Request Review"
             onPress={handleRequestReview}
             color={lineColor}
           />
-          <View class="capability-row">
-            <Text class="capability-label">Last result</Text>
-            <Text testID="store-review-result" class="value-text">
+          <view class="capability-row">
+            <text class="capability-label">Last result</text>
+            <text testID="store-review-result" class="value-text">
               {lastResult()}
-            </Text>
-          </View>
-          <Text class="info-text">
+            </text>
+          </view>
+          <text class="info-text">
             resolved means the call completed, not that a prompt appeared. On
             Android the Play dialog only shows for a build installed from Google
             Play (internal test track, internal app sharing, or production); a
             sideloaded debug build resolves silently. iOS shows it in debug
             builds. Both stores also enforce a quota.
-          </Text>
-        </View>
+          </text>
+        </view>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

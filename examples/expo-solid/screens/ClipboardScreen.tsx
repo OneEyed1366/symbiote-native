@@ -1,12 +1,5 @@
 import { createEffect, createSignal } from 'solid-js';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/solid';
+import { Platform, ScrollView, TextInput } from '@symbiote-native/solid';
 import {
   getStringAsync,
   getUrlAsync,
@@ -34,9 +27,9 @@ function CapabilityBadge(props: { status: ICapabilityStatus }) {
         ? 'YES'
         : 'NO';
   return (
-    <View class={`status-badge status-badge-${props.status}`}>
-      <Text class="status-badge-text">{label()}</Text>
-    </View>
+    <view class={`status-badge status-badge-${props.status}`}>
+      <text class="status-badge-text">{label()}</text>
+    </view>
   );
 }
 
@@ -46,10 +39,10 @@ function CapabilityRow(props: {
   status: ICapabilityStatus;
 }) {
   return (
-    <View testID={props.testID} class="capability-row">
-      <Text class="capability-label">{props.label}</Text>
+    <view testID={props.testID} class="capability-row">
+      <text class="capability-label">{props.label}</text>
       <CapabilityBadge status={props.status} />
-    </View>
+    </view>
   );
 }
 
@@ -116,53 +109,53 @@ export function ClipboardScreen() {
   };
 
   return (
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="clipboard-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Clipboard</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Clipboard</text>
+            <text class="hero-body">
               @symbiote-native/clipboard — read/write clipboard text and URLs,
               plus a live change-event subscription via createClipboard(). Copy
               something outside the app to see the value below update on its
               own.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="clipboard-value-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Current value</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Clipboard text</Text>
-            <Text class="value-text">
+        <view testID="clipboard-value-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Current value</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Clipboard text</text>
+            <text class="value-text">
               {clipboardText() === null
                 ? 'checking…'
                 : clipboardText() || '(empty)'}
-            </Text>
-          </View>
+            </text>
+          </view>
           <CapabilityRow
             testID="clipboard-has-string"
             label="Has string"
             status={hasString()}
           />
-        </View>
+        </view>
 
-        <View testID="clipboard-copy-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Copy text</Text>
-          </View>
+        <view testID="clipboard-copy-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Copy text</text>
+          </view>
           <TextInput
             testID="clipboard-copy-input"
             value={inputText()}
@@ -177,21 +170,21 @@ export function ClipboardScreen() {
             onPress={handleCopy}
             color={lineColor}
           />
-        </View>
+        </view>
 
         {Platform.OS === 'ios' && (
-          <View testID="clipboard-url-card" class="feature-card">
-            <View class="feature-card-header">
-              <Text class="feature-card-title">URL (iOS only)</Text>
-            </View>
-            <View class="capability-row">
-              <Text class="capability-label">Clipboard URL</Text>
-              <Text class="value-text">
+          <view testID="clipboard-url-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">URL (iOS only)</text>
+            </view>
+            <view class="capability-row">
+              <text class="capability-label">Clipboard URL</text>
+              <text class="value-text">
                 {clipboardUrl() === null
                   ? 'checking…'
                   : clipboardUrl() || '(none)'}
-              </Text>
-            </View>
+              </text>
+            </view>
             <CapabilityRow
               testID="clipboard-has-url"
               label="Has URL"
@@ -211,9 +204,9 @@ export function ClipboardScreen() {
               onPress={handleSetUrl}
               color={lineColor}
             />
-          </View>
+          </view>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

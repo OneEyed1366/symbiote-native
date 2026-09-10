@@ -80,7 +80,7 @@ describe('Solid Animated.ScrollView native onScroll attach', () => {
           { useNativeDriver: true },
         )}
       >
-        <Animated.View style={{ opacity: 1 }} />
+        <view style={{ opacity: 1 }} />
       </Animated.ScrollView>
     ));
     await tick();

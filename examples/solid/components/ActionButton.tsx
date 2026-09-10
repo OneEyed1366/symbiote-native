@@ -5,7 +5,7 @@
 // NOTHING here destructures `props` — a Solid component body runs ONCE, so a destructure would
 // freeze the button at its mount-time config.
 
-import { Pressable, Text } from '@symbiote-native/solid';
+import { Pressable } from '@symbiote-native/solid';
 
 interface IActionButtonProps {
   title: string;
@@ -36,9 +36,9 @@ export function ActionButton(props: IActionButtonProps) {
       })}
     >
       {() => (
-        <Text class="action-button-text" style={{ color: props.color }}>
+        <text class="action-button-text" style={{ color: props.color }}>
           {props.title}
-        </Text>
+        </text>
       )}
     </Pressable>
   );

@@ -3,7 +3,6 @@
 //
 // isFocused stays an accessor read inside the JSX — see TabHomeScreen for why a snapshot freezes.
 
-import { SafeAreaView, Text, View } from '@symbiote-native/solid';
 import { createIsFocused } from '@symbiote-native/navigation/solid';
 import { ROUTE_NAME } from '../routes';
 import { ROUTE_LINE_INFO } from '../navigation-lines';
@@ -14,16 +13,16 @@ export function TabProfileScreen() {
   const isFocused = createIsFocused();
 
   return (
-    <SafeAreaView class="screen">
-      <View class="demo-section">
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">
+    <safe-area-view class="screen">
+      <view class="demo-section">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">
             {`${lineInfo.code} · ${lineInfo.label}`}
-          </Text>
-        </View>
-        <Text class="section-label">Profile tab</Text>
-        <Text class="info-text">{`focused: ${isFocused()}`}</Text>
-      </View>
-    </SafeAreaView>
+          </text>
+        </view>
+        <text class="section-label">Profile tab</text>
+        <text class="info-text">{`focused: ${isFocused()}`}</text>
+      </view>
+    </safe-area-view>
   );
 }

@@ -2,11 +2,10 @@
 // style fold, resizeMode-and-tintColor-from-style, the alt fold) is pure, framework-agnostic and
 // already exhaustively covered by core/components/src/view/render-image/render-image.test.ts —
 // re-asserting those branches through a Solid mount would duplicate that suite, not add proof.
-// This file covers what is genuinely SOLID-side: that ./image.ts wires splitProps +
-// resolveAccessibilityProps + renderImage + descriptorToSolid into a real Fabric commit, that the
-// VIEW_PROPS split keeps the W3C aliases off the wire, and — the part with no counterpart in
-// React's twin — that a component body which runs ONCE still tracks later prop changes and still
-// clears a prop key that VANISHES from the bag.
+// THE SUBJECT IS THE BARE TAG. There is no Image component any more — an app writes `<image>` and
+// the fold runs in the tag's own behavior — so what is genuinely SOLID-side here is that the tag
+// reaches that fold through a real Fabric commit, that the W3C aliases stay off the wire, and that
+// a prop written after mount still lands on the SAME host node.
 //
 // No Negative group: every Image prop is optional and every path resolves to some descriptor, so
 // there is no input this component rejects (React's twin reaches the same conclusion).
@@ -19,8 +18,14 @@ import {
   setImageSourceResolver,
 } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// SIDE-EFFECT IMPORT: the tag's fold lives in its behavior, and only this module installs it. An
+// app reaches it through the package barrel; a test importing the renderer directly does not.
+import '../register';
 import { mount, unmount } from '../render';
-import { Image } from './image';
+// SIDE-EFFECT IMPORT, and the suite is worthless without it: `renderImage`'s whole fold reaches
+// the tag through `registerImageBehavior`, which only this module calls.
+// The STATICS half of the old component, now a plain namespace with no view.
+import { Image } from '../modules/image';
 
 const ROOT_TAG = 913;
 const IMAGE_VIEW = 'RCTImageView';
@@ -83,7 +88,7 @@ describe('Solid Image on the engine', () => {
     // the real native view name. A wrong view name resolves to no component on the host, and no
     // JS-level check would catch it.
     it('mounts to a real RCTImageView', async () => {
-      mount(ROOT_TAG, () => <Image source={REMOTE} />);
+      mount(ROOT_TAG, () => <image source={REMOTE} />);
       await tick();
       expect(committedImage().props.source).toEqual([REMOTE]);
     });
@@ -92,7 +97,7 @@ describe('Solid Image on the engine', () => {
     // rather than only through core's internal wiring — and, since renderImage resolves inside the
     // descriptor accessor, that it is read at render time (after bootstrapHost) and not at import.
     it('runs the installed source resolver on a require()-style asset id', async () => {
-      mount(ROOT_TAG, () => <Image source={ASSET_ID} />);
+      mount(ROOT_TAG, () => <image source={ASSET_ID} />);
       await tick();
       expect(firstSource(committedImage())).toEqual(RESOLVED_ASSET);
     });
@@ -102,7 +107,7 @@ describe('Solid Image on the engine', () => {
     // Fabric raw as well — a prop native has no idea about, alongside a source that looks correct.
     it('keeps the W3C aliases off the native prop bag, folding them into source', async () => {
       mount(ROOT_TAG, () => (
-        <Image src="http://x/w.png" width={20} height={30} alt="a wombat" />
+        <image src="http://x/w.png" width={20} height={30} alt="a wombat" />
       ));
       await tick();
 
@@ -124,7 +129,7 @@ describe('Solid Image on the engine', () => {
     it('fires onLoad from the captured native topLoad event', async () => {
       let loadedUri: unknown;
       mount(ROOT_TAG, () => (
-        <Image
+        <image
           source={REMOTE}
           onLoad={event => {
             loadedUri = event.nativeEvent.source;
@@ -151,7 +156,7 @@ describe('Solid Image on the engine', () => {
           style: { opacity: CLASS_OPACITY },
         },
       ]);
-      mount(ROOT_TAG, () => <Image source={REMOTE} class="hero" />);
+      mount(ROOT_TAG, () => <image source={REMOTE} class="hero" />);
       await tick();
 
       const props = committedImage().props;
@@ -166,7 +171,7 @@ describe('Solid Image on the engine', () => {
     // replacement restarts the download and drops the decoded bitmap).
     it('re-commits the same native node when the parent swaps source after mount', async () => {
       const [source, setSource] = createSignal(REMOTE);
-      mount(ROOT_TAG, () => <Image source={source()} />);
+      mount(ROOT_TAG, () => <image source={source()} />);
       await tick();
       const createdAtMount = fabric.counts.createNode;
       expect(firstSource(committedImage())).toEqual(REMOTE);
@@ -187,7 +192,7 @@ describe('Solid Image on the engine', () => {
     // (.claude/rules/solid-descriptor-bridge.md §1).
     it('clears the alt-derived accessibility props when alt goes undefined after mount', async () => {
       const [alt, setAlt] = createSignal<string | undefined>('a wombat');
-      mount(ROOT_TAG, () => <Image source={REMOTE} alt={alt()} />);
+      mount(ROOT_TAG, () => <image source={REMOTE} alt={alt()} />);
       await tick();
       expect(committedImage().props.accessibilityLabel).toBe('a wombat');
       expect(committedImage().props.accessible).toBe(true);

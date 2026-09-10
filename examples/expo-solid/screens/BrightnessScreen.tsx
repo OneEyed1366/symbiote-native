@@ -1,11 +1,5 @@
 import { For, createSignal, onCleanup } from 'solid-js';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/solid';
+import { Platform, ScrollView } from '@symbiote-native/solid';
 import {
   BrightnessMode,
   addBrightnessListener,
@@ -31,9 +25,9 @@ function CapabilityBadge(props: { status: ICapabilityStatus }) {
         ? 'YES'
         : 'NO';
   return (
-    <View class={`status-badge status-badge-${props.status}`}>
-      <Text class="status-badge-text">{label()}</Text>
-    </View>
+    <view class={`status-badge status-badge-${props.status}`}>
+      <text class="status-badge-text">{label()}</text>
+    </view>
   );
 }
 
@@ -127,39 +121,39 @@ export function BrightnessScreen() {
     permissions.status() === null ? 'checking…' : permissions.status()!.status;
 
   return (
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="brightness-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Brightness</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Brightness</text>
+            <text class="hero-body">
               @symbiote-native/brightness — screen brightness get/set, Android
               system-brightness mode, and an iOS-only live listener. Requires
               SYSTEM_BRIGHTNESS permission on Android before setting the
               system-wide value.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="brightness-live-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Live brightness</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Screen brightness</Text>
-            <Text class="value-text">{brightnessLabel()}</Text>
-          </View>
-          <View class="button-row">
+        <view testID="brightness-live-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Live brightness</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Screen brightness</text>
+            <text class="value-text">{brightnessLabel()}</text>
+          </view>
+          <view class="button-row">
             <For each={BRIGHTNESS_STEPS}>
               {({ label, value }) => (
                 <ActionButton
@@ -170,27 +164,27 @@ export function BrightnessScreen() {
                 />
               )}
             </For>
-          </View>
-        </View>
+          </view>
+        </view>
 
         {Platform.OS === 'android' && (
-          <View testID="brightness-system-card" class="feature-card">
-            <View class="feature-card-header">
-              <Text class="feature-card-title">
+          <view testID="brightness-system-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">
                 System brightness (Android only)
-              </Text>
-            </View>
-            <View class="capability-row">
-              <Text class="capability-label">Mode</Text>
-              <Text class="value-text">
+              </text>
+            </view>
+            <view class="capability-row">
+              <text class="capability-label">Mode</text>
+              <text class="value-text">
                 {brightnessModeLabel(systemMode())}
-              </Text>
-            </View>
-            <View class="capability-row" testID="brightness-using-system">
-              <Text class="capability-label">Using system value</Text>
+              </text>
+            </view>
+            <view class="capability-row" testID="brightness-using-system">
+              <text class="capability-label">Using system value</text>
               <CapabilityBadge status={isUsingSystem()} />
-            </View>
-            <View class="button-row">
+            </view>
+            <view class="button-row">
               <ActionButton
                 testID="brightness-mode-automatic"
                 title="Automatic"
@@ -209,26 +203,26 @@ export function BrightnessScreen() {
                 onPress={handleRestoreSystem}
                 color={lineColor}
               />
-            </View>
-          </View>
+            </view>
+          </view>
         )}
 
-        <View testID="brightness-permission-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Permission</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">SYSTEM_BRIGHTNESS status</Text>
-            <Text class="value-text">{permissionLabel()}</Text>
-          </View>
+        <view testID="brightness-permission-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Permission</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">SYSTEM_BRIGHTNESS status</text>
+            <text class="value-text">{permissionLabel()}</text>
+          </view>
           <ActionButton
             testID="brightness-request-permission"
             title="Request permission"
             onPress={() => permissions.request()}
             color={lineColor}
           />
-        </View>
+        </view>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

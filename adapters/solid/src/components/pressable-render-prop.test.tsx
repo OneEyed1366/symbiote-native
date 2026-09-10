@@ -29,7 +29,6 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import '../register';
 import { mount, unmount } from '../render';
 import { Pressable } from './pressable';
-import { Text } from './text';
 
 const ROOT_TAG = 815;
 const TARGET = 'render-prop-target';
@@ -121,7 +120,7 @@ describe('Pressable with a function child, across repeated press cycles', () => 
   it('creates no node when a press flips the state the child reads', async () => {
     mount(ROOT_TAG, () => (
       <Pressable testID={TARGET}>
-        {state => <Text>{state().pressed ? 'down' : 'up'}</Text>}
+        {state => <text>{state().pressed ? 'down' : 'up'}</text>}
       </Pressable>
     ));
     await flush();
@@ -159,7 +158,7 @@ describe('Pressable with a function child, across repeated press cycles', () => 
           presses++;
         }}
       >
-        {state => <Text>{state().pressed ? 'down' : 'up'}</Text>}
+        {state => <text>{state().pressed ? 'down' : 'up'}</text>}
       </Pressable>
     ));
     await flush();
@@ -183,7 +182,7 @@ describe('Pressable with a function child, across repeated press cycles', () => 
   it('never re-creates the responder host node during a press', async () => {
     mount(ROOT_TAG, () => (
       <Pressable testID={TARGET}>
-        {state => <Text>{state().pressed ? 'down' : 'up'}</Text>}
+        {state => <text>{state().pressed ? 'down' : 'up'}</text>}
       </Pressable>
     ));
     await flush();
@@ -218,8 +217,8 @@ describe('Pressable with a function child, across repeated press cycles', () => 
       >
         {state => (
           <>
-            <Text>{state().pressed ? 'down' : 'up'}</Text>
-            {busy() ? <activity-indicator /> : <Text>off</Text>}
+            <text>{state().pressed ? 'down' : 'up'}</text>
+            {busy() ? <activity-indicator /> : <text>off</text>}
           </>
         )}
       </Pressable>
@@ -246,7 +245,7 @@ describe('Pressable with a function child, across repeated press cycles', () => 
   it('returns pressed to false in the committed text after release', async () => {
     mount(ROOT_TAG, () => (
       <Pressable testID={TARGET}>
-        {state => <Text>{state().pressed ? 'down' : 'up'}</Text>}
+        {state => <text>{state().pressed ? 'down' : 'up'}</text>}
       </Pressable>
     ));
     await flush();
@@ -281,8 +280,8 @@ describe('Pressable with a function child, across repeated press cycles', () => 
       >
         {state => (
           <>
-            <Text>{state().pressed ? 'down' : 'up'}</Text>
-            {busy() ? <activity-indicator /> : <Text>off</Text>}
+            <text>{state().pressed ? 'down' : 'up'}</text>
+            {busy() ? <activity-indicator /> : <text>off</text>}
           </>
         )}
       </Pressable>

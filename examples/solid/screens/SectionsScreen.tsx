@@ -14,8 +14,6 @@ import { ListDiagnostics } from './ListDiagnostics';
 import {
   Pressable,
   SectionList,
-  Text,
-  View,
   type ISectionListHandle,
 } from '@symbiote-native/solid';
 
@@ -48,19 +46,19 @@ const SECTIONS = LETTERS.map(letter => ({
 // Hoisted out of the component body on purpose. Solid does not re-render, so nothing here would
 // actually churn — but keeping them at module scope states that intent, and silences the React
 // lint rule about component identity that the shared eslint config still applies to .tsx files.
-const Divider = () => <View class="divider" />;
-const SectionGap = () => <View class="section-gap" />;
+const Divider = () => <view class="divider" />;
+const SectionGap = () => <view class="section-gap" />;
 
 export function SectionsScreen() {
   const [sticky, setSticky] = createSignal(true);
   let list: ISectionListHandle | undefined;
 
   return (
-    <View class="screen-body">
-      <View class="toolbar">
+    <view class="screen-body">
+      <view class="toolbar">
         <Pressable class="chip" onPress={() => setSticky(current => !current)}>
           {() => (
-            <Text class="chip-label">sticky: {sticky() ? 'on' : 'off'}</Text>
+            <text class="chip-label">sticky: {sticky() ? 'on' : 'off'}</text>
           )}
         </Pressable>
         {/* itemIndex 0 targets the section HEADER, not the first row — RN's own convention. */}
@@ -74,9 +72,9 @@ export function SectionsScreen() {
             })
           }
         >
-          {() => <Text class="chip-label">Jump to D</Text>}
+          {() => <text class="chip-label">Jump to D</text>}
         </Pressable>
-      </View>
+      </view>
 
       <ListDiagnostics />
 
@@ -92,33 +90,33 @@ export function SectionsScreen() {
         initialNumToRender={8}
         windowSize={3}
         renderSectionHeader={info => (
-          <View class="section-header">
-            <Text class="section-header-label">{info().section.title}</Text>
-          </View>
+          <view class="section-header">
+            <text class="section-header-label">{info().section.title}</text>
+          </view>
         )}
         renderSectionFooter={info => (
-          <Text class="section-footer">
+          <text class="section-footer">
             {info().section.data.length} in {info().section.title}
-          </Text>
+          </text>
         )}
         ItemSeparatorComponent={Divider}
         SectionSeparatorComponent={SectionGap}
         renderItem={info => (
-          <View class="contact">
-            <Text class="row-label">{info().item.name}</Text>
-            <Text class="subtle">{info().item.detail}</Text>
-          </View>
+          <view class="contact">
+            <text class="row-label">{info().item.name}</text>
+            <text class="subtle">{info().item.detail}</text>
+          </view>
         )}
         ListHeaderComponent={
-          <View class="card">
-            <Text class="section">SectionList · sticky headers</Text>
-            <Text class="subtitle">
+          <view class="card">
+            <text class="section">SectionList · sticky headers</text>
+            <text class="subtitle">
               Scroll and watch a header pin to the top, then hand the pin to the
               next one. Toggle sticky off to see the difference.
-            </Text>
-          </View>
+            </text>
+          </view>
         }
       />
-    </View>
+    </view>
   );
 }

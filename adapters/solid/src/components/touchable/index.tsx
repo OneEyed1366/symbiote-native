@@ -98,7 +98,7 @@ export interface ITouchableOpacityProps extends ITouchableBaseProps {
   activeOpacity?: number;
 }
 
-// `class` is split off with `style`: both describe the FEEDBACK node (the inner Animated.View),
+// `class` is split off with `style`: both describe the FEEDBACK node (the inner faded `<view>`),
 // not the outer Pressable that owns the responder. Left in `rest` they would land on the wrong one.
 const TOUCHABLE_OPACITY_HANDLED = [
   'activeOpacity',
@@ -215,9 +215,9 @@ export function TouchableOpacity(props: ITouchableOpacityProps): JSX.Element {
       onPressIn={handlers().handlePressIn}
       onPressOut={handlers().handlePressOut}
     >
-      <Animated.View style={feedbackStyle()} class={local.class}>
+      <view style={feedbackStyle()} class={local.class}>
         {local.children}
-      </Animated.View>
+      </view>
     </Pressable>
   );
 }

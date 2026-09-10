@@ -215,8 +215,28 @@ function assertMultilineMatchesTag(node: ISymbioteNode, value: unknown): void {
   );
 }
 
-function foldAliasKey(name: string): string {
-  return name === ALIAS_FROM ? ALIAS_TO : name;
+// RN gives `id` UNCONDITIONAL priority when both are set (View.js:77-79,
+// `processedProps.nativeID = id`), and `foldHostBag` reproduces that by deleting the source key out
+// of a whole bag. This renderer never sees a bag — it folds one key at a time — so precedence would
+// otherwise come out as source order, and `<view id nativeID>` would keep the stale legacy value
+// while `<view nativeID id>` would not. The wrapper hid that; a bare tag does not.
+//
+// So the node remembers that its nativeID came from an `id`, and a later raw `nativeID` write loses
+// to it. Off the hot path in every ordinary case: nothing is touched unless the prop being written
+// is one of these two names.
+const aliasedNodes = new WeakSet<ISymbioteNode>();
+
+function foldAliasKey(
+  node: ISymbioteNode,
+  name: string,
+  value: unknown,
+): string {
+  if (name === ALIAS_FROM) {
+    if (value === undefined) aliasedNodes.delete(node);
+    else aliasedNodes.add(node);
+    return ALIAS_TO;
+  }
+  return name;
 }
 
 const nodeOps: RendererOptions<IHostNode> = {
@@ -276,11 +296,16 @@ const nodeOps: RendererOptions<IHostNode> = {
   setProperty(node, name, value) {
     if (isSurface(node)) return;
     if (name === MULTILINE_PROP) assertMultilineMatchesTag(node, value);
+    if (name === ALIAS_TO && aliasedNodes.has(node)) return;
     // routeProp makes the prop-vs-event decision from the node's ViewConfig (onPress on a View
     // becomes a listener; onTintColor on a Switch stays a prop), and centralizes the class+style
     // merge. Shared with React and Vue — never re-implement an `onX` check here
     // (symbiote-engine-core §2).
-    routeProp(node, foldAliasKey(name), foldTextValue(node, name, value));
+    routeProp(
+      node,
+      foldAliasKey(node, name, value),
+      foldTextValue(node, name, value),
+    );
     requestCommit();
   },
 

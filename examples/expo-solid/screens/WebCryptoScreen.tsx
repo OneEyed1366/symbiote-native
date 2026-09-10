@@ -1,5 +1,5 @@
 import { Show, createSignal, type Accessor } from 'solid-js';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import { ScrollView } from '@symbiote-native/solid';
 import webCrypto, {
   polyfillWebCrypto,
 } from '@symbiote-native/standard-web-crypto';
@@ -24,10 +24,10 @@ function hasGlobalCrypto(): boolean {
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="capability-row">
-      <Text class="capability-label">{props.label}</Text>
-      <Text class="value-text">{props.value}</Text>
-    </View>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -55,33 +55,33 @@ export function WebCryptoScreen() {
   };
 
   return (
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="web-crypto-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Web Crypto</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Web Crypto</text>
+            <text class="hero-body">
               @symbiote-native/standard-web-crypto — a Web Crypto API
               getRandomValues polyfill over @symbiote-native/crypto's native
               random source, installable onto globalThis.crypto.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="web-crypto-random-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Random bytes</Text>
-          </View>
+        <view testID="web-crypto-random-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Random bytes</text>
+          </view>
           <ActionButton
             testID="web-crypto-random-button"
             title="Generate 16 random bytes"
@@ -93,12 +93,12 @@ export function WebCryptoScreen() {
               <ValueRow label="Bytes (hex)" value={value()} />
             )}
           </Show>
-        </View>
+        </view>
 
-        <View testID="web-crypto-polyfill-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Polyfill</Text>
-          </View>
+        <view testID="web-crypto-polyfill-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Polyfill</text>
+          </view>
           <ActionButton
             testID="web-crypto-polyfill-button"
             title="Install polyfill"
@@ -109,8 +109,8 @@ export function WebCryptoScreen() {
             label="globalThis.crypto installed"
             value={isPolyfillInstalled() ? 'Yes' : 'No'}
           />
-        </View>
+        </view>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

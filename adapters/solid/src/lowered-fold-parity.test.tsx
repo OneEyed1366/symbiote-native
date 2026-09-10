@@ -11,8 +11,6 @@
 import { describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
-import { View } from './components/view';
-import { Text } from './components/text';
 
 const fabric = installFabric();
 const TARGET = 'fold-parity';
@@ -54,7 +52,7 @@ describe('lowered vs component: committed prop KEYS', () => {
   it('View — id folds to nativeID on both paths', async () => {
     const lowered = await committed(() => <view id="anchor" testID={TARGET} />);
     const component = await committed(() => (
-      <View id="anchor" testID={TARGET} />
+      <view id="anchor" testID={TARGET} />
     ));
     expect(keysOf(lowered)).toEqual(keysOf(component));
     expect(lowered.nativeID).toBe('anchor');
@@ -63,14 +61,14 @@ describe('lowered vs component: committed prop KEYS', () => {
 
   it('View — no id on either path leaves no nativeID key', async () => {
     const lowered = await committed(() => <view testID={TARGET} />);
-    const component = await committed(() => <View testID={TARGET} />);
+    const component = await committed(() => <view testID={TARGET} />);
     expect(keysOf(lowered)).toEqual(keysOf(component));
     expect(keysOf(lowered)).not.toContain('nativeID');
   });
 
   it('Text — the two defaults land on both paths', async () => {
     const lowered = await committed(() => <text testID={TARGET}>y</text>);
-    const component = await committed(() => <Text testID={TARGET}>y</Text>);
+    const component = await committed(() => <text testID={TARGET}>y</text>);
     expect(keysOf(lowered)).toEqual(keysOf(component));
     expect(lowered.ellipsizeMode).toBe(component.ellipsizeMode);
     expect(lowered.allowFontScaling).toBe(component.allowFontScaling);
@@ -83,9 +81,9 @@ describe('lowered vs component: committed prop KEYS', () => {
       </text>
     ));
     const component = await committed(() => (
-      <Text testID={TARGET} ellipsizeMode={null}>
+      <text testID={TARGET} ellipsizeMode={null}>
         y
-      </Text>
+      </text>
     ));
     expect(lowered.ellipsizeMode).toBe(component.ellipsizeMode);
   });

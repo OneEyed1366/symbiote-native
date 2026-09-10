@@ -17,7 +17,6 @@
 import { describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
-import { View } from './components/view';
 
 const fabric = installFabric();
 const TARGET = 'aria-parity';
@@ -56,7 +55,7 @@ describe('aria fold reaches both Solid paths', () => {
       <view testID={TARGET} role="button" aria-label="x" />
     ));
     const component = await committed(() => (
-      <View testID={TARGET} role="button" aria-label="x" />
+      <view testID={TARGET} role="button" aria-label="x" />
     ));
 
     for (const arm of [lowered, component]) {
@@ -87,7 +86,7 @@ describe('aria fold reaches both Solid paths', () => {
             />
           )
         : () => (
-            <View
+            <view
               testID={TARGET}
               accessibilityState={{ checked: false, busy: true }}
               aria-checked={true}

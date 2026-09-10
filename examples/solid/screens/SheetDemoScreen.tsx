@@ -4,7 +4,7 @@
 // native sheet the same way a real app would toggle it from a button. Solid twin of
 // examples/svelte/screens/SheetDemoScreen.svelte.
 
-import { ScrollView, Text, View } from '@symbiote-native/solid';
+import { ScrollView } from '@symbiote-native/solid';
 import { useStackNavigation } from '@symbiote-native/navigation/solid';
 import type { ISolidScreenOptions } from '@symbiote-native/navigation/solid';
 import { ActionButton } from '../components/ActionButton';
@@ -53,30 +53,30 @@ export function SheetDemoScreen() {
 
   return (
     <ScrollView class="screen" contentContainerStyle="demo-section">
-      <View class={`line-tag line-tag-${lineInfo.line}`}>
-        <Text class="line-tag-text">
+      <view class={`line-tag line-tag-${lineInfo.line}`}>
+        <text class="line-tag-text">
           {`${lineInfo.code} · ${lineInfo.label}`}
-        </Text>
-      </View>
-      <View class="hero-card">
-        <View
+        </text>
+      </view>
+      <view class="hero-card">
+        <view
           class="hero-badge"
           style={{ backgroundColor: LINE_COLOR.presentation }}
         >
-          <Text class="hero-badge-text">SH</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Sheet presentation</Text>
-          <Text class="hero-body">
+          <text class="hero-badge-text">SH</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Sheet presentation</text>
+          <text class="hero-body">
             Pushed with stackPresentation: formSheet and three detents — drag
             the grabber between 30%, 60%, and full height.
-          </Text>
-        </View>
-      </View>
-      <Text class="info-text">
+          </text>
+        </view>
+      </view>
+      <text class="info-text">
         stackPresentation: formSheet · detents 30% / 60% / 100% · drag the
         grabber
-      </Text>
+      </text>
       <ActionButton
         testID="sheet-dismiss"
         title="Dismiss"

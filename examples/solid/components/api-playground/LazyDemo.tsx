@@ -6,7 +6,6 @@
 // the boundary observable on device. Nothing about lazy() itself is stubbed.
 
 import { Suspense, createSignal, lazy } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -27,8 +26,8 @@ export function LazyDemo() {
   const [loadedAt, setLoadedAt] = createSignal<string>('never');
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">lazy · Suspense</Text>
+    <view class="section-nested">
+      <text class="section-label">lazy · Suspense</text>
       <ActionButton
         testID="lazy-mount"
         title={mounted() ? 'unmount lazy panel' : 'mount lazy panel'}
@@ -37,9 +36,9 @@ export function LazyDemo() {
       />
       <Suspense
         fallback={
-          <Text class="subtle" testID="lazy-fallback">
+          <text class="subtle" testID="lazy-fallback">
             Suspense fallback — module in flight
-          </Text>
+          </text>
         }
       >
         {mounted() ? (
@@ -50,9 +49,9 @@ export function LazyDemo() {
           />
         ) : null}
       </Suspense>
-      <Text class="subtle" testID="lazy-loaded-at">
+      <text class="subtle" testID="lazy-loaded-at">
         {`module first evaluated at ${loadedAt()}`}
-      </Text>
-    </View>
+      </text>
+    </view>
   );
 }

@@ -1,9 +1,19 @@
-// The Animated namespace for @symbiote-native/solid. createAnimatedComponent applied to this
-// adapter's primitives gives the six animated components RN exposes; the value graph, easing and
-// imperative drivers come from @symbiote-native/engine (framework-agnostic), so both halves meet
-// here in one object and `Animated.timing(new Animated.Value(0), …).start()` reads as it does in
-// RN. Solid's JSX takes the dotted form directly — `<Animated.View/>` compiles to
-// createComponent(Animated.View, …), no local alias needed.
+// The Animated namespace for @symbiote-native/solid. The value graph, easing and imperative drivers
+// come from @symbiote-native/engine (framework-agnostic), so both halves meet here in one object and
+// `Animated.timing(new Animated.Value(0), …).start()` reads as it does in RN. Solid's JSX takes the
+// dotted form directly — `<Animated.ScrollView/>` compiles to createComponent(Animated.ScrollView, …),
+// no local alias needed.
+//
+// THERE IS NO `Animated.View` / `Animated.Text` / `Animated.Image`, and nothing replaced them:
+// `<view style={{ opacity: someAnimatedValue }}>` is the whole API. The engine resolves an
+// AnimatedNode written into any prop of any host node (`core/engine/src/animated/host-binding.ts`)
+// — it publishes the current value, subscribes the leaf, writes each frame through its own targeted
+// setNativeProps commit, and releases at the commit sweep. Those three were aliases of the wrappers,
+// and a wrapper is a tag now, which is not a value `<Animated.X>` can call.
+//
+// The three below REMAIN because they are tier 3: a render prop decides the list family's output
+// shape in JS, and ScrollView still composes its content container in the adapter — so each is a
+// real component for `<Animated.X>` to be an alias of.
 //
 // The NATIVE DRIVER is not this module's doing and must not be re-derived here. A
 // useNativeDriver animation promotes the value graph itself (animations/base.ts ->
@@ -35,9 +45,6 @@ import {
   forkEvent,
   unforkEvent,
 } from '@symbiote-native/engine';
-import { View } from '../../components/view';
-import { Text } from '../../components/text';
-import { Image } from '../../components/image';
 import { ScrollView } from '../../components/scroll-view';
 import { FlatList } from '../../components/flat-list';
 import { SectionList } from '../../components/section-list';
@@ -52,11 +59,6 @@ export {
   AnimatedStyle,
   AnimatedTransform,
 } from '@symbiote-native/engine';
-
-// View/Text/Image are pure host primitives with no cycle back to here, so wrap them eagerly.
-const AnimatedView = createAnimatedComponent(View);
-const AnimatedText = createAnimatedComponent(Text);
-const AnimatedImage = createAnimatedComponent(Image);
 
 // The scrolling containers go behind memoized LAZY getters, mirroring RN's own
 // `get ScrollView() { return require(…) }`: ScrollView's module chain pulls in
@@ -101,9 +103,6 @@ const liveDrivers = {
 const drivers = Platform.isDisableAnimations ? AnimatedMock : liveDrivers;
 
 export const Animated = {
-  View: AnimatedView,
-  Text: AnimatedText,
-  Image: AnimatedImage,
   get ScrollView(): IAnimatedComponent {
     animatedScrollView ??= createAnimatedComponent(ScrollView);
     return animatedScrollView;

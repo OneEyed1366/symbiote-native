@@ -5,7 +5,7 @@ import {
   type Accessor,
   type JSX,
 } from 'solid-js';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import { ScrollView } from '@symbiote-native/solid';
 import {
   Accelerometer,
   DeviceMotion,
@@ -82,9 +82,9 @@ function resolveSensorStatus(
 
 function SensorStatusBadge(props: { status: ISensorStatus }) {
   return (
-    <View class={`sensor-status-badge sensor-status-badge-${props.status}`}>
-      <Text class="sensor-status-text">{SENSOR_STATUS_TEXT[props.status]}</Text>
-    </View>
+    <view class={`sensor-status-badge sensor-status-badge-${props.status}`}>
+      <text class="sensor-status-text">{SENSOR_STATUS_TEXT[props.status]}</text>
+    </view>
   );
 }
 
@@ -95,22 +95,22 @@ function SensorCard(props: {
   children?: JSX.Element;
 }) {
   return (
-    <View testID={props.testID} class="sensor-card">
-      <View class="sensor-card-header">
-        <Text class="sensor-card-title">{props.title}</Text>
+    <view testID={props.testID} class="sensor-card">
+      <view class="sensor-card-header">
+        <text class="sensor-card-title">{props.title}</text>
         <SensorStatusBadge status={props.status} />
-      </View>
+      </view>
       {props.status === 'checking' && (
-        <Text class="info-text">checking availability…</Text>
+        <text class="info-text">checking availability…</text>
       )}
       {props.status === 'unavailable' && (
-        <Text class="info-text">not available on this device</Text>
+        <text class="info-text">not available on this device</text>
       )}
       {props.status === 'waiting' && (
-        <Text class="info-text">waiting for first reading…</Text>
+        <text class="info-text">waiting for first reading…</text>
       )}
       {props.status === 'live' && props.children}
-    </View>
+    </view>
   );
 }
 
@@ -118,26 +118,26 @@ function AxisReadingRow(props: {
   measurement: { x: number; y: number; z: number };
 }) {
   return (
-    <View class="sensor-reading-row">
-      <View class="sensor-reading-chip">
-        <Text class="sensor-reading-label">X</Text>
-        <Text class="sensor-reading-value">
+    <view class="sensor-reading-row">
+      <view class="sensor-reading-chip">
+        <text class="sensor-reading-label">X</text>
+        <text class="sensor-reading-value">
           {props.measurement.x.toFixed(3)}
-        </Text>
-      </View>
-      <View class="sensor-reading-chip">
-        <Text class="sensor-reading-label">Y</Text>
-        <Text class="sensor-reading-value">
+        </text>
+      </view>
+      <view class="sensor-reading-chip">
+        <text class="sensor-reading-label">Y</text>
+        <text class="sensor-reading-value">
           {props.measurement.y.toFixed(3)}
-        </Text>
-      </View>
-      <View class="sensor-reading-chip">
-        <Text class="sensor-reading-label">Z</Text>
-        <Text class="sensor-reading-value">
+        </text>
+      </view>
+      <view class="sensor-reading-chip">
+        <text class="sensor-reading-label">Z</text>
+        <text class="sensor-reading-value">
           {props.measurement.z.toFixed(3)}
-        </Text>
-      </View>
-    </View>
+        </text>
+      </view>
+    </view>
   );
 }
 
@@ -181,32 +181,32 @@ export function SensorsScreen() {
     resolveSensorStatus(pedometerAvailability(), pedometer() !== null);
 
   return (
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="sensors-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view
             class="hero-badge"
             style={{ backgroundColor: LINE_COLOR.sensors }}
           >
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Sensors</Text>
-            <Text class="hero-body">
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Sensors</text>
+            <text class="hero-body">
               @symbiote-native/sensors — live readings from five
               expo-sensors-backed primitives. A simulator reports every
               CoreMotion/CMPedometer-backed sensor as unavailable; a real device
               is needed to see live readings.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
         <SensorCard
           testID="sensors-accelerometer"
@@ -251,31 +251,31 @@ export function SensorsScreen() {
         >
           <Show when={deviceMotion()}>
             {(motion: Accessor<IDeviceMotionMeasurement>) => (
-              <Text class="info-text">{`interval: ${motion().interval.toFixed(1)}ms`}</Text>
+              <text class="info-text">{`interval: ${motion().interval.toFixed(1)}ms`}</text>
             )}
           </Show>
           <Show when={deviceMotion()?.rotation}>
             {(rotation: Accessor<IDeviceMotionMeasurement['rotation']>) => (
-              <View class="sensor-reading-row">
-                <View class="sensor-reading-chip">
-                  <Text class="sensor-reading-label">ALPHA</Text>
-                  <Text class="sensor-reading-value">
+              <view class="sensor-reading-row">
+                <view class="sensor-reading-chip">
+                  <text class="sensor-reading-label">ALPHA</text>
+                  <text class="sensor-reading-value">
                     {rotation().alpha.toFixed(3)}
-                  </Text>
-                </View>
-                <View class="sensor-reading-chip">
-                  <Text class="sensor-reading-label">BETA</Text>
-                  <Text class="sensor-reading-value">
+                  </text>
+                </view>
+                <view class="sensor-reading-chip">
+                  <text class="sensor-reading-label">BETA</text>
+                  <text class="sensor-reading-value">
                     {rotation().beta.toFixed(3)}
-                  </Text>
-                </View>
-                <View class="sensor-reading-chip">
-                  <Text class="sensor-reading-label">GAMMA</Text>
-                  <Text class="sensor-reading-value">
+                  </text>
+                </view>
+                <view class="sensor-reading-chip">
+                  <text class="sensor-reading-label">GAMMA</text>
+                  <text class="sensor-reading-value">
                     {rotation().gamma.toFixed(3)}
-                  </Text>
-                </View>
-              </View>
+                  </text>
+                </view>
+              </view>
             )}
           </Show>
         </SensorCard>
@@ -287,16 +287,16 @@ export function SensorsScreen() {
         >
           <Show when={pedometer()}>
             {(reading: Accessor<IPedometerResult>) => (
-              <Text
+              <text
                 testID="sensors-pedometer-steps"
                 class="sensor-reading-value"
               >
                 {`${reading().steps} steps`}
-              </Text>
+              </text>
             )}
           </Show>
         </SensorCard>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

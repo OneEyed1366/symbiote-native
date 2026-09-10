@@ -4,18 +4,13 @@
 // committed native tag. The flash holds until the next commit re-applies the declarative style,
 // exactly RN's imperative-override semantics.
 //
-// Solid takes the ref on the public `View`, which forwards it (IViewProps.ref: Ref<IHostInstance>)
-// — no hand-authored `view` host tag, which is what Svelte's twin needs because its View
-// has no bind:this escape hatch. And no shallowRef discipline either, which is Vue's concern: a
-// Solid signal stores the node by identity, so the engine's WeakMap mirror still finds it.
+// The ref goes on the bare `<view>` tag and yields the engine node itself — IHostInstance IS a
+// SymbioteNode, so a tag hands back exactly what the old `View` wrapper forwarded. And no
+// shallowRef discipline either, which is Vue's concern: a Solid signal stores the node by
+// identity, so the engine's WeakMap mirror still finds it.
 
 import { createSignal, onMount } from 'solid-js';
-import {
-  Text,
-  View,
-  findNodeHandle,
-  type IHostInstance,
-} from '@symbiote-native/solid';
+import { findNodeHandle, type IHostInstance } from '@symbiote-native/solid';
 import { ActionButton } from './ActionButton';
 import './RefApiDemo.css';
 
@@ -56,33 +51,33 @@ export function RefApiDemo() {
   };
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">
+    <view class="section-nested">
+      <text class="section-label">
         Imperative ref · measure / setNativeProps / findNodeHandle
-      </Text>
-      <View ref={node => setBox(node)} testID="ref-box" class="ref-box">
-        <Text class="ref-box-text">{`native tag ${tag() ?? '—'}`}</Text>
-      </View>
-      <Text testID="measure-frame" class="ref-frame-text">
+      </text>
+      <view ref={node => setBox(node)} testID="ref-box" class="ref-box">
+        <text class="ref-box-text">{`native tag ${tag() ?? '—'}`}</text>
+      </view>
+      <text testID="measure-frame" class="ref-frame-text">
         {`frame: ${frame()}`}
-      </Text>
-      <View class="row">
-        <View class="flex1">
+      </text>
+      <view class="row">
+        <view class="flex1">
           <ActionButton
             testID="measure-btn"
             title="Measure"
             onPress={onMeasure}
             color="#7aa2e3"
           />
-        </View>
-        <View class="flex1">
+        </view>
+        <view class="flex1">
           <ActionButton
             title="Flash (setNativeProps)"
             onPress={onFlash}
             color="#f6ad55"
           />
-        </View>
-      </View>
-    </View>
+        </view>
+      </view>
+    </view>
   );
 }

@@ -14,9 +14,10 @@ import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// SIDE-EFFECT IMPORT: the refresh-control tag's behavior owns the controlled-spinner handshake,
+// and only this module installs it. An app reaches it through the package barrel; a test does not.
+import '../../register';
 import { mount, unmount } from '../../render';
-import { View } from '../view';
-import { RefreshControl } from '../refresh-control';
 import { ScrollView } from './index';
 import type { IScrollViewHandle } from './index';
 
@@ -67,7 +68,7 @@ describe('Solid ScrollView on the engine', () => {
     it('commits the nested scroll-view / content-view pair with the children inside the content', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView>
-          <View testID={MARKER} />
+          <view testID={MARKER} />
         </ScrollView>
       ));
       await tick();
@@ -85,7 +86,7 @@ describe('Solid ScrollView on the engine', () => {
     it('keeps the content view un-flattened with collapsable false', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView>
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -98,7 +99,7 @@ describe('Solid ScrollView on the engine', () => {
     it('lays the content out along the scroll axis when horizontal', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView horizontal>
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -122,7 +123,7 @@ describe('Solid ScrollView on the engine', () => {
       ]);
       mount(ROOT_TAG, () => (
         <ScrollView contentContainerStyle="padded">
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -142,7 +143,7 @@ describe('Solid ScrollView on the engine', () => {
             scroller = handle;
           }}
         >
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -172,7 +173,7 @@ describe('Solid ScrollView on the engine', () => {
             scroller = handle;
           }}
         >
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -191,7 +192,7 @@ describe('Solid ScrollView on the engine', () => {
             sizes.push([width, height]);
           }}
         >
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -221,7 +222,7 @@ describe('Solid ScrollView on the engine', () => {
           stickyHeaderIndices={[0]}
           invertStickyHeaders
         >
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -239,7 +240,7 @@ describe('Solid ScrollView on the engine', () => {
     it('resolves a named decelerationRate to its numeric constant', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView decelerationRate="fast">
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -251,7 +252,7 @@ describe('Solid ScrollView on the engine', () => {
     it('defaults nestedScrollEnabled to true and honours an explicit false', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView>
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -261,7 +262,7 @@ describe('Solid ScrollView on the engine', () => {
 
       mount(ROOT_TAG, () => (
         <ScrollView nestedScrollEnabled={false}>
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -275,7 +276,7 @@ describe('Solid ScrollView on the engine', () => {
     it('keeps the content cells un-flattened for maintainVisibleContentPosition', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView maintainVisibleContentPosition={{ minIndexForVisible: 0 }}>
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -298,7 +299,7 @@ describe('Solid ScrollView on the engine', () => {
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
         >
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -318,7 +319,7 @@ describe('Solid ScrollView on the engine', () => {
       const [horizontal, setHorizontal] = createSignal(false);
       mount(ROOT_TAG, () => (
         <ScrollView horizontal={horizontal()}>
-          <View testID={MARKER} />
+          <view testID={MARKER} />
         </ScrollView>
       ));
       await tick();
@@ -345,7 +346,7 @@ describe('Solid ScrollView on the engine', () => {
       const [enabled, setEnabled] = createSignal(true);
       mount(ROOT_TAG, () => (
         <ScrollView scrollEnabled={enabled()}>
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -368,10 +369,10 @@ describe('Solid ScrollView on the engine', () => {
       mount(ROOT_TAG, () => (
         <ScrollView
           refreshControl={
-            <RefreshControl refreshing={false} onRefresh={() => {}} />
+            <refresh-control refreshing={false} onRefresh={() => {}} />
           }
         >
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -392,9 +393,9 @@ describe('Solid ScrollView on the engine', () => {
       const [refreshing, setRefreshing] = createSignal(false);
       mount(ROOT_TAG, () => (
         <ScrollView
-          refreshControl={<RefreshControl refreshing={refreshing()} />}
+          refreshControl={<refresh-control refreshing={refreshing()} />}
         >
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();
@@ -422,7 +423,7 @@ describe('Solid ScrollView on the engine', () => {
       mount(ROOT_TAG, () => (
         // A number is neither a class name nor a style object; the resolver's else-branch takes it.
         <ScrollView contentContainerStyle={undefined}>
-          <View />
+          <view />
         </ScrollView>
       ));
       await tick();

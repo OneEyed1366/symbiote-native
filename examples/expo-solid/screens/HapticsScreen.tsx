@@ -1,11 +1,5 @@
 import { For, Show, createSignal, type Accessor } from 'solid-js';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/solid';
+import { Platform, ScrollView } from '@symbiote-native/solid';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -101,35 +95,35 @@ export function HapticsScreen() {
   };
 
   return (
-    <SafeAreaView class="screen">
+    <safe-area-view class="screen">
       <ScrollView
         testID="haptics-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Haptics</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Haptics</text>
+            <text class="hero-body">
               @symbiote-native/haptics — impact/notification/selection vibration
               feedback via iOS's Taptic Engine and Android's Vibrator API. A
               simulator won't produce physical feedback; a real device is needed
               to feel it.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="haptics-impact-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Impact</Text>
-          </View>
-          <View class="button-row">
+        <view testID="haptics-impact-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Impact</text>
+          </view>
+          <view class="button-row">
             <For each={IMPACT_STYLES}>
               {({ label, style }) => (
                 <ActionButton
@@ -140,14 +134,14 @@ export function HapticsScreen() {
                 />
               )}
             </For>
-          </View>
-        </View>
+          </view>
+        </view>
 
-        <View testID="haptics-notification-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Notification</Text>
-          </View>
-          <View class="button-row">
+        <view testID="haptics-notification-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Notification</text>
+          </view>
+          <view class="button-row">
             <For each={NOTIFICATION_TYPES}>
               {({ label, type }) => (
                 <ActionButton
@@ -158,31 +152,31 @@ export function HapticsScreen() {
                 />
               )}
             </For>
-          </View>
-        </View>
+          </view>
+        </view>
 
-        <View testID="haptics-selection-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Selection</Text>
-          </View>
+        <view testID="haptics-selection-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Selection</text>
+          </view>
           <ActionButton
             testID="haptics-selection-button"
             title="Selection"
             onPress={handleSelection}
             color={lineColor}
           />
-        </View>
+        </view>
 
         {Platform.OS === 'android' && (
-          <View testID="haptics-android-card" class="feature-card">
-            <View class="feature-card-header">
-              <Text class="feature-card-title">Android haptics</Text>
-            </View>
-            <Text class="info-text">
+          <view testID="haptics-android-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Android haptics</text>
+            </view>
+            <text class="info-text">
               performAndroidHapticsAsync() drives the device haptics engine
               directly — Android only.
-            </Text>
-            <View class="button-row">
+            </text>
+            <view class="button-row">
               <For each={ANDROID_HAPTICS}>
                 {({ label, type }) => (
                   <ActionButton
@@ -193,18 +187,18 @@ export function HapticsScreen() {
                   />
                 )}
               </For>
-            </View>
-          </View>
+            </view>
+          </view>
         )}
 
         <Show when={lastFired()}>
           {(fired: Accessor<string>) => (
-            <View testID="haptics-last-fired" class="feature-card">
-              <Text class="value-text">{`Last fired: ${fired()}`}</Text>
-            </View>
+            <view testID="haptics-last-fired" class="feature-card">
+              <text class="value-text">{`Last fired: ${fired()}`}</text>
+            </view>
           )}
         </Show>
       </ScrollView>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

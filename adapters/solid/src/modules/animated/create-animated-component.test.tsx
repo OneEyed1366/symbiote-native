@@ -32,7 +32,7 @@ function appView(): IFakeNode {
 describe('Solid createAnimatedComponent', () => {
   it('reduces an animated prop to a concrete value on first paint', async () => {
     const opacity = new Animated.Value(0.25);
-    mount(ROOT_TAG, () => <Animated.View style={{ opacity }} />);
+    mount(ROOT_TAG, () => <view style={{ opacity }} />);
     await tick();
 
     // A live AnimatedValue reaching Fabric would serialize as an object and paint nothing.
@@ -42,9 +42,9 @@ describe('Solid createAnimatedComponent', () => {
   it('drives a frame through the leaf without rebuilding the subtree', async () => {
     const opacity = new Animated.Value(0);
     mount(ROOT_TAG, () => (
-      <Animated.View style={{ opacity }}>
+      <view style={{ opacity }}>
         <text>label</text>
-      </Animated.View>
+      </view>
     ));
     await tick();
 
@@ -87,7 +87,7 @@ describe('Solid createAnimatedComponent', () => {
   it('gives the caller the base instance and the leaf the resolved host node', async () => {
     let received: unknown = null;
     mount(ROOT_TAG, () => (
-      <Animated.View
+      <view
         ref={(instance: unknown) => {
           received = instance;
         }}

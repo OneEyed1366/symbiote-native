@@ -13,8 +13,6 @@ import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { Pressable } from './pressable';
-import { Text } from './text';
-import { View } from './view';
 
 const ROOT_TAG = 977;
 const SCREEN_FLEX = 1;
@@ -79,7 +77,7 @@ describe('class resolution through the adapter components', () => {
   // why: this is the exact shape of every canary's root box. A `class` that does not resolve
   // leaves the root with no flex and no background — a blank screen, silently.
   it('resolves a registered class on View into real style props', async () => {
-    mount(ROOT_TAG, () => <View class="screen" testID={PROBE} />);
+    mount(ROOT_TAG, () => <view class="screen" testID={PROBE} />);
     await tick();
 
     const view = committed(PROBE);
@@ -91,9 +89,9 @@ describe('class resolution through the adapter components', () => {
 
   it('resolves a registered class on Text', async () => {
     mount(ROOT_TAG, () => (
-      <Text class="label" testID={PROBE}>
+      <text class="label" testID={PROBE}>
         hi
-      </Text>
+      </text>
     ));
     await tick();
 
@@ -117,7 +115,7 @@ describe('class resolution through the adapter components', () => {
   // it from an adapter file would duplicate the contract in a place that cannot fix it.
   it('forwards class and an explicit style together on View', async () => {
     mount(ROOT_TAG, () => (
-      <View class="screen" style={{ margin: 7 }} testID={PROBE} />
+      <view class="screen" style={{ margin: 7 }} testID={PROBE} />
     ));
     await tick();
 

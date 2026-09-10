@@ -17,7 +17,6 @@ import {
   createSignal,
   on,
 } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -59,23 +58,23 @@ export function EffectTimingDemo() {
   );
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">
+    <view class="section-nested">
+      <text class="section-label">
         createComputed · createRenderEffect · createEffect · on(defer) · batch
-      </Text>
-      <View class="ap-log" testID="effect-timing-log">
+      </text>
+      <view class="ap-log" testID="effect-timing-log">
         {/* <Index>, not <For>: the log is a rolling window keyed by POSITION, so the row that
             already exists should have its text replaced rather than be rebuilt. Imported
             explicitly — an un-imported control-flow name resolves against the renderer module and
             reads back undefined (.claude/rules/solid-descriptor-bridge.md §3). */}
         <Index each={log()}>
-          {line => <Text class="ap-log-line">{line()}</Text>}
+          {line => <text class="ap-log-line">{line()}</text>}
         </Index>
-      </View>
-      <Text class="ap-value" testID="effect-pair-runs">
+      </view>
+      <text class="ap-value" testID="effect-pair-runs">
         {`effect over [step, other] ran ${pairRuns()}× · step=${step()} other=${other()}`}
-      </Text>
-      <View class="ap-wrap">
+      </text>
+      <view class="ap-wrap">
         <ActionButton
           testID="effect-step"
           title="step + 1"
@@ -102,7 +101,7 @@ export function EffectTimingDemo() {
             })
           }
         />
-      </View>
-    </View>
+      </view>
+    </view>
   );
 }

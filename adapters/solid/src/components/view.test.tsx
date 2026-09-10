@@ -16,8 +16,7 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { findNodeHandle } from '../host-instance';
 import type { IHostInstance } from '../host-instance';
 import { mount, unmount } from '../render';
-import { Text } from './text';
-import { View, type IViewProps } from './view';
+import type { IViewProps } from './view-props';
 
 const ROOT_TAG = 8_201;
 const VIEW = 'RCTView';
@@ -62,7 +61,7 @@ describe('Solid View on the engine', () => {
     // component, which no JS-level check would otherwise catch.
     it('commits as RCTView and forwards ordinary props verbatim', async () => {
       mount(ROOT_TAG, () => (
-        <View testID="probe" pointerEvents="box-none" collapsable={false} />
+        <view testID="probe" pointerEvents="box-none" collapsable={false} />
       ));
       await tick();
 
@@ -78,7 +77,7 @@ describe('Solid View on the engine', () => {
     // alias maps it to `nativeID`, and a stray `id` key on a real native view manager is undefined
     // behavior on device, not a cosmetic mismatch.
     it('folds a raw id into nativeID and drops the raw id key', async () => {
-      mount(ROOT_TAG, () => <View testID="probe" id="foo" />);
+      mount(ROOT_TAG, () => <view testID="probe" id="foo" />);
       await tick();
 
       expect(probe().props.nativeID).toBe('foo');
@@ -90,7 +89,19 @@ describe('Solid View on the engine', () => {
     // `id` never silently keeps the stale legacy value.
     it('lets id win over nativeID when both are passed', async () => {
       mount(ROOT_TAG, () => (
-        <View testID="probe" id="from-id" nativeID="from-nativeID" />
+        <view testID="probe" id="from-id" nativeID="from-nativeID" />
+      ));
+      await tick();
+
+      expect(probe().props.nativeID).toBe('from-id');
+    });
+
+    // why: the fold is PER KEY here — the renderer never sees a whole bag — so without the node
+    // remembering where its nativeID came from, precedence would be source order and this arm and
+    // the one above would disagree. The wrapper hid that; a bare tag does not.
+    it('lets id win when nativeID is written FIRST', async () => {
+      mount(ROOT_TAG, () => (
+        <view testID="probe" nativeID="from-nativeID" id="from-id" />
       ));
       await tick();
 
@@ -102,7 +113,7 @@ describe('Solid View on the engine', () => {
     // which is exactly why the bag must reach routeProp unsplit.
     it('raises the onLayout flag and never leaks the handler as a prop', async () => {
       mount(ROOT_TAG, () => (
-        <View testID="probe" onLayout={() => {}} onPress={() => {}} />
+        <view testID="probe" onLayout={() => {}} onPress={() => {}} />
       ));
       await tick();
 
@@ -116,11 +127,11 @@ describe('Solid View on the engine', () => {
     // so this asserts the real nesting reaches Fabric, string leaf included.
     it('passes a user subtree through to the committed tree', async () => {
       mount(ROOT_TAG, () => (
-        <View testID="probe">
-          <View testID="inner">
-            <Text>hi</Text>
-          </View>
-        </View>
+        <view testID="probe">
+          <view testID="inner">
+            <text>hi</text>
+          </view>
+        </view>
       ));
       await tick();
 
@@ -135,7 +146,7 @@ describe('Solid View on the engine', () => {
     it('re-commits the same native node when a prop changes after mount', async () => {
       const [collapsable, setCollapsable] = createSignal(true);
       mount(ROOT_TAG, () => (
-        <View testID="probe" collapsable={collapsable()} />
+        <view testID="probe" collapsable={collapsable()} />
       ));
       await tick();
       const createdAtMount = fabric.counts.createNode;
@@ -156,11 +167,11 @@ describe('Solid View on the engine', () => {
     it('mounts a child that first appears after mount', async () => {
       const [shown, setShown] = createSignal(false);
       mount(ROOT_TAG, () => (
-        <View testID="probe">
+        <view testID="probe">
           <Show when={shown()}>
-            <View testID="late" />
+            <view testID="late" />
           </Show>
-        </View>
+        </view>
       ));
       await tick();
       expect(committed(n => n.props.testID === 'late')).toBeUndefined();
@@ -177,7 +188,7 @@ describe('Solid View on the engine', () => {
     // reader keeps announcing a label the app already removed — green in every other test here.
     it('clears a folded accessibility prop when its aria alias goes undefined', async () => {
       const [label, setLabel] = createSignal<string | undefined>('wifi');
-      mount(ROOT_TAG, () => <View testID="probe" aria-label={label()} />);
+      mount(ROOT_TAG, () => <view testID="probe" aria-label={label()} />);
       await tick();
       expect(probe().props.accessibilityLabel).toBe('wifi');
 
@@ -200,7 +211,7 @@ describe('Solid View on the engine', () => {
       // same callback prop, and holding the node in a signal is the shape host-instance.ts's
       // findNodeHandle documents an accessor unwrap for — so this covers the interop path too.
       const [node, setNode] = createSignal<IHostInstance | undefined>();
-      mount(ROOT_TAG, () => <View testID="probe" ref={setNode} />);
+      mount(ROOT_TAG, () => <view testID="probe" ref={setNode} />);
       await tick();
 
       expect(node()).toBeDefined();
@@ -224,7 +235,7 @@ describe('Solid View on the engine', () => {
     // reachable without violating IViewProps.
     it('throws when a bare string is rendered as a View child', () => {
       expect(() =>
-        mount(ROOT_TAG, () => <View testID="probe">oops</View>),
+        mount(ROOT_TAG, () => <view testID="probe">oops</view>),
       ).toThrow(/must be rendered inside a <Text>/);
     });
   });

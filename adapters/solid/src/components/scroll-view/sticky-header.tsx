@@ -40,7 +40,6 @@ import {
   type AnimatedValue,
   type ISymbioteEvent,
 } from '@symbiote-native/engine';
-import { Animated } from '../../modules/animated';
 
 // The framework-agnostic sticky inputs (IStickyHeaderProps) plus Solid's own children slot — the
 // per-adapter half of <prop_types_split_agnostic_vs_per_adapter>. A custom `StickyHeaderComponent`
@@ -187,28 +186,36 @@ export function ScrollViewStickyHeader(
   };
 
   // The EXPLICIT debounced translateY overrides the committed transform for hit-testing, while
-  // animatedTranslateY does the smooth (native-driven) pin.
+  // animatedTranslateY does the smooth (native-driven) pin. It rides the style ARRAY now rather
+  // than `passthroughAnimatedPropExplicitValues`: that prop was read by `createAnimatedComponent`,
+  // and the host is a bare tag, where the engine ignores it
+  // (core/engine/src/animated/host-binding.ts calls it a wrapper-ism by name). The wrapper did
+  // exactly this merge — `[reduced.style, passthroughStyle]` — so a later array entry overriding
+  // the transform is the same semantics, one layer down, and the engine still binds the
+  // interpolation it finds in entry 0.
   const passthrough = createMemo(() => {
     // Read the bump so a committed translateY repaints.
     version();
-    if (state.translateY === null) return null;
-    return { style: { transform: [{ translateY: state.translateY }] } };
+    if (state.translateY === null) return undefined;
+    return { transform: [{ translateY: state.translateY }] };
   });
 
   // collapsable:false keeps the wrapper a real Yoga node; zIndex makes the pinned header paint OVER
   // the rows scrolling up under it.
   return (
-    <Animated.View
-      style={{
-        transform: [{ translateY: animatedTranslateY() }],
-        zIndex: STICKY_HEADER_Z_INDEX,
-      }}
+    <view
+      style={[
+        {
+          transform: [{ translateY: animatedTranslateY() }],
+          zIndex: STICKY_HEADER_Z_INDEX,
+        },
+        passthrough(),
+      ]}
       onLayout={onLayout}
       collapsable={false}
-      passthroughAnimatedPropExplicitValues={passthrough()}
     >
       {props.children}
-    </Animated.View>
+    </view>
   );
 }
 

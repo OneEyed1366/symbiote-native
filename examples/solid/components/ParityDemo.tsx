@@ -22,9 +22,7 @@ import {
   FlatList,
   Keyboard,
   SectionList,
-  Text,
   TextInput,
-  View,
   type IFlatListHandle,
   type IHostInstance,
   type ISection,
@@ -91,20 +89,20 @@ export function ParityDemo() {
   };
 
   return (
-    <View class="section-nested">
-      <Text ref={title} class="section-label">
+    <view class="section-nested">
+      <text ref={title} class="section-label">
         Parity checks · longPress · dismiss · animated scroll · sticky · a11y
         focus
-      </Text>
+      </text>
 
       {/* Text.onLongPress synthesis: hold ~0.5s (suppresses the tap) vs a quick tap */}
-      <Text
+      <text
         class="parity-long-press-row"
         onLongPress={() => setLongPressMsg('long press! (tap was suppressed)')}
         onPress={() => setLongPressMsg('tap')}
       >
         {longPressMsg()}
-      </Text>
+      </text>
 
       {/* Keyboard.dismiss: blurs whatever input holds focus, no ref needed */}
       <TextInput
@@ -114,7 +112,7 @@ export function ParityDemo() {
         onFocus={() => setDismissMsg('keyboard up — tap Hide keyboard')}
         onBlur={() => setDismissMsg('blurred (keyboard down)')}
       />
-      <Text class="parity-note">{dismissMsg()}</Text>
+      <text class="parity-note">{dismissMsg()}</text>
       <ActionButton
         title="Hide keyboard"
         onPress={() => Keyboard.dismiss()}
@@ -124,7 +122,7 @@ export function ParityDemo() {
       {/* animated list scroll: smooth (native command) vs instant. A fixed height with no
           wrapper — the vertical ScrollView clips to its own frame, so rows stay inside the box
           on iOS too. */}
-      <Text class="section-label">FlatList · animated scrollToOffset</Text>
+      <text class="section-label">FlatList · animated scrollToOffset</text>
       <FlatList
         ref={list}
         class="parity-list"
@@ -136,13 +134,13 @@ export function ParityDemo() {
           index,
         })}
         renderItem={info => (
-          <View class="parity-row" style={PARITY_ROW_STYLE}>
-            <Text class="parity-text">{`row ${info().item.n}`}</Text>
-          </View>
+          <view class="parity-row" style={PARITY_ROW_STYLE}>
+            <text class="parity-text">{`row ${info().item.n}`}</text>
+          </view>
         )}
       />
-      <View class="row">
-        <View class="flex1">
+      <view class="row">
+        <view class="flex1">
           <ActionButton
             title="Scroll ▼ animated"
             onPress={() =>
@@ -153,21 +151,21 @@ export function ParityDemo() {
             }
             color="#7aa2e3"
           />
-        </View>
-        <View class="flex1">
+        </view>
+        <view class="flex1">
           <ActionButton
             title="Top · instant"
             onPress={() => list?.scrollToOffset({ offset: 0, animated: false })}
             color="#7aa2e3"
           />
-        </View>
-      </View>
+        </view>
+      </view>
 
       {/* sticky section headers. Drag the inner list: each header pins at the top, and as the
           NEXT header reaches the top it should PUSH the pinned one off. */}
-      <Text class="section-label">
+      <text class="section-label">
         SectionList · sticky (scroll: next header should push prev off)
-      </Text>
+      </text>
       <SectionList
         testID="sticky-section-list"
         class="parity-section-list"
@@ -175,12 +173,12 @@ export function ParityDemo() {
         keyExtractor={item => item.id}
         stickySectionHeadersEnabled
         renderSectionHeader={info => (
-          <Text class="parity-section-header">{info().section.title}</Text>
+          <text class="parity-section-header">{info().section.title}</text>
         )}
         renderItem={info => (
-          <View class="parity-row" style={PARITY_ROW_STYLE}>
-            <Text class="parity-text">{info().item.label}</Text>
-          </View>
+          <view class="parity-row" style={PARITY_ROW_STYLE}>
+            <text class="parity-text">{info().item.label}</text>
+          </view>
         )}
       />
 
@@ -189,6 +187,6 @@ export function ParityDemo() {
         onPress={focusTitle}
         color="#7aa2e3"
       />
-    </View>
+    </view>
   );
 }

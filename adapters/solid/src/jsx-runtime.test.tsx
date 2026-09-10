@@ -24,8 +24,6 @@ import { createSignal, For, Show } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
-import { Text } from './components/text';
-import { View } from './components/view';
 
 const ROOT_TAG = 9_311;
 const RAW_TEXT = 'RCTRawText';
@@ -59,11 +57,11 @@ describe("solid-js control flow through this package's renderer", () => {
   it('mounts and updates a <Show> branch', async () => {
     const [ready, setReady] = createSignal(false);
     mount(ROOT_TAG, () => (
-      <View>
-        <Show when={ready()} fallback={<Text>waiting</Text>}>
-          <Text>ready</Text>
+      <view>
+        <Show when={ready()} fallback={<text>waiting</text>}>
+          <text>ready</text>
         </Show>
-      </View>
+      </view>
     ));
     await tick();
     expect(committedText()).toEqual(['waiting']);
@@ -78,9 +76,9 @@ describe("solid-js control flow through this package's renderer", () => {
   it('renders a <For> list and reflects a later append', async () => {
     const [items, setItems] = createSignal(['one', 'two']);
     mount(ROOT_TAG, () => (
-      <View>
-        <For each={items()}>{item => <Text>{item}</Text>}</For>
-      </View>
+      <view>
+        <For each={items()}>{item => <text>{item}</text>}</For>
+      </view>
     ));
     await tick();
     expect(committedText()).toEqual(['one', 'two']);
@@ -96,9 +94,9 @@ describe("solid-js control flow through this package's renderer", () => {
   it('reorders a <For> list without losing entries', async () => {
     const [items, setItems] = createSignal(['a', 'b', 'c']);
     mount(ROOT_TAG, () => (
-      <View>
-        <For each={items()}>{item => <Text>{item}</Text>}</For>
-      </View>
+      <view>
+        <For each={items()}>{item => <text>{item}</text>}</For>
+      </view>
     ));
     await tick();
     expect(committedText()).toEqual(['a', 'b', 'c']);

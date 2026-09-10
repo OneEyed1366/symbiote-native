@@ -19,7 +19,6 @@ import {
 } from '@symbiote-native/components';
 import { mount, unmount } from '../../render';
 import type { JSX } from '../../jsx-runtime';
-import { View } from '../view';
 import { ScrollView } from './index';
 
 const ROOT_TAG = 818;
@@ -85,8 +84,8 @@ describe('Solid ScrollView sticky headers', () => {
     it('wraps only the flagged children in a z-raised sticky wrapper', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView stickyHeaderIndices={[0]}>
-          <View testID={HEADER} />
-          <View testID={ROW} />
+          <view testID={HEADER} />
+          <view testID={ROW} />
         </ScrollView>
       ));
       await tick();
@@ -108,7 +107,7 @@ describe('Solid ScrollView sticky headers', () => {
     it('adds no wrapper when no index is flagged', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView>
-          <View testID={HEADER} />
+          <view testID={HEADER} />
         </ScrollView>
       ));
       await tick();
@@ -121,7 +120,7 @@ describe('Solid ScrollView sticky headers', () => {
     it('raises scrollEventThrottle to the JS-fallback default when sticky headers are on', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView stickyHeaderIndices={[0]}>
-          <View testID={HEADER} />
+          <view testID={HEADER} />
         </ScrollView>
       ));
       await tick();
@@ -135,8 +134,8 @@ describe('Solid ScrollView sticky headers', () => {
     it('pins the header by committing a translateY once the scroll offset moves', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView stickyHeaderIndices={[0]}>
-          <View testID={HEADER} />
-          <View testID={ROW} />
+          <view testID={HEADER} />
+          <view testID={ROW} />
         </ScrollView>
       ));
       await tick();
@@ -164,9 +163,9 @@ describe('Solid ScrollView sticky headers', () => {
     it('creates no node when a header layout bumps the cross-talk map', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView stickyHeaderIndices={[0, 2]}>
-          <View testID={HEADER} />
-          <View testID={ROW} />
-          <View testID={HEADER} />
+          <view testID={HEADER} />
+          <view testID={ROW} />
+          <view testID={HEADER} />
         </ScrollView>
       ));
       await tick();
@@ -192,7 +191,7 @@ describe('Solid ScrollView sticky headers', () => {
     it('creates no node when the inverted viewport height is captured', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView stickyHeaderIndices={[0]} invertStickyHeaders>
-          <View testID={HEADER} />
+          <view testID={HEADER} />
         </ScrollView>
       ));
       await tick();
@@ -217,16 +216,16 @@ describe('Solid ScrollView sticky headers', () => {
       const CustomHeader = (
         props: IStickyHeaderProps & { children?: JSX.Element },
       ): JSX.Element => (
-        <View testID="custom-wrapper" onLayout={props.onLayout}>
+        <view testID="custom-wrapper" onLayout={props.onLayout}>
           {props.children}
-        </View>
+        </view>
       );
       mount(ROOT_TAG, () => (
         <ScrollView
           stickyHeaderIndices={[0]}
           StickyHeaderComponent={CustomHeader}
         >
-          <View testID={HEADER} />
+          <view testID={HEADER} />
         </ScrollView>
       ));
       await tick();
@@ -250,7 +249,7 @@ describe('Solid ScrollView sticky headers', () => {
       );
       mount(ROOT_TAG, () => (
         <ScrollView stickyHeaderIndices={indices()}>
-          <View testID={HEADER} />
+          <view testID={HEADER} />
         </ScrollView>
       ));
       await tick();
@@ -268,7 +267,7 @@ describe('Solid ScrollView sticky headers', () => {
     it('ignores an index with no corresponding child', async () => {
       mount(ROOT_TAG, () => (
         <ScrollView stickyHeaderIndices={[7]}>
-          <View testID={ROW} />
+          <view testID={ROW} />
         </ScrollView>
       ));
       await tick();

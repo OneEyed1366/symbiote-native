@@ -15,7 +15,7 @@
 // every row reads.
 
 import { For, Index, createSelector, createSignal } from 'solid-js';
-import { Pressable, Text, View } from '@symbiote-native/solid';
+import { Pressable } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -46,10 +46,10 @@ export function ForVsIndexDemo() {
   };
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">For · Index · createSelector</Text>
+    <view class="section-nested">
+      <text class="section-label">For · Index · createSelector</text>
 
-      <Text class="subtle">{`<For> — keyed by value · pass ${pass()}`}</Text>
+      <text class="subtle">{`<For> — keyed by value · pass ${pass()}`}</text>
       <For each={labels()}>
         {(label, position) => {
           // Runs once per KEY, under its own root, so a plain const is right: a new value means a
@@ -62,30 +62,30 @@ export function ForVsIndexDemo() {
               onPress={() => setSelected(position())}
             >
               {() => (
-                <Text class="ap-item-text">
+                <text class="ap-item-text">
                   {`${label} · row created on pass ${bornAt}`}
-                </Text>
+                </text>
               )}
             </Pressable>
           );
         }}
       </For>
 
-      <Text class="subtle">{`<Index> — keyed by position · pass ${pass()}`}</Text>
+      <text class="subtle">{`<Index> — keyed by position · pass ${pass()}`}</text>
       <Index each={labels()}>
         {(label, position) => {
           const bornAt = pass();
           return (
-            <View class="ap-item">
-              <Text class="ap-item-text" testID={`index-row-${position}`}>
+            <view class="ap-item">
+              <text class="ap-item-text" testID={`index-row-${position}`}>
                 {`${label()} · row created on pass ${bornAt}`}
-              </Text>
-            </View>
+              </text>
+            </view>
           );
         }}
       </Index>
 
-      <View class="ap-wrap">
+      <view class="ap-wrap">
         <ActionButton
           testID="list-rename"
           title="rename first"
@@ -107,7 +107,7 @@ export function ForVsIndexDemo() {
             setLabels(INITIAL_LABELS);
           }}
         />
-      </View>
-    </View>
+      </view>
+    </view>
   );
 }
