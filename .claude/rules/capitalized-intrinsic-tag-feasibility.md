@@ -107,6 +107,41 @@ capability audit has to reach `packages/*`, not just the five adapters.
   drops function props — the commit carries NO style, with nothing red.
 
 
+## A component→tag sweep must find the primitive used as a VALUE, and a tag grep reports those clean
+
+Measured 2026-09-11 finishing Vue. Deleting a wrapper breaks two kinds of call site and only one of
+them looks like a call site:
+
+```
+<View />                     a TAG      — every grep finds it
+h(View, {...})               a VALUE    — a render fn; after deletion the fn returns undefined
+createVNode(Text, null, 'x') a VALUE
+components: { View, Text }   a VALUE    — an Options-API registration
+```
+
+**The sharpest instance had no tag spelling anywhere in the tree.** `CanaryScreen.vue` passed
+`h(RefreshControl, {...})` as the element-valued `:refresh-control` prop, and `RefreshControl`
+appears as `<RefreshControl` in that app zero times — so a tag census reports the primitive absent
+and the migration complete while the one real usage is a value that is about to become `undefined`.
+
+So sweep for the IDENTIFIER, not the tag, and read the import list as the census:
+
+```bash
+command grep -rn "\b<Primitive>\b" examples/<app> --include="*.vue" --include="*.tsx" --include="*.ts"
+```
+
+A hit that is not inside `<...>` is the case a tag-shaped probe cannot see. This is the repo's own
+"a count of ZERO on both sides is a probe that matched nothing" rule
+(`adapter-parity-audit.md`), reached from the direction where the count is zero for a real reason
+and the conclusion is still wrong.
+
+### And on Vue an element vnode refuses a FUNCTION child, silently
+
+`h(View, null, () => [...])` was legal while `View` was a component: a function child sets
+`SLOTS_CHILDREN`. On an ELEMENT vnode `mountElement` never mounts that shape, so the subtree
+vanishes with nothing red. Rewrite to array children in the same edit as the rename — this is not a
+rename, and a sweep that only changes the first argument leaves a screen that mounts nothing.
+
 ## A single-word HTML tag name IS available on Svelte — the escape hatch is a pair, and we use one half
 
 Measured 2026-09-09 while pricing `Button` as a tag, and recorded because the first answer was WRONG

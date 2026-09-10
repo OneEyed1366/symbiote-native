@@ -1811,3 +1811,34 @@ The orchestrator's failure in both cases was the same: relaying an agent's verdi
 the one command that decides it. `verify-the-deciding-side.md` applies to a subagent's report exactly
 as it applies to a sibling's comment — and a report is likelier to be quoted onward, because it
 arrives sounding like work already done.
+
+### A killed agent's last streamed line is a PLAN, not a state — measure the tree
+
+The stream watchdog kills on 600s of silence, and what survives is whatever sentence the agent was
+mid-way through. Read as a status it is actively misleading: "Now the barrel entries for Switch,
+TextInput, Pressable" and "Now TextInput's prop type, then delete both wrappers" both describe work
+NOT yet done, and both were mistaken for descriptions of what the agent had been doing all along.
+
+Measured 2026-09-11, when two agents died in the same minute and the question was whether they had
+been deleting wrappers or quietly rewriting them. Three commands answer it and no reading of the
+transcript does:
+
+```bash
+git status --porcelain adapters/<fw> | awk '{print $1}' | sort | uniq -c     # D vs M vs ??
+git status --porcelain adapters/<fw> | grep '^ D' | sed 's/^...//'           # what actually went
+for f in <the ?? files>; do command grep -cE "^export (const|function|class)" "$f"; done
+```
+
+The third is the one that settles "deleted or rewritten": a replacement `*-props.ts` with **zero**
+runtime exports is the intended shape, and any runtime export in a new adapter file is the thing to
+read before believing anything else. Here it found exactly one — eight lines of two string constants
+breaking a require cycle — and that single hit is what made the other twelve trustworthy.
+
+And check each half separately: of the two agents, one left a fully green tree and the other left 74
+red tests. "Both were killed" says nothing about either.
+
+**Scoping a brief's verification to one directory is NOT enough to survive the watchdog**, which is
+what this round assumed. `npx vitest run adapters/vue` takes 41s and `adapters/angular` 6.5s —
+neither is what stalled them; a long unbroken run of EDITS is. So the instruction that works is
+per-primitive batching — convert one, verify, convert the next — rather than a cheaper verify
+command.
