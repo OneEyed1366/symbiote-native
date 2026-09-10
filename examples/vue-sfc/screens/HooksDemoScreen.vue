@@ -10,7 +10,6 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { SafeAreaView, Text, View } from '@symbiote-native/vue';
 import {
   useFocusEffect,
   useIsFocused,
@@ -36,49 +35,49 @@ useFocusEffect(() => {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <View class="section">
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+  <safe-area-view class="screen">
+    <view class="section">
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.introspection }"
         >
-          <Text class="hero-badge-text">HK</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Hooks</Text>
-          <Text class="hero-body"
+          <text class="hero-badge-text">HK</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Hooks</text>
+          <text class="hero-body"
             >useFocusEffect, useIsFocused, and useNavigationState —
             introspecting the navigator's own live state from inside a
-            screen.</Text
+            screen.</text
           >
-        </View>
-      </View>
-      <Text testID="hooks-is-focused" class="info-text">{{
+        </view>
+      </view>
+      <text testID="hooks-is-focused" class="info-text">{{
         `useIsFocused(): ${isFocused}`
-      }}</Text>
-      <Text testID="hooks-focus-count" class="info-text">{{
+      }}</text>
+      <text testID="hooks-focus-count" class="info-text">{{
         `useFocusEffect focus count: ${focusCount}`
-      }}</Text>
-      <Text class="info-text">{{
+      }}</text>
+      <text class="info-text">{{
         lastBlurAt === undefined
           ? 'not blurred yet'
           : `last blurred at ${lastBlurAt}`
-      }}</Text>
-      <Text class="section-label"
-        >useNavigationState() · current route stack</Text
+      }}</text>
+      <text class="section-label"
+        >useNavigationState() · current route stack</text
       >
-      <Text
+      <text
         v-for="(name, index) in routeNames"
         :key="`${name}-${index}`"
         class="list-row-text"
-        >{{ `${index}. ${name}` }}</Text
+        >{{ `${index}. ${name}` }}</text
       >
-    </View>
-  </SafeAreaView>
+    </view>
+  </safe-area-view>
 </template>

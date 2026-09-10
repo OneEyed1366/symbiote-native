@@ -19,6 +19,21 @@
 // runtime-readable table reachable from here, so a hand-written `<scroll-view>` still resolves as a
 // component. Closing that needs a CJS intrinsic table in `core/components`.
 //
+// WHAT THAT GAP COSTS, measured 2026-09-11 rather than reasoned, because the first guess was that
+// the tag simply would not work. It works: `resolveComponent` falls back to the tag STRING, and
+// `normalizeChildren` then unwraps the `withCtx` default slot for an element shapeFlag, so
+// `<scroll-view><text>hi</text></scroll-view>` committed `RCTView > RCTScrollView > RCTText >
+// RCTRawText`. What it costs is a dev-mode `[Vue warn]: Failed to resolve component: scroll-view`
+// on every such element plus the component codegen path (a slot closure per element) instead of
+// `_createElementBlock`. That is a divergence from every other tag, so `ScrollView`,
+// `TouchableOpacity` and `TouchableHighlight` stay COMPONENTS on Vue until their
+// `HOST_PRIMITIVES` entries land — and `intrinsic-elements.ts` already types all three as valid
+// markup off `ISymbioteIntrinsic`, so vue-tsc accepts what the runtime compiler warns about.
+//
+// The tell that the three are still wrapped rather than merely unlisted: `src/register.ts` does
+// NOT call their behaviors, because a registered behavior plus a surviving wrapper is two owners
+// on one node. Those two facts move together or not at all.
+//
 // .cjs, and its own file rather than a copy in each consumer: two transforms carrying one
 // derivation is the drift the shared spec exists to prevent.
 

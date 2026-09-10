@@ -205,7 +205,28 @@ const TAG_ONLY: readonly string[] = [
   // compare against. Coverage is `src/activity-indicator-tag.test.ts` (node count + the routing
   // split) and `core/components/src/behaviors/activity-indicator/activity-indicator.test.ts`.
   'ActivityIndicator',
+  // Wrapperless since 2026-09-10. Each was a pure passthrough over one tag — attrs normalized, aria
+  // folded, one `h()` — and every one of those folds now runs below all four Vue paths: kebab->camel
+  // and `id -> nativeID` in `renderer/index.ts`'s `patchProp`, aria/role in the engine's
+  // `fabricProps`, and each primitive's own mapping in its `register`ed behavior. Coverage is
+  // `src/<name>-tag.test.ts` (the fold, on the tag) plus the behavior's suite in `core/components`.
+  'SafeAreaView',
+  'InputAccessoryView',
+  'RefreshControl',
+  'Image',
+  'View',
+  'Text',
+  'Pressable',
+  'TextInput',
+  'Switch',
 ];
+
+// EVERY primitive the spec declares is now tag-only on Vue, so the comparison above has no rows
+// left to run and this file's remaining value is the guard below: it fails the day a name leaves
+// `HOST_PRIMITIVES` or a wrapper comes back. What replaced the comparison is ABSOLUTE — the tag has
+// to commit the right payload on its own, with nothing to be equal to — and lives in
+// `src/fold-only-tags.test.ts`, `src/renderer/tag-fold-parity.test.ts` and `fold-parity.test.ts`.
+// Keep the machinery: a sixth adapter, or a primitive that regains a component spelling, needs it.
 
 const NAMES = Object.keys(HOST_PRIMITIVES).filter(
   name => !TAG_ONLY.includes(name),
@@ -247,23 +268,23 @@ function assertPathsAreDistinct(
 }
 
 describe('the spec still declares something worth comparing', () => {
-  // Without this the whole file is satisfiable by the DATA going quiet: every row below is derived
-  // from HOST_PRIMITIVES, so an empty spec produces zero rows and a green suite. Same class as
-  // `assertArmsAreDistinct` one level up — that catches an arm that never lowered, this catches a
-  // spec that stopped declaring.
-  it('carries primitives, and at least one fold to observe', () => {
-    expect(NAMES.length).toBeGreaterThan(0);
+  // The block that survives every row leaving. Without it, `describe.each([])` runs nothing and the
+  // file is green whatever the spec says — the same "satisfiable by the DATA going quiet" shape as
+  // an empty `HOST_PRIMITIVES`, reached from the other side now that TAG_ONLY covers all of it.
+  it('names every spec primitive, and no primitive it does not', () => {
+    expect(Object.keys(HOST_PRIMITIVES).length).toBeGreaterThan(0);
     // A `TAG_ONLY` member the spec no longer names excludes nothing and reads as a live exclusion.
     expect(
       TAG_ONLY.filter(name => HOST_PRIMITIVES[name] === undefined),
       'a tag-only entry names no primitive — the exclusion is stale',
     ).toEqual([]);
+    // The demand this file now makes: a NEW primitive is not in TAG_ONLY, so it lands in NAMES and
+    // fails below for want of a component to mount — which is the correct question to ask of it.
+    // Every primitive being tag-only is today's answer, not a permanent one.
     expect(
-      NAMES.filter(
-        name => Object.keys(HOST_PRIMITIVES[name].aliases).length > 0,
-      ).length,
-      'no entry declares an alias — the arms below would compare two payloads with nothing folded',
-    ).toBeGreaterThan(0);
+      NAMES,
+      'a primitive is outside TAG_ONLY, so it claims a component spelling — mount it or list it',
+    ).toEqual([]);
   });
 });
 

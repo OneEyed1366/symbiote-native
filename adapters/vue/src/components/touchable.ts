@@ -51,8 +51,8 @@ import {
   emitPressableEvents,
   PRESSABLE_EMITS,
   type IPressableEmits,
-  type IPressableProps,
 } from './pressable';
+import type { IPressableProps } from './pressable-props';
 import { Animated } from '../modules/animated';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 

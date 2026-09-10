@@ -13,7 +13,7 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, ref, type ComputedRef, type Ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import { ScrollView } from '@symbiote-native/vue';
 import {
   Accelerometer,
   Gyroscope,
@@ -116,246 +116,246 @@ const pedometerStatus = sensorStatus(
 </script>
 
 <template>
-  <SafeAreaView class="screen">
+  <safe-area-view class="screen">
     <ScrollView
       testID="sensors-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.sensors }"
         >
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Sensors</Text>
-          <Text class="hero-body"
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Sensors</text>
+          <text class="hero-body"
             >@symbiote-native/sensors — live readings from five
             expo-sensors-backed hooks. A simulator reports every
             CoreMotion/CMPedometer-backed sensor as unavailable; a real device
-            is needed to see live readings.</Text
+            is needed to see live readings.</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
       <!-- Accelerometer -->
-      <View testID="sensor-card-accelerometer" class="sensor-card">
-        <View class="sensor-card-header">
-          <Text class="sensor-card-title">Accelerometer</Text>
-          <View
+      <view testID="sensor-card-accelerometer" class="sensor-card">
+        <view class="sensor-card-header">
+          <text class="sensor-card-title">Accelerometer</text>
+          <view
             :class="`sensor-status-badge sensor-status-badge-${accelerometerStatus}`"
           >
-            <Text class="sensor-status-text">{{
+            <text class="sensor-status-text">{{
               SENSOR_STATUS_TEXT[accelerometerStatus]
-            }}</Text>
-          </View>
-        </View>
-        <Text v-if="accelerometerStatus === 'checking'" class="info-text"
-          >checking availability…</Text
+            }}</text>
+          </view>
+        </view>
+        <text v-if="accelerometerStatus === 'checking'" class="info-text"
+          >checking availability…</text
         >
-        <Text
+        <text
           v-else-if="accelerometerStatus === 'unavailable'"
           class="info-text"
-          >not available on this device</Text
+          >not available on this device</text
         >
-        <Text v-else-if="accelerometerStatus === 'waiting'" class="info-text"
-          >waiting for first reading…</Text
+        <text v-else-if="accelerometerStatus === 'waiting'" class="info-text"
+          >waiting for first reading…</text
         >
-        <View v-else-if="accelerometer" class="sensor-reading-row">
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">X</Text>
-            <Text class="sensor-reading-value">{{
+        <view v-else-if="accelerometer" class="sensor-reading-row">
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">X</text>
+            <text class="sensor-reading-value">{{
               accelerometer.x.toFixed(3)
-            }}</Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Y</Text>
-            <Text class="sensor-reading-value">{{
+            }}</text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Y</text>
+            <text class="sensor-reading-value">{{
               accelerometer.y.toFixed(3)
-            }}</Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Z</Text>
-            <Text class="sensor-reading-value">{{
+            }}</text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Z</text>
+            <text class="sensor-reading-value">{{
               accelerometer.z.toFixed(3)
-            }}</Text>
-          </View>
-        </View>
-      </View>
+            }}</text>
+          </view>
+        </view>
+      </view>
 
       <!-- Gyroscope -->
-      <View testID="sensor-card-gyroscope" class="sensor-card">
-        <View class="sensor-card-header">
-          <Text class="sensor-card-title">Gyroscope</Text>
-          <View
+      <view testID="sensor-card-gyroscope" class="sensor-card">
+        <view class="sensor-card-header">
+          <text class="sensor-card-title">Gyroscope</text>
+          <view
             :class="`sensor-status-badge sensor-status-badge-${gyroscopeStatus}`"
           >
-            <Text class="sensor-status-text">{{
+            <text class="sensor-status-text">{{
               SENSOR_STATUS_TEXT[gyroscopeStatus]
-            }}</Text>
-          </View>
-        </View>
-        <Text v-if="gyroscopeStatus === 'checking'" class="info-text"
-          >checking availability…</Text
+            }}</text>
+          </view>
+        </view>
+        <text v-if="gyroscopeStatus === 'checking'" class="info-text"
+          >checking availability…</text
         >
-        <Text v-else-if="gyroscopeStatus === 'unavailable'" class="info-text"
-          >not available on this device</Text
+        <text v-else-if="gyroscopeStatus === 'unavailable'" class="info-text"
+          >not available on this device</text
         >
-        <Text v-else-if="gyroscopeStatus === 'waiting'" class="info-text"
-          >waiting for first reading…</Text
+        <text v-else-if="gyroscopeStatus === 'waiting'" class="info-text"
+          >waiting for first reading…</text
         >
-        <View v-else-if="gyroscope" class="sensor-reading-row">
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">X</Text>
-            <Text class="sensor-reading-value">{{
+        <view v-else-if="gyroscope" class="sensor-reading-row">
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">X</text>
+            <text class="sensor-reading-value">{{
               gyroscope.x.toFixed(3)
-            }}</Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Y</Text>
-            <Text class="sensor-reading-value">{{
+            }}</text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Y</text>
+            <text class="sensor-reading-value">{{
               gyroscope.y.toFixed(3)
-            }}</Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Z</Text>
-            <Text class="sensor-reading-value">{{
+            }}</text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Z</text>
+            <text class="sensor-reading-value">{{
               gyroscope.z.toFixed(3)
-            }}</Text>
-          </View>
-        </View>
-      </View>
+            }}</text>
+          </view>
+        </view>
+      </view>
 
       <!-- Magnetometer -->
-      <View testID="sensor-card-magnetometer" class="sensor-card">
-        <View class="sensor-card-header">
-          <Text class="sensor-card-title">Magnetometer</Text>
-          <View
+      <view testID="sensor-card-magnetometer" class="sensor-card">
+        <view class="sensor-card-header">
+          <text class="sensor-card-title">Magnetometer</text>
+          <view
             :class="`sensor-status-badge sensor-status-badge-${magnetometerStatus}`"
           >
-            <Text class="sensor-status-text">{{
+            <text class="sensor-status-text">{{
               SENSOR_STATUS_TEXT[magnetometerStatus]
-            }}</Text>
-          </View>
-        </View>
-        <Text v-if="magnetometerStatus === 'checking'" class="info-text"
-          >checking availability…</Text
+            }}</text>
+          </view>
+        </view>
+        <text v-if="magnetometerStatus === 'checking'" class="info-text"
+          >checking availability…</text
         >
-        <Text v-else-if="magnetometerStatus === 'unavailable'" class="info-text"
-          >not available on this device</Text
+        <text v-else-if="magnetometerStatus === 'unavailable'" class="info-text"
+          >not available on this device</text
         >
-        <Text v-else-if="magnetometerStatus === 'waiting'" class="info-text"
-          >waiting for first reading…</Text
+        <text v-else-if="magnetometerStatus === 'waiting'" class="info-text"
+          >waiting for first reading…</text
         >
-        <View v-else-if="magnetometer" class="sensor-reading-row">
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">X</Text>
-            <Text class="sensor-reading-value">{{
+        <view v-else-if="magnetometer" class="sensor-reading-row">
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">X</text>
+            <text class="sensor-reading-value">{{
               magnetometer.x.toFixed(3)
-            }}</Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Y</Text>
-            <Text class="sensor-reading-value">{{
+            }}</text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Y</text>
+            <text class="sensor-reading-value">{{
               magnetometer.y.toFixed(3)
-            }}</Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Z</Text>
-            <Text class="sensor-reading-value">{{
+            }}</text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Z</text>
+            <text class="sensor-reading-value">{{
               magnetometer.z.toFixed(3)
-            }}</Text>
-          </View>
-        </View>
-      </View>
+            }}</text>
+          </view>
+        </view>
+      </view>
 
       <!-- DeviceMotion — rotation is nested and can legitimately be absent from the very first
            event (the underlying sensor hasn't reported yet), so it's guarded at the field
            itself (deviceMotion?.rotation, not deviceMotion && deviceMotion.rotation — an
            unguarded nested read throws with no visible error and silently blanks the screen). -->
-      <View testID="sensor-card-device-motion" class="sensor-card">
-        <View class="sensor-card-header">
-          <Text class="sensor-card-title">Device motion</Text>
-          <View
+      <view testID="sensor-card-device-motion" class="sensor-card">
+        <view class="sensor-card-header">
+          <text class="sensor-card-title">Device motion</text>
+          <view
             :class="`sensor-status-badge sensor-status-badge-${deviceMotionStatus}`"
           >
-            <Text class="sensor-status-text">{{
+            <text class="sensor-status-text">{{
               SENSOR_STATUS_TEXT[deviceMotionStatus]
-            }}</Text>
-          </View>
-        </View>
-        <Text v-if="deviceMotionStatus === 'checking'" class="info-text"
-          >checking availability…</Text
+            }}</text>
+          </view>
+        </view>
+        <text v-if="deviceMotionStatus === 'checking'" class="info-text"
+          >checking availability…</text
         >
-        <Text v-else-if="deviceMotionStatus === 'unavailable'" class="info-text"
-          >not available on this device</Text
+        <text v-else-if="deviceMotionStatus === 'unavailable'" class="info-text"
+          >not available on this device</text
         >
-        <Text v-else-if="deviceMotionStatus === 'waiting'" class="info-text"
-          >waiting for first reading…</Text
+        <text v-else-if="deviceMotionStatus === 'waiting'" class="info-text"
+          >waiting for first reading…</text
         >
         <template v-else-if="deviceMotion">
-          <Text class="info-text">{{
+          <text class="info-text">{{
             `interval: ${deviceMotion.interval.toFixed(1)}ms`
-          }}</Text>
-          <View v-if="deviceMotion.rotation" class="sensor-reading-row">
-            <View class="sensor-reading-chip">
-              <Text class="sensor-reading-label">ALPHA</Text>
-              <Text class="sensor-reading-value">{{
+          }}</text>
+          <view v-if="deviceMotion.rotation" class="sensor-reading-row">
+            <view class="sensor-reading-chip">
+              <text class="sensor-reading-label">ALPHA</text>
+              <text class="sensor-reading-value">{{
                 deviceMotion.rotation.alpha.toFixed(3)
-              }}</Text>
-            </View>
-            <View class="sensor-reading-chip">
-              <Text class="sensor-reading-label">BETA</Text>
-              <Text class="sensor-reading-value">{{
+              }}</text>
+            </view>
+            <view class="sensor-reading-chip">
+              <text class="sensor-reading-label">BETA</text>
+              <text class="sensor-reading-value">{{
                 deviceMotion.rotation.beta.toFixed(3)
-              }}</Text>
-            </View>
-            <View class="sensor-reading-chip">
-              <Text class="sensor-reading-label">GAMMA</Text>
-              <Text class="sensor-reading-value">{{
+              }}</text>
+            </view>
+            <view class="sensor-reading-chip">
+              <text class="sensor-reading-label">GAMMA</text>
+              <text class="sensor-reading-value">{{
                 deviceMotion.rotation.gamma.toFixed(3)
-              }}</Text>
-            </View>
-          </View>
+              }}</text>
+            </view>
+          </view>
         </template>
-      </View>
+      </view>
 
       <!-- Pedometer — free functions, no shared instance, so both the availability check and
            the live subscription go through the standalone core exports instead of a singleton. -->
-      <View testID="sensor-card-pedometer" class="sensor-card">
-        <View class="sensor-card-header">
-          <Text class="sensor-card-title">Pedometer</Text>
-          <View
+      <view testID="sensor-card-pedometer" class="sensor-card">
+        <view class="sensor-card-header">
+          <text class="sensor-card-title">Pedometer</text>
+          <view
             :class="`sensor-status-badge sensor-status-badge-${pedometerStatus}`"
           >
-            <Text class="sensor-status-text">{{
+            <text class="sensor-status-text">{{
               SENSOR_STATUS_TEXT[pedometerStatus]
-            }}</Text>
-          </View>
-        </View>
-        <Text v-if="pedometerStatus === 'checking'" class="info-text"
-          >checking availability…</Text
+            }}</text>
+          </view>
+        </view>
+        <text v-if="pedometerStatus === 'checking'" class="info-text"
+          >checking availability…</text
         >
-        <Text v-else-if="pedometerStatus === 'unavailable'" class="info-text"
-          >not available on this device</Text
+        <text v-else-if="pedometerStatus === 'unavailable'" class="info-text"
+          >not available on this device</text
         >
-        <Text v-else-if="pedometerStatus === 'waiting'" class="info-text"
-          >waiting for first reading…</Text
+        <text v-else-if="pedometerStatus === 'waiting'" class="info-text"
+          >waiting for first reading…</text
         >
-        <Text
+        <text
           v-else-if="pedometer"
           testID="sensors-pedometer-steps"
           class="sensor-reading-value"
-          >{{ `${pedometer.steps} steps` }}</Text
+          >{{ `${pedometer.steps} steps` }}</text
         >
-      </View>
+      </view>
     </ScrollView>
-  </SafeAreaView>
+  </safe-area-view>
 </template>

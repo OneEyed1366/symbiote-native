@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { computed } from 'vue';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import { ScrollView } from '@symbiote-native/vue';
 import {
   Orientation,
   OrientationLock,
@@ -64,59 +64,59 @@ function handleUnlock(): void {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
+  <safe-area-view class="screen">
     <ScrollView
       testID="screen-orientation-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Screen Orientation</Text>
-          <Text class="hero-body"
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Screen Orientation</text>
+          <text class="hero-body"
             >@symbiote-native/screen-orientation — live orientation state plus
-            lock/unlock controls.</Text
+            lock/unlock controls.</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View
+      <view
         testID="screen-orientation-state-card"
         class="screen-orientation-card"
       >
-        <Text class="screen-orientation-card-title">Current state</Text>
-        <View class="screen-orientation-row">
-          <Text class="screen-orientation-row-label">Orientation</Text>
-          <Text
+        <text class="screen-orientation-card-title">Current state</text>
+        <view class="screen-orientation-row">
+          <text class="screen-orientation-row-label">Orientation</text>
+          <text
             testID="screen-orientation-value"
             class="screen-orientation-value-text"
-            >{{ orientationText }}</Text
+            >{{ orientationText }}</text
           >
-        </View>
-        <View class="screen-orientation-row">
-          <Text class="screen-orientation-row-label">Orientation lock</Text>
-          <Text
+        </view>
+        <view class="screen-orientation-row">
+          <text class="screen-orientation-row-label">Orientation lock</text>
+          <text
             testID="screen-orientation-lock-value"
             class="screen-orientation-value-text"
-            >{{ orientationLockText }}</Text
+            >{{ orientationLockText }}</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View
+      <view
         testID="screen-orientation-actions-card"
         class="screen-orientation-card"
       >
-        <Text class="screen-orientation-card-title">Lock controls</Text>
-        <View class="button-row">
+        <text class="screen-orientation-card-title">Lock controls</text>
+        <view class="button-row">
           <ActionButton
             testID="screen-orientation-lock-portrait-button"
             title="Lock portrait"
@@ -135,8 +135,8 @@ function handleUnlock(): void {
             :onPress="handleUnlock"
             :color="lineColor"
           />
-        </View>
-      </View>
+        </view>
+      </view>
     </ScrollView>
-  </SafeAreaView>
+  </safe-area-view>
 </template>

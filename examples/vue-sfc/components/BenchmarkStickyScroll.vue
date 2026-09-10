@@ -11,7 +11,7 @@
 -->
 <script setup lang="ts">
 import { h, type FunctionalComponent, type VNode } from 'vue';
-import { ScrollView, Text } from '@symbiote-native/vue';
+import { ScrollView } from '@symbiote-native/vue';
 
 const STICKY_SECTION_COUNT = 200;
 const STICKY_ROWS_PER_SECTION = 3;
@@ -26,13 +26,13 @@ const headerIndices = Array.from(
 function buildStickyChildren(): VNode[] {
   return Array.from({ length: STICKY_SECTION_COUNT }, (_value, section) => [
     h(
-      Text,
+      'text',
       { key: `sticky-header-${section}`, class: 'section-header' },
       () => `SECTION ${section + 1}`,
     ),
     ...Array.from({ length: STICKY_ROWS_PER_SECTION }, (_rowValue, row) =>
       h(
-        Text,
+        'text',
         { key: `sticky-row-${section}-${row}`, class: 'list-row-text' },
         () => `row ${section + 1}.${row + 1}`,
       ),
@@ -60,11 +60,11 @@ const StickyScrollBody: FunctionalComponent = () =>
 </script>
 
 <template>
-  <Text class="section-label"
-    >STICKY PATH A · ScrollView · stickyHeaderIndices</Text
+  <text class="section-label"
+    >STICKY PATH A · ScrollView · stickyHeaderIndices</text
   >
   <StickyScrollBody />
-  <Text class="note-text">{{
+  <text class="note-text">{{
     `${STICKY_SECTION_COUNT} sections, every row mounted — no virtualization in the frame.`
-  }}</Text>
+  }}</text>
 </template>

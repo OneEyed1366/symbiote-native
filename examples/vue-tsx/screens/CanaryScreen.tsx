@@ -25,20 +25,13 @@ import {
   type Ref,
 } from 'vue';
 import {
-  View,
-  Text,
   Animated,
   ScrollView,
-  TextInput,
   Image,
-  Switch,
-  Pressable,
   Modal,
   FlatList,
   SectionList,
   KeyboardAvoidingView,
-  SafeAreaView,
-  RefreshControl,
   StatusBar,
   Keyboard,
   KEYBOARD_EVENT,
@@ -167,11 +160,11 @@ const AnimatedDemo = defineComponent({
     };
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">Animated · JS vs native driver</Text>
+      <view class="section-nested">
+        <text class="section-label">Animated · JS vs native driver</text>
 
         {/* native-driven perpetual pulse */}
-        <View class="pulse-frame">
+        <view class="pulse-frame">
           <Animated.View
             testID="pulse-dot"
             class="pulse-dot"
@@ -180,16 +173,16 @@ const AnimatedDemo = defineComponent({
               transform: [{ scale: pulseScale }],
             }}
           />
-        </View>
+        </view>
 
         {/* JS-driven slide: a commit per frame */}
-        <View class="slide-track">
+        <view class="slide-track">
           <Animated.View
             testID="slide-js-dot"
             class="js-slide-dot"
             style={{ transform: [{ translateX: jsX }] }}
           />
-        </View>
+        </view>
         <button
           testID="slide-js-btn"
           title="Slide (JS driver)"
@@ -198,13 +191,13 @@ const AnimatedDemo = defineComponent({
         />
 
         {/* native-driven slide: offloaded, zero JS frames */}
-        <View class="slide-track">
+        <view class="slide-track">
           <Animated.View
             testID="slide-native-dot"
             class="native-slide-dot"
             style={{ transform: [{ translateX: nativeX }] }}
           />
-        </View>
+        </view>
         <button
           testID="slide-native-btn"
           title="Slide (native driver)"
@@ -214,7 +207,7 @@ const AnimatedDemo = defineComponent({
 
         {/* Freeze the JS thread 1.5s: native (pulse + green) keep moving, JS (orange) stalls */}
         <button title="Freeze JS 1.5s" onPress={freezeJs} color="#fc8181" />
-      </View>
+      </view>
     );
   },
 });
@@ -294,15 +287,15 @@ const AnimatedParityDemo = defineComponent({
     };
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           Animated · ValueXY / tracking / diffClamp
-        </Text>
+        </text>
 
         {/* ValueXY box you drag with a finger (PanResponder) */}
-        <Text class="drag-hint">drag the purple box →</Text>
+        <text class="drag-hint">drag the purple box →</text>
         {/* width/height dynamic: XY_SPAN script const, a CSS selector has no way to read */}
-        <View
+        <view
           class="xy-frame"
           style={{ width: XY_SPAN + 36, height: XY_SPAN + 36 }}
         >
@@ -311,22 +304,22 @@ const AnimatedParityDemo = defineComponent({
             class="xy-box"
             style={{ transform: xy.getTranslateTransform() }}
           />
-        </View>
+        </view>
 
         {/* Tracking: lead dot (blue) and follower (orange) that lags behind it */}
-        <View class="track-row">
+        <view class="track-row">
           <Animated.View
             class="lead-dot"
             style={{ transform: [{ translateX: lead }] }}
           />
-        </View>
-        <View class="track-row">
+        </view>
+        <view class="track-row">
           <Animated.View
             testID="follow-dot"
             class="follow-dot"
             style={{ transform: [{ translateX: follow }] }}
           />
-        </View>
+        </view>
         <button
           testID="track-btn"
           title="Move target (follower chases)"
@@ -336,7 +329,7 @@ const AnimatedParityDemo = defineComponent({
 
         {/* diffClamp collapsing header */}
         {/* height dynamic: HEADER_COLLAPSE script const */}
-        <View class="collapse-frame" style={{ height: HEADER_COLLAPSE + 24 }}>
+        <view class="collapse-frame" style={{ height: HEADER_COLLAPSE + 24 }}>
           <Animated.View
             class="collapse-header"
             style={{
@@ -344,26 +337,26 @@ const AnimatedParityDemo = defineComponent({
               transform: [{ translateY: headerOffset }],
             }}
           >
-            <Text class="collapse-header-text">collapsing header</Text>
+            <text class="collapse-header-text">collapsing header</text>
           </Animated.View>
-        </View>
-        <View class="row-tight">
-          <View class="flex1">
+        </view>
+        <view class="row-tight">
+          <view class="flex1">
             <button
               title="Scroll ↓"
               onPress={() => scrollBy(40)}
               color="#38b2ac"
             />
-          </View>
-          <View class="flex1">
+          </view>
+          <view class="flex1">
             <button
               title="Scroll ↑"
               onPress={() => scrollBy(-40)}
               color="#38b2ac"
             />
-          </View>
-        </View>
-      </View>
+          </view>
+        </view>
+      </view>
     );
   },
 });
@@ -443,15 +436,15 @@ const NativeModulesDemo = defineComponent({
     };
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           Runtime modules · I18nManager / Settings / Image statics
-        </Text>
+        </text>
 
         {/* I18nManager: RTL layout constants, read live */}
-        <Text class="info-text">
+        <text class="info-text">
           {`RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`}
-        </Text>
+        </text>
         <button
           title={
             rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'
@@ -461,9 +454,9 @@ const NativeModulesDemo = defineComponent({
         />
 
         {/* Settings: counter persisted to NSUserDefaults, survives a relaunch */}
-        <Text testID="persist-count" class="info-text">
+        <text testID="persist-count" class="info-text">
           {`persisted taps: ${persisted.value} · survives relaunch`}
-        </Text>
+        </text>
         <button
           testID="persist-btn"
           title="Persist a tap"
@@ -472,16 +465,16 @@ const NativeModulesDemo = defineComponent({
         />
 
         {/* Image statics: the rendered asset + getSize's measurement of it */}
-        <View class="row-align-center">
-          <Image source={{ uri: LOGO_URI }} class="logo-thumb" />
-          <Text testID="logo-size" class="info-text-flex">
+        <view class="row-align-center">
+          <image source={{ uri: LOGO_URI }} class="logo-thumb" />
+          <text testID="logo-size" class="info-text-flex">
             {`logo size: ${imageSize.value}`}
-          </Text>
-        </View>
+          </text>
+        </view>
         {/* prefetch warms a cold url: not cached → (tap) → cached */}
-        <Text class="info-text">{`prefetch cache: ${cacheState.value}`}</Text>
+        <text class="info-text">{`prefetch cache: ${cacheState.value}`}</text>
         <button title="Prefetch logo" onPress={prefetchLogo} color="#42b883" />
-      </View>
+      </view>
     );
   },
 });
@@ -526,35 +519,35 @@ const RefApiDemo = defineComponent({
     };
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           Imperative ref · measure / setNativeProps / findNodeHandle
-        </Text>
-        <View ref={boxRef} testID="ref-box" class="ref-box">
-          <Text class="ref-box-text">{`native tag ${tag.value ?? '—'}`}</Text>
-        </View>
-        <Text
+        </text>
+        <view ref={boxRef} testID="ref-box" class="ref-box">
+          <text class="ref-box-text">{`native tag ${tag.value ?? '—'}`}</text>
+        </view>
+        <text
           testID="measure-frame"
           class="info-text"
-        >{`frame: ${frame.value}`}</Text>
-        <View class="row">
-          <View class="flex1">
+        >{`frame: ${frame.value}`}</text>
+        <view class="row">
+          <view class="flex1">
             <button
               testID="measure-btn"
               title="Measure"
               onPress={onMeasure}
               color="#42b883"
             />
-          </View>
-          <View class="flex1">
+          </view>
+          <view class="flex1">
             <button
               title="Flash (setNativeProps)"
               onPress={onFlash}
               color="#f6ad55"
             />
-          </View>
-        </View>
-      </View>
+          </view>
+        </view>
+      </view>
     );
   },
 });
@@ -569,20 +562,20 @@ const PlatformColorDemo = defineComponent({
   setup() {
     const scheme = useColorScheme();
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           {`PlatformColor · semantic + DynamicColorIOS (${scheme.value ?? 'unknown'})`}
-        </Text>
-        <View class="row">
+        </text>
+        <view class="row">
           {/* backgroundColor stays dynamic (PlatformColor is a runtime-resolved opaque color object) */}
-          <View
+          <view
             class="color-tile"
             style={{ backgroundColor: PlatformColor('systemBlue') }}
           >
-            <Text class="tile-label">systemBlue</Text>
-          </View>
+            <text class="tile-label">systemBlue</text>
+          </view>
           {/* backgroundColor / borderColor stay dynamic (DynamicColorIOS / PlatformColor) */}
-          <View
+          <view
             class="color-tile-bordered"
             style={{
               backgroundColor: DynamicColorIOS({
@@ -592,12 +585,12 @@ const PlatformColorDemo = defineComponent({
               borderColor: PlatformColor('separator'),
             }}
           >
-            <Text class="bold-label" style={{ color: PlatformColor('label') }}>
+            <text class="bold-label" style={{ color: PlatformColor('label') }}>
               dynamic
-            </Text>
-          </View>
-        </View>
-      </View>
+            </text>
+          </view>
+        </view>
+      </view>
     );
   },
 });
@@ -620,35 +613,35 @@ const CompoundClassDemo = defineComponent({
   setup() {
     const isLoud = ref(false);
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">Compound class · App.css</Text>
-        <View class="row">
-          <View class="badge" testID="compound-badge-plain">
-            <Text class="badge-text">plain</Text>
-          </View>
-          <View class="badge loud" testID="compound-badge-loud">
-            <Text class="badge-text">loud</Text>
-          </View>
+      <view class="section-nested">
+        <text class="section-label">Compound class · App.css</text>
+        <view class="row">
+          <view class="badge" testID="compound-badge-plain">
+            <text class="badge-text">plain</text>
+          </view>
+          <view class="badge loud" testID="compound-badge-loud">
+            <text class="badge-text">loud</text>
+          </view>
           {/* Built at runtime, so the resolver sees a string it never saw at build time. */}
-          <View
+          <view
             class={isLoud.value ? 'badge loud' : 'badge'}
             testID="compound-badge-dynamic"
           >
-            <Text class="badge-text">dynamic</Text>
-          </View>
-        </View>
-        <Text class="note-text" testID="compound-badge-readout">
+            <text class="badge-text">dynamic</text>
+          </view>
+        </view>
+        <text class="note-text" testID="compound-badge-readout">
           {isLoud.value
             ? 'dynamic badge carries both tokens — accent border, same pill shape'
             : 'dynamic badge carries only .badge — grey border'}
-        </Text>
+        </text>
         <button
           testID="compound-badge-toggle"
           title={isLoud.value ? 'Drop .loud' : 'Add .loud'}
           onPress={() => (isLoud.value = !isLoud.value)}
           color="#42b883"
         />
-      </View>
+      </view>
     );
   },
 });
@@ -682,20 +675,20 @@ const ResponderDemo = defineComponent({
     let grabbed: number | null = null;
 
     return () => (
-      <View class="section-tight">
-        <Text class="section-label">
+      <view class="section-tight">
+        <text class="section-label">
           Responder · drag a chip vs hand-off to the strip
-        </Text>
-        <Text class="info-text">{status.value}</Text>
+        </text>
+        <text class="info-text">{status.value}</text>
         {/* the separate transfer indicator, lit only when the strip steals the gesture;
             color stays dynamic (transfer.value ? active : idle) */}
-        <Text
+        <text
           class="transfer-text"
           style={{ color: transfer.value ? '#f6ad55' : '#3b5266' }}
         >
           {transfer.value || 'transfer: —'}
-        </Text>
-        <View
+        </text>
+        <view
           // Claims the gesture only once the finger has travelled past the threshold,
           // stealing it from whichever chip currently holds it, the transfer path.
           onMoveShouldSetResponder={(event: ISymbioteEvent) =>
@@ -722,12 +715,12 @@ const ResponderDemo = defineComponent({
           class="strip-box"
         >
           {/* transform stays dynamic (rowDx.value drives the strip pan) */}
-          <View
+          <view
             class="row-tight"
             style={{ transform: [{ translateX: rowDx.value }] }}
           >
             {RESPONDER_CHIPS.map(index => (
-              <View
+              <view
                 key={index}
                 testID={`resp-chip-${index}`}
                 // Grabs on start and drags itself; yields to the strip past the threshold.
@@ -772,12 +765,12 @@ const ResponderDemo = defineComponent({
                   ],
                 }}
               >
-                <Text class="chip-text">{index}</Text>
-              </View>
+                <text class="chip-text">{index}</text>
+              </view>
             ))}
-          </View>
-        </View>
-      </View>
+          </view>
+        </view>
+      </view>
     );
   },
 });
@@ -809,42 +802,42 @@ const AccessibilityDemo = defineComponent({
     });
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           Accessibility · props → native · aria/role transform ·
           AccessibilityInfo
-        </Text>
+        </text>
         {/* getter readout: 'off' (no screen reader) proves the module resolved */}
-        <Text class="info-text">{`screen reader: ${screenReader.value}`}</Text>
+        <text class="info-text">{`screen reader: ${screenReader.value}`}</text>
         {/* canonical accessibility*: content-desc 'a11y-canonical-label' + role=header */}
-        <View
+        <view
           accessible={true}
           accessibilityRole="header"
           accessibilityLabel="a11y-canonical-label"
           class="a11y-card"
         >
-          <Text class="info-text">canonical label + role=header</Text>
-        </View>
+          <text class="info-text">canonical label + role=header</text>
+        </view>
         {/* web aria and role aliases MUST fold: content-desc should be
             'a11y-aria-label', a raw aria-label attribute must not reach the native node */}
-        <View
+        <view
           accessible={true}
           role="button"
           aria-label="a11y-aria-label"
           class="a11y-card"
         >
-          <Text class="info-text">aria-label + role=button</Text>
-        </View>
+          <text class="info-text">aria-label + role=button</text>
+        </view>
         {/* accessibilityState: uiautomator shows enabled=false / selected=true */}
-        <View
+        <view
           accessible={true}
           accessibilityLabel="a11y-state"
           accessibilityState={{ disabled: true, selected: true }}
           class="a11y-card"
         >
-          <Text class="info-text">state: disabled + selected</Text>
-        </View>
-      </View>
+          <text class="info-text">state: disabled + selected</text>
+        </view>
+      </view>
     );
   },
 });
@@ -884,14 +877,14 @@ const ParityDemo = defineComponent({
     const dismissMsg = ref('focus the field, then Hide keyboard');
 
     return () => (
-      <View class="section-nested">
-        <Text ref={titleRef} class="section-label">
+      <view class="section-nested">
+        <text ref={titleRef} class="section-label">
           Parity checks · longPress · dismiss · animated scroll · sticky · a11y
           focus
-        </Text>
+        </text>
 
         {/* #10 Text.onLongPress synthesis: hold ~0.5s (suppresses tap) vs quick tap */}
-        <Text
+        <text
           onLongPress={() => {
             longPressMsg.value = 'long press! (tap was suppressed)';
           }}
@@ -901,10 +894,10 @@ const ParityDemo = defineComponent({
           class="long-press-row"
         >
           {longPressMsg.value}
-        </Text>
+        </text>
 
         {/* #15 Keyboard.dismiss: blurs whatever input holds focus without needing a ref */}
-        <TextInput
+        <text-input
           placeholder="focus me…"
           placeholderTextColor="#3b5266"
           onFocus={() => {
@@ -915,7 +908,7 @@ const ParityDemo = defineComponent({
           }}
           class="focus-input"
         />
-        <Text class="note-text">{dismissMsg.value}</Text>
+        <text class="note-text">{dismissMsg.value}</text>
         <button
           title="Hide keyboard"
           onPress={() => Keyboard.dismiss()}
@@ -925,7 +918,7 @@ const ParityDemo = defineComponent({
         {/* #12 animated VirtualizedList scroll: smooth (native command) vs instant.
             A fixed height with no wrapper: the vertical ScrollView clips to its own
             frame (overflow:'scroll' base, like RN), so rows stay inside the box on iOS too. */}
-        <Text class="section-label">FlatList · animated scrollToOffset</Text>
+        <text class="section-label">FlatList · animated scrollToOffset</text>
         <FlatList
           ref={listRef}
           data={parityRows}
@@ -951,15 +944,15 @@ const ParityDemo = defineComponent({
             {
               item: ({ item }) => (
                 // height stays dynamic: PARITY_ROW_H script const
-                <View class="parity-row" style={{ height: PARITY_ROW_H }}>
-                  <Text class="info-text">{`row ${item.n}`}</Text>
-                </View>
+                <view class="parity-row" style={{ height: PARITY_ROW_H }}>
+                  <text class="info-text">{`row ${item.n}`}</text>
+                </view>
               ),
             } satisfies IFlatListSlots<{ id: string; n: number }>
           }
         </FlatList>
-        <View class="row">
-          <View class="flex1">
+        <view class="row">
+          <view class="flex1">
             <button
               title="Scroll ▼ animated"
               onPress={() =>
@@ -970,8 +963,8 @@ const ParityDemo = defineComponent({
               }
               color="#42b883"
             />
-          </View>
-          <View class="flex1">
+          </view>
+          <view class="flex1">
             <button
               title="Top · instant"
               onPress={() =>
@@ -979,15 +972,15 @@ const ParityDemo = defineComponent({
               }
               color="#42b883"
             />
-          </View>
-        </View>
+          </view>
+        </view>
 
         {/* #13 sticky section headers. Drag the inner list: each header pins at the top.
             Cross-talk check: as the NEXT header reaches the top it should PUSH the pinned
             one off (nextHeaderLayoutY not yet wired, watch push vs overlap). */}
-        <Text class="section-label">
+        <text class="section-label">
           SectionList · sticky (scroll: next header should push prev off)
-        </Text>
+        </text>
         <SectionList
           testID="sticky-section-list"
           sections={paritySections}
@@ -999,13 +992,13 @@ const ParityDemo = defineComponent({
           {
             {
               sectionHeader: ({ section }) => (
-                <Text class="section-header">{section.title}</Text>
+                <text class="section-header">{section.title}</text>
               ),
               item: ({ item }) => (
                 // height stays dynamic: PARITY_ROW_H script const
-                <View class="parity-row" style={{ height: PARITY_ROW_H }}>
-                  <Text class="info-text">{item.label}</Text>
-                </View>
+                <view class="parity-row" style={{ height: PARITY_ROW_H }}>
+                  <text class="info-text">{item.label}</text>
+                </view>
               ),
             } satisfies ISectionListSlots<{ id: string; label: string }>
           }
@@ -1022,7 +1015,7 @@ const ParityDemo = defineComponent({
           }}
           color="#42b883"
         />
-      </View>
+      </view>
     );
   },
 });
@@ -1035,6 +1028,10 @@ export const CanaryScreen = defineComponent({
     const spinning = ref(true);
     const volume = ref(0.5);
     const modalVisible = ref(false);
+    // The pressed look of the card below is the tag's own `style` callback. This mirror exists
+    // only for its CHILD: press state lives on the engine node and never crosses back into Vue's
+    // reactivity, so a child cannot receive it the way a render-prop child once did.
+    const cardPressed = ref(false);
     const toastVisible = ref(false);
     const tunnelToastVisible = ref(false);
     // shallowRef, NOT ref: the engine node must be held by IDENTITY so Teleport's `to` target
@@ -1161,13 +1158,13 @@ export const CanaryScreen = defineComponent({
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Canary];
 
     return () => (
-      <SafeAreaView class="screen">
+      <safe-area-view class="screen">
         <ScrollView
           testID="canary-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
           refreshControl={
-            <RefreshControl
+            <refresh-control
               refreshing={refreshing.value}
               onRefresh={onRefresh}
               tintColor="#42b883"
@@ -1181,35 +1178,35 @@ export const CanaryScreen = defineComponent({
             hidden={statusBarHidden.value}
             animated={true}
           />
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view
               class="hero-badge"
               style={{ backgroundColor: LINE_COLOR.primitives }}
             >
-              <Text class="hero-badge-text">CN</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">All primitives</Text>
-              <Text class="hero-body">
+              <text class="hero-badge-text">CN</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">All primitives</text>
+              <text class="hero-body">
                 Every @symbiote-native/vue primitive, driven straight onto
                 Fabric — no react-native renderer in the path.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
           {/* native->JS: keyboard height pushed from the device hub, read live */}
-          <Text class="header-note">
+          <text class="header-note">
             {keyboardHeight.value > 0
               ? `keyboard up · ${keyboardHeight.value}px`
               : 'keyboard down'}
-          </Text>
+          </text>
           {/* Tier A runtime modules, read live from the real native side. A non-empty
             Version proves PlatformConstants resolved; a fractional hairline (e.g. 0.333
             on @3x) proves DeviceInfo's scale resolved. The border below IS that hairline;
             borderTopWidth stays dynamic (StyleSheet.hairlineWidth is a runtime constant). */}
-          <Text
+          <text
             class="hairline-note"
             style={{ borderTopWidth: StyleSheet.hairlineWidth }}
           >
@@ -1217,17 +1214,17 @@ export const CanaryScreen = defineComponent({
               `${Platform.isPad ? ' · iPad' : ''}` +
               ` · ${Platform.select({ ios: 'native ios', android: 'native android', default: '?' })}` +
               ` · hairline ${StyleSheet.hairlineWidth.toFixed(3)}`}
-          </Text>
+          </text>
           {/* Tier B runtime modules, live. Real w×h@scale proves Dimensions + PixelRatio;
             a colorScheme proves Appearance; appState flips when you background the app
             (AppState's device events). */}
-          <Text class="header-note">
+          <text class="header-note">
             {`${Math.round(window.value.width)}×${Math.round(window.value.height)} @${PixelRatio.get()}x` +
               ` · ${colorScheme.value ?? 'no-scheme'} · ${appState.value}`}
-          </Text>
+          </text>
           {/* JS->native StatusBar controls: watch the top strip react */}
-          <View class="row">
-            <View class="flex1">
+          <view class="row">
+            <view class="flex1">
               <button
                 title={
                   statusBarHidden.value ? 'Show status bar' : 'Hide status bar'
@@ -1237,8 +1234,8 @@ export const CanaryScreen = defineComponent({
                 }}
                 color="#42b883"
               />
-            </View>
-            <View class="flex1">
+            </view>
+            <view class="flex1">
               <button
                 title={darkStatusBar.value ? 'Light text' : 'Dark text'}
                 onPress={() => {
@@ -1246,14 +1243,14 @@ export const CanaryScreen = defineComponent({
                 }}
                 color="#42b883"
               />
-            </View>
-          </View>
+            </view>
+          </view>
           {/* #6 Android-only window flags: the blank-risk pair. PASS: the top strip turns
             red / goes translucent and the app STAYS rendered. FAIL: the surface blanks
             (white screen); watch logcat for stopSurface / "reactInstance is null". */}
           {Platform.OS === 'android' && (
-            <View class="row">
-              <View class="flex1">
+            <view class="row">
+              <view class="flex1">
                 <button
                   title={statusBarRed.value ? 'BG default' : 'BG red'}
                   onPress={() => {
@@ -1266,8 +1263,8 @@ export const CanaryScreen = defineComponent({
                   }}
                   color="#42b883"
                 />
-              </View>
-              <View class="flex1">
+              </view>
+              <view class="flex1">
                 <button
                   title={statusBarTranslucent.value ? 'Opaque' : 'Translucent'}
                   onPress={() => {
@@ -1277,70 +1274,70 @@ export const CanaryScreen = defineComponent({
                   }}
                   color="#42b883"
                 />
-              </View>
-            </View>
+              </view>
+            </view>
           )}
           {/* JS->native imperative modules: tap to fire the real native UI / haptics.
             Each working button proves its module name resolved on the bridgeless host. */}
-          <View class="row">
-            <View class="flex1">
+          <view class="row">
+            <view class="flex1">
               <button title="Alert" onPress={onAlert} color="#42b883" />
-            </View>
+            </view>
             {/* ActionSheetIOS drives the iOS-only ActionSheetManager; no Android native
               module exists, so the control is iOS-only by design (not a gap). */}
             {Platform.OS !== 'android' && (
-              <View class="flex1">
+              <view class="flex1">
                 <button
                   title="Action sheet"
                   onPress={onActionSheet}
                   color="#42b883"
                 />
-              </View>
+              </view>
             )}
-          </View>
-          <View class="row">
-            <View class="flex1">
+          </view>
+          <view class="row">
+            <view class="flex1">
               <button title="Share" onPress={onShare} color="#42b883" />
-            </View>
-            <View class="flex1">
+            </view>
+            <view class="flex1">
               <button
                 title="Vibrate"
                 onPress={() => Vibration.vibrate()}
                 color="#42b883"
               />
-            </View>
-          </View>
+            </view>
+          </view>
           <button title="Open vuejs.org" onPress={onOpenUrl} color="#42b883" />
 
           {/* The native UIRefreshControl spinner only shows while iOS holds the scroll
             view pulled-down; our full re-commit snaps the offset back, so we drive
             our OWN indicator from the same `refreshing` flag, guaranteed visible. */}
           {refreshing.value ? (
-            <View class="refresh-row">
+            <view class="refresh-row">
               <activity-indicator color="#42b883" />
-              <Text class="accent-note">Refreshing…</Text>
-            </View>
+              <text class="accent-note">Refreshing…</text>
+            </view>
           ) : (
-            <Text class="muted-center">
+            <text class="muted-center">
               {`pull to refresh · refreshed ${refreshes.value}×`}
-            </Text>
+            </text>
           )}
 
           {/* View + press-to-increment */}
-          <View
+          <view
             testID="counter-card"
             onPress={() => {
               count.value += 1;
             }}
             class="counter-card"
           >
-            <Text testID="counter-value" class="counter-text">
+            <text testID="counter-value" class="counter-text">
               {`tapped ${count.value}×`}
-            </Text>
-          </View>
+            </text>
+          </view>
 
           {/* TextInput + greeting */}
-          <TextInput
+          <text-input
             testID="greeting-input"
             value={name.value}
             onValueChange={(text: string) => {
@@ -1350,14 +1347,14 @@ export const CanaryScreen = defineComponent({
             placeholderTextColor="#3b5266"
             class="text-input"
           />
-          <Text testID="greeting-output" class="greeting">
+          <text testID="greeting-output" class="greeting">
             {name.value ? `Hello, ${name.value}` : 'Hello, stranger'}
-          </Text>
+          </text>
 
           {/* Switch drives the ActivityIndicator */}
-          <View class="switch-row">
-            <Text class="switch-label">spinner</Text>
-            <Switch
+          <view class="switch-row">
+            <text class="switch-label">spinner</text>
+            <switch
               testID="spinner-switch"
               value={spinning.value}
               onValueChange={(next: boolean) => {
@@ -1365,7 +1362,7 @@ export const CanaryScreen = defineComponent({
               }}
               trackColor={{ false: '#334155', true: '#369870' }}
             />
-          </View>
+          </view>
           <activity-indicator
             testID="spinner-indicator"
             animating={spinning.value}
@@ -1376,10 +1373,10 @@ export const CanaryScreen = defineComponent({
           {/* Slider: the @react-native-community/slider native view via @symbiote-native/slider/vue. Drag
             it — onValueChange streams live; the colored track proves the engine ran the tint
             processors it derived from the library's ViewConfig. Same wrapper as the React canary. */}
-          <View class="section-tight">
-            <Text class="switch-label">
+          <view class="section-tight">
+            <text class="switch-label">
               {`volume · ${Math.round(volume.value * 100)}%`}
-            </Text>
+            </text>
             <Slider
               testID="volume-slider"
               value={volume.value}
@@ -1394,7 +1391,7 @@ export const CanaryScreen = defineComponent({
               thumbTintColor="#ffffff"
               class="slider"
             />
-          </View>
+          </view>
 
           {/* Animated: JS driver vs native driver, side by side */}
           <AnimatedDemo />
@@ -1434,9 +1431,15 @@ export const CanaryScreen = defineComponent({
           />
 
           {/* Pressable card with pressed-state feedback */}
-          <Pressable
+          <pressable
             onPress={() => {
               count.value += 1;
+            }}
+            onPressIn={() => {
+              cardPressed.value = true;
+            }}
+            onPressOut={() => {
+              cardPressed.value = false;
             }}
             class="pressable-card"
             style={({ pressed }: { pressed: boolean }) => ({
@@ -1444,19 +1447,17 @@ export const CanaryScreen = defineComponent({
               borderColor: pressed ? '#42b883' : '#369870',
             })}
           >
-            {({ pressed }: { pressed: boolean }) => (
-              // color stays dynamic (pressed ? active : idle)
-              <Text
-                class="pressable-label"
-                style={{ color: pressed ? '#42b883' : '#cbd5e1' }}
-              >
-                {pressed ? 'holding…' : 'press me (also +1)'}
-              </Text>
-            )}
-          </Pressable>
+            {/* color stays dynamic (cardPressed mirrors the press) */}
+            <text
+              class="pressable-label"
+              style={{ color: cardPressed.value ? '#42b883' : '#cbd5e1' }}
+            >
+              {cardPressed.value ? 'holding…' : 'press me (also +1)'}
+            </text>
+          </pressable>
 
           {/* Horizontal FlatList: real windowing */}
-          <Text class="section-label">FlatList · 24 chips, windowed</Text>
+          <text class="section-label">FlatList · 24 chips, windowed</text>
           <FlatList
             testID="chips-list"
             data={chips}
@@ -1479,7 +1480,7 @@ export const CanaryScreen = defineComponent({
                 item: ({ item }) => (
                   // width / marginRight stay dynamic: CHIP_WIDTH/CHIP_GAP script consts;
                   // backgroundColor stays dynamic (item.color)
-                  <View
+                  <view
                     class="chip-card"
                     style={{
                       width: CHIP_WIDTH,
@@ -1487,8 +1488,8 @@ export const CanaryScreen = defineComponent({
                       backgroundColor: item.color,
                     }}
                   >
-                    <Text class="chip-number">{item.index}</Text>
-                  </View>
+                    <text class="chip-number">{item.index}</text>
+                  </view>
                 ),
               } satisfies IFlatListSlots<{
                 id: string;
@@ -1504,7 +1505,7 @@ export const CanaryScreen = defineComponent({
             STAYS highlighted (inside the measured rect + 80px bottom retention). Drag UP
             off the top: highlight drops. Proves measured-rect retention rather than a
             symmetric-radius approximation. The dx/dy readout tracks the move offset. */}
-          <Pressable
+          <pressable
             hitSlop={{ top: 0, bottom: 40, left: 0, right: 0 }}
             pressRetentionOffset={{ top: 0, bottom: 80, left: 0, right: 0 }}
             onPressMove={(event: ISymbioteEvent) => {
@@ -1518,15 +1519,15 @@ export const CanaryScreen = defineComponent({
               backgroundColor: pressed ? '#369870' : '#2c3e50',
             })}
           >
-            <Text class="info-text">
+            <text class="info-text">
               {`drag me · dx ${retentionMove.value.dx} · dy ${retentionMove.value.dy}`}
-            </Text>
-          </Pressable>
+            </text>
+          </pressable>
 
           {/* maintainVisibleContentPosition. PASS: scroll down a bit, tap Prepend: the rows
             you are looking at DO NOT jump; new items appear above without shifting the
             viewport. FAIL: the list jumps to the top. */}
-          <Text class="section-label">MVCP · prepend without jump</Text>
+          <text class="section-label">MVCP · prepend without jump</text>
           <FlatList
             data={mvcpItems.value}
             keyExtractor={(item: { id: string; label: string }) => item.id}
@@ -1537,9 +1538,9 @@ export const CanaryScreen = defineComponent({
             {
               {
                 item: ({ item }) => (
-                  <View class="mvcp-row">
-                    <Text class="list-row-text">{item.label}</Text>
-                  </View>
+                  <view class="mvcp-row">
+                    <text class="list-row-text">{item.label}</text>
+                  </view>
                 ),
                 // This list measures its own cells (no getItemLayout), and the divider is CHROME
                 // the list renders BETWEEN them — so it belongs to the distance from one row to
@@ -1548,7 +1549,7 @@ export const CanaryScreen = defineComponent({
                 // skipped, and the content below a windowed-out region slides up and back as the
                 // window moves (core/components buildOffsets). Deliberately on the MVCP list:
                 // prepend-without-jump is exactly where a few points of offset error show.
-                separator: () => <View class="mvcp-divider" />,
+                separator: () => <view class="mvcp-divider" />,
               } satisfies IFlatListSlots<{ id: string; label: string }>
             }
           </FlatList>
@@ -1578,9 +1579,9 @@ export const CanaryScreen = defineComponent({
               transform: [{ translateY: parityHeaderTranslateY }],
             }}
           >
-            <Text class="parity-header-text">
+            <text class="parity-header-text">
               HEADER — fades as you scroll ↓
-            </Text>
+            </text>
           </Animated.View>
           <Animated.ScrollView
             class="box-list160"
@@ -1588,14 +1589,14 @@ export const CanaryScreen = defineComponent({
             onScroll={onParityScroll}
           >
             {Array.from({ length: 6 }, (_value, index) => (
-              <View key={index} class="scroll-demo-row">
-                <Text class="list-row-text">{`scroll me · row ${index}`}</Text>
-              </View>
+              <view key={index} class="scroll-demo-row">
+                <text class="list-row-text">{`scroll me · row ${index}`}</text>
+              </view>
             ))}
           </Animated.ScrollView>
-          <Text class="tiny-center">
+          <text class="tiny-center">
             ↑ drag inside the box — the bar above reacts
-          </Text>
+          </text>
           {/* Native-driver proof for Animated.event: tap to JAM the JS thread 3s, then drag
             the box above DURING the freeze. If the bar keeps fading/lifting while JS is
             frozen, the scroll event drives parityScrollY on the UI thread (native attach).
@@ -1611,9 +1612,9 @@ export const CanaryScreen = defineComponent({
               }
             }}
           />
-          <Text class="tiny-center">
+          <text class="tiny-center">
             tap Freeze, then immediately drag the box — bar should still move
-          </Text>
+          </text>
 
           {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect
             is unmistakable on the dark theme. Kept as a dynamic style object here — the CSS
@@ -1621,36 +1622,36 @@ export const CanaryScreen = defineComponent({
             below, this is just legacy demo wiring, not a remaining gap. */}
           {/* boxShadow: a BLUE glow (a black shadow is invisible on the near-black bg).
             PASS: a soft blue halo bleeds out around the panel. */}
-          <View class="shadow-card" style={shadowCardExtra}>
-            <Text class="note-text">boxShadow · blue glow</Text>
-          </View>
+          <view class="shadow-card" style={shadowCardExtra}>
+            <text class="note-text">boxShadow · blue glow</text>
+          </view>
           {/* filter: same base colour both sides; the right one is darkened by
             brightness(0.5). PASS: the right panel is clearly darker than the left. */}
-          <View class="row">
-            <View class="filter-tile">
-              <Text class="tile-text">no filter</Text>
-            </View>
-            <View class="filter-tile" style={dimStyle}>
-              <Text class="tile-text">brightness 0.5</Text>
-            </View>
-          </View>
+          <view class="row">
+            <view class="filter-tile">
+              <text class="tile-text">no filter</text>
+            </view>
+            <view class="filter-tile" style={dimStyle}>
+              <text class="tile-text">brightness 0.5</text>
+            </view>
+          </view>
           {/* transformOrigin: the panel rotates around its TOP-LEFT corner, not its centre.
             PASS: the left edge stays put while the bottom-right swings down. */}
-          <View class="rotated-card" style={rotationStyle}>
-            <Text class="tile-text">transformOrigin · top-left</Text>
-          </View>
+          <view class="rotated-card" style={rotationStyle}>
+            <text class="tile-text">transformOrigin · top-left</text>
+          </view>
 
           {/* background-image: a CSS `linear-gradient(...)` authored entirely in App.css
             (.gradient-card), proving @symbiote-native/css-parser's `background-image` → RN's
             `experimental_backgroundImage` raw passthrough works end to end.
             PASS: the panel shows a gradient sweeping left to right. */}
-          <View class="gradient-card">
-            <Text class="tile-text">background-image · linear-gradient</Text>
-          </View>
+          <view class="gradient-card">
+            <text class="tile-text">background-image · linear-gradient</text>
+          </view>
 
           {/* Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
             width/height→style); a screen reader reads "Vue logo" (alt→accessibilityLabel). */}
-          <Image
+          <image
             src="https://vuejs.org/images/logo.png"
             alt="Vue logo"
             width={48}
@@ -1661,21 +1662,21 @@ export const CanaryScreen = defineComponent({
           {/* KeyboardAvoidingView enabled toggle. PASS: with enabled ON, focusing the field
             lifts it above the keyboard AND the keyboard is the email layout (proves
             autoComplete/inputMode fold); with enabled OFF the keyboard covers the field. */}
-          <View class="switch-row">
-            <Text class="switch-label">avoid keyboard</Text>
-            <Switch
+          <view class="switch-row">
+            <text class="switch-label">avoid keyboard</text>
+            <switch
               value={kavEnabled.value}
               onValueChange={(next: boolean) => {
                 kavEnabled.value = next;
               }}
               trackColor={{ false: '#334155', true: '#369870' }}
             />
-          </View>
+          </view>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             enabled={kavEnabled.value}
           >
-            <TextInput
+            <text-input
               autoComplete="email"
               inputMode="email"
               enterKeyHint="done"
@@ -1685,14 +1686,14 @@ export const CanaryScreen = defineComponent({
             />
           </KeyboardAvoidingView>
 
-          <Image
+          <image
             source={{ uri: 'https://vuejs.org/images/logo.png' }}
             class="logo-image"
           />
 
-          <View class="bottom-card">
-            <Text class="bottom-text">↑ you scrolled to the bottom</Text>
-          </View>
+          <view class="bottom-card">
+            <text class="bottom-text">↑ you scrolled to the bottom</text>
+          </view>
 
           {/* Modal overlays its own window */}
           <Modal
@@ -1704,13 +1705,13 @@ export const CanaryScreen = defineComponent({
             }}
           >
             {/* transparent modal => paint our own dim layer (the RN pattern) */}
-            <View class="modal-overlay">
-              <View testID="modal-card" class="modal-card">
-                <Text class="modal-title">It's a Modal</Text>
-                <Text class="modal-body">
+            <view class="modal-overlay">
+              <view testID="modal-card" class="modal-card">
+                <text class="modal-title">It's a Modal</text>
+                <text class="modal-body">
                   Rendered through ModalHostView — its own native window, same
                   Fabric tree.
-                </Text>
+                </text>
                 <button
                   testID="modal-close"
                   title="Close"
@@ -1719,8 +1720,8 @@ export const CanaryScreen = defineComponent({
                   }}
                   color="#42b883"
                 />
-              </View>
-            </View>
+              </view>
+            </view>
           </Modal>
 
           {/* Teleport: moves the toast card OUT of this scroll content and INTO the
@@ -1739,8 +1740,8 @@ export const CanaryScreen = defineComponent({
           {overlayHost.value && (
             <Teleport to={overlayHost.value}>
               {toastVisible.value && (
-                <View testID="toast-card" class="modal-card">
-                  <Text class="modal-body">Ported via Teleport ✦</Text>
+                <view testID="toast-card" class="modal-card">
+                  <text class="modal-body">Ported via Teleport ✦</text>
                   <button
                     testID="toast-dismiss"
                     title="Dismiss"
@@ -1749,7 +1750,7 @@ export const CanaryScreen = defineComponent({
                     }}
                     color="#42b883"
                   />
-                </View>
+                </view>
               )}
             </Teleport>
           )}
@@ -1769,8 +1770,8 @@ export const CanaryScreen = defineComponent({
           />
           {tunnelToastVisible.value && (
             <tunnelDemo.In>
-              <View testID="tunnel-toast-card" class="modal-card">
-                <Text class="modal-body">Ported via createTunnel ✦</Text>
+              <view testID="tunnel-toast-card" class="modal-card">
+                <text class="modal-body">Ported via createTunnel ✦</text>
                 <button
                   testID="tunnel-toast-dismiss"
                   title="Dismiss"
@@ -1779,7 +1780,7 @@ export const CanaryScreen = defineComponent({
                   }}
                   color="#42b883"
                 />
-              </View>
+              </view>
             </tunnelDemo.In>
           )}
         </ScrollView>
@@ -1789,15 +1790,15 @@ export const CanaryScreen = defineComponent({
             actual ported child (the toast card). Rendered here — a sibling of ScrollView, same
             surface — so Teleport above can reach it via the ref; createTunnel's Out below works
             identically wherever it's mounted. */}
-        <View
+        <view
           testID="overlay-host"
           ref={overlayHost}
           pointerEvents="box-none"
           class="overlay-host"
         >
           <tunnelDemo.Out />
-        </View>
-      </SafeAreaView>
+        </view>
+      </safe-area-view>
     );
   },
 });

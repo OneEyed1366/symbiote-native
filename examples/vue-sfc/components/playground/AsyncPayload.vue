@@ -4,8 +4,6 @@
   purely so this stays a self-contained, offline demo.
 -->
 <script setup lang="ts">
-import { View, Text } from '@symbiote-native/vue';
-
 const LOAD_DELAY_MS = 900;
 
 async function loadPayload(): Promise<{ fetchedAt: number }> {
@@ -17,10 +15,10 @@ const payload = await loadPayload();
 </script>
 
 <template>
-  <View class="a11y-card">
-    <Text class="switch-label" testID="suspense-resolved"
-      >async payload resolved</Text
+  <view class="a11y-card">
+    <text class="switch-label" testID="suspense-resolved"
+      >async payload resolved</text
     >
-    <Text class="note-text">{{ `fetched at ${payload.fetchedAt}` }}</Text>
-  </View>
+    <text class="note-text">{{ `fetched at ${payload.fetchedAt}` }}</text>
+  </view>
 </template>

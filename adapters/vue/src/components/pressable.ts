@@ -38,28 +38,30 @@ import {
   type IRectOffset,
   type IPressMachineConfig,
   type IPressableAndroidRippleConfig,
-  type IAccessibilityProps,
-  type IAriaProps,
   type IAccessibilityStateValue,
 } from '@symbiote-native/components';
 import {
   measure,
   isSymbioteNode,
-  type IClassNameValue,
   type ISymbioteEvent,
   type ISymbioteNode,
   type IStyleProp,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { HOST_VIEW } from '../components';
+import type { IPressableProps } from './pressable-props';
 import { useRawAttrs } from '../composables/use-raw-attrs';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 import type { ICtx } from '../utils/component-helpers';
 
-export type {
-  IPressState,
-  IPressableAndroidRippleConfig,
-} from '@symbiote-native/components';
+// INTERNAL as of 2026-09-10 — off the package barrel, and the only thing left that renders it is
+// `./touchable.ts`. `<pressable>` is a TAG for an app; this component survives ONLY because
+// `TouchableOpacity` / `TouchableHighlight` are still components, and they are still components
+// only because `touchable-opacity` / `touchable-highlight` are missing from
+// `@symbiote-native/components/host-primitives`, which is what both Vue compilers read to decide
+// element-vs-component (`../../intrinsic-tags.cjs`). It renders `view`, never `pressable`, so the
+// engine's press machine does not attach to it and there is exactly one owner per node. Delete this
+// file with the two Touchable* wrappers.
+export type { IPressState, IPressableProps } from './pressable-props';
 
 export type IPressableEmits = {
   press: (event: ISymbioteEvent) => boolean;
@@ -99,30 +101,7 @@ export function emitPressableEvents(
   };
 }
 
-// Mirrors React's IPressableProps minus children/callback props, which Vue takes via slots/emits.
-export interface IPressableProps extends IAccessibilityProps, IAriaProps {
-  delayLongPress?: number;
-  disabled?: boolean;
-  // Whether a non-touch input device (hardware keyboard, TV remote) may focus this. Resolved rather
-  // than forwarded — see the `focusable` line in the View props below.
-  focusable?: boolean;
-  cancelable?: boolean;
-  hitSlop?: IRectOffset;
-  pressRetentionOffset?: IRectOffset;
-  unstable_pressDelay?: number;
-  android_ripple?: IPressableAndroidRippleConfig;
-  android_disableSound?: boolean;
-  delayHoverIn?: number;
-  delayHoverOut?: number;
-  testID?: string;
-  style?:
-    IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
-  // Unlike `style`, never a function of press state - a CSS class is compiled statically, so a
-  // press-state-dependent look still needs `style`'s function form.
-  class?: IClassNameValue;
-}
-
-export type IPressableSlots = {
+type IPressableSlots = {
   default?: (state: IPressState) => VNode[] | VNode;
 };
 
@@ -338,7 +317,7 @@ export const Pressable = defineComponent(
         ? rippleProps(asRippleConfig(attrs.android_ripple) ?? {})
         : undefined;
       const inner =
-        ripple !== undefined ? [h(HOST_VIEW, ripple, content)] : content;
+        ripple !== undefined ? [h('view', ripple, content)] : content;
 
       // The host node is the intrinsic TAG, not our <View> component: a Vue component instance
       // costs createComponentInstance + initProps + initSlots + setupRenderEffect even when the
@@ -350,7 +329,9 @@ export const Pressable = defineComponent(
       // dev warn, whose trace formats the __self/__source dev props (native HostObjects) — a read
       // that throws under JSX and unwinds the whole mount into a blank screen. An element takes
       // array children natively and never reaches that path.
-      return h(HOST_VIEW, viewProps, inner);
+      // `view`, never `pressable`: this component runs its own press machine, and the tag is what
+      // the engine's registry keys on — emitting it here would put a second machine on the node.
+      return h('view', viewProps, inner);
     };
   },
   {

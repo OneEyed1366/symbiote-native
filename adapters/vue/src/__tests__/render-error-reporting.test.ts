@@ -15,7 +15,7 @@ import {
   type VNode,
 } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { View, mount, setAppConfigurator, unmount } from '@symbiote-native/vue';
+import { mount, setAppConfigurator, unmount } from '@symbiote-native/vue';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 219;
@@ -38,7 +38,7 @@ const Boundary = defineComponent({
       hasFailed.value = true;
       return false;
     });
-    return (): unknown => (hasFailed.value ? h(View) : slots.default?.());
+    return (): unknown => (hasFailed.value ? h('view') : slots.default?.());
   },
 });
 
@@ -51,7 +51,7 @@ const LeakyBoundary = defineComponent({
     onErrorCaptured(() => {
       hasFailed.value = true;
     });
-    return (): unknown => (hasFailed.value ? h(View) : slots.default?.());
+    return (): unknown => (hasFailed.value ? h('view') : slots.default?.());
   },
 });
 

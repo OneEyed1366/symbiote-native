@@ -9,8 +9,6 @@
   surface byte-for-byte across every screen that uses it.
 -->
 <script setup lang="ts">
-import { Pressable, Text } from '@symbiote-native/vue';
-
 const props = defineProps<{
   title: string;
   onPress: () => void;
@@ -18,15 +16,13 @@ const props = defineProps<{
   testID?: string;
 }>();
 
-// The pressed look, as a `style` FUNCTION of press state — RN's own idiom, and the same shape
-// CanaryScreen's pressableStyle/retentionStyle use. It briefly lived in `.action-button:active`
-// instead, because a template that read `pressed` could not compile to an intrinsic tag and this
-// component is 90 call sites. That constraint is GONE: the lowering transform now derives both
-// looks from this declaration, so the idiom and the intrinsic tag are no longer a trade-off.
+// The pressed look, as a `style` FUNCTION of press state — RN's own idiom. It works on the bare
+// `<pressable>` tag because the ENGINE resolves it: `routeProp`'s `isStyleCallback` evaluates the
+// callback at both values of `pressed` and swaps the pressed one in while the node is held
+// (`core/engine/src/node.ts`). No component has to read press state for this.
 //
-// Kept HOISTED rather than written inline in the template on purpose. The SFC path emits a call
-// per state and does not substitute (no JS AST in hand), so an inline arrow would allocate two
-// closures per render; a hoisted one is created once in setup and only called.
+// Kept HOISTED rather than written inline on purpose: an inline arrow allocates a closure per
+// render, and this component has ~90 call sites.
 const actionButtonStyle = ({ pressed }: { pressed: boolean }) => ({
   borderColor: props.color,
   opacity: pressed ? 0.6 : 1,
@@ -34,12 +30,12 @@ const actionButtonStyle = ({ pressed }: { pressed: boolean }) => ({
 </script>
 
 <template>
-  <Pressable
+  <pressable
     :testID="testID"
     @press="onPress"
     class="action-button"
     :style="actionButtonStyle"
   >
-    <Text class="action-button-text" :style="{ color }">{{ title }}</Text>
-  </Pressable>
+    <text class="action-button-text" :style="{ color }">{{ title }}</text>
+  </pressable>
 </template>

@@ -52,7 +52,6 @@ import {
   type VNode,
 } from 'vue';
 import { withModifiers } from '@symbiote-native/vue/runtime-helpers';
-import { View, Text, Pressable } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 import { vHighlight } from './directives';
 
@@ -76,7 +75,7 @@ const RenderVNode = defineComponent(
 const tone = ref('#f5a623');
 const baseVNode = computed(() =>
   createVNode(
-    Text,
+    'text',
     mergeProps({ class: 'note-text' }, { style: { color: tone.value } }),
     () => `h()/createVNode() built this · tone=${tone.value}`,
   ),
@@ -86,26 +85,28 @@ const clonedVNode = computed(() =>
 );
 const fragmentVNode = computed(() =>
   h(Fragment, [
-    h(Text, { class: 'note-text' }, () => 'Fragment child 1'),
-    h(Text, { class: 'note-text' }, () => 'Fragment child 2'),
+    h('text', { class: 'note-text' }, () => 'Fragment child 1'),
+    h('text', { class: 'note-text' }, () => 'Fragment child 2'),
   ]),
 );
 const isVNodeCheck = computed(() => isVNode(baseVNode.value));
 
 const glowOn = ref(false);
 const directedVNode = computed(() =>
-  withDirectives(h(View, { class: 'chip' }), [[vHighlight, glowOn.value]]),
+  withDirectives(h('view', { class: 'chip' }), [[vHighlight, glowOn.value]]),
 );
 
 const AsyncBadgeReal = defineComponent({
   setup: () => () =>
-    h(View, { class: 'chip' }, [h(Text, { class: 'chip-text' }, () => 'OK')]),
+    h('view', { class: 'chip' }, [
+      h('text', { class: 'chip-text' }, () => 'OK'),
+    ]),
 });
 const LoadingStub = defineComponent({
-  setup: () => () => h(Text, { class: 'note-text' }, () => 'async loading…'),
+  setup: () => () => h('text', { class: 'note-text' }, () => 'async loading…'),
 });
 const ErrorStub = defineComponent({
-  setup: () => () => h(Text, { class: 'note-text' }, () => 'async failed'),
+  setup: () => () => h('text', { class: 'note-text' }, () => 'async failed'),
 });
 const AsyncWidget = defineAsyncComponent({
   loader: () =>
@@ -121,21 +122,21 @@ const asyncLoadTriggered = ref(false);
 </script>
 
 <template>
-  <View class="section-tight">
-    <Text class="section-label"
+  <view class="section-tight">
+    <text class="section-label"
       >Other —
-      h()/createVNode/cloneVNode/isVNode/Fragment/withDirectives/mergeProps</Text
+      h()/createVNode/cloneVNode/isVNode/Fragment/withDirectives/mergeProps</text
     >
     <RenderVNode :node="baseVNode" />
     <RenderVNode :node="clonedVNode" />
     <RenderVNode :node="fragmentVNode" />
-    <Text class="note-text" testID="other-is-vnode">{{
+    <text class="note-text" testID="other-is-vnode">{{
       `isVNode(baseVNode)=${isVNodeCheck}`
-    }}</Text>
+    }}</text>
 
-    <Text class="note-text"
+    <text class="note-text"
       >withDirectives() — the SAME v-highlight directive as the Template
-      Directives demo, applied programmatically</Text
+      Directives demo, applied programmatically</text
     >
     <ActionButton
       testID="other-toggle-glow"
@@ -145,9 +146,9 @@ const asyncLoadTriggered = ref(false);
     />
     <RenderVNode :node="directedVNode" />
 
-    <Text class="note-text"
+    <text class="note-text"
       >defineAsyncComponent — loadingComponent → resolved component, with a
-      150ms delay before the loader shows</Text
+      150ms delay before the loader shows</text
     >
     <ActionButton
       testID="other-load-async"
@@ -157,27 +158,27 @@ const asyncLoadTriggered = ref(false);
     />
     <component :is="AsyncWidget" v-if="asyncLoadTriggered" />
 
-    <Text class="note-text"
+    <text class="note-text"
       >withModifiers() — programmatic form, the .stop modifier bound by hand
       instead of via @press.stop (needs the real press event, unlike
-      ActionButton's zero-arg onPress, so this uses a plain Pressable)</Text
+      ActionButton's zero-arg onPress, so this uses a plain Pressable)</text
     >
-    <Pressable
+    <pressable
       testID="other-modifier-press"
       class="chip"
       :onPress="onModifierPress"
     >
-      <Text class="chip-text">press (wrapped in withModifiers)</Text>
-    </Pressable>
-    <Text class="note-text" testID="other-modifier-log">{{
+      <text class="chip-text">press (wrapped in withModifiers)</text>
+    </pressable>
+    <text class="note-text" testID="other-modifier-log">{{
       modifierLog.join(' · ') || '(not pressed yet)'
-    }}</Text>
+    }}</text>
 
-    <Text class="note-text" testID="other-css-module-gap"
+    <text class="note-text" testID="other-css-module-gap"
       >useCssModule() — real function now, but unreachable here: this project's
       &lt;style module&gt; compiler emits a plain `$style` const, not the
       `__cssModules` instance option this function reads (see the file header
-      comment above).</Text
+      comment above).</text
     >
-  </View>
+  </view>
 </template>

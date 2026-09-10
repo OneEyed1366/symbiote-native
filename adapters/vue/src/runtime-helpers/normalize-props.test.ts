@@ -56,7 +56,6 @@ const FUNCTION_STYLE =
 
 function sfc(primitive: string, styleExpression: string): string {
   return `<script setup lang="ts">
-import { ${primitive} } from '@symbiote-native/vue';
 const bag = { testID: 'p', style: ${styleExpression} };
 </script>
 <template><${primitive} v-bind="bag" /></template>`;
@@ -67,7 +66,6 @@ const bag = { testID: 'p', style: ${styleExpression} };
 // first door and this arm stayed broken behind a green suite.
 function sfcMerged(primitive: string, styleExpression: string): string {
   return `<script setup lang="ts">
-import { ${primitive} } from '@symbiote-native/vue';
 const rest = { testID: 'p' };
 const fn = ${styleExpression};
 </script>
@@ -103,16 +101,14 @@ async function commit(
   return props;
 }
 
-// Pressable's wrapper writes RN's `accessible` (Pressable.js:252) and `focusable`
-// (Pressable.js:258) defaults, and View has neither, so the payload differs by primitive. These
-// rows previously pinned their ABSENCE, i.e. a divergence from RN that the lowered path had
-// already closed.
+// The press behavior writes RN's `accessible` (Pressable.js:252) and `focusable`
+// (Pressable.js:258) defaults, and `view` has neither, so the payload differs by primitive.
 function expectedProps(
   primitive: string,
   style: Record<string, unknown>,
 ): Record<string, unknown> {
   const base = { testID: 'p', ...style };
-  return primitive === 'Pressable'
+  return primitive === 'pressable'
     ? { ...base, accessible: true, focusable: true }
     : base;
 }
@@ -120,7 +116,7 @@ function expectedProps(
 describe('a functional style survives v-bind', () => {
   // Both, because the defect is NOT stateful-only: measured identically on View, which observes no
   // press state at all. Scoping the override to Pressable would have left this arm broken.
-  it.each(['View', 'Pressable'])(
+  it.each(['view', 'pressable'])(
     '%s: the style resolves instead of being dropped',
     async primitive => {
       const props = await commit(primitive, FUNCTION_STYLE);
@@ -133,7 +129,7 @@ describe('a functional style survives v-bind', () => {
 
   // The mergeProps door. Same defect, different compiler helper — so this is not a duplicate of
   // the rows above: breaking either override leaves the other set green.
-  it.each(['View', 'Pressable'])(
+  it.each(['view', 'pressable'])(
     '%s: v-bind beside a separate :style goes through mergeProps and survives',
     async primitive => {
       const props = await commit(primitive, FUNCTION_STYLE, sfcMerged);
@@ -150,22 +146,22 @@ describe('a functional style survives v-bind', () => {
   // lowered `<Pressable :style="({pressed}) => …" />` and no style at all.
   it('an inline callback survives the :style path', async () => {
     const props = await commit(
-      'Pressable',
+      'pressable',
       FUNCTION_STYLE,
       (primitive, expr) =>
         `<script setup lang="ts">
-import { ${primitive} } from '@symbiote-native/vue';
+const __tagArm = true;
 </script>
 <template><${primitive} testID="p" :style="${expr}" /></template>`,
     );
 
-    expect(props).toEqual(expectedProps('Pressable', { opacity: 1 }));
+    expect(props).toEqual(expectedProps('pressable', { opacity: 1 }));
   });
 
   // The control. Without it, "the style is present" cannot distinguish a working override from a
   // harness that never lost it — and an object style is the shape Vue's own normalizer handles
   // correctly, so it must keep working unchanged.
-  it.each(['View', 'Pressable'])(
+  it.each(['view', 'pressable'])(
     '%s: an object style still goes through Vue’s own normalizer',
     async primitive => {
       const props = await commit(primitive, '{ opacity: 0.3 }');

@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { View, Text, Animated, PanResponder } from '@symbiote-native/vue';
+import { Animated, PanResponder } from '@symbiote-native/vue';
 import ActionButton from './ActionButton.vue';
 
 const XY_SPAN = 96;
@@ -75,33 +75,33 @@ const scrollBy = (delta: number): void => {
 </script>
 
 <template>
-  <View class="section-nested">
-    <Text class="section-label">Animated · ValueXY / tracking / diffClamp</Text>
+  <view class="section-nested">
+    <text class="section-label">Animated · ValueXY / tracking / diffClamp</text>
 
     <!-- ValueXY box you drag with a finger (PanResponder) -->
-    <Text class="drag-hint">drag the purple box →</Text>
-    <View class="xy-frame">
+    <text class="drag-hint">drag the purple box →</text>
+    <view class="xy-frame">
       <Animated.View
         v-bind="panResponder.panHandlers"
         class="xy-box"
         :style="{ transform: xy.getTranslateTransform() }"
       />
-    </View>
+    </view>
 
     <!-- Tracking: lead dot (blue) and follower (orange) that lags behind it -->
-    <View class="track-row">
+    <view class="track-row">
       <Animated.View
         class="lead-dot"
         :style="{ transform: [{ translateX: lead }] }"
       />
-    </View>
-    <View class="track-row">
+    </view>
+    <view class="track-row">
       <Animated.View
         testID="follow-dot"
         class="follow-dot"
         :style="{ transform: [{ translateX: follow }] }"
       />
-    </View>
+    </view>
     <ActionButton
       testID="track-btn"
       title="Move target (follower chases)"
@@ -110,29 +110,29 @@ const scrollBy = (delta: number): void => {
     />
 
     <!-- diffClamp collapsing header -->
-    <View class="collapse-frame">
+    <view class="collapse-frame">
       <Animated.View
         class="collapse-header"
         :style="{ transform: [{ translateY: headerOffset }] }"
       >
-        <Text class="collapse-header-text">collapsing header</Text>
+        <text class="collapse-header-text">collapsing header</text>
       </Animated.View>
-    </View>
-    <View class="row-tight">
-      <View class="flex1">
+    </view>
+    <view class="row-tight">
+      <view class="flex1">
         <ActionButton
           title="Scroll ↓"
           :onPress="() => scrollBy(40)"
           color="#38b2ac"
         />
-      </View>
-      <View class="flex1">
+      </view>
+      <view class="flex1">
         <ActionButton
           title="Scroll ↑"
           :onPress="() => scrollBy(-40)"
           color="#38b2ac"
         />
-      </View>
-    </View>
-  </View>
+      </view>
+    </view>
+  </view>
 </template>

@@ -6,7 +6,6 @@
 -->
 <script setup lang="ts">
 import { computed } from 'vue';
-import { SafeAreaView, Text, View } from '@symbiote-native/vue';
 import { useRoute, useStackNavigation } from '@symbiote-native/navigation/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { LINE_COLOR } from '../navigation-lines';
@@ -26,19 +25,19 @@ const paramsLabel = computed(() => {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <View class="section">
-      <Text class="section-label">Navigation demo · Details screen</Text>
-      <Text class="info-text">{{ `route.params: ${paramsLabel}` }}</Text>
-      <Text class="info-text">{{
+  <safe-area-view class="screen">
+    <view class="section">
+      <text class="section-label">Navigation demo · Details screen</text>
+      <text class="info-text">{{ `route.params: ${paramsLabel}` }}</text>
+      <text class="info-text">{{
         `canGoBack: ${navigation.canGoBack()}`
-      }}</Text>
+      }}</text>
       <ActionButton
         testID="nav-pop"
         title="← Pop back"
         :onPress="() => navigation.pop()"
         :color="LINE_COLOR.primitives"
       />
-    </View>
-  </SafeAreaView>
+    </view>
+  </safe-area-view>
 </template>

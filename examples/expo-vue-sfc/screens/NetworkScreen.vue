@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import { ScrollView } from '@symbiote-native/vue';
 import {
   NetworkStateType,
   getIpAddressAsync,
@@ -93,69 +93,69 @@ const airplaneModeText = computed(() =>
 </script>
 
 <template>
-  <SafeAreaView class="screen">
+  <safe-area-view class="screen">
     <ScrollView
       testID="network-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Network</Text>
-          <Text class="hero-body"
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Network</text>
+          <text class="hero-body"
             >@symbiote-native/network — live network state via
             useNetworkState(), plus the device's IP address and airplane-mode
             check. Toggle Wi-Fi or airplane mode on the device to see the live
-            card update on its own.</Text
+            card update on its own.</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="network-live-card" class="network-card">
-        <Text class="network-card-title">Live network state</Text>
-        <View class="network-row">
-          <Text class="network-row-label">Type</Text>
-          <Text testID="network-type-value" class="network-value-text">{{
+      <view testID="network-live-card" class="network-card">
+        <text class="network-card-title">Live network state</text>
+        <view class="network-row">
+          <text class="network-row-label">Type</text>
+          <text testID="network-type-value" class="network-value-text">{{
             networkTypeText
-          }}</Text>
-        </View>
-        <View class="network-row">
-          <Text class="network-row-label">Connected</Text>
-          <Text testID="network-connected-value" class="network-value-text">{{
+          }}</text>
+        </view>
+        <view class="network-row">
+          <text class="network-row-label">Connected</text>
+          <text testID="network-connected-value" class="network-value-text">{{
             isConnectedText
-          }}</Text>
-        </View>
-        <View class="network-row">
-          <Text class="network-row-label">Internet reachable</Text>
-          <Text testID="network-reachable-value" class="network-value-text">{{
+          }}</text>
+        </view>
+        <view class="network-row">
+          <text class="network-row-label">Internet reachable</text>
+          <text testID="network-reachable-value" class="network-value-text">{{
             isInternetReachableText
-          }}</Text>
-        </View>
-      </View>
+          }}</text>
+        </view>
+      </view>
 
-      <View testID="network-info-card" class="network-card">
-        <Text class="network-card-title">Device info</Text>
-        <View class="network-row">
-          <Text class="network-row-label">IP address</Text>
-          <Text testID="network-ip-value" class="network-value-text">{{
+      <view testID="network-info-card" class="network-card">
+        <text class="network-card-title">Device info</text>
+        <view class="network-row">
+          <text class="network-row-label">IP address</text>
+          <text testID="network-ip-value" class="network-value-text">{{
             ipAddressText
-          }}</Text>
-        </View>
-        <View class="network-row">
-          <Text class="network-row-label">Airplane mode</Text>
-          <Text testID="network-airplane-value" class="network-value-text">{{
+          }}</text>
+        </view>
+        <view class="network-row">
+          <text class="network-row-label">Airplane mode</text>
+          <text testID="network-airplane-value" class="network-value-text">{{
             airplaneModeText
-          }}</Text>
-        </View>
-      </View>
+          }}</text>
+        </view>
+      </view>
     </ScrollView>
-  </SafeAreaView>
+  </safe-area-view>
 </template>

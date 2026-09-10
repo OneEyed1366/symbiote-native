@@ -7,7 +7,7 @@
 -->
 <script setup lang="ts">
 import { defineComponent, onMounted, ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import { ScrollView } from '@symbiote-native/vue';
 import {
   isAvailableAsync,
   useKeepAwake,
@@ -48,52 +48,52 @@ function handleToggle(): void {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
+  <safe-area-view class="screen">
     <ScrollView
       testID="keep-awake-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Keep Awake</Text>
-          <Text class="hero-body"
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Keep Awake</text>
+          <text class="hero-body"
             >@symbiote-native/keep-awake — keeps the screen on for as long as a
-            component holding useKeepAwake() stays mounted.</Text
+            component holding useKeepAwake() stays mounted.</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="keep-awake-card" class="keep-awake-card">
-        <Text class="keep-awake-card-title">Screen lock</Text>
-        <View class="keep-awake-row">
-          <Text class="keep-awake-row-label">Available</Text>
-          <View
+      <view testID="keep-awake-card" class="keep-awake-card">
+        <text class="keep-awake-card-title">Screen lock</text>
+        <view class="keep-awake-row">
+          <text class="keep-awake-row-label">Available</text>
+          <view
             :class="`keep-awake-status-badge keep-awake-status-badge-${isAvailable}`"
           >
-            <Text class="keep-awake-status-text">{{
+            <text class="keep-awake-status-text">{{
               isAvailable === 'checking'
                 ? 'CHECKING…'
                 : isAvailable === 'yes'
                   ? 'YES'
                   : 'NO'
-            }}</Text>
-          </View>
-        </View>
-        <View class="keep-awake-row">
-          <Text class="keep-awake-row-label">Held</Text>
-          <Text testID="keep-awake-held-value" class="keep-awake-value-text">{{
+            }}</text>
+          </view>
+        </view>
+        <view class="keep-awake-row">
+          <text class="keep-awake-row-label">Held</text>
+          <text testID="keep-awake-held-value" class="keep-awake-value-text">{{
             isHeld ? 'true' : 'false'
-          }}</Text>
-        </View>
+          }}</text>
+        </view>
         <ActionButton
           testID="keep-awake-toggle-button"
           :title="isHeld ? 'Release keep-awake' : 'Activate keep-awake'"
@@ -101,7 +101,7 @@ function handleToggle(): void {
           :color="lineColor"
         />
         <KeepAwakeHolder v-if="isHeld" />
-      </View>
+      </view>
     </ScrollView>
-  </SafeAreaView>
+  </safe-area-view>
 </template>

@@ -15,7 +15,6 @@ import {
   watchPostEffect,
   watchSyncEffect,
 } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 
 const count = ref(0);
@@ -50,22 +49,22 @@ function increment(): void {
 </script>
 
 <template>
-  <View class="a11y-card">
-    <Text class="switch-label"
-      >ref + computed + watch/watchEffect/watchPostEffect/watchSyncEffect</Text
+  <view class="a11y-card">
+    <text class="switch-label"
+      >ref + computed + watch/watchEffect/watchPostEffect/watchSyncEffect</text
     >
-    <Text class="list-row-text" testID="reactivity-counter">{{
+    <text class="list-row-text" testID="reactivity-counter">{{
       `count=${count} · doubled (computed)=${doubled}`
-    }}</Text>
+    }}</text>
     <ActionButton
       testID="reactivity-increment"
       title="increment"
       :onPress="increment"
       color="#f5a623"
     />
-    <Text class="section-label">firing order (last 8)</Text>
-    <Text v-for="(entry, index) in log" :key="index" class="list-row-text">{{
+    <text class="section-label">firing order (last 8)</text>
+    <text v-for="(entry, index) in log" :key="index" class="list-row-text">{{
       entry
-    }}</Text>
-  </View>
+    }}</text>
+  </view>
 </template>

@@ -6,13 +6,7 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import {
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/vue';
+import { ScrollView } from '@symbiote-native/vue';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
@@ -102,74 +96,74 @@ function handleDelete(): void {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
+  <safe-area-view class="screen">
     <ScrollView
       testID="secure-store-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Secure Store</Text>
-          <Text class="hero-body"
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Secure Store</text>
+          <text class="hero-body"
             >@symbiote-native/secure-store — encrypted key/value storage in the
             iOS Keychain and the Android Keystore. Save a value, kill the app,
-            relaunch, and read it back.</Text
+            relaunch, and read it back.</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="secure-store-capability-card" class="secure-store-card">
-        <Text class="secure-store-card-title">Capabilities</Text>
-        <View testID="secure-store-available" class="secure-store-row">
-          <Text class="secure-store-row-label">Available</Text>
-          <View
+      <view testID="secure-store-capability-card" class="secure-store-card">
+        <text class="secure-store-card-title">Capabilities</text>
+        <view testID="secure-store-available" class="secure-store-row">
+          <text class="secure-store-row-label">Available</text>
+          <view
             :class="`secure-store-status-badge secure-store-status-badge-${isAvailable}`"
           >
-            <Text class="secure-store-status-text">{{
+            <text class="secure-store-status-text">{{
               toBadgeText(isAvailable)
-            }}</Text>
-          </View>
-        </View>
-        <View testID="secure-store-biometrics" class="secure-store-row">
-          <Text class="secure-store-row-label">Biometrics usable</Text>
-          <View
+            }}</text>
+          </view>
+        </view>
+        <view testID="secure-store-biometrics" class="secure-store-row">
+          <text class="secure-store-row-label">Biometrics usable</text>
+          <view
             :class="`secure-store-status-badge secure-store-status-badge-${canUseBiometrics}`"
           >
-            <Text class="secure-store-status-text">{{
+            <text class="secure-store-status-text">{{
               toBadgeText(canUseBiometrics)
-            }}</Text>
-          </View>
-        </View>
-      </View>
+            }}</text>
+          </view>
+        </view>
+      </view>
 
-      <View testID="secure-store-value-card" class="secure-store-card">
-        <Text class="secure-store-card-title">Stored value</Text>
-        <View class="secure-store-row">
-          <Text class="secure-store-row-label">{{ DEMO_KEY }}</Text>
-          <Text testID="secure-store-value" class="secure-store-value-text">{{
+      <view testID="secure-store-value-card" class="secure-store-card">
+        <text class="secure-store-card-title">Stored value</text>
+        <view class="secure-store-row">
+          <text class="secure-store-row-label">{{ DEMO_KEY }}</text>
+          <text testID="secure-store-value" class="secure-store-value-text">{{
             storedValue === null ? '(no entry)' : storedValue
-          }}</Text>
-        </View>
-        <View class="secure-store-row">
-          <Text class="secure-store-row-label">Last result</Text>
-          <Text testID="secure-store-result" class="secure-store-value-text">{{
+          }}</text>
+        </view>
+        <view class="secure-store-row">
+          <text class="secure-store-row-label">Last result</text>
+          <text testID="secure-store-result" class="secure-store-value-text">{{
             lastResult
-          }}</Text>
-        </View>
-      </View>
+          }}</text>
+        </view>
+      </view>
 
-      <View testID="secure-store-write-card" class="secure-store-card">
-        <Text class="secure-store-card-title">Write, read, delete</Text>
-        <TextInput
+      <view testID="secure-store-write-card" class="secure-store-card">
+        <text class="secure-store-card-title">Write, read, delete</text>
+        <text-input
           testID="secure-store-input"
           v-model="inputText"
           placeholder="Value to store"
@@ -200,7 +194,7 @@ function handleDelete(): void {
           :onPress="handleDelete"
           :color="lineColor"
         />
-      </View>
+      </view>
     </ScrollView>
-  </SafeAreaView>
+  </safe-area-view>
 </template>

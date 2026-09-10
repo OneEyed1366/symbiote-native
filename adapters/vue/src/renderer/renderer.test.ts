@@ -22,7 +22,7 @@
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '../render';
-import { View, Text } from '@symbiote-native/vue';
+// No primitive import: `view` and `text` are TAGS written directly below.
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
@@ -160,7 +160,7 @@ describe('insert', () => {
     expect(() =>
       mount(
         ROOT_TAG,
-        defineComponent({ setup: () => () => h(View, null, 'plain text') }),
+        defineComponent({ setup: () => () => h('view', null, 'plain text') }),
       ),
     ).toThrow('must be rendered inside a <Text>');
   });
@@ -177,7 +177,7 @@ describe("createComment / createText('') — Fragment and v-if placeholder ancho
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          visible.value ? h(View, { nativeID: 'toggle' }) : null,
+          visible.value ? h('view', { nativeID: 'toggle' }) : null,
       }),
     );
     await tick();
@@ -197,8 +197,8 @@ describe("createComment / createText('') — Fragment and v-if placeholder ancho
       ROOT_TAG,
       defineComponent({
         setup: () => () => [
-          h(View, { nativeID: 'a' }),
-          h(View, { nativeID: 'b' }),
+          h('view', { nativeID: 'a' }),
+          h('view', { nativeID: 'b' }),
         ],
       }),
     );
@@ -217,7 +217,7 @@ describe('setElementText — <Text> content updates', () => {
     const label = ref('first');
     mount(
       ROOT_TAG,
-      defineComponent({ setup: () => () => h(Text, null, label.value) }),
+      defineComponent({ setup: () => () => h('text', null, label.value) }),
     );
     await tick();
     expect(
@@ -271,9 +271,9 @@ describe('remove and reorder', () => {
       defineComponent({
         setup: () => () =>
           h(
-            View,
+            'view',
             { nativeID: 'parent' },
-            show.value ? [h(View, { nativeID: 'child' })] : [],
+            show.value ? [h('view', { nativeID: 'child' })] : [],
           ),
       }),
     );
@@ -297,9 +297,9 @@ describe('remove and reorder', () => {
       defineComponent({
         setup: () => () =>
           h(
-            View,
+            'view',
             { nativeID: 'list' },
-            order.value.map(key => h(View, { key, nativeID: `item-${key}` })),
+            order.value.map(key => h('view', { key, nativeID: `item-${key}` })),
           ),
       }),
     );

@@ -1,5 +1,4 @@
 import { defineComponent } from 'vue';
-import { SafeAreaView, Text, View } from '@symbiote-native/vue';
 import { useRoute, useStackNavigation } from '@symbiote-native/navigation/vue';
 import { ActionButton } from '../components/ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
@@ -19,19 +18,19 @@ export const DetailsScreen = defineComponent(
           ? String(params.openedFrom)
           : 'none';
       return (
-        <SafeAreaView class="screen">
-          <View class="section">
-            <Text class="section-label">Navigation demo · Details screen</Text>
-            <Text class="info-text">{`route.params: ${paramsLabel}`}</Text>
-            <Text class="info-text">{`canGoBack: ${navigation.value.canGoBack()}`}</Text>
+        <safe-area-view class="screen">
+          <view class="section">
+            <text class="section-label">Navigation demo · Details screen</text>
+            <text class="info-text">{`route.params: ${paramsLabel}`}</text>
+            <text class="info-text">{`canGoBack: ${navigation.value.canGoBack()}`}</text>
             <ActionButton
               testID="nav-pop"
               title="← Pop back"
               onPress={() => navigation.value.pop()}
               color={LINE_COLOR.primitives}
             />
-          </View>
-        </SafeAreaView>
+          </view>
+        </safe-area-view>
       );
     };
   },

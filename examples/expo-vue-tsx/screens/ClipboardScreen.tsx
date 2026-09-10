@@ -1,13 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { Ref } from 'vue';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/vue';
+import { Platform, ScrollView } from '@symbiote-native/vue';
 import {
   getStringAsync,
   getUrlAsync,
@@ -33,27 +26,27 @@ function CapabilityRow(props: {
   status: ICapabilityStatus;
 }) {
   return (
-    <View testID={props.testID} class="auth-capability-row">
-      <Text class="auth-capability-label">{props.label}</Text>
-      <View class={`auth-status-badge auth-status-badge-${props.status}`}>
-        <Text class="auth-status-text">
+    <view testID={props.testID} class="auth-capability-row">
+      <text class="auth-capability-label">{props.label}</text>
+      <view class={`auth-status-badge auth-status-badge-${props.status}`}>
+        <text class="auth-status-text">
           {props.status === 'checking'
             ? 'CHECKING…'
             : props.status === 'yes'
               ? 'YES'
               : 'NO'}
-        </Text>
-      </View>
-    </View>
+        </text>
+      </view>
+    </view>
   );
 }
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="auth-capability-row">
-      <Text class="auth-capability-label">{props.label}</Text>
-      <Text class="auth-value-text">{props.value}</Text>
-    </View>
+    <view class="auth-capability-row">
+      <text class="auth-capability-label">{props.label}</text>
+      <text class="auth-value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -120,48 +113,48 @@ export const ClipboardScreen = defineComponent(
     }
 
     return () => (
-      <SafeAreaView class="screen">
+      <safe-area-view class="screen">
         <ScrollView
           testID="clipboard-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Clipboard</Text>
-              <Text class="hero-body">
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Clipboard</text>
+              <text class="hero-body">
                 @symbiote-native/clipboard — reads and writes the system
                 clipboard text/URL content, plus a change listener. iOS 16+ may
                 prompt for paste permission on every read.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="clipboard-value-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Current value</Text>
-            </View>
-            <Text testID="clipboard-current-text" class="auth-value-text">
+          <view testID="clipboard-value-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Current value</text>
+            </view>
+            <text testID="clipboard-current-text" class="auth-value-text">
               {clipboardText.value || '(empty)'}
-            </Text>
+            </text>
             <CapabilityRow
               testID="clipboard-has-string"
               label="Has text"
               status={hasString.value}
             />
-          </View>
+          </view>
 
-          <View testID="clipboard-copy-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Copy text</Text>
-            </View>
-            <TextInput
+          <view testID="clipboard-copy-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Copy text</text>
+            </view>
+            <text-input
               testID="clipboard-input"
               value={inputText.value}
               onValueChange={(text: string) => {
@@ -177,13 +170,13 @@ export const ClipboardScreen = defineComponent(
               onPress={handleCopy}
               color={lineColor}
             />
-          </View>
+          </view>
 
           {Platform.OS === 'ios' && (
-            <View testID="clipboard-url-card" class="auth-card">
-              <View class="auth-card-header">
-                <Text class="auth-card-title">URL</Text>
-              </View>
+            <view testID="clipboard-url-card" class="auth-card">
+              <view class="auth-card-header">
+                <text class="auth-card-title">URL</text>
+              </view>
               <ValueRow
                 label="Current URL"
                 value={urlValue.value ?? '(none)'}
@@ -193,7 +186,7 @@ export const ClipboardScreen = defineComponent(
                 label="Has URL"
                 status={hasUrl.value}
               />
-              <TextInput
+              <text-input
                 testID="clipboard-url-input"
                 value={urlInput.value}
                 onValueChange={(text: string) => {
@@ -209,10 +202,10 @@ export const ClipboardScreen = defineComponent(
                 onPress={handleSetUrl}
                 color={lineColor}
               />
-            </View>
+            </view>
           )}
         </ScrollView>
-      </SafeAreaView>
+      </safe-area-view>
     );
   },
   { name: 'ClipboardScreen' },

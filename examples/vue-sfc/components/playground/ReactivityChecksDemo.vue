@@ -27,7 +27,6 @@ import {
   computed,
   type MaybeRefOrGetter,
 } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 
 const deep = reactive({ n: 0 });
@@ -65,27 +64,27 @@ function bumpDeep(): void {
 </script>
 
 <template>
-  <View class="a11y-card">
-    <Text class="switch-label"
+  <view class="a11y-card">
+    <text class="switch-label"
       >reactive/shallowReactive/readonly/shallowReadonly/toRaw/markRaw +
-      predicates</Text
+      predicates</text
     >
-    <Text class="list-row-text" testID="checks-deep-n">{{
+    <text class="list-row-text" testID="checks-deep-n">{{
       `reactive({n}).n = ${deep.n} (live)`
-    }}</Text>
+    }}</text>
     <ActionButton
       testID="checks-bump-deep"
       title="deep.n++"
       :onPress="bumpDeep"
       color="#f5a623"
     />
-    <Text class="note-text"
+    <text class="note-text"
       >readonly()'s block isn't demoed interactively — mutating it would need
       TypeScript's DeepReadonly&lt;T&gt; suppressed just for this button, not
-      worth adding to app code.</Text
+      worth adding to app code.</text
     >
-    <Text v-for="(entry, index) in checks" :key="index" class="list-row-text">{{
+    <text v-for="(entry, index) in checks" :key="index" class="list-row-text">{{
       entry
-    }}</Text>
-  </View>
+    }}</text>
+  </view>
 </template>

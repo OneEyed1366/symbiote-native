@@ -26,7 +26,6 @@ import {
   getCurrentInstance,
   inject,
 } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 import { vHighlight } from './directives';
 import { PLUGIN_KEY } from './provide-keys';
@@ -43,7 +42,9 @@ const RuntimeBadge = defineComponent({
   name: 'PlaygroundRuntimeBadgeImpl',
   setup() {
     return () =>
-      h(View, { class: 'chip' }, [h(Text, { class: 'chip-text' }, () => 'RT')]);
+      h('view', { class: 'chip' }, [
+        h('text', { class: 'chip-text' }, () => 'RT'),
+      ]);
   },
 });
 
@@ -101,9 +102,9 @@ function runInAppContext(): void {
 </script>
 
 <template>
-  <View class="section-tight">
-    <Text class="section-label"
-      >Global / Application API — driving the live `app` instance</Text
+  <view class="section-tight">
+    <text class="section-label"
+      >Global / Application API — driving the live `app` instance</text
     >
     <ActionButton
       testID="global-register-component"
@@ -126,7 +127,7 @@ function runInAppContext(): void {
       :onPress="registerRuntimeDirective"
       color="#f5a623"
     />
-    <View v-if="directiveRegistered" v-runtime-glow="true" class="chip" />
+    <view v-if="directiveRegistered" v-runtime-glow="true" class="chip" />
     <ActionButton
       testID="global-install-plugin"
       :title="
@@ -143,8 +144,8 @@ function runInAppContext(): void {
       :onPress="triggerWarnOutsideSetup"
       color="#f5a623"
     />
-    <Text v-if="warnTriggered" class="note-text" testID="global-warn-triggered"
-      >inject() outside setup() called — see the warn log below</Text
+    <text v-if="warnTriggered" class="note-text" testID="global-warn-triggered"
+      >inject() outside setup() called — see the warn log below</text
     >
     <ActionButton
       testID="global-run-with-context"
@@ -152,15 +153,15 @@ function runInAppContext(): void {
       :onPress="runInAppContext"
       color="#f5a623"
     />
-    <Text
+    <text
       v-if="runWithContextResult !== undefined"
       class="list-row-text"
       testID="global-run-with-context-result"
-      >{{ `runWithContext() result: "${runWithContextResult}"` }}</Text
+      >{{ `runWithContext() result: "${runWithContextResult}"` }}</text
     >
-    <Text class="note-text"
+    <text class="note-text"
       >createApp() / app.mount() / app.unmount() are root-level singletons — see
-      adapters/vue/src/render.ts, not re-demoed on a screen.</Text
+      adapters/vue/src/render.ts, not re-demoed on a screen.</text
     >
-  </View>
+  </view>
 </template>

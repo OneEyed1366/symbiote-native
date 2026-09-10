@@ -12,7 +12,7 @@
 // sit on a node that never commits.
 import type { INativeFeedbackBackground } from '@symbiote-native/components';
 
-import type { IPressableProps } from './pressable';
+import type { IPressableProps } from './pressable-props';
 
 export type ITouchableNativeFeedbackProps = Omit<IPressableProps, 'style'> & {
   background?: INativeFeedbackBackground;

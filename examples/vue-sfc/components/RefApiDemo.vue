@@ -7,12 +7,7 @@
 -->
 <script setup lang="ts">
 import { ref, shallowRef, onMounted } from 'vue';
-import {
-  View,
-  Text,
-  findNodeHandle,
-  type IHostInstance,
-} from '@symbiote-native/vue';
+import { findNodeHandle, type IHostInstance } from '@symbiote-native/vue';
 import ActionButton from './ActionButton.vue';
 
 // shallowRef, NOT ref: the engine node is held by IDENTITY so measure()/setNativeProps()
@@ -48,32 +43,32 @@ const onFlash = (): void => {
 </script>
 
 <template>
-  <View class="section-nested">
-    <Text class="section-label"
-      >Imperative ref · measure / setNativeProps / findNodeHandle</Text
+  <view class="section-nested">
+    <text class="section-label"
+      >Imperative ref · measure / setNativeProps / findNodeHandle</text
     >
-    <View testID="ref-box" ref="boxRef" class="ref-box">
-      <Text class="ref-box-text">{{ `native tag ${tag ?? '—'}` }}</Text>
-    </View>
-    <Text testID="measure-frame" class="info-text">{{
+    <view testID="ref-box" ref="boxRef" class="ref-box">
+      <text class="ref-box-text">{{ `native tag ${tag ?? '—'}` }}</text>
+    </view>
+    <text testID="measure-frame" class="info-text">{{
       `frame: ${frame}`
-    }}</Text>
-    <View class="row">
-      <View class="flex1">
+    }}</text>
+    <view class="row">
+      <view class="flex1">
         <ActionButton
           testID="measure-btn"
           title="Measure"
           :onPress="onMeasure"
           color="#42b883"
         />
-      </View>
-      <View class="flex1">
+      </view>
+      <view class="flex1">
         <ActionButton
           title="Flash (setNativeProps)"
           :onPress="onFlash"
           color="#f6ad55"
         />
-      </View>
-    </View>
-  </View>
+      </view>
+    </view>
+  </view>
 </template>

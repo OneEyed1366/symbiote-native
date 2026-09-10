@@ -78,14 +78,7 @@ import {
   type Ref,
   type ObjectDirective,
 } from 'vue';
-import {
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-  Pressable,
-  TextInput,
-} from '@symbiote-native/vue';
+import { ScrollView } from '@symbiote-native/vue';
 import type { IHostInstance, ISymbioteNode } from '@symbiote-native/vue';
 // Not re-exported by @symbiote-native/vue's package root (same as this adapter's own vShow shim,
 // adapters/vue/src/runtime-helpers/index.ts) — the engine's imperative/commit-timing API lives
@@ -165,35 +158,35 @@ const ConditionalRenderingDemo = defineComponent({
     })();
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           v-if / v-else-if / v-else → a plain ternary chain
-        </Text>
+        </text>
         <ActionButton
           testID="conditional-cycle"
           title={`mode: ${mode.value} (tap to cycle)`}
           onPress={cycleMode}
           color={LINE_COLOR.framework}
         />
-        <Text class="info-text">
+        <text class="info-text">
           {mode.value === RENDER_MODE.A
             ? 'branch A'
             : mode.value === RENDER_MODE.B
               ? 'branch B'
               : 'branch C (else)'}
-        </Text>
-        <Text class="section-label">v-for → .map()</Text>
+        </text>
+        <text class="section-label">v-for → .map()</text>
         {FRUITS.map(fruit => (
-          <Text key={fruit.id} class="list-row-text">{`• ${fruit.label}`}</Text>
+          <text key={fruit.id} class="list-row-text">{`• ${fruit.label}`}</text>
         ))}
-        <Text class="section-label">
+        <text class="section-label">
           v-once / v-memo → hand-rolled (no h()-level primitive)
-        </Text>
-        <Text class="note-text">
+        </text>
+        <text class="note-text">
           {onceValue} — proven never-recomputed by cycling "mode" above and
           watching this line stay put.
-        </Text>
-      </View>
+        </text>
+      </view>
     );
   },
 });
@@ -207,23 +200,23 @@ type INumberStepperEmits = { 'update:modelValue': (value: number) => boolean };
 const NumberStepper = defineComponent<INumberStepperProps, INumberStepperEmits>(
   (props, { emit }) => {
     return () => (
-      <View class="stepper-row">
-        <Pressable
+      <view class="stepper-row">
+        <pressable
           testID="stepper-dec"
           class="stepper-button"
           onPress={() => emit('update:modelValue', props.modelValue - 1)}
         >
-          <Text class="stepper-button-text">−</Text>
-        </Pressable>
-        <Text class="stepper-value">{props.modelValue}</Text>
-        <Pressable
+          <text class="stepper-button-text">−</text>
+        </pressable>
+        <text class="stepper-value">{props.modelValue}</text>
+        <pressable
           testID="stepper-inc"
           class="stepper-button"
           onPress={() => emit('update:modelValue', props.modelValue + 1)}
         >
-          <Text class="stepper-button-text">+</Text>
-        </Pressable>
-      </View>
+          <text class="stepper-button-text">+</text>
+        </pressable>
+      </view>
     );
   },
   {
@@ -238,11 +231,11 @@ const NumberStepperVModelDemo = defineComponent({
   setup() {
     const count = ref(0);
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           v-model on a component → wired by hand (modelValue /
           onUpdate:modelValue)
-        </Text>
+        </text>
         {/* h() here, not JSX: a namespaced JSX attribute (onUpdate:modelValue) crashes
             eslint-plugin-react-native's no-inline-styles visitor (it assumes every JSXAttribute
             name is a plain JSXIdentifier) — the object-literal prop key sidesteps that parser gap
@@ -251,7 +244,7 @@ const NumberStepperVModelDemo = defineComponent({
           modelValue: count.value,
           'onUpdate:modelValue': (value: number) => (count.value = value),
         })}
-      </View>
+      </view>
     );
   },
 });
@@ -281,42 +274,42 @@ const EventModifiersDemo = defineComponent({
     );
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           withModifiers() → v-on.stop / v-on.self for render functions
-        </Text>
-        <Pressable
+        </text>
+        <pressable
           testID="modifiers-backdrop"
           class="frame-box"
           onPress={onBackdropPress}
         >
-          <Text class="info-text">
+          <text class="info-text">
             backdrop — tap the empty area around the card
-          </Text>
-          <Pressable
+          </text>
+          <pressable
             testID="modifiers-card"
             class="tab-card"
             onPress={onCardPress}
           >
-            <Text class="list-row-text">
+            <text class="list-row-text">
               card — .stop keeps this tap from also logging "backdrop pressed"
-            </Text>
-          </Pressable>
-        </Pressable>
-        <View class="log-card">
+            </text>
+          </pressable>
+        </pressable>
+        <view class="log-card">
           {log.value.length === 0 ? (
-            <Text class="list-row-text">
+            <text class="list-row-text">
               tap the card, then tap the backdrop around it
-            </Text>
+            </text>
           ) : (
             log.value.map((entry, index) => (
-              <Text key={index} class="list-row-text">
+              <text key={index} class="list-row-text">
                 {entry}
-              </Text>
+              </text>
             ))
           )}
-        </View>
-      </View>
+        </view>
+      </view>
     );
   },
 });
@@ -354,10 +347,10 @@ const CustomDirectiveDemo = defineComponent({
           : LINE_COLOR.framework;
     };
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           Custom directive → withDirectives(vnode, [[vFlash, value]])
-        </Text>
+        </text>
         <ActionButton
           testID="custom-directive-flash"
           title="Flash again"
@@ -365,12 +358,12 @@ const CustomDirectiveDemo = defineComponent({
           color={flashColor.value}
         />
         {withDirectives(
-          <View testID="custom-directive-box" class="flash-box">
-            <Text class="flash-box-text">flashed via a custom directive</Text>
-          </View>,
+          <view testID="custom-directive-box" class="flash-box">
+            <text class="flash-box-text">flashed via a custom directive</text>
+          </view>,
           [[vFlash, flashColor.value]],
         )}
-      </View>
+      </view>
     );
   },
 });
@@ -382,10 +375,10 @@ type IFrameProps = { count: number };
 const Frame = defineComponent<IFrameProps>(
   (props, { slots }) => {
     return () => (
-      <View class="frame-box" testID="scoped-slot-frame">
-        <Text class="section-label">Frame (defines a scoped slot)</Text>
+      <view class="frame-box" testID="scoped-slot-frame">
+        <text class="section-label">Frame (defines a scoped slot)</text>
         {slots.default?.({ count: props.count })}
-      </View>
+      </view>
     );
   },
   { name: 'Frame', props: ['count'] },
@@ -398,10 +391,10 @@ const ScopedSlotDemo = defineComponent({
   setup() {
     const count = ref(0);
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           v-slot → a slot object literal, passed straight as children
-        </Text>
+        </text>
         <ActionButton
           testID="scoped-slot-inc"
           title="Increment"
@@ -412,12 +405,12 @@ const ScopedSlotDemo = defineComponent({
           {
             {
               default: (scope: IFrameScope) => (
-                <Text class="list-row-text">{`scoped slot prop from Frame: count=${scope.count}`}</Text>
+                <text class="list-row-text">{`scoped slot prop from Frame: count=${scope.count}`}</text>
               ),
             } satisfies IFrameSlots
           }
         </Frame>
-      </View>
+      </view>
     );
   },
 });
@@ -437,16 +430,16 @@ function makeKeepAliveTab(componentName: string) {
       onActivated(() => props.onLog(`${props.label} activated`));
       onDeactivated(() => props.onLog(`${props.label} deactivated`));
       return () => (
-        <View class="tab-card">
-          <Text class="hero-title">{props.label}</Text>
-          <Text class="info-text">{`local count: ${count.value}`}</Text>
+        <view class="tab-card">
+          <text class="hero-title">{props.label}</text>
+          <text class="info-text">{`local count: ${count.value}`}</text>
           <ActionButton
             testID={`keepalive-inc-${componentName}`}
             title="Increment"
             onPress={() => (count.value += 1)}
             color={props.color}
           />
-        </View>
+        </view>
       );
     },
     { name: componentName, props: ['label', 'color', 'onLog'] },
@@ -464,16 +457,16 @@ const KeepAliveDemo = defineComponent({
     const active = ref<'a' | 'b'>('a');
     const log = ref<string[]>([]);
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           {'<KeepAlive> — onActivated / onDeactivated'}
-        </Text>
-        <Text class="note-text">
+        </text>
+        <text class="note-text">
           Switching tabs would normally reset each child's local counter on
           unmount — KeepAlive caches both instances instead, so each survives a
           switch away and back.
-        </Text>
-        <View class="row-tight">
+        </text>
+        <view class="row-tight">
           <ActionButton
             testID="keepalive-tab-a"
             title="Tab A"
@@ -486,7 +479,7 @@ const KeepAliveDemo = defineComponent({
             onPress={() => (active.value = 'b')}
             color={LINE_COLOR.framework}
           />
-        </View>
+        </view>
         <KeepAlive>
           {active.value === 'a' ? (
             <KeepAliveTabA
@@ -502,20 +495,20 @@ const KeepAliveDemo = defineComponent({
             />
           )}
         </KeepAlive>
-        <View class="log-card">
+        <view class="log-card">
           {log.value.length === 0 ? (
-            <Text class="list-row-text">
+            <text class="list-row-text">
               switch tabs to see activation events
-            </Text>
+            </text>
           ) : (
             log.value.map((entry, index) => (
-              <Text key={index} class="list-row-text">
+              <text key={index} class="list-row-text">
                 {entry}
-              </Text>
+              </text>
             ))
           )}
-        </View>
-      </View>
+        </view>
+      </view>
     );
   },
 });
@@ -529,9 +522,9 @@ const AsyncGreeting = defineComponent({
       setTimeout(resolve, ASYNC_GREETING_DELAY_MS),
     );
     return () => (
-      <Text class="list-row-text">
+      <text class="list-row-text">
         resolved after 1.2s inside {'<Suspense>'}
-      </Text>
+      </text>
     );
   },
 });
@@ -543,15 +536,15 @@ const SuspenseDemo = defineComponent({
   setup() {
     const attempt = ref(0);
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           {'<Suspense> + h(Suspense, …) — the render-function symbol'}
-        </Text>
-        <Text class="note-text">
+        </text>
+        <text class="note-text">
           First real test of Suspense against Fabric for this adapter (checklist
           decision, 2026-08-17) — if the fallback never clears, that is a
           genuine finding, not something to hide.
-        </Text>
+        </text>
         <ActionButton
           testID="suspense-remount"
           title="Remount async child"
@@ -563,10 +556,10 @@ const SuspenseDemo = defineComponent({
           { key: attempt.value },
           {
             default: () => h(AsyncGreeting),
-            fallback: () => <Text class="list-row-text">loading…</Text>,
+            fallback: () => <text class="list-row-text">loading…</text>,
           },
         )}
-      </View>
+      </view>
     );
   },
 });
@@ -575,7 +568,7 @@ const AsyncLoaded = defineComponent({
   name: 'AsyncLoaded',
   setup() {
     return () => (
-      <Text class="list-row-text">defineAsyncComponent resolved ✓</Text>
+      <text class="list-row-text">defineAsyncComponent resolved ✓</text>
     );
   },
 });
@@ -583,9 +576,9 @@ const AsyncFailed = defineComponent({
   name: 'AsyncFailed',
   setup() {
     return () => (
-      <Text class="list-row-text">
+      <text class="list-row-text">
         defineAsyncComponent's errorComponent (simulated failure)
-      </Text>
+      </text>
     );
   },
 });
@@ -593,9 +586,9 @@ const AsyncLoadingPlaceholder = defineComponent({
   name: 'AsyncLoadingPlaceholder',
   setup() {
     return () => (
-      <Text class="list-row-text">
+      <text class="list-row-text">
         defineAsyncComponent's loadingComponent (delay 200ms)…
-      </Text>
+      </text>
     );
   },
 });
@@ -642,12 +635,12 @@ const AsyncComponentDemo = defineComponent({
   setup() {
     const mode = ref<IAsyncDemoMode>(ASYNC_DEMO_MODE.Idle);
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           defineAsyncComponent() — its own loading/error components, independent
           of Suspense
-        </Text>
-        <View class="row-tight">
+        </text>
+        <view class="row-tight">
           <ActionButton
             testID="async-load-ok"
             title="Load (succeeds)"
@@ -660,13 +653,13 @@ const AsyncComponentDemo = defineComponent({
             onPress={() => (mode.value = ASYNC_DEMO_MODE.Fail)}
             color={LINE_COLOR.framework}
           />
-        </View>
+        </view>
         {mode.value === ASYNC_DEMO_MODE.Ok && <AsyncComponentOk />}
         {mode.value === ASYNC_DEMO_MODE.Fail && <AsyncComponentFail />}
         {mode.value === ASYNC_DEMO_MODE.Idle && (
-          <Text class="list-row-text">pick a load button</Text>
+          <text class="list-row-text">pick a load button</text>
         )}
-      </View>
+      </view>
     );
   },
 });
@@ -700,26 +693,26 @@ const RefComputedWatchDemo = defineComponent({
     );
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           ref() / computed() / watch() / watchEffect() / watchPostEffect() /
           watchSyncEffect()
-        </Text>
+        </text>
         <ActionButton
           testID="reactivity-increment"
           title={`count: ${count.value} (tap to increment)`}
           onPress={() => (count.value += 1)}
           color={LINE_COLOR.framework}
         />
-        <Text class="info-text">{`computed doubled: ${doubled.value}`}</Text>
-        <View class="log-card">
+        <text class="info-text">{`computed doubled: ${doubled.value}`}</text>
+        <view class="log-card">
           {log.value.map((entry, index) => (
-            <Text key={index} class="list-row-text">
+            <text key={index} class="list-row-text">
               {entry}
-            </Text>
+            </text>
           ))}
-        </View>
-      </View>
+        </view>
+      </view>
     );
   },
 });
@@ -751,26 +744,26 @@ const DeepVsShallowDemo = defineComponent({
     };
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           reactive() vs shallowReactive() / readonly() / shallowReadonly()
-        </Text>
+        </text>
         <ActionButton
           testID="deep-shallow-mutate"
           title="Mutate nested.hits on both"
           onPress={mutateNested}
           color={LINE_COLOR.framework}
         />
-        <Text class="info-text">
+        <text class="info-text">
           {`reactive(): watcher fired ${deepHitLog.value} time(s) · deep.nested.hits=${deep.nested.hits}`}
-        </Text>
-        <Text class="info-text">
+        </text>
+        <text class="info-text">
           {`shallowReactive(): watcher fired ${shallowHitLog.value} time(s) · shallow.nested.hits=${shallow.nested.hits}`}
-        </Text>
-        <Text class="info-text">
+        </text>
+        <text class="info-text">
           {`isReadonly(readonly(deep)): ${isReadonly(deepGuard)} · isReadonly(shallowReadonly(shallow)): ${isReadonly(shallowGuard)}`}
-        </Text>
-      </View>
+        </text>
+      </view>
     );
   },
 });
@@ -824,24 +817,24 @@ const IdentitySafeHostRefDemo = defineComponent({
     const onTriggerRef = (): void => triggerRef(boxRef);
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           Template Refs · shallowRef / useTemplateRef / triggerRef / markRaw /
           toRaw
-        </Text>
-        <View ref={boxRef} testID="tplref-shallow-box" class="flash-box">
-          <Text class="flash-box-text">{frame.value}</Text>
-        </View>
+        </text>
+        <view ref={boxRef} testID="tplref-shallow-box" class="flash-box">
+          <text class="flash-box-text">{frame.value}</text>
+        </view>
         {/* eslint-disable-next-line react/no-string-refs -- Vue's OWN string-ref form (3.5+
             useTemplateRef), not React's legacy this.refs pattern this rule targets. */}
-        <View
+        <view
           ref="api-playground-tpl-box"
           testID="tplref-named-box"
           class="flash-box"
         >
-          <Text class="flash-box-text">{`useTemplateRef resolved: ${tplRef.value !== null}`}</Text>
-        </View>
-        <View class="row-tight">
+          <text class="flash-box-text">{`useTemplateRef resolved: ${tplRef.value !== null}`}</text>
+        </view>
+        <view class="row-tight">
           <ActionButton
             testID="tplref-measure"
             title="Measure"
@@ -860,10 +853,10 @@ const IdentitySafeHostRefDemo = defineComponent({
             onPress={onTriggerRef}
             color={LINE_COLOR.framework}
           />
-        </View>
-        <Text class="info-text">{identityProof.value}</Text>
-        <Text class="info-text">{`watchEffect over the shallowRef re-ran ${effectRuns.value} time(s)`}</Text>
-      </View>
+        </view>
+        <text class="info-text">{identityProof.value}</text>
+        <text class="info-text">{`watchEffect over the shallowRef re-ran ${effectRuns.value} time(s)`}</text>
+      </view>
     );
   },
 });
@@ -893,9 +886,9 @@ const CustomRefDemo = defineComponent({
     const committed = debouncedRef('', DEBOUNCE_MS);
     watch(draft, value => (committed.value = value));
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">customRef() → a debounced ref</Text>
-        <TextInput
+      <view class="section-nested">
+        <text class="section-label">customRef() → a debounced ref</text>
+        <text-input
           testID="customref-input"
           class="text-input"
           value={draft.value}
@@ -903,8 +896,8 @@ const CustomRefDemo = defineComponent({
           placeholder="type — commits 400ms after the last keystroke"
           placeholderTextColor="#41506a"
         />
-        <Text class="info-text">{`committed (debounced) value: "${committed.value}"`}</Text>
-      </View>
+        <text class="info-text">{`committed (debounced) value: "${committed.value}"`}</text>
+      </view>
     );
   },
 });
@@ -938,11 +931,11 @@ const EffectScopeDemo = defineComponent({
     };
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           effectScope() / getCurrentScope() / onScopeDispose()
-        </Text>
-        <View class="row-tight">
+        </text>
+        <view class="row-tight">
           <ActionButton
             testID="scope-start"
             title="Start scope"
@@ -961,21 +954,21 @@ const EffectScopeDemo = defineComponent({
             onPress={stopScope}
             color={LINE_COLOR.framework}
           />
-        </View>
-        <View class="log-card">
+        </view>
+        <view class="log-card">
           {log.value.length === 0 ? (
-            <Text class="list-row-text">
+            <text class="list-row-text">
               start a scope, then bump — stop to see onScopeDispose fire
-            </Text>
+            </text>
           ) : (
             log.value.map((entry, index) => (
-              <Text key={index} class="list-row-text">
+              <text key={index} class="list-row-text">
                 {entry}
-              </Text>
+              </text>
             ))
           )}
-        </View>
-      </View>
+        </view>
+      </view>
     );
   },
 });
@@ -1023,11 +1016,11 @@ const ReactivityUtilityInspector = defineComponent({
     };
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           Reactivity utilities · isRef / unref / isReactive / isReadonly /
           isProxy / isShallow / toRef / toRefs / toValue / toRaw
-        </Text>
+        </text>
         <ActionButton
           testID="inspector-run"
           title="Run inspector"
@@ -1035,20 +1028,20 @@ const ReactivityUtilityInspector = defineComponent({
           color={LINE_COLOR.framework}
         />
         {ranAt.value === null ? (
-          <Text class="list-row-text">
+          <text class="list-row-text">
             tap "Run inspector" to evaluate every check live
-          </Text>
+          </text>
         ) : (
-          <View class="log-card">
+          <view class="log-card">
             {rows.value.map(([key, value]) => (
-              <View key={key} class="inspector-row">
-                <Text class="inspector-key">{key}</Text>
-                <Text class="inspector-value">{value}</Text>
-              </View>
+              <view key={key} class="inspector-row">
+                <text class="inspector-key">{key}</text>
+                <text class="inspector-value">{value}</text>
+              </view>
             ))}
-          </View>
+          </view>
         )}
-      </View>
+      </view>
     );
   },
 });
@@ -1081,9 +1074,9 @@ const LifecycleLoggerChild = defineComponent<ILifecycleLoggerProps>(
     onRenderTracked(() => props.onLog('onRenderTracked (dev-only)'));
     onRenderTriggered(() => props.onLog('onRenderTriggered (dev-only)'));
     return () => (
-      <View ref={boxRef} class="tab-card" testID="lifecycle-child">
-        <Text class="info-text">{`bump: ${props.bump}`}</Text>
-      </View>
+      <view ref={boxRef} class="tab-card" testID="lifecycle-child">
+        <text class="info-text">{`bump: ${props.bump}`}</text>
+      </view>
     );
   },
   { name: 'LifecycleLoggerChild', props: ['onLog', 'bump'] },
@@ -1096,13 +1089,13 @@ const LifecycleLoggerDemo = defineComponent({
     const bump = ref(0);
     const log = ref<string[]>([]);
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">Lifecycle hooks</Text>
-        <Text class="note-text">
+      <view class="section-nested">
+        <text class="section-label">Lifecycle hooks</text>
+        <text class="note-text">
           onRenderTracked/onRenderTriggered are dev-only — never firing in a
           release bundle is expected, not broken.
-        </Text>
-        <View class="row-tight">
+        </text>
+        <view class="row-tight">
           <ActionButton
             testID="lifecycle-toggle"
             title={mounted.value ? 'Unmount' : 'Mount'}
@@ -1115,25 +1108,25 @@ const LifecycleLoggerDemo = defineComponent({
             onPress={() => (bump.value += 1)}
             color={LINE_COLOR.framework}
           />
-        </View>
+        </view>
         {mounted.value && (
           <LifecycleLoggerChild
             bump={bump.value}
             onLog={msg => pushLimited(log, msg)}
           />
         )}
-        <View class="log-card">
+        <view class="log-card">
           {log.value.length === 0 ? (
-            <Text class="list-row-text">mount the child to start logging</Text>
+            <text class="list-row-text">mount the child to start logging</text>
           ) : (
             log.value.map((entry, index) => (
-              <Text key={index} class="list-row-text">
+              <text key={index} class="list-row-text">
                 {entry}
-              </Text>
+              </text>
             ))
           )}
-        </View>
-      </View>
+        </view>
+      </view>
     );
   },
 });
@@ -1146,7 +1139,7 @@ const ErrorChild = defineComponent<IErrorChildProps>(
       if (props.shouldThrow) throw new Error('boom from ErrorChild.onMounted');
     });
     return () => (
-      <Text class="list-row-text">error child mounted without throwing</Text>
+      <text class="list-row-text">error child mounted without throwing</text>
     );
   },
   { name: 'ErrorChild', props: ['shouldThrow'] },
@@ -1163,8 +1156,8 @@ const ErrorCapturedDemo = defineComponent({
       return false; // stop propagation — the error dies here, the rest of the screen keeps rendering.
     });
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">onErrorCaptured()</Text>
+      <view class="section-nested">
+        <text class="section-label">onErrorCaptured()</text>
         <ActionButton
           testID="error-arm"
           title="Mount a child that throws"
@@ -1175,12 +1168,12 @@ const ErrorCapturedDemo = defineComponent({
           color={LINE_COLOR.framework}
         />
         {armed.value && <ErrorChild shouldThrow={true} />}
-        <Text class="info-text">
+        <text class="info-text">
           {caught.value === null
             ? 'no error captured yet'
             : `captured: ${caught.value}`}
-        </Text>
-      </View>
+        </text>
+      </view>
     );
   },
 });
@@ -1197,15 +1190,15 @@ const ProvideInjectChild = defineComponent({
     const hasContextHere = hasInjectionContext();
     const instance = getCurrentInstance();
     return () => (
-      <View class="tab-card">
-        <Text class="info-text">
+      <view class="tab-card">
+        <text class="info-text">
           {`inject(THEME_KEY): ${theme === undefined ? 'undefined (no provider above)' : theme.accent.value}`}
-        </Text>
-        <Text class="info-text">{`hasInjectionContext() inside setup(): ${hasContextHere}`}</Text>
-        <Text class="info-text">
+        </text>
+        <text class="info-text">{`hasInjectionContext() inside setup(): ${hasContextHere}`}</text>
+        <text class="info-text">
           {`getCurrentInstance() inside setup(): ${instance !== null ? 'a real ComponentInternalInstance' : 'null'}`}
-        </Text>
-      </View>
+        </text>
+      </view>
     );
   },
 });
@@ -1222,10 +1215,10 @@ const ProvideInjectDemo = defineComponent({
       outsideSetupCheck.value = hasInjectionContext();
     });
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           provide() / inject() / hasInjectionContext() / getCurrentInstance()
-        </Text>
+        </text>
         <ActionButton
           testID="provide-rotate"
           title="Rotate accent"
@@ -1238,10 +1231,10 @@ const ProvideInjectDemo = defineComponent({
           color={accent.value}
         />
         <ProvideInjectChild />
-        <Text class="info-text">
+        <text class="info-text">
           {`hasInjectionContext() from onMounted (outside setup): ${outsideSetupCheck.value ?? 'not checked yet'}`}
-        </Text>
-      </View>
+        </text>
+      </view>
     );
   },
 });
@@ -1281,16 +1274,16 @@ const CommitTimingDemo = defineComponent({
     };
 
     return () => (
-      <View class="section-nested">
-        <Text class="section-label">
+      <view class="section-nested">
+        <text class="section-label">
           nextTick() vs whenCommitted() — the async-commit race
-        </Text>
-        <Text class="note-text">
+        </text>
+        <text class="note-text">
           nextTick() only guarantees Vue's own patch flush finished, not that
           the engine's Fabric commit (a separate microtask) landed — a
           "tag=undefined" line below is the race actually happening, not a bug
           in this demo.
-        </Text>
+        </text>
         <ActionButton
           testID="commit-timing-probe"
           title="Mount + probe both"
@@ -1298,29 +1291,29 @@ const CommitTimingDemo = defineComponent({
           color={LINE_COLOR.framework}
         />
         {attempt.value > 0 && (
-          <View
+          <view
             key={attempt.value}
             ref={probeRef}
             testID="commit-timing-node"
             class="flash-box"
           >
-            <Text class="flash-box-text">freshly mounted probe node</Text>
-          </View>
+            <text class="flash-box-text">freshly mounted probe node</text>
+          </view>
         )}
-        <View class="log-card">
+        <view class="log-card">
           {log.value.length === 0 ? (
-            <Text class="list-row-text">
+            <text class="list-row-text">
               tap the button to mount a fresh node and race the two reads
-            </Text>
+            </text>
           ) : (
             log.value.map((entry, index) => (
-              <Text key={index} class="list-row-text">
+              <text key={index} class="list-row-text">
                 {entry}
-              </Text>
+              </text>
             ))
           )}
-        </View>
-      </View>
+        </view>
+      </view>
     );
   },
 });
@@ -1332,7 +1325,7 @@ const RawRenderFunctionDemo = defineComponent({
   setup() {
     return () => {
       const original = createVNode(
-        Text,
+        'text',
         { class: 'list-row-text', testID: 'raw-h-original' },
         'built with createVNode()',
       );
@@ -1346,28 +1339,28 @@ const RawRenderFunctionDemo = defineComponent({
         { style: { opacity: 0.75 } },
       );
       return (
-        <View class="section-nested">
-          <Text class="section-label">
+        <view class="section-nested">
+          <text class="section-label">
             h() / createVNode / cloneVNode / isVNode / Fragment / mergeProps
-          </Text>
-          <Text class="note-text">
+          </text>
+          <text class="note-text">
             Every element on this whole screen already compiles down to h()
             through @vue/babel-plugin-jsx — this widget just calls the
             primitives directly instead of through JSX sugar.
-          </Text>
+          </text>
           {original}
           {cloned}
-          <Text class="info-text">{`isVNode(original): ${isVNode(original)} · isVNode({}): ${isVNode({})}`}</Text>
+          <text class="info-text">{`isVNode(original): ${isVNode(original)} · isVNode({}): ${isVNode({})}`}</text>
           {h(Fragment, {}, [
-            <Text key="fragment-a" class="list-row-text">
+            <text key="fragment-a" class="list-row-text">
               Fragment child A
-            </Text>,
-            <Text key="fragment-b" class="list-row-text">
+            </text>,
+            <text key="fragment-b" class="list-row-text">
               Fragment child B — one h(Fragment, …) call, two roots
-            </Text>,
+            </text>,
           ])}
-          {h(Text, merged, 'props merged via mergeProps()')}
-        </View>
+          {h('text', merged, 'props merged via mergeProps()')}
+        </view>
       );
     };
   },
@@ -1379,59 +1372,59 @@ export const ApiPlaygroundScreen = defineComponent(
   () => {
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.ApiPlayground];
     return () => (
-      <SafeAreaView class="screen">
+      <safe-area-view class="screen">
         <ScrollView
           testID="playground-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view
               class="hero-badge"
               style={{ backgroundColor: LINE_COLOR.framework }}
             >
-              <Text class="hero-badge-text">AP</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">API Playground</Text>
-              <Text class="hero-body">
+              <text class="hero-badge-text">AP</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">API Playground</text>
+              <text class="hero-body">
                 Vue's own Composition API, reactivity, lifecycle, and
                 render-function surface — h(), withDirectives(), provide/inject,
                 KeepAlive, Suspense — running live under Symbiote's engine
                 instead of the DOM. Not @symbiote-native/navigation; this is Vue
                 itself.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <Text class="section-label">
+          <text class="section-label">
             TEMPLATE DIRECTIVES → the vue-tsx way
-          </Text>
+          </text>
           <ConditionalRenderingDemo />
           <NumberStepperVModelDemo />
           <EventModifiersDemo />
           <CustomDirectiveDemo />
           <ScopedSlotDemo />
-          <Text class="note-text">
+          <text class="note-text">
             v-bind / v-on / v-bind.camel are already the JSX norm here (plain
             props, used throughout this app) — nothing to demo. v-text ≈ a text
             interpolation, which JSX always does. v-pre has no real purpose
             outside an in-DOM template. v-show and {'<Teleport>'} are already
             demoed live in CanaryScreen — not rebuilt here, see that screen
             instead.
-          </Text>
+          </text>
 
-          <Text class="section-label">
+          <text class="section-label">
             BUILT-IN COMPONENTS · KeepAlive &amp; Suspense (first real test)
-          </Text>
+          </text>
           <KeepAliveDemo />
           <SuspenseDemo />
           <AsyncComponentDemo />
 
-          <Text class="section-label">REACTIVITY API + TEMPLATE REFS</Text>
+          <text class="section-label">REACTIVITY API + TEMPLATE REFS</text>
           <RefComputedWatchDemo />
           <DeepVsShallowDemo />
           <IdentitySafeHostRefDemo />
@@ -1439,19 +1432,19 @@ export const ApiPlaygroundScreen = defineComponent(
           <EffectScopeDemo />
           <ReactivityUtilityInspector />
 
-          <Text class="section-label">LIFECYCLE HOOKS</Text>
+          <text class="section-label">LIFECYCLE HOOKS</text>
           <LifecycleLoggerDemo />
           <ErrorCapturedDemo />
 
-          <Text class="section-label">
+          <text class="section-label">
             COMPOSITION API / DEPENDENCY INJECTION
-          </Text>
+          </text>
           <ProvideInjectDemo />
           <CommitTimingDemo />
 
-          <Text class="section-label">RENDER FUNCTION API</Text>
+          <text class="section-label">RENDER FUNCTION API</text>
           <RawRenderFunctionDemo />
-          <Text class="note-text">
+          <text class="note-text">
             withKeys() is a real shim (adapters/vue/src/runtime-helpers) but has
             no live demo here — Pressable's onPress event carries no `.key`
             field to filter against, and this screen has no keyboard-driven
@@ -1465,9 +1458,9 @@ export const ApiPlaygroundScreen = defineComponent(
             props/emits option pair). createApp()/app.mount()/ app.* are this
             whole app's own bootstrap (adapters/vue/src/render.ts) — already
             exercised once per app run, not something a single screen re-demos.
-          </Text>
+          </text>
         </ScrollView>
-      </SafeAreaView>
+      </safe-area-view>
     );
   },
   { name: 'ApiPlaygroundScreen' },

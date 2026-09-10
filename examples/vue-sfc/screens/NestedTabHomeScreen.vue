@@ -6,7 +6,6 @@
 -->
 <script setup lang="ts">
 import { computed } from 'vue';
-import { SafeAreaView, Text, View } from '@symbiote-native/vue';
 import { useNavigation } from '@symbiote-native/navigation/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
@@ -26,37 +25,37 @@ function popParent(): void {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <View class="section">
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+  <safe-area-view class="screen">
+    <view class="section">
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.structure }"
         >
-          <Text class="hero-badge-text">NN</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Nested navigators</Text>
-          <Text class="hero-body"
+          <text class="hero-badge-text">NN</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Nested navigators</text>
+          <text class="hero-body"
             >A Tab navigator nested inside a Stack screen, reaching its parent's
-            own navigation handle through getParent().</Text
+            own navigation handle through getParent().</text
           >
-        </View>
-      </View>
-      <Text class="info-text">{{
+        </view>
+      </view>
+      <text class="info-text">{{
         `parent navigator reachable via getParent(): ${canPopParent ? 'yes (Stack)' : 'no'}`
-      }}</Text>
+      }}</text>
       <ActionButton
         testID="nested-pop-parent"
         title="Pop parent Stack (via getParent)"
         :onPress="popParent"
         :color="LINE_COLOR.structure"
       />
-    </View>
-  </SafeAreaView>
+    </view>
+  </safe-area-view>
 </template>

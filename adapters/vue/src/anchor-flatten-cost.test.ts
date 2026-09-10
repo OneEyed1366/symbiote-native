@@ -24,8 +24,9 @@ import {
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
-import { View, Text } from './components';
-import { Pressable } from './components/pressable';
+// The behaviors the bare tags below reach. A tag with no registration commits an inert node, so the
+// census would count the right nodes for the wrong reason.
+import './register';
 
 const ROOT_TAG = 8803;
 const ROWS = 1000;
@@ -62,13 +63,15 @@ const BenchmarkRow = defineComponent({
     return (): VNode => {
       const row: unknown = props.row;
       if (!isRow(row)) throw new Error('row prop lost its shape');
+      // Children go to an element as an ARRAY, never a slot function: an element ignores slot
+      // children entirely and renders nothing.
       return h(
-        View,
+        'view',
         { style: props.isSelected ? { backgroundColor: 'blue' } : undefined },
-        () => [
-          h(Text, null, () => String(row.id)),
-          h(Pressable, null, () => [h(Text, null, () => row.label)]),
-          h(Pressable, null, () => [h(Text, null, () => 'x')]),
+        [
+          h('text', null, String(row.id)),
+          h('pressable', null, [h('text', null, row.label)]),
+          h('pressable', null, [h('text', null, 'x')]),
         ],
       );
     };
@@ -84,7 +87,7 @@ const List = defineComponent({
   name: 'List',
   setup() {
     return (): VNode =>
-      h(View, { testID: 'list' }, () => [
+      h('view', { testID: 'list' }, [
         h(
           Fragment,
           null,

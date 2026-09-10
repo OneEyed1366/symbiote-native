@@ -23,41 +23,40 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from './ActionButton.vue';
 
 const isLoud = ref(false);
 </script>
 
 <template>
-  <View class="section-nested">
-    <Text class="section-label">Compound class · scoped style block</Text>
-    <View class="row">
-      <View class="badge" testID="compound-badge-plain">
-        <Text class="badge-text">plain</Text>
-      </View>
-      <View class="badge loud" testID="compound-badge-loud">
-        <Text class="badge-text">loud</Text>
-      </View>
-      <View
+  <view class="section-nested">
+    <text class="section-label">Compound class · scoped style block</text>
+    <view class="row">
+      <view class="badge" testID="compound-badge-plain">
+        <text class="badge-text">plain</text>
+      </view>
+      <view class="badge loud" testID="compound-badge-loud">
+        <text class="badge-text">loud</text>
+      </view>
+      <view
         :class="isLoud ? 'badge loud' : 'badge'"
         testID="compound-badge-dynamic"
       >
-        <Text class="badge-text">dynamic</Text>
-      </View>
-    </View>
-    <Text class="note-text" testID="compound-badge-readout">{{
+        <text class="badge-text">dynamic</text>
+      </view>
+    </view>
+    <text class="note-text" testID="compound-badge-readout">{{
       isLoud
         ? 'dynamic badge carries both tokens — green border, same pill shape'
         : 'dynamic badge carries only .badge — grey border'
-    }}</Text>
+    }}</text>
     <ActionButton
       testID="compound-badge-toggle"
       :title="isLoud ? 'Drop .loud' : 'Add .loud'"
       color="#42b883"
       :onPress="() => (isLoud = !isLoud)"
     />
-  </View>
+  </view>
 </template>
 
 <style scoped>

@@ -1,12 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import {
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/vue';
+import { ScrollView } from '@symbiote-native/vue';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -30,12 +24,12 @@ function CapabilityRow(props: {
         ? 'YES'
         : 'NO';
   return (
-    <View testID={props.testID} class="sharing-row">
-      <Text class="sharing-row-label">{props.label}</Text>
-      <View class={`sharing-status-badge sharing-status-badge-${props.status}`}>
-        <Text class="sharing-status-text">{text}</Text>
-      </View>
-    </View>
+    <view testID={props.testID} class="sharing-row">
+      <text class="sharing-row-label">{props.label}</text>
+      <view class={`sharing-status-badge sharing-status-badge-${props.status}`}>
+        <text class="sharing-status-text">{text}</text>
+      </view>
+    </view>
   );
 }
 
@@ -79,50 +73,50 @@ export const SharingScreen = defineComponent(
     }
 
     return () => (
-      <SafeAreaView class="screen">
+      <safe-area-view class="screen">
         <ScrollView
           testID="sharing-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Sharing</Text>
-              <Text class="hero-body">
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Sharing</text>
+              <text class="hero-body">
                 @symbiote-native/sharing — opens the platform share sheet for a
                 local file. Type a file URI below, then hand it to the sheet.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="sharing-capability-card" class="sharing-card">
-            <Text class="sharing-card-title">Capabilities</Text>
+          <view testID="sharing-capability-card" class="sharing-card">
+            <text class="sharing-card-title">Capabilities</text>
             <CapabilityRow
               testID="sharing-available"
               label="Available"
               status={isAvailable.value}
             />
-            <Text class="sharing-note">
+            <text class="sharing-note">
               Reports on the native module, not on any device capability — it is
               true on both platforms once the module is linked.
-            </Text>
-          </View>
+            </text>
+          </view>
 
-          <View testID="sharing-share-card" class="sharing-card">
-            <Text class="sharing-card-title">Share a file</Text>
-            <Text class="sharing-note">
+          <view testID="sharing-share-card" class="sharing-card">
+            <text class="sharing-card-title">Share a file</text>
+            <text class="sharing-note">
               A real local file URI is required — the share sheet reads the file
               itself, so a path that does not exist raises an error rather than
               opening. This app ships no file-system package to produce one, so
               supply a path from the device.
-            </Text>
-            <TextInput
+            </text>
+            <text-input
               testID="sharing-uri-input"
               value={fileUri.value}
               onValueChange={(text: string) => {
@@ -138,23 +132,23 @@ export const SharingScreen = defineComponent(
               onPress={handleShare}
               color={lineColor}
             />
-          </View>
+          </view>
 
-          <View testID="sharing-result-card" class="sharing-card">
-            <Text class="sharing-card-title">Last result</Text>
-            <View class="sharing-row">
-              <Text class="sharing-row-label">Outcome</Text>
-              <Text testID="sharing-result" class="sharing-value-text">
+          <view testID="sharing-result-card" class="sharing-card">
+            <text class="sharing-card-title">Last result</text>
+            <view class="sharing-row">
+              <text class="sharing-row-label">Outcome</text>
+              <text testID="sharing-result" class="sharing-value-text">
                 {lastResult.value}
-              </Text>
-            </View>
-            <Text class="sharing-note">
+              </text>
+            </view>
+            <text class="sharing-note">
               The sheet does not report which app the user picked, or whether
               they cancelled — it resolves once dismissed either way.
-            </Text>
-          </View>
+            </text>
+          </view>
         </ScrollView>
-      </SafeAreaView>
+      </safe-area-view>
     );
   },
   { name: 'SharingScreen' },

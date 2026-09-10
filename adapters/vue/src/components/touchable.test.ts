@@ -32,8 +32,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,
   unmount,
-  View,
-  Text,
   TouchableOpacity,
   TouchableHighlight,
 } from '@symbiote-native/vue';
@@ -191,7 +189,7 @@ function asNumber(value: unknown, label: string): number {
   return value;
 }
 
-const childView = (): VNode[] => [h(View, { testID: CHILD })];
+const childView = (): VNode[] => [h('view', { testID: CHILD })];
 
 describe('Vue TouchableOpacity', () => {
   // why: RN drives TouchableOpacity's feedback with a real Animated.timing, not a discrete style
@@ -629,7 +627,7 @@ describe('Vue TouchableHighlight', () => {
             activeOpacity: 0.5,
             onPress: () => {},
           },
-          () => [h(View, { testID: CHILD }), h(View, {})],
+          () => [h('view', { testID: CHILD }), h('view', {})],
         ),
     });
     mount(ROOT_TAG, App);
@@ -658,7 +656,7 @@ describe('Vue TouchableHighlight', () => {
             activeOpacity: 0.5,
             onPress: () => {},
           },
-          () => [h(Fragment, null, [h(View, { testID: CHILD })])],
+          () => [h(Fragment, null, [h('view', { testID: CHILD })])],
         ),
     });
     mount(ROOT_TAG, App);

@@ -7,7 +7,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import { ScrollView } from '@symbiote-native/vue';
 import {
   DeviceType,
   brand,
@@ -88,79 +88,79 @@ function handleCheckRooted(): void {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
+  <safe-area-view class="screen">
     <ScrollView
       testID="device-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Device</Text>
-          <Text class="hero-body"
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Device</text>
+          <text class="hero-body"
             >@symbiote-native/device — physical device info: brand/model/OS
             constants, memory, and best-effort root/jailbreak detection. A
             Simulator/emulator reports `isDevice` as false and several fields as
-            unavailable.</Text
+            unavailable.</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="device-info-card" class="device-card">
-        <Text class="device-card-title">Info</Text>
-        <View class="device-row">
-          <Text class="device-row-label">Is device</Text>
-          <Text testID="device-is-device-value" class="device-value-text">{{
+      <view testID="device-info-card" class="device-card">
+        <text class="device-card-title">Info</text>
+        <view class="device-row">
+          <text class="device-row-label">Is device</text>
+          <text testID="device-is-device-value" class="device-value-text">{{
             isDevice ? 'Yes' : 'No (simulator/emulator)'
-          }}</Text>
-        </View>
-        <View class="device-row">
-          <Text class="device-row-label">Brand</Text>
-          <Text class="device-value-text">{{ brand ?? 'unknown' }}</Text>
-        </View>
-        <View class="device-row">
-          <Text class="device-row-label">Manufacturer</Text>
-          <Text class="device-value-text">{{ manufacturer ?? 'unknown' }}</Text>
-        </View>
-        <View class="device-row">
-          <Text class="device-row-label">Model name</Text>
-          <Text class="device-value-text">{{ modelName ?? 'unknown' }}</Text>
-        </View>
-        <View class="device-row">
-          <Text class="device-row-label">Device type</Text>
-          <Text class="device-value-text">{{
+          }}</text>
+        </view>
+        <view class="device-row">
+          <text class="device-row-label">Brand</text>
+          <text class="device-value-text">{{ brand ?? 'unknown' }}</text>
+        </view>
+        <view class="device-row">
+          <text class="device-row-label">Manufacturer</text>
+          <text class="device-value-text">{{ manufacturer ?? 'unknown' }}</text>
+        </view>
+        <view class="device-row">
+          <text class="device-row-label">Model name</text>
+          <text class="device-value-text">{{ modelName ?? 'unknown' }}</text>
+        </view>
+        <view class="device-row">
+          <text class="device-row-label">Device type</text>
+          <text class="device-value-text">{{
             deviceTypeLabel(deviceType)
-          }}</Text>
-        </View>
-        <View class="device-row">
-          <Text class="device-row-label">OS</Text>
-          <Text class="device-value-text">{{
+          }}</text>
+        </view>
+        <view class="device-row">
+          <text class="device-row-label">OS</text>
+          <text class="device-value-text">{{
             `${osName ?? 'unknown'} ${osVersion ?? ''}`
-          }}</Text>
-        </View>
-        <View class="device-row">
-          <Text class="device-row-label">Total memory</Text>
-          <Text class="device-value-text">{{ totalMemoryText }}</Text>
-        </View>
-        <View class="device-row">
-          <Text class="device-row-label">Device name</Text>
-          <Text testID="device-name-value" class="device-value-text">{{
+          }}</text>
+        </view>
+        <view class="device-row">
+          <text class="device-row-label">Total memory</text>
+          <text class="device-value-text">{{ totalMemoryText }}</text>
+        </view>
+        <view class="device-row">
+          <text class="device-row-label">Device name</text>
+          <text testID="device-name-value" class="device-value-text">{{
             deviceName ?? 'unnamed device'
-          }}</Text>
-        </View>
-      </View>
+          }}</text>
+        </view>
+      </view>
 
-      <View testID="device-actions-card" class="device-card">
-        <Text class="device-card-title">Actions</Text>
-        <View class="button-row">
+      <view testID="device-actions-card" class="device-card">
+        <text class="device-card-title">Actions</text>
+        <view class="button-row">
           <ActionButton
             testID="device-get-type-button"
             title="Get Device Type"
@@ -179,26 +179,26 @@ function handleCheckRooted(): void {
             :onPress="handleCheckRooted"
             :color="lineColor"
           />
-        </View>
-        <View v-if="deviceTypeResult !== null" class="device-row">
-          <Text class="device-row-label">Device type result</Text>
-          <Text testID="device-type-result-value" class="device-value-text">{{
+        </view>
+        <view v-if="deviceTypeResult !== null" class="device-row">
+          <text class="device-row-label">Device type result</text>
+          <text testID="device-type-result-value" class="device-value-text">{{
             deviceTypeResult
-          }}</Text>
-        </View>
-        <View v-if="uptimeResult !== null" class="device-row">
-          <Text class="device-row-label">Uptime</Text>
-          <Text testID="device-uptime-result-value" class="device-value-text">{{
+          }}</text>
+        </view>
+        <view v-if="uptimeResult !== null" class="device-row">
+          <text class="device-row-label">Uptime</text>
+          <text testID="device-uptime-result-value" class="device-value-text">{{
             `${uptimeResult}ms`
-          }}</Text>
-        </View>
-        <View v-if="isRootedResult !== null" class="device-row">
-          <Text class="device-row-label">Rooted/jailbroken</Text>
-          <Text testID="device-rooted-result-value" class="device-value-text">{{
+          }}</text>
+        </view>
+        <view v-if="isRootedResult !== null" class="device-row">
+          <text class="device-row-label">Rooted/jailbroken</text>
+          <text testID="device-rooted-result-value" class="device-value-text">{{
             isRootedResult ? 'true' : 'false'
-          }}</Text>
-        </View>
-      </View>
+          }}</text>
+        </view>
+      </view>
     </ScrollView>
-  </SafeAreaView>
+  </safe-area-view>
 </template>

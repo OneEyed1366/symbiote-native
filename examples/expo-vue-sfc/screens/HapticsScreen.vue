@@ -8,13 +8,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/vue';
+import { Platform, ScrollView } from '@symbiote-native/vue';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -81,35 +75,35 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
+  <safe-area-view class="screen">
     <ScrollView
       testID="haptics-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Haptics</Text>
-          <Text class="hero-body"
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Haptics</text>
+          <text class="hero-body"
             >@symbiote-native/haptics — impact/notification/selection feedback
             via iOS's Taptic Engine and Android's Vibrator API, plus a direct
             Android haptics-engine path. The Simulator plays no physical
-            feedback; a real device is needed to feel it.</Text
+            feedback; a real device is needed to feel it.</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="haptics-impact-card" class="haptics-card">
-        <Text class="haptics-card-title">Impact</Text>
-        <View class="button-row">
+      <view testID="haptics-impact-card" class="haptics-card">
+        <text class="haptics-card-title">Impact</text>
+        <view class="button-row">
           <ActionButton
             v-for="item in IMPACT_STYLES"
             :key="item.style"
@@ -118,12 +112,12 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
             :onPress="() => fireImpact(item.style)"
             :color="lineColor"
           />
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="haptics-notification-card" class="haptics-card">
-        <Text class="haptics-card-title">Notification</Text>
-        <View class="button-row">
+      <view testID="haptics-notification-card" class="haptics-card">
+        <text class="haptics-card-title">Notification</text>
+        <view class="button-row">
           <ActionButton
             v-for="item in NOTIFICATION_TYPES"
             :key="item.type"
@@ -132,28 +126,28 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
             :onPress="() => fireNotification(item.type)"
             :color="lineColor"
           />
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="haptics-selection-card" class="haptics-card">
-        <Text class="haptics-card-title">Selection</Text>
-        <View class="button-row">
+      <view testID="haptics-selection-card" class="haptics-card">
+        <text class="haptics-card-title">Selection</text>
+        <view class="button-row">
           <ActionButton
             testID="haptics-selection-button"
             title="Selection"
             :onPress="fireSelection"
             :color="lineColor"
           />
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View
+      <view
         v-if="Platform.OS === 'android'"
         testID="haptics-android-card"
         class="haptics-card"
       >
-        <Text class="haptics-card-title">Android haptics</Text>
-        <View class="button-row">
+        <text class="haptics-card-title">Android haptics</text>
+        <view class="button-row">
           <ActionButton
             v-for="item in ANDROID_HAPTICS"
             :key="item.type"
@@ -162,17 +156,17 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
             :onPress="() => fireAndroidHaptic(item.type)"
             :color="lineColor"
           />
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="haptics-last-fired-card" class="haptics-last-fired-card">
-        <Text class="haptics-last-fired-label">LAST FIRED</Text>
-        <Text
+      <view testID="haptics-last-fired-card" class="haptics-last-fired-card">
+        <text class="haptics-last-fired-label">LAST FIRED</text>
+        <text
           testID="haptics-last-fired-value"
           class="haptics-last-fired-value"
-          >{{ lastFired ?? 'nothing yet' }}</Text
+          >{{ lastFired ?? 'nothing yet' }}</text
         >
-      </View>
+      </view>
     </ScrollView>
-  </SafeAreaView>
+  </safe-area-view>
 </template>

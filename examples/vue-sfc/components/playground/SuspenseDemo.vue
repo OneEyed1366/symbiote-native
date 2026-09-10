@@ -11,7 +11,6 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 import AsyncPayload from './AsyncPayload.vue';
 
@@ -19,9 +18,9 @@ const loadKey = ref(0);
 </script>
 
 <template>
-  <View class="section-tight">
-    <Text class="section-label"
-      >&lt;Suspense&gt; + an async setup() component</Text
+  <view class="section-tight">
+    <text class="section-label"
+      >&lt;Suspense&gt; + an async setup() component</text
     >
     <ActionButton
       testID="suspense-reload"
@@ -34,12 +33,12 @@ const loadKey = ref(0);
         <AsyncPayload :key="loadKey" />
       </template>
       <template #fallback>
-        <View class="a11y-card">
-          <Text class="note-text" testID="suspense-fallback"
-            >loading async payload…</Text
+        <view class="a11y-card">
+          <text class="note-text" testID="suspense-fallback"
+            >loading async payload…</text
           >
-        </View>
+        </view>
       </template>
     </Suspense>
-  </View>
+  </view>
 </template>

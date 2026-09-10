@@ -19,7 +19,13 @@ export type { IAppConfigurator } from './render';
 // into an <Out/> the destination has to render. See create-portal/index.ts.
 export { Teleport, type ITeleportTarget } from './create-portal';
 export { createTunnel, type ITunnel } from './create-tunnel';
-export { View, Text } from './components';
+// `View` and `Text` are TAGS — `<view>` and `<text>` — and there is nothing to import in their
+// place. Both wrappers were `h(tag, normalizeVueAttrs(attrs))`, and both folds now run in the
+// renderer: kebab->camel plus `id -> nativeID` in `patchProp`, RN's Text defaults in
+// `createElement`'s `seedTextDefaults`. A renderer fold covers all four Vue paths to a node; a
+// wrapper covered only the two that named it.
+export type { IViewProps } from './components/view-props';
+export type { ITextProps } from './components/text-props';
 // Type-only, and the re-export is the POINT rather than the names: it is what makes the checker
 // load `intrinsic-elements.ts`, whose `declare module 'vue'` is the tag alphabet vue-tsc reads.
 // A declaration nothing imports applies inside this package only.
@@ -41,38 +47,51 @@ export type {
 // live on each component's expose() handle).
 export { findNodeHandle } from './host-instance';
 export type { IHostInstance } from './host-instance';
-export { Image, setImageSourceResolver } from './components/image';
+// `Image` is a TAG — `<image>`. What survives the name is the STATICS namespace, and it lives in
+// `modules/` beside Alert/Share because it carries no view; the prop type stays, for a component
+// forwarding a bag.
+export { Image } from './modules/image';
+export { setImageSourceResolver } from '@symbiote-native/components';
+export type { IImageProps } from './components/image-props';
 export type {
-  IImageProps,
   IImageSource,
   IImageSourceProp,
   IResizeMode,
   IImageSize,
   IImageCacheStatus,
-} from './components/image';
+} from '@symbiote-native/components';
 // `ActivityIndicator` is a TAG — `<activity-indicator>` — and there is nothing to import in its
 // place. RN's ActivityIndicator has no statics, so the name exports nothing at all now; the prop
 // type stays, for a component forwarding a bag.
 export type { IActivityIndicatorProps } from './components/activity-indicator-props';
-export { Switch } from './components/switch';
+// `Switch` is a TAG — `<switch>` — and there is nothing to import in its place. The
+// `lastNativeReport` mirror, the snap-back command and the platform track-color mapping all live on
+// the engine node (`registerSwitchBehavior`), so the `switch-managed` twin that kept the wrapper's
+// machine apart from it is dead too. `v-model` still works: on an element it compiles to a runtime
+// directive, and `vModelText` in `./runtime-helpers` is ours.
 export type {
   ISwitchProps,
   ISwitchTrackColor,
   ISwitchChangeEvent,
-} from './components/switch';
+} from './components/switch/switch-props';
 export { ScrollView } from './components/scroll-view';
 export type {
   IScrollViewProps,
   IScrollViewEmits,
   IScrollViewHandle,
 } from './components/scroll-view';
-export { Pressable } from './components/pressable';
+// `Pressable` is a TAG — `<pressable>` — and there is nothing to import in its place. The press
+// machine runs on the engine node (`registerPressableBehavior`).
+//
+// `IPressableSlots` is GONE with the wrapper and nothing replaces it: press state lives on the
+// engine node and never reaches Vue's reactivity, so `#default="{ pressed }"` has no channel. A
+// functional `style` still works (the engine resolves it at both values of `pressed`), and a child
+// that needs the state takes it from a ref the screen mirrors off `@press-in`/`@press-out`.
 export type {
   IPressableProps,
-  IPressableSlots,
   IPressState,
   IPressableAndroidRippleConfig,
-} from './components/pressable';
+} from './components/pressable-props';
 export { TouchableOpacity, TouchableHighlight } from './components/touchable';
 export type {
   ITouchableOpacityProps,
@@ -96,12 +115,17 @@ export type { ITouchableNativeFeedbackProps } from './components/touchable-nativ
 // statics (unlike `TouchableNativeFeedback` next to it), so the name exports nothing at all now;
 // the prop type stays, for a component forwarding a bag.
 export type { IButtonProps } from './components/button-props';
-export { TextInput } from './components/text-input';
+// `TextInput` is a TAG — `<text-input>`, and `multiline` picks `text-input-multiline` underneath —
+// so there is nothing to import in its place. The controlled handshake, the focus mirror and
+// `autoFocus` live on the engine node now; the imperative API comes from `buildTextInputHandle`,
+// imported from `@symbiote-native/components` over the node a template `ref` hands back, not
+// re-exported here — four adapters reach it that way and `tests/adapter-barrel-parity.test.ts`
+// compares the sets.
+export type { ITextInputProps } from './components/text-input/text-input-props';
 export type {
-  ITextInputProps,
   ITextInputHandle,
   ITextInputChangeEvent,
-} from './components/text-input';
+} from '@symbiote-native/components';
 export { VirtualizedList } from './components/virtualized-list';
 export type {
   IVirtualizedListProps,
@@ -138,14 +162,13 @@ export type {
   ISectionListEmits,
   ISectionListHandle,
 } from './components/section-list';
-// RefreshControl hosts the wrapped scroll view via its default slot.
-export { SafeAreaView } from './components/safe-area-view';
-export type { ISafeAreaViewProps } from './components/safe-area-view';
-export { RefreshControl } from './components/refresh-control';
-export type {
-  IRefreshControlProps,
-  IRefreshControlEmits,
-} from './components/refresh-control';
+// `SafeAreaView` is a TAG — `<safe-area-view>` — and there is nothing to import in its place: the
+// wrapper only normalized attrs and folded aria, and both now run below every path.
+export type { ISafeAreaViewProps } from './components/safe-area-view-props';
+// `RefreshControl` is a TAG — `<refresh-control>` — carrying its own engine behavior
+// (`registerRefreshControlBehavior`, the controlled-spinner handshake). `@refresh` reaches native
+// as an ordinary `onRefresh` prop, so the wrapper's `refresh` emit had nothing left to add.
+export type { IRefreshControlProps } from './components/refresh-control-props';
 export { descriptorToVue } from './descriptor-to-vue';
 // Exported so an external wrapper package (e.g. @symbiote-native/slider/vue over a third-party
 // native view) can fold its incoming attrs/v-model through the SAME transform rather than
@@ -158,8 +181,9 @@ export { Animated, createAnimatedComponent } from './modules/animated';
 // `ImageBackground` is a TAG — `<image-background>` — and there is nothing to import in its place.
 // The prop type stays, for a component forwarding a bag.
 export type { IImageBackgroundProps } from './components/image-background-props';
-export { InputAccessoryView } from './components/input-accessory-view';
-export type { IInputAccessoryViewProps } from './components/input-accessory-view';
+// `InputAccessoryView` is a TAG — `<input-accessory-view>` — and there is nothing to import in its
+// place. Its whole body was the fold `registerInputAccessoryViewBehavior` now runs on the tag.
+export type { IInputAccessoryViewProps } from './components/input-accessory-view-props';
 export { Modal } from './components/modal';
 export type {
   IModalProps,

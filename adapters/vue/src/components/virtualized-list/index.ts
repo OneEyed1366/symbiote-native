@@ -82,7 +82,6 @@ import {
   type IViewStyle,
 } from '@symbiote-native/engine';
 import { ScrollView } from '../scroll-view';
-import { RefreshControl } from '../refresh-control';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 import { componentFromSlot } from '../../utils/slots-to-render-props';
 import type { ICtx } from '../../utils/component-helpers';
@@ -923,7 +922,10 @@ export const VirtualizedList = defineComponent(
       // onRefresh bridge is gated on the listener, so an unlistened list builds no control.
       if (p.onRefresh !== undefined) {
         dlog('Vue VirtualizedList wiring RefreshControl (@refresh listened)');
-        scrollProps.refreshControl = h(RefreshControl, {
+        // The TAG, not a wrapper: `registerRefreshControlBehavior` owns the controlled-spinner
+        // handshake and `onRefresh` reaches native as an ordinary prop, so there is nothing a
+        // component could add here.
+        scrollProps.refreshControl = h('refresh-control', {
           refreshing: p.refreshing,
           onRefresh: p.onRefresh,
           progressViewOffset: p.progressViewOffset,

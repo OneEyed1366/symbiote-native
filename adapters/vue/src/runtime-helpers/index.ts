@@ -415,6 +415,16 @@ type IEventHandler<TEvent> = ((event: TEvent, ...args: never[]) => unknown) & {
  * typed as required, matching upstream Vue's own declaration — its runtime-only `!fn` guard below
  * (for a compiler-generated call site that could pass a falsy handler) isn't reflected in the
  * type there either.
+ *
+ * `@press.self` on a LOWERED element reaches this, and both halves were measured 2026-09-11 rather
+ * than assumed — the question arose because a modifier on a COMPONENT takes Vue's own event path
+ * and only an element emits the helper. `<pressable @press.self>` compiles to
+ * `_withModifiers(fn, ["self"])` imported `from "@symbiote-native/vue/runtime-helpers"` (the Metro
+ * transformer retargets every compiled `from 'vue'`), so the compiler-emitted call lands here and
+ * not on @vue/runtime-dom's. And `ISymbioteEvent` (`core/engine/src/node.ts`) declares `target`,
+ * `currentTarget` and `stopPropagation` as REQUIRED fields with the DOM semantics these guards
+ * read, so `.self` genuinely filters a bubbled press instead of degenerating to
+ * `undefined !== undefined`.
  */
 export function withModifiers<TEvent extends IModifierGuardableEvent>(
   fn: IEventHandler<TEvent>,

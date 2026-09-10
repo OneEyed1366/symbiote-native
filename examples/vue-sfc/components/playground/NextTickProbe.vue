@@ -12,7 +12,6 @@ import {
   whenCommitted,
   type IHostInstance,
 } from '@symbiote-native/engine';
-import { View } from '@symbiote-native/vue';
 
 const emit = defineEmits<{ result: [message: string] }>();
 const probeRef = useTemplateRef<IHostInstance>('probe');
@@ -42,5 +41,5 @@ onMounted(() => {
 </script>
 
 <template>
-  <View ref="probe" class="chip" testID="nexttick-probe-node" />
+  <view ref="probe" class="chip" testID="nexttick-probe-node" />
 </template>

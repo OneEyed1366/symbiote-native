@@ -20,7 +20,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '../../render';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import { RefreshControl } from '../refresh-control';
 import { ScrollView } from './index.android';
 
 const ROOT_TAG = 512;
@@ -66,7 +65,8 @@ function mountAndroidScrollView(props: Record<string, unknown>): Promise<void> {
           ScrollView,
           {
             ...props,
-            refreshControl: h(RefreshControl, { refreshing: false }),
+            // The TAG — the RefreshControl wrapper is gone; the behavior owns the handshake.
+            refreshControl: h('refresh-control', { refreshing: false }),
           },
           { default: () => [h('text')] },
         ),

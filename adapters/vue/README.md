@@ -66,23 +66,23 @@ RNAppRegistry.registerRunnable(appName, ({ rootTag }) => {
 });
 ```
 
-The app is ordinary Vue — it just imports primitives from `@symbiote-native/vue` instead of
-`react-native`. A tap→increment counter, authored in TSX:
+The app is ordinary Vue. The primitives are TAGS — `<view>`, `<text>`, `<pressable>` — so there is
+nothing to import for them at all; both Vue compilers resolve them as elements and the renderer
+maps each to its Fabric view. A tap→increment counter, authored in TSX:
 
 ```jsx
 import { ref } from '@vue/runtime-core';
-import { View, Text, Pressable } from '@symbiote-native/vue';
 
 export default {
   setup() {
     const count = ref(0);
     return () => (
-      <View style={{ padding: 24 }}>
-        <Text>Taps: {count.value}</Text>
-        <Pressable onPress={() => count.value++}>
-          <Text>Tap me</Text>
-        </Pressable>
-      </View>
+      <view style={{ padding: 24 }}>
+        <text>Taps: {count.value}</text>
+        <pressable onPress={() => count.value++}>
+          <text>Tap me</text>
+        </pressable>
+      </view>
     );
   },
 };
