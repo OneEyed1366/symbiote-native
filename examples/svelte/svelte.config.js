@@ -39,5 +39,9 @@ export default {
   compilerOptions: {
     fragments: 'tree',
     css: 'external',
+    // `<pressable class="x" />` is how an app writes a primitive, and Svelte warns on it. Full
+    // reasoning in adapters/svelte/svelte.config.js, which this file mirrors.
+    warningFilter: warning =>
+      warning.code !== 'element_invalid_self_closing_tag',
   },
 };

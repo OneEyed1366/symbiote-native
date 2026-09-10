@@ -20,6 +20,20 @@ export default {
   compilerOptions: {
     fragments: 'tree',
     css: 'external',
+    // `<pressable class="x" />` is how an app writes a primitive, and Svelte warns on it:
+    // `element_invalid_self_closing_tag`, on every tag it does not know to be void. The warning is
+    // about HTML's PARSING ambiguity, and nothing here is parsed as HTML — `fragments: 'tree'`
+    // above makes the compiler emit `from_tree()`, so every element goes through createElement.
+    // Blanket is safe because a React Native app has no html elements at all, and
+    // forbidWebOnlyConstructs() rejects the web-only ones outright.
+    //
+    // Config rather than a per-file `svelte-ignore`, which has to be remembered on every new file
+    // — forgetting it pushes an author into an explicit closing tag, and prettier reflows that
+    // into `<tag …\n></tag>`. svelte-check and the language server are the whole surface:
+    // metro-svelte-transformer.cjs reads `js.code` and discards `warnings`. Measured on 5.56.8,
+    // where sveltejs/svelte#14654 is long fixed: examples/svelte 15 warnings -> 3.
+    warningFilter: warning =>
+      warning.code !== 'element_invalid_self_closing_tag',
   },
   // Order matters: the guard throws on a construct that cannot work at all, so it runs before
   // anything rewrites the source it would report offsets against. `scopedStyles` then compiles
