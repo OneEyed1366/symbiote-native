@@ -1762,3 +1762,52 @@ verification step is the whole suite does not parallelise past two.
 And the recovery is cheap, which is worth knowing before anyone reverts: a stalled agent resumes from
 its own transcript with a message, remembers exactly where it was, and can be handed the lifted
 restriction in the same message.
+
+### Split by ADAPTER, not by primitive — that is the axis with no shared files
+
+The incident above split four agents by PRIMITIVE, so every one of them needed the same barrels,
+`register.ts` and spec. Splitting by adapter instead gives each agent `adapters/<fw>/**` plus
+`examples/<fw>*/**` and nothing else — a partition with no shared member, once the shared half
+(spec, behaviors, component-names, the register seam) is already complete. Run 2026-09-10 across
+React, Solid and the engine: zero collisions in a shared file.
+
+Two conditions, and neither is optional. The shared half must genuinely be finished FIRST — this
+axis works only because one adapter (Svelte) had already driven every primitive through the engine,
+so nothing an agent needed was still being invented. And the repo-root `tests/**` plus `.claude/**`
+stay with the orchestrator, on report-only: an agent that finds a needed edit there names it instead
+of making it.
+
+Concurrency still caps at two or three, and for the reason the incident gives — the machine, not the
+files. Give each agent a path-filtered run (`npx vitest run adapters/<fw>`), never the full sweep.
+
+### "Adapter X cannot" is never a finding — it is a report about that adapter's LEFTOVERS
+
+Once the host creates the primitives, an adapter has no business doing anything on top of them. So a
+migration verdict of "this one refuses" is, by construction, a statement about code that has not been
+deleted yet. Twice on 2026-09-10 a refusal was reported with a mechanism attached, and both times the
+mechanism was the thing to remove:
+
+```
+"the three Touchable failures are Solid-side"      two of the three were ENGINE seam defects,
+                                                    reproduced independently by the React agent
+"ScrollView refuses — two owners already build      the two owners are React's leftovers. Svelte
+ the content node"                                  deleted the same code; the engine owns it
+                                                    (behaviors/scroll-view/shared.ts:340)
+```
+
+**The check is one `ls`, against the adapter that already finished:**
+
+```bash
+ls adapters/svelte/src/components/<primitive>/    # props type + tests, no implementation
+ls adapters/<fw>/src/components/<primitive>/      # anything more is what to delete
+```
+
+Both refusals came with real, correct, specific detail, which is what made them persuasive — the
+detail was true and the conclusion did not follow from it. A refusal is only a finding when the
+FINISHED adapter also cannot do it; otherwise the sentence to write is "here is what <fw> still owns
+that <finished> does not".
+
+The orchestrator's failure in both cases was the same: relaying an agent's verdict without running
+the one command that decides it. `verify-the-deciding-side.md` applies to a subagent's report exactly
+as it applies to a sibling's comment — and a report is likelier to be quoted onward, because it
+arrives sounding like work already done.
