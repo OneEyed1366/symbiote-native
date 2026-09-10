@@ -1,5 +1,14 @@
 <script lang="ts" module>
   import type { IFabricCallProfile } from '../fabric-call-counter';
+  import {
+    BENCH_OP,
+    SUITE_STEPS,
+    formatDuration,
+    formatFabric,
+    suiteLabel,
+    type IBenchOpId,
+    type IStepProfile,
+  } from './bench-clock';
 
   // Word lists and row shape are taken verbatim from js-framework-benchmark (krausest) so the
   // numbers here can be read next to the published Vue/Svelte/Solid ones. Its rules forbid
@@ -108,11 +117,6 @@
 
   // Every timed step of the suite below starts from exactly this many rows.
   const SUITE_ROWS = ROW_BATCH;
-  // A step that never commits would leave the suite awaiting forever and the screen frozen mid-run.
-  // Timing out into a reported `timeout` row instead keeps the rest of the suite measurable and
-  // names the broken operation - which is worth more than a hung screen.
-  const SUITE_STEP_TIMEOUT_MS = 30_000;
-  const SUITE_TIMED_OUT = Number.NaN;
 
   // Two sticky paths are on this screen on purpose (see the markup below): a plain ScrollView, and
   // a SectionList. Same viewport height and same header look, so a difference between the two
@@ -228,20 +232,6 @@
     ],
   ).flat();
 
-  const BENCH_OP = {
-    Create: 'create',
-    Replace: 'replace',
-    Update: 'update',
-    Select: 'select',
-    Swap: 'swap',
-    Remove: 'remove',
-    CreateLots: 'createLots',
-    Append: 'append',
-    Clear: 'clear',
-  } as const;
-
-  type IBenchOpId = (typeof BENCH_OP)[keyof typeof BENCH_OP];
-
   type IBenchOperation = {
     id: IBenchOpId;
     label: string;
@@ -256,54 +246,6 @@
     rowCount: number;
   };
 
-  // What the ENGINE did inside one timed step, captured from readCommitProfile() around the step
-  // rather than sampled on a timer. This is the number that separates "our commit is expensive"
-  // from "the framework above it is expensive": every adapter builds the same 9 001-node tree for
-  // Create 1 000, so a nodesVisited or propWrites that differs between adapters on the SAME step is
-  // work the screen is generating, not a cost of the platform.
-  //
-  // `walkMs` is NOT the engine's JS cost — the window around reconcile() contains the createNode
-  // and appendChild JSI crossings it makes. Read it only as a DELTA between adapters, where the
-  // native part is a shared constant (measured: identical Fabric call counts across the adapters).
-  type IStepProfile = {
-    nodesVisited: number;
-    propWrites: number;
-    propNoops: number;
-    commits: number;
-    walkMs: number;
-  };
-
-  const EMPTY_STEP_PROFILE: IStepProfile = {
-    nodesVisited: 0,
-    propWrites: 0,
-    propNoops: 0,
-    commits: 0,
-    walkMs: 0,
-  };
-
-  const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
-    calls: {},
-    propKeys: {},
-    totalCalls: 0,
-    totalPropKeys: 0,
-  };
-
-  // The one quantity this canary and `examples/bare-rn` (stock React Native on React's own Fabric
-  // renderer) can both report. IStepProfile above counts the ENGINE's reconcile walk, which stock
-  // has no equivalent of; `global.nativeFabricUIManager` is what both stacks actually drive, so
-  // counting calls there is the only like-for-like number between them.
-  function formatFabric(profile: IFabricCallProfile | undefined): string {
-    if (profile === undefined) return '—';
-    const create = profile.calls.createNode ?? 0;
-    const append = profile.calls.appendChild ?? 0;
-    const clones =
-      (profile.calls.cloneNode ?? 0) +
-      (profile.calls.cloneNodeWithNewChildren ?? 0) +
-      (profile.calls.cloneNodeWithNewProps ?? 0) +
-      (profile.calls.cloneNodeWithNewChildrenAndProps ?? 0);
-    return `${create}/${append}/${clones}`;
-  }
-
   // One row of the fixed-order suite. `startRows` is recorded rather than derived because it is the
   // number the whole suite exists to pin down - a duration is meaningless without it.
   type ISuiteEntry = {
@@ -314,23 +256,6 @@
     profile: IStepProfile;
     fabric: IFabricCallProfile;
   };
-
-  // The suite's fixed order, shared by the runner and the comparison table below, so a step can
-  // never run without a row to land in (or a row exist for a step that never runs).
-  export const SUITE_STEPS: readonly { op: IBenchOpId; label: string }[] = [
-    { op: BENCH_OP.Create, label: 'Create 1,000 rows' },
-    { op: BENCH_OP.Replace, label: 'Replace all 1,000 rows' },
-    { op: BENCH_OP.Update, label: 'Partial update · every 10th row' },
-    { op: BENCH_OP.Select, label: 'Select row' },
-    { op: BENCH_OP.Swap, label: 'Swap 2 rows' },
-    { op: BENCH_OP.Remove, label: 'Remove row' },
-    { op: BENCH_OP.Append, label: 'Append 1,000 rows' },
-    { op: BENCH_OP.Clear, label: 'Clear' },
-  ];
-
-  function suiteLabel(op: IBenchOpId): string {
-    return SUITE_STEPS.find(step => step.op === op)?.label ?? op;
-  }
 
   // Which mode is mid-run and how far along. Rendered as its own block rather than folded into
   // the button title, because a suite step can hold the JS thread for hundreds of milliseconds
@@ -405,12 +330,6 @@
     }
     return rows;
   }
-
-  function formatDuration(durationMs: number | undefined): string {
-    if (durationMs === undefined) return '—';
-    if (!Number.isFinite(durationMs)) return 'timeout';
-    return `${durationMs.toFixed(1)} ms`;
-  }
 </script>
 
 <script lang="ts">
@@ -438,12 +357,7 @@
     SectionList,
     type ISection,
   } from '@symbiote-native/svelte';
-  import {
-    readCommitProfile,
-    registerPostCommit,
-    unregisterPostCommit,
-  } from '@symbiote-native/engine';
-  import { readFabricCallProfile } from '../fabric-call-counter';
+  import { createBenchClock } from './bench-clock';
   import ActionButton from '../components/ActionButton.svelte';
   import BenchmarkRow from '../components/BenchmarkRow.svelte';
   import type { IBenchmarkRow } from '../components/BenchmarkRow.svelte';
@@ -465,64 +379,15 @@
   const rows = $derived(list.rows);
   const selectedId = $derived(list.selectedId);
 
-  // Deliberately NOT runes (React's useRef pair): the pending stopwatch and the sequence counter
-  // are read and written by the measurement machinery itself, and making them reactive would
-  // schedule a commit from inside the post-commit hook that is trying to time one.
-  let pending: {
-    startedAt: number;
-    settle: (durationMs: number) => void;
-  } | null = null;
+  // Not a rune: making the sequence counter reactive would schedule a commit from inside the hook
+  // that is timing one.
   let seq = 0;
-  // Filled by the post-commit hook, read by `timed` right after its own `await runStep(mutate)`.
-  // Plain, for the same reason as `pending`: it is written from inside the hook that times a
-  // commit, and a rune write there would schedule another one. Steps are serialized and `timed`
-  // awaits the progress step BEFORE the measured one, so what stands here when it reads is always
-  // the measured step's.
-  let lastStepProfile: IStepProfile = EMPTY_STEP_PROFILE;
-  let lastFabricProfile: IFabricCallProfile = EMPTY_FABRIC_PROFILE;
+  const clock = createBenchClock(commitProfileGate);
+  const runStep = clock.runStep;
   let isBatchingCreate = $state(false);
 
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Benchmark];
   const accent = LINE_COLOR.performance;
-
-  // THE timing primitive - every number on this screen, button or suite, comes through here. The
-  // clock starts here (a rune write is asynchronous, so a performance.now() pair wrapped around the
-  // mutation would time the scheduling call and nothing else) and stops in the post-commit hook
-  // below, which resolves this promise. Awaiting it is what lets the suite drive one operation at a
-  // time from a known state instead of racing its own steps.
-  function runStep(mutate: () => void): Promise<number> {
-    return new Promise<number>(resolve => {
-      let isSettled = false;
-      const settle = (durationMs: number): void => {
-        if (isSettled) return;
-        isSettled = true;
-        clearTimeout(timer);
-        // Release before resolving, so the meter is live again the moment the step is over even if
-        // a caller does more work synchronously off this promise.
-        commitProfileGate.isHeldByBenchmark = false;
-        resolve(durationMs);
-      };
-      const timer = setTimeout(() => {
-        // Drop the pending record too: leaving it would make the NEXT step's commit stop this
-        // step's stopwatch and report a duration against the wrong operation.
-        pending = null;
-        lastStepProfile = EMPTY_STEP_PROFILE;
-        lastFabricProfile = EMPTY_FABRIC_PROFILE;
-        settle(SUITE_TIMED_OUT);
-      }, SUITE_STEP_TIMEOUT_MS);
-
-      // Stop the meter and zero both sets of counters LAST, immediately before the mutation, so
-      // nothing between here and the commit lands in the step's profile. No install retry for the
-      // Fabric counter: its wrapper has to be in place while the engine binds the slot, which
-      // index.js already did and nothing can redo — an all-zero FABRIC CALLS table means that
-      // install did not land.
-      commitProfileGate.isHeldByBenchmark = true;
-      readCommitProfile();
-      readFabricCallProfile();
-      pending = { startedAt: performance.now(), settle };
-      mutate();
-    });
-  }
 
   // `rowCount` is passed in rather than read back from state afterwards: this closes over the list
   // as it was when the button was pressed, and reading it later would report the post-mutation one.
@@ -547,37 +412,8 @@
     });
   }
 
-  // Stopped by the ENGINE's post-commit hook, not by Svelte's own after-update hook, and that
-  // choice is what makes this screen comparable across adapters at all. Svelte batches its update
-  // and the engine coalesces the commit onto a microtask, so `tick()` resolves at a DIFFERENT
-  // point relative to completeRoot than React's useLayoutEffect does - this repo has already been
-  // bitten by exactly that ordering, where a parity test needed a second tick() to drain a
-  // coalesced flush. Four framework hooks would silently measure four different quantities under
-  // one name and the cross-adapter table would be fiction. registerPostCommit means one definition
-  // of "done" everywhere: completeRoot has returned. Native layout and paint happen after that and
-  // are not in the number; the frame counter above is what shows those.
-  $effect(() => {
-    const onCommitted = (): void => {
-      const finished = pending;
-      if (finished === null) return;
-      pending = null;
-      const durationMs = performance.now() - finished.startedAt;
-      // Safe to read here: commitContainer increments walkMs and commits BEFORE completeRoot, and
-      // runPostCommitHooks() fires after it, so the profile for this commit is already complete.
-      const profile = readCommitProfile();
-      lastStepProfile = {
-        nodesVisited: profile.nodesVisited,
-        propWrites: profile.propWrites,
-        propNoops: profile.propNoops,
-        commits: profile.commits,
-        walkMs: profile.walkMs,
-      };
-      lastFabricProfile = readFabricCallProfile();
-      finished.settle(durationMs);
-    };
-    registerPostCommit(onCommitted);
-    return (): void => unregisterPostCommit(onCommitted);
-  });
+  // Registration lifetime only; why the stopwatch stops in the engine's hook is in ./bench-clock.ts.
+  $effect(() => clock.install());
 
   // The guards below keep an operation from recording a measurement of nothing - an empty list,
   // or an index krausest's fixed row numbers put past the end of a short one.
@@ -764,8 +600,8 @@
         label,
         durationMs,
         startRows,
-        profile: lastStepProfile,
-        fabric: lastFabricProfile,
+        profile: clock.lastStepProfile,
+        fabric: clock.lastFabricProfile,
       });
     };
 
@@ -822,8 +658,15 @@
     await runStep(fillRows);
     await timed(BENCH_OP.Clear, SUITE_ROWS, clearRows);
 
-    suiteResults = { ...suiteResults, [mode]: entries };
-    progress = undefined;
+    // AWAITED, so the suite leaves no commit behind it. The two writes change the tree, and an
+    // unawaited commit lands microtasks later — by which time a SECOND run's stopwatch may be
+    // installed, and this one stops it. The table has two columns, so all-mounted and virtualized
+    // do get pressed back to back. Here it shifts a whole run by one step, so every row carries a
+    // plausible number belonging to its neighbour (`.claude/rules/perf-claims-need-numbers.md`).
+    await runStep(() => {
+      suiteResults = { ...suiteResults, [mode]: entries };
+      progress = undefined;
+    });
   }
 
   // The engine reads `__SYMBIOTE_BATCH_CREATE__` once per commit, not per node, so it has to be

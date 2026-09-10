@@ -113,6 +113,13 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'BM',
     label: 'PERFORMANCE LINE',
   },
+  // Svelte-only, unlike every other stop on this tour — the per-primitive screen exists on no
+  // other canary yet, so this entry has no twin to stay byte-identical with.
+  [ROUTE_NAME.PrimitiveBench]: {
+    line: NAV_LINE.Performance,
+    code: 'PB',
+    label: 'PERFORMANCE LINE',
+  },
   [ROUTE_NAME.StyleShowcase]: {
     line: NAV_LINE.Styling,
     code: 'ST',

@@ -89,6 +89,11 @@
       route: ROUTE_NAME.Benchmark,
       hint: 'js-framework-benchmark ops + JS-thread FPS',
     },
+    {
+      label: 'Primitive benchmark',
+      route: ROUTE_NAME.PrimitiveBench,
+      hint: 'the same ops, one primitive at a time',
+    },
   ];
 </script>
 
