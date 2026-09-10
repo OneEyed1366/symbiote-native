@@ -23,7 +23,7 @@ import type {
   ReactElement,
   RefAttributes,
 } from 'react';
-import { descriptorToReact, Image } from '@symbiote-native/react';
+import { descriptorToReact } from '@symbiote-native/react';
 import { resolveAccessibilityProps } from '@symbiote-native/components';
 import type {
   IDescriptor,
@@ -339,7 +339,9 @@ function renderCustomStepsOverlay(params: ICustomStepsParams): ReactElement {
             style: THUMB_IMAGE_CONTAINER_STYLE,
             testID: 'sliderTrackMark-thumbImage',
           },
-          createElement(Image, {
+          // An asset id still resolves: the fold that used to live in the Image wrapper is now
+          // `sourceOf` in the shared image behavior, which every path into the tag crosses.
+          createElement('image', {
             source: params.thumbImage,
             style: THUMB_IMAGE_STYLE,
           }),

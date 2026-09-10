@@ -121,7 +121,11 @@ interface ILoweredPrimitive {
 const LOWERED: Readonly<Record<string, ILoweredPrimitive>> = {
   Pressable: {
     behavior: 'core/components/src/behaviors/pressable.ts',
-    noWrapper: ['svelte'],
+    // GROWS as the wrapper layer is deleted, and the row retires itself when it reaches
+    // `adapterNames()` — the `perAdapter.length > 0` assertion below says so. While adapters are
+    // still migrating this audit is at its most useful: it is the guard that catches a fold a tag
+    // path drops on the way.
+    noWrapper: ['react', 'svelte'],
     // `android_ripple` was the one open FOLD gap and it is closed: the ripple background is an
     // ordinary prop of the responder itself in RN's own Pressable, so a single lowered node carries
     // it (see the behavior's foldPayload). Our wrapper's inner-View spelling mirrors
@@ -133,7 +137,7 @@ const LOWERED: Readonly<Record<string, ILoweredPrimitive>> = {
   },
   TextInput: {
     behavior: 'core/components/src/behaviors/text-input.ts',
-    noWrapper: ['svelte'],
+    noWrapper: ['react', 'svelte'],
     wrapperOnly: {
       // The render fn itself. Wrapper-only by construction — a lowered element has no render, which
       // is the entire point of lowering it.
@@ -189,7 +193,12 @@ describe('a lowered primitive applies every fold its wrapper applies', () => {
   // nothing would satisfy them all by making both sides empty — the false green this audit already
   // produced once. So pin that the parser reads a real, non-trivial set off a real wrapper.
   it('reads a non-empty import set, so an empty diff means agreement', () => {
-    const wrapper = wrapperPathFor('react', 'Pressable');
+    // The adapter is DERIVED, not named: every adapter named here so far has since deleted its
+    // Pressable wrapper, and a hardcoded one turns this control into the false green it exists to
+    // prevent. Whichever adapter still has a wrapper is a valid subject.
+    const wrapper = adapterNames()
+      .map(adapter => wrapperPathFor(adapter, 'Pressable'))
+      .find(path => path !== undefined);
     expect(wrapper, 'the control needs a real wrapper to parse').toBeDefined();
     const names = sharedImports(readFileSync(wrapper ?? '', 'utf8'));
     expect(names.has('createPressHandlers')).toBe(true);

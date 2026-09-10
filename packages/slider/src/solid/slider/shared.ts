@@ -27,22 +27,9 @@
 // and TypeScript has one `jsx` setting per program. descriptor-to-solid.ts drives the renderer the
 // same way for the same reason.
 
-// createComponent comes from solid-js, not the renderer's re-export: the renderer's is typed to
-// return its own host-node union, which cannot hold what a component returns (an Image is
-// JSX.Element). Same function either way.
-import {
-  createComponent,
-  createEffect,
-  createMemo,
-  createSignal,
-  untrack,
-} from 'solid-js';
+import { createEffect, createMemo, createSignal, untrack } from 'solid-js';
 import type { Accessor, Ref } from 'solid-js';
-import {
-  descriptorToSolid,
-  Image,
-  type IHostInstance,
-} from '@symbiote-native/solid';
+import { descriptorToSolid, type IHostInstance } from '@symbiote-native/solid';
 import {
   createElement,
   createTextNode,
@@ -458,11 +445,11 @@ function buildThumbImage(cell: IStepCellParams): ISymbioteNode | null {
   const container = hostElement('view');
   setProp(container, 'style', THUMB_IMAGE_CONTAINER_STYLE);
   setProp(container, 'testID', 'sliderTrackMark-thumbImage');
-  // The Image COMPONENT, not a raw image: it resolves an asset id through RN's own
-  // resolveAssetSource, exactly as React's and Vue's custom overlays do.
-  insert(
-    container,
-    createComponent(Image, { source, style: THUMB_IMAGE_STYLE }),
-  );
+  const thumb = hostElement('image');
+  // An asset id still resolves: the fold that used to live in the Image wrapper is now
+  // `sourceOf` in the shared image behavior, which every path into the tag crosses.
+  setProp(thumb, 'source', source);
+  setProp(thumb, 'style', THUMB_IMAGE_STYLE);
+  insertNode(container, thumb);
   return container;
 }
