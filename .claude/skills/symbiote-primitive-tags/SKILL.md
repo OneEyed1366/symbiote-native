@@ -2702,3 +2702,18 @@ resolve (`behaviors/pressable.ts`, `asRippleConfig`). But the `touchable-native-
 Both facts got recorded instead of one replacing the other. Same shape as
 `verify-the-deciding-side.md`'s "a refuted rationale is not a refuted verdict", applied to a
 recommendation rather than a refusal.
+
+## After deleting a wrapper, `tsc --build` blames a package that never changed
+
+`pnpm run typecheck` failed with three `TS6305: Output file
+'adapters/svelte/build/native-view-bridge.d.ts' has not been built from source file …` — all three
+raised by `packages/navigation`, which the migration never touched, about a source file the diff
+never touched either.
+
+The cause is `adapters/svelte/build/`, which nothing cleans (its own `.gitignore` entry hides it).
+Deleting wrappers left the directory half-emptied — five entries, no `native-view-bridge.d.ts` — and
+a composite project treats a MISSING output as stale rather than as absent, so it refuses instead of
+re-emitting. `rm -rf adapters/svelte/build adapters/svelte/tsconfig.tsbuildinfo` and re-run.
+
+Read the SOURCE path in a TS6305, never the file it is reported from: the reporting file is only the
+first consumer that reached the stale output.
