@@ -26,7 +26,6 @@ import {
 } from 'vue';
 import {
   Animated,
-  ScrollView,
   Image,
   Modal,
   FlatList,
@@ -1159,18 +1158,16 @@ export const CanaryScreen = defineComponent({
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="canary-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
-          refreshControl={
-            <refresh-control
-              refreshing={refreshing.value}
-              onRefresh={onRefresh}
-              tintColor="#42b883"
-            />
-          }
         >
+          <refresh-control
+            refreshing={refreshing.value}
+            onRefresh={onRefresh}
+            tintColor="#42b883"
+          />
           {/* JS->native: StatusBar renders nothing; it drives the iOS status bar
             (the top strip: clock, wi-fi, battery) imperatively from these props. */}
           <StatusBar
@@ -1783,7 +1780,7 @@ export const CanaryScreen = defineComponent({
               </view>
             </tunnelDemo.In>
           )}
-        </ScrollView>
+        </scroll-view>
 
         {/* The Teleport/tunnel target: a persistent, empty View sitting above the scroll
             content. pointerEvents="box-none" lets touches pass through everywhere except an

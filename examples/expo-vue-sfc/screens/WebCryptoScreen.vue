@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   webCrypto,
   polyfillWebCrypto,
@@ -44,7 +44,7 @@ function handleInstallPolyfill(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="web-crypto-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -102,6 +102,6 @@ function handleInstallPolyfill(): void {
           >
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

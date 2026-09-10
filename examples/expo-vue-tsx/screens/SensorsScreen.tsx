@@ -1,6 +1,6 @@
 import { computed, defineComponent, onMounted, ref } from 'vue';
 import type { ComputedRef, Ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   useAccelerometer,
   useDeviceMotion,
@@ -146,7 +146,7 @@ export const SensorsScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="sensors-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -289,7 +289,7 @@ export const SensorsScreen = defineComponent(
                 ),
             )}
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

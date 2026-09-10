@@ -1,6 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
@@ -122,7 +122,7 @@ export const SecureStoreScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="secure-store-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -214,7 +214,7 @@ export const SecureStoreScreen = defineComponent(
               color={lineColor}
             />
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

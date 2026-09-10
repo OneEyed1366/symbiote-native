@@ -1,5 +1,5 @@
 import { computed, defineComponent, onUnmounted, ref, watch } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   NetworkStateType,
   getIpAddressAsync,
@@ -103,7 +103,7 @@ export const NetworkScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="network-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -148,7 +148,7 @@ export const NetworkScreen = defineComponent(
             <ValueRow label="IP address" value={ipAddressLabel.value} />
             <ValueRow label="Airplane mode" value={airplaneModeLabel.value} />
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

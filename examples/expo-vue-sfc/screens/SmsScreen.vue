@@ -5,7 +5,7 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
@@ -54,7 +54,7 @@ function handleSend(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="sms-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -130,6 +130,6 @@ function handleSend(): void {
           composer closed".</text
         >
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

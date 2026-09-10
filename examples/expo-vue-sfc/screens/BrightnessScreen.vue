@@ -7,7 +7,7 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   BrightnessMode,
   addBrightnessListener,
@@ -116,7 +116,7 @@ const permissionLabel = computed(() =>
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="brightness-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -228,6 +228,6 @@ const permissionLabel = computed(() =>
           :color="lineColor"
         />
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   getAdvertisingId,
   usePermissions,
@@ -42,7 +42,7 @@ function handleRequest(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="tracking-transparency-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -122,6 +122,6 @@ function handleRequest(): void {
           >
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

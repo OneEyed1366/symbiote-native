@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -48,7 +48,7 @@ function handleGetRandomBytes(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="crypto-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -123,6 +123,6 @@ function handleGetRandomBytes(): void {
           >
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

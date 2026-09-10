@@ -1333,11 +1333,11 @@ exports[`vue SFC <style> blocks -> compileSfc > examples/vue-sfc/components/Comp
   ],
   "scopeRewrites": [
     "class: "badge__data-v-sv9p8b",",
-    "_createVNode(_unref(Text), { class: "badge-text__data-v-sv9p8b" }, {",
+    "_createElementVNode("text", { class: "badge-text__data-v-sv9p8b" }, "plain")",
     "class: "badge__data-v-sv9p8b loud__data-v-sv9p8b",",
-    "_createVNode(_unref(Text), { class: "badge-text__data-v-sv9p8b" }, {",
+    "_createElementVNode("text", { class: "badge-text__data-v-sv9p8b" }, "loud")",
     "class: _normalizeClass(__scopeClass(isLoud.value ? 'badge loud' : 'badge', __scopedClassNames)),",
-    "_createVNode(_unref(Text), { class: "badge-text__data-v-sv9p8b" }, {",
+    "_createElementVNode("text", { class: "badge-text__data-v-sv9p8b" }, "dynamic", -1 /* CACHED */)",
   ],
 }
 `;

@@ -27,7 +27,7 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Animated, ScrollView } from '@symbiote-native/vue';
+import { Animated } from '@symbiote-native/vue';
 import StyleShowcaseTile from '../components/StyleShowcaseTile.vue';
 import StyleShowcaseToggle from '../components/StyleShowcaseToggle.vue';
 import { ROUTE_NAME } from '../routes';
@@ -109,7 +109,7 @@ const mergeReadout = computed(() => {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="style-showcase-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -550,6 +550,6 @@ const mergeReadout = computed(() => {
           the file that declares them, write literals.</text
         >
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

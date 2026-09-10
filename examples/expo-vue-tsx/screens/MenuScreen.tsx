@@ -1,5 +1,5 @@
 import { defineComponent } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import { useStackNavigation } from '@symbiote-native/navigation/vue';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
@@ -135,7 +135,7 @@ export const MenuScreen = defineComponent(
     const navigation = useStackNavigation();
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="menu-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -171,7 +171,7 @@ export const MenuScreen = defineComponent(
               </pressable>
             );
           })}
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

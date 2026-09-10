@@ -1,5 +1,5 @@
 import { defineComponent } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import { useCalendars, useLocales } from '@symbiote-native/localization/vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -32,7 +32,7 @@ export const LocalizationScreen = defineComponent(
 
       return (
         <safe-area-view class="screen">
-          <ScrollView
+          <scroll-view
             testID="localization-scroll"
             class="screen"
             contentContainerStyle="scroll-content"
@@ -99,7 +99,7 @@ export const LocalizationScreen = defineComponent(
                 value={calendar?.timeZone ?? 'unknown'}
               />
             </view>
-          </ScrollView>
+          </scroll-view>
         </safe-area-view>
       );
     };

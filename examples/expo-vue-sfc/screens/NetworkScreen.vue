@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   NetworkStateType,
   getIpAddressAsync,
@@ -94,7 +94,7 @@ const airplaneModeText = computed(() =>
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="network-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -156,6 +156,6 @@ const airplaneModeText = computed(() =>
           }}</text>
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

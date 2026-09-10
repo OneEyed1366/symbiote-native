@@ -1,5 +1,5 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   BrightnessMode,
   addBrightnessListener,
@@ -141,7 +141,7 @@ export const BrightnessScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="brightness-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -234,7 +234,7 @@ export const BrightnessScreen = defineComponent(
               color={lineColor}
             />
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

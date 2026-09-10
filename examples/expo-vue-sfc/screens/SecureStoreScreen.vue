@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
@@ -97,7 +97,7 @@ function handleDelete(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="secure-store-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -195,6 +195,6 @@ function handleDelete(): void {
           :color="lineColor"
         />
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

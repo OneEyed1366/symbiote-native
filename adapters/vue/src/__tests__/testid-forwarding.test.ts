@@ -2,8 +2,8 @@
 // matches on, and the Vue path adds risk the React path lacks: attrs arrive untyped and run through
 // normalizeVueAttrs, and a component's forwardAttrs allow-list could drop testID. This is the Vue
 // twin of the React testid-forwarding guard: render each component with a unique testID and assert
-// some committed Fabric node carries it (a wrapper like Button -> TouchableOpacity passes as long as
-// the id lands on its root).
+// some committed Fabric node carries it (a tag whose behavior clones onto a child, like
+// touchable-native-feedback, passes as long as the id lands somewhere in the committed subtree).
 //
 // `cases` is the closure: it must list every public visual component exported from
 // adapters/vue/src/index.ts. TouchableNativeFeedback / VirtualizedSectionList / RefreshControl were
@@ -16,9 +16,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,
   unmount,
-  ScrollView,
-  TouchableOpacity,
-  TouchableHighlight,
   Modal,
   KeyboardAvoidingView,
   FlatList,
@@ -76,7 +73,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
     id =>
       h('image-background', { testID: id, source: { uri: 'x' } }, textChild()),
   ],
-  ['ScrollView', id => h(ScrollView, { testID: id }, textChild)],
+  ['scroll-view', id => h('scroll-view', { testID: id }, textChild())],
   ['text-input', id => h('text-input', { testID: id })],
   ['switch', id => h('switch', { testID: id, value: false })],
   [
@@ -93,10 +90,16 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
     id => h('button', { testID: id, title: 'x' }),
   ],
   ['pressable', id => h('pressable', { testID: id }, textChild())],
-  ['TouchableOpacity', id => h(TouchableOpacity, { testID: id }, textChild)],
   [
-    'TouchableHighlight',
-    id => h(TouchableHighlight, { testID: id }, textChild),
+    // The TAG — one node, no clone-onto-child, unlike TouchableHighlight below.
+    'touchable-opacity',
+    id => h('touchable-opacity', { testID: id }, textChild()),
+  ],
+  [
+    // The TAG. Both style halves fold onto this one node; the child is untouched, so the id stays
+    // where it is written regardless.
+    'touchable-highlight',
+    id => h('touchable-highlight', { testID: id }, textChild()),
   ],
   [
     // The other clone-onto-the-child TAG, and the same route as the row below it

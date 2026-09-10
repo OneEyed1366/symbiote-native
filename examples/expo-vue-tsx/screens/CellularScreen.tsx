@@ -1,6 +1,6 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   CellularGeneration,
   allowsVoipAsync,
@@ -105,7 +105,7 @@ export const CellularScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="cellular-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -174,7 +174,7 @@ export const CellularScreen = defineComponent(
               color={lineColor}
             />
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

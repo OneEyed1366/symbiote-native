@@ -1,6 +1,6 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   AuthenticationType,
   SecurityLevel,
@@ -145,7 +145,7 @@ export const LocalAuthScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="local-auth-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -231,7 +231,7 @@ export const LocalAuthScreen = defineComponent(
               </view>
             )}
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

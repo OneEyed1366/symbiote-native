@@ -1,6 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   hasAction,
   isAvailableAsync,
@@ -63,7 +63,7 @@ export const StoreReviewScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="store-review-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -124,7 +124,7 @@ export const StoreReviewScreen = defineComponent(
               it in debug builds. Both stores also enforce a quota.
             </text>
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

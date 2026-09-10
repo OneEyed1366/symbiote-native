@@ -1,6 +1,6 @@
 import { defineComponent, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -63,7 +63,7 @@ export const CryptoScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="crypto-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -117,7 +117,7 @@ export const CryptoScreen = defineComponent(
               value={randomBytes.value ?? 'not generated yet'}
             />
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

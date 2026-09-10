@@ -1,6 +1,6 @@
 import { defineComponent, ref } from 'vue';
 import type { Ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   getAdvertisingId,
   usePermissions,
@@ -44,7 +44,7 @@ export const TrackingTransparencyScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="tracking-transparency-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -107,7 +107,7 @@ export const TrackingTransparencyScreen = defineComponent(
             </view>
             <ValueRow label="ID" value={advertisingId.value ?? 'null'} />
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

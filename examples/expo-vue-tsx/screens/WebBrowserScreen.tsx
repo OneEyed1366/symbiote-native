@@ -1,6 +1,6 @@
 import { defineComponent, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -108,7 +108,7 @@ export const WebBrowserScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="web-browser-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -221,7 +221,7 @@ export const WebBrowserScreen = defineComponent(
               </text>
             </view>
           )}
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

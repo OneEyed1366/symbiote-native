@@ -1,5 +1,5 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
-import { Animated, ScrollView } from '@symbiote-native/vue';
+import { Animated } from '@symbiote-native/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -159,7 +159,7 @@ export const StyleShowcaseScreen = defineComponent({
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="style-showcase-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -622,7 +622,7 @@ export const StyleShowcaseScreen = defineComponent({
               Outside the file that declares them, write literals.
             </text>
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

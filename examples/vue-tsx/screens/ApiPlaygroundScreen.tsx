@@ -78,7 +78,6 @@ import {
   type Ref,
   type ObjectDirective,
 } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
 import type { IHostInstance, ISymbioteNode } from '@symbiote-native/vue';
 // Not re-exported by @symbiote-native/vue's package root (same as this adapter's own vShow shim,
 // adapters/vue/src/runtime-helpers/index.ts) — the engine's imperative/commit-timing API lives
@@ -1373,7 +1372,7 @@ export const ApiPlaygroundScreen = defineComponent(
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.ApiPlayground];
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="playground-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -1459,7 +1458,7 @@ export const ApiPlaygroundScreen = defineComponent(
             whole app's own bootstrap (adapters/vue/src/render.ts) — already
             exercised once per app run, not something a single screen re-demos.
           </text>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

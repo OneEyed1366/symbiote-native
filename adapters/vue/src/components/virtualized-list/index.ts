@@ -52,6 +52,7 @@ import {
   INVERTED_X_STYLE,
   INVERTED_Y_STYLE,
   buildListPlan,
+  buildScrollViewHandle,
   buildViewabilityPairs,
   createInitialListState,
   isSeparatorGapInRange,
@@ -76,12 +77,12 @@ import {
 } from '@symbiote-native/components';
 import {
   dlog,
+  isSymbioteNode,
   type IStyleProp,
   type ISymbioteEvent,
   type ISymbioteNode,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { ScrollView } from '../scroll-view';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 import { componentFromSlot } from '../../utils/slots-to-render-props';
 import type { ICtx } from '../../utils/component-helpers';
@@ -289,9 +290,6 @@ type IUnknownHandler = (...args: readonly unknown[]) => unknown;
 function isHandler(value: unknown): value is IUnknownHandler {
   return typeof value === 'function';
 }
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 function isComponent(value: unknown): value is Component {
   return (
     typeof value === 'function' || (typeof value === 'object' && value !== null)
@@ -340,10 +338,6 @@ function renderSeparatorElement(
   return h(component, props);
 }
 
-function isScrollViewHandle(value: unknown): value is IScrollViewHandle {
-  return isRecord(value) && typeof value.scrollTo === 'function';
-}
-
 export const VirtualizedList = defineComponent(
   <ItemT>(
     props: IVirtualizedListProps<ItemT>,
@@ -364,13 +358,17 @@ export const VirtualizedList = defineComponent(
       undefined,
     );
 
-    // shallowRef, NOT ref: the ScrollView handle closes over the engine scroll node, reached by
-    // identity through the engine's WeakMap mirror. A deep ref would proxy the object and every
-    // imperative scroll (scrollToOffset/Index/…) would miss the node and silently no-op.
-    const scrollHandle = shallowRef<IScrollViewHandle | null>(null);
-    const setScrollHandle = (instance: unknown): void => {
-      scrollHandle.value = isScrollViewHandle(instance) ? instance : null;
+    // shallowRef, NOT ref: `<scroll-view>` is a tag now, so its `ref` hands back the raw engine
+    // node directly, reached by identity through the engine's WeakMap mirror. A deep ref would
+    // proxy the object and every imperative scroll (scrollToOffset/Index/…) would miss the node
+    // and silently no-op.
+    const scrollNodeRef = shallowRef<ISymbioteNode | null>(null);
+    const setScrollNodeRef = (el: unknown): void => {
+      scrollNodeRef.value = isSymbioteNode(el) ? el : null;
     };
+    // Built once: `getNode` is lazy, read on every call, so this stays valid across the ref
+    // transitioning from null to the committed node.
+    const scrollHandle = buildScrollViewHandle(() => scrollNodeRef.value);
 
     // The five list events are emits, so Vue strips their onX listeners from $attrs. Detect listener
     // presence off the instance's own vnode props (what the parent passed), exactly like FlatList, so
@@ -513,12 +511,15 @@ export const VirtualizedList = defineComponent(
       const targetOffset = p.horizontal
         ? { x: clamped, y: EMPTY_OFFSET }
         : { x: EMPTY_OFFSET, y: clamped };
-      const handle = scrollHandle.value;
-      if (handle !== null) {
+      if (scrollNodeRef.value !== null) {
         dlog(
           `Vue VirtualizedList scrollTo offset=${clamped} animated=${animated} (horizontal=${p.horizontal})`,
         );
-        handle.scrollTo({ x: targetOffset.x, y: targetOffset.y, animated });
+        scrollHandle.scrollTo({
+          x: targetOffset.x,
+          y: targetOffset.y,
+          animated,
+        });
         return;
       }
       dlog(`Vue VirtualizedList scrollTo offset=${clamped} pending-ref`);
@@ -697,13 +698,15 @@ export const VirtualizedList = defineComponent(
         dispatch({ kind: 'scroll-to-end', animated: params?.animated ?? true });
       },
       flashScrollIndicators: (): void => {
-        scrollHandle.value?.flashScrollIndicators();
+        scrollHandle.flashScrollIndicators();
       },
-      getNativeScrollRef: (): IScrollViewHandle | null => scrollHandle.value,
-      getScrollableNode: (): IScrollViewHandle | null => scrollHandle.value,
-      getScrollResponder: (): IScrollViewHandle | null => scrollHandle.value,
-      getScrollNode: (): ISymbioteNode | null =>
-        scrollHandle.value?.getScrollNode() ?? null,
+      getNativeScrollRef: (): IScrollViewHandle | null =>
+        scrollNodeRef.value !== null ? scrollHandle : null,
+      getScrollableNode: (): IScrollViewHandle | null =>
+        scrollNodeRef.value !== null ? scrollHandle : null,
+      getScrollResponder: (): IScrollViewHandle | null =>
+        scrollNodeRef.value !== null ? scrollHandle : null,
+      getScrollNode: (): ISymbioteNode | null => scrollNodeRef.value,
       recordInteraction: (): void => {
         dispatch({ kind: 'record-interaction' });
       },
@@ -882,14 +885,15 @@ export const VirtualizedList = defineComponent(
         ? [p.style, p.horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE]
         : p.style;
 
+      // `horizontal` is NOT in the bag: the axis is the TAG (`horizontal-scroll-view`), so passing
+      // it would be redundant at best and a contradiction the behavior has to warn about at worst.
       const scrollProps: Record<string, unknown> = {
         ...p.forwarded,
         style: resolvedStyle,
         contentContainerStyle: resolvedContentContainerStyle,
-        horizontal: p.horizontal,
         onScroll,
         onLayout: onViewportLayout,
-        ref: setScrollHandle,
+        ref: setScrollNodeRef,
       };
       // The raw scroll-lifecycle callbacks (onScrollBeginDrag/…) and scrollEventThrottle are NOT in
       // PROP_KEYS, so they already ride through via ...p.forwarded. The keyboard props come from
@@ -917,22 +921,28 @@ export const VirtualizedList = defineComponent(
             (header !== undefined ? 1 : 0),
         };
       }
-      // Pull-to-refresh: when a @refresh listener is present, build a RefreshControl for the
-      // ScrollView's refreshControl prop (iOS sibling / Android wrap, owned by ScrollView). The
+      // Pull-to-refresh: when a @refresh listener is present, the RefreshControl is an ordinary
+      // FIRST CHILD on both platforms rather than a prop — the scroll behavior CLAIMS it, so the
+      // engine keeps it beside the content view on iOS and inverts the tree on Android. The
       // onRefresh bridge is gated on the listener, so an unlistened list builds no control.
+      let refreshControl: VNode | undefined;
       if (p.onRefresh !== undefined) {
         dlog('Vue VirtualizedList wiring RefreshControl (@refresh listened)');
-        // The TAG, not a wrapper: `registerRefreshControlBehavior` owns the controlled-spinner
-        // handshake and `onRefresh` reaches native as an ordinary prop, so there is nothing a
-        // component could add here.
-        scrollProps.refreshControl = h('refresh-control', {
+        refreshControl = h('refresh-control', {
           refreshing: p.refreshing,
           onRefresh: p.onRefresh,
           progressViewOffset: p.progressViewOffset,
         });
       }
 
-      return h(ScrollView, scrollProps, { default: () => children });
+      // The scroll TAG, not a wrapper: the engine builds the content node, carries
+      // `contentContainerStyle` onto it and places the refresh control. `ref` hands back the
+      // engine node, which is what `buildScrollViewHandle` drives for the imperative scrolls.
+      return h(
+        p.horizontal ? 'horizontal-scroll-view' : 'scroll-view',
+        scrollProps,
+        refreshControl === undefined ? children : [refreshControl, ...children],
+      );
     };
   },
   {

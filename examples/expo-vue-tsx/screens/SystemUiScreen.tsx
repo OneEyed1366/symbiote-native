@@ -1,6 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   getBackgroundColorAsync,
   setBackgroundColorAsync,
@@ -48,7 +48,7 @@ export const SystemUiScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="system-ui-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -96,7 +96,7 @@ export const SystemUiScreen = defineComponent(
               color={lineColor}
             />
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

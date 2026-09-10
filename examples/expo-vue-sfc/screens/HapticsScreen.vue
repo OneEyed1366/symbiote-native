@@ -8,7 +8,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -76,7 +76,7 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="haptics-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -167,6 +167,6 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
           >{{ lastFired ?? 'nothing yet' }}</text
         >
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

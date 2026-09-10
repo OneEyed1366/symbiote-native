@@ -1,6 +1,6 @@
 import { defineComponent, ref } from 'vue';
 import type { Ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   webCrypto,
   polyfillWebCrypto,
@@ -56,7 +56,7 @@ export const WebCryptoScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="standard-web-crypto-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -109,7 +109,7 @@ export const WebCryptoScreen = defineComponent(
               value={hasGlobalCrypto.value ? 'defined' : 'undefined'}
             />
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

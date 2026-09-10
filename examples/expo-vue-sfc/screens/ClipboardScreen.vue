@@ -7,7 +7,7 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   getStringAsync,
   getUrlAsync,
@@ -85,7 +85,7 @@ function handleSetUrl(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="clipboard-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -193,6 +193,6 @@ function handleSetUrl(): void {
           clipboardUrl ?? 'tap Get URL to read the clipboard'
         }}</text>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

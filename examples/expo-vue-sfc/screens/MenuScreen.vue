@@ -6,7 +6,7 @@
   .examples/react/screens/MenuScreen.tsx.
 -->
 <script setup lang="ts">
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import { useStackNavigation } from '@symbiote-native/navigation/vue';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
@@ -143,7 +143,7 @@ function lineInfoFor(route: ITourRouteName) {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="menu-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -178,6 +178,6 @@ function lineInfoFor(route: ITourRouteName) {
           >
         </view>
       </pressable>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

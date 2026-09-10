@@ -74,12 +74,16 @@ export type {
   ISwitchTrackColor,
   ISwitchChangeEvent,
 } from './components/switch/switch-props';
-export { ScrollView } from './components/scroll-view';
+// `ScrollView` is a TAG — `<scroll-view>`, and `horizontal` is the SEPARATE tag
+// `<horizontal-scroll-view>` because Android scrolls the two axes with different ViewManagers.
+// The engine builds the content node, routes `contentContainerStyle` onto it, places a
+// `<refresh-control>` CHILD per platform, and pins `<sticky-header>` children. The imperative
+// scroll API needs nothing from this barrel: a `ref` hands back the engine node, and
+// `scrollTo` / `scrollToEnd` / `flashScrollIndicators` are methods ON it.
 export type {
   IScrollViewProps,
-  IScrollViewEmits,
   IScrollViewHandle,
-} from './components/scroll-view';
+} from './components/scroll-view/scroll-view-props';
 // `Pressable` is a TAG — `<pressable>` — and there is nothing to import in its place. The press
 // machine runs on the engine node (`registerPressableBehavior`).
 //
@@ -92,11 +96,16 @@ export type {
   IPressState,
   IPressableAndroidRippleConfig,
 } from './components/pressable-props';
-export { TouchableOpacity, TouchableHighlight } from './components/touchable';
+// `TouchableOpacity` / `TouchableHighlight` are TAGS — `<touchable-opacity>` /
+// `<touchable-highlight>` — and there is nothing to import in their place. RN builds ONE node for
+// each (an Animated.View for Opacity; TouchableHighlight clones its extra style onto a child a tag
+// has no render to reach, so both halves fold onto the one node instead); the press machine, the
+// opacity fade and the underlay show/hide machine all run on the engine node
+// (`core/components/src/behaviors/touchable-{opacity,highlight}.ts`), wired by `./register`.
 export type {
   ITouchableOpacityProps,
   ITouchableHighlightProps,
-} from './components/touchable';
+} from './components/touchable-props';
 // `TouchableWithoutFeedback` is a TAG — `<touchable-without-feedback>` — and RN gives it no statics,
 // so like `Button` the name exports nothing now; only the prop type stays, for a component
 // forwarding a bag.

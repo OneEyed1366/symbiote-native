@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import { useCalendars, useLocales } from '@symbiote-native/localization/vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -32,7 +32,7 @@ const uses24hourClockText = computed(() => {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="localization-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -118,6 +118,6 @@ const uses24hourClockText = computed(() => {
           >
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

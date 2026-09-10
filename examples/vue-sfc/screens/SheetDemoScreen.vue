@@ -9,7 +9,6 @@
   .examples/react/screens/SheetDemoScreen.tsx.
 -->
 <script setup lang="ts">
-import { ScrollView } from '@symbiote-native/vue';
 import { useStackNavigation } from '@symbiote-native/navigation/vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -22,7 +21,7 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
 </script>
 
 <template>
-  <ScrollView class="screen" content-container-style="section">
+  <scroll-view class="screen" content-container-style="section">
     <view :class="`line-tag line-tag-${lineInfo.line}`">
       <text class="line-tag-text">{{
         `${lineInfo.code} · ${lineInfo.label}`
@@ -53,5 +52,5 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
       :onPress="() => navigation.pop()"
       :color="LINE_COLOR.presentation"
     />
-  </ScrollView>
+  </scroll-view>
 </template>

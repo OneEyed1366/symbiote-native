@@ -7,7 +7,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   DeviceType,
   brand,
@@ -89,7 +89,7 @@ function handleCheckRooted(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="device-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -199,6 +199,6 @@ function handleCheckRooted(): void {
           }}</text>
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

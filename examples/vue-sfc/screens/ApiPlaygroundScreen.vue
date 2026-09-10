@@ -23,7 +23,6 @@ import {
   getCurrentInstance,
   useTemplateRef,
 } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
 import type { IHostInstance } from '@symbiote-native/vue';
 import { setNativeProps, whenCommitted } from '@symbiote-native/engine';
 import ActionButton from '../components/ActionButton.vue';
@@ -196,7 +195,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="api-playground-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -681,6 +680,6 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
       </view>
 
       <OtherApiDemo />
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

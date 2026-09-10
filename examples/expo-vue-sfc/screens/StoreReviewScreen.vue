@@ -7,7 +7,7 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   hasAction,
   isAvailableAsync,
@@ -55,7 +55,7 @@ function handleRequestReview(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="store-review-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -132,6 +132,6 @@ function handleRequestReview(): void {
           builds. Both stores also enforce a quota.</text
         >
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

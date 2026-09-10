@@ -23,18 +23,18 @@
   what happened before this screen was brought back to parity. Same pattern as
   DrawerHomeScreen.vue / StatePersistenceScreen.vue.
 
-  Non-template constructs handled the SFC way: RefreshControl is element-valued, so it is built in
-  script via a computed h() and bound (:refresh-control); Animated.View / Animated.ScrollView
+  Non-template constructs handled the SFC way: RefreshControl is an ordinary `<refresh-control>`
+  CHILD of the scroll tag, not a prop — the behavior claims it and places it per platform;
+  Animated.View / Animated.ScrollView
   are used as dotted tags, which the SFC compiler resolves off the setup binding; FlatList renders its cell
   through the #item scoped slot; a `pressable` CHILD that needs the press state gets it from a
   local ref the screen keeps in step with @press-in/@press-out — press state lives on the engine
   node and never crosses back into Vue's reactivity.
 -->
 <script setup lang="ts">
-import { ref, shallowRef, computed, h, onMounted, onUnmounted } from 'vue';
+import { ref, shallowRef, computed, onMounted, onUnmounted } from 'vue';
 import {
   Animated,
-  ScrollView,
   Modal,
   FlatList,
   KeyboardAvoidingView,
@@ -198,16 +198,6 @@ const onRefresh = (): void => {
   }, REFRESH_MS);
 };
 
-// The RefreshControl as an element-valued prop — Vue templates can't inline an element into a
-// prop, so build the VNode in script and bind it; recomputes when `refreshing` flips.
-const refreshControl = computed(() =>
-  h('refresh-control', {
-    refreshing: refreshing.value,
-    onRefresh,
-    tintColor: LINE_COLOR.primitives,
-  }),
-);
-
 // Tier A runtime modules, read live. A non-empty Version proves PlatformConstants resolved; a
 // fractional hairline (e.g. 0.333 on @3x) proves DeviceInfo's scale resolved.
 const hairlineText = computed(
@@ -341,12 +331,16 @@ const rotationStyle = {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="canary-scroll"
       class="screen"
       content-container-style="scroll-content"
-      :refresh-control="refreshControl"
     >
+      <refresh-control
+        :refreshing="refreshing"
+        :tint-color="LINE_COLOR.primitives"
+        @refresh="onRefresh"
+      />
       <!-- JS->native: StatusBar renders nothing; it drives the iOS status bar imperatively. -->
       <StatusBar
         :bar-style="darkStatusBar ? 'dark-content' : 'light-content'"
@@ -841,7 +835,7 @@ const rotationStyle = {
           />
         </view>
       </TunnelIn>
-    </ScrollView>
+    </scroll-view>
 
     <!-- The Teleport/tunnel target: a persistent, empty View sitting above the scroll content.
          pointer-events="box-none" lets touches pass through everywhere except an actual ported

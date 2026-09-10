@@ -1,6 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -82,7 +82,7 @@ export const SmsScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="sms-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -163,7 +163,7 @@ export const SmsScreen = defineComponent(
               sent from cancelled.
             </text>
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

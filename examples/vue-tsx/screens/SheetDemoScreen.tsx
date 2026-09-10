@@ -1,5 +1,4 @@
 import { defineComponent } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
 import { useStackNavigation } from '@symbiote-native/navigation/vue';
 import type { IScreenOptions } from '@symbiote-native/navigation/vue';
 import { ROUTE_NAME } from '../routes';
@@ -53,7 +52,7 @@ export const SheetDemoScreen = defineComponent(
     return () => {
       const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
       return (
-        <ScrollView class="screen" contentContainerStyle="section">
+        <scroll-view class="screen" contentContainerStyle="section">
           <view class={`line-tag line-tag-${lineInfo.line}`}>
             <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
           </view>
@@ -82,7 +81,7 @@ export const SheetDemoScreen = defineComponent(
             onPress={() => navigation.value.pop()}
             color={LINE_COLOR.presentation}
           />
-        </ScrollView>
+        </scroll-view>
       );
     };
   },

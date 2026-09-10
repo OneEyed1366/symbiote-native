@@ -1,5 +1,5 @@
 import { defineComponent, ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -105,7 +105,7 @@ export const HapticsScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="haptics-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -192,7 +192,7 @@ export const HapticsScreen = defineComponent(
               <text class="auth-value-text">{`Last fired: ${lastFired.value}`}</text>
             </view>
           )}
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

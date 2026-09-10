@@ -1,5 +1,5 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   useBatteryLevel,
   useBatteryState,
@@ -110,7 +110,7 @@ export const BatteryScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="battery-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -166,7 +166,7 @@ export const BatteryScreen = defineComponent(
               />
             )}
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

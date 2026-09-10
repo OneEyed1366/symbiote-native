@@ -1,6 +1,6 @@
 import { defineComponent, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   ApplicationReleaseType,
   applicationId,
@@ -97,7 +97,7 @@ export const ApplicationScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="application-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -213,7 +213,7 @@ export const ApplicationScreen = defineComponent(
               />
             </view>
           )}
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

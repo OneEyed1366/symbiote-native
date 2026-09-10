@@ -5,7 +5,7 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
@@ -51,7 +51,7 @@ function handleShare(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="sharing-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -123,6 +123,6 @@ function handleShare(): void {
           }}</text>
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

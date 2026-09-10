@@ -5,7 +5,7 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   getBackgroundColorAsync,
   setBackgroundColorAsync,
@@ -46,7 +46,7 @@ onMounted(() => {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="system-ui-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -100,6 +100,6 @@ onMounted(() => {
           />
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

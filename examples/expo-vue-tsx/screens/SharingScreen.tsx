@@ -1,6 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -74,7 +74,7 @@ export const SharingScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="sharing-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -147,7 +147,7 @@ export const SharingScreen = defineComponent(
               they cancelled — it resolves once dismissed either way.
             </text>
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

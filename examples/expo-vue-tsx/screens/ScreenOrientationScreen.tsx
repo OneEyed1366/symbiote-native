@@ -1,5 +1,5 @@
 import { defineComponent } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   Orientation,
   OrientationLock,
@@ -68,7 +68,7 @@ export const ScreenOrientationScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="screen-orientation-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -128,7 +128,7 @@ export const ScreenOrientationScreen = defineComponent(
               color={lineColor}
             />
           </view>
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

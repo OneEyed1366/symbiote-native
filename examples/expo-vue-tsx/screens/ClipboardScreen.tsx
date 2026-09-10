@@ -1,6 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { Ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   getStringAsync,
   getUrlAsync,
@@ -114,7 +114,7 @@ export const ClipboardScreen = defineComponent(
 
     return () => (
       <safe-area-view class="screen">
-        <ScrollView
+        <scroll-view
           testID="clipboard-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
@@ -204,7 +204,7 @@ export const ClipboardScreen = defineComponent(
               />
             </view>
           )}
-        </ScrollView>
+        </scroll-view>
       </safe-area-view>
     );
   },

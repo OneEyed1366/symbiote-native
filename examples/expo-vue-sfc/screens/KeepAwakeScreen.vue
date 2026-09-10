@@ -7,7 +7,7 @@
 -->
 <script setup lang="ts">
 import { defineComponent, onMounted, ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   isAvailableAsync,
   useKeepAwake,
@@ -49,7 +49,7 @@ function handleToggle(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="keep-awake-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -102,6 +102,6 @@ function handleToggle(): void {
         />
         <KeepAwakeHolder v-if="isHeld" />
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

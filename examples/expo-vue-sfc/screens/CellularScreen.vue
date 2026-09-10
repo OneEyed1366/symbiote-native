@@ -7,7 +7,7 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   CellularGeneration,
   allowsVoipAsync,
@@ -93,7 +93,7 @@ const permissionLabel = computed(() =>
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="cellular-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -169,6 +169,6 @@ const permissionLabel = computed(() =>
           :color="lineColor"
         />
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

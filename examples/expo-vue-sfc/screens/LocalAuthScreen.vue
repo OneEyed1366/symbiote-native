@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   AuthenticationType,
   SecurityLevel,
@@ -139,7 +139,7 @@ function handleCancel(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="local-auth-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -232,6 +232,6 @@ function handleCancel(): void {
           <text class="auth-result-text">{{ authResultText }}</text>
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

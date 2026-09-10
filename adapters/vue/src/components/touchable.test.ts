@@ -1,40 +1,26 @@
-// Vue twin of adapters/solid/src/components/touchable/touchable.test.tsx. Drives the real Vue
+// Vue twin of adapters/react/src/components/touchable/touchable.test.tsx. Drives the real Vue
 // renderer through the engine into the fake Fabric slot, firing the raw touch primitives the way
 // native would.
 //
-// SCOPE. The press-scheduling machine and the underlay machine are unit-tested in
-// core/components/src/state/touchable.test.ts, and the press lifecycle underneath in Pressable.
-// What is Vue-specific — and therefore what this file is for:
-//   - each variant drives its REAL visual mechanism through a real engine commit (Animated for
-//     Opacity, the container/child style split for Highlight, nothing for WithoutFeedback);
-//   - the RN-accurate contract the 2026-08-19 audit added: no minPressDuration floor, the resting
-//     opacity taken from the caller's style, the has-press-handler gate, the post-press underlay
-//     hold, onShowUnderlay/onHideUnderlay;
-//   - the two seams only Vue has: a watch that must NOT fire at mount, and cloneVNode putting the
-//     lowered opacity on the child without inserting a wrapper node.
+// `<touchable-opacity>` / `<touchable-highlight>` are TAGS now — the press machine, the opacity
+// fade and the underlay show/hide machine all live on the engine node
+// (core/components/src/behaviors/touchable-{opacity,highlight}.ts). The press-scheduling machine
+// and the underlay machine are unit-tested there and in core/components/src/state/touchable.test.ts;
+// this file proves the Vue-side WIRING: that mounting the tag through the real reconciler actually
+// drives the real mechanism (Animated for Opacity, a single-node style fold for Highlight) through
+// a real engine commit.
 //
-// NOT covered here, deliberately: `useNativeDriver: true` (headless has no NativeAnimated module,
-// so both values drive the same JS frames) and `resetAnimation()` on unmount (nothing observable
-// survives the teardown to assert against). Both ship device-verified only.
+// Both halves of a TouchableHighlight's feedback land on the ONE node — a tag has no render to
+// clone a style onto a child with (core/components/src/behaviors/touchable-highlight.ts). There is
+// no cloneVNode split left to guard.
 //
 // rAF is polyfilled (setTimeout-based) so Animated.timing can run to completion; `measure` is
 // stubbed because Pressable measures its responder rect on grant. Both are installed before any
 // mount, because the engine destructures slot methods off the global on its first commit.
 
-import {
-  defineComponent,
-  Fragment,
-  h,
-  ref,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  mount,
-  unmount,
-  TouchableOpacity,
-  TouchableHighlight,
-} from '@symbiote-native/vue';
+import { mount, unmount } from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 733;
@@ -110,8 +96,8 @@ const flush = async (): Promise<void> => {
 };
 
 // One `flush` per iteration lets exactly one scheduled frame run, and the loop re-checks AFTER
-// draining — an animation started by a watch that only fires during that drain would be missed by
-// a while-loop that tested the queue first.
+// draining — an animation started during that drain would be missed by a while-loop that tested
+// the queue first.
 async function flushFrames(): Promise<void> {
   let guard = 0;
   do {
@@ -133,14 +119,6 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'cancelAnimationFrame');
 });
 
-// The responder is the Pressable's own RCTView, found by the testID every mount below sets.
-function responderHandle(): unknown {
-  const node = fabric.find(n => n.props.testID === TARGET);
-  if (node === undefined)
-    throw new Error(`no node created with testID=${TARGET}`);
-  return node.instanceHandle;
-}
-
 function findCommitted(
   predicate: (node: IFakeNode) => boolean,
 ): IFakeNode | undefined {
@@ -159,26 +137,20 @@ function findCommitted(
   return undefined;
 }
 
+// The responder is the tag's own node, found by the testID every mount below sets — one node now,
+// for both variants.
+function responderHandle(): unknown {
+  const node = findCommitted(n => n.props.testID === TARGET);
+  if (node === undefined)
+    throw new Error(`no node created with testID=${TARGET}`);
+  return node.instanceHandle;
+}
+
 function committedProps(testID: string): Record<string, unknown> {
   const node = findCommitted(n => n.props.testID === testID);
   if (node === undefined)
     throw new Error(`no committed node with testID=${testID}`);
   return node.props;
-}
-
-// TouchableOpacity's feedback rides its own inner Animated.View, which carries no testID — it is
-// the deepest committed non-box-none RCTView. Read off the COMMITTED tree: fabric.find would hand
-// back the mount-time snapshot and read as passing forever.
-function feedbackProps(): Record<string, unknown> {
-  let found: Record<string, unknown> | undefined;
-  function walk(node: IFakeNode): void {
-    if (node.viewName === 'RCTView' && node.props.pointerEvents !== 'box-none')
-      found = node.props;
-    for (const child of node.children) walk(child);
-  }
-  for (const root of fabric.committed) walk(root);
-  if (found === undefined) throw new Error('no committed RCTView found');
-  return found;
 }
 
 function asNumber(value: unknown, label: string): number {
@@ -193,13 +165,13 @@ const childView = (): VNode[] => [h('view', { testID: CHILD })];
 
 describe('Vue TouchableOpacity', () => {
   // why: RN drives TouchableOpacity's feedback with a real Animated.timing, not a discrete style
-  // swap. Proves the fade runs through the engine's Animated graph onto the committed node, and
-  // that the caller's base style survives the per-frame opacity diff.
+  // swap. Proves the fade runs through the engine's Animated graph onto the committed node — the
+  // SAME node the tag itself is, not an inner Animated.View leaf.
   it('animates opacity to activeOpacity on press-in and back on press-out', async () => {
     const events: string[] = [];
     const App = defineComponent({
       setup: () => (): VNode =>
-        h(TouchableOpacity, {
+        h('touchable-opacity', {
           testID: TARGET,
           activeOpacity: ACTIVE_OPACITY,
           style: { width: BASE_WIDTH },
@@ -211,38 +183,36 @@ describe('Vue TouchableOpacity', () => {
     mount(ROOT_TAG, App);
     await flush();
 
-    expect(asNumber(feedbackProps().opacity, 'resting opacity')).toBe(1);
-    expect(feedbackProps().width).toBe(BASE_WIDTH);
+    expect(asNumber(committedProps(TARGET).opacity, 'resting opacity')).toBe(1);
+    expect(committedProps(TARGET).width).toBe(BASE_WIDTH);
 
     const handle = responderHandle();
     fabric.fireEvent(handle, TOUCH_START);
     await flushFrames();
-    expect(asNumber(feedbackProps().opacity, 'pressed opacity')).toBeCloseTo(
-      ACTIVE_OPACITY,
-      6,
-    );
-    expect(feedbackProps().width, 'the base style survived the diff').toBe(
-      BASE_WIDTH,
-    );
+    expect(
+      asNumber(committedProps(TARGET).opacity, 'pressed opacity'),
+    ).toBeCloseTo(ACTIVE_OPACITY, 6);
+    expect(
+      committedProps(TARGET).width,
+      'the base style survived the diff',
+    ).toBe(BASE_WIDTH);
 
     fabric.fireEvent(handle, TOUCH_END);
     await flushFrames();
-    expect(asNumber(feedbackProps().opacity, 'released opacity')).toBeCloseTo(
-      1,
-      6,
-    );
+    expect(
+      asNumber(committedProps(TARGET).opacity, 'released opacity'),
+    ).toBeCloseTo(1, 6);
     expect(events).toEqual(['pressIn', 'press', 'pressOut']);
   });
 
   // why: RN's Touchables pass minPressDuration: 0 — Pressability's own 130ms floor
-  // (Pressability.js:264) never reaches them. Defaulting to 130, which every pre-audit adapter
-  // did, delays EVERY press-out by an eighth of a second. Observable as ordering alone: with no
-  // floor the deactivation is synchronous, so pressOut has already fired when fireEvent returns.
+  // (Pressability.js:264) never reaches them. Observable as ordering alone: with no floor the
+  // deactivation is synchronous, so pressOut has already fired when fireEvent returns.
   it('deactivates synchronously — no minPressDuration floor by default', async () => {
     let pressOuts = 0;
     const App = defineComponent({
       setup: () => (): VNode =>
-        h(TouchableOpacity, {
+        h('touchable-opacity', {
           testID: TARGET,
           onPressOut: () => {
             pressOuts++;
@@ -259,12 +229,12 @@ describe('Vue TouchableOpacity', () => {
   });
 
   // why: RN's _getChildStyleOpacityWithDefault settles the fade at the opacity the CALLER's style
-  // asks for, not at a hard 1 — and seeds the Animated.Value with it, so first paint is not a jump
-  // to fully opaque. A port that hardcodes RESTING_OPACITY is visibly wrong on a faded Touchable.
+  // asks for, not at a hard 1, and seeds the Animated.Value with it — first paint is not a jump to
+  // fully opaque on a Touchable styled `opacity: 0.6`.
   it('rests at the style opacity, not at 1', async () => {
     const App = defineComponent({
       setup: () => (): VNode =>
-        h(TouchableOpacity, {
+        h('touchable-opacity', {
           testID: TARGET,
           activeOpacity: ACTIVE_OPACITY,
           style: { width: BASE_WIDTH, opacity: STYLE_OPACITY },
@@ -272,7 +242,7 @@ describe('Vue TouchableOpacity', () => {
     });
     mount(ROOT_TAG, App);
     await flush();
-    expect(asNumber(feedbackProps().opacity, 'initial')).toBeCloseTo(
+    expect(asNumber(committedProps(TARGET).opacity, 'initial')).toBeCloseTo(
       STYLE_OPACITY,
       6,
     );
@@ -280,34 +250,17 @@ describe('Vue TouchableOpacity', () => {
     const handle = responderHandle();
     fabric.fireEvent(handle, TOUCH_START);
     await flushFrames();
-    expect(asNumber(feedbackProps().opacity, 'pressed')).toBeCloseTo(
+    expect(asNumber(committedProps(TARGET).opacity, 'pressed')).toBeCloseTo(
       ACTIVE_OPACITY,
       6,
     );
 
     fabric.fireEvent(handle, TOUCH_END);
     await flushFrames();
-    expect(asNumber(feedbackProps().opacity, 'released')).toBeCloseTo(
+    expect(asNumber(committedProps(TARGET).opacity, 'released')).toBeCloseTo(
       STYLE_OPACITY,
       6,
     );
-  });
-
-  // why: the re-settle watch must stay quiet at mount, or it animates over the value the
-  // Animated.Value was just seeded with. `immediate: true` is invisible in the committed opacity
-  // (the animation would run from the resting value TO the resting value) — the only trace is that
-  // an animation was scheduled at all, so this asserts on the pending frame queue.
-  it('schedules no animation at mount', async () => {
-    const App = defineComponent({
-      setup: () => (): VNode =>
-        h(TouchableOpacity, {
-          testID: TARGET,
-          style: { opacity: STYLE_OPACITY },
-        }),
-    });
-    mount(ROOT_TAG, App);
-    await flush();
-    expect(pendingFrames.size, 'the mount fired the re-settle watch').toBe(0);
   });
 
   // why: RN's componentDidUpdate re-settles the view when `disabled` flips, so a Touchable
@@ -316,7 +269,7 @@ describe('Vue TouchableOpacity', () => {
     const disabled = ref(false);
     const App = defineComponent({
       setup: () => (): VNode =>
-        h(TouchableOpacity, {
+        h('touchable-opacity', {
           testID: TARGET,
           activeOpacity: ACTIVE_OPACITY,
           disabled: disabled.value,
@@ -324,53 +277,53 @@ describe('Vue TouchableOpacity', () => {
     });
     mount(ROOT_TAG, App);
     await flush();
-    expect(asNumber(feedbackProps().opacity, 'at mount')).toBeCloseTo(1, 6);
+    expect(asNumber(committedProps(TARGET).opacity, 'at mount')).toBeCloseTo(
+      1,
+      6,
+    );
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
     await flushFrames();
-    expect(asNumber(feedbackProps().opacity, 'held')).toBeCloseTo(
+    expect(asNumber(committedProps(TARGET).opacity, 'held')).toBeCloseTo(
       ACTIVE_OPACITY,
       6,
     );
 
     disabled.value = true;
     await flushFrames();
-    expect(asNumber(feedbackProps().opacity, 'after disabling')).toBeCloseTo(
-      1,
-      6,
-    );
+    expect(
+      asNumber(committedProps(TARGET).opacity, 'after disabling'),
+    ).toBeCloseTo(1, 6);
   });
 
-  // why: the same watch must also fire on a changed style opacity — RN compares
-  // _getChildStyleOpacityWithDefault(prevProps.style) against the new one, not just `disabled`.
-  it('re-settles the opacity when the style opacity changes', async () => {
-    const styleOpacity = ref(1);
+  // why: a style changed after mount must keep reaching the committed node — this Touchable has
+  // no second node to hide a freeze behind any more (the concern that used to live in its own
+  // touchable-style-updates.test.ts, for a two-node shape that no longer exists).
+  it('a style changed after mount reaches the committed node', async () => {
+    const style = ref<Record<string, number>>({ margin: 1 });
     const App = defineComponent({
       setup: () => (): VNode =>
-        h(TouchableOpacity, {
-          testID: TARGET,
-          style: { opacity: styleOpacity.value },
-        }),
+        h('touchable-opacity', { testID: TARGET, style: style.value }),
     });
     mount(ROOT_TAG, App);
     await flush();
-    expect(asNumber(feedbackProps().opacity, 'at mount')).toBeCloseTo(1, 6);
+    expect(committedProps(TARGET).margin).toBe(1);
+    expect(committedProps(TARGET).borderWidth).toBeUndefined();
 
-    styleOpacity.value = STYLE_OPACITY;
-    await flushFrames();
-    expect(
-      asNumber(feedbackProps().opacity, 'after the style change'),
-    ).toBeCloseTo(STYLE_OPACITY, 6);
+    style.value = { margin: 2, borderWidth: 7 };
+    await flush();
+    expect(committedProps(TARGET).borderWidth).toBe(7);
+    expect(committedProps(TARGET).margin).toBe(2);
   });
 
   // why: delayPressIn defers the pressed feedback past a quick swipe-through. Proves the adapter
-  // threads the prop into the shared machine rather than ignoring it (the machine's own timing
-  // math is unit-tested at core; this is the wiring).
+  // threads the prop into the shared machine (the machine's own timing math is unit-tested at
+  // core; this is the wiring).
   it('defers pressIn past touch-down with delayPressIn', async () => {
     let pressIns = 0;
     const App = defineComponent({
       setup: () => (): VNode =>
-        h(TouchableOpacity, {
+        h('touchable-opacity', {
           testID: TARGET,
           delayPressIn: PRESS_DELAY_MS,
           onPressIn: () => {
@@ -389,15 +342,15 @@ describe('Vue TouchableOpacity', () => {
 });
 
 describe('Vue TouchableHighlight', () => {
-  // why: RN's _createExtraStyles keeps the two halves APART — the backgroundColor on the container,
-  // the lowered opacity on the CHILD. Folding both onto the container (what every pre-audit adapter
-  // did) fades the very underlay it is supposed to reveal, so `underlayColor: '#abc'` paints a
-  // washed-out '#abc'. This is the assertion that pins the split.
-  it('paints the underlay on the container and the opacity on the child', async () => {
+  // why: RN's _createExtraStyles splits the underlay color and the lowered opacity across a
+  // container and its child — a tag has no render to clone a style onto a child with, so both
+  // halves fold onto the ONE node instead (core/components/src/behaviors/touchable-highlight.ts).
+  // The app's own child is an ordinary child, untouched.
+  it('paints the underlay and the pressed opacity on the one node', async () => {
     const App = defineComponent({
       setup: () => (): VNode =>
         h(
-          TouchableHighlight,
+          'touchable-highlight',
           {
             testID: TARGET,
             underlayColor: '#abc',
@@ -412,35 +365,38 @@ describe('Vue TouchableHighlight', () => {
     await flush();
     expect(committedProps(TARGET).backgroundColor).toBeUndefined();
     expect(committedProps(TARGET).width).toBe(BASE_WIDTH);
+    expect(committedProps(CHILD).opacity).toBeUndefined();
 
     const handle = responderHandle();
     fabric.fireEvent(handle, TOUCH_START);
     await flush();
-    const container = committedProps(TARGET);
-    expect(container.backgroundColor, 'the underlay').toBe('#abc');
-    expect(container.opacity, 'must NOT fade the underlay').toBeUndefined();
-    expect(container.width, 'the base style survived').toBe(BASE_WIDTH);
-    expect(committedProps(CHILD).opacity, 'the child dims').toBe(0.5);
+    expect(committedProps(TARGET).backgroundColor, 'the underlay').toBe('#abc');
+    expect(committedProps(TARGET).opacity, 'the lowered opacity').toBe(0.5);
+    expect(committedProps(TARGET).width, 'the base style survived').toBe(
+      BASE_WIDTH,
+    );
+    expect(
+      committedProps(CHILD).opacity,
+      'the child is untouched',
+    ).toBeUndefined();
 
     // The release is ASYNC: onPress arms the hide timer at delayPressOut (0 here), so the underlay
-    // outlives the microtask queue by one macrotask. `null`, not `undefined` — the fake slot keeps
-    // an explicitly-removed prop as null, which is how a cleared value reads apart from an unset
-    // one (the assertions before the press are `toBeUndefined`).
+    // outlives the microtask queue by one macrotask.
     fabric.fireEvent(handle, TOUCH_END);
     await wait(20);
     await flush();
+    // `null`, not `undefined` — the fake slot keeps an explicitly-removed prop as null.
     expect(committedProps(TARGET).backgroundColor).toBeNull();
-    expect(committedProps(CHILD).opacity).toBeNull();
+    expect(committedProps(TARGET).opacity).toBeNull();
   });
 
-  // why: RN's _hasPressHandler gates the underlay — a TouchableHighlight with no press callback is
-  // decorative, and flashing an underlay under a touch that passes through it is wrong. The gate
-  // is invisible to any test that always supplies onPress, which is how it stayed unported.
+  // why: RN's _hasPressHandler gates the underlay — a decorative TouchableHighlight with no press
+  // callback must not flash on a touch that merely passes through it.
   it('paints no underlay when no press handler is supplied', async () => {
     const App = defineComponent({
       setup: () => (): VNode =>
         h(
-          TouchableHighlight,
+          'touchable-highlight',
           { testID: TARGET, underlayColor: '#abc' },
           childView,
         ),
@@ -451,17 +407,13 @@ describe('Vue TouchableHighlight', () => {
     fabric.fireEvent(responderHandle(), TOUCH_START);
     await flush();
     expect(committedProps(TARGET).backgroundColor).toBeUndefined();
-    expect(committedProps(CHILD).opacity).toBeUndefined();
   });
 
-  // why: the gate reads the listeners the PARENT passed, and Vue strips declared-emit listeners
-  // from $attrs — so an implementation that looks for `attrs.onLongPress` finds nothing and a
-  // long-press-only Touchable silently loses its underlay.
   it('counts an onLongPress-only listener as a press handler', async () => {
     const App = defineComponent({
       setup: () => (): VNode =>
         h(
-          TouchableHighlight,
+          'touchable-highlight',
           { testID: TARGET, underlayColor: '#abc', onLongPress: () => {} },
           childView,
         ),
@@ -475,13 +427,12 @@ describe('Vue TouchableHighlight', () => {
   });
 
   // why: THE reason the underlay is a machine and not a `pressed`-derived style. RN re-shows the
-  // underlay in onPress and holds it for delayPressOut, so a tap too fast to see still flashes. A
-  // port driven off `pressed` cannot express the hold — the flag is already false by then.
+  // underlay in onPress and holds it for delayPressOut, so a tap too fast to see still flashes.
   it('holds the underlay past the tap for delayPressOut', async () => {
     const App = defineComponent({
       setup: () => (): VNode =>
         h(
-          TouchableHighlight,
+          'touchable-highlight',
           {
             testID: TARGET,
             underlayColor: '#abc',
@@ -511,15 +462,13 @@ describe('Vue TouchableHighlight', () => {
     ).toBeNull();
   });
 
-  // why: the OTHER half of the hold. A cancelled gesture bubbles pressOut with no press before it
-  // (core/engine/src/events/index.ts's TOUCH_CANCEL branch), so no hide timer was ever armed and
-  // pressOut must hide right away — the hold is for taps, not for a swipe that walked off. Without
-  // this the pressOut handler could be deleted outright and every other underlay test stays green.
+  // why: the OTHER half of the hold. A cancelled gesture bubbles pressOut with no press before it,
+  // so no hide timer was ever armed and pressOut must hide right away.
   it('hides the underlay immediately when the gesture is cancelled', async () => {
     const App = defineComponent({
       setup: () => (): VNode =>
         h(
-          TouchableHighlight,
+          'touchable-highlight',
           {
             testID: TARGET,
             underlayColor: '#abc',
@@ -545,16 +494,14 @@ describe('Vue TouchableHighlight', () => {
     ).toBeNull();
   });
 
-  // why: RN fires onShowUnderlay / onHideUnderlay on a real transition only, and it runs the
-  // VISUAL before the caller's callback (_createPressabilityConfig's order). Interleaving the
-  // underlay notifications with the press emits is what makes that order observable at all — the
-  // visual has no other synchronous trace, so a swapped order is otherwise invisible.
+  // why: RN fires onShowUnderlay / onHideUnderlay on a real transition only, and runs the visual
+  // BEFORE the caller's callback (_createPressabilityConfig's order).
   it('runs the underlay before the press emit it rides on', async () => {
     const seen: string[] = [];
     const App = defineComponent({
       setup: () => (): VNode =>
         h(
-          TouchableHighlight,
+          'touchable-highlight',
           {
             testID: TARGET,
             onPress: () => seen.push('press'),
@@ -586,104 +533,15 @@ describe('Vue TouchableHighlight', () => {
     ]);
   });
 
-  // why: the child style is applied by cloning the child's vnode, NOT by wrapping it. A wrapper
-  // view would insert a node into the flex chain between the responder and the children and
-  // silently re-parent any `flex` the child declares — damage the fake Fabric (no Yoga) cannot
-  // measure. This pins the structure so the wrapper cannot creep back in.
-  it('inserts no node between the responder and its child', async () => {
-    const App = defineComponent({
-      setup: () => (): VNode =>
-        h(
-          TouchableHighlight,
-          { testID: TARGET, underlayColor: '#abc', onPress: () => {} },
-          childView,
-        ),
-    });
-    mount(ROOT_TAG, App);
-    await flush();
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    await flush();
-
-    const responder = findCommitted(n => n.props.testID === TARGET);
-    if (responder === undefined) throw new Error('responder not committed');
-    expect(
-      responder.children.map(n => n.props.testID),
-      'the child must be a DIRECT child',
-    ).toContain(CHILD);
-  });
-
-  // why: RN clones ONE child (React.Children.only). With several roots there is no single child to
-  // clone, so both halves fold onto the container — the pre-audit approximation. Documented as a
-  // deliberate fallback, not a silent one: a regression that dropped the child opacity entirely
-  // would look identical without this.
-  it('folds the child opacity onto the container when there is no single child', async () => {
-    const App = defineComponent({
-      setup: () => (): VNode =>
-        h(
-          TouchableHighlight,
-          {
-            testID: TARGET,
-            underlayColor: '#abc',
-            activeOpacity: 0.5,
-            onPress: () => {},
-          },
-          () => [h('view', { testID: CHILD }), h('view', {})],
-        ),
-    });
-    mount(ROOT_TAG, App);
-    await flush();
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    await flush();
-
-    expect(committedProps(TARGET).backgroundColor).toBe('#abc');
-    expect(committedProps(TARGET).opacity, 'folded onto the container').toBe(
-      0.5,
-    );
-    expect(committedProps(CHILD).opacity).toBeUndefined();
-  });
-
-  // why: a single child that is a FRAGMENT (what `v-for` / `<template>` compiles to) is one vnode
-  // but carries no props bag — cloning a style onto it drops the style silently. The type guard
-  // must catch that, not just the "several roots" case.
-  it('folds the child opacity onto the container for a fragment child', async () => {
-    const App = defineComponent({
-      setup: () => (): VNode =>
-        h(
-          TouchableHighlight,
-          {
-            testID: TARGET,
-            underlayColor: '#abc',
-            activeOpacity: 0.5,
-            onPress: () => {},
-          },
-          () => [h(Fragment, null, [h('view', { testID: CHILD })])],
-        ),
-    });
-    mount(ROOT_TAG, App);
-    await flush();
-    fabric.fireEvent(responderHandle(), TOUCH_START);
-    await flush();
-
-    expect(committedProps(TARGET).backgroundColor).toBe('#abc');
-    expect(committedProps(TARGET).opacity, 'folded onto the container').toBe(
-      0.5,
-    );
-    expect(committedProps(CHILD).opacity).toBeUndefined();
-  });
-
-  // why: a Touchable's underlayColor can be re-supplied after mount; the handlers and the extra
-  // styles are rebuilt each render, so the press must read the CURRENT value.
+  // why: an underlayColor can be re-supplied after mount; the behavior reads the CURRENT props on
+  // each press, not a value captured at attach.
   it('honors an underlayColor changed after mount', async () => {
     const color = ref('#abc');
     const App = defineComponent({
       setup: () => (): VNode =>
         h(
-          TouchableHighlight,
-          {
-            testID: TARGET,
-            underlayColor: color.value,
-            onPress: () => {},
-          },
+          'touchable-highlight',
+          { testID: TARGET, underlayColor: color.value, onPress: () => {} },
           childView,
         ),
     });
@@ -703,44 +561,38 @@ describe('Vue TouchableHighlight', () => {
 // `core/components/src/behaviors/touchable-without-feedback.test.ts`.
 
 // RN gives Pressable a ONE-leg focusable default (Pressable.js:258) and the Touchables a THREE-leg
-// one (TouchableOpacity.js:336-340, TouchableHighlight.js:370-374,
-// TouchableWithoutFeedback.js:263-266), so a wrapper composing Pressable has to resolve its own and
-// hand the answer down. Nothing computed it anywhere until 2026-09-09: a disabled touchable stayed
-// focusable, so a keyboard, a TV remote or switch control could land on a dead control.
+// one (TouchableOpacity.js:336-340, TouchableHighlight.js:370-374), so each tag folds its own.
 describe('Vue Touchable* focusable', () => {
-  const VARIANTS = {
-    TouchableOpacity,
-    TouchableHighlight,
-  };
+  const VARIANTS = ['touchable-opacity', 'touchable-highlight'];
 
   async function mountWith(
-    variant: (typeof VARIANTS)[keyof typeof VARIANTS],
+    tag: string,
     props: Record<string, unknown>,
   ): Promise<void> {
     const App = defineComponent({
-      setup: () => (): VNode => h(variant, { testID: TARGET, ...props }),
+      setup: () => (): VNode => h(tag, { testID: TARGET, ...props }),
     });
     mount(ROOT_TAG, App);
     await flush();
   }
 
-  for (const [name, variant] of Object.entries(VARIANTS)) {
-    // Leg 2, read off the APP's `onPress` attr — the wrapped handler the family hands Pressable is
-    // always defined, so resolving one level down could never answer false.
-    it(`${name} stays out of the focus order without an onPress`, async () => {
-      await mountWith(variant, {});
+  for (const tag of VARIANTS) {
+    // Leg 2, read off the app's own onPress — the machine's synthesized handler is always defined,
+    // so resolving one level down could never answer false.
+    it(`${tag} stays out of the focus order without an onPress`, async () => {
+      await mountWith(tag, {});
       expect(committedProps(TARGET).focusable).toBe(false);
     });
 
-    it(`${name} focuses once it has an onPress`, async () => {
-      await mountWith(variant, { onPress: () => {} });
+    it(`${tag} focuses once it has an onPress`, async () => {
+      await mountWith(tag, { onPress: () => {} });
       expect(committedProps(TARGET).focusable).toBe(true);
     });
 
-    // Leg 3, and the case a `focusable ?? computed` implementation gets wrong: `&&` means an
-    // explicit opt-IN still loses to `disabled`.
-    it(`${name} refuses focus while disabled, opt-in notwithstanding`, async () => {
-      await mountWith(variant, {
+    // Leg 3, the case a `focusable ?? computed` implementation gets wrong: an explicit opt-IN
+    // still loses to `disabled`.
+    it(`${tag} refuses focus while disabled, opt-in notwithstanding`, async () => {
+      await mountWith(tag, {
         onPress: () => {},
         disabled: true,
         focusable: true,

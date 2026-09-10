@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   Orientation,
   OrientationLock,
@@ -65,7 +65,7 @@ function handleUnlock(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="screen-orientation-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -137,6 +137,6 @@ function handleUnlock(): void {
           />
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

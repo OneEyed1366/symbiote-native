@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -91,7 +91,7 @@ function handleCoolDown(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="web-browser-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -194,6 +194,6 @@ function handleCoolDown(): void {
           is behind a Platform.OS check.</text
         >
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

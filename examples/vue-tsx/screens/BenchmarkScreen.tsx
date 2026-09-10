@@ -1,7 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref, shallowRef } from 'vue';
 import {
   FlatList,
-  ScrollView,
   SectionList,
   type IFlatListSlots,
   type ISection,
@@ -487,7 +486,7 @@ const StickyScrollViewBlock = defineComponent(
         <text class="section-label">
           STICKY PATH A · ScrollView · stickyHeaderIndices
         </text>
-        <ScrollView
+        <scroll-view
           testID="benchmark-sticky-scroll"
           class="bench-sticky"
           stickyHeaderIndices={STICKY_HEADER_INDICES}
@@ -502,7 +501,7 @@ const StickyScrollViewBlock = defineComponent(
               {entry.text}
             </text>
           ))}
-        </ScrollView>
+        </scroll-view>
         <text class="note-text">
           {`${STICKY_SECTION_COUNT} sections, every row mounted — no virtualization in the frame.`}
         </text>
@@ -1061,7 +1060,7 @@ export const BenchmarkScreen = defineComponent(
 
       return (
         <safe-area-view class="screen">
-          <ScrollView
+          <scroll-view
             testID="benchmark-scroll"
             class="screen"
             contentContainerStyle="scroll-content"
@@ -1306,7 +1305,7 @@ export const BenchmarkScreen = defineComponent(
                 </text>
               ))
             )}
-          </ScrollView>
+          </scroll-view>
         </safe-area-view>
       );
     };

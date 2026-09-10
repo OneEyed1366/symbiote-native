@@ -7,7 +7,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   ApplicationReleaseType,
   applicationId,
@@ -81,7 +81,7 @@ function handleGetIosReleaseType(): void {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="application-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -214,6 +214,6 @@ function handleGetIosReleaseType(): void {
           >
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

@@ -129,7 +129,7 @@ function buildRows(count: number): IBenchmarkRow[] {
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue';
-import { FlatList, ScrollView } from '@symbiote-native/vue';
+import { FlatList } from '@symbiote-native/vue';
 import {
   readCommitProfile,
   registerPostCommit,
@@ -840,7 +840,7 @@ const rowItemLayout = (
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="benchmark-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -1087,6 +1087,6 @@ const rowItemLayout = (
           }}</text
         >
       </template>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

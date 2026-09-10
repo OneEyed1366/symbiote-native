@@ -13,7 +13,7 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, ref, type ComputedRef, type Ref } from 'vue';
-import { ScrollView } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   Accelerometer,
   Gyroscope,
@@ -117,7 +117,7 @@ const pedometerStatus = sensorStatus(
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="sensors-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -356,6 +356,6 @@ const pedometerStatus = sensorStatus(
           >{{ `${pedometer.steps} steps` }}</text
         >
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>

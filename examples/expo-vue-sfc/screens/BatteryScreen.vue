@@ -7,7 +7,7 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Platform, ScrollView } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   BatteryState,
   isAvailableAsync,
@@ -74,7 +74,7 @@ onMounted(() => {
 
 <template>
   <safe-area-view class="screen">
-    <ScrollView
+    <scroll-view
       testID="battery-scroll"
       class="screen"
       content-container-style="scroll-content"
@@ -152,6 +152,6 @@ onMounted(() => {
           </view>
         </view>
       </view>
-    </ScrollView>
+    </scroll-view>
   </safe-area-view>
 </template>
