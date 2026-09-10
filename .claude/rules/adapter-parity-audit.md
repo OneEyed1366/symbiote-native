@@ -1350,6 +1350,19 @@ identical green.
 
 ## The sixth surface: a lowered primitive silently loses its wrapper's PROP FOLDS
 
+> **THE INSTRUMENT IS RETIRED — 2026-09-11.** `tests/lowered-primitive-fold-parity.test.ts` is
+> deleted: it compared a WRAPPER's shared-layer imports against a behavior's, and no adapter has a
+> wrapper left for any primitive, so its `noWrapper` set reached `adapterNames()` exactly as the
+> file said it would. It retired itself by its own rule.
+>
+> **Read every section from here to "An IDEMPOTENT fold" as METHOD, never as current state.** The
+> method lessons transfer and are the reason this stays: an intersection across five sets is emptied
+> by ONE unlocated wrapper; a locator miss reads as agreement; an INLINE fold is invisible to an
+> import oracle; a red row is a question about the NAME, not an instruction to import it. What
+> replaced it is a stronger oracle the migration made possible — the behavior's own committed
+> payload (`core/components/src/behaviors/<name>.test.ts`) plus each adapter's `*-tag.test.*`,
+> which assert the tree rather than the import list.
+
 Every audit above compares two things that both exist — two barrels, two subpaths, two transforms'
 verdicts. This one compares an implementation against a DELETION. Lowering removes the component
 body, and the body is where the per-primitive prop folds live. Nothing is left behind to report a
@@ -1842,3 +1855,53 @@ what this round assumed. `npx vitest run adapters/vue` takes 41s and `adapters/a
 neither is what stalled them; a long unbroken run of EDITS is. So the instruction that works is
 per-primitive batching — convert one, verify, convert the next — rather than a cheaper verify
 command.
+
+### A bare `grep -r` over `examples/*` measures three trees, and two of them are not source
+
+Measured 2026-09-11, correcting an instruction already sent to an agent. An `examples/<app>` directory
+is an installed npm project, so it carries `node_modules/`, an `ios/Pods/` CocoaPods sandbox — whose
+`React.xcframework` headers name `ScrollView` in dozens of files — and a `build/` tree holding the
+compiled output of the very screens being audited. A migration census over it read:
+
+```
+bare grep -r                 108 <ScrollView · 33 <RefreshControl   across 49 files
+tracked source only          2 files
+```
+
+Two orders of magnitude, in the direction that manufactures work. The instruction that went out named
+49 files and had to be retracted before the agent started rewriting Fabric headers.
+
+The probe that answers the question:
+
+```bash
+git ls-files 'examples/*' | grep -E '\.(ts|tsx|vue|svelte|html)$' | xargs grep -l "<Pattern"
+```
+
+`git ls-files` is the discriminator worth keeping, not `--exclude-dir`: an exclusion list is a
+hand-written enumeration of the junk that happens to be there today, which is this file's own stale-list
+failure one directory over. Tracked-vs-untracked is derived and cannot rot.
+
+The general form, and it is the mirror of the false-green this file records everywhere else: **a probe
+returning a LARGE answer is as unverified as one returning zero.** A count of zero reads as suspicious
+and gets checked; a count of 141 reads as a measurement and gets acted on. Before quoting either, name
+which files the probe could reach.
+
+### And the sweep itself can silently do nothing: BSD `sed` ignores `\b`
+
+Same family, opposite direction, measured 2026-09-11 on macOS. A 69-file rename pass written as
+`sed -i '' 's/\bScrollView\b/scroll-view/g'` edited NOTHING. `\b` is a GNU extension; BSD `sed`
+does not error on it, it simply never matches:
+
+```
+$ echo "ScrollViewX ScrollView" | sed 's/\bScrollView\b/HIT/g'
+ScrollViewX ScrollView
+```
+
+The pass reported success on every file, and the only edits that landed were the handful made by
+hand with `Edit` — so the tree looked half-renamed by some mysterious rule rather than by a dead
+pattern. Use a literal pattern with explicit context (`<ScrollView`, `, ScrollView,`), or `perl -pe`
+if a boundary is genuinely needed; never assume a regex extension crosses a platform.
+
+The check that costs one line, before any multi-file `sed`: run it on ONE file and `git diff` that
+file. A sweep whose dry run changes nothing is a dead pattern, not a clean tree — which is this
+section's own lesson, pointed at the instrument instead of at the census.
