@@ -28,11 +28,31 @@
     "cross-platform"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./mutation-buffer": "./src/mutation-buffer.ts"
   },
   "files": [
-    "build"
+    "build",
+    "cpp",
+    "ios",
+    "android",
+    "codegen-specs",
+    "symbiote-engine.podspec",
+    "react-native.config.cjs"
   ],
+  "codegenConfig": {
+    "name": "SymbioteEngineSpec",
+    "type": "modules",
+    "jsSrcsDir": "codegen-specs",
+    "android": {
+      "javaPackageName": "dev.symbiotenative.engine"
+    },
+    "ios": {
+      "modulesProvider": {
+        "SymbioteEngine": "SymbioteEngineModule"
+      }
+    }
+  },
   "publishConfig": {
     "access": "public",
     "main": "./build/index.js",
@@ -42,6 +62,10 @@
       ".": {
         "types": "./build/index.d.ts",
         "default": "./build/index.js"
+      },
+      "./mutation-buffer": {
+        "types": "./build/mutation-buffer.d.ts",
+        "default": "./build/mutation-buffer.js"
       }
     }
   },

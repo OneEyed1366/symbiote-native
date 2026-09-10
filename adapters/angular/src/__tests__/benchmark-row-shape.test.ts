@@ -31,11 +31,9 @@ import { readFileSync } from 'node:fs';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  censusRetainedTree,
   clearGlobalStyles,
-  isAnchor,
-  readCommitProfile,
   registerRules,
-  type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
@@ -336,23 +334,6 @@ function viewNamesOf(nodes: readonly IFakeNode[]): string[] {
   return nodes.flatMap(node => [node.viewName, ...viewNamesOf(node.children)]);
 }
 
-function countEngineNodes(roots: readonly ISymbioteNode[]): {
-  total: number;
-  anchors: number;
-} {
-  let total = 0;
-  let anchors = 0;
-  const stack: ISymbioteNode[] = [...roots];
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (node === undefined) break;
-    total += 1;
-    if (isAnchor(node)) anchors += 1;
-    for (const child of node.children) stack.push(child);
-  }
-  return { total, anchors };
-}
-
 type IMountProbe = {
   committed: ICommittedShape[];
   viewNames: string[];
@@ -371,19 +352,20 @@ async function mountProbe(
   rowsSignal.set(buildRows(rowCount));
   selectedSignal.set(undefined);
   fabric.reset();
-  readCommitProfile();
 
   const surface = mount(ROOT_TAG, component);
   await flush();
 
-  const profile = readCommitProfile();
-  const census = countEngineNodes(surface.children);
+  // The host's own census, not a walk here: JS holds no tree to walk. `flattenWidths` lists one
+  // entry per parent whose child list contains a node the commit skips, which is the same
+  // population the retired `childFlattens` commit counter priced.
+  const census = censusRetainedTree(surface.children);
   return {
     committed: shapeOf(fabric.committed),
     viewNames: viewNamesOf(fabric.committed),
-    engineNodes: census.total,
+    engineNodes: census.nodes,
     anchors: census.anchors,
-    childFlattens: profile.childFlattens,
+    childFlattens: census.flattenWidths.length,
   };
 }
 
@@ -458,16 +440,17 @@ describe('benchmark row shapes', () => {
       composedNodes: COMPOSED_NODES_PER_ROW,
       composedAnchors: COMPOSED_NODES_PER_ROW - FLAT_NODES_PER_ROW,
       composedRenderable: FLAT_NODES_PER_ROW,
-      // What an anchor costs the walk even though it never paints: two parents per row whose
-      // children hold one (the row's own host, and the row View holding the two Pressables), so
-      // renderableChildren's fast path is defeated and re-allocates on both.
-      composedFlattens: 2,
+      // What an anchor costs the child-set build even though it never paints: the row View holds
+      // the two Pressable anchors, so its child list has to be flattened. One per row, and the
+      // @for container that holds every row's host anchor is a single node however many rows it
+      // carries — which is why it does not appear in a per-row delta.
+      composedFlattens: 1,
       flatNodes: FLAT_NODES_PER_ROW,
       flatAnchors: 0,
       flatRenderable: FLAT_NODES_PER_ROW,
     });
     // Flat's own flatten count is not in that table because it does not scale with rows at all -
-    // the fixture's @for anchor defeats one scan whatever the row count, and the per-row delta is
+    // the fixture's @for anchor is one node whatever the row count, and the per-row delta is
     // noise around zero. Growth is the property under test.
     expect(flatFlattensPerRow).toBeLessThanOrEqual(0);
   });

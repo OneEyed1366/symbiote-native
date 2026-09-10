@@ -16,12 +16,13 @@ import {
   clearGlobalStyles,
   createElement,
   createSurface,
+  propOf,
   routeProp,
   setNodePressed,
   type ISymbioteNode,
 } from '../index';
 
-installFabric();
+const fabric = installFabric();
 let nextRootTag = 8600;
 
 function mount(node: ISymbioteNode) {
@@ -31,8 +32,10 @@ function mount(node: ISymbioteNode) {
   return surface;
 }
 
+// The published `[classStyle, explicitStyle]` pair, read back out of the tree HOST — the engine
+// holds no props of its own.
 function slots(node: ISymbioteNode): unknown[] {
-  const style = node.props.style;
+  const style = propOf(node, 'style');
   return Array.isArray(style) ? style : [];
 }
 
@@ -166,8 +169,12 @@ describe('runtime state-style resolution', () => {
         opacity: pressed ? 0.6 : 1,
       }));
       mount(node);
-      for (const slot of slots(node)) {
-        expect(typeof slot).not.toBe('function');
+      // The style slot is HOISTED into the payload, so the resting half arrives as a top-level
+      // `opacity` — and its presence is what says the callback resolved rather than being dropped.
+      const committed = fabric.appRoot().children[0].props;
+      expect(committed.opacity).toBe(1);
+      for (const value of Object.values(committed)) {
+        expect(typeof value).not.toBe('function');
       }
     });
   });

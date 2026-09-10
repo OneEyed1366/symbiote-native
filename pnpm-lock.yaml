@@ -585,7 +585,11 @@ importers:
         specifier: workspace:*
         version: link:../test-utils
 
-  core/test-utils: {}
+  core/test-utils:
+    dependencies:
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../engine
 
   packages/android:
     dependencies:

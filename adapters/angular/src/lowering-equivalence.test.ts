@@ -33,6 +33,7 @@ import {
 import {
   censusRetainedTree,
   isSymbioteNode,
+  parentOf,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 // SIDE-EFFECT IMPORT, and the arm is worthless without it: `register.ts` is what calls
@@ -208,7 +209,13 @@ function retainedNodeCount(): number {
   const handle: unknown = seed.instanceHandle;
   if (!isSymbioteNode(handle)) return 0;
   let current: ISymbioteNode = handle;
-  while (current.parent !== undefined) current = current.parent;
+  // Through the seam, not the field: `node.parent` was deleted by item 8b and a direct read now
+  // silently answers `undefined`, which turns this climb into a no-op and censuses one leaf.
+  let above = parentOf(current);
+  while (above !== undefined) {
+    current = above;
+    above = parentOf(current);
+  }
   return censusRetainedTree([current]).nodes;
 }
 

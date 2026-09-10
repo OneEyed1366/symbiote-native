@@ -1,0 +1,90 @@
+// @symbiote-native/engine's Android native half — the twin of `symbiote-engine.podspec`.
+//
+// `@symbiote-native/engine` is a DIRECT dependency of every example app, so RN's autolinking finds
+// this project with no entry in anybody's `settings.gradle` — the same reason the podspec needs no
+// Podfile line. Built as a subproject of the consuming app, so it reads the app's pinned SDK/NDK
+// versions from `rootProject.ext` (see `examples/*/android/build.gradle`), falling back to the same
+// defaults `packages/android` uses when built in isolation.
+
+apply plugin: "com.android.library"
+apply plugin: "org.jetbrains.kotlin.android"
+// Runs codegen over `../codegen-specs`, producing `NativeSymbioteEngineSpec` (Java) and the JNI spec
+// the app's autolinking links. Needed for the module to be a real TURBO module: the legacy-interop
+// path (`TurboModuleManager::getLegacyModule`) never consults `TurboModuleWithJSIBindings`, so a
+// plain `ReactContextBaseJavaModule` — the shape `packages/android` uses — would install nothing.
+// The plugin supplies `root`/`reactNativeDir`/`jsRootDir` for a library itself and adds the generated
+// java dir to `sourceSets.main` (ReactPlugin.kt, `configureCodegen(isLibrary = true)`), so no
+// `react { }` block and no `sourceSets` line are needed here.
+apply plugin: "com.facebook.react"
+
+def safeExtGet(prop, fallback) {
+  rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
+
+android {
+  namespace "dev.symbiotenative.engine"
+  compileSdk safeExtGet("compileSdkVersion", 36)
+
+  if (rootProject.hasProperty("ndkPath")) {
+    ndkPath rootProject.ext.ndkPath
+  }
+  if (rootProject.hasProperty("ndkVersion")) {
+    ndkVersion rootProject.ext.ndkVersion
+  }
+
+  defaultConfig {
+    minSdk safeExtGet("minSdkVersion", 24)
+
+    externalNativeBuild {
+      cmake {
+        arguments "-DANDROID_STL=c++_shared"
+      }
+    }
+  }
+
+  buildFeatures {
+    // Consumes ReactAndroid's published `jsi` / `reactnative` prefab modules.
+    prefab true
+  }
+
+  externalNativeBuild {
+    cmake {
+      path "CMakeLists.txt"
+    }
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+
+  kotlinOptions {
+    jvmTarget = "17"
+  }
+
+  packagingOptions {
+    // RN's own .so files get copied into this library's intermediates by prefab and would collide
+    // when the app merges native libs. Only `libsymbiote_engine.so` should ship from here. Since
+    // RN 0.76 the renderer/jni libraries are merged into `libreactnative.so`, so that one name
+    // covers all of them (same list as `react-native-screens`).
+    excludes = [
+        "META-INF",
+        "META-INF/**",
+        "**/libjsi.so",
+        "**/libc++_shared.so",
+        "**/libfbjni.so",
+        "**/libreactnative.so",
+    ]
+  }
+}
+
+repositories {
+  google()
+  mavenCentral()
+}
+
+dependencies {
+  // Version-less: the consuming app's React Native Gradle plugin pins react-android, and it brings
+  // fbjni's prefab in transitively (which is what `find_package(fbjni)` resolves).
+  implementation "com.facebook.react:react-android"
+}

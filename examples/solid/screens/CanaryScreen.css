@@ -139,6 +139,13 @@
 
 /* ---- horizontal FlatList ---- */
 
+/* TEMPORARY — deletes with probe A. */
+.probe-fill {
+  width: 48px;
+  height: 48px;
+  background-color: #55ff88;
+}
+
 .chip-list {
   height: 84px;
 }

@@ -1,6 +1,9 @@
 import { Component, Input, OnDestroy, OnInit, signal } from '@angular/core';
 import { Text, View } from '@symbiote-native/angular';
-import { readCommitProfile } from '@symbiote-native/engine';
+import {
+  readCommitProfile,
+  type ICommitProfile,
+} from '@symbiote-native/engine';
 import { ActionButton } from './ActionButton';
 import './JsFrameRateMeter.css';
 
@@ -23,26 +26,26 @@ const SUSPENDED_FRAME_MS = 1_000;
 // itself dominate the very commit path this meter is supposed to observe.
 const SAMPLE_WINDOW_MS = 500;
 
-// What the engine's reconcile walk cost inside the last window, next to the frame numbers so the
-// two can be read against each other: the walk is a term in every adapter's frame budget.
+// What the engine was ASKED for inside the last window, beside the frame numbers so the two can be
+// read against each other: a stall with no commits under it is not the commit path's.
 //
-// Reported as two halves, never as `walkMs / nodesVisited`. Dirty-marking means the denominator
-// counts only the nodes reconcile did NOT skip, while the numerator still covers everything it does
-// (the JSI createNode/appendChild calls included), so that ratio inflates by the skip factor: 13.4
-// us/node without dirty-marking, 438 us/node with it, on a device that had got ~2x faster. So
-// `nodesPerCommit` is the skip itself (read against the screen's node count) and `msPerCommit` is
-// what a commit costs. A true per-node figure needs a full walk - a cold mount, where nothing is
-// skippable.
-type IWalkSample = {
-  sharePercent: number;
-  nodesPerCommit: number;
-  msPerCommit: number;
-};
-
-const EMPTY_WALK_SAMPLE: IWalkSample = {
-  sharePercent: 0,
-  nodesPerCommit: 0,
-  msPerCommit: 0,
+// Counts, never a share of the window. What the engine SPENDS is no longer readable from JS - the
+// tree lives in C++ and this side only fills a command buffer, so timing it means instrumenting the
+// host, not this meter.
+const EMPTY_COMMIT_PROFILE: ICommitProfile = {
+  commits: 0,
+  propWrites: 0,
+  applyMs: 0,
+  buildMs: 0,
+  commitMs: 0,
+  adoptSwaps: 0,
+  propClones: 0,
+  textSwaps: 0,
+  dirtyTexts: 0,
+  layoutMs: 0,
+  textMs: 0,
+  layoutNodes: 0,
+  textMeasures: 0,
 };
 
 // `readCommitProfile()` is read-and-RESET, and this meter calls it once per window off rAF. A
@@ -99,34 +102,25 @@ export const commitProfileGate = { isHeldByBenchmark: false };
           <Text class="bench-metric-label">worst ms</Text>
         </View>
       </View>
-      <Text class="section-label">ENGINE RECONCILE WALK</Text>
+      <Text class="section-label">ENGINE PER WINDOW</Text>
       <View class="bench-meter-row">
         <View class="bench-metric">
           <Text
-            testID="bench-walk-share"
+            testID="bench-commits"
             class="bench-metric-value"
             [style]="accentStyle"
-            >{{ walkShareText() }}</Text
+            >{{ engine().commits }}</Text
           >
-          <Text class="bench-metric-label">% of window</Text>
+          <Text class="bench-metric-label">commits</Text>
         </View>
         <View class="bench-metric">
           <Text
-            testID="bench-walk-nodes-per-commit"
+            testID="bench-commit-writes"
             class="bench-metric-value"
             [style]="accentStyle"
-            >{{ walkNodesText() }}</Text
+            >{{ engine().propWrites }}</Text
           >
-          <Text class="bench-metric-label">nodes / commit</Text>
-        </View>
-        <View class="bench-metric">
-          <Text
-            testID="bench-walk-ms-per-commit"
-            class="bench-metric-value"
-            [style]="accentStyle"
-            >{{ walkMsText() }}</Text
-          >
-          <Text class="bench-metric-label">ms / commit</Text>
+          <Text class="bench-metric-label">prop writes</Text>
         </View>
       </View>
       <ActionButton
@@ -153,7 +147,7 @@ export class JsFrameRateMeter implements OnInit, OnDestroy {
   readonly framesPerSecond = signal(0);
   readonly droppedFrames = signal(0);
   readonly worstFrameMs = signal(0);
-  readonly walk = signal<IWalkSample>(EMPTY_WALK_SAMPLE);
+  readonly engine = signal<ICommitProfile>(EMPTY_COMMIT_PROFILE);
 
   private dropped = 0;
   private worst = 0;
@@ -193,18 +187,7 @@ export class JsFrameRateMeter implements OnInit, OnDestroy {
         this.worstFrameMs.set(this.worst);
         // Read-and-reset, once per window, so each sample covers exactly the window just closed
         // rather than an ever-growing total.
-        const commitProfile = readCommitProfile();
-        this.walk.set({
-          sharePercent: (commitProfile.walkMs / windowMs) * 100,
-          nodesPerCommit:
-            commitProfile.commits === 0
-              ? 0
-              : commitProfile.nodesVisited / commitProfile.commits,
-          msPerCommit:
-            commitProfile.commits === 0
-              ? 0
-              : commitProfile.walkMs / commitProfile.commits,
-        });
+        this.engine.set(readCommitProfile());
         framesInWindow = 0;
         windowStartedAt = now;
       }
@@ -224,23 +207,11 @@ export class JsFrameRateMeter implements OnInit, OnDestroy {
     return this.worstFrameMs().toFixed(0);
   }
 
-  walkShareText(): string {
-    return this.walk().sharePercent.toFixed(1);
-  }
-
-  walkNodesText(): string {
-    return this.walk().nodesPerCommit.toFixed(0);
-  }
-
-  walkMsText(): string {
-    return this.walk().msPerCommit.toFixed(1);
-  }
-
   onReset(): void {
     this.dropped = 0;
     this.worst = 0;
     this.droppedFrames.set(0);
     this.worstFrameMs.set(0);
-    this.walk.set(EMPTY_WALK_SAMPLE);
+    this.engine.set(EMPTY_COMMIT_PROFILE);
   }
 }

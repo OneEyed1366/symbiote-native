@@ -1,4 +1,4 @@
-// JS-thread frame rate + the engine's reconcile-walk cost, ported from
+// JS-thread frame rate + what the engine was asked for per window, ported from
 // examples/react/components/JsFrameRateMeter.tsx. Every constant, every label and every testID is
 // the reference's, because the numbers on this panel are read next to the other five canaries'.
 //
@@ -10,7 +10,10 @@
 
 import { createSignal, onCleanup, onMount } from 'solid-js';
 import { Text, View } from '@symbiote-native/solid';
-import { readCommitProfile } from '@symbiote-native/engine';
+import {
+  readCommitProfile,
+  type ICommitProfile,
+} from '@symbiote-native/engine';
 import { ActionButton } from './ActionButton';
 import './JsFrameRateMeter.css';
 
@@ -34,32 +37,31 @@ const SUSPENDED_FRAME_MS = 1_000;
 const SAMPLE_WINDOW_MS = 500;
 
 const MS_PER_SECOND = 1000;
-const PERCENT = 100;
 
 interface IJsFrameRateMeterProps {
   accent: string;
 }
 
-// What the engine's reconcile walk cost inside the last window, next to the frame numbers so the
-// two can be read against each other: the walk is a term in every adapter's frame budget.
+// What the engine was ASKED for inside the last window, beside the frame numbers so the two can be
+// read against each other: a stall with no commits under it is not the commit path's.
 //
-// Reported as two halves, never as `walkMs / nodesVisited`. Dirty-marking means the denominator
-// counts only the nodes reconcile did NOT skip, while the numerator still covers everything it does
-// (the JSI createNode/appendChild calls included), so that ratio inflates by the skip factor: 13.4
-// us/node without dirty-marking, 438 us/node with it, on a device that had got ~2x faster. So
-// `nodesPerCommit` is the skip itself (read against the screen's node count) and `msPerCommit` is
-// what a commit costs. A true per-node figure needs a full walk — a cold mount, where nothing is
-// skippable.
-interface IWalkSample {
-  sharePercent: number;
-  nodesPerCommit: number;
-  msPerCommit: number;
-}
-
-const EMPTY_WALK_SAMPLE: IWalkSample = {
-  sharePercent: 0,
-  nodesPerCommit: 0,
-  msPerCommit: 0,
+// Counts, never a share of the window. What the engine SPENDS is no longer readable from JS — the
+// tree lives in C++ and this side only fills a command buffer, so timing it means instrumenting the
+// host, not this meter.
+const EMPTY_COMMIT_PROFILE: ICommitProfile = {
+  commits: 0,
+  propWrites: 0,
+  applyMs: 0,
+  buildMs: 0,
+  commitMs: 0,
+  adoptSwaps: 0,
+  propClones: 0,
+  textSwaps: 0,
+  dirtyTexts: 0,
+  layoutMs: 0,
+  textMs: 0,
+  layoutNodes: 0,
+  textMeasures: 0,
 };
 
 // `readCommitProfile()` is read-and-RESET, and this meter calls it once per window off rAF. A
@@ -82,7 +84,8 @@ export function JsFrameRateMeter(props: IJsFrameRateMeterProps) {
   const [framesPerSecond, setFramesPerSecond] = createSignal(0);
   const [droppedFrames, setDroppedFrames] = createSignal(0);
   const [worstFrameMs, setWorstFrameMs] = createSignal(0);
-  const [walk, setWalk] = createSignal<IWalkSample>(EMPTY_WALK_SAMPLE);
+  const [engine, setEngine] =
+    createSignal<ICommitProfile>(EMPTY_COMMIT_PROFILE);
 
   // Running totals, carried across windows and published only when one closes. Plain bindings
   // rather than signals: no JSX reads them, so a signal would notify nobody.
@@ -124,18 +127,7 @@ export function JsFrameRateMeter(props: IJsFrameRateMeterProps) {
         setWorstFrameMs(worstSinceResetMs);
         // Read-and-reset, once per window, so each sample covers exactly the window just closed
         // rather than an ever-growing total.
-        const commitProfile = readCommitProfile();
-        setWalk({
-          sharePercent: (commitProfile.walkMs / windowMs) * PERCENT,
-          nodesPerCommit:
-            commitProfile.commits === 0
-              ? 0
-              : commitProfile.nodesVisited / commitProfile.commits,
-          msPerCommit:
-            commitProfile.commits === 0
-              ? 0
-              : commitProfile.walkMs / commitProfile.commits,
-        });
+        setEngine(readCommitProfile());
         framesInWindow = 0;
         windowStartedAt = now;
       }
@@ -155,7 +147,7 @@ export function JsFrameRateMeter(props: IJsFrameRateMeterProps) {
     worstSinceResetMs = 0;
     setDroppedFrames(0);
     setWorstFrameMs(0);
-    setWalk(EMPTY_WALK_SAMPLE);
+    setEngine(EMPTY_COMMIT_PROFILE);
   };
 
   return (
@@ -189,37 +181,27 @@ export function JsFrameRateMeter(props: IJsFrameRateMeterProps) {
           <Text class="bench-metric-label">worst ms</Text>
         </View>
       </View>
-      <Text class="section-label">ENGINE RECONCILE WALK</Text>
+      <Text class="section-label">ENGINE PER WINDOW</Text>
       <View class="bench-meter-row">
         <View class="bench-metric">
           <Text
-            testID="bench-walk-share"
+            testID="bench-commits"
             class="bench-metric-value"
             style={{ color: props.accent }}
           >
-            {walk().sharePercent.toFixed(1)}
+            {String(engine().commits)}
           </Text>
-          <Text class="bench-metric-label">% of window</Text>
+          <Text class="bench-metric-label">commits</Text>
         </View>
         <View class="bench-metric">
           <Text
-            testID="bench-walk-nodes-per-commit"
+            testID="bench-commit-writes"
             class="bench-metric-value"
             style={{ color: props.accent }}
           >
-            {walk().nodesPerCommit.toFixed(0)}
+            {String(engine().propWrites)}
           </Text>
-          <Text class="bench-metric-label">nodes / commit</Text>
-        </View>
-        <View class="bench-metric">
-          <Text
-            testID="bench-walk-ms-per-commit"
-            class="bench-metric-value"
-            style={{ color: props.accent }}
-          >
-            {walk().msPerCommit.toFixed(1)}
-          </Text>
-          <Text class="bench-metric-label">ms / commit</Text>
+          <Text class="bench-metric-label">prop writes</Text>
         </View>
       </View>
       <ActionButton

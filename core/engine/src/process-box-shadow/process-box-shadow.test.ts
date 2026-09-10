@@ -10,7 +10,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { processBoxShadow } from './index';
 import { processFilter } from '../process-filter';
-import { setColorProcessor } from '../commit';
+import { setColorProcessor } from '../platform-color';
 
 const PROCESSED_COLOR = 0x7f_b5_ff_d9;
 

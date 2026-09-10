@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createElement,
   createSurface,
+  disposeRoot,
   routeProp,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -61,6 +62,11 @@ function build(arm: 'split' | 'split-hoisted' | 'callback', tag: number): void {
     surface.appendChild(node);
   }
   surface.commit();
+  // Disposed, or every earlier arm's surface stays LIVE and the counters stop being about the arm:
+  // a commit names every live root, so `completeRoot` would count surfaces this function has leaked
+  // rather than work this arm did. The two arms run at different points in the file, so the leak is
+  // not even symmetric.
+  disposeRoot(tag);
 }
 
 function timeArm(

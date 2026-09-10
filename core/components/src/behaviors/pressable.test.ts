@@ -13,6 +13,7 @@ import {
   clearHostBehaviors,
   createElement,
   createSurface,
+  propOf,
   registerRules,
   removeChild,
   routeProp,
@@ -59,6 +60,13 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
 // That is exactly what happened; a peer session caught it by probing the installed shape.
 function makePressable(): ISymbioteNode {
   return createElement(PRESSABLE_VIEW_NAME, false, PRESSABLE_TAG);
+}
+
+// Slot 0 of the published `[classStyle, explicitStyle]` pair, read back out of the HOST — the
+// engine keeps no props, so `propOf` is what a node's own style slot is now.
+function classStyleOf(node: ISymbioteNode): unknown {
+  const style = propOf(node, 'style');
+  return Array.isArray(style) ? style[0] : undefined;
 }
 
 // By testID, never by viewName: the committed tree carries container nodes of the same view name,
@@ -136,15 +144,11 @@ describe('pressable host behavior', () => {
     routeProp(node, 'class', 'btn');
     mount(node);
 
-    const style = node.props.style;
-    expect(Array.isArray(style) ? style[0] : undefined).toEqual({ opacity: 1 });
+    expect(classStyleOf(node)).toEqual({ opacity: 1 });
 
     press(node);
 
-    const pressedStyle = node.props.style;
-    expect(Array.isArray(pressedStyle) ? pressedStyle[0] : undefined).toEqual({
-      opacity: 0.6,
-    });
+    expect(classStyleOf(node)).toEqual({ opacity: 0.6 });
   });
 
   // What `ownedListeners` buys, stated as behaviour rather than as structure. `press`/`pressIn`/
@@ -194,10 +198,7 @@ describe('pressable host behavior', () => {
     touchWithoutClaiming(node);
 
     expect(onPressIn).toHaveBeenCalledTimes(1);
-    const style = node.props.style;
-    expect(Array.isArray(style) ? style[0] : undefined).toEqual({
-      opacity: 0.6,
-    });
+    expect(classStyleOf(node)).toEqual({ opacity: 0.6 });
   });
 
   // The other half of the gesture-open flag: it has to be CLEARED at the end, or the second gesture
@@ -228,8 +229,8 @@ describe('pressable host behavior', () => {
 
   // Dirtying is not publishing. A press arrives from a native event, outside every renderer
   // mutation path, so unless the behavior asks for one nothing ever commits — the node holds the
-  // pressed style and the screen keeps the unpressed one. Asserting `node.props.style` cannot see
-  // this: `pushClassStyle` writes that synchronously whether or not a commit follows.
+  // pressed style and the screen keeps the unpressed one. Asserting the node's own style slot
+  // cannot see this: `pushClassStyle` writes that synchronously whether or not a commit follows.
   it('commits the pressed style, not just dirties the node', async () => {
     registerRules([
       {

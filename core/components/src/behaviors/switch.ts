@@ -11,7 +11,7 @@
 // WHY THE DIVERGENCE CHECK IS DEFERRED A MICROTASK, NOT RUN SYNCHRONOUSLY INSIDE `onChange`. The
 // obvious place to compare "what native just reported" against "what the app currently authors" is
 // right where the report arrives. It is wrong: an ACCEPTED toggle updates the app's own state, and
-// that state reaches `node.props.value` only once the app's OWN reconciliation runs — which, for
+// that state reaches the node only once the app's OWN reconciliation runs — which, for
 // every adapter here, happens strictly after `onChange` returns, never during it. Checking
 // synchronously would read the STALE pre-accept value and send a spurious snap-back on every
 // accepted toggle. The wrapper avoids this by running its own check from an effect that fires AFTER
@@ -41,6 +41,7 @@ import {
   dispatchViewCommand,
   dlog,
   Platform,
+  propOf,
   registerHostBehavior,
   setBehaviorListener,
   type ISymbioteEvent,
@@ -160,7 +161,7 @@ function evaluateSnapBack(node: ISymbioteNode): void {
   const state = stateOf(node);
   if (state === undefined) return; // detached before this ran
 
-  const fabricValue = node.props.value === true;
+  const fabricValue = propOf(node, 'value') === true;
   if (!shouldSnapBack(state, fabricValue)) {
     dlog(
       `Switch behavior snap-back no-op reported=${String(state.lastNativeReport)} value=${fabricValue}`,
@@ -188,9 +189,9 @@ function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
 
   // `onValueChange` is not a Fabric event — it is a fold the component wrapper does over the raw
   // `change` payload (same class as TextInput's `onValueChange`, `text-input.ts`'s
-  // `callValueChange`), so it lands in `node.props` as a plain function key rather than through
+  // `callValueChange`), so it lands on the node as a plain prop key rather than through
   // `ownedListeners`.
-  const listener = node.props.onValueChange;
+  const listener = propOf(node, 'onValueChange');
   if (typeof listener === 'function') listener(value, event);
 
   // A raw `change` listener authored directly on the bare tag — not part of any adapter's public
@@ -200,7 +201,7 @@ function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
   if (typeof rawListener === 'function') rawListener(event);
 
   // See the module header: deferred so an ACCEPTING app's own state update has a turn of the
-  // microtask queue to reach `node.props.value` first.
+  // microtask queue to write the node first.
   queueMicrotask(() => evaluateSnapBack(node));
 }
 

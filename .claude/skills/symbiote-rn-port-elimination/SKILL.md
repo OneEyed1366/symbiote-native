@@ -277,6 +277,10 @@ implementation with a fake, which defeats the entire point of importing upstream
    And `SHARED.plugins` is REPLACED, not merged, by a project that declares its own — the solid
    project did, so the transform has to be restated there or half the suite never sees it.
 
+   The other branch's copy of this step said the opposite — that `.ios.js` now wins over `.js`
+   repo-wide — because it was written from the PROBE, which did reorder `resolve.extensions`. The
+   landed config does not, and the two accounts met in a merge. What shipped is above.
+
 2. **Tier A — delete 12 ports.** One commit per module or small group, each keeping the port's
    existing tests pointed at the upstream implementation. Where our port deliberately DIVERGES
    from upstream, that divergence is either a bug to drop or a documented reason to keep the

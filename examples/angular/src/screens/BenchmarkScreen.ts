@@ -28,6 +28,7 @@ import {
   readCommitProfile,
   registerPostCommit,
   unregisterPostCommit,
+  type ICommitProfile,
 } from '@symbiote-native/engine';
 import {
   readFabricCallProfile,
@@ -106,7 +107,8 @@ const ROW_BATCH = 1000;
 const ROW_BATCH_LARGE = 10000;
 
 // FABRIC currency (native views the host actually paints), not the engine's retained-tree node
-// count — the two diverge on this row and VISITED is where the difference shows, never Fabric.
+// count — the two diverge on this row, and nothing on this screen shows the gap any more: the
+// retained tree is the host's, so the node census is a test, not a counter.
 // The number that decides whether a row COUNT is even feasible here, and the one krausest cannot
 // tell us: its counts are DOM-node counts. `BenchmarkRow` below expands to TEN native views
 // (1 View + 3x[Text + RawText] + 2 Pressable Views + 1 TextInput), the same row shape every other
@@ -353,27 +355,26 @@ type IListState = {
 
 // What the ENGINE did inside one timed step, captured from readCommitProfile() around the step
 // rather than sampled on a timer. This is the number that separates "our commit is expensive" from
-// "the framework above it is expensive": every adapter builds the same 9 001-node tree for
-// Create 1 000, so a nodesVisited or propWrites that differs between adapters on the SAME step is
-// work the screen is generating, not a cost of the platform.
+// "the framework above it is expensive": every adapter drives the same tree for Create 1 000, so a
+// propWrites that differs between adapters on the SAME step is work the screen is generating, not a
+// cost of the platform.
 //
-// `walkMs` is NOT the engine's JS cost — the window around reconcile() contains the createNode and
-// appendChild JSI crossings it makes. Read it only as a DELTA between adapters, where the native
-// part is a shared constant (measured: identical Fabric call counts across react/vue/solid/svelte).
-type IStepProfile = {
-  nodesVisited: number;
-  propWrites: number;
-  propNoops: number;
-  commits: number;
-  walkMs: number;
-};
-
-const EMPTY_STEP_PROFILE: IStepProfile = {
-  nodesVisited: 0,
-  propWrites: 0,
-  propNoops: 0,
+// Two counts and no milliseconds. The walk numbers went with the walk — the tree lives in C++ and
+// JS holds only a command buffer, so what applying it costs is not readable from here.
+const EMPTY_STEP_PROFILE: ICommitProfile = {
   commits: 0,
-  walkMs: 0,
+  propWrites: 0,
+  applyMs: 0,
+  buildMs: 0,
+  commitMs: 0,
+  adoptSwaps: 0,
+  propClones: 0,
+  textSwaps: 0,
+  dirtyTexts: 0,
+  layoutMs: 0,
+  textMs: 0,
+  layoutNodes: 0,
+  textMeasures: 0,
 };
 
 const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
@@ -384,8 +385,8 @@ const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
 };
 
 // The one quantity this canary and `examples/bare-rn` (stock React Native on React's own Fabric
-// renderer) can both report. IStepProfile above counts the ENGINE's reconcile walk, which stock
-// has no equivalent of; `global.nativeFabricUIManager` is what both stacks actually drive, so
+// renderer) can both report. The ENGINE table above counts what an adapter pushed at OUR engine,
+// which stock has no counterpart for; `global.nativeFabricUIManager` is what both stacks drive, so
 // counting calls there is the only like-for-like number between them.
 function formatFabric(profile: IFabricCallProfile | undefined): string {
   if (profile === undefined) return '—';
@@ -406,7 +407,7 @@ type ISuiteEntry = {
   label: string;
   durationMs: number;
   startRows: number;
-  profile: IStepProfile;
+  profile: ICommitProfile;
   fabric: IFabricCallProfile;
 };
 
@@ -738,18 +739,6 @@ export class StickySectionListBlock {
           </View>
         </View>
 
-        <View class="bench-run-row">
-          <View class="flex1">
-            <ActionButton
-              testID="bench-toggle-batch-create"
-              [title]="batchCreateTitle()"
-              [color]="accent"
-              (press)="onToggleBatchCreate()"
-            ></ActionButton>
-          </View>
-        </View>
-        <Text class="note-text">{{ batchCreateNote }}</Text>
-
         @if (progress() !== undefined) {
           <View testID="bench-suite-progress" class="bench-progress">
             <ActivityIndicator [color]="accent" />
@@ -782,8 +771,7 @@ export class StickySectionListBlock {
           <Text class="section-label">ENGINE PER STEP · ALL MOUNTED</Text>
           <View class="bench-compare-row">
             <Text class="bench-compare-label"></Text>
-            <Text class="bench-compare-head-cell">VISITED</Text>
-            <Text class="bench-compare-head-cell">WRITES/NOOP</Text>
+            <Text class="bench-compare-head-cell">WRITES</Text>
             <Text class="bench-compare-head-cell">COMMITS</Text>
           </View>
           @for (step of suiteSteps; track step.op) {
@@ -792,9 +780,6 @@ export class StickySectionListBlock {
               class="bench-compare-row"
             >
               <Text class="bench-compare-label">{{ step.label }}</Text>
-              <Text class="bench-compare-cell">{{
-                engineVisited(step.op)
-              }}</Text>
               <Text class="bench-compare-cell">{{
                 engineWrites(step.op)
               }}</Text>
@@ -842,6 +827,41 @@ export class StickySectionListBlock {
           frame.
         </Text>
 
+        <!-- These sat BELOW the rows until 2026-09-07, deliberately, so nobody would report
+             numbers from them: their Remove and Append act on whatever happened to be on screen,
+             which is the whole reason the suite above exists. That is still true and the note
+             under them still says so — what changed is that "below the fold" became UNREACHABLE
+             once the list holds a thousand rows, which is exactly the state you are in when you
+             want to poke at one commit shape. A caveat keeps working from the top of the screen;
+             a scroll position does not. -->
+        <Text class="section-label">OPERATIONS · LAST RUN</Text>
+        @for (operation of operations; track operation.id) {
+          <View class="bench-op-row">
+            <View class="flex1">
+              <ActionButton
+                [testID]="operation.testID"
+                [title]="operation.label"
+                [color]="accent"
+                (press)="operation.run()"
+              ></ActionButton>
+            </View>
+            <Text
+              [symbioteHostProps]="operation.resultHostProps"
+              class="bench-op-result"
+              >{{ resultFor(operation.id) }}</Text
+            >
+          </View>
+        }
+        <Text class="note-text"
+          >Single operations, for poking at one commit shape while debugging. Do
+          NOT report from them — Remove and Append act on whatever row count is
+          on screen, which is what the suite above removes.</Text
+        >
+
+        <Text testID="bench-row-count" class="info-text">{{
+          rowCountLine()
+        }}</Text>
+
         <Text class="section-label">{{ rowsSectionLabel() }}</Text>
         <!-- The only row shape: a row component and two real <Pressable>s, plus the unconditional
              <TextInput> — the same instrument every other adapter's column mounts. This used to
@@ -875,32 +895,6 @@ export class StickySectionListBlock {
             </ng-template>
           </FlatList>
         }
-
-        <!-- Below the fold on purpose: the single operations are for poking at one commit shape
-             while debugging, not for reporting. Their Remove and Append numbers depend on press
-             order, which is exactly what the suite above exists to remove. -->
-        <Text class="section-label">OPERATIONS · LAST RUN</Text>
-        @for (operation of operations; track operation.id) {
-          <View class="bench-op-row">
-            <View class="flex1">
-              <ActionButton
-                [testID]="operation.testID"
-                [title]="operation.label"
-                [color]="accent"
-                (press)="operation.run()"
-              ></ActionButton>
-            </View>
-            <Text
-              [symbioteHostProps]="operation.resultHostProps"
-              class="bench-op-result"
-              >{{ resultFor(operation.id) }}</Text
-            >
-          </View>
-        }
-
-        <Text testID="bench-row-count" class="info-text">{{
-          rowCountLine()
-        }}</Text>
 
         <Text class="section-label">{{ historyLabel }}</Text>
         @if (history().length === 0) {
@@ -1014,18 +1008,9 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     return new Map(entries.map(entry => [entry.op, entry.fabric]));
   });
 
-  // Off by default because the engine's default is off; the toggle only mirrors the global back.
-  readonly isBatchingCreate = signal(false);
+  readonly engineNote = `Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. There is no ms here and no node count: the tree lives in C++ and JS only fills a command buffer, so what the host spends applying it is invisible from JS.`;
 
-  readonly batchCreateTitle = computed(() =>
-    this.isBatchingCreate() ? 'Batch create · on ✓' : 'Batch create · off',
-  );
-
-  readonly batchCreateNote = `Temporary experiment switch. On, the engine hands a parent's children to cloneNodeWithChildren in one call instead of appending them one at a time — about a third fewer JSI calls on Create, paid for with one extra ShadowNode per batched parent. The sign is not predicted, which is why it is a runtime toggle: two builds a day apart drifted 4% on Create and 6x on Clear with no code change, so the only trustworthy comparison is back-to-back on one binary. Flip it, re-run the suite, compare.`;
-
-  readonly engineNote = `Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. On the flat row shape every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a VISITED or WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. The ms is the reconcile window and it CONTAINS the createNode/appendChild JSI calls, so compare it across adapters, never read it as engine JS.`;
-
-  readonly fabricNote = `Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no reconcile walk to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`;
+  readonly fabricNote = `Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no command buffer to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`;
 
   readonly suiteNote = `Every operation in a fixed order, each timed step starting from exactly ${SUITE_ROWS} rows, with untimed resets in between. All-mounted is krausest's own shape (${NATIVE_VIEWS_PER_ROW} native views per row) and the column that compares to the published web numbers; virtualized mounts a window instead, so it prices what an app ships rather than the commit path itself. Pressing the operation buttons by hand leaves Remove and Append measuring whatever happened to be on screen.`;
 
@@ -1036,7 +1021,7 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
   // the recorded suite entries), and a signal write here would dirty the view from inside the
   // commit that was just measured. Steps are serialized and `timed` awaits the progress step BEFORE
   // the measured one, so the value standing here when it reads is always the measured step's.
-  private lastStepProfile: IStepProfile = EMPTY_STEP_PROFILE;
+  private lastStepProfile: ICommitProfile = EMPTY_STEP_PROFILE;
   private lastFabricProfile: IFabricCallProfile = EMPTY_FABRIC_PROFILE;
 
   readonly operations: readonly IBenchOperation[] = [
@@ -1080,16 +1065,9 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     if (pending === null) return;
     this.pending = null;
     const durationMs = performance.now() - pending.startedAt;
-    // Safe to read here: commitContainer increments walkMs and commits BEFORE completeRoot, and
+    // Safe to read here: the buffer is flushed and the commit counted BEFORE completeRoot, and
     // runPostCommitHooks() fires after it, so the profile for this commit is already complete.
-    const profile = readCommitProfile();
-    this.lastStepProfile = {
-      nodesVisited: profile.nodesVisited,
-      propWrites: profile.propWrites,
-      propNoops: profile.propNoops,
-      commits: profile.commits,
-      walkMs: profile.walkMs,
-    };
+    this.lastStepProfile = readCommitProfile();
     this.lastFabricProfile = readFabricCallProfile();
     pending.settle(durationMs);
   };
@@ -1126,25 +1104,16 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     return FABRIC_ROW_HOST_PROPS[op];
   }
 
-  // Three cells rather than one formatter, so an operation the suite has not run yet reads as a
+  // Two cells rather than one formatter, so an operation the suite has not run yet reads as a
   // dash in every column instead of a row of zeroes that looks like a measurement.
-  engineVisited(op: IBenchOpId): string {
-    const profile = this.profiles().get(op);
-    return profile === undefined ? '—' : String(profile.nodesVisited);
-  }
-
   engineWrites(op: IBenchOpId): string {
     const profile = this.profiles().get(op);
-    return profile === undefined
-      ? '—'
-      : `${profile.propWrites}/${profile.propNoops}`;
+    return profile === undefined ? '—' : String(profile.propWrites);
   }
 
   engineCommits(op: IBenchOpId): string {
     const profile = this.profiles().get(op);
-    return profile === undefined
-      ? '—'
-      : `${profile.commits} · ${profile.walkMs.toFixed(1)}ms`;
+    return profile === undefined ? '—' : String(profile.commits);
   }
 
   fabricCalls(op: IBenchOpId): string {
@@ -1154,15 +1123,6 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
   fabricPropKeys(op: IBenchOpId): string {
     const fabric = this.fabricProfiles().get(op);
     return fabric === undefined ? '—' : String(fabric.totalPropKeys);
-  }
-
-  // The engine reads `__SYMBIOTE_BATCH_CREATE__` once per commit, not per node, so it has to be
-  // set BEFORE the mutation that starts a step — which a press between runs always is. Deliberately
-  // a global rather than an input: nothing on the commit path should have to be threaded a flag.
-  onToggleBatchCreate(): void {
-    const next = !this.isBatchingCreate();
-    Reflect.set(globalThis, '__SYMBIOTE_BATCH_CREATE__', next);
-    this.isBatchingCreate.set(next);
   }
 
   allMountedResult(op: IBenchOpId): string {

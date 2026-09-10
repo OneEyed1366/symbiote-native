@@ -20,6 +20,8 @@ import {
   type ObjectDirective,
 } from '@vue/runtime-core';
 import {
+  componentOf,
+  propOf,
   requestCommitFor,
   setNativeProps,
   setProp,
@@ -250,7 +252,7 @@ function modelStateFor(el: ISymbioteNode): IModelState {
 // by `patchProp` during the same patch, so anything captured earlier is either missing or stale. A
 // prop that is already OUR listener means nothing overwrote it and the app half is unchanged.
 function syncModelListener(el: ISymbioteNode, state: IModelState): void {
-  const current = el.props.onValueChange;
+  const current = propOf(el, 'onValueChange');
   if (current === state.listener) return;
   state.appListener = isValueChangeListener(current) ? current : undefined;
   setProp(el, 'onValueChange', state.listener);
@@ -268,7 +270,7 @@ function syncModelListener(el: ISymbioteNode, state: IModelState): void {
 const SWITCH_COMPONENT = descriptorFor(SWITCH_TAG).component;
 
 function isSwitchNode(el: ISymbioteNode): boolean {
-  return el.component === SWITCH_COMPONENT;
+  return componentOf(el) === SWITCH_COMPONENT;
 }
 
 function syncModelValue(el: ISymbioteNode, value: unknown): void {

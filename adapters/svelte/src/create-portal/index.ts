@@ -60,6 +60,7 @@ import { pop, push, snippet, user_effect } from 'svelte/internal/client';
 import {
   appendChild as engineAppendChild,
   removeChild as engineRemoveChild,
+  componentOf,
   dlog,
   isSymbioteNode,
   SymbioteSurface,
@@ -108,7 +109,7 @@ function assertPortalTarget(target: unknown): IPortalTarget {
 function targetLabel(target: IPortalTarget): string {
   if (target instanceof SymbioteSurface) return `surface#${target.rootTag}`;
   if (target instanceof ShimElement) return target.tagName;
-  return target.component;
+  return componentOf(target);
 }
 
 // Attach the fragment host under `target` and hand back the matching detach. Three branches

@@ -16,6 +16,7 @@ export {
   routeProp,
   censusRetainedTree,
   getExplicitStyle,
+  getPublishedStyle,
   setNodeHidden,
   setNodeComponent,
   setNodePressed,
@@ -25,6 +26,20 @@ export {
   RAW_TEXT_COMPONENT,
   debugNodeId,
 } from './node';
+// Host access — the DOM read half Fabric does not ship. Adapters route their seam's
+// parentNode/nextSibling/firstChild through these instead of reading a node's fields, which is
+// what keeps the retained tree's shape ours to change (symbiote-fabric-cxx-surface §9).
+export {
+  parentOf,
+  childrenOf,
+  firstChildOf,
+  nextSiblingOf,
+  isTextContainer,
+  isRawTextNode,
+  componentOf,
+  textOf,
+  propOf,
+} from './host-access';
 export { isEventFor } from './view-config';
 export { registerComponent, setNativeViewConfigSource } from './registry';
 // Real cross-package consumer: core/components' KeyboardAvoidingView render narrows
@@ -64,9 +79,10 @@ export type { ISymbioteNode, ISymbioteEvent, IListener } from './node';
 
 export { SymbioteSurface, createSurface } from './surface';
 export { setEventDispatcher } from './dispatch';
+// `setColorProcessor` / `processColor` were only RE-exported by the old `commit.ts`; they point at
+// their real home now.
+export { setColorProcessor, processColor } from './platform-color';
 export {
-  setColorProcessor,
-  processColor,
   dispatchViewCommand,
   sendAccessibilityEvent,
   setNativeProps,
@@ -77,9 +93,33 @@ export {
   measureInWindow,
   measureLayout,
   disposeRoot,
+  requestCommitFor,
+} from './imperative';
+// The tree host: the seam a runtime installs to answer about the tree JS does not hold. `setTreeHost`
+// is what `installFabric()` (@symbiote-native/test-utils) calls with the TypeScript applier.
+export {
+  setTreeHost,
+  treeHost,
   readCommitProfile,
-} from './commit';
-export type { ICommitProfile } from './commit';
+  readSurfaceTelemetry,
+} from './tree-host';
+export type { ISurfaceTelemetry } from './tree-host';
+// The native host, exported for the same audience as `setTreeHost` — a HOST author, not an app.
+// `installNativeTreeHost` is not on any app path: `getSlot()` already calls it, and it is here so a
+// bring-up probe can install one explicitly against a hand-built set of bindings.
+export { nativeTreeHost, installNativeTreeHost } from './native-tree-host';
+export type {
+  ITreeHost,
+  ITreeCensus,
+  ICommittedRecord,
+  ICommitProfile,
+} from './tree-host';
+// The OPCODES and the recorder are deliberately NOT here. They are the wire contract between this
+// package and whatever implements the tree, so their audience is a HOST author — the C++ and the
+// TypeScript applier — not an app. They live on the `@symbiote-native/engine/mutation-buffer`
+// subpath, for the same reason `state-style` does: a name on this barrel is public API on all five
+// adapters at once, with no edit to any of them
+// (`.claude/rules/adapter-parity-audit.md`, "A build-tool-facing symbol belongs on a SUBPATH").
 // "A commit just reached completeRoot." The one seam that means the same thing under every
 // adapter: React commits synchronously inside its own commit phase, while Vue / Svelte / Angular
 // schedule completeRoot on a microtask, so each framework's own after-render hook fires at a
@@ -91,6 +131,10 @@ export { registerPostCommit, unregisterPostCommit } from './post-commit';
 // LOWERED element has no wrapper: `fabricProps` runs it on the way to the payload, so every path
 // gets it. `core/components`' typed `resolveAccessibilityProps` delegates to this one.
 export { foldAriaProps } from './accessibility-props';
+// The payload builder, exported for the HOST rather than for an app: the engine holds no tree, so
+// whoever built the bag calls this on the way to `createNode`. Headlessly that is the TypeScript
+// applier; on device it will be the C++ one, which does not have it yet.
+export { fabricProps } from './fabric-props';
 // The public instance every host node already is (React's getPublicInstance, the Vue renderer's
 // createElement): the imperative measure/setNativeProps/focus API, on the shared node prototype.
 // toPublicInstance is the identity that names the seam — see ./host-instance.
@@ -267,6 +311,10 @@ export type {
 } from './animated';
 
 export { getSlot } from './fabric';
+// Test seam, not app API: forget the bound slot so a
+// fixture can install a different host and be believed. Exported now that the harness lives in
+// another package (`@symbiote-native/test-utils`) and can no longer reach `./fabric` directly.
+export { resetSlot } from './fabric';
 export type {
   IFabricSlot,
   IFabricNode,
@@ -427,5 +475,4 @@ export {
   appListenerFor,
 } from './host-behavior';
 export type { IHostBehavior } from './host-behavior';
-export { requestCommitFor } from './commit';
 export { setBehaviorListener } from './node';

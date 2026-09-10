@@ -13,7 +13,7 @@
 // initialiser would shadow it and break subclassing. (See shared graph.ts leafUpdate.)
 
 import { AnimatedNode, AnimatedWithChildren } from './graph';
-import { setNativeProps, getNativeTag } from '../commit';
+import { setNativeProps, getNativeTag } from '../imperative';
 import { isSymbioteNode, type ISymbioteNode } from '../node';
 import { registerPostCommit } from '../post-commit';
 import {

@@ -24,6 +24,7 @@ import {
   blurTextInput,
   dispatchViewCommand,
   dlog,
+  propOf,
   registerHostBehavior,
   requestCommitFor,
   setBehaviorListener,
@@ -71,7 +72,7 @@ function stateOf(node: ISymbioteNode): IBehaviorState | undefined {
 }
 
 function stringProp(node: ISymbioteNode, key: string): string | undefined {
-  const value = node.props[key];
+  const value = propOf(node, key);
   return typeof value === 'string' ? value : undefined;
 }
 
@@ -88,7 +89,7 @@ function selectionOf(value: unknown): { start: number; end: number } {
 }
 
 // The app's own callback for an owned event name, read from the STASH rather than from
-// `node.props`: every name below is in `ownedListeners`, so `routeProp` parks the app's handler
+// the props: every name below is in `ownedListeners`, so `routeProp` parks the app's handler
 // beside the machine's instead of overwriting it.
 function callAppListener(
   node: ISymbioteNode,
@@ -100,7 +101,7 @@ function callAppListener(
 }
 
 // `onValueChange(text, event)` is NOT a Fabric event — it is a fold the component wrapper used to do
-// over the raw `change` payload, so it lives in `node.props` as a plain function key and
+// over the raw `change` payload, so it lives on the node as a plain prop key and
 // `fabricProps` drops it on the way to native. A lowered element has no wrapper to run that fold, so
 // before this the callback was simply never called: the field echoed keystrokes natively (native
 // owns its own text) while every value the app derived from it stayed frozen. Device-found
@@ -115,7 +116,7 @@ function callValueChange(
   text: string,
   event: ISymbioteEvent,
 ): void {
-  const listener = node.props.onValueChange;
+  const listener = propOf(node, 'onValueChange');
   if (typeof listener === 'function') listener(text, event);
 }
 
@@ -247,7 +248,7 @@ function attachAfterCommit(node: ISymbioteNode): void {
     stringProp(node, 'defaultValue'),
   );
 
-  if (node.props.autoFocus !== true) return;
+  if (propOf(node, 'autoFocus') !== true) return;
   // Driven in JS rather than as a native prop, exactly as RN does it
   // (TextInput.js:538 -> TextInputState.focusInput). The native command is idempotent if the input
   // is already focused.
@@ -268,7 +269,7 @@ function afterCommit(node: ISymbioteNode): void {
   // `selection` is `{ start, end? }` when present. SELECTION_NONE (-1) is RN's "leave the cursor
   // where native put it" sentinel, so an absent selection must not be read as position 0 — that
   // would jump the caret to the front of the field on every controlled write.
-  const { start, end } = selectionOf(node.props.selection);
+  const { start, end } = selectionOf(propOf(node, 'selection'));
 
   dlog(
     `TextInput behavior: setTextAndSelection count=${state.mostRecentEventCount} ` +

@@ -22,6 +22,22 @@ changing a benchmark. The must-apply points:
 - **A FLAT benchmark tree cannot show a subtree-skip win, and krausest's is flat** —
   a flat parent re-appends all N child handles on any change, which is Fabric's
   protocol, not our walk. Always keep a bushy/sectioned case beside the flat one.
+- **That applies to the CREATE rows too, and until 2026-09-07 it did not hold there.**
+  `reconcile.bench.ts` had bushy cases for every UPDATE row (sectioned, app-shaped) and
+  none for a create: `makeRow` builds ONE node, so `create 1000 rows` mounted 1 001 nodes
+  under a single parent. That prices per-node work correctly and is blind by construction
+  to per-parent, per-depth or per-subtree work — and the blindness reads as a clean result,
+  not as a gap. Item 8b's node table allocates per PARENT; on the flat row it allocated
+  once for a thousand nodes and measured free. `create 1000 nested rows` exists for this.
+  Before pricing a change, name the structural quantity its cost scales with and check the
+  bench varies it.
+- **Two arms measured in different SITTINGS are not two arms, they are two containers.** Measured
+  2026-09-07: identical code, same machine, forty minutes apart, `create 1000 rows` read 0.832-0.854
+  and then 0.921-0.956 — **+11% drift**, larger than every effect the run was trying to size. An
+  A/B built from "yesterday's arm" and "today's arm" attributes that drift to the change. Alternate
+  the arms and repeat (4 per side is enough to see the bands overlap or not), and treat a MODEL that
+  predicts an effect the row does not show as the signal to re-run rather than as a mystery to
+  explain — that contradiction is what caught this one.
 - **Benchmarks run `pnpm bench`** (sets `--max-semi-space-size=64`; without it
   `fabricProps`'s props-object-per-node-per-commit garbage makes results useless:
   105 ms ±91% vs 4.7 ms ±1.6%). Read `min`, not p75 or mean, on the create-shaped rows — GC makes their p75 swing

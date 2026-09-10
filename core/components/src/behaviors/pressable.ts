@@ -18,6 +18,7 @@
 import {
   appListenerFor,
   dlog,
+  propOf,
   registerHostBehavior,
   requestCommitFor,
   setBehaviorListener,
@@ -105,7 +106,7 @@ const MACHINE_ONLY_KEYS = [
   'delayHoverOut',
 ] as const;
 
-// Narrowed field by field rather than cast: the bag arrives as `unknown` off `node.props`. A local
+// Narrowed field by field rather than cast: the bag arrives as `unknown` off `propOf`. A local
 // twin of the guard each adapter keeps for its own attrs (Vue's `asAccessibilityState`) — not
 // hoisted to the shared barrel, because every adapter re-exports that barrel wholesale and a
 // narrowing helper is not API anyone should be able to import.
@@ -124,7 +125,7 @@ function asAccessibilityState(
 }
 
 // Narrowed field by field, same reason as the accessibility guard above: the config arrives as
-// `unknown` off `node.props`.
+// `unknown` off `propOf`.
 function asRippleConfig(
   value: unknown,
 ): IPressableAndroidRippleConfig | undefined {
@@ -142,7 +143,7 @@ function asRippleConfig(
 // `disabled` reaches a screen reader ONLY as `accessibilityState.disabled` — it is not a native
 // View prop, so the wrapper folds it (`resolveDisabledAccessibilityState`, called by all five) and
 // forwards the composite. Lowering dropped that fold: press suppression still worked, because the
-// machine reads `node.props.disabled` directly, so the button behaved correctly and announced
+// machine reads the node's own `disabled` directly, so the button behaved correctly and announced
 // itself as enabled. An accessibility regression with no visual tell and no failing test.
 //
 // Found by the wrapper-vs-behavior import audit (`.claude/rules/adapter-parity-audit.md`).
@@ -180,10 +181,10 @@ function foldPayload(
   return out;
 }
 
-// From the STASH, not from `node.props`. Every name below is in `ownedListeners`, so `routeProp`
+// From the STASH, not from the props. Every name below is in `ownedListeners`, so `routeProp`
 // diverts the app's `onPress` away from `node.listeners` (where it would evict the behavior's own
 // dispatcher) and into the stash — which makes the stash the only place it exists. Reading
-// `node.props` here returns undefined for every callback and every press silently does nothing:
+// `propOf` here returns undefined for every callback and every press silently does nothing:
 // the behavior runs, the machine runs, and it calls nobody.
 function callbackAt(
   node: ISymbioteNode,
@@ -193,9 +194,9 @@ function callbackAt(
   return isPressHandler(value) ? value : undefined;
 }
 
-// Callbacks come from `callbackAt` (the stash), scalars from `node.props`. The split is not
+// Callbacks come from `callbackAt` (the stash), scalars from `propOf`. The split is not
 // cosmetic: `delayLongPress` and `hitSlop` are ordinary props that `fabricProps` drops as unknown
-// keys, while `onPress` and friends are OWNED event names that never reach `node.props` at all.
+// keys, while `onPress` and friends are OWNED event names that never reach the props at all.
 function configFor(node: ISymbioteNode): IPressMachineConfig {
   return {
     onPress: callbackAt(node, 'press'),
@@ -204,18 +205,18 @@ function configFor(node: ISymbioteNode): IPressMachineConfig {
     onPressMove: callbackAt(node, 'pressMove'),
     onLongPress: callbackAt(node, 'longPress'),
     delayLongPress: numberOr(
-      node.props.delayLongPress,
+      propOf(node, 'delayLongPress'),
       DEFAULT_DELAY_LONG_PRESS_MS,
     ),
-    unstable_pressDelay: numberOr(node.props.unstable_pressDelay, 0),
-    hitSlop: asRectOffset(node.props.hitSlop),
-    pressRetentionOffset: asRectOffset(node.props.pressRetentionOffset),
+    unstable_pressDelay: numberOr(propOf(node, 'unstable_pressDelay'), 0),
+    hitSlop: asRectOffset(propOf(node, 'hitSlop')),
+    pressRetentionOffset: asRectOffset(propOf(node, 'pressRetentionOffset')),
   };
 }
 
 // Rebuilding at GESTURE START is the whole reason for the dispatcher indirection, and skipping it
 // is a bug that looks like working code. `attach` runs inside `createElement`, before a single
-// prop has been routed — `node.props` is literally `{}` there — so a machine built at attach would
+// prop has been routed — the node holds nothing at all there — so a machine built at attach would
 // capture no `onPress` at all and every press would silently do nothing. `createPressHandlers`
 // destructures its config eagerly, so it cannot be handed a live view either; it has to be re-made
 // once the props exist. A gesture is one interaction, so a handful of closures per press is
@@ -228,10 +229,10 @@ function rebuild(node: ISymbioteNode, state: IBehaviorState): void {
   );
   state.isBuilt = true;
   state.listeners = buildPressableListeners(handlers, {
-    disabled: node.props.disabled === true ? true : undefined,
+    disabled: propOf(node, 'disabled') === true ? true : undefined,
     cancelable:
-      typeof node.props.cancelable === 'boolean'
-        ? node.props.cancelable
+      typeof propOf(node, 'cancelable') === 'boolean'
+        ? propOf(node, 'cancelable') === true
         : undefined,
   });
 }

@@ -15,6 +15,7 @@ import { installFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
   createElement,
+  propOf,
   routeProp,
   setEventListener,
   type ISymbioteEvent,
@@ -561,7 +562,7 @@ describe('direct (non-bubbling) delivery', () => {
       payload = event.nativeEvent.layout;
     });
     // Fabric only emits layout when the node is flagged; a layout listener must raise onLayout.
-    expect(tree.sibling.props.onLayout).toBe(true);
+    expect(propOf(tree.sibling, 'onLayout')).toBe(true);
     fabric.fireEvent(tree.sibling, 'topLayout', { layout: frame });
     expect(payload).toBe(frame);
   });
@@ -672,7 +673,7 @@ describe('ViewConfig gate', () => {
   // prop (e.g. a native-only configuration value), never get treated as a listener.
   it('keeps an undeclared onX as a prop, not a listener', () => {
     routeProp(tree.sibling, 'onTintColor', '#34c759');
-    expect(tree.sibling.props.onTintColor).toBe('#34c759');
+    expect(propOf(tree.sibling, 'onTintColor')).toBe('#34c759');
     expect(tree.sibling.listeners?.has('tintColor')).not.toBe(true);
   });
 });

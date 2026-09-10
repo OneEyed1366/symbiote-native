@@ -210,6 +210,30 @@ So the wrapper's damage is not limited to gates (`prettier`, `tsc`, `diff`, exit
 any command whose real work is a side effect on disk. Run generators, scaffolders and installers
 through `rtk proxy`, and verify the artifact exists afterwards rather than trusting a silent exit.
 
+## 8a. The rtk wrapper rewrites `head`/`tail`/`sed`, so REDIRECTING one into a file writes its SUMMARY
+
+§6-§8 are about the wrapper giving a wrong answer or doing nothing. This is the destructive member
+of the family: the summary is not merely printed, it is what lands on disk.
+
+Measured 2026-09-08, trimming a test file: `head -39 file > tmp && mv tmp file` left a 99-line file
+looking like
+
+```
+  function leafIds(): string[] {
+    // ... 75 lines omitted
+      }
+// ... 72 more lines (total: 99)
+```
+
+`wc -l` then reported 35, which is the wrapper summarising ITS OWN output — so the check meant to
+catch it lied in the same direction. Recovered from git, and the file was tracked; an untracked one
+would have been gone.
+
+Two rules: **never redirect a text tool's output into a source file** — Edit/Write only, which the
+global coding rule already says and this is the concrete cost of ignoring it. And when a file's
+contents look wrong after a shell step, read it through `rtk proxy` before believing either the
+content or the line count.
+
 ## 9. Two copies of a framework loaded at once — a whole CATEGORY of test goes silently dead
 
 Not a wrong assertion; an entire mechanism unplugged, with every existing test still green.
@@ -1189,3 +1213,190 @@ EFFECT (a `ɵɵdefineComponent` present at its own `Program` exit — the linker
 generated `base$N`, so a name check would rot) and throws, and the rewrite moved to a source
 pre-pass in `@symbiote-native/angular/metro-transformer`, which prints the lowered code to text
 before Metro parses it.
+
+## 31. One field, two hosts, two meanings — a contract only the un-exercised side violates
+
+The seam has two implementations and only one of them ever runs headless, so a field they fill
+DIFFERENTLY is invisible to the whole suite. Not a stand-in for an input (§22) — a stand-in for the
+implementation, where the test is honest and the arm that is wrong is never the arm that runs.
+
+Measured 2026-09-08 on `ICommittedRecord.handle`:
+
+```
+tree-applier.ts (headless)   handle = the fake FABRIC node       getSlot().measure(handle) works
+SymbioteTree.cpp (device)    handle = the PLACEHOLDER            throws "Value state is nullptr,
+                                                                 expected a ShadowNode reference"
+```
+
+`imperative.ts` passed `record.handle` to the Fabric slot. Correct against the applier, fatal on a
+device at the first `measure()` an app performs — and the imperative five were already implemented in
+C++ and on the ABI, so this is the "implemented but unreachable" shape
+(`adapter-parity-audit.md`) with a crash instead of silence. 5 526 tests green throughout, and the
+suite could not have gone red: the defect lives in the half it never loads.
+
+Two working rules:
+
+- **A field two implementations both fill needs its meaning pinned by the TYPE or by a test that
+  names the value, not by whichever host the suite happens to run.** Here the field was typed
+  `IFabricNode` and native put a placeholder in it — the comment in `SymbioteTree.cpp` even said so,
+  and nothing consumed the statement.
+- **What IS assertable headless is the ROUTING, and it is worth a test on its own.** Not "measure
+  works" — that passed before and after — but "an imperative call reaches the HOST, with the
+  placeholder as its argument" (`imperative-goes-through-the-host.test.ts`). A spy on the installed
+  host distinguishes the two designs where the observable behaviour cannot.
+
+## 30. Arms that share MODULE state are not independent — and the strictest arm is what tells you
+
+A comparison harness reinstalls the world between arms (`installFabric()`, `resetSlot()`) and that
+reads as isolation. It is not: anything held in a module-level map keyed by something the arms share
+survives every reinstall.
+
+Measured 2026-09-07 on `core/engine/src/slot-differential.test.ts` (deleted 2026-09-08 with the
+batching slot — the finding is about module-scope state, not about that file), adding a fourth arm.
+`rootContainers` in `commit.ts` is `Map<rootTag, node>` at module scope, so the synthetic root
+container — and the Fabric handle its mirror holds — carried from one arm into the next:
+
+```
+direct -> records -> encoded    GREEN for weeks   a resolved handle needs no creating record
+              -> native         THROWS            "encoded op names unknown node 112"
+```
+
+The three lax arms tolerated a foreign handle; the arm that addresses nodes by ID could not. So the
+harness had been comparing "the slot" plus "whatever the previous arm left in the mirror" and its own
+header's promise — _the arms must differ in the slot and in nothing else_ — had been false since it
+was written. `disposeRoot(ROOT_TAG)` per arm closed it.
+
+Two things generalise:
+
+- **A per-test reinstall proves nothing about module-level state that outlives it.** §1 records this
+  for a once-per-module install flag; the sharper form is any `Map`/`Set`/cache at module scope whose
+  key an arm reuses. Grep the code under test for module-scope mutable state before trusting an
+  A/B harness, and reset it explicitly — the reinstall helper will not.
+- **When adding a STRICTER arm makes an old harness throw, suspect the harness before the arm.** The
+  new arm is usually not finding a product bug; it is the first arm with a tight enough contract to
+  notice contamination the others were absorbing. Nothing in production could reach that state here —
+  one runtime binds one slot mode for its whole life.
+
+## The fake Fabric recorder keeps ONE root — a two-surface assertion reads whichever committed last
+
+`installFabric()`'s `completeRoot(rootTag, childSet)` ignores the tag and assigns
+`committed = childSet`. With one mounted surface — the overwhelming case — that is exactly right.
+With two, `fabric.committed` is a report about whichever surface committed most recently, and every
+`findText` / `serialize` / `walk` over it silently answers about the wrong tree.
+
+Measured 2026-09-08 while pricing a `completeRoot` skip on an unchanged child set.
+`adapters/angular/src/create-tunnel/create-tunnel.test.ts` asserts the tunnelled content is _gone
+from surface B_ after surface A unmounts. It passed for years. Probing every commit's rootTag and
+every live surface's dirty pair:
+
+```
+enter root=920  s920{kids=1,d=00}  s921{kids=1,d=01}    B is dirty, A is not
+COMMIT root=920                                          and only A is ever asked to commit
+```
+
+So B is never recommitted, its Fabric tree keeps the content, and the assertion passed because A
+committed last and overwrote `committed`. The test's subject and its oracle were different surfaces.
+
+Two things fell out, and they were independent:
+
+- **A cross-surface mutation left the other surface dirty and uncommitted.** Every adapter calls
+  `this.surface.requestCommit()` after mutating whatever node it was handed, and a portal or a
+  tunnel hands it a node belonging to a different surface. FIXED: `commitSurfaceOps` now names every
+  live root, so a commit means "flush what changed" rather than "flush the surface I am bound to",
+  and the applier declines to `completeRoot` a root whose child set came back identical — which is
+  what makes naming them all cost nothing.
+- **The obvious repair — a `Map<rootTag, childSet>` and `committed` as the concatenation — breaks 60
+  tests** and was reverted. They mount a fresh rootTag per case with no `reset()` between, so they
+  depend on the overwrite to discard the previous case's tree. `committedAll` / `committedFor` are
+  the additive shape; changing `committed` itself is not.
+
+Three things the repair then turned up, each invisible while every commit was unconditional:
+
+- **A superseded surface must not complete its root.** Re-mounting the same rootTag (Fast Refresh,
+  the focus lifecycle) creates a second surface; the first one's teardown commit lands AFTER the new
+  one's mount commit and handed Fabric the emptied tree. It still has to DRAIN — that batch carries
+  the removals — so the guard suppresses only its own `OP_COMMIT`, and only when the registry holds
+  a different live owner. An unregistered surface is not superseded: nobody took the root, so its
+  final tree is still the truth for it.
+- **A memo on one side of a harness must carry the other side's generation.** The applier now
+  remembers what each surface last handed to `completeRoot`; `installFabric()`'s `reset()` throws
+  that away on the RECORDER side only, so the next commit skipped and `fabric.committed` stayed
+  empty. `reset()` bumps a generation the memo is keyed on.
+- **A bench that leaks surfaces stops measuring its arms.** `state-style-cost.bench.test.ts` created
+  a surface per rep and disposed none, so once a commit names every live root its `completeRoot`
+  count read 10 for the first arm and 25 for the second — the leak, not the arm. `disposeRoot` per
+  build. Same class as §30: module-scope state a per-test reinstall does not touch.
+
+The general form, and it is the `verify-the-deciding-side` rule pointed at a RECORDER: **a shared
+observable that collapses several subjects into one slot reports the last writer, not the subject.**
+Before reading such an observable, count how many producers can write it during the window under
+test. One is fine; two makes every assertion a race the test cannot see.
+
+## `malloc_history` names where LIVE memory was born, not what is allocating now
+
+Measured 2026-09-09, chasing unbounded RAM growth in `examples/solid`. `heap` reported 2.68M
+untyped blocks and `malloc_history -callTree -invert` attributed 298 MB to one stack ending in
+`Tree::applyOps -> jsi::dynamicFromValue -> folly::dynamic::insert`. That was read as "applyOps is
+running in a loop", and three hours went into finding the loop.
+
+The distinction is real — both tools walk LIVE blocks and print the stack each was allocated from,
+so 298 MB under a stack means that code allocated memory **that is still held**, and says nothing
+about the rate:
+
+```
+what is allocating now      a counter at the suspected call site, or two heap snapshots
+what is being retained      malloc_history / heap — this is what they answer
+```
+
+**But the conclusion drawn from it here was WRONG, and the way it was wrong is the more useful
+half.** Counters on `applyOps`, on the op recorder, on `setNativeProps` and on the reconcile all
+sat frozen through the growth, and that was read as "the producer is idle, look for an owner". It
+was not idle. Every one of those counters printed to the CONSOLE, and a JS thread saturated by the
+runaway loop never yielded to deliver a line — so "the count does not move" and "the log did not
+arrive" are the same observation, and only one of them was true.
+
+Two tells were present the whole time and both were read as properties of the leak rather than of
+the instrument: **Metro reload did not stop the growth, and leaving the screen did not either.**
+Both need a free JS thread. A leak you cannot interrupt from JS is evidence about the THREAD, not
+about the owner.
+
+So before trusting a frozen console counter, ask what else in the run needs the same thread. Where
+the suspected failure is a saturating loop, a console probe cannot report it by construction —
+the one instrument that stayed honest was `malloc_history`, because it is sampled from outside the
+process. Match the probe's channel to the failure being hunted: a stack sampler for a busy thread,
+a counter only for a thread you have already shown to be responsive.
+
+## A probe whose threshold is coarser than normal traffic makes silence unreadable
+
+Same session. A counter printed every 5 000 calls was added to the engine's only op recorder to see
+whether it ran away. It printed nothing, which was read as "this path is not involved" — but the
+whole screen mount is ~1 400 writes, so the probe would have been silent on a perfectly healthy
+run too. It could not distinguish its two outcomes, which is this file's own subject applied to a
+diagnostic.
+
+Two habits that cost nothing: size the threshold against the KNOWN normal volume before trusting a
+silence, and give every probe a load-time control line (`[x] probe loaded`) so "not called" and
+"not loaded" stop looking identical. The control is what proved the recorder probe was live, and
+the reason the threshold error was found instead of believed.
+
+## The headless applier STORES a prop value; the device CONVERTS it — a whole bug class fits in the gap
+
+`core/test-utils/src/tree-applier.ts` does `node.props[key] = value` and walks nothing. The device
+runs `jsi::dynamicFromValue` over that same value, expanding the whole object graph. So every
+defect of the form "this value cannot be converted" is invisible to the entire headless suite by
+construction, and the greenness carries no information about it:
+
+```
+cyclic value          headless: stored fine        device: endless walk, thread dead, heap unbounded
+a Symbol / BigInt     headless: stored fine        device: JSError from the conversion
+a huge object         headless: one assignment     device: the whole graph, per commit
+```
+
+`AnimatedProps` already carries a comment about the second row (it strips `children` because a
+React element's `$$typeof` Symbol throws), which is the tell that this gap was known one row at a
+time rather than as a class.
+
+Two consequences. A prop-path test written headless proves the VALUE is right and never that it is
+SENDABLE — assert the shape when the shape is what the device consumes. And the engine owes the
+conversion a bound, because a harness that cannot reach the failure also cannot regression-test it:
+`boundedDynamicFrom` in `SymbioteTree.cpp` turns the hang into a report naming the prop.

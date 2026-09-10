@@ -602,3 +602,37 @@ Three things generalise:
 - **When a probe's answer matches the shape of the bug you are hunting, distrust it hardest.** The
   reflex is the opposite — a result that confirms the hypothesis feels finished. Here the confirming
   result was the artifact.
+
+## A probe's SAMPLING RATE breaks it as reliably as its meaning — and a process-level observable often skips the whole problem
+
+This file's probe family is about what a probe ASKS. Measured 2026-09-07 over three device rounds on
+the node table's reclamation sweep, the same probe can be perfectly phrased and still answer the same
+thing in both branches because of WHEN it looks:
+
+```
+round 1   sweep fires when the table fills          every fruitless sweep DOUBLED the table, so it
+                                                    doubled its own next attempt: 1024, 2048, silence
+round 2   a gc canary polled inside the sweep       ~3 samples per session, all in the first second
+round 3   canary polled every 512 allocations       it cleared at row 2559; the sweep landed at 4096
+                                                    and found the runtime quiet again
+```
+
+Every arm read `freed 0`, and none of them was evidence: three independent events — a node dying, a
+collection running, a sweep firing — had to coincide, and nothing made them. **A probe needing N
+unsynchronised events to align does not measure rarely, it measures never.** Count the events before
+trusting a null result; one is fine, two is a design flaw, three is a coin toss reported as a fact.
+
+Two repairs, and the second is the one that actually ended it:
+
+- **Drive the probe from the event, not from a clock adjacent to it.** The sweep now fires ON the
+  canary transition, which removes two of the three coincidences.
+- **Before instrumenting, ask whether the runtime already reports the quantity.** The question was
+  "are these objects reclaimed", and Xcode's memory gauge answered it in one glance — **1 GB → 538 MB
+  across a create/clear cycle**, i.e. a full collection took ~460 MB — while three rounds of
+  in-process instrumentation produced nothing but `freed 0`. RSS, the GC gauge and the allocation
+  graph are outside the loop being measured and cannot be starved by it.
+
+And a smaller one from the same code: **a diagnostic must not mutate the state it reports.**
+`canaryState()` re-arms the canary it reads, so a sweep fired BY a collection printed `gc canary
+alive` on the next line — the log said the opposite of what had just happened. It prints the trigger
+now.

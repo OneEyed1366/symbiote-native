@@ -32,12 +32,18 @@ async function costOf(
   render: () => unknown,
 ): Promise<{ created: number; retained: number }> {
   const before = fabric.counts.createNode;
-  mount(root, render as never);
+  const surface = mount(root, render as never);
   await flush();
   const created = fabric.counts.createNode - before;
-  const retained = censusRetainedTree(
-    fabric.committed as unknown as never,
-  ).nodes;
+  // The SURFACE's top-level nodes, which are engine nodes. This used to hand `fabric.committed` in
+  // through a cast, and it read plausibly because a fake Fabric node and a retained node both had a
+  // `children` field — so the census walked the COMMITTED tree and reported it as the retained one.
+  // Which is the exact opposite of what this file is about: the committed tree cannot contain an
+  // anchor, by construction, so a placeholder in the retained tree was invisible to it. Caught when
+  // `node.children` was deleted and the cast started reading `undefined`
+  // (`.claude/rules/test-harness-false-greens.md` §11 — the harness built the subject wrong, and it
+  // worked only because two unrelated shapes shared a field name).
+  const retained = censusRetainedTree(surface.children).nodes;
   unmount(root);
   return { created, retained };
 }

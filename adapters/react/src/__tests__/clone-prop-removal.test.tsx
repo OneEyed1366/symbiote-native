@@ -10,6 +10,8 @@
 import { createElement, useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
+import { setTreeHost } from '@symbiote-native/engine';
+import { treeApplierHost } from '@symbiote-native/test-utils';
 import { Pressable, Text, View, mount, unmount } from '@symbiote-native/react';
 
 interface IFakeNode {
@@ -94,6 +96,9 @@ const slot = {
   dispatchCommand: (): void => {},
 };
 Object.assign(globalThis, { nativeFabricUIManager: slot });
+// The slot alone is not enough: JS records opcodes and a HOST turns them into the tree that
+// drives the slot. `installFabric()` binds both, and this file replaces only its slot half.
+setTreeHost(treeApplierHost);
 
 const TEST_ID = 'btn';
 const ACTIVE_OPACITY = 0.2;

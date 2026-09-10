@@ -63,7 +63,20 @@ function findCommitted(
   predicate: (node: IFakeNode) => boolean,
 ): IFakeNode | undefined {
   let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
+  walk(fabric.committedAll, node => {
+    if (found === undefined && predicate(node)) found = node;
+  });
+  return found;
+}
+
+// One surface's own tree. `committed` cannot answer this — it is the last `completeRoot`, whichever
+// root that was — and with two surfaces mounted the difference is the whole question.
+function findOn(
+  rootTag: number,
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
+  let found: IFakeNode | undefined;
+  walk(fabric.committedFor(rootTag), node => {
     if (found === undefined && predicate(node)) found = node;
   });
   return found;
@@ -71,7 +84,7 @@ function findCommitted(
 
 function committedTexts(): string[] {
   const texts: string[] = [];
-  walk(fabric.committed, node => {
+  walk(fabric.committedAll, node => {
     if (node.viewName === 'RCTRawText') texts.push(String(node.props.text));
   });
   return texts;
@@ -108,19 +121,22 @@ describe('createTunnel', () => {
       );
     }
 
-    mountApp(SourceApp);
-    mountApp(TargetApp);
+    const sourceTag = mountApp(SourceApp);
+    const targetTag = mountApp(TargetApp);
     await tick();
 
-    // fake-fabric's `committed` is last-write-wins across rootTags, and the target mounted second,
-    // so this IS the target surface's own tree.
-    const target = findCommitted(byTestID('target'));
-    const ported = findCommitted(byText('across surfaces'));
-    expect(target, 'the target surface committed').toBeDefined();
-    expect(ported, 'the tunneled text committed on it').toBeDefined();
     expect(
-      findCommitted(byTestID('source')),
-      'and the source surface is NOT what we are reading',
+      findOn(targetTag, byTestID('target')),
+      'the target surface committed',
+    ).toBeDefined();
+    expect(
+      findOn(targetTag, byText('across surfaces')),
+      'the tunneled text committed on it',
+    ).toBeDefined();
+    // The cross-surface claim itself: the text paints on B and NOT on the surface that declared it.
+    expect(
+      findOn(sourceTag, byText('across surfaces')),
+      'and it is not also painting on the source surface',
     ).toBeUndefined();
   });
 

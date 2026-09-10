@@ -21,7 +21,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import type { ISymbioteNode } from '@symbiote-native/engine';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
 import { mount, unmount } from '../render';
 
 // Both are set by RN before any app code runs (setUpGlobals.js / setUpNavigator.js); a bare
@@ -414,8 +414,11 @@ describe('Portal', () => {
       childTestIDs(findCommitted(byTestID('overlay-host'))),
       'the target paints nothing again',
     ).toEqual([]);
+    // Through the engine's accessor: a node's desired children are derived from its published
+    // record plus its op log, so there is no `children` field to read.
+    const host = control?.target()?.engineNode;
     expect(
-      control?.target()?.engineNode?.children.length,
+      host === undefined ? undefined : childrenOf(host as never).length,
       'and the fragment host itself left the retained tree — no leaked anchor',
     ).toBe(0);
   });

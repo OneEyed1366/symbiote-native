@@ -87,7 +87,9 @@ the only signal that appears before the simulator.
 `scripts/check-packed-consumer-bundles.mjs` closes this class of false green without maintaining
 an allowlist of folders to overwrite. It performs the same sequence a real npm consumer does:
 
-1. Read the five standalone examples (React, Vue SFC, Svelte, Angular, Solid).
+1. Read the six standalone canary examples (React, Vue SFC, Vue TSX, Svelte, Angular, Solid) — one
+   ARM each, which is not one per adapter: `vue-sfc` and `vue-tsx` both consume
+   `@symbiote-native/vue`.
 2. Pack every direct `@symbiote-native/*` dependency they declare from the current checkout.
 3. Copy each example's tracked files to a disposable directory.
 4. Rewrite all direct internal dependencies there to `file:<fresh tarball>` and run a clean
@@ -165,6 +167,55 @@ Three checks, cheap, and the third is the one that actually settles it:
 ```py
 t = re.sub(r"(from '\.[^']*?)(/index)?\.js'", r"\1'", pathlib.Path(f).read_text())
 ```
+
+### The engine ships C++, and every check above greps `build/**` — which is the JS half only
+
+`core/engine/cpp/**` is compiled by the EXAMPLE, out of the installed package:
+
+```
+symbiote-engine.podspec:26   source_files = 'ios/**/*.{h,m,mm}', 'cpp/**/*.{h,cpp}'
+package.json files           build, cpp, ios, android, codegen-specs, …
+```
+
+So an edit to `SymbioteTree.cpp` reaches a device only through `prepublish-build` -> publish ->
+refresh -> `pod install`, exactly like a JS edit. Nothing about that is new.
+
+**`registry:publish` does NOT build, and quoting the loop without its first step is how a session
+ships nothing.** It packs `build/`, so with a stale `build/` it publishes the previous cut and
+reports `published` for all 36 packages — the loop's own failure text says as much ("Most often a
+missing build/"). Measured 2026-09-09: a one-line engine fix was handed over as publish -> refresh
+-> `pod install`, and the device came back with the SAME stack, identical down to the line numbers.
+
+That identity is the tell worth keeping. A fix that ran and failed moves something — a line
+number, a frame, a message. **A byte-identical stack after a change means the change is not in the
+binary**, and the probe is the grep this file already prescribes, run BEFORE blaming the fix:
+
+```bash
+grep -c '<marker>' core/engine/build/node.js                                   # did tsc run
+grep -c '<marker>' examples/<app>/node_modules/@symbiote-native/engine/build/node.js  # did it land
+```
+
+Both counts must match what the source has. Ours read 1 and 1 against a source with 2. What IS new is that
+**the verification this file prescribes cannot see it**: every probe here greps the installed
+`build/**` for a marker, and a session that changed only C++ has no `build/**` marker to grep. The
+JS half is genuinely current, the probe says so, and the device runs last week's C++.
+
+Measured 2026-09-08, on the turn the payload fold was wired into `fabricProps`: `tsc` clean, 5522
+tests green, and `grep -c foldFor` on the example's installed `cpp/SymbioteTree.cpp` read **0**.
+Both gates were honest — neither compiles C++ — and the build that was about to be spent would have
+reported "the fold does nothing", the measurement-that-lies rather than a failure.
+
+The probe is the same shape, pointed one directory over:
+
+```bash
+grep -c '<a symbol only the new C++ has>' \
+  examples/<app>/node_modules/@symbiote-native/engine/cpp/SymbioteTree.cpp
+```
+
+Two things follow. **A repo-wide green suite is not evidence about a C++ change at all** — say so
+when handing one over, or the reader takes the green as coverage. And when a package grows a
+compiled half, every staleness probe written for it inherits a blind spot silently: the check still
+passes, on a file that is no longer the whole package.
 
 ### Check ZERO: verify the ADAPTER separately, and first
 

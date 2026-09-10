@@ -156,8 +156,9 @@ describe('node census', () => {
         `nodes=${census.nodes} renderable=${census.renderable} anchors=${census.anchors} emptyRawTexts=${census.emptyRawTexts}`,
         `flattenWidths(top10)=[${census.flattenWidths.slice(0, 10).join(',')}] count=${census.flattenWidths.length}`,
         `fabric createNode=${fabric.counts.createNode} appendChild=${fabric.counts.appendChild} clone=${fabric.counts.clone} completeRoot=${fabric.counts.completeRoot}`,
-        `walkMs=${profile.walkMs.toFixed(1)} visited=${profile.nodesVisited} writes=${profile.propWrites}/${profile.propNoops} commits=${profile.commits}`,
-        `childScans=${profile.childScans} probed=${profile.childScanProbed} flattens=${profile.childFlattens} widest=${profile.widestFlattenedParent ?? '?'}`,
+        // The walk numbers this line used to carry (visited, childScans, flattens, walkMs) went with
+        // the JS tree — the host does that work now and its cost is not observable from here.
+        `writes=${profile.propWrites} commits=${profile.commits}`,
         '',
       ].join('\n'),
     );
@@ -166,10 +167,7 @@ describe('node census', () => {
         `anchors=${census.anchors} createNode=${fabric.counts.createNode} ` +
         `appendChild=${fabric.counts.appendChild} clone=${fabric.counts.clone} ` +
         `completeRoot=${fabric.counts.completeRoot} | propWrites=${profile.propWrites} ` +
-        `propNoops=${profile.propNoops} nodesVisited=${profile.nodesVisited} ` +
-        `commits=${profile.commits} walkMs=${profile.walkMs.toFixed(1)} ` +
-        `childScans=${profile.childScans} probed=${profile.childScanProbed} ` +
-        `flattens=${profile.childFlattens} widest=${profile.widestFlattenedParent ?? '?'}`,
+        `commits=${profile.commits}`,
     );
     unmount(ROOT_TAG);
     for (const out of [VIEW_OUT, TEXT_OUT, PRESSABLE_OUT, PARENT_OUT])

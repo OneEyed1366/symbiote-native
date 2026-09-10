@@ -12,13 +12,14 @@ import {
   clearGlobalStyles,
   createElement,
   createSurface,
+  propOf,
   registerRules,
   routeProp,
   setNodePressed,
   type ISymbioteNode,
 } from '../index';
 
-installFabric();
+const fabric = installFabric();
 let nextRootTag = 7500;
 
 function mount(node: ISymbioteNode) {
@@ -28,8 +29,10 @@ function mount(node: ISymbioteNode) {
   return surface;
 }
 
+// The published `[classStyle, explicitStyle]` pair, read back out of the tree HOST — the engine
+// holds no props, and slot identity is what the no-variant case asserts on.
 function slots(node: ISymbioteNode): unknown[] {
-  const style = node.props.style;
+  const style = propOf(node, 'style');
   return Array.isArray(style) ? style : [];
 }
 
@@ -103,6 +106,6 @@ describe('compiler-supplied pressed style variant', () => {
     routeProp(node, 'activeStyle', { opacity: 0.6 });
     mount(node);
 
-    expect('activeStyle' in node.props).toBe(false);
+    expect('activeStyle' in fabric.appRoot().children[0].props).toBe(false);
   });
 });

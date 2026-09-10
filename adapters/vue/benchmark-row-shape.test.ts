@@ -18,7 +18,11 @@ import ts from 'typescript';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defineComponent, h, type Component } from '@vue/runtime-core';
 import * as engine from '@symbiote-native/engine';
-import { isAnchor, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  childrenOf,
+  isAnchor,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 import * as vueAdapter from '@symbiote-native/vue';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -76,7 +80,9 @@ function census(roots: readonly ISymbioteNode[]): {
     if (node === undefined) break;
     retained += 1;
     if (isAnchor(node)) anchors += 1;
-    for (const child of node.children) stack.push(child);
+    // Through the engine's accessor: a node's desired children are derived from its published
+    // record plus its op log, so there is no `children` field.
+    for (const child of childrenOf(node)) stack.push(child);
   }
   return { retained, anchors };
 }

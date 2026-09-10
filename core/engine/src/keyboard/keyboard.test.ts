@@ -10,7 +10,6 @@
 // with a zero duration). So there is no Negative (toThrow) group; every scenario is Positive.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
 import type { IKeyboardEvent } from './index';
 
 interface IDeviceHub {
@@ -29,7 +28,14 @@ const ROOT_TAG = 88;
 // top-level-imported binding for any of these would point at a stale module
 // instance disconnected from the one Keyboard resolves internally after reset, so
 // everything Keyboard touches is re-imported fresh, in beforeEach, same as Keyboard itself.
+//
+// installFabric() is in that set, and it has to be: the tree host is module state on the engine,
+// so a host installed on the pre-reset instance leaves the fresh one holding no tree at all — the
+// ops for the input below stay pending and dismiss() finds nothing focused to blur.
 let Keyboard: typeof import('./index').Keyboard;
+let fabric: ReturnType<
+  typeof import('@symbiote-native/test-utils').installFabric
+>;
 let createElement: typeof import('@symbiote-native/engine').createElement;
 let createSurface: typeof import('@symbiote-native/engine').createSurface;
 let currentlyFocusedInput: typeof import('../text-input-state').currentlyFocusedInput;
@@ -46,14 +52,11 @@ const showEvent: IKeyboardEvent = {
   endCoordinates: { screenX: 0, screenY: 300, width: 390, height: 346 },
 };
 
-const fabric = installFabric();
-
 beforeEach(async () => {
   observerAdded = 0;
   observerRemoved = 0;
   deviceHub = undefined;
   layoutAnimationCalls = [];
-  fabric.reset();
 
   const fakeKeyboardObserver = {
     addListener: (): void => {
@@ -92,6 +95,7 @@ beforeEach(async () => {
   };
 
   vi.resetModules();
+  fabric = (await import('@symbiote-native/test-utils')).installFabric();
   ({ Keyboard } = await import('./index'));
   ({ createElement, createSurface } = await import('@symbiote-native/engine'));
   ({ currentlyFocusedInput, setInputFocused } =

@@ -111,9 +111,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Build first because every tarball's publishConfig points at build/ (and build-ngc/ for
-      # Angular). The matrix then packs the exact direct @symbiote-native dependencies of all five
-      # standalone examples, installs them into disposable npm consumers, type-checks/AOT-builds
-      # each app, and creates iOS + Android Metro production bundles.
+      # Angular). The matrix then packs the exact direct @symbiote-native dependencies of every
+      # standalone canary example, installs them into disposable npm consumers, type-checks/AOT-builds
+      # each app, and creates iOS + Android Metro production bundles. One arm per example, not per
+      # adapter — vue-sfc and vue-tsx both consume @symbiote-native/vue.
       - run: pnpm run prepublish-build
 
       - run: pnpm run check:bundle-isolation

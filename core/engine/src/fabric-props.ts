@@ -1,29 +1,24 @@
-// Fabric-prop translation: turn a retained node's logical props into the flat payload
-// Fabric's C++ props expect. Split out of commit.ts (which owns the reconciler/mirror walk
-// + the imperative instance API, neither of which this half touches) so the two
-// responsibilities stop sharing one 300+ line file. Color processing itself lives in
-// ./platform-color (the stable leaf every color-touching module imports from); this file only
-// decides WHICH props are color props and wires the structured CSS-style processors.
+// Fabric-prop translation: turn a node's logical props into the flat payload Fabric's C++ props
+// expect. Color processing itself lives in ./platform-color (the stable leaf every color-touching
+// module imports from); this file only decides WHICH props are color props and wires the structured
+// CSS-style processors.
+//
+// IT IS CALLED BY THE HOST, and that is what the `props` parameter is for. The engine no longer
+// holds a tree, so the bag belongs to whoever built it: the TypeScript applier headlessly, the C++
+// applier on device. The NODE still comes in beside it, because three inputs to the fold are
+// JS-side facts about the node rather than entries in the bag — its authored component name, the
+// sticky `hasAriaAlias` flag, and the behavior's own `payloadFold`.
+//
+// **The C++ side does not have this yet.** `SymbioteTree.cpp` hands its raw bag to `createNode`,
+// so every fold below — style hoisting included — is headless-only until it is ported. `style` is
+// not a Fabric prop name, so on device that is a blank screen rather than a subtle difference.
 
 import { foldAriaProps } from './accessibility-props';
 import type { IFabricProps } from './fabric';
 import { RAW_TEXT_COMPONENT, type ISymbioteNode } from './node';
-import { registeredProcessor } from './registry';
 import { isProcessableColor, processColor } from './platform-color';
-import { processBoxShadow } from './process-box-shadow';
-import { processFilter } from './process-filter';
-import { processTransformOrigin } from './process-transform-origin';
-import { processTransform } from './process-transform';
-import { processAspectRatio } from './process-aspect-ratio';
-import { processFontVariant } from './process-font-variant';
-import { processBackgroundImage } from './process-background-image';
-import {
-  processBackgroundPosition,
-  processBackgroundRepeat,
-  processBackgroundSize,
-  type IBackgroundLonghandInput,
-} from './process-background-longhands';
-import { isRecord, isString } from './type-guards';
+import { configProcessedKeys } from './registry';
+import { isRecord } from './type-guards';
 
 // Color props must reach Fabric as platform ints, not CSS strings. Fabric's C++
 // color parser silently drops strings. The actual conversion (processColor) is
@@ -73,137 +68,29 @@ const COLOR_PROPS: ReadonlySet<string> = new Set([
   'trackTintColor',
 ]);
 
-// Structured CSS-style keys RN parses in JS before native. Each runs on the hoisted top-level
-// style key, turning a CSS string or structured array into the processed array Fabric's C++
-// expects.
+// Convert a prop to the shape Fabric's C++ expects: a CSS-string color runs through the injected
+// platform processor, because Fabric's C++ color parser silently drops strings.
 //
-// The gate is enableNativeCSSParsing(), which defaults to false today - but upstream READS that
-// flag once at module load (ReactNativeStyleAttributes.js:27) and switches all eleven attributes
-// to raw passthrough when it is on, whereas this table always processes. So an app that enables
-// the flag gets upstream sending raw and us sending processed: same input, different payload.
-// Latent while the default holds; the fix is to read the flag, not to port anything.
+// TWO FAMILIES OF PROCESSOR USED TO BE HERE AND BOTH MOVED, for one reason: on a device the payload
+// is built in C++ and this function does not run, so anything resolved only here is resolved only
+// headless. A third-party view's own `validAttributes[*].process` now runs in `configPayloadFold`
+// (installed on the node, called by the C++ through `payloadFold`); the structured style keys
+// — boxShadow, filter, transform, transformOrigin, aspectRatio, fontVariant,
+// experimental_backgroundImage — now run at WRITE time in `structured-style.ts`, so `node.props`
+// already holds the structured value whichever builder reads it.
 //
-// Keep this table in step with ReactNativeStyleAttributes' gated attributes. It carried
-// backgroundImage without its three longhand siblings for as long as they have existed, and the
-// symptom of a missing entry is silent: the CSS string reaches Fabric, which expects a structure.
-const STYLE_PROCESSORS = new Map<string, (value: unknown) => unknown>([
-  ['boxShadow', value => processBoxShadow(asBoxShadowInput(value))],
-  ['filter', value => processFilter(asFilterInput(value))],
-  [
-    'transformOrigin',
-    value => processTransformOrigin(asTransformOriginInput(value)),
-  ],
-  ['transform', processTransformValue],
-  ['aspectRatio', value => processAspectRatio(asAspectRatioInput(value))],
-  ['fontVariant', value => processFontVariant(asFontVariantInput(value))],
-  [
-    'experimental_backgroundImage',
-    value => processBackgroundImage(asBackgroundImageInput(value)),
-  ],
-  [
-    'experimental_backgroundSize',
-    value => processBackgroundSize(asBackgroundLonghandInput(value)),
-  ],
-  [
-    'experimental_backgroundPosition',
-    value => processBackgroundPosition(asBackgroundLonghandInput(value)),
-  ],
-  [
-    'experimental_backgroundRepeat',
-    value => processBackgroundRepeat(asBackgroundLonghandInput(value)),
-  ],
-]);
-
-// All three longhands take the same two shapes: a CSS string, or an already-structured array RN
-// passes through untouched. Anything else is undefined, which upstream answers with [] and the
-// wrapper turns into an absent key.
-function asBackgroundLonghandInput(value: unknown): IBackgroundLonghandInput {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value;
-  return undefined;
-}
-
-// boxShadow accepts a CSS string or an array of shadow objects; anything else is
-// undefined to processBoxShadow (which returns []). Narrowing avoids an `as` cast.
-function asBoxShadowInput(
+// Neither may come back here. Applying a processor twice is not a no-op: a color already converted
+// to a platform int, run through processColor again, is a DIFFERENT color.
+function processValue(
+  key: string,
   value: unknown,
-): Parameters<typeof processBoxShadow>[0] {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.filter(isRecord);
-  return undefined;
-}
-
-// filter accepts a CSS string or an array of single-key filter objects; same narrowing.
-function asFilterInput(value: unknown): Parameters<typeof processFilter>[0] {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.filter(isRecord);
-  return undefined;
-}
-
-// experimental_backgroundImage accepts a CSS string (gradient functions) or an array of
-// structured gradient objects; same narrowing as boxShadow/filter.
-function asBackgroundImageInput(
-  value: unknown,
-): Parameters<typeof processBackgroundImage>[0] {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.filter(isRecord);
-  return undefined;
-}
-
-// transformOrigin accepts a CSS string or a [x, y, z] array of strings/numbers; anything
-// else is undefined to processTransformOrigin (which defaults to center/center/0).
-function asTransformOriginInput(
-  value: unknown,
-): Parameters<typeof processTransformOrigin>[0] {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.filter(isStringOrNumber);
-  return undefined;
-}
-
-// aspectRatio accepts a number (the common, working form) or a ratio string; otherwise
-// undefined, which processAspectRatio drops.
-function asAspectRatioInput(
-  value: unknown,
-): Parameters<typeof processAspectRatio>[0] {
-  if (typeof value === 'number' || typeof value === 'string') return value;
-  return undefined;
-}
-
-// fontVariant accepts an array of variant strings (the common, working form) or a
-// space-separated string; anything else becomes an empty string, which yields [].
-function asFontVariantInput(
-  value: unknown,
-): Parameters<typeof processFontVariant>[0] {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.filter(isString);
-  return '';
-}
-
-// transform accepts a CSS string (processTransform parses it) or an array of single-key
-// transform records (the hot animated / sticky-header path, passed through unchanged).
-// A non-string non-array value is NOT dropped: it may already be processed, so it passes
-// through verbatim rather than being coerced to [] (which would erase a valid transform).
-function processTransformValue(value: unknown): unknown {
-  if (typeof value === 'string') return processTransform(value);
-  if (Array.isArray(value)) return processTransform(value.filter(isRecord));
-  return value;
-}
-
-function isStringOrNumber(value: unknown): value is string | number {
-  return typeof value === 'string' || typeof value === 'number';
-}
-
-// Convert a prop to the shape Fabric's C++ expects. A third-party view contributes
-// its own processors, auto-derived from its ViewConfig (validAttributes[*].process,
-// e.g. processColor for a slider's track tints); those run first. Then the structured
-// CSS-style processors (boxShadow/filter). Built-ins are never in the registry, so they
-// fall through to the global color path, where any CSS-string color is run through the
-// injected platform processor (Fabric's C++ color parser silently drops strings).
-function processValue(component: string, key: string, value: unknown): unknown {
-  const processor = registeredProcessor(component, key);
-  if (processor !== undefined) return processor(value);
-  const styleProcessor = STYLE_PROCESSORS.get(key);
-  if (styleProcessor !== undefined) return styleProcessor(value);
+  alreadyProcessed: ReadonlySet<string> | undefined,
+): unknown {
+  // A key the component's own config already converted is DONE. Running the engine's colour pass
+  // over it as well is not a no-op: processColor rotates, so a second rotation is a different
+  // colour. This used to be prevented by accident — a processed colour is a number, and numbers
+  // were not processable — until a numeric colour became an author's own rrggbbaa literal.
+  if (alreadyProcessed?.has(key) === true) return value;
   if (COLOR_PROPS.has(key) && isProcessableColor(value))
     return processColor(value);
   return value;
@@ -215,8 +102,10 @@ function processValue(component: string, key: string, value: unknown): unknown {
 // of style objects, and resolving each one per node costs O(nodes x styleKeys) to compute an
 // answer that only varies with O(distinct styles). Cache it on the style object's identity.
 //
-// Keyed by component as well: processValue consults that component's ViewConfig processors, so one
-// style object can legitimately resolve differently under two view names.
+// Keyed by the style object ALONE. It used to carry a per-component dimension because processValue
+// consulted that component's ViewConfig processors and one style object could resolve differently
+// under two view names; those processors moved to `configPayloadFold`, which runs on the top-level
+// bag before this, so what is left here is component-independent.
 //
 // The cache assumes a style object is not MUTATED IN PLACE, which is already the engine's contract:
 // setProp compares with Object.is and skips a same-identity write, so an in-place style edit never
@@ -228,26 +117,24 @@ function processValue(component: string, key: string, value: unknown): unknown {
 // style entry, and addStyle below needs to see an explicit `undefined` to let a later entry clear
 // an earlier one. Dropping them here would silently turn `[{flex:1},{flex:undefined}]` into
 // `flex: 1`.
-const styleCache = new Map<string, WeakMap<object, Record<string, unknown>>>();
+const styleCache = new WeakMap<object, Record<string, unknown>>();
 
 function processedStyle(
-  component: string,
   style: Record<string, unknown>,
 ): Record<string, unknown> {
-  let perComponent = styleCache.get(component);
-  if (perComponent === undefined) {
-    perComponent = new WeakMap();
-    styleCache.set(component, perComponent);
-  }
-  const cached = perComponent.get(style);
+  const cached = styleCache.get(style);
   if (cached !== undefined) return cached;
   const resolved: Record<string, unknown> = {};
   for (const key of Object.keys(style)) {
     const value = style[key];
+    // `undefined` for the already-processed set, and it must stay that way: this cache is keyed on
+    // the style object ALONE (see the note above), so anything component-dependent read here would
+    // be shared with every other component using the same style object. A config's processors are
+    // keyed on top-level prop names and never reach inside a style anyway.
     resolved[key] =
-      value === undefined ? undefined : processValue(component, key, value);
+      value === undefined ? undefined : processValue(key, value, undefined);
   }
-  perComponent.set(style, resolved);
+  styleCache.set(style, resolved);
   return resolved;
 }
 
@@ -278,17 +165,13 @@ function processedStyle(
  * overlap in practice (one is Yoga/visual, the other is testID/accessibility/source), so this is
  * theoretical - but it is a difference, and `fabric-props.test.ts` pins both halves.
  */
-function addStyle(
-  out: Record<string, unknown>,
-  component: string,
-  style: unknown,
-): void {
+function addStyle(out: Record<string, unknown>, style: unknown): void {
   if (Array.isArray(style)) {
-    for (const entry of style) addStyle(out, component, entry);
+    for (const entry of style) addStyle(out, entry);
     return;
   }
   if (!isRecord(style)) return;
-  const resolved = processedStyle(component, style);
+  const resolved = processedStyle(style);
   for (const key of Object.keys(resolved)) {
     const value = resolved[key];
     if (value === undefined) delete out[key];
@@ -343,9 +226,12 @@ function foldTextInputValue(
   return folded;
 }
 
-export function fabricProps(node: ISymbioteNode): IFabricProps {
+export function fabricProps(
+  node: ISymbioteNode,
+  nodeProps: Readonly<Record<string, unknown>>,
+): IFabricProps {
   if (node.component === RAW_TEXT_COMPONENT) {
-    return { text: node.props.text };
+    return { text: nodeProps.text };
   }
   // This runs once per node per commit - 9 000 times on one benchmark press - so the two loops
   // below iterate with Object.keys rather than Object.entries: entries allocates a fresh
@@ -366,13 +252,11 @@ export function fabricProps(node: ISymbioteNode): IFabricProps {
   // one key at a time. Both commit paths — create and update — reach here, so a lowered element
   // gets the fold it has no wrapper to run.
   //
-  // NOT memoised on `node.props` identity. That object is stable and mutated IN PLACE, so an
-  // identity-keyed cache (the `processedStyle` pattern below) would be stale forever. The gate is
-  // the node's sticky flag instead: one boolean read for a node with no alias, which is nearly all
-  // of them, and the fold's own fast path returns by identity for the rest.
-  const aliasFolded = node.hasAriaAlias
-    ? foldAriaProps(node.props)
-    : node.props;
+  // NOT memoised on the bag's identity. The host mutates it IN PLACE, so an identity-keyed cache
+  // (the `processedStyle` pattern below) would be stale forever. The gate is the node's sticky flag
+  // instead: one boolean read for a node with no alias, which is nearly all of them, and the fold's
+  // own fast path returns by identity for the rest.
+  const aliasFolded = node.hasAriaAlias ? foldAriaProps(nodeProps) : nodeProps;
   // The behavior's own fold, for a LOWERED element only — the two folds above are keyed on the
   // component name, which a wrapper and its lowered twin share, so neither could carry a
   // per-primitive fold without running it twice on the wrapper. See IPayloadFold.
@@ -385,21 +269,17 @@ export function fabricProps(node: ISymbioteNode): IFabricProps {
     node.component === MULTILINE_TEXT_INPUT
       ? foldTextInputValue(behaviorFolded)
       : behaviorFolded;
+  // Hoisted out of the loop: one cached lookup per node per commit, not one per key.
+  const alreadyProcessed = configProcessedKeys(node.component);
   for (const key of Object.keys(props)) {
     if (key === 'style') continue;
     const value = props[key];
     if (typeof value === 'function') continue;
     if (value === undefined) continue;
-    const processed = processValue(node.component, key, value);
-    // A processor that REFUSES its input answers undefined (a malformed transformOrigin, a
-    // malformed aspectRatio). Assigning it would hand Fabric an explicit undefined for a prop the
-    // app never set; absent is what "refused" means. The check is one strict comparison per key
-    // and allocates nothing, so it does not fall under this loop's own for-in caution above.
-    if (processed === undefined) continue;
-    out[key] = processed;
+    out[key] = processValue(key, value, alreadyProcessed);
   }
   // Hoist the style slot (object | array | nested arrays) into the SAME payload object - no
   // intermediate flatten. See addStyle for the shape and for the two things this fixed.
-  addStyle(out, node.component, props.style);
+  addStyle(out, props.style);
   return out;
 }

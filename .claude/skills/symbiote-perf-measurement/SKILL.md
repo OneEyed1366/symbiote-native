@@ -172,7 +172,10 @@ Cold mount pays ~3-6% (read off `min`, see below).
 Two changes landed together on `core/engine`, and they are worth reading side by side because one
 of them is the cautionary tale and the other is the result.
 
-**`propsDirty` (the clone-bubble fast lane).** `dirty` answered two questions; splitting off "did
+**`propsDirty` (the clone-bubble fast lane).** Named as it was when measured; since 2026-09-05 the
+question is `hasPendingProps` in `core/engine/src/edit-buffer.ts` and the field is gone. The
+measurement below is unaffected — the swap preserved the mechanics exactly — but do not grep for
+the identifier. `dirty` answered two questions; splitting off "did
 THIS node's own props change" lets reconcile reuse the committed payload by reference instead of
 rebuilding it with `fabricProps()` and deep-comparing. Real work removed — and far less of it than
 intended:
@@ -335,7 +338,7 @@ What makes this a design task rather than a one-liner, and what to settle before
   not know about the animated props. Our `setNativeProps` writes `node.props`, so our retained tree
   stays truthful — what would go stale is `node.committed.props` versus what Fabric actually holds.
   That is precisely the condition `warnIfStale` reports as `DIRTY-MISS`. Decide explicitly whether a
-  direct write updates the committed record, marks `propsDirty`, or neither; each choice trades a
+  direct write updates the committed record, calls `markPropsDirty`, or neither; each choice trades a
   redundant re-send against a stale mirror, and the wrong one is silent.
 - **The synchronous contract.** A caller today reads the committed result on the next line and
   `dirty-marking.test.ts` does exactly that. Whatever replaces the commit must keep that observable
@@ -2330,3 +2333,72 @@ hand pass had missed.
 Generalise it as: **when the thing you are optimising is invisible to every runtime observer, the
 test belongs on the source, not on the behaviour** — and check that the behavioural test you were
 about to write can actually fail before trusting it.
+
+## A "touched-set" rewrite: the SPEED case is dead, the ARCHITECTURAL case is not — do not conflate
+
+**Corrected 2026-09-05, same day, after the first version of this section got it wrong.** It was
+written as "measured and DECLINED", which took a performance measurement and used it to close an
+item that was on the list for two reasons. The numbers below are sound and the conclusion drawn
+from them was not: the buffer exists so the adapter's knowledge reaches the engine intact, and a
+microsecond count cannot speak to that. Kept here in full, because the measurement is exactly the
+right INPUT TO SCOPING — it says do not sell the buffer as a speed win and do not over-engineer it
+for O(k) — and because the substitution it demonstrates is worth recognising:
+
+**a measurement can only decide the question it measured.** An item justified on two grounds needs
+both answered; measuring the cheaper one and reporting a verdict on the whole is how architectural
+work gets closed by a benchmark that was never about it.
+
+Recurring proposal, and it sounds obviously right: the commit walk visits every child of a dirty
+parent (`VISITED 1046` for two changed nodes on a 1 000-row list), so replace the boolean dirty
+marks with a set of touched nodes and visit only those. Measured 2026-09-05 with `pnpm bench`
+BEFORE writing any of it, and the numbers say do not.
+
+```
+1 prop, 10 005 nodes across 244 sections   min 0.0124 ms
+1 prop, 10 000 nodes FLAT                  min 0.5990 ms      48x
+select row (1000 flat rows)                min 0.0526 ms
+no-op commit, 9 761 nodes                  min 0.0004 ms
+```
+
+Dirty marking already delivers wherever a win exists: at the SAME node count a bushy tree is 48x
+faster than a flat one, and a no-op commit is essentially free. What is left is one shape — a single
+wide FLAT parent — and there the O(n) is **Fabric's protocol, not our walk**. A parent whose child
+set changed must re-specify ALL N child handles to `cloneNodeWithNewChildren`; no dirty structure of
+any kind removes that. `reconcile.bench.ts`'s own header said so and it was worth re-reading rather
+than re-deriving.
+
+So a touched-set can only remove the per-clean-child `reconcile` CALL, not the O(n) beside it: about
+50 ns per visit, so ~25 us on a 1 000-row Select against a device wall time of 5.5-8 ms for that
+row. Not worth a rewrite of the commit path.
+
+**And it corrects a framing this branch had been using.** `VISITED 1046` was quoted as "the adapter
+told us what changed and we go looking for it again". Half true — the visits are cheap, and the
+array rebuild beside them is protocol-mandated. **The number is large and the time is not**, which
+is exactly why a count is not a cost.
+
+What the numbers legitimately constrain: expect the buffer to be **performance-neutral**, and hold
+it to that rather than to a win. A wide flat parent must still hand `cloneNodeWithNewChildren` all N
+handles, so `VISITED`/`WRITES`/FABRIC counters should come out byte-identical — which makes them a
+correctness oracle for the change rather than a scoreboard.
+
+Separately, and genuinely small: caching the child-handle ARRAY on the mirror stops a dirty parent
+allocating a fresh N-element array per commit. Contained, and the bench above measures it directly.
+
+## `flush()` "moving to the adapters" was already done — under two other names
+
+Same session, same shape: a design item that turned out to describe the existing state. The
+contract's `flush()` is meant to put the transaction boundary in the framework's hands rather than
+the engine's. It already is — the engine offers two strategies and every adapter picks per call
+site:
+
+```
+react     1 .commit()                        sync, from resetAfterCommit
+vue       8 .requestCommit()                 microtask-coalesced
+svelte   11 .requestCommit()
+solid     3 .commit()   1 .requestCommit()
+angular   3 .commit()  12 .requestCommit()
+```
+
+The engine never imposed one. What is missing is only the NAME — `flush()` as the contract's verb
+instead of `commit`/`requestCommit` — which is an API-surfacing task, not a behavioural change.
+Do not scope it as one.
