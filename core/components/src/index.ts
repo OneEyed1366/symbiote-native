@@ -526,9 +526,9 @@ export {
 // caller of `registerScrollViewBehavior()` names it. The shape CLAUDE.md forbids is a module whose
 // evaluation alone registers.
 //
-// NO ADAPTER CALLS IT YET, deliberately — `scroll-view` is the tag the wrappers already
-// emit and they build their own content node, so registering globally would double-nest every
-// existing ScrollView. See the behavior's header.
+// EVERY ADAPTER CALLS IT since 2026-09-11, through `@symbiote-native/components/register`. It was
+// withheld while the wrappers built their own content node — registering then would have
+// double-nested every ScrollView. They are gone; the engine is the single owner.
 export {
   HORIZONTAL_SCROLL_VIEW_TAG,
   registerScrollViewBehavior,

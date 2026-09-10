@@ -46,7 +46,8 @@
 // rename across every call site now and a second rename when the wrapper dies. The owner's decision
 // is that the ENGINE becomes the single owner of the content node — every adapter's list and
 // wrapper stops building one — so registration waits on that cut rather than on a new spelling.
-// Until then `registerScrollViewBehavior()` is called only by tests, which is what exercises it.
+// That cut LANDED 2026-09-11: no adapter's wrapper or list builds a content node any more, and all
+// five register this behavior through `@symbiote-native/components/register`.
 //
 // STYLE, on both nodes, and the precedence is the part that is easy to get silently wrong. The
 // wrapper composes exactly two arrays, and this reproduces both:

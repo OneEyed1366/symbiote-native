@@ -32,7 +32,8 @@
     "./bootstrap": "./src/bootstrap/index.ts",
     "./host-primitives": "./host-primitives.cjs",
     "./fold-host-bag": "./src/fold-host-bag.ts",
-    "./resolve-intrinsic": "./src/resolve-intrinsic.ts"
+    "./resolve-intrinsic": "./src/resolve-intrinsic.ts",
+    "./register": "./src/register.ts"
   },
   "files": [
     "build",
@@ -64,6 +65,10 @@
       "./resolve-intrinsic": {
         "types": "./build/resolve-intrinsic.d.ts",
         "default": "./build/resolve-intrinsic.js"
+      },
+      "./register": {
+        "types": "./build/register.d.ts",
+        "default": "./build/register.js"
       }
     }
   },
