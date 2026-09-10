@@ -146,6 +146,13 @@ const TAG_ONLY: readonly string[] = [
   // CASES shape (one component, one lowered) cannot express anyway. Coverage is that file plus
   // `core/components/src/behaviors/text-input.test.ts`.
   'TextInput',
+  // Spec entries only since 2026-09-11 — their tags and behaviors predate them. They arrive here
+  // rather than in `PAIRED` because the withholding condition was "the wrappers collapse", and what
+  // happened instead is that every wrapper was deleted: there is no component spelling to pair with.
+  // Coverage is `src/scroll-view-tag.test.tsx` and `src/touchable-tag.test.tsx`.
+  'TouchableOpacity',
+  'TouchableHighlight',
+  'ScrollView',
 ];
 
 const PAIRED = Object.keys(HOST_PRIMITIVES).filter(

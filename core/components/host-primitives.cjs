@@ -93,17 +93,45 @@ const HOST_PRIMITIVES = {
     // a tag with no machine — the whole reason this entry landed last.
     observesState: true,
   },
-  // `TouchableOpacity` is DELIBERATELY ABSENT, and this note is here so the next reader does not
-  // add it as an oversight. Its tag exists (`touchable-opacity`) and its behavior is registered;
-  // what is not ready is the other four adapters' wrappers, which still build TWO nodes — a
-  // `pressable` around a faded `view` — where RN and the tag build ONE
-  // (`TouchableOpacity.js:302`). An entry here is a switch for every adapter at once: the
-  // equivalence arms demand a component spelling that commits what the tag commits, and today
-  // four of them cannot. It lands when the wrappers collapse to a forwarder over the tag.
+  // The three that were WITHHELD until their wrappers collapsed, landed 2026-09-11 now that none
+  // exists on any adapter. The condition the old note stated — "it lands when the wrappers collapse
+  // to a forwarder over the tag" — was met by deleting them outright.
   //
-  // Until then the `id -> nativeID` alias this entry would carry is applied by the behavior's own
-  // `foldPayload` (`behaviors/touchable-opacity.ts`), so the tag is not missing the fold — it is
-  // getting it one layer down, on its own path only.
+  // What the entry buys, since the tag and its behavior already worked without one: a hand-written
+  // `<scroll-view>` was resolving as a COMPONENT on Vue, because `adapters/vue/intrinsic-tags.cjs`
+  // derives its element set from this table and both Vue compilers read it. Missing here, the tag
+  // cost a dev-mode resolve warning per element plus the component codegen path — a slot closure
+  // instead of `_createElementBlock`.
+  //
+  // `aliases: ID_ALIAS` even though each behavior's own `foldPayload` already renames `id`. The
+  // two COMPOSE: `foldHostBag` deletes the source key, so the behavior's fold finds no `id` and is
+  // a no-op. Measured on the committed payload rather than reasoned, both arms identical — the
+  // check `adapter-parity-audit.md` demands before declining a majority value, run in the
+  // direction of accepting one.
+  TouchableOpacity: {
+    intrinsic: 'touchable-opacity',
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
+  TouchableHighlight: {
+    intrinsic: 'touchable-highlight',
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
+  // The second primitive whose TAG depends on a prop, and the first where the prop is one RN's own
+  // API takes (`<ScrollView horizontal>`): the axis is a SEPARATE native ViewManager, not a flag on
+  // one view (`behaviors/scroll-view/shared.ts:131`). So an app may write either spelling and
+  // `resolveIntrinsicTag` picks the view, which is also what puts `horizontal-scroll-view` into
+  // Vue's element set — a tag apps write directly and which would otherwise resolve as a component.
+  ScrollView: {
+    intrinsic: 'scroll-view',
+    aliases: ID_ALIAS,
+    defaults: {},
+    intrinsicWhen: {
+      prop: 'horizontal',
+      intrinsic: 'horizontal-scroll-view',
+    },
+  },
   // Landed 2026-08-31, on the second attempt. The first threw the switch with the runtime half
   // unwired and was reverted the same hour; both gaps it exposed are closed here, and the record is
   // kept because the SEQUENCE is the reusable part — an entry here is a switch for four transforms

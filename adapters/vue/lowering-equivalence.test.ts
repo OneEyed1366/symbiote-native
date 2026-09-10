@@ -219,6 +219,13 @@ const TAG_ONLY: readonly string[] = [
   'Pressable',
   'TextInput',
   'Switch',
+  // Spec entries only since 2026-09-11 — their tags and behaviors predate them, and the entry is
+  // what puts them in Vue's element set. They arrive here rather than in `NAMES` because the
+  // withholding condition was "the wrappers collapse", and what happened instead is that every
+  // wrapper was deleted: there has never been a component spelling for these three to be equal to.
+  'TouchableOpacity',
+  'TouchableHighlight',
+  'ScrollView',
 ];
 
 // EVERY primitive the spec declares is now tag-only on Vue, so the comparison above has no rows
