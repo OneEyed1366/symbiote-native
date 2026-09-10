@@ -1,7 +1,7 @@
 /** @jsxRuntime automatic */
-// Proves a FlatList threads pull-to-refresh down to its inner ScrollView: RN's VirtualizedList
-// renders a <RefreshControl> into the ScrollView's `refreshControl` prop whenever
-// `onRefresh` is set, and omits it otherwise.
+// Proves a FlatList threads pull-to-refresh down to its scroll tag: when `onRefresh` is set the
+// list writes a `<refresh-control>` as the tag's first child and the scroll behavior claims it,
+// and it writes nothing otherwise.
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -107,8 +107,8 @@ function findScrollView(): IFakeNode {
 // absent), not a validation boundary.
 describe('React FlatList pull-to-refresh on the engine (Positive)', () => {
   it('wires a PullToRefreshView child onto the scroll view when onRefresh is set', () => {
-    // why: RN renders a RefreshControl into the inner ScrollView's `refreshControl` prop
-    // whenever `onRefresh` is set — a FlatList that drops this wiring silently loses
+    // why: RN wires a RefreshControl into the scroll view whenever `onRefresh` is set — here as
+    // a claimed CHILD rather than a prop — and a FlatList that drops this wiring silently loses
     // pull-to-refresh, and `refreshing`/`progressViewOffset` must reach the native control
     // controlled, not just present.
     mount(ROOT_TAG, <RefreshApp />);

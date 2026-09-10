@@ -17,22 +17,12 @@ import {
   unmount,
   View,
   Text,
-  Image,
-  ScrollView,
-  TextInput,
-  Switch,
-  Pressable,
-  TouchableOpacity,
-  TouchableHighlight,
-  SafeAreaView,
   Modal,
   KeyboardAvoidingView,
-  InputAccessoryView,
   FlatList,
   SectionList,
   VirtualizedList,
   VirtualizedSectionList,
-  RefreshControl,
   Animated,
 } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -66,7 +56,7 @@ function carriesTestId(id: string): IFakeNode | undefined {
 const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
   ['View', id => createElement(View, { testID: id })],
   ['Text', id => createElement(Text, { testID: id }, 'x')],
-  ['Image', id => createElement(Image, { testID: id, source: { uri: 'x' } })],
+  ['image', id => createElement('image', { testID: id, source: { uri: 'x' } })],
   [
     // The TAG. RN spreads `...props` onto the inner Image (ImageBackground.js:81), so the id lands
     // on the IMAGE rather than the box it is written on — which is what "some committed node
@@ -80,12 +70,16 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       ),
   ],
   [
-    'ScrollView',
+    'scroll-view',
     id =>
-      createElement(ScrollView, { testID: id }, createElement(Text, {}, 'x')),
+      createElement(
+        'scroll-view',
+        { testID: id },
+        createElement(Text, {}, 'x'),
+      ),
   ],
-  ['TextInput', id => createElement(TextInput, { testID: id })],
-  ['Switch', id => createElement(Switch, { testID: id, value: false })],
+  ['text-input', id => createElement('text-input', { testID: id })],
+  ['switch', id => createElement('switch', { testID: id, value: false })],
   [
     // The TAG. RN spreads `...restProps` onto the spinner (ActivityIndicator.js:99), so the id
     // lands on the SPINNER rather than the centering host — which is what "some committed node
@@ -100,24 +94,24 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
     id => createElement('button', { testID: id, title: 'x' }),
   ],
   [
-    'Pressable',
+    'pressable',
     id =>
-      createElement(Pressable, { testID: id }, createElement(Text, {}, 'x')),
+      createElement('pressable', { testID: id }, createElement(Text, {}, 'x')),
   ],
   [
-    'TouchableOpacity',
+    'touchable-opacity',
     id =>
       createElement(
-        TouchableOpacity,
+        'touchable-opacity',
         { testID: id },
         createElement(Text, {}, 'x'),
       ),
   ],
   [
-    'TouchableHighlight',
+    'touchable-highlight',
     id =>
       createElement(
-        TouchableHighlight,
+        'touchable-highlight',
         { testID: id },
         createElement(Text, {}, 'x'),
       ),
@@ -146,9 +140,13 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       ),
   ],
   [
-    'SafeAreaView',
+    'safe-area-view',
     id =>
-      createElement(SafeAreaView, { testID: id }, createElement(Text, {}, 'x')),
+      createElement(
+        'safe-area-view',
+        { testID: id },
+        createElement(Text, {}, 'x'),
+      ),
   ],
   [
     'KeyboardAvoidingView',
@@ -169,10 +167,10 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       ),
   ],
   [
-    'InputAccessoryView',
+    'input-accessory-view',
     id =>
       createElement(
-        InputAccessoryView,
+        'input-accessory-view',
         { testID: id, nativeID: 'acc' },
         createElement(Text, {}, 'x'),
       ),
@@ -222,8 +220,8 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       }),
   ],
   [
-    'RefreshControl',
-    id => createElement(RefreshControl, { testID: id, refreshing: false }),
+    'refresh-control',
+    id => createElement('refresh-control', { testID: id, refreshing: false }),
   ],
   ['Animated.View', id => createElement(Animated.View, { testID: id })],
   ['Animated.Text', id => createElement(Animated.Text, { testID: id }, 'x')],

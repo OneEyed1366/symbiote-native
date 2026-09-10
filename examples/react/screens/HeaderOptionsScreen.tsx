@@ -1,5 +1,5 @@
 import { createRef } from 'react';
-import { SafeAreaView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import { useRoute } from '@symbiote-native/navigation/react';
 import type { IScreenOptionsResolver } from '@symbiote-native/navigation/react';
 import type { ISearchBarCommands } from '@symbiote-native/navigation';
@@ -122,7 +122,7 @@ export function HeaderOptionsScreen() {
   const params = isHeaderOptionsParams(route.params) ? route.params : {};
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HeaderOptions];
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
@@ -188,6 +188,6 @@ export function HeaderOptionsScreen() {
           color={LINE_COLOR.presentation}
         />
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

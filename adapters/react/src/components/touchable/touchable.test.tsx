@@ -22,19 +22,16 @@
 
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  mount,
-  unmount,
-  View,
-  TouchableOpacity,
-  TouchableHighlight,
-} from '@symbiote-native/react';
+import { mount, unmount, View } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 120;
 const TOUCH_START = 'topTouchStart';
 const TOUCH_END = 'topTouchEnd';
 const ACTIVE_OPACITY = 0.3;
+// Long enough for the engine's own commit to publish a value that was SET, far short of the
+// 150 ms fade the grant-branch case exists to rule out.
+const DURATION_PROBE_MS = 20;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -170,9 +167,15 @@ function feedbackProps(): Record<string, unknown> {
   return found;
 }
 
-// TouchableHighlight splits its feedback across TWO nodes (RN's _createExtraStyles): the
-// underlay color on the container — the Pressable's responder RCTView, shallowest — and the
-// lowered opacity on the child, deepest. Asserting them apart is the point.
+// The engine folds an underlay flip into the node's payload and asks for a commit; the commit is
+// scheduled rather than run inside the event, so a read taken synchronously after a touch sees the
+// pre-flip payload. Well under the 40 ms `delayPressOut` the hold case pins.
+const settleUnderlay = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, DURATION_PROBE_MS));
+
+// Both halves of a TouchableHighlight's feedback land on ONE node now (see the assertion below for
+// why), but the helpers stay split: `containerProps` is the responder and `childProps` the app's
+// own child, and proving the child is UNTOUCHED is what the second one is for.
 function committedViews(): Record<string, unknown>[] {
   const found: Record<string, unknown>[] = [];
   function walk(node: IFakeNode): void {
@@ -215,22 +218,34 @@ describe('React TouchableOpacity animated feedback', () => {
   // behind `await flushFrames()`, which burns past 150 ms, so the duration is invisible to them —
   // swapping 0 for 150 left all 79 adapter tests green (.claude/rules/test-harness-false-greens
   // §5: the test that pins a duration is the one that does not wait).
-  it('snaps to activeOpacity on press-in with no fade, as the grant branch does', () => {
+  it('snaps to activeOpacity on press-in with no fade, as the grant branch does', async () => {
     function App(): ReactElement {
       return (
-        <TouchableOpacity
+        <touchable-opacity
           activeOpacity={ACTIVE_OPACITY}
           style={{ width: 10 }}
         />
       );
     }
     mount(ROOT_TAG, <App />);
+    // The RESTING value is published from the behavior's `afterCommit`, one commit after the
+    // mount — the wrapper carried it in the style it rendered, so it was there synchronously. This
+    // await is on the setup, NOT on the measurement: the press-in read below still takes no wait,
+    // which is what keeps the 0-vs-150ms duration observable at all.
+    await flushEffectsAndFrames();
 
     expect(asNumber(feedbackProps().opacity, 'resting opacity')).toBe(1);
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
+    // A BOUNDED wait, an order of magnitude under the 150 ms it is guarding against — the engine
+    // publishes an animated value on its own commit rather than in the render that fired the
+    // event, so a strictly synchronous read now sees nothing on ANY duration and the oracle would
+    // be dead. Draining frames instead is not available here: `flushFrames` runs until nothing is
+    // pending, which burns past 150 ms and is exactly what makes every other fade assertion in
+    // this file blind to the duration (test-harness-false-greens §5).
+    await new Promise(resolve => setTimeout(resolve, DURATION_PROBE_MS));
 
-    // Broken (duration 150): still ~1 here, the fade has not started moving.
+    // Broken (duration 150): ~0.97 here, barely started. Correct (0): already landed.
     expect(
       asNumber(feedbackProps().opacity, 'opacity right after press-in'),
     ).toBeCloseTo(ACTIVE_OPACITY, 6);
@@ -246,7 +261,7 @@ describe('React TouchableOpacity animated feedback', () => {
 
     function App(): ReactElement {
       return (
-        <TouchableOpacity
+        <touchable-opacity
           activeOpacity={ACTIVE_OPACITY}
           style={{ width: 10 }}
           onPress={() => {
@@ -262,6 +277,8 @@ describe('React TouchableOpacity animated feedback', () => {
       );
     }
     mount(ROOT_TAG, <App />);
+    // See the case above: the resting value lands one commit after the mount now.
+    await flushEffectsAndFrames();
 
     const handle = responderHandle();
 
@@ -303,7 +320,7 @@ describe('React TouchableOpacity animated feedback', () => {
 
     function App(): ReactElement {
       return (
-        <TouchableOpacity
+        <touchable-opacity
           delayPressIn={DELAY}
           onPressIn={() => {
             deferredPressIns++;
@@ -331,7 +348,7 @@ describe('React TouchableOpacity animated feedback', () => {
     let pressOuts = 0;
     mount(
       ROOT_TAG,
-      <TouchableOpacity
+      <touchable-opacity
         onPress={() => {}}
         onPressOut={() => {
           pressOuts++;
@@ -356,7 +373,7 @@ describe('React TouchableOpacity animated feedback', () => {
     const STYLE_OPACITY = 0.6;
     mount(
       ROOT_TAG,
-      <TouchableOpacity
+      <touchable-opacity
         style={{ opacity: STYLE_OPACITY, width: 10 }}
         activeOpacity={ACTIVE_OPACITY}
         onPress={() => {}}
@@ -393,7 +410,7 @@ describe('React TouchableOpacity animated feedback', () => {
       const [disabled, update] = useState(false);
       setDisabled = update;
       return (
-        <TouchableOpacity
+        <touchable-opacity
           disabled={disabled}
           activeOpacity={ACTIVE_OPACITY}
           onPress={() => {}}
@@ -426,17 +443,17 @@ describe('React TouchableHighlight underlay feedback', () => {
   // the 2026-08-19 audit — fades the very underlay it is meant to reveal, so `underlayColor:
   // 'black'` paints grey. React is the only adapter that can reach the child (cloneElement), so
   // this test is the split's only guard in the repo.
-  it('paints underlayColor on the container and activeOpacity on the child while pressed', () => {
+  it('paints underlayColor and activeOpacity while pressed, and clears the child', async () => {
     mount(
       ROOT_TAG,
-      <TouchableHighlight
+      <touchable-highlight
         underlayColor="#abc"
         activeOpacity={0.5}
         style={{ width: 10 }}
         onPress={() => {}}
       >
         <View style={{ height: 4 }} />
-      </TouchableHighlight>,
+      </touchable-highlight>,
     );
     const handle = responderHandle();
 
@@ -445,11 +462,17 @@ describe('React TouchableHighlight underlay feedback', () => {
     expect(childProps().opacity).toBeUndefined();
 
     fabric.fireEvent(handle, TOUCH_START);
+    await settleUnderlay();
     expect(containerProps().backgroundColor).toBe('#abc');
     expect(containerProps().width).toBe(10);
-    // The container must stay OPAQUE — an opacity here would fade the underlay itself.
-    expect(containerProps().opacity).toBeUndefined();
-    expect(childProps().opacity).toBe(0.5);
+    // BOTH halves land on the ONE node, and the child is untouched — this is the tag's documented
+    // divergence from RN, which paints the underlay on a container and clones the lowered opacity
+    // onto the child. Splitting them needs a child to target, and a tag has no render to reach one
+    // (`core/components/src/behaviors/touchable-highlight.ts`, and `component-names/shared.ts` at
+    // the tag's own declaration). Every adapter's wrapper except React's had already shipped this
+    // simplification; deleting React's wrapper is what made it the only shape.
+    expect(containerProps().opacity).toBe(0.5);
+    expect(childProps().opacity).toBeUndefined();
     expect(childProps().height).toBe(4);
   });
 
@@ -460,28 +483,29 @@ describe('React TouchableHighlight underlay feedback', () => {
   it('holds the underlay past release for delayPressOut, then clears both halves', async () => {
     mount(
       ROOT_TAG,
-      <TouchableHighlight
+      <touchable-highlight
         underlayColor="#abc"
         activeOpacity={0.5}
         delayPressOut={40}
         onPress={() => {}}
       >
         <View style={{ height: 4 }} />
-      </TouchableHighlight>,
+      </touchable-highlight>,
     );
     const handle = responderHandle();
 
     fabric.fireEvent(handle, TOUCH_START);
     fabric.fireEvent(handle, TOUCH_END);
+    await settleUnderlay();
     expect(
       containerProps().backgroundColor,
-      'release must not clear the underlay synchronously',
+      'release must not clear the underlay before delayPressOut elapses',
     ).toBe('#abc');
-    expect(childProps().opacity).toBe(0.5);
+    expect(containerProps().opacity).toBe(0.5);
 
     await new Promise(resolve => setTimeout(resolve, 60));
     expect(containerProps().backgroundColor).toBeUndefined();
-    expect(childProps().opacity).toBeUndefined();
+    expect(containerProps().opacity).toBeUndefined();
   });
 
   // why: RN's _hasPressHandler gates the whole underlay — a decorative TouchableHighlight with no
@@ -489,9 +513,9 @@ describe('React TouchableHighlight underlay feedback', () => {
   it('paints no underlay when no press handler is supplied', async () => {
     mount(
       ROOT_TAG,
-      <TouchableHighlight underlayColor="#abc" activeOpacity={0.5}>
+      <touchable-highlight underlayColor="#abc" activeOpacity={0.5}>
         <View style={{ height: 4 }} />
-      </TouchableHighlight>,
+      </touchable-highlight>,
     );
     const handle = responderHandle();
 
@@ -512,14 +536,14 @@ describe('React TouchableHighlight underlay feedback', () => {
     const hides: number[] = [];
     mount(
       ROOT_TAG,
-      <TouchableHighlight
+      <touchable-highlight
         underlayColor="#abc"
         onPress={() => {}}
         onShowUnderlay={() => shows.push(1)}
         onHideUnderlay={() => hides.push(1)}
       >
         <View style={{ height: 4 }} />
-      </TouchableHighlight>,
+      </touchable-highlight>,
     );
     const handle = responderHandle();
 
@@ -539,14 +563,14 @@ describe('React TouchableHighlight underlay feedback', () => {
     const calls: string[] = [];
     mount(
       ROOT_TAG,
-      <TouchableHighlight
+      <touchable-highlight
         underlayColor="#abc"
         onPress={() => calls.push('press')}
         onPressIn={() => calls.push('pressIn')}
         onPressOut={() => calls.push('pressOut')}
       >
         <View style={{ height: 4 }} />
-      </TouchableHighlight>,
+      </touchable-highlight>,
     );
     fabric.fireEvent(responderHandle(), TOUCH_START);
     fabric.fireEvent(responderHandle(), TOUCH_END);
@@ -575,11 +599,11 @@ describe('React Touchable* accessibility default', () => {
   const variants: [string, (child: ReactElement) => ReactElement][] = [
     [
       'TouchableOpacity',
-      c => <TouchableOpacity onPress={() => {}}>{c}</TouchableOpacity>,
+      c => <touchable-opacity onPress={() => {}}>{c}</touchable-opacity>,
     ],
     [
       'TouchableHighlight',
-      c => <TouchableHighlight onPress={() => {}}>{c}</TouchableHighlight>,
+      c => <touchable-highlight onPress={() => {}}>{c}</touchable-highlight>,
     ],
   ];
 
@@ -593,9 +617,9 @@ describe('React Touchable* accessibility default', () => {
   it('a literal false still opts out through the composition', () => {
     mount(
       ROOT_TAG,
-      <TouchableOpacity accessible={false} onPress={() => {}}>
+      <touchable-opacity accessible={false} onPress={() => {}}>
         <View />
-      </TouchableOpacity>,
+      </touchable-opacity>,
     );
     expect(responderProps().accessible).toBe(false);
   });
@@ -621,17 +645,17 @@ describe('React Touchable* focusable', () => {
       [
         'TouchableOpacity',
         p => (
-          <TouchableOpacity {...p}>
+          <touchable-opacity {...p}>
             <View />
-          </TouchableOpacity>
+          </touchable-opacity>
         ),
       ],
       [
         'TouchableHighlight',
         p => (
-          <TouchableHighlight {...p}>
+          <touchable-highlight {...p}>
             <View />
-          </TouchableHighlight>
+          </touchable-highlight>
         ),
       ],
     ];

@@ -10,7 +10,7 @@
 import { createElement, useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
-import { Pressable, Text, View, mount, unmount } from '@symbiote-native/react';
+import { Text, View, mount, unmount } from '@symbiote-native/react';
 
 interface IFakeNode {
   viewName: string;
@@ -107,7 +107,7 @@ function App(): ReactElement {
     View,
     null,
     createElement(
-      Pressable,
+      'pressable',
       {
         testID: TEST_ID,
         onPress: () => setOpen(true),
@@ -147,7 +147,13 @@ describe('clone-on-write prop removal', () => {
   describe('Positive', () => {
     // why: `diffProps` sending `{ opacity: null }` must survive a Fabric-faithful MERGE (not
     // the shared harness's replace) — a merge slot is the only way this bug is observable at all.
-    it('sets opacity on press and fully resets it on release', () => {
+    // The press flip is coalesced onto a MICROTASK now — the machine calls `setNodePressed` and
+    // asks for a commit rather than re-rendering, where the wrapper flipped React state and rode
+    // the renderer's own forced sync flush. So each read is preceded by `settle()`. Fake timers do
+    // not fake microtasks, so the two mix: `settle` turns the queue, `advanceTimersByTime` moves
+    // the 130 ms floor.
+    it('sets opacity on press and fully resets it on release', async () => {
+      const settle = (): Promise<void> => Promise.resolve();
       mount(ROOT_TAG, createElement(App));
 
       expect(eventHandler, 'an event handler was registered').toBeDefined();
@@ -156,21 +162,25 @@ describe('clone-on-write prop removal', () => {
       const handle = button!.instanceHandle;
 
       eventHandler!(handle, 'topTouchStart', {});
+      await settle();
       expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
         ACTIVE_OPACITY,
       );
 
       eventHandler!(handle, 'topTouchEnd', {});
+      await settle();
       // Plain Pressable follows RN's 130ms active-duration floor, so the prop remains during the
       // floor and must then be GONE (reset), not stuck at 0.2 after the Fabric merge.
       expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
         ACTIVE_OPACITY,
       );
       vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS - 1);
+      await settle();
       expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
         ACTIVE_OPACITY,
       );
       vi.advanceTimersByTime(1);
+      await settle();
       expect(findByTestId(committed, TEST_ID)?.props.opacity).toBeUndefined();
     });
   });

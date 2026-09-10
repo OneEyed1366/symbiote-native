@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   FlatList,
   SectionList,
   Keyboard,
@@ -66,7 +65,7 @@ export function ParityDemo() {
       </Text>
 
       {/* #15 Keyboard.dismiss: blurs whatever input holds focus without needing a ref. */}
-      <TextInput
+      <text-input
         placeholder="focus me…"
         placeholderTextColor="#41506a"
         onFocus={() => setDismissMsg('keyboard up — tap Hide keyboard')}

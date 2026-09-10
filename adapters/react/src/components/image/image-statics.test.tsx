@@ -5,9 +5,9 @@
 // per-platform prefetch arity) is already exhaustively covered by
 // core/engine/src/image-loader.test.ts. Re-testing that logic here through the React `Image`
 // import would duplicate that suite. This file instead proves ONLY the React-side wiring: that
-// `Image.<static>` is the SAME function core exports (Object.assign(ImageComponent, imageStatics)
-// didn't wrap, clone, or drop anything), and one live call to prove the composed object is
-// actually callable through the React entry point.
+// `Image.<static>` is the SAME function core exports (`modules/image` re-exports rather than
+// wrapping), and one live call to prove the object is actually callable through the React entry
+// point. `Image` is no longer a component at all — the primitive is the `<image>` tag.
 //
 // No Negative group: there is no React-side logic here to reject anything — the wiring is a
 // straight object composition. Every failure mode (native module missing, malformed native

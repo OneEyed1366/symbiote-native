@@ -1,4 +1,4 @@
-import { Pressable, SafeAreaView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import { Drawer, useDrawerNavigation } from '@symbiote-native/navigation/react';
 import type {
   IDrawerDescriptorMap,
@@ -16,7 +16,7 @@ const drawerLineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DrawerDemo];
 function DrawerHomeScreen() {
   const navigation = useDrawerNavigation();
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <View className={`line-tag line-tag-${drawerLineInfo.line}`}>
           <Text className="line-tag-text">{`${drawerLineInfo.code} · ${drawerLineInfo.label}`}</Text>
@@ -53,14 +53,14 @@ function DrawerHomeScreen() {
           color={LINE_COLOR.structure}
         />
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }
 
 function DrawerSettingsScreen() {
   const navigation = useDrawerNavigation();
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <View className={`line-tag line-tag-${drawerLineInfo.line}`}>
           <Text className="line-tag-text">{`${drawerLineInfo.code} · ${drawerLineInfo.label}`}</Text>
@@ -73,7 +73,7 @@ function DrawerSettingsScreen() {
           color={LINE_COLOR.structure}
         />
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }
 
@@ -89,10 +89,10 @@ function renderDrawerContent({
   navigation,
 }: IDrawerContentProps) {
   return (
-    <SafeAreaView testID="drawer-panel" className="section-tight drawer-panel">
+    <safe-area-view testID="drawer-panel" className="section-tight drawer-panel">
       <Text className="section-label">Menu</Text>
       {state.routes.map(route => (
-        <Pressable
+        <pressable
           key={route.key}
           testID={`drawer-menu-${route.name}`}
           className="menu-row"
@@ -101,9 +101,9 @@ function renderDrawerContent({
           <Text className="menu-row-label">
             {descriptors[route.key]?.options.drawerLabel ?? route.name}
           </Text>
-        </Pressable>
+        </pressable>
       ))}
-    </SafeAreaView>
+    </safe-area-view>
   );
 }
 

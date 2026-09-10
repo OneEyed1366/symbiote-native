@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   hasAction,
   isAvailableAsync,
@@ -58,8 +58,8 @@ export function StoreReviewScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="store-review-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -126,7 +126,7 @@ export function StoreReviewScreen() {
             builds. Both stores also enforce a quota.
           </Text>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

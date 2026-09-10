@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   NetworkStateType,
   getIpAddressAsync,
@@ -63,8 +63,8 @@ export function NetworkScreen() {
   }, [networkState]);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="network-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -140,7 +140,7 @@ export function NetworkScreen() {
             </Text>
           </View>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

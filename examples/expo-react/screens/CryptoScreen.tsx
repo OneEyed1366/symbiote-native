@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -52,8 +52,8 @@ export function CryptoScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="crypto-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -115,7 +115,7 @@ export function CryptoScreen() {
             <ValueRow label="Bytes" value={randomBytes} />
           )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

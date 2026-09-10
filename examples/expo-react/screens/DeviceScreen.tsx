@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   DeviceType,
   brand,
@@ -89,8 +89,8 @@ export function DeviceScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="device-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -160,7 +160,7 @@ export function DeviceScreen() {
             />
           )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

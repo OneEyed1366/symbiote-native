@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  Switch,
-  Text,
-  View,
-} from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   isAvailableAsync,
   useKeepAwake,
@@ -47,8 +41,8 @@ export function KeepAwakeScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="keep-awake-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -81,7 +75,7 @@ export function KeepAwakeScreen() {
           />
           <View testID="keep-awake-toggle-row" className="capability-row">
             <Text className="capability-label">Keep screen awake</Text>
-            <Switch
+            <switch
               testID="keep-awake-switch"
               value={isKeepAwakeOn}
               onValueChange={event => setIsKeepAwakeOn(event.value)}
@@ -90,7 +84,7 @@ export function KeepAwakeScreen() {
           </View>
           {isKeepAwakeOn && <KeepAwakeHolder />}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

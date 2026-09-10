@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   Platform,
-  SafeAreaView,
-  ScrollView,
   Text,
   View,
 } from '@symbiote-native/react';
@@ -110,8 +108,8 @@ export function BatteryScreen() {
     batteryLevel < 0 ? 'unknown' : `${Math.round(batteryLevel * 100)}%`;
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="battery-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -171,7 +169,7 @@ export function BatteryScreen() {
             />
           )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

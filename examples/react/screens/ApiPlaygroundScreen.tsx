@@ -1,4 +1,4 @@
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 import { HooksStateContextDemo } from '../components/HooksStateContextDemo';
@@ -33,8 +33,8 @@ export function ApiPlaygroundScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.ApiPlayground];
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="api-playground-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -100,7 +100,7 @@ export function ApiPlaygroundScreen() {
           picture.
         </Text>
         <OtherApisDemo />
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

@@ -12,7 +12,7 @@
 import type { ReactNode } from 'react';
 import type { IPressTimingProps } from '@symbiote-native/components';
 
-import type { IPressableProps } from '../pressable';
+import type { IPressableProps } from '../pressable/pressable-props';
 
 export type ITouchableWithoutFeedbackProps = Omit<
   IPressableProps,

@@ -1,14 +1,7 @@
 // TEMPORARY probe: enumerate the native nodes one benchmark row builds, by name.
 // Not a regression test — deleted after the question it answers is answered.
 import { describe, expect, it } from 'vitest';
-import {
-  Pressable,
-  Text,
-  TextInput,
-  View,
-  mount,
-  unmount,
-} from '@symbiote-native/react';
+import { Text, View, mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 909;
@@ -19,13 +12,13 @@ function Row(): React.ReactElement {
   return (
     <View className="bench-row">
       <Text className="bench-row-id">1</Text>
-      <Pressable className="flex1" onPress={() => {}}>
+      <pressable className="flex1" onPress={() => {}}>
         <Text className="bench-row-label">label</Text>
-      </Pressable>
-      <Pressable className="bench-row-remove" onPress={() => {}}>
+      </pressable>
+      <pressable className="bench-row-remove" onPress={() => {}}>
         <Text className="bench-row-remove-text">×</Text>
-      </Pressable>
-      <TextInput className="bench-row-input" value="label" />
+      </pressable>
+      <text-input className="bench-row-input" value="label" />
     </View>
   );
 }

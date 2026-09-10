@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SafeAreaView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   deserializeNavigatorState,
   serializeNavigatorState,
@@ -58,7 +58,7 @@ export function StatePersistenceScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StatePersistence];
 
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
@@ -101,6 +101,6 @@ export function StatePersistenceScreen() {
           </Text>
         </View>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   Orientation,
   OrientationLock,
@@ -63,8 +63,8 @@ export function ScreenOrientationScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="screen-orientation-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -119,7 +119,7 @@ export function ScreenOrientationScreen() {
             color={lineColor}
           />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

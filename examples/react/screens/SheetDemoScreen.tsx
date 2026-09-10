@@ -1,4 +1,4 @@
-import { ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import { useStackNavigation } from '@symbiote-native/navigation/react';
 import type { IScreenOptions } from '@symbiote-native/navigation/react';
 import { ROUTE_NAME } from '../routes';
@@ -44,7 +44,7 @@ export function SheetDemoScreen() {
   const navigation = useStackNavigation();
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
   return (
-    <ScrollView className="screen" contentContainerStyle="section">
+    <scroll-view className="screen" contentContainerStyle="section">
       <View className={`line-tag line-tag-${lineInfo.line}`}>
         <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
       </View>
@@ -73,6 +73,6 @@ export function SheetDemoScreen() {
         onPress={() => navigation.pop()}
         color={LINE_COLOR.presentation}
       />
-    </ScrollView>
+    </scroll-view>
   );
 }

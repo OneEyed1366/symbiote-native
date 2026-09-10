@@ -1,8 +1,6 @@
 import { useCallback, useState } from 'react';
 import {
   Platform,
-  SafeAreaView,
-  ScrollView,
   Text,
   View,
 } from '@symbiote-native/react';
@@ -107,8 +105,8 @@ export function HapticsScreen() {
   );
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="haptics-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -205,7 +203,7 @@ export function HapticsScreen() {
             <Text className="value-text">{`Last fired: ${lastFired}`}</Text>
           </View>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

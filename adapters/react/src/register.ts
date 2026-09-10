@@ -15,23 +15,6 @@
 // adapters use. `register.test.ts` is what stops a later tidy-up from "fixing" the bare import into
 // a re-export.
 //
-// ScrollView is deliberately ABSENT, and DELETING THE WRAPPER IS NOT WHAT UNBLOCKS IT.
-// `registerScrollViewBehavior()` puts a `buildStructure` on `scroll-view` /
-// `horizontal-scroll-view` that builds a content node, and TWO owners already build one:
-// `components/scroll-view`, and `components/virtualized-list`, which renders that wrapper and is
-// staying a component through this migration (its output shape is decided in JS). Registering
-// while either stands double-nests the content view — measured: it reddens 8 ScrollView and
-// VirtualizedList tests, `contentContainerStyle` landing on the behavior's slot instead of the
-// wrapper's node. Per the 2026-09-07 cross-adapter finding, some adapters' lists hand-author
-// `scroll-view` + `scroll-content` rather than rendering the wrapper, so an import grep reports
-// them clean; React's does not, but the list stack is the blocker on both shapes.
-//
-// Two folds are owed before the tag can stand alone either way, both in the behavior rather than
-// here: `horizontal` (a real C++ ScrollView prop, `BaseScrollViewProps.h:56` — the behavior
-// composes only the axis STYLE base, so a bare `horizontal-scroll-view` scrolls vertically on iOS,
-// where both tags resolve to RCTScrollView) and `nestedScrollEnabled ?? true` (written only on
-// Android's RefreshControl WRAP path, `index.android.ts`, so an unwrapped scroll view loses the
-// default RN and the wrapper both apply).
 import {
   registerActivityIndicatorBehavior,
   registerButtonBehavior,
@@ -40,9 +23,12 @@ import {
   registerRefreshControlBehavior,
   registerInputAccessoryViewBehavior,
   registerPressableBehavior,
+  registerScrollViewBehavior,
   registerSwitchBehavior,
   registerTextInputBehavior,
+  registerTouchableHighlightBehavior,
   registerTouchableNativeFeedbackBehavior,
+  registerTouchableOpacityBehavior,
   registerTouchableWithoutFeedbackBehavior,
 } from '@symbiote-native/components';
 
@@ -68,23 +54,33 @@ registerButtonBehavior();
 // it. Safe because the wrapper is GONE in this same commit — while five wrappers still painted the
 // spinner themselves, registering here would have given every indicator two.
 registerActivityIndicatorBehavior();
-// Only the LOWERED tags carry this — the wrapper renders `text-input-managed` and keeps running its
-// own lifecycle. One owner per node; see `component-names/shared.ts`.
+
+// Its own tag rather than `pressable`, because one node may hold exactly one press machine and
+// this one is a pressable PLUS the opacity fade. RN builds ONE `Animated.View` here
+// (TouchableOpacity.js:302), so the wrapper's second node was ours; both the machine and the fade
+// live on the engine node now. Safe because the wrapper is GONE in this same commit.
+registerTouchableOpacityBehavior();
+// Its own tag too, same reason: one node holds one press machine, and this one is a pressable
+// PLUS the underlay show/hide machine. Safe for the same reason — the wrapper is GONE here.
+registerTouchableHighlightBehavior();
+// The whole TextInput lifecycle — the acknowledged event count, the `setTextAndSelection`
+// controlled write, the focus/blur mirror, mount `autoFocus`. Its wrapper is GONE in this same
+// commit, so the `text-input-managed` twin that kept the two machines apart is dead on this
+// adapter: nothing here emits it, and there is only one owner left to be.
 registerTextInputBehavior();
-// Same reason as TextInput: the wrapper renders `switch-managed` and runs its own
-// lastNativeReport/snap-back lifecycle, so the engine's copy attaches only to the bare tag.
+// Same shape as TextInput: the wrapper ran its own lastNativeReport/snap-back lifecycle and
+// rendered `switch-managed` to stay out of the way. It is GONE too, so the bare tag is the only
+// spelling and the twin is unreachable from here.
 registerSwitchBehavior();
 
-// Image owns no runtime — its behavior is a prop FOLD and nothing else, and it is registered on the
-// same `image` the wrapper already emits rather than on a `-managed` twin. Safe only because the
-// mapping is idempotent, which `core/components/src/behaviors/image.test.ts` asserts rather than
-// assumes; a wrapper-built node simply folds a second time and nothing moves.
+// Image owns no runtime — its behavior is a prop FOLD and nothing else. The wrapper shared this
+// tag and is GONE; what is left under the name `Image` is the STATICS namespace (`modules/image`),
+// which builds no node at all.
 registerImageBehavior();
 
-// The controlled-spinner handshake, which only Angular ever had and which it kept in its own
-// component until now: mirror the value native last reported, and command it back down when the
-// app's `refreshing` disagrees (RefreshControl.js:145-166). Shares the wrapper's tag with no
-// `-managed` twin, which is safe because no wrapper runs a second copy of the machine any more.
+// The controlled-spinner handshake: mirror the value native last reported, and command it back
+// down when the app's `refreshing` disagrees (RefreshControl.js:145-166). Shares the wrapper's tag
+// with no `-managed` twin, which is safe because that wrapper is GONE too.
 registerRefreshControlBehavior();
 
 // Same order Image used, and safe for the same kind of reason with one extra step: this tag
@@ -92,7 +88,17 @@ registerRefreshControlBehavior();
 // the five wrappers are GONE in this same commit.
 registerImageBackgroundBehavior();
 
-// Fold-only, and it shares the wrapper's tag for the same reason Image does: the mapping has no
-// aliasing at all, so a wrapper-built node folding a second time moves nothing.
-// `core/components/src/behaviors/input-accessory-view.test.ts` asserts that rather than assuming it.
+// Fold-only, like Image, and its wrapper is GONE — the host-node assembly the wrapper used to run
+// is exactly what this behavior does on the tag.
 registerInputAccessoryViewBehavior();
+
+// The ENGINE is the single owner of a ScrollView's content node from here: `buildStructure` builds
+// the `RCTScrollContentView`, `slotProps` carries `contentContainerStyle` onto it, the claim on a
+// `refresh-control` child places it per platform (a sibling on iOS, an inverting wrap on Android),
+// and the sticky seam is `behaviors/scroll-view/sticky.ts`.
+//
+// EXACTLY ONE THING MAY BUILD THAT CONTENT NODE. `components/scroll-view` and
+// `components/virtualized-list` both used to; both now emit only the scroll tag, and
+// `components/scroll-view/scroll-view-content-owner.test.tsx` is what stops a third owner
+// reappearing — the failure it guards is silent, a second `RCTScrollContentView` inside the first.
+registerScrollViewBehavior();

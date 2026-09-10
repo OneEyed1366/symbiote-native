@@ -5,7 +5,7 @@ import {
   useState,
   useTransition,
 } from 'react';
-import { Text, TextInput, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { CaveatNote } from './CaveatNote';
 import { LINE_COLOR } from '../navigation-lines';
@@ -65,7 +65,7 @@ export function HooksPerformanceDemo() {
       <Text className="section-label">
         useMemo · useCallback · useTransition · useDeferredValue
       </Text>
-      <TextInput
+      <text-input
         testID="hooks-perf-query"
         className="text-input"
         value={query}

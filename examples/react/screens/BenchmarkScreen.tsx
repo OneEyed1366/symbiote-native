@@ -1,12 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
   SectionList,
   Text,
-  TextInput,
   View,
   type ISection,
 } from '@symbiote-native/react';
@@ -414,26 +410,26 @@ const BenchmarkRow = memo(function BenchmarkRowView({
   return (
     <View className={isSelected ? 'bench-row bench-row-selected' : 'bench-row'}>
       <Text className="bench-row-id">{String(row.id)}</Text>
-      <Pressable className="flex1" onPress={() => onSelect(row.id)}>
+      <pressable className="flex1" onPress={() => onSelect(row.id)}>
         <Text className="bench-row-label">{row.label}</Text>
-      </Pressable>
-      <Pressable className="bench-row-remove" onPress={() => onRemove(row.id)}>
+      </pressable>
+      <pressable className="bench-row-remove" onPress={() => onRemove(row.id)}>
         <Text className="bench-row-remove-text">×</Text>
-      </Pressable>
+      </pressable>
       {/* LAST child, and deliberately bare: no `multiline` (it would pick the other native view
         and, being a runtime value, refuse to lower at all), no change handler and no ref (a ref
         refuses to lower on the adapters that check for one). CONTROLLED rather than
         `defaultValue`, because the controlled write is the beat the engine-side machine exists
         for and an uncontrolled input would never run it. React has no lowering transform, so
         here it stays a component — this column is the control the lowered ones are read against. */}
-      <TextInput className="bench-row-input" value={row.label} />
+      <text-input className="bench-row-input" value={row.label} />
     </View>
   );
 });
 
 /**
- * Sticky path A - a plain ScrollView with stickyHeaderIndices. Stickiness is computed in JS (the
- * adapter wraps each flagged child and drives it off the scroll offset), but nothing else runs
+ * Sticky path A - a plain scroll-view with stickyHeaderIndices. Stickiness is computed in JS (the
+ * engine wraps each flagged child and drives it off the scroll offset), but nothing else runs
  * per frame: every child is mounted up front, there is no windowing. Memoized with no props so a
  * benchmark run never re-renders it and never contaminates the numbers next to the buttons.
  */
@@ -467,9 +463,9 @@ const StickyScrollViewBlock = memo(function StickyScrollViewBlockView() {
   return (
     <>
       <Text className="section-label">
-        STICKY PATH A · ScrollView · stickyHeaderIndices
+        STICKY PATH A · scroll-view · stickyHeaderIndices
       </Text>
-      <ScrollView
+      <scroll-view
         testID="benchmark-sticky-scroll"
         className="bench-sticky"
         stickyHeaderIndices={headerIndices}
@@ -477,7 +473,7 @@ const StickyScrollViewBlock = memo(function StickyScrollViewBlockView() {
         nestedScrollEnabled
       >
         {children}
-      </ScrollView>
+      </scroll-view>
       <Text className="note-text">
         {`${STICKY_SECTION_COUNT} sections, every row mounted — no virtualization in the frame.`}
       </Text>
@@ -987,8 +983,8 @@ export function BenchmarkScreen() {
   }
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="benchmark-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -1260,7 +1256,7 @@ export function BenchmarkScreen() {
             </Text>
           ))
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

@@ -1,4 +1,4 @@
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import { useCalendars, useLocales } from '@symbiote-native/localization/react';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -25,8 +25,8 @@ export function LocalizationScreen() {
   const [calendar] = useCalendars();
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="localization-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -80,7 +80,7 @@ export function LocalizationScreen() {
           />
           <ValueRow label="Time zone" value={calendar.timeZone ?? 'unknown'} />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

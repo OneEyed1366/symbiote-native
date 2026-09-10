@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   getAdvertisingId,
   usePermissions,
@@ -34,8 +34,8 @@ export function TrackingTransparencyScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="tracking-transparency-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -97,7 +97,7 @@ export function TrackingTransparencyScreen() {
           </View>
           <ValueRow label="Advertising ID" value={advertisingId ?? 'null'} />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

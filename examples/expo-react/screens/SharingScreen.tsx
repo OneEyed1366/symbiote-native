@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  SafeAreaView,
-  ScrollView,
   Text,
-  TextInput,
   View,
 } from '@symbiote-native/react';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing';
@@ -76,8 +73,8 @@ export function SharingScreen() {
   }, [fileUri]);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="sharing-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -120,7 +117,7 @@ export function SharingScreen() {
             file-system package, so supply a path that already exists on the
             device.
           </Text>
-          <TextInput
+          <text-input
             testID="sharing-uri-input"
             value={fileUri}
             onValueChange={event => setFileUri(event.text)}
@@ -142,7 +139,7 @@ export function SharingScreen() {
             </Text>
           </View>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

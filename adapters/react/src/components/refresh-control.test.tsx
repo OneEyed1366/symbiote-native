@@ -6,25 +6,16 @@
 // refresh-control node calls onRefresh, all against the fake Fabric slot, no simulator.
 // A failure here is in JS.
 //
-// RefreshControl (adapters/react/src/components/refresh-control/index.ts) is a plain
-// functional component with no reducer/render split into core/components and no guard
-// clause on any prop — every branch is either a `dlog` side effect or an unconditional
-// object spread onto `createElement('refresh-control', ...)`. There is no input
-// this component rejects, so there is no Negative (toThrow) group here — only Positive.
-// `resolveAccessibilityProps` is shared infrastructure exercised elsewhere (activity-indicator,
-// image, modal tests) and not RefreshControl-specific, so it stays out of scope here.
-// The Android WRAP-style routing (RefreshControl wraps ScrollView instead of nesting inside
-// it) is covered by the sibling scroll-view-android-refresh.test.tsx, not duplicated here.
+// There is no component any more — `<refresh-control>` is a bare tag, and nothing it accepts is
+// rejected, so there is no Negative group here. Neither is there a `refreshControl` PROP to hand it
+// to: the control is an ordinary CHILD, and the scroll behavior CLAIMS it, which is what puts it
+// beside the content view here and inverts the tree on Android. That Android wrap is the engine's
+// (`core/components/src/behaviors/scroll-view/wrap-android.test.ts`) — the adapter no longer has a
+// platform build for it to get wrong.
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  View,
-  ScrollView,
-  RefreshControl,
-  mount,
-  unmount,
-} from '@symbiote-native/react';
+import { View, mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 61;
@@ -34,20 +25,17 @@ let refreshed = false;
 
 function App(): ReactElement {
   return (
-    <ScrollView
-      refreshControl={
-        <RefreshControl
-          refreshing={false}
-          enabled={true}
-          title="Pull to refresh"
-          onRefresh={() => {
-            refreshed = true;
-          }}
-        />
-      }
-    >
+    <scroll-view>
+      <refresh-control
+        refreshing={false}
+        enabled={true}
+        title="Pull to refresh"
+        onRefresh={() => {
+          refreshed = true;
+        }}
+      />
       <View />
-    </ScrollView>
+    </scroll-view>
   );
 }
 
@@ -58,7 +46,7 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-describe('React RefreshControl on the engine (Positive — completes without error)', () => {
+describe('React <refresh-control> on the engine (Positive — completes without error)', () => {
   // why: iOS has no room in RN's Fabric ScrollView for a wrapper node, so RefreshControl
   // must render as a SIBLING of the content container, positioned before it — reversing the
   // order (or nesting it inside the content container) breaks the native pull gesture.

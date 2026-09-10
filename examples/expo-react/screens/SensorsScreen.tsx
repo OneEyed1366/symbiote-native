@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   Accelerometer,
   DeviceMotion,
@@ -182,8 +182,8 @@ export function SensorsScreen() {
   );
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="sensors-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -279,7 +279,7 @@ export function SensorsScreen() {
             </Text>
           )}
         </SensorCard>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Platform,
-  SafeAreaView,
-  ScrollView,
   Text,
-  TextInput,
   View,
 } from '@symbiote-native/react';
 import {
@@ -115,8 +112,8 @@ export function ClipboardScreen() {
   }, [urlText]);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="clipboard-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -162,7 +159,7 @@ export function ClipboardScreen() {
           <View className="feature-card-header">
             <Text className="feature-card-title">Copy text</Text>
           </View>
-          <TextInput
+          <text-input
             testID="clipboard-copy-input"
             value={inputText}
             onValueChange={event => setInputText(event.text)}
@@ -194,7 +191,7 @@ export function ClipboardScreen() {
               label="Has URL"
               status={hasUrl}
             />
-            <TextInput
+            <text-input
               testID="clipboard-url-input"
               value={urlText}
               onValueChange={event => setUrlText(event.text)}
@@ -210,7 +207,7 @@ export function ClipboardScreen() {
             />
           </View>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

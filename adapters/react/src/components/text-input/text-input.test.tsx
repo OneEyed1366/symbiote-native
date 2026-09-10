@@ -8,22 +8,27 @@
 // Keyboard.dismiss blurring the focused input, the W3C alias folds, and the
 // underlineColorAndroid default.
 //
-// SCOPE: `resolveTextInputProps`/`shouldCommandText`/`foldSubmitBehavior`/`foldText` etc.
-// (core/components/src/state/text-input.ts) have NO co-located core-level unit test anywhere in
-// the repo (only the Vue/Svelte adapter tests exercise them, same as switch.test.tsx's finding).
-// This file is therefore the primary proof of the shared prop-fold/controlled-write logic too,
-// not merely React-wiring. No Negative group: nothing here has a throwing path — a malformed
-// native change payload is narrowed away (see the ignored-payload test below), never rejected.
+// SCOPE: there is no component any more — `<text-input>` is a bare tag (and `multiline` picks
+// `text-input-multiline` in the host config), with the whole machine in the engine
+// (`core/components/src/behaviors/text-input.ts`, wired by `../../register`). The suite passes
+// unchanged apart from the spelling and the ref shape, which is what made deleting the wrapper
+// safe: it was testing the controlled handshake, not the hook that used to run it.
+//
+// No Negative group: nothing here has a throwing path — a malformed native change payload is
+// narrowed away (see the ignored-payload test below), never rejected.
 
 import { useRef, useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   Keyboard,
-  TextInput,
   mount,
   unmount,
+  type IHostInstance,
   type ITextInputHandle,
 } from '@symbiote-native/react';
+// Not from the adapter barrel: every adapter reaches the handle builder in `components` directly,
+// and `tests/adapter-barrel-parity.test.ts` compares the re-exported sets.
+import { buildTextInputHandle } from '@symbiote-native/components';
 
 interface IFakeNode {
   tag: number;
@@ -136,7 +141,7 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-describe('TextInput', () => {
+describe('<text-input>', () => {
   // why: `value` is the controlled React prop but native reads a private `text` prop plus an
   // event-count handshake (mostRecentEventCount) — get the fold or the derived onValueChange
   // wrong and the input either doesn't render the caller's text or never reports keystrokes back.
@@ -144,7 +149,7 @@ describe('TextInput', () => {
     let changedText: string | undefined;
     mount(
       ROOT_TAG,
-      <TextInput
+      <text-input
         value="hi"
         onValueChange={event => {
           changedText = event.text;
@@ -171,7 +176,7 @@ describe('TextInput', () => {
     let calls = 0;
     mount(
       ROOT_TAG,
-      <TextInput
+      <text-input
         value="hi"
         onValueChange={() => {
           calls++;
@@ -189,7 +194,7 @@ describe('TextInput', () => {
   // RCTSinglelineTextInputView) — they are genuinely different native components, not the same
   // one with a multiline flag, so picking the wrong one means the wrong editor renders on device.
   it('selects the multiline intrinsic for multiline', () => {
-    mount(ROOT_TAG, <TextInput multiline value="x" />);
+    mount(ROOT_TAG, <text-input multiline value="x" />);
     inputNode(MULTILINE);
   });
 
@@ -197,14 +202,14 @@ describe('TextInput', () => {
   // submitBehavior on a single-line field must still resolve to a real native value
   // ('blurAndSubmit', RN's single-line default) rather than leaving the native prop undefined.
   it('folds an unset submitBehavior to blurAndSubmit on a single-line field', () => {
-    mount(ROOT_TAG, <TextInput value="x" />);
+    mount(ROOT_TAG, <text-input value="x" />);
     expect(inputNode(SINGLELINE).props.submitBehavior).toBe('blurAndSubmit');
   });
 
   // why: an explicit submitBehavior is the caller's own choice and must win outright over any
   // derived default — proves the fold doesn't override an explicit value with the legacy path.
   it('lets an explicit submitBehavior win over the derived default', () => {
-    mount(ROOT_TAG, <TextInput value="x" submitBehavior="submit" />);
+    mount(ROOT_TAG, <text-input value="x" submitBehavior="submit" />);
     expect(inputNode(SINGLELINE).props.submitBehavior).toBe('submit');
   });
 
@@ -218,7 +223,7 @@ describe('TextInput', () => {
     function Forced(): ReactElement {
       const [value, setValue] = useState('');
       return (
-        <TextInput
+        <text-input
           value={value}
           onValueChange={event => setValue(event.text.toUpperCase())}
         />
@@ -246,7 +251,7 @@ describe('TextInput', () => {
   // currently holds focus (tracked from real topFocus events, not a prop), and must be a safe
   // no-op when nothing is focused rather than dispatching a blur to a stale/absent node.
   it('Keyboard.dismiss blurs the focused input and no-ops when nothing holds focus', () => {
-    mount(ROOT_TAG, <TextInput value="focus me" />);
+    mount(ROOT_TAG, <text-input value="focus me" />);
 
     const node = inputNode(SINGLELINE);
     expect(eventHandler, 'an event handler was registered').toBeDefined();
@@ -268,7 +273,7 @@ describe('TextInput', () => {
   it('folds W3C aliases to their legacy native props and strips the raw aliases', () => {
     mount(
       ROOT_TAG,
-      <TextInput
+      <text-input
         inputMode="numeric"
         enterKeyHint="done"
         readOnly
@@ -293,7 +298,7 @@ describe('TextInput', () => {
   // the system keyboard/autofill can recognize the field, and a normal inputMode must default
   // the soft keyboard to visible (the opposite case, inputMode="none", is tested separately).
   it('folds autoComplete + derives showSoftInputOnFocus:true from inputMode', () => {
-    mount(ROOT_TAG, <TextInput autoComplete="email" inputMode="text" />);
+    mount(ROOT_TAG, <text-input autoComplete="email" inputMode="text" />);
 
     const node = inputNode(SINGLELINE);
     expect(node.props.autoComplete).toBe('email');
@@ -304,7 +309,7 @@ describe('TextInput', () => {
   // why: inputMode="none" is the W3C signal for "I render my own custom keyboard/picker" — the
   // system soft keyboard must NOT pop up over it, the opposite of every other inputMode value.
   it('derives showSoftInputOnFocus:false from inputMode="none"', () => {
-    mount(ROOT_TAG, <TextInput inputMode="none" />);
+    mount(ROOT_TAG, <text-input inputMode="none" />);
     expect(inputNode(SINGLELINE).props.showSoftInputOnFocus).toBe(false);
   });
 
@@ -312,7 +317,7 @@ describe('TextInput', () => {
   // valid token must still pass through as the raw autoComplete value while still resolving a
   // real iOS textContentType, rather than silently dropping to undefined for anything unmapped.
   it('passes an unmapped autoComplete token through with its iOS textContentType', () => {
-    mount(ROOT_TAG, <TextInput autoComplete="cc-name" />);
+    mount(ROOT_TAG, <text-input autoComplete="cc-name" />);
     const node = inputNode(SINGLELINE);
     expect(node.props.autoComplete).toBe('cc-name');
     expect(node.props.textContentType).toBe('creditCardName');
@@ -321,7 +326,7 @@ describe('TextInput', () => {
   // why: RN's Material EditText paints a visible underline by default; every host silently
   // getting one uninvited would be a visual regression, so the default must actively suppress it.
   it('defaults underlineColorAndroid to transparent', () => {
-    mount(ROOT_TAG, <TextInput value="x" />);
+    mount(ROOT_TAG, <text-input value="x" />);
     expect(inputNode(SINGLELINE).props.underlineColorAndroid).toBe(
       'transparent',
     );
@@ -330,7 +335,7 @@ describe('TextInput', () => {
   // why: the transparent default above must not be hardcoded past an explicit caller choice —
   // a designer who deliberately wants the underline back must be able to set it.
   it('lets an explicit underlineColorAndroid win', () => {
-    mount(ROOT_TAG, <TextInput value="x" underlineColorAndroid="#00ff00" />);
+    mount(ROOT_TAG, <text-input value="x" underlineColorAndroid="#00ff00" />);
     expect(inputNode(SINGLELINE).props.underlineColorAndroid).toBe('#00ff00');
   });
 
@@ -339,12 +344,12 @@ describe('TextInput', () => {
   // autoFocus-ed field, and does NOT fire at all when the prop is unset (a spurious focus steal
   // would be a real UX bug: it would pop the keyboard over a field the user never touched).
   it('commands focus once on mount when autoFocus is set, and not when unset', () => {
-    mount(ROOT_TAG, <TextInput value="x" autoFocus />);
+    mount(ROOT_TAG, <text-input value="x" autoFocus />);
     expect(commands.filter(c => c.name === 'focus')).toHaveLength(1);
 
     commands.length = 0;
     unmount(ROOT_TAG);
-    mount(ROOT_TAG, <TextInput value="x" />);
+    mount(ROOT_TAG, <text-input value="x" />);
     expect(commands.some(c => c.name === 'focus')).toBe(false);
   });
 
@@ -352,20 +357,27 @@ describe('TextInput', () => {
   // case of driving a TextInput without going through the controlled-value prop — each method
   // must dispatch the real native command a caller (e.g. a "next field" button) depends on.
   describe('imperative ref handle', () => {
-    // The ref object itself is captured at render time (synchronous, before commit); mount()'s
+    // A ref on the TAG hands back the engine node's public instance, not a five-method handle —
+    // there is no component body left to run a `useImperativeHandle`. `buildTextInputHandle` is
+    // what turns it into RN's surface, and it is the SAME function every other adapter's
+    // host-instance accessor feeds: the capability is shared, only the way each framework hands
+    // you the node differs (`.claude/rules/adapter-parity-audit.md`, "phrase a parity oracle as a
+    // CAPABILITY").
+    //
+    // The ref object is captured at render time (synchronous, before commit); mount()'s
     // updateContainerSync + flushSyncWork commits and attaches refs synchronously, so `.current`
     // is populated by the time mount() returns — no effect/timer needed to observe it.
-    let capturedRef: { current: ITextInputHandle | null } | undefined;
+    let capturedRef: { current: IHostInstance | null } | undefined;
     function Handle(): ReactElement {
-      const ref = useRef<ITextInputHandle>(null);
+      const ref = useRef<IHostInstance>(null);
       capturedRef = ref;
-      return <TextInput ref={ref} value="hello" />;
+      return <text-input ref={ref} value="hello" />;
     }
     function mountHandle(): ITextInputHandle {
       mount(ROOT_TAG, <Handle />);
-      const handle = capturedRef?.current;
-      expect(handle, 'the imperative handle was attached').not.toBeNull();
-      return handle!;
+      const node = capturedRef?.current;
+      expect(node, 'the host instance was attached').not.toBeNull();
+      return buildTextInputHandle(node!);
     }
 
     it('focus() dispatches a focus command', () => {

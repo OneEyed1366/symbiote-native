@@ -1,4 +1,4 @@
-import { SafeAreaView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import { Tab, useNavigation } from '@symbiote-native/navigation/react';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -14,7 +14,7 @@ function NestedTabHomeScreen() {
   const parent = navigation.getParent();
   const canPopParent = parent !== undefined && 'pop' in parent;
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <View className={`line-tag line-tag-${nestedLineInfo.line}`}>
           <Text className="line-tag-text">{`${nestedLineInfo.code} · ${nestedLineInfo.label}`}</Text>
@@ -46,13 +46,13 @@ function NestedTabHomeScreen() {
           color={LINE_COLOR.structure}
         />
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }
 
 function NestedTabInfoScreen() {
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <View className={`line-tag line-tag-${nestedLineInfo.line}`}>
           <Text className="line-tag-text">{`${nestedLineInfo.code} · ${nestedLineInfo.label}`}</Text>
@@ -62,7 +62,7 @@ function NestedTabInfoScreen() {
           A second tab, proving the nested Tab bar switches focus normally.
         </Text>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }
 

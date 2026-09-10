@@ -100,7 +100,7 @@ export function NativeModulesDemo() {
 
       {/* Image statics: the rendered asset + getSize's measurement of it. */}
       <View className="row-align-center">
-        <Image source={{ uri: LOGO_URI }} className="logo-thumb" />
+        <image source={{ uri: LOGO_URI }} className="logo-thumb" />
         <Text testID="logo-size" className="info-text-flex">
           {`logo size: ${imageSize}`}
         </Text>

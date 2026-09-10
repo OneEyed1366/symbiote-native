@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import {
-  Animated,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/react';
+import { Animated, Text, View } from '@symbiote-native/react';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -149,8 +143,8 @@ export function StyleShowcaseScreen() {
   const mergeReadout = mergeReadoutFor(hasMergeClass, hasMergeInline);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="style-showcase-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -599,7 +593,7 @@ export function StyleShowcaseScreen() {
             Outside the file that declares them, write literals.
           </Text>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

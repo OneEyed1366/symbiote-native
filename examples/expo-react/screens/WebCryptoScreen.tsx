@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import webCrypto, {
   polyfillWebCrypto,
 } from '@symbiote-native/standard-web-crypto';
@@ -55,8 +55,8 @@ export function WebCryptoScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="web-crypto-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -108,7 +108,7 @@ export function WebCryptoScreen() {
             value={isPolyfillInstalled ? 'Yes' : 'No'}
           />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

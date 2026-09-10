@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  SafeAreaView,
-  ScrollView,
   Text,
-  TextInput,
   View,
 } from '@symbiote-native/react';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms';
@@ -83,8 +80,8 @@ export function SmsScreen() {
   }, [recipients, message]);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="sms-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -126,7 +123,7 @@ export function SmsScreen() {
           <View className="feature-card-header">
             <Text className="feature-card-title">Compose</Text>
           </View>
-          <TextInput
+          <text-input
             testID="sms-recipients-input"
             value={recipients}
             onValueChange={event => setRecipients(event.text)}
@@ -135,7 +132,7 @@ export function SmsScreen() {
             autoCapitalize="none"
             className="text-input"
           />
-          <TextInput
+          <text-input
             testID="sms-message-input"
             value={message}
             onValueChange={event => setMessage(event.text)}
@@ -162,7 +159,7 @@ export function SmsScreen() {
             or cancelled.
           </Text>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

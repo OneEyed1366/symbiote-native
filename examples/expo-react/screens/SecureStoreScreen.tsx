@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  SafeAreaView,
-  ScrollView,
   Text,
-  TextInput,
   View,
 } from '@symbiote-native/react';
 import {
@@ -126,8 +123,8 @@ export function SecureStoreScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="secure-store-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -187,7 +184,7 @@ export function SecureStoreScreen() {
           <View className="feature-card-header">
             <Text className="feature-card-title">Write, read, delete</Text>
           </View>
-          <TextInput
+          <text-input
             testID="secure-store-input"
             value={inputText}
             onValueChange={event => setInputText(event.text)}
@@ -220,7 +217,7 @@ export function SecureStoreScreen() {
             color={lineColor}
           />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

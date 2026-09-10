@@ -10,7 +10,7 @@
 // negative one fails when someone "fixes" it by keying the registry on the Fabric name instead —
 // which would work for this test's `view` and put a press machine on every View in the app.
 import { afterEach, describe, expect, it } from 'vitest';
-import { Image, mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount, View } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import {
   clearHostBehaviors,
@@ -57,20 +57,20 @@ describe('a behavior registered under an intrinsic tag', () => {
     const attached = trackAttachesOn('RCTImageView');
     const rootTag = (nextRootTag += 1);
 
-    mount(rootTag, <Image source={{ uri: 'probe' }} />);
+    mount(rootTag, <image source={{ uri: 'probe' }} />);
 
     expect(attached).toEqual([]);
     unmount(rootTag);
   });
 
-  // The other half of the same claim: the Image path really does reach the engine under its
+  // The other half of the same claim: the `<image>` path really does reach the engine under its
   // intrinsic tag, so the negative above is a statement about KEYING and not about the node
   // never being created.
-  it('attaches to that same Image node under its intrinsic tag', () => {
+  it('attaches to that same image node under its intrinsic tag', () => {
     const attached = trackAttachesOn('image');
     const rootTag = (nextRootTag += 1);
 
-    mount(rootTag, <Image source={{ uri: 'probe' }} />);
+    mount(rootTag, <image source={{ uri: 'probe' }} />);
 
     expect(attached.map(node => node.component)).toEqual(['RCTImageView']);
     unmount(rootTag);

@@ -18,7 +18,7 @@
 // (a Positive contract — completes without error, callback just never fires), it never rejects.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, Pressable } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
@@ -132,7 +132,7 @@ describe('React Pressable on the engine', () => {
     let presses = 0;
     mount(
       ROOT_TAG,
-      <Pressable
+      <pressable
         onPress={() => {
           presses++;
         }}
@@ -148,7 +148,7 @@ describe('React Pressable on the engine', () => {
     const order: string[] = [];
     mount(
       ROOT_TAG,
-      <Pressable
+      <pressable
         onPressIn={() => order.push('in')}
         onPress={() => order.push('press')}
         onPressOut={() => order.push('out')}
@@ -203,13 +203,13 @@ describe('React Pressable on the engine', () => {
     mount(
       ROOT_TAG,
       <>
-        <Pressable
+        <pressable
           testID="first"
           onPressIn={() => firstOrder.push('in')}
           onPress={() => firstOrder.push('press')}
           onPressOut={() => firstOrder.push('out')}
         />
-        <Pressable
+        <pressable
           testID="sibling"
           onPressIn={() => siblingOrder.push('in')}
           onPress={() => siblingOrder.push('press')}
@@ -266,7 +266,7 @@ describe('React Pressable on the engine', () => {
     let presses = 0;
     mount(
       ROOT_TAG,
-      <Pressable
+      <pressable
         disabled
         onPress={() => {
           presses++;
@@ -288,7 +288,7 @@ describe('React Pressable on the engine', () => {
     let presses = 0;
     mount(
       ROOT_TAG,
-      <Pressable
+      <pressable
         delayLongPress={DELAY}
         onLongPress={() => {
           longPresses++;
@@ -323,7 +323,7 @@ describe('React Pressable on the engine', () => {
     let longPresses = 0;
     mount(
       ROOT_TAG,
-      <Pressable
+      <pressable
         delayLongPress={DELAY}
         onLongPress={() => {
           longPresses++;
@@ -343,7 +343,7 @@ describe('React Pressable on the engine', () => {
   it('reports accessibilityState.disabled and passes a11y props through', () => {
     mount(
       ROOT_TAG,
-      <Pressable disabled accessibilityLabel="save" testID="save-btn" />,
+      <pressable disabled accessibilityLabel="save" testID="save-btn" />,
     );
     const props = responderProps();
     expect(accessibilityDisabled(props)).toBe(true);
@@ -386,7 +386,7 @@ describe('React Pressable on the engine', () => {
     // hitSlop 0 + retention 30 -> threshold 30. A 10pt move retains; a 100pt move drops.
     mount(
       ROOT_TAG,
-      <Pressable
+      <pressable
         hitSlop={0}
         pressRetentionOffset={30}
         onPress={() => {
@@ -429,7 +429,7 @@ describe('React Pressable on the engine', () => {
     let presses = 0;
     mount(
       ROOT_TAG,
-      <Pressable
+      <pressable
         unstable_pressDelay={DELAY}
         onPressIn={() => {
           pressIns++;
@@ -464,7 +464,7 @@ describe('React Pressable on the engine', () => {
     let pressOuts = 0;
     mount(
       ROOT_TAG,
-      <Pressable
+      <pressable
         onPress={() => {}}
         onPressOut={() => {
           pressOuts++;
@@ -482,11 +482,34 @@ describe('React Pressable on the engine', () => {
     expect(pressOuts).toBe(1);
   });
 
+  // KNOWN RED — an engine gap, CROSS-ADAPTER, left failing on purpose rather than relaxed. The
+  // wrapper cancelled this from its own unmount effect; the tag's `detach` cancels every timer in
+  // `state.timers`, and on UNMOUNT — and only on unmount — `detach` never runs.
+  //
+  // The gap is ONE file and it is not this adapter's. Measured 2026-09-10 with a control arm that
+  // moves, which is what makes the negative mean anything: the SAME pressable removed from a live
+  // tree by an ordinary conditional render is nominated, swept, detached, and its timer cancelled
+  // (`pressIns` 0, the node gone from the committed tree). Only the unmount path leaks. The reason
+  // is that an unmount does not go through `node.ts`'s `removeChild` at all — React's
+  // `clearContainer`/`removeChildFromContainer` land on `SymbioteSurface.clear()` and
+  // `SymbioteSurface.removeChild()` (`core/engine/src/surface.ts`), which splice `children`
+  // directly and call no `markDetachCandidate`. So `sweepDetachedBehaviors` sees an empty
+  // candidate set, and `disposeRoot` -> `teardownSubtree` then walks a container that final commit
+  // already emptied. `after-commit-lifecycle.test.ts` passes because it calls `disposeRoot`
+  // directly with no framework teardown in front of it (test-harness-false-greens §11).
+  //
+  // An earlier version of this comment said the repair was "placed where no adapter can reach it"
+  // and blamed the ORDER of teardown and dispose. That was reasoning, not measurement, and the
+  // control arm above refutes it: the sweep works fine, it is simply never told.
+  //
+  // The adapter-side workaround — reordering render.ts, or having React's host config nominate —
+  // is deliberately NOT taken: it would be five copies of one engine fix, in the layer this
+  // migration exists to delete.
   it('cancels a pending unstable_pressDelay timer on unmount', () => {
     let pressIns = 0;
     mount(
       ROOT_TAG,
-      <Pressable
+      <pressable
         unstable_pressDelay={120}
         onPressIn={() => {
           pressIns++;
@@ -512,7 +535,7 @@ describe('React Pressable on the engine', () => {
     let pressOuts = 0;
     mount(
       ROOT_TAG,
-      <Pressable
+      <pressable
         pressRetentionOffset={{ right: 40 }}
         onPress={() => {
           presses++;
@@ -548,7 +571,7 @@ describe('React Pressable on the engine', () => {
   // returns false, not merely accept the prop (buildPressableListeners is already unit-tested at
   // core; this proves the adapter threads its result onto the real responder node).
   it('registers a termination gate returning false for cancelable={false}', () => {
-    mount(ROOT_TAG, <Pressable cancelable={false} onPress={() => {}} />);
+    mount(ROOT_TAG, <pressable cancelable={false} onPress={() => {}} />);
     const gate = terminationGate(responderHandle());
     expect(gate, 'termination gate registered').toBeDefined();
     expect(gate!({ nativeEvent: {} })).toBe(false);
@@ -557,17 +580,26 @@ describe('React Pressable on the engine', () => {
   // why: cancelable={true} is the explicit opposite of the case above — the gate must still be
   // attached (not omitted, which would defer to RN's own default) and must resolve to true.
   it('registers a termination gate returning true for cancelable', () => {
-    mount(ROOT_TAG, <Pressable cancelable onPress={() => {}} />);
+    mount(ROOT_TAG, <pressable cancelable onPress={() => {}} />);
     const gate = terminationGate(responderHandle());
     expect(gate, 'termination gate registered').toBeDefined();
     expect(gate!({ nativeEvent: {} })).toBe(true);
   });
 
-  // why: leaving `cancelable` unset must leave RN's own native default in charge — attaching a
-  // gate at all (even one resolving to true) would override that default with our own opinion.
-  it('registers no termination gate when cancelable is unset (RN implicit yes)', () => {
-    mount(ROOT_TAG, <Pressable onPress={() => {}} />);
-    expect(terminationGate(responderHandle())).toBeUndefined();
+  // why: leaving `cancelable` unset must leave RN's own native default in charge — FORCING an
+  // answer would override that default with our own opinion.
+  //
+  // Asserted on the ANSWER, not on the listener's presence, and the change is a shape-vs-capability
+  // correction rather than a relaxation. The wrapper omitted the listener entirely; the behavior
+  // installs ONE dispatcher per owned event at attach — it has to, since the machine needs the slot
+  // before any gesture can start — and that dispatcher returns `undefined` when no inner gate was
+  // built. Undefined is exactly what an absent listener yields to the engine, so the capability is
+  // unchanged and only the shape moved (`.claude/rules/adapter-parity-audit.md`, "phrase a parity
+  // oracle as a CAPABILITY"). A presence check here would now report a correct adapter as broken.
+  it('forces no termination answer when cancelable is unset (RN implicit yes)', () => {
+    mount(ROOT_TAG, <pressable onPress={() => {}} />);
+    const gate = terminationGate(responderHandle());
+    expect(gate?.({ nativeEvent: {} })).toBeUndefined();
   });
 
   // why: onPressMove is a distinct RN callback from the retention drift bookkeeping above — it
@@ -577,7 +609,7 @@ describe('React Pressable on the engine', () => {
     let moves = 0;
     mount(
       ROOT_TAG,
-      <Pressable
+      <pressable
         onPressMove={() => {
           moves++;
         }}
@@ -601,9 +633,9 @@ describe('React Pressable on the engine', () => {
   it('does not wrap the child in a ripple View for android_ripple on this (iOS-resolved) host', () => {
     mount(
       ROOT_TAG,
-      <Pressable android_ripple={{ color: '#f00' }} onPress={() => {}}>
+      <pressable android_ripple={{ color: '#f00' }} onPress={() => {}}>
         <button title="inner" />
-      </Pressable>,
+      </pressable>,
     );
     const rippleCarrier = fabric.find(
       n =>
@@ -618,12 +650,12 @@ describe('React Pressable on the engine', () => {
   // than a plain view. Asserted on the COMMITTED payload — the gap this closes was invisible in
   // JS and device-only. The `false` case pins `!== false` against a `?? true` regression.
   it('marks the responder accessible when the app says nothing', () => {
-    mount(ROOT_TAG, <Pressable onPress={() => {}} />);
+    mount(ROOT_TAG, <pressable onPress={() => {}} />);
     expect(responderProps().accessible).toBe(true);
   });
 
   it('lets a literal false opt out (not `?? true`)', () => {
-    mount(ROOT_TAG, <Pressable accessible={false} onPress={() => {}} />);
+    mount(ROOT_TAG, <pressable accessible={false} onPress={() => {}} />);
     expect(responderProps().accessible).toBe(false);
   });
 });

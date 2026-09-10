@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   Platform,
-  SafeAreaView,
-  ScrollView,
   Text,
   View,
 } from '@symbiote-native/react';
@@ -92,8 +90,8 @@ export function CellularScreen() {
     permissionStatus === null ? 'checking…' : permissionStatus.status;
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="cellular-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -173,7 +171,7 @@ export function CellularScreen() {
             color={lineColor}
           />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

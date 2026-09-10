@@ -13,7 +13,7 @@
 import type { ReactNode } from 'react';
 import type { INativeFeedbackBackground } from '@symbiote-native/components';
 
-import type { IPressableProps } from '../pressable';
+import type { IPressableProps } from '../pressable/pressable-props';
 
 export type ITouchableNativeFeedbackProps = Omit<
   IPressableProps,

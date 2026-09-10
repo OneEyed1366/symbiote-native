@@ -6,18 +6,12 @@
 // event (same discrete-lane flush path the device uses) and inspect the recommitted tree.
 // Green here means a missing spinner is native/visual, not JS.
 //
-// Positive-only for the same reason as refresh-control.test.tsx: RefreshControl has no
-// throwing path, so there is no Negative group.
+// Positive-only for the same reason as refresh-control.test.tsx: the tag has no throwing path,
+// so there is no Negative group.
 
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  View,
-  ScrollView,
-  RefreshControl,
-  mount,
-  unmount,
-} from '@symbiote-native/react';
+import { View, mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 62;
@@ -25,16 +19,13 @@ const ROOT_TAG = 62;
 function App(): ReactElement {
   const [refreshing, setRefreshing] = useState(false);
   return (
-    <ScrollView
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => setRefreshing(true)}
-        />
-      }
-    >
+    <scroll-view>
+      <refresh-control
+        refreshing={refreshing}
+        onRefresh={() => setRefreshing(true)}
+      />
       <View />
-    </ScrollView>
+    </scroll-view>
   );
 }
 
@@ -53,8 +44,8 @@ const fabric = installFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-describe('React RefreshControl controlled flip on the engine (Positive — completes without error)', () => {
-  // why: `refreshing` is a CONTROLLED prop — RefreshControl itself holds no internal
+describe('React <refresh-control> controlled flip on the engine (Positive — completes without error)', () => {
+  // why: `refreshing` is a CONTROLLED prop — the tag itself holds no internal
   // spinner state, the app owns it and must re-push it every commit. If the clone-on-write
   // recommit dropped the new value, the spinner would freeze at its stale state forever
   // after the very first pull, since native never gets told to keep spinning.

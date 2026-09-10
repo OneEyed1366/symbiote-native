@@ -52,6 +52,8 @@ describe('the React adapter registration', () => {
       SWITCH_TAG,
       IMAGE_TAG,
       INPUT_ACCESSORY_VIEW_TAG,
+      SCROLL_VIEW_TAG,
+      HORIZONTAL_SCROLL_VIEW_TAG,
     ].filter(tag => hostBehaviorFor(tag) !== undefined);
 
     expect(registered).toEqual([
@@ -63,21 +65,9 @@ describe('the React adapter registration', () => {
       SWITCH_TAG,
       IMAGE_TAG,
       INPUT_ACCESSORY_VIEW_TAG,
+      SCROLL_VIEW_TAG,
+      HORIZONTAL_SCROLL_VIEW_TAG,
     ]);
-  });
-
-  // why: the ScrollView behavior's `buildStructure` creates a content node, and TWO owners in this
-  // adapter already create one — `components/scroll-view` and `components/virtualized-list`, which
-  // renders it and stays a component through this migration. Registering while either stands
-  // double-nests the content view; measured, it reddens 8 ScrollView/VirtualizedList tests. The
-  // assertion above is this one's positive control: without it, an absent registry and a
-  // correctly-withheld registration read identically.
-  //
-  // DELETE THIS when the LIST STACK stops building a content node — not merely when the wrapper
-  // goes, which was the first reading and is not sufficient.
-  it('withholds the ScrollView behavior while other owners build the content node', () => {
-    expect(hostBehaviorFor(SCROLL_VIEW_TAG)).toBeUndefined();
-    expect(hostBehaviorFor(HORIZONTAL_SCROLL_VIEW_TAG)).toBeUndefined();
   });
 
   it('reaches the registration from the barrel as a side effect', () => {

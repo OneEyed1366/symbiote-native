@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   getBackgroundColorAsync,
   setBackgroundColorAsync,
@@ -51,8 +51,8 @@ export function SystemUiScreen() {
   );
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="system-ui-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -100,7 +100,7 @@ export function SystemUiScreen() {
             color={lineColor}
           />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

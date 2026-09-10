@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SafeAreaView, Text, TextInput, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from '../components/ActionButton';
 import { resolveRouteFromUrl } from '@symbiote-native/navigation';
 import {
@@ -27,7 +27,7 @@ export function DeepLinkingScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
 
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
@@ -54,7 +54,7 @@ export function DeepLinkingScreen() {
           Details → details/:id · HeaderOptions → header-options · TabsDemo →
           tabs
         </Text>
-        <TextInput
+        <text-input
           testID="deep-link-input"
           value={url}
           onValueChange={event => setUrl(event.text)}
@@ -74,6 +74,6 @@ export function DeepLinkingScreen() {
           </Text>
         </View>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

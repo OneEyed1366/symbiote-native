@@ -9,16 +9,9 @@ import {
   View,
   Text,
   Animated,
-  ScrollView,
-  TextInput,
-  Image,
-  Switch,
-  Pressable,
   Modal,
   FlatList,
   KeyboardAvoidingView,
-  SafeAreaView,
-  RefreshControl,
   StatusBar,
   Keyboard,
   KEYBOARD_EVENT,
@@ -195,19 +188,20 @@ export function CanaryScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="canary-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={LINE_COLOR.primitives}
-          />
-        }
       >
+        {/* The RefreshControl is a CHILD, not a prop: the scroll behavior claims it and places it
+          per platform — beside the content view on iOS, wrapping the whole scroll view on
+          Android. */}
+        <refresh-control
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={LINE_COLOR.primitives}
+        />
         {/* JS->native: StatusBar renders nothing; it drives the iOS status bar
           (the top strip: clock, wi-fi, battery) imperatively from these props. */}
         <StatusBar
@@ -378,7 +372,7 @@ export function CanaryScreen() {
         </View>
 
         {/* TextInput + greeting. text-input is shared with the KAV email field below. */}
-        <TextInput
+        <text-input
           testID="greeting-input"
           value={name}
           onValueChange={event => setName(event.text)}
@@ -393,7 +387,7 @@ export function CanaryScreen() {
         {/* Switch drives the ActivityIndicator */}
         <View className="switch-row">
           <Text className="switch-label">spinner</Text>
-          <Switch
+          <switch
             testID="spinner-switch"
             value={spinning}
             onValueChange={event => setSpinning(event.value)}
@@ -466,7 +460,7 @@ export function CanaryScreen() {
 
         {/* Pressable's static look lives in .pressable-card; only the press-state-dependent
           colors stay a style function. */}
-        <Pressable
+        <pressable
           onPress={() => setCount(value => value + 1)}
           className="pressable-card"
           style={({ pressed }) => ({
@@ -482,7 +476,7 @@ export function CanaryScreen() {
               {pressed ? 'holding…' : 'press me (also +1)'}
             </Text>
           )}
-        </Pressable>
+        </pressable>
 
         {/* Horizontal FlatList: real windowing. */}
         <Text className="section-label">FlatList · 24 chips, windowed</Text>
@@ -522,7 +516,7 @@ export function CanaryScreen() {
           symmetric-radius approximation. The dx/dy readout tracks the move offset. */}
         {/* Pressable's static look lives in .retention-card; only the press-state-dependent
           background stays a style function. */}
-        <Pressable
+        <pressable
           hitSlop={{ top: 0, bottom: 40, left: 0, right: 0 }}
           pressRetentionOffset={{ top: 0, bottom: 80, left: 0, right: 0 }}
           onPressMove={event =>
@@ -539,12 +533,12 @@ export function CanaryScreen() {
           <Text className="info-text">
             {`drag me · dx ${retentionMove.dx} · dy ${retentionMove.dy}`}
           </Text>
-        </Pressable>
+        </pressable>
 
         {/* maintainVisibleContentPosition. PASS: scroll down a bit, tap Prepend: the rows
           you are looking at DO NOT jump; new items appear above without shifting the
           viewport. FAIL: the list jumps to the top. box-list160 is shared with the
-          Animated.ScrollView below. */}
+          scroll-driven header demo below. */}
         <Text className="section-label">MVCP · prepend without jump</Text>
         <FlatList
           data={mvcpItems}
@@ -579,10 +573,10 @@ export function CanaryScreen() {
           }}
         />
 
-        {/* Animated.ScrollView scroll-driven header (native driver). PASS: drag INSIDE the
-          box below (not the page): the bright bar above SMOOTHLY fades to near-invisible
-          and lifts, on the UI thread (no jank, no per-frame JS). Proves Animated.ScrollView
-          + Animated.event native attach. */}
+        {/* Scroll-driven header (native driver). PASS: drag INSIDE the box below (not the page):
+          the bright bar above SMOOTHLY fades to near-invisible and lifts, on the UI thread (no
+          jank, no per-frame JS). There is no `Animated.ScrollView` — `Animated.event` binds
+          natively on any host node, so the bare tag takes the handler directly. */}
         <Animated.View
           className="parity-header"
           style={{
@@ -607,7 +601,7 @@ export function CanaryScreen() {
           </Text>
         </Animated.View>
         {/* box-list160 is shared with the MVCP FlatList above. */}
-        <Animated.ScrollView
+        <scroll-view
           className="box-list160"
           scrollEventThrottle={16}
           onScroll={Animated.event(
@@ -620,7 +614,7 @@ export function CanaryScreen() {
               <Text className="list-row-text">{`scroll me · row ${index}`}</Text>
             </View>
           ))}
-        </Animated.ScrollView>
+        </scroll-view>
         <Text className="tiny-center">
           ↑ drag inside the box — the bar above reacts
         </Text>
@@ -693,7 +687,7 @@ export function CanaryScreen() {
 
         {/* Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
           width/height→style); a screen reader reads "React logo" (alt→accessibilityLabel). */}
-        <Image
+        <image
           src="https://reactnative.dev/img/tiny_logo.png"
           alt="React logo"
           width={48}
@@ -706,7 +700,7 @@ export function CanaryScreen() {
           autoComplete/inputMode fold); with enabled OFF the keyboard covers the field. */}
         <View className="switch-row">
           <Text className="switch-label">avoid keyboard</Text>
-          <Switch
+          <switch
             value={kavEnabled}
             onValueChange={event => setKavEnabled(event.value)}
             trackColor={{ false: '#334155', true: '#2b6cb0' }}
@@ -716,7 +710,7 @@ export function CanaryScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           enabled={kavEnabled}
         >
-          <TextInput
+          <text-input
             autoComplete="email"
             inputMode="email"
             enterKeyHint="done"
@@ -726,7 +720,7 @@ export function CanaryScreen() {
           />
         </KeyboardAvoidingView>
 
-        <Image
+        <image
           source={{ uri: 'https://reactnative.dev/img/tiny_logo.png' }}
           className="logo-image"
         />
@@ -806,7 +800,7 @@ export function CanaryScreen() {
             </View>
           </overlayTunnel.In>
         )}
-      </ScrollView>
+      </scroll-view>
 
       {/* The portal/tunnel target: a persistent, empty View sitting above the scroll content.
           pointerEvents="box-none" lets touches pass through everywhere except an actual ported
@@ -821,6 +815,6 @@ export function CanaryScreen() {
       >
         <overlayTunnel.Out />
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

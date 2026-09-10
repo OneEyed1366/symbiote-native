@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Platform,
-  SafeAreaView,
-  ScrollView,
   Text,
   View,
 } from '@symbiote-native/react';
@@ -129,8 +127,8 @@ export function BrightnessScreen() {
     permissionStatus === null ? 'checking…' : permissionStatus.status;
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="brightness-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -229,7 +227,7 @@ export function BrightnessScreen() {
             color={lineColor}
           />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

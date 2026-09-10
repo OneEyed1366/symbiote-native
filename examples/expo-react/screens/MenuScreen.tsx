@@ -1,10 +1,4 @@
-import {
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import { useStackNavigation } from '@symbiote-native/navigation/react';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
@@ -138,8 +132,8 @@ const MENU_ITEMS: readonly IMenuItem[] = [
 export function MenuScreen() {
   const navigation = useStackNavigation();
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="menu-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -157,7 +151,7 @@ export function MenuScreen() {
         {MENU_ITEMS.map(item => {
           const lineInfo = ROUTE_LINE_INFO[item.route];
           return (
-            <Pressable
+            <pressable
               key={item.route}
               testID={`menu-row-${item.route}`}
               className={`menu-row menu-row-${lineInfo.line}`}
@@ -174,10 +168,10 @@ export function MenuScreen() {
                   {item.hint}
                 </Text>
               </View>
-            </Pressable>
+            </pressable>
           );
         })}
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

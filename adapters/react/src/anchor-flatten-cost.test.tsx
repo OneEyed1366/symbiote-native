@@ -26,7 +26,6 @@ import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
 import { View, Text } from './components';
-import { Pressable } from './components/pressable';
 
 const ROOT_TAG = 8801;
 const ROWS = 1000;
@@ -67,12 +66,12 @@ function BenchmarkRow({
   return (
     <View style={isSelected ? { backgroundColor: 'blue' } : undefined}>
       <Text>{String(row.id)}</Text>
-      <Pressable>
+      <pressable>
         <Text>{row.label}</Text>
-      </Pressable>
-      <Pressable>
+      </pressable>
+      <pressable>
         <Text>{'x'}</Text>
-      </Pressable>
+      </pressable>
     </View>
   );
 }

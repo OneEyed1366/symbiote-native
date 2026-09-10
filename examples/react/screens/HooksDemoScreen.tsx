@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { SafeAreaView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   useFocusEffect,
   useIsFocused,
@@ -31,7 +31,7 @@ export function HooksDemoScreen() {
   );
 
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
@@ -74,6 +74,6 @@ export function HooksDemoScreen() {
           >{`${index}. ${name}`}</Text>
         ))}
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

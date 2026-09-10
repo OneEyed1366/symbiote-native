@@ -1,10 +1,7 @@
 import { useCallback, useState } from 'react';
 import {
   Platform,
-  SafeAreaView,
-  ScrollView,
   Text,
-  TextInput,
   View,
 } from '@symbiote-native/react';
 import {
@@ -119,8 +116,8 @@ export function WebBrowserScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="web-browser-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -146,7 +143,7 @@ export function WebBrowserScreen() {
           <View className="feature-card-header">
             <Text className="feature-card-title">Open a url</Text>
           </View>
-          <TextInput
+          <text-input
             testID="web-browser-url-input"
             value={url}
             onValueChange={event => setUrl(event.text)}
@@ -223,7 +220,7 @@ export function WebBrowserScreen() {
             />
           </View>
         ) : null}
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

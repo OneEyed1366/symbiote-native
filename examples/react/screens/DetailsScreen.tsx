@@ -1,4 +1,4 @@
-import { SafeAreaView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import {
   useRoute,
   useStackNavigation,
@@ -18,7 +18,7 @@ export function DetailsScreen() {
       ? String(params.openedFrom)
       : 'none';
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <Text className="section-label">Navigation demo · Details screen</Text>
         <Text className="info-text">{`route.params: ${paramsLabel}`}</Text>
@@ -30,6 +30,6 @@ export function DetailsScreen() {
           color={LINE_COLOR.primitives}
         />
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }

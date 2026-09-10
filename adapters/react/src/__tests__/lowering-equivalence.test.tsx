@@ -1,40 +1,24 @@
-// React's arm of the shared lowering-equivalence oracle: mount a primitive as a COMPONENT and as a
-// bare intrinsic with the same props, and require the two committed Fabric trees to agree.
+// React's arm of the shared lowering-equivalence oracle — and it has lost the EQUIVALENCE half, on
+// purpose. Every primitive here is a bare tag now (`src/index.ts` records where each wrapper's body
+// went), so there is no second spelling to compare against: an arm-vs-arm row would assert a value
+// against itself, which is `test-harness-false-greens.md` §12 exactly.
 //
-// READ THIS BEFORE COPYING THE FILE — React's arm is the WEAKEST of the five and the reasons are
-// structural, not oversights. The other four adapters should be more sensitive, not less.
+// So what remains is the ABSOLUTE half, `expectCommittedProps`, and on this adapter it was always
+// the load-bearing one. The oracle's own header measured why: when a fold lives in a layer BOTH
+// arms traverse — React's wrappers rendered the intrinsic themselves, and `foldHostBag` runs in the
+// host config for whatever tag arrives — deleting it moves both arms identically and they still
+// agree. Emptying `PROP_ALIASES` left 4 of 5 equivalence cases green.
 //
-//   1. `View` and `Text` HAVE NO COMPONENT ARM. They are string constants (`components.ts`), so
-//      `<View>` and `<view>` are the same expression after compilation. There is nothing
-//      to compare; a row for them would assert a value against itself, which is
-//      `test-harness-false-greens.md` §12 exactly.
-//   2. A STATEFUL primitive still has no comparable pair. `src/register.ts` now installs the same
-//      behaviors the other four adapters do, so a bare `pressable` / `text-input` / `switch` does
-//      carry its machine — but the wrappers deliberately render the `-managed` twins (one owner per
-//      node), so the two arms commit different TAGS by design and the oracle has nothing to equate.
-//      What the registration did close is the FOLD-only pair: `image` and `input-accessory-view`
-//      share their tag with the wrapper, so those rows compare a real pair.
-//   3. For what remains, BOTH ARMS TRAVERSE ONE FOLD. React's wrappers render the intrinsic
-//      themselves, and `foldHostBag` runs in the host config for whatever tag arrives — so a fold
-//      that broke would move both arms identically and they would still agree. This is the failure
-//      the oracle's own header measured (emptying `PROP_ALIASES` left 4 of 5 equivalence cases
-//      green), and React is its extreme case.
+// READ THIS BEFORE COPYING THE FILE. The other four adapters should keep both halves: theirs
+// genuinely differ in mechanism, and cross-arm is what catches a fold ONE path loses. Here every
+// row instead names the exact key a broken fold would drop — which is stronger, not weaker, since
+// it fails even when nothing to compare against survives.
 //
-// So `expectCommittedProps` is the load-bearing half here and `compareLoweringEquivalence` is the
-// cheap half — the reverse of Svelte, whose two arms genuinely differ in mechanism. Both are
-// written anyway: the equivalence half still catches a wrapper that starts folding something the
-// tag does not.
+// NO component arm is left: all ten primitives are tags.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  Image,
-  InputAccessoryView,
-  SafeAreaView,
-  mount,
-  unmount,
-} from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import {
   assertArmsAreDistinct,
-  compareLoweringEquivalence,
   expectCommittedProps,
   installFabric,
 } from '@symbiote-native/test-utils';
@@ -74,58 +58,138 @@ describe('React: component and bare intrinsic commit the same tree', () => {
   });
 
   describe('Positive', () => {
-    // why: this row recorded a GAP until React gained `src/register.ts` — Image's real mapping
-    // (`normalizeSource`, which wraps `{uri}` into RN's array shape) lives in `behaviors/image.ts`
-    // and not in the spec, so `foldHostBag`'s aliases-and-defaults left the lowered arm committing
-    // the raw object. `registerImageBehavior()` is what closed it, and the equality below is what
-    // keeps it closed: drop the registration and this row reports the two source shapes again.
-    it('Image: both spellings commit the same source shape', () => {
-      const component = commitAndRead(
-        <Image testID="probe" source={{ uri: 'x' }} />,
-      );
-      const lowered = commitAndRead(
+    // why: Image's real mapping (`normalizeSource`, which wraps `{uri}` into RN's array shape)
+    // lives in `behaviors/image.ts` and not in the spec, so `foldHostBag`'s aliases-and-defaults
+    // alone would leave the tag committing the raw object. `registerImageBehavior()` is what
+    // closes it; drop the registration and this row reports the raw shape.
+    it('Image: the tag commits RNs array source shape', () => {
+      const tree = commitAndRead(
         <image testID="probe" source={{ uri: 'x' }} />,
       );
-      const result = compareLoweringEquivalence(component, lowered);
+      expect(
+        expectCommittedProps(tree, 'probe', {
+          source: [{ uri: 'x' }],
+        }).differences,
+      ).toEqual([]);
+    });
+
+    it('Image: nativeID is folded from id', () => {
+      const tree = commitAndRead(
+        <image testID="probe" id="hero" source={{ uri: 'x' }} />,
+      );
+      expect(
+        expectCommittedProps(tree, 'probe', { nativeID: 'hero' }).differences,
+      ).toEqual([]);
+    });
+
+    // why: SafeAreaView gained `ID_ALIAS` on 2026-09-01, and the fold is invisible either way —
+    // the prop compiles whether or not it runs. There is no component arm left to compare against
+    // (the wrapper is deleted), so this ABSOLUTE assertion is the whole coverage of the fold.
+    it('SafeAreaView: id folds to nativeID on the tag', () => {
+      const tree = commitAndRead(<safe-area-view testID="probe" id="pane" />);
+      const result = expectCommittedProps(tree, 'probe', { nativeID: 'pane' });
       expect(result.differences).toEqual([]);
     });
 
-    // why: the ABSOLUTE half, and on React it is the one carrying the weight — both arms share the
-    // fold, so only a fixed expectation notices the fold itself breaking.
-    it('Image: nativeID is folded from id on BOTH spellings', () => {
-      for (const tree of [
-        commitAndRead(<Image testID="probe" id="hero" source={{ uri: 'x' }} />),
-        commitAndRead(<image testID="probe" id="hero" source={{ uri: 'x' }} />),
-      ]) {
-        const result = expectCommittedProps(tree, 'probe', {
-          nativeID: 'hero',
-        });
-        expect(result.differences).toEqual([]);
-      }
-    });
-
-    // why: SafeAreaView gained `ID_ALIAS` on 2026-09-01 together with `id` on all five wrappers.
-    // Before that it declared no aliases, and the pair had to move as ONE change — this pins the
-    // half that is easy to lose, since the prop compiles fine whether or not the fold runs.
-    it('SafeAreaView: id folds to nativeID on both spellings', () => {
-      for (const tree of [
-        commitAndRead(<SafeAreaView testID="probe" id="pane" />),
-        commitAndRead(<safe-area-view testID="probe" id="pane" />),
-      ]) {
-        const result = expectCommittedProps(tree, 'probe', {
-          nativeID: 'pane',
-        });
-        expect(result.differences).toEqual([]);
-      }
-    });
-
-    // why: the third fold-only primitive, and the one whose wrapper is smallest — so a divergence
-    // here would be the wrapper adding something rather than the tag losing it.
-    it('InputAccessoryView: the two spellings agree', () => {
-      const component = commitAndRead(<InputAccessoryView testID="probe" />);
-      const lowered = commitAndRead(<input-accessory-view testID="probe" />);
+    // why: the third fold-only primitive. No component arm survives, so this is the ABSOLUTE half
+    // only — the fold assembles the host node, and `nativeID` is what a TextInput docks against.
+    it('InputAccessoryView: the tag carries its fold', () => {
+      const tree = commitAndRead(
+        <input-accessory-view testID="probe" nativeID="acc" />,
+      );
       expect(
-        compareLoweringEquivalence(component, lowered).differences,
+        expectCommittedProps(tree, 'probe', { nativeID: 'acc' }).differences,
+      ).toEqual([]);
+    });
+
+    // why: the fourth fold-only primitive, and the last one whose wrapper was a pure passthrough.
+    // Absolute only, for the same reason as the two above — there is no component arm left.
+    it('RefreshControl: id folds to nativeID on the tag', () => {
+      const tree = commitAndRead(
+        <refresh-control testID="probe" id="rc" refreshing={false} />,
+      );
+      expect(
+        expectCommittedProps(tree, 'probe', { nativeID: 'rc' }).differences,
+      ).toEqual([]);
+    });
+
+    // why: the colour fold is the one every adapter used to run in its own platform file — a
+    // lowered switch that skipped it would send RN's PUBLIC prop names to a view that declares
+    // none of them, so nothing paints and nothing is red.
+    it('Switch: the tag folds trackColor to the native iOS names', () => {
+      const tree = commitAndRead(
+        <switch
+          testID="probe"
+          value={true}
+          trackColor={{ false: '#111', true: '#222' }}
+        />,
+      );
+      expect(
+        expectCommittedProps(tree, 'probe', {
+          onTintColor: '#222',
+          tintColor: '#111',
+          trackColor: undefined,
+        }).differences,
+      ).toEqual([]);
+    });
+
+    // why: `value` is not a Fabric prop — native reads a private `text` alongside the event-count
+    // handshake — and `readOnly` is a W3C alias for `editable`. A tag that skipped either fold
+    // renders no text and accepts typing into a read-only field, on device only.
+    it('TextInput: the tag folds value to text and readOnly to editable', () => {
+      const tree = commitAndRead(
+        <text-input testID="probe" value="hi" readOnly />,
+      );
+      expect(
+        expectCommittedProps(tree, 'probe', {
+          text: 'hi',
+          editable: false,
+          value: undefined,
+        }).differences,
+      ).toEqual([]);
+    });
+
+    // why: `disabled` is not a Fabric prop on a view — it has to reach a screen reader as
+    // `accessibilityState.disabled`, and the press suppression works either way, so a lost fold
+    // announces a dead button as ENABLED with nothing red anywhere.
+    it('Pressable: disabled folds into accessibilityState', () => {
+      const tree = commitAndRead(<pressable testID="probe" disabled />);
+      expect(
+        expectCommittedProps(tree, 'probe', {
+          accessibilityState: { disabled: true },
+          accessible: true,
+        }).differences,
+      ).toEqual([]);
+    });
+
+    // why: the press family's own `accessible` default (Pressable.js:252,
+    // TouchableOpacity.js:303) — RN makes every pressable accessible unless the app opts OUT, and
+    // each of these tags carries its OWN machine rather than sharing `pressable`, so each needs
+    // its own row or one of them can lose the fold alone.
+    it.each([
+      ['touchable-opacity', <touchable-opacity key="o" testID="probe" />],
+      ['touchable-highlight', <touchable-highlight key="h" testID="probe" />],
+    ])('%s: carries the press family accessible default', (_name, element) => {
+      const tree = commitAndRead(element);
+      expect(
+        expectCommittedProps(tree, 'probe', { accessible: true }).differences,
+      ).toEqual([]);
+    });
+
+    // why: the axis base a wrapper used to compose under the app's own style. Two claims were made
+    // about this row while ScrollView was the last wrapper standing — that the behavior owed
+    // `horizontal` and `nestedScrollEnabled ?? true` before a bare tag could match it — and BOTH
+    // were false, quoted out of a stale comment instead of read out of the behavior. The folds
+    // were already there; `../components/scroll-view/scroll-view.test.tsx` pins each by name.
+    it('scroll-view: the behavior composes the vertical axis base', () => {
+      const tree = commitAndRead(<scroll-view testID="probe" />);
+      expect(
+        expectCommittedProps(tree, 'probe', {
+          flexGrow: 1,
+          flexShrink: 1,
+          overflow: 'scroll',
+          nestedScrollEnabled: true,
+        }).differences,
       ).toEqual([]);
     });
   });
@@ -136,27 +200,23 @@ describe('React: component and bare intrinsic commit the same tree', () => {
     // fold's own OUTPUT and can never fail — the prefix hazard, third instance today, and the first
     // one over prop keys rather than tag names.
     it('the authored id does not survive alongside nativeID', () => {
-      const tree = commitAndRead(<SafeAreaView testID="probe" id="pane" />);
+      const tree = commitAndRead(<safe-area-view testID="probe" id="pane" />);
       const result = expectCommittedProps(tree, 'probe', { id: undefined });
       expect(result.differences).toEqual([]);
     });
 
-    // why: the control that keeps every row above honest. If the "lowered" arm silently rendered
-    // the component, both arms would agree trivially and this file would report perfect health
-    // while testing one path twice.
-    it('control: the two arms are genuinely different trees', () => {
-      const component = commitAndRead(
-        <Image testID="probe" source={{ uri: 'x' }} />,
-      );
-      const lowered = commitAndRead(
+    // why: the control that keeps every row above honest. Every absolute row asserts what a
+    // committed node CARRIES, and `expectCommittedProps` finds its node by `testID` — so a mount
+    // that committed nothing at all would leave those rows unable to fail. This is the sentinel.
+    it('control: the harness commits a tree at all', () => {
+      // React commits the intrinsic directly on both spellings, so node COUNTS legitimately match
+      // here and `assertArmsAreDistinct` would fire on a correct adapter — it guards the four
+      // adapters whose component form allocates a wrapper node.
+      void assertArmsAreDistinct;
+      const tree = commitAndRead(
         <image testID="probe" source={{ uri: 'x' }} />,
       );
-      // React's wrappers render the intrinsic directly, so node COUNTS legitimately match here —
-      // `assertArmsAreDistinct` would fire on a correct adapter. Assert the arms were both built
-      // instead, which is what that control is protecting against on the other four.
-      void assertArmsAreDistinct;
-      expect(component.length, 'component arm committed').toBeGreaterThan(0);
-      expect(lowered.length, 'lowered arm committed').toBeGreaterThan(0);
+      expect(tree.length, 'the mount committed').toBeGreaterThan(0);
     });
   });
 });

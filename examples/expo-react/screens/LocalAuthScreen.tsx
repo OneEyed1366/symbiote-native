@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Platform,
-  SafeAreaView,
-  ScrollView,
   Text,
   View,
 } from '@symbiote-native/react';
@@ -162,8 +160,8 @@ export function LocalAuthScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="local-auth-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
@@ -255,7 +253,7 @@ export function LocalAuthScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

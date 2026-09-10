@@ -1,4 +1,4 @@
-import { SafeAreaView, Text, View } from '@symbiote-native/react';
+import { Text, View } from '@symbiote-native/react';
 import { Tab, useIsFocused } from '@symbiote-native/navigation/react';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -16,7 +16,7 @@ function TabLineTag() {
 function TabHomeScreen() {
   const isFocused = useIsFocused();
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <TabLineTag />
         <View className="hero-card">
@@ -36,33 +36,33 @@ function TabHomeScreen() {
         </View>
         <Text className="info-text">{`focused: ${isFocused}`}</Text>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }
 
 function TabSearchScreen() {
   const isFocused = useIsFocused();
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <TabLineTag />
         <Text className="section-label">Search tab</Text>
         <Text className="info-text">{`focused: ${isFocused}`}</Text>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }
 
 function TabProfileScreen() {
   const isFocused = useIsFocused();
   return (
-    <SafeAreaView className="screen">
+    <safe-area-view className="screen">
       <View className="section">
         <TabLineTag />
         <Text className="section-label">Profile tab</Text>
         <Text className="info-text">{`focused: ${isFocused}`}</Text>
       </View>
-    </SafeAreaView>
+    </safe-area-view>
   );
 }
 
