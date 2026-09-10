@@ -15,7 +15,7 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 61;
@@ -34,7 +34,7 @@ function App(): ReactElement {
           refreshed = true;
         }}
       />
-      <View />
+      <view />
     </scroll-view>
   );
 }

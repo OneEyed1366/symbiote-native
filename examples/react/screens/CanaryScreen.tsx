@@ -5,31 +5,7 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import {
-  View,
-  Text,
-  Animated,
-  Modal,
-  FlatList,
-  KeyboardAvoidingView,
-  StatusBar,
-  Keyboard,
-  KEYBOARD_EVENT,
-  Platform,
-  StyleSheet,
-  PixelRatio,
-  useWindowDimensions,
-  useColorScheme,
-  AppState,
-  Alert,
-  ActionSheetIOS,
-  Linking,
-  Vibration,
-  Share,
-  createPortal,
-  createTunnel,
-  type IHostInstance,
-} from '@symbiote-native/react';
+import { Animated, Modal, FlatList, KeyboardAvoidingView, StatusBar, Keyboard, KEYBOARD_EVENT, Platform, StyleSheet, PixelRatio, useWindowDimensions, useColorScheme, AppState, Alert, ActionSheetIOS, Linking, Vibration, Share, createPortal, createTunnel, type IHostInstance } from '@symbiote-native/react';
 // A real third-party native view, driven through symbiote's own wrapper (@symbiote-native/slider)
 // rather than the library's React component: the wrapper registers RNCSlider's ViewConfig and
 // renders the native leaf through the engine, so the SAME slider works on Vue/Angular too. App
@@ -51,7 +27,7 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 // Hoisted, not inlined at the prop: a component identity that changes every render would remount
 // the dividers on every list update.
-const MvcpDivider = (): ReactElement => <View className="mvcp-divider" />;
+const MvcpDivider = (): ReactElement => <view className="mvcp-divider" />;
 
 const CHIP_WIDTH = 72;
 const CHIP_GAP = 12;
@@ -209,35 +185,35 @@ export function CanaryScreen() {
           hidden={statusBarHidden}
           animated
         />
-        <View className="line-tag line-tag-primitives">
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View
+        <view className="line-tag line-tag-primitives">
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view
             className="hero-badge"
             style={{ backgroundColor: LINE_COLOR.primitives }}
           >
-            <Text className="hero-badge-text">CN</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">All primitives</Text>
-            <Text className="hero-body">
+            <text className="hero-badge-text">CN</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">All primitives</text>
+            <text className="hero-body">
               Every @symbiote-native/react primitive, driven straight onto
               Fabric — no react-native renderer in the path.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
         {/* native->JS: keyboard height pushed from the device hub, read live */}
-        <Text className="header-note">
+        <text className="header-note">
           {keyboardHeight > 0
             ? `keyboard up · ${keyboardHeight}px`
             : 'keyboard down'}
-        </Text>
+        </text>
         {/* Tier A runtime modules, read live from the real native side. A non-empty
           Version proves PlatformConstants resolved; a fractional hairline (e.g. 0.333
           on @3x) proves DeviceInfo's scale resolved. The border below IS that hairline.
           borderTopWidth stays dynamic (StyleSheet.hairlineWidth is a runtime constant). */}
-        <Text
+        <text
           className="hairline-note"
           style={{ borderTopWidth: StyleSheet.hairlineWidth }}
         >
@@ -245,37 +221,37 @@ export function CanaryScreen() {
             `${Platform.isPad ? ' · iPad' : ''}` +
             ` · ${Platform.select({ ios: 'native ios', android: 'native android', default: '?' })}` +
             ` · hairline ${StyleSheet.hairlineWidth.toFixed(3)}`}
-        </Text>
+        </text>
         {/* Tier B runtime modules, live. Real w×h@scale proves Dimensions + PixelRatio;
           a colorScheme proves Appearance; appState flips when you background the app
           (AppState's device events). */}
-        <Text className="header-note">
+        <text className="header-note">
           {`${Math.round(window.width)}×${Math.round(window.height)} @${PixelRatio.get()}x` +
             ` · ${colorScheme ?? 'no-scheme'} · ${appState}`}
-        </Text>
+        </text>
         {/* JS->native StatusBar controls: watch the top strip react */}
-        <View className="row">
-          <View className="flex1">
+        <view className="row">
+          <view className="flex1">
             <ActionButton
               title={statusBarHidden ? 'Show status bar' : 'Hide status bar'}
               onPress={() => setStatusBarHidden(value => !value)}
               color={LINE_COLOR.primitives}
             />
-          </View>
-          <View className="flex1">
+          </view>
+          <view className="flex1">
             <ActionButton
               title={darkStatusBar ? 'Light text' : 'Dark text'}
               onPress={() => setDarkStatusBar(value => !value)}
               color={LINE_COLOR.primitives}
             />
-          </View>
-        </View>
+          </view>
+        </view>
         {/* #6 Android-only window flags: the blank-risk pair. PASS: the top strip turns
           red / goes translucent and the app STAYS rendered. FAIL: the surface blanks
           (white screen); watch logcat for stopSurface / "reactInstance is null". */}
         {Platform.OS === 'android' && (
-          <View className="row">
-            <View className="flex1">
+          <view className="row">
+            <view className="flex1">
               <ActionButton
                 title={statusBarRed ? 'BG default' : 'BG red'}
                 onPress={() => {
@@ -288,8 +264,8 @@ export function CanaryScreen() {
                 }}
                 color={LINE_COLOR.primitives}
               />
-            </View>
-            <View className="flex1">
+            </view>
+            <view className="flex1">
               <ActionButton
                 title={statusBarTranslucent ? 'Opaque' : 'Translucent'}
                 onPress={() => {
@@ -299,47 +275,47 @@ export function CanaryScreen() {
                 }}
                 color={LINE_COLOR.primitives}
               />
-            </View>
-          </View>
+            </view>
+          </view>
         )}
         {/* JS->native imperative modules: tap to fire the real native UI / haptics.
           Each working button proves its module name resolved on the bridgeless host. */}
-        <View className="row">
-          <View className="flex1">
+        <view className="row">
+          <view className="flex1">
             <ActionButton
               title="Alert"
               onPress={onAlert}
               color={LINE_COLOR.primitives}
             />
-          </View>
+          </view>
           {/* ActionSheetIOS drives the iOS-only ActionSheetManager; no Android native
             module exists, so the control is iOS-only by design (not a gap). */}
           {Platform.OS !== 'android' && (
-            <View className="flex1">
+            <view className="flex1">
               <ActionButton
                 title="Action sheet"
                 onPress={onActionSheet}
                 color={LINE_COLOR.primitives}
               />
-            </View>
+            </view>
           )}
-        </View>
-        <View className="row">
-          <View className="flex1">
+        </view>
+        <view className="row">
+          <view className="flex1">
             <ActionButton
               title="Share"
               onPress={onShare}
               color={LINE_COLOR.primitives}
             />
-          </View>
-          <View className="flex1">
+          </view>
+          <view className="flex1">
             <ActionButton
               title="Vibrate"
               onPress={() => Vibration.vibrate()}
               color={LINE_COLOR.primitives}
             />
-          </View>
-        </View>
+          </view>
+        </view>
         <ActionButton
           title="Open reactnative.dev"
           onPress={onOpenUrl}
@@ -350,26 +326,26 @@ export function CanaryScreen() {
           view pulled-down; our full re-commit snaps the offset back, so we drive
           our OWN indicator from the same `refreshing` flag, guaranteed visible. */}
         {refreshing ? (
-          <View className="refresh-row">
+          <view className="refresh-row">
             <activity-indicator color={LINE_COLOR.primitives} />
-            <Text className="accent-note">Refreshing…</Text>
-          </View>
+            <text className="accent-note">Refreshing…</text>
+          </view>
         ) : (
-          <Text className="muted-center">
+          <text className="muted-center">
             {`pull to refresh · refreshed ${refreshes}×`}
-          </Text>
+          </text>
         )}
 
         {/* View + press-to-increment */}
-        <View
+        <view
           testID="counter-card"
           onPress={() => setCount(value => value + 1)}
           className="counter-card"
         >
-          <Text testID="counter-value" className="counter-text">
+          <text testID="counter-value" className="counter-text">
             {`tapped ${count}×`}
-          </Text>
-        </View>
+          </text>
+        </view>
 
         {/* TextInput + greeting. text-input is shared with the KAV email field below. */}
         <text-input
@@ -380,20 +356,20 @@ export function CanaryScreen() {
           placeholderTextColor="#41506a"
           className="text-input"
         />
-        <Text testID="greeting-output" className="greeting">
+        <text testID="greeting-output" className="greeting">
           {name ? `Hello, ${name}` : 'Hello, stranger'}
-        </Text>
+        </text>
 
         {/* Switch drives the ActivityIndicator */}
-        <View className="switch-row">
-          <Text className="switch-label">spinner</Text>
+        <view className="switch-row">
+          <text className="switch-label">spinner</text>
           <switch
             testID="spinner-switch"
             value={spinning}
             onValueChange={event => setSpinning(event.value)}
             trackColor={{ false: '#334155', true: LINE_COLOR.primitives }}
           />
-        </View>
+        </view>
         <activity-indicator
           testID="spinner-indicator"
           animating={spinning}
@@ -405,10 +381,10 @@ export function CanaryScreen() {
           @symbiote-native/slider native-proxy wrapper. The engine derives the onValueChange event and
           the track/thumb tint processors from the library's own ViewConfig at runtime. Drag it:
           the value updates live; the colored track proves color derivation. */}
-        <View className="section-tight">
-          <Text className="switch-label">
+        <view className="section-tight">
+          <text className="switch-label">
             {`volume · ${Math.round(volume * 100)}%`}
-          </Text>
+          </text>
           <Slider
             value={volume}
             onValueChange={setVolume}
@@ -421,7 +397,7 @@ export function CanaryScreen() {
             // Pin a height so the native track always has room in the flex column.
             className="slider"
           />
-        </View>
+        </view>
 
         {/* Animated: JS driver vs native driver, side by side */}
         <AnimatedDemo />
@@ -469,17 +445,17 @@ export function CanaryScreen() {
           })}
         >
           {({ pressed }) => (
-            <Text
+            <text
               className="pressable-label"
               style={{ color: pressed ? LINE_COLOR.primitives : '#cbd5e1' }}
             >
               {pressed ? 'holding…' : 'press me (also +1)'}
-            </Text>
+            </text>
           )}
         </pressable>
 
         {/* Horizontal FlatList: real windowing. */}
-        <Text className="section-label">FlatList · 24 chips, windowed</Text>
+        <text className="section-label">FlatList · 24 chips, windowed</text>
         <FlatList
           testID="chips-list"
           data={chips}
@@ -495,7 +471,7 @@ export function CanaryScreen() {
             // width/marginRight stay dynamic — they reference the CHIP_WIDTH/CHIP_GAP
             // script consts (also used by getItemLayout above), which a CSS selector
             // has no way to read; backgroundColor is per-chip (item.color).
-            <View
+            <view
               className="chip-card"
               style={{
                 width: CHIP_WIDTH,
@@ -503,8 +479,8 @@ export function CanaryScreen() {
                 backgroundColor: item.color,
               }}
             >
-              <Text className="chip-number">{item.index}</Text>
-            </View>
+              <text className="chip-number">{item.index}</text>
+            </view>
           )}
         />
 
@@ -530,16 +506,16 @@ export function CanaryScreen() {
             backgroundColor: pressed ? LINE_COLOR.primitives : '#13243a',
           })}
         >
-          <Text className="info-text">
+          <text className="info-text">
             {`drag me · dx ${retentionMove.dx} · dy ${retentionMove.dy}`}
-          </Text>
+          </text>
         </pressable>
 
         {/* maintainVisibleContentPosition. PASS: scroll down a bit, tap Prepend: the rows
           you are looking at DO NOT jump; new items appear above without shifting the
           viewport. FAIL: the list jumps to the top. box-list160 is shared with the
           scroll-driven header demo below. */}
-        <Text className="section-label">MVCP · prepend without jump</Text>
+        <text className="section-label">MVCP · prepend without jump</text>
         <FlatList
           data={mvcpItems}
           keyExtractor={item => item.id}
@@ -554,9 +530,9 @@ export function CanaryScreen() {
           // offset being off by a few points is visible.
           ItemSeparatorComponent={MvcpDivider}
           renderItem={({ item }) => (
-            <View className="mvcp-row">
-              <Text className="list-row-text">{item.label}</Text>
-            </View>
+            <view className="mvcp-row">
+              <text className="list-row-text">{item.label}</text>
+            </view>
           )}
         />
         <ActionButton
@@ -596,9 +572,9 @@ export function CanaryScreen() {
             ],
           }}
         >
-          <Text className="parity-header-text">
+          <text className="parity-header-text">
             HEADER — fades as you scroll ↓
-          </Text>
+          </text>
         </Animated.View>
         {/* box-list160 is shared with the MVCP FlatList above. */}
         <scroll-view
@@ -610,14 +586,14 @@ export function CanaryScreen() {
           )}
         >
           {Array.from({ length: 6 }, (_value, index) => (
-            <View key={index} className="scroll-demo-row">
-              <Text className="list-row-text">{`scroll me · row ${index}`}</Text>
-            </View>
+            <view key={index} className="scroll-demo-row">
+              <text className="list-row-text">{`scroll me · row ${index}`}</text>
+            </view>
           ))}
         </scroll-view>
-        <Text className="tiny-center">
+        <text className="tiny-center">
           ↑ drag inside the box — the bar above reacts
-        </Text>
+        </text>
         {/* Native-driver proof for Animated.event: tap to JAM the JS thread 3s, then drag
           the box above DURING the freeze. If the bar keeps fading/lifting while JS is
           frozen, the scroll event drives parityScrollY on the UI thread (native attach).
@@ -633,9 +609,9 @@ export function CanaryScreen() {
             }
           }}
         />
-        <Text className="tiny-center">
+        <text className="tiny-center">
           tap Freeze, then immediately drag the box — bar should still move
-        </Text>
+        </text>
 
         {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect
           is unmistakable on the dark theme. Kept as inline dynamic style here (not CSS)
@@ -645,45 +621,45 @@ export function CanaryScreen() {
           authored via CSS) — this is just legacy demo wiring, not a remaining gap. */}
         {/* boxShadow: a BLUE glow (a black shadow is invisible on the near-black bg).
           PASS: a soft blue halo bleeds out around the panel. */}
-        <View
+        <view
           className="shadow-card"
           style={{ boxShadow: '0px 0px 22px 3px rgba(20,158,202,0.85)' }}
         >
-          <Text className="note-text">boxShadow · glow</Text>
-        </View>
+          <text className="note-text">boxShadow · glow</text>
+        </view>
         {/* filter: same base colour both sides; the right one is darkened by
           brightness(0.5). PASS: the right panel is clearly darker than the left. */}
-        <View className="row">
-          <View className="filter-tile">
-            <Text className="tile-text">no filter</Text>
-          </View>
-          <View
+        <view className="row">
+          <view className="filter-tile">
+            <text className="tile-text">no filter</text>
+          </view>
+          <view
             className="filter-tile"
             style={{ filter: [{ brightness: 0.5 }] }}
           >
-            <Text className="tile-text">brightness 0.5</Text>
-          </View>
-        </View>
+            <text className="tile-text">brightness 0.5</text>
+          </view>
+        </view>
         {/* transformOrigin: the panel rotates around its TOP-LEFT corner, not its centre.
           PASS: the left edge stays put while the bottom-right swings down. */}
-        <View
+        <view
           className="rotated-card"
           style={{
             transformOrigin: 'top left',
             transform: [{ rotate: '4deg' }],
           }}
         >
-          <Text className="tile-text">transformOrigin · top-left</Text>
-        </View>
+          <text className="tile-text">transformOrigin · top-left</text>
+        </view>
 
         {/* background-image: a CSS `linear-gradient(...)` authored entirely in App.css
           (.gradient-card), proving @symbiote-native/css-parser's `background-image` → RN's
           `experimental_backgroundImage` raw passthrough works end to end (css-parser →
           registerRules → routeProp → core/engine/src/process-background-image → Fabric).
           PASS: the panel shows a blue-to-orange gradient sweeping left to right. */}
-        <View className="gradient-card">
-          <Text className="tile-text">background-image · linear-gradient</Text>
-        </View>
+        <view className="gradient-card">
+          <text className="tile-text">background-image · linear-gradient</text>
+        </view>
 
         {/* Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
           width/height→style); a screen reader reads "React logo" (alt→accessibilityLabel). */}
@@ -698,14 +674,14 @@ export function CanaryScreen() {
         {/* KeyboardAvoidingView enabled toggle. PASS: with enabled ON, focusing the field
           lifts it above the keyboard AND the keyboard is the email layout (proves
           autoComplete/inputMode fold); with enabled OFF the keyboard covers the field. */}
-        <View className="switch-row">
-          <Text className="switch-label">avoid keyboard</Text>
+        <view className="switch-row">
+          <text className="switch-label">avoid keyboard</text>
           <switch
             value={kavEnabled}
             onValueChange={event => setKavEnabled(event.value)}
             trackColor={{ false: '#334155', true: '#2b6cb0' }}
           />
-        </View>
+        </view>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           enabled={kavEnabled}
@@ -725,9 +701,9 @@ export function CanaryScreen() {
           className="logo-image"
         />
 
-        <View className="bottom-card">
-          <Text className="bottom-text">↑ you scrolled to the bottom</Text>
-        </View>
+        <view className="bottom-card">
+          <text className="bottom-text">↑ you scrolled to the bottom</text>
+        </view>
 
         {/* Modal overlays its own window */}
         <Modal
@@ -737,21 +713,21 @@ export function CanaryScreen() {
           onRequestClose={() => setModalVisible(false)}
         >
           {/* transparent modal => paint our own dim layer (the RN pattern) */}
-          <View className="modal-overlay">
-            <View testID="modal-card" className="modal-card">
-              <Text className="modal-title">It's a Modal</Text>
-              <Text className="modal-body">
+          <view className="modal-overlay">
+            <view testID="modal-card" className="modal-card">
+              <text className="modal-title">It's a Modal</text>
+              <text className="modal-body">
                 Rendered through ModalHostView — its own native window, same
                 Fabric tree.
-              </Text>
+              </text>
               <ActionButton
                 testID="modal-close"
                 title="Close"
                 onPress={() => setModalVisible(false)}
                 color={LINE_COLOR.primitives}
               />
-            </View>
-          </View>
+            </view>
+          </view>
         </Modal>
 
         {/* createPortal: moves the toast card OUT of this scroll content and INTO the
@@ -766,15 +742,15 @@ export function CanaryScreen() {
         {toastVisible &&
           overlayHost &&
           createPortal(
-            <View testID="toast-card" className="modal-card">
-              <Text className="modal-body">Ported via createPortal ✦</Text>
+            <view testID="toast-card" className="modal-card">
+              <text className="modal-body">Ported via createPortal ✦</text>
               <ActionButton
                 testID="toast-dismiss"
                 title="Dismiss"
                 onPress={() => setToastVisible(false)}
                 color={LINE_COLOR.primitives}
               />
-            </View>,
+            </view>,
             overlayHost,
           )}
 
@@ -789,15 +765,15 @@ export function CanaryScreen() {
         />
         {tunnelToastVisible && (
           <overlayTunnel.In>
-            <View testID="tunnel-toast-card" className="modal-card">
-              <Text className="modal-body">Ported via createTunnel ✦</Text>
+            <view testID="tunnel-toast-card" className="modal-card">
+              <text className="modal-body">Ported via createTunnel ✦</text>
               <ActionButton
                 testID="tunnel-toast-dismiss"
                 title="Dismiss"
                 onPress={() => setTunnelToastVisible(false)}
                 color={LINE_COLOR.primitives}
               />
-            </View>
+            </view>
           </overlayTunnel.In>
         )}
       </scroll-view>
@@ -807,14 +783,14 @@ export function CanaryScreen() {
           child (the toast card). Rendered here — a sibling of ScrollView, same surface — so
           createPortal above can reach it via the callback ref; createTunnel's Out below works
           identically wherever it's mounted. */}
-      <View
+      <view
         testID="overlay-host"
         ref={setOverlayHost}
         pointerEvents="box-none"
         className="overlay-host"
       >
         <overlayTunnel.Out />
-      </View>
+      </view>
     </safe-area-view>
   );
 }

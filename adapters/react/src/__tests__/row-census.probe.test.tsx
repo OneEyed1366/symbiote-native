@@ -1,7 +1,7 @@
 // TEMPORARY probe: enumerate the native nodes one benchmark row builds, by name.
 // Not a regression test — deleted after the question it answers is answered.
 import { describe, expect, it } from 'vitest';
-import { Text, View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 909;
@@ -10,16 +10,16 @@ const fabric = installFabric();
 // Copied verbatim from examples/react/screens/BenchmarkScreen.tsx's BenchmarkRow.
 function Row(): React.ReactElement {
   return (
-    <View className="bench-row">
-      <Text className="bench-row-id">1</Text>
+    <view className="bench-row">
+      <text className="bench-row-id">1</text>
       <pressable className="flex1" onPress={() => {}}>
-        <Text className="bench-row-label">label</Text>
+        <text className="bench-row-label">label</text>
       </pressable>
       <pressable className="bench-row-remove" onPress={() => {}}>
-        <Text className="bench-row-remove-text">×</Text>
+        <text className="bench-row-remove-text">×</text>
       </pressable>
       <text-input className="bench-row-input" value="label" />
-    </View>
+    </view>
   );
 }
 
@@ -40,7 +40,7 @@ function census(): string[] {
 describe('benchmark row census', () => {
   it('control: the harness sees a plain Text reach RCTRawText', () => {
     fabric.reset();
-    mount(ROOT_TAG, <Text>sentinel</Text>);
+    mount(ROOT_TAG, <text>sentinel</text>);
     expect(census(), 'harness is live').toContain('RCTRawText');
     unmount(ROOT_TAG);
   });

@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Text,
-  View,
-} from '@symbiote-native/react';
-import {
   canUseBiometricAuthentication,
   deleteItemAsync,
   getItemAsync,
@@ -34,12 +30,12 @@ function CapabilityRow({
   const text =
     status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
-    <View testID={testID} className="capability-row">
-      <Text className="capability-label">{label}</Text>
-      <View className={`status-badge status-badge-${status}`}>
-        <Text className="status-badge-text">{text}</Text>
-      </View>
-    </View>
+    <view testID={testID} className="capability-row">
+      <text className="capability-label">{label}</text>
+      <view className={`status-badge status-badge-${status}`}>
+        <text className="status-badge-text">{text}</text>
+      </view>
+    </view>
   );
 }
 
@@ -129,27 +125,27 @@ export function SecureStoreScreen() {
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Secure Store</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Secure Store</text>
+            <text className="hero-body">
               @symbiote-native/secure-store — encrypted key/value storage in the
               iOS Keychain and the Android Keystore. Save a value, kill the app,
               relaunch, and read it back.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="secure-store-capability-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Capabilities</Text>
-          </View>
+        <view testID="secure-store-capability-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Capabilities</text>
+          </view>
           <CapabilityRow
             testID="secure-store-available"
             label="Available"
@@ -160,30 +156,30 @@ export function SecureStoreScreen() {
             label="Biometrics usable"
             status={canUseBiometrics}
           />
-        </View>
+        </view>
 
-        <View testID="secure-store-value-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Stored value</Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">{DEMO_KEY}</Text>
-            <Text testID="secure-store-value" className="value-text">
+        <view testID="secure-store-value-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Stored value</text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">{DEMO_KEY}</text>
+            <text testID="secure-store-value" className="value-text">
               {storedValue === null ? '(no entry)' : storedValue}
-            </Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">Last result</Text>
-            <Text testID="secure-store-result" className="value-text">
+            </text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">Last result</text>
+            <text testID="secure-store-result" className="value-text">
               {lastResult}
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="secure-store-write-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Write, read, delete</Text>
-          </View>
+        <view testID="secure-store-write-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Write, read, delete</text>
+          </view>
           <text-input
             testID="secure-store-input"
             value={inputText}
@@ -216,7 +212,7 @@ export function SecureStoreScreen() {
             onPress={handleDelete}
             color={lineColor}
           />
-        </View>
+        </view>
       </scroll-view>
     </safe-area-view>
   );

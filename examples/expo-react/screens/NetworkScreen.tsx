@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import {
   NetworkStateType,
   getIpAddressAsync,
@@ -69,77 +68,77 @@ export function NetworkScreen() {
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Network</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Network</text>
+            <text className="hero-body">
               @symbiote-native/network — live network state via
               useNetworkState(), plus the device's IP address and airplane-mode
               check. Toggle Wi-Fi or airplane mode on the device to see the live
               card update on its own.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="network-live-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Live network state</Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">Type</Text>
-            <Text className="value-text">
+        <view testID="network-live-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Live network state</text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">Type</text>
+            <text className="value-text">
               {networkTypeLabel(networkState.type)}
-            </Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">Connected</Text>
-            <Text className="value-text">
+            </text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">Connected</text>
+            <text className="value-text">
               {networkState.isConnected === undefined
                 ? 'checking…'
                 : networkState.isConnected
                   ? 'Yes'
                   : 'No'}
-            </Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">Internet reachable</Text>
-            <Text className="value-text">
+            </text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">Internet reachable</text>
+            <text className="value-text">
               {networkState.isInternetReachable === undefined
                 ? 'checking…'
                 : networkState.isInternetReachable
                   ? 'Yes'
                   : 'No'}
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="network-info-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Device info</Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">IP address</Text>
-            <Text className="value-text">
+        <view testID="network-info-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Device info</text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">IP address</text>
+            <text className="value-text">
               {ipAddress === null ? 'checking…' : ipAddress}
-            </Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">Airplane mode</Text>
-            <Text className="value-text">
+            </text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">Airplane mode</text>
+            <text className="value-text">
               {isAirplaneMode === null
                 ? 'checking…'
                 : isAirplaneMode
                   ? 'On'
                   : 'Off'}
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
       </scroll-view>
     </safe-area-view>
   );

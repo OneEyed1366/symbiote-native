@@ -1,5 +1,5 @@
 // `activity-indicator` as a TAG, measured through React's own reconciler. RN's ActivityIndicator is
-// a centering `<View>` wrapped around a native spinner (ActivityIndicator.js:112) and takes no
+// a centering `<view>` wrapped around a native spinner (ActivityIndicator.js:112) and takes no
 // children, so the wrapper this replaces was composition the engine behavior now owns
 // (`core/components/src/behaviors/activity-indicator/`).
 //

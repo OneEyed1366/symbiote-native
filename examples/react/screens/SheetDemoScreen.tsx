@@ -1,4 +1,3 @@
-import { Text, View } from '@symbiote-native/react';
 import { useStackNavigation } from '@symbiote-native/navigation/react';
 import type { IScreenOptions } from '@symbiote-native/navigation/react';
 import { ROUTE_NAME } from '../routes';
@@ -45,28 +44,28 @@ export function SheetDemoScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
   return (
     <scroll-view className="screen" contentContainerStyle="section">
-      <View className={`line-tag line-tag-${lineInfo.line}`}>
-        <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-      </View>
-      <View className="hero-card">
-        <View
+      <view className={`line-tag line-tag-${lineInfo.line}`}>
+        <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+      </view>
+      <view className="hero-card">
+        <view
           className="hero-badge"
           style={{ backgroundColor: LINE_COLOR.presentation }}
         >
-          <Text className="hero-badge-text">SH</Text>
-        </View>
-        <View className="hero-copy">
-          <Text className="hero-title">Sheet presentation</Text>
-          <Text className="hero-body">
+          <text className="hero-badge-text">SH</text>
+        </view>
+        <view className="hero-copy">
+          <text className="hero-title">Sheet presentation</text>
+          <text className="hero-body">
             Pushed with stackPresentation: formSheet and three detents — drag
             the grabber between 30%, 60%, and full height.
-          </Text>
-        </View>
-      </View>
-      <Text className="info-text">
+          </text>
+        </view>
+      </view>
+      <text className="info-text">
         stackPresentation: formSheet · detents 30% / 60% / 100% · drag the
         grabber
-      </Text>
+      </text>
       <ActionButton
         testID="sheet-dismiss"
         title="Dismiss"

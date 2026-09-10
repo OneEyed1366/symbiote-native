@@ -26,7 +26,6 @@ import {
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
-import { Text, View } from './components';
 
 const ROOT_TAG = 8833;
 const ROWS = 50;
@@ -35,20 +34,20 @@ const fabric = installFabric();
 
 function Row({ withChild }: { withChild: boolean }): React.ReactElement {
   return (
-    <View>
-      <Text>{'id'}</Text>
-      {withChild ? <Text>{'extra'}</Text> : null}
-    </View>
+    <view>
+      <text>{'id'}</text>
+      {withChild ? <text>{'extra'}</text> : null}
+    </view>
   );
 }
 
 function List({ withChild }: { withChild: boolean }): React.ReactElement {
   return (
-    <View testID="list">
+    <view testID="list">
       {Array.from({ length: ROWS }, (_value, index) => (
         <Row key={index} withChild={withChild} />
       ))}
-    </View>
+    </view>
   );
 }
 

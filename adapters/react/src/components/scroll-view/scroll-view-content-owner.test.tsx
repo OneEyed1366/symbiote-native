@@ -14,13 +14,7 @@
 // content node — a capability an app depends on, rather than a shape
 // (`.claude/rules/adapter-parity-audit.md`, "Phrase a parity oracle as a CAPABILITY").
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  Text,
-  View,
-  VirtualizedList,
-  mount,
-  unmount,
-} from '@symbiote-native/react';
+import { VirtualizedList, mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 6102;
@@ -89,7 +83,7 @@ describe('exactly one owner builds the scroll content node', () => {
     mount(
       ROOT_TAG,
       <scroll-view testID="sv">
-        <View testID={CHILD_ID} />
+        <view testID={CHILD_ID} />
       </scroll-view>,
     );
     expect(countByName(SCROLL_CONTENT)).toBe(1);
@@ -105,7 +99,7 @@ describe('exactly one owner builds the scroll content node', () => {
     mount(
       ROOT_TAG,
       <scroll-view testID="sv" contentContainerStyle={{ padding: 7 }}>
-        <View testID={CHILD_ID} />
+        <view testID={CHILD_ID} />
       </scroll-view>,
     );
     let content: IFakeNode | undefined;
@@ -130,7 +124,7 @@ describe('exactly one owner builds the scroll content node', () => {
         getItemCount={(d: number[]) => d.length}
         keyExtractor={(item: number) => String(item)}
         renderItem={({ item }: { item: number }) => (
-          <Text testID={CHILD_ID}>{String(item)}</Text>
+          <text testID={CHILD_ID}>{String(item)}</text>
         )}
       />,
     );

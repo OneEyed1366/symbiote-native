@@ -1,11 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  FlatList,
-  SectionList,
-  Text,
-  View,
-  type ISection,
-} from '@symbiote-native/react';
+import { FlatList, SectionList, type ISection } from '@symbiote-native/react';
 import {
   readCommitProfile,
   registerPostCommit,
@@ -408,13 +402,13 @@ const BenchmarkRow = memo(function BenchmarkRowView({
   onRemove,
 }: IBenchmarkRowProps) {
   return (
-    <View className={isSelected ? 'bench-row bench-row-selected' : 'bench-row'}>
-      <Text className="bench-row-id">{String(row.id)}</Text>
+    <view className={isSelected ? 'bench-row bench-row-selected' : 'bench-row'}>
+      <text className="bench-row-id">{String(row.id)}</text>
       <pressable className="flex1" onPress={() => onSelect(row.id)}>
-        <Text className="bench-row-label">{row.label}</Text>
+        <text className="bench-row-label">{row.label}</text>
       </pressable>
       <pressable className="bench-row-remove" onPress={() => onRemove(row.id)}>
-        <Text className="bench-row-remove-text">×</Text>
+        <text className="bench-row-remove-text">×</text>
       </pressable>
       {/* LAST child, and deliberately bare: no `multiline` (it would pick the other native view
         and, being a runtime value, refuse to lower at all), no change handler and no ref (a ref
@@ -423,7 +417,7 @@ const BenchmarkRow = memo(function BenchmarkRowView({
         for and an uncontrolled input would never run it. React has no lowering transform, so
         here it stays a component — this column is the control the lowered ones are read against. */}
       <text-input className="bench-row-input" value={row.label} />
-    </View>
+    </view>
   );
 });
 
@@ -440,13 +434,13 @@ const StickyScrollViewBlock = memo(function StickyScrollViewBlockView() {
   const children = useMemo(
     () =>
       Array.from({ length: STICKY_SECTION_COUNT }, (_value, section) => [
-        <Text key={`sticky-header-${section}`} className="section-header">
+        <text key={`sticky-header-${section}`} className="section-header">
           {`SECTION ${section + 1}`}
-        </Text>,
+        </text>,
         ...Array.from({ length: STICKY_ROWS_PER_SECTION }, (_rowValue, row) => (
-          <Text key={`sticky-row-${section}-${row}`} className="list-row-text">
+          <text key={`sticky-row-${section}-${row}`} className="list-row-text">
             {`row ${section + 1}.${row + 1}`}
-          </Text>
+          </text>
         )),
       ]).flat(),
     [],
@@ -462,9 +456,9 @@ const StickyScrollViewBlock = memo(function StickyScrollViewBlockView() {
 
   return (
     <>
-      <Text className="section-label">
+      <text className="section-label">
         STICKY PATH A · scroll-view · stickyHeaderIndices
-      </Text>
+      </text>
       <scroll-view
         testID="benchmark-sticky-scroll"
         className="bench-sticky"
@@ -474,9 +468,9 @@ const StickyScrollViewBlock = memo(function StickyScrollViewBlockView() {
       >
         {children}
       </scroll-view>
-      <Text className="note-text">
+      <text className="note-text">
         {`${STICKY_SECTION_COUNT} sections, every row mounted — no virtualization in the frame.`}
-      </Text>
+      </text>
     </>
   );
 });
@@ -492,9 +486,9 @@ const StickyScrollViewBlock = memo(function StickyScrollViewBlockView() {
 const StickySectionListBlock = memo(function StickySectionListBlockView() {
   return (
     <>
-      <Text className="section-label">
+      <text className="section-label">
         STICKY PATH B · SectionList · stickySectionHeadersEnabled
-      </Text>
+      </text>
       <SectionList
         testID="benchmark-sticky-section-list"
         sections={BENCHMARK_SECTIONS}
@@ -507,25 +501,25 @@ const StickySectionListBlock = memo(function StickySectionListBlockView() {
           // Height is pinned inline rather than in the stylesheet because the number has to agree
           // with sectionListItemLayout's arithmetic; splitting it across two files is how that
           // pair silently drifts apart.
-          <Text
+          <text
             className="section-header"
             style={{ height: SECTION_LIST_HEADER_HEIGHT }}
           >
             {section.title}
-          </Text>
+          </text>
         )}
         renderItem={({ item }) => (
-          <View
+          <view
             className="parity-row"
             style={{ height: SECTION_LIST_ROW_HEIGHT }}
           >
-            <Text className="list-row-text">{item.label}</Text>
-          </View>
+            <text className="list-row-text">{item.label}</text>
+          </view>
         )}
       />
-      <Text className="note-text">
+      <text className="note-text">
         {`${SECTION_LIST_SECTION_COUNT} sections x ${SECTION_LIST_ROWS_PER_SECTION} rows — windowed, sticky math inside the list.`}
-      </Text>
+      </text>
     </>
   );
 });
@@ -989,30 +983,30 @@ export function BenchmarkScreen() {
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: accent }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Benchmark</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: accent }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Benchmark</text>
+            <text className="hero-body">
               The js-framework-benchmark operations, run on device against the
               engine's commit path — with the JS-thread frame rate beside them.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <Text className="section-label">MEASUREMENTS</Text>
+        <text className="section-label">MEASUREMENTS</text>
         <JsFrameRateMeter accent={accent} />
 
         {/* Buttons and results sit DIRECTLY under the meter, and everything they stress sits
           below: a suite step holds the JS thread, so the dip has to be readable in the same
           screenful as the press that caused it. */}
-        <View className="bench-run-row">
-          <View className="flex1">
+        <view className="bench-run-row">
+          <view className="flex1">
             <ActionButton
               testID="bench-run-suite-all"
               title={
@@ -1023,8 +1017,8 @@ export function BenchmarkScreen() {
               onPress={() => onRunSuite(MOUNT_MODE.All)}
               color={accent}
             />
-          </View>
-          <View className="flex1">
+          </view>
+          <view className="flex1">
             <ActionButton
               testID="bench-run-suite-virtualized"
               title={
@@ -1035,11 +1029,11 @@ export function BenchmarkScreen() {
               onPress={() => onRunSuite(MOUNT_MODE.Virtualized)}
               color={accent}
             />
-          </View>
-        </View>
+          </view>
+        </view>
 
-        <View className="bench-run-row">
-          <View className="flex1">
+        <view className="bench-run-row">
+          <view className="flex1">
             <ActionButton
               testID="bench-toggle-batch-create"
               title={
@@ -1048,143 +1042,143 @@ export function BenchmarkScreen() {
               onPress={onToggleBatchCreate}
               color={accent}
             />
-          </View>
-        </View>
-        <Text className="note-text">
+          </view>
+        </view>
+        <text className="note-text">
           {`Temporary experiment switch. On, the engine hands a parent's children to cloneNodeWithChildren in one call instead of appending them one at a time — about a third fewer JSI calls on Create, paid for with one extra ShadowNode per batched parent. The sign is not predicted, which is why it is a runtime toggle: two builds a day apart drifted 4% on Create and 6x on Clear with no code change, so the only trustworthy comparison is back-to-back on one binary. Flip it, re-run the suite, compare.`}
-        </Text>
+        </text>
 
         {progress !== undefined && (
-          <View testID="bench-suite-progress" className="bench-progress">
+          <view testID="bench-suite-progress" className="bench-progress">
             <activity-indicator color={accent} />
-            <Text className="bench-progress-text">
+            <text className="bench-progress-text">
               {`${progress.mode === MOUNT_MODE.All ? 'All mounted' : 'Virtualized'} · ${progress.label}`}
-            </Text>
-            <Text className="bench-progress-count">
+            </text>
+            <text className="bench-progress-count">
               {`${progress.done}/${SUITE_STEPS.length}`}
-            </Text>
-          </View>
+            </text>
+          </view>
         )}
 
         {hasSuiteResults ? (
-          <View>
-            <View className="bench-compare-row">
-              <Text className="bench-compare-label" />
-              <Text className="bench-compare-head-cell">ALL MOUNTED</Text>
-              <Text className="bench-compare-head-cell">VIRTUALIZED</Text>
-            </View>
+          <view>
+            <view className="bench-compare-row">
+              <text className="bench-compare-label" />
+              <text className="bench-compare-head-cell">ALL MOUNTED</text>
+              <text className="bench-compare-head-cell">VIRTUALIZED</text>
+            </view>
             {SUITE_STEPS.map(step => (
-              <View
+              <view
                 key={step.op}
                 testID={`bench-suite-${step.op}`}
                 className="bench-compare-row"
               >
-                <Text className="bench-compare-label">{step.label}</Text>
-                <Text className="bench-compare-cell">
+                <text className="bench-compare-label">{step.label}</text>
+                <text className="bench-compare-cell">
                   {formatDuration(allDurations.get(step.op))}
-                </Text>
-                <Text className="bench-compare-cell">
+                </text>
+                <text className="bench-compare-cell">
                   {formatDuration(virtualizedDurations.get(step.op))}
-                </Text>
-              </View>
+                </text>
+              </view>
             ))}
-          </View>
+          </view>
         ) : (
-          <Text testID="bench-suite-empty" className="note-text">
+          <text testID="bench-suite-empty" className="note-text">
             No suite run yet.
-          </Text>
+          </text>
         )}
 
         {hasSuiteResults && (
-          <View>
-            <Text className="section-label">ENGINE PER STEP · ALL MOUNTED</Text>
-            <View className="bench-compare-row">
-              <Text className="bench-compare-label" />
-              <Text className="bench-compare-head-cell">VISITED</Text>
-              <Text className="bench-compare-head-cell">WRITES/NOOP</Text>
-              <Text className="bench-compare-head-cell">COMMITS</Text>
-            </View>
+          <view>
+            <text className="section-label">ENGINE PER STEP · ALL MOUNTED</text>
+            <view className="bench-compare-row">
+              <text className="bench-compare-label" />
+              <text className="bench-compare-head-cell">VISITED</text>
+              <text className="bench-compare-head-cell">WRITES/NOOP</text>
+              <text className="bench-compare-head-cell">COMMITS</text>
+            </view>
             {SUITE_STEPS.map(step => {
               const profile = allProfiles.get(step.op);
               return (
-                <View
+                <view
                   key={`engine-${step.op}`}
                   testID={`bench-engine-${step.op}`}
                   className="bench-compare-row"
                 >
-                  <Text className="bench-compare-label">{step.label}</Text>
-                  <Text className="bench-compare-cell">
+                  <text className="bench-compare-label">{step.label}</text>
+                  <text className="bench-compare-cell">
                     {profile === undefined ? '—' : String(profile.nodesVisited)}
-                  </Text>
-                  <Text className="bench-compare-cell">
+                  </text>
+                  <text className="bench-compare-cell">
                     {profile === undefined
                       ? '—'
                       : `${profile.propWrites}/${profile.propNoops}`}
-                  </Text>
-                  <Text className="bench-compare-cell">
+                  </text>
+                  <text className="bench-compare-cell">
                     {profile === undefined
                       ? '—'
                       : `${profile.commits} · ${profile.walkMs.toFixed(1)}ms`}
-                  </Text>
-                </View>
+                  </text>
+                </view>
               );
             })}
-            <Text className="note-text">
+            <text className="note-text">
               {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a VISITED or WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. The ms is the reconcile window and it CONTAINS the createNode/appendChild JSI calls, so compare it across adapters, never read it as engine JS.`}
-            </Text>
-          </View>
+            </text>
+          </view>
         )}
 
         {hasSuiteResults && (
-          <View>
-            <Text className="section-label">FABRIC CALLS · ALL MOUNTED</Text>
-            <View className="bench-compare-row">
-              <Text className="bench-compare-label" />
-              <Text className="bench-compare-head-cell">
+          <view>
+            <text className="section-label">FABRIC CALLS · ALL MOUNTED</text>
+            <view className="bench-compare-row">
+              <text className="bench-compare-label" />
+              <text className="bench-compare-head-cell">
                 CREATE/APPEND/CLONE
-              </Text>
-              <Text className="bench-compare-head-cell">PROP KEYS</Text>
-            </View>
+              </text>
+              <text className="bench-compare-head-cell">PROP KEYS</text>
+            </view>
             {SUITE_STEPS.map(step => {
               const fabric = allFabricProfiles.get(step.op);
               return (
-                <View
+                <view
                   key={`fabric-${step.op}`}
                   testID={`bench-fabric-${step.op}`}
                   className="bench-compare-row"
                 >
-                  <Text className="bench-compare-label">{step.label}</Text>
-                  <Text className="bench-compare-cell">
+                  <text className="bench-compare-label">{step.label}</text>
+                  <text className="bench-compare-cell">
                     {formatFabric(fabric)}
-                  </Text>
-                  <Text className="bench-compare-cell">
+                  </text>
+                  <text className="bench-compare-cell">
                     {fabric === undefined ? '—' : String(fabric.totalPropKeys)}
-                  </Text>
-                </View>
+                  </text>
+                </view>
               );
             })}
-            <Text className="note-text">
+            <text className="note-text">
               {`Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no reconcile walk to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`}
-            </Text>
-          </View>
+            </text>
+          </view>
         )}
-        <Text className="note-text">
+        <text className="note-text">
           {`Every operation in a fixed order, each timed step starting from exactly ${SUITE_ROWS} rows, with untimed resets in between. All-mounted is krausest's own shape (${NATIVE_VIEWS_PER_ROW} native views per row) and the column that compares to the published web numbers; virtualized mounts a window instead, so it prices what an app ships rather than the commit path itself. Pressing the operation buttons by hand leaves Remove and Append measuring whatever happened to be on screen.`}
-        </Text>
+        </text>
 
         {/* Both sticky paths and the row list sit under the buttons: the meter above stays on
           screen while either box is being dragged — the concrete case the benchmark exists for. */}
         <StickyScrollViewBlock />
         <StickySectionListBlock />
-        <Text className="note-text">
+        <text className="note-text">
           Drag inside a box (not the page) and watch the counters above — the
           two boxes differ only in which sticky implementation carries the
           frame.
-        </Text>
+        </text>
 
-        <Text className="section-label">
+        <text className="section-label">
           {isAllMounted ? 'ROWS · ALL MOUNTED' : 'ROWS · VIRTUALIZED'}
-        </Text>
+        </text>
         {isAllMounted ? (
           rows.map(row => (
             <BenchmarkRow
@@ -1220,40 +1214,40 @@ export function BenchmarkScreen() {
         {/* Below the fold on purpose: the single operations are for poking at one commit shape
           while debugging, not for reporting. Their Remove and Append numbers depend on press
           order, which is exactly what the suite above exists to remove. */}
-        <Text className="section-label">OPERATIONS · LAST RUN</Text>
+        <text className="section-label">OPERATIONS · LAST RUN</text>
         {operations.map(operation => (
-          <View key={operation.id} className="bench-op-row">
-            <View className="flex1">
+          <view key={operation.id} className="bench-op-row">
+            <view className="flex1">
               <ActionButton
                 testID={`bench-op-${operation.id}`}
                 title={operation.label}
                 onPress={operation.onPress}
                 color={accent}
               />
-            </View>
-            <Text
+            </view>
+            <text
               testID={`bench-result-${operation.id}`}
               className="bench-op-result"
             >
               {formatDuration(lastDurations.get(operation.id))}
-            </Text>
-          </View>
+            </text>
+          </view>
         ))}
 
-        <Text testID="bench-row-count" className="info-text">
+        <text testID="bench-row-count" className="info-text">
           {`rows: ${rows.length} · ${mountedViews} native views mounted · selected: ${selectedId ?? 'none'}`}
-        </Text>
+        </text>
 
-        <Text className="section-label">{`HISTORY · LAST ${HISTORY_LIMIT} MEASUREMENTS`}</Text>
+        <text className="section-label">{`HISTORY · LAST ${HISTORY_LIMIT} MEASUREMENTS`}</text>
         {history.length === 0 ? (
-          <Text className="note-text">
+          <text className="note-text">
             Run an operation above to record a measurement.
-          </Text>
+          </text>
         ) : (
           history.map(entry => (
-            <Text key={entry.seq} className="bench-history-row">
+            <text key={entry.seq} className="bench-history-row">
               {`${entry.label} — ${formatDuration(entry.durationMs)} · ${entry.rowCount} rows`}
-            </Text>
+            </text>
           ))
         )}
       </scroll-view>

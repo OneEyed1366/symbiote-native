@@ -13,7 +13,7 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const TEST_ID = 'safe-area';
@@ -33,7 +33,7 @@ function App(): ReactElement {
         layoutFired = true;
       }}
     >
-      <View />
+      <view />
     </safe-area-view>
   );
 }
@@ -98,7 +98,7 @@ describe('SafeAreaView', () => {
     mount(
       ROOT_TAG,
       <safe-area-view testID={TEST_ID}>
-        <View />
+        <view />
       </safe-area-view>,
     );
     const safe = safeAreaNode();

@@ -15,7 +15,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 54;
@@ -43,7 +43,7 @@ describe('React <scroll-view> contentContainerStyle class-name resolution', () =
     mount(
       ROOT_TAG,
       <scroll-view contentContainerStyle="scrollContent">
-        <View />
+        <view />
       </scroll-view>,
     );
 
@@ -65,7 +65,7 @@ describe('React <scroll-view> contentContainerStyle class-name resolution', () =
     mount(
       ROOT_TAG,
       <scroll-view contentContainerStyle={{ padding: 12 }}>
-        <View />
+        <view />
       </scroll-view>,
     );
 

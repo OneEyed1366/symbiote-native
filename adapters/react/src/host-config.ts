@@ -159,7 +159,7 @@ const reconciler = createReconciler<
     const tag = resolveIntrinsicTag(type, props);
     const descriptor = descriptorFor(tag);
     if (hostContext.isInsideText && !descriptor.isText) {
-      throw new Error(`<${type}> can't be nested inside <Text>`);
+      throw new Error(`<${type}> can't be nested inside <text>`);
     }
     // The third argument is what makes a host behavior reachable AT ALL on this adapter. Dropping
     // it degrades silently: `createElement`'s default is `tag = component`, so the lookup runs
@@ -179,7 +179,7 @@ const reconciler = createReconciler<
   },
   createTextInstance(text, _container, hostContext) {
     if (!hostContext.isInsideText) {
-      throw new Error(`Text string "${text}" must be rendered inside a <Text>`);
+      throw new Error(`Text string "${text}" must be rendered inside a <text>`);
     }
     return createRawText(text);
   },

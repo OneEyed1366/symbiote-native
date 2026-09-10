@@ -28,7 +28,7 @@ export function createPortal(
 ): ReactPortal {
   if (!(container instanceof SymbioteSurface) && !isSymbioteNode(container)) {
     throw new Error(
-      'createPortal target must be an already-mounted host node (e.g. a ref to a rendered <View>) — got something else. Did you forget `.current`/`.value`, or pass a CSS-selector-style string?',
+      'createPortal target must be an already-mounted host node (e.g. a ref to a rendered <view>) — got something else. Did you forget `.current`/`.value`, or pass a CSS-selector-style string?',
     );
   }
   // @ts-expect-error @types/react-reconciler's ReactPortal (containerInfo/implementation) and

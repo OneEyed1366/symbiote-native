@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, AccessibilityInfo } from '@symbiote-native/react';
+import { AccessibilityInfo } from '@symbiote-native/react';
 
 // Accessibility: the props reach native unchanged (accessibilityLabel -> Android
 // content-desc / iOS accessibilityLabel; accessibilityState -> checked/selected/enabled),
@@ -20,40 +20,40 @@ export function AccessibilityDemo() {
   }, []);
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         Accessibility · props → native · aria/role transform · AccessibilityInfo
-      </Text>
+      </text>
       {/* getter readout: 'off' (no screen reader) proves the module resolved */}
-      <Text className="info-text">{`screen reader: ${screenReader}`}</Text>
+      <text className="info-text">{`screen reader: ${screenReader}`}</text>
       {/* canonical accessibility*: content-desc 'a11y-canonical-label' + role=header */}
-      <View
+      <view
         accessible
         accessibilityRole="header"
         accessibilityLabel="a11y-canonical-label"
         className="a11y-card"
       >
-        <Text className="info-text">canonical label + role=header</Text>
-      </View>
+        <text className="info-text">canonical label + role=header</text>
+      </view>
       {/* web aria and role aliases MUST fold: content-desc should be
           'a11y-aria-label', a raw aria-label attribute must not reach the native node */}
-      <View
+      <view
         accessible
         role="button"
         aria-label="a11y-aria-label"
         className="a11y-card"
       >
-        <Text className="info-text">aria-label + role=button</Text>
-      </View>
+        <text className="info-text">aria-label + role=button</text>
+      </view>
       {/* accessibilityState: uiautomator shows enabled=false / selected=true */}
-      <View
+      <view
         accessible
         accessibilityLabel="a11y-state"
         accessibilityState={{ disabled: true, selected: true }}
         className="a11y-card"
       >
-        <Text className="info-text">state: disabled + selected</Text>
-      </View>
-    </View>
+        <text className="info-text">state: disabled + selected</text>
+      </view>
+    </view>
   );
 }

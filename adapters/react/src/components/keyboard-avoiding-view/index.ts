@@ -35,7 +35,7 @@ import {
   type IKeyboardAvoidingBehavior,
   type IMeasuredFrame,
 } from '@symbiote-native/components';
-import { View, type IViewProps } from '../../components';
+import { type IViewProps } from '../../components';
 import type {
   IAccessibilityProps,
   IAriaProps,
@@ -162,7 +162,7 @@ export const KeyboardAvoidingView: FC<IKeyboardAvoidingViewProps> = props => {
   if (layout.kind === 'nested') {
     return renderWrapper(
       layout.wrapperStyle,
-      createElement(View, { style: layout.innerStyle }, children),
+      createElement('view', { style: layout.innerStyle }, children),
     );
   }
   return renderWrapper(layout.wrapperStyle, children);
@@ -183,6 +183,6 @@ export const KeyboardAvoidingView: FC<IKeyboardAvoidingViewProps> = props => {
       onLayout: handleLayout,
       children: content,
     };
-    return createElement(View, wrapperProps);
+    return createElement('view', wrapperProps);
   }
 };

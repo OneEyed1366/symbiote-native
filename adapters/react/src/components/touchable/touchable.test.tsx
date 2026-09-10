@@ -22,7 +22,7 @@
 
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 120;
@@ -452,7 +452,7 @@ describe('React TouchableHighlight underlay feedback', () => {
         style={{ width: 10 }}
         onPress={() => {}}
       >
-        <View style={{ height: 4 }} />
+        <view style={{ height: 4 }} />
       </touchable-highlight>,
     );
     const handle = responderHandle();
@@ -489,7 +489,7 @@ describe('React TouchableHighlight underlay feedback', () => {
         delayPressOut={40}
         onPress={() => {}}
       >
-        <View style={{ height: 4 }} />
+        <view style={{ height: 4 }} />
       </touchable-highlight>,
     );
     const handle = responderHandle();
@@ -514,7 +514,7 @@ describe('React TouchableHighlight underlay feedback', () => {
     mount(
       ROOT_TAG,
       <touchable-highlight underlayColor="#abc" activeOpacity={0.5}>
-        <View style={{ height: 4 }} />
+        <view style={{ height: 4 }} />
       </touchable-highlight>,
     );
     const handle = responderHandle();
@@ -542,7 +542,7 @@ describe('React TouchableHighlight underlay feedback', () => {
         onShowUnderlay={() => shows.push(1)}
         onHideUnderlay={() => hides.push(1)}
       >
-        <View style={{ height: 4 }} />
+        <view style={{ height: 4 }} />
       </touchable-highlight>,
     );
     const handle = responderHandle();
@@ -569,7 +569,7 @@ describe('React TouchableHighlight underlay feedback', () => {
         onPressIn={() => calls.push('pressIn')}
         onPressOut={() => calls.push('pressOut')}
       >
-        <View style={{ height: 4 }} />
+        <view style={{ height: 4 }} />
       </touchable-highlight>,
     );
     fabric.fireEvent(responderHandle(), TOUCH_START);
@@ -609,7 +609,7 @@ describe('React Touchable* accessibility default', () => {
 
   for (const [name, render] of variants) {
     it(`${name} marks its responder accessible by default`, () => {
-      mount(ROOT_TAG, render(<View />));
+      mount(ROOT_TAG, render(<view />));
       expect(responderProps().accessible).toBe(true);
     });
   }
@@ -618,7 +618,7 @@ describe('React Touchable* accessibility default', () => {
     mount(
       ROOT_TAG,
       <touchable-opacity accessible={false} onPress={() => {}}>
-        <View />
+        <view />
       </touchable-opacity>,
     );
     expect(responderProps().accessible).toBe(false);
@@ -646,7 +646,7 @@ describe('React Touchable* focusable', () => {
         'TouchableOpacity',
         p => (
           <touchable-opacity {...p}>
-            <View />
+            <view />
           </touchable-opacity>
         ),
       ],
@@ -654,7 +654,7 @@ describe('React Touchable* focusable', () => {
         'TouchableHighlight',
         p => (
           <touchable-highlight {...p}>
-            <View />
+            <view />
           </touchable-highlight>
         ),
       ],

@@ -9,7 +9,7 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Text, View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const NATIVE_ID = 'accessory-1';
@@ -18,16 +18,16 @@ const ROOT_TAG = 230;
 
 function App(): ReactElement {
   return (
-    <View>
+    <view>
       <text-input inputAccessoryViewID={NATIVE_ID} />
       <input-accessory-view
         nativeID={NATIVE_ID}
         backgroundColor={BACKGROUND_COLOR}
         style={{ flex: 1 }}
       >
-        <Text>Done</Text>
+        <text>Done</text>
       </input-accessory-view>
-    </View>
+    </view>
   );
 }
 
@@ -54,7 +54,7 @@ describe('InputAccessoryView', () => {
       expect(accessory.props.flex).toBe(1);
     });
 
-    // why: the fold builds no structural children of its own, so the caller's <Text> must be the
+    // why: the fold builds no structural children of its own, so the caller's <text> must be the
     // host's only child — losing it, or nesting it a level down, is the failure this pins.
     it('nests the caller-supplied ReactNode children directly under the host', () => {
       mount(ROOT_TAG, <App />);

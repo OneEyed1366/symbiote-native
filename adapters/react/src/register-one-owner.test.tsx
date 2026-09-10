@@ -19,7 +19,7 @@
 // The markers REPLACE the real behaviors for this file, which is why the presence assertions live
 // in `register.test.ts` and not here. Two files, two questions.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Text, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { registerHostBehavior } from '@symbiote-native/engine';
 import {
   IMAGE_TAG,
@@ -101,7 +101,7 @@ describe('a bare tag owns its node alone', () => {
     expect(
       attachedWhileMounting(
         <input-accessory-view key="a" nativeID="bar">
-          <Text>ok</Text>
+          <text>ok</text>
         </input-accessory-view>,
       ),
     ).toEqual([INPUT_ACCESSORY_VIEW_TAG]);

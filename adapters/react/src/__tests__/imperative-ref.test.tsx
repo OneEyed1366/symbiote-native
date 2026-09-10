@@ -12,7 +12,7 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, View, findNodeHandle } from '@symbiote-native/react';
+import { mount, unmount, findNodeHandle } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 180;
@@ -90,20 +90,20 @@ function mountApp(): { box: unknown; anchor: unknown } {
   let anchor: unknown;
   function App(): ReactElement {
     return (
-      <View style={{ flex: 1 }}>
-        <View
+      <view style={{ flex: 1 }}>
+        <view
           ref={instance => {
             anchor = instance;
           }}
           style={{ width: 10, height: 10 }}
         />
-        <View
+        <view
           ref={instance => {
             box = instance;
           }}
           style={{ width: 50, height: 50 }}
         />
-      </View>
+      </view>
     );
   }
   mount(ROOT_TAG, <App />);

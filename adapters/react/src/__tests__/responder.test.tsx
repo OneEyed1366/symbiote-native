@@ -6,7 +6,7 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, View, PanResponder } from '@symbiote-native/react';
+import { mount, unmount, PanResponder } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 150;
@@ -63,7 +63,7 @@ describe('React responder system through the event layer', () => {
 
       function App(): ReactElement {
         return (
-          <View {...responder.panHandlers} style={{ width: 50, height: 50 }} />
+          <view {...responder.panHandlers} style={{ width: 50, height: 50 }} />
         );
       }
 

@@ -5,7 +5,6 @@ import {
   useState,
   useTransition,
 } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { CaveatNote } from './CaveatNote';
 import { LINE_COLOR } from '../navigation-lines';
@@ -61,10 +60,10 @@ export function HooksPerformanceDemo() {
   const ordered = reversed ? [...results].reverse() : results;
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         useMemo · useCallback · useTransition · useDeferredValue
-      </Text>
+      </text>
       <text-input
         testID="hooks-perf-query"
         className="text-input"
@@ -72,13 +71,13 @@ export function HooksPerformanceDemo() {
         onValueChange={event => setQuery(event.text)}
         placeholder="filter primitives…"
       />
-      <Text testID="hooks-perf-results" className="info-text">
+      <text testID="hooks-perf-results" className="info-text">
         {`showing ${ordered.length} of ${WORDS.length}${isStale ? ' (deferred value still catching up)' : ''}`}
-      </Text>
+      </text>
       {ordered.map(word => (
-        <Text key={word} className="list-row-text">
+        <text key={word} className="list-row-text">
           {word}
-        </Text>
+        </text>
       ))}
       <ActionButton
         testID="hooks-perf-reverse"
@@ -92,6 +91,6 @@ export function HooksPerformanceDemo() {
         lane and flush immediately; isPending and "stale" above rarely stay
         observable for more than the same tick they change in.
       </CaveatNote>
-    </View>
+    </view>
   );
 }

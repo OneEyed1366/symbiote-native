@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { View, Text } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 
 // The compound-class rule, on screen. `.badge.loud` (App.css) restates only two colours, so
@@ -25,33 +24,33 @@ export function CompoundClassDemo() {
   const [isLoud, setIsLoud] = useState(false);
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">Compound class · App.css</Text>
-      <View className="row">
-        <View className="badge" testID="compound-badge-plain">
-          <Text className="badge-text">plain</Text>
-        </View>
-        <View className="badge loud" testID="compound-badge-loud">
-          <Text className="badge-text">loud</Text>
-        </View>
-        <View
+    <view className="section-nested">
+      <text className="section-label">Compound class · App.css</text>
+      <view className="row">
+        <view className="badge" testID="compound-badge-plain">
+          <text className="badge-text">plain</text>
+        </view>
+        <view className="badge loud" testID="compound-badge-loud">
+          <text className="badge-text">loud</text>
+        </view>
+        <view
           className={isLoud ? 'badge loud' : 'badge'}
           testID="compound-badge-dynamic"
         >
-          <Text className="badge-text">dynamic</Text>
-        </View>
-      </View>
-      <Text className="note-text" testID="compound-badge-readout">
+          <text className="badge-text">dynamic</text>
+        </view>
+      </view>
+      <text className="note-text" testID="compound-badge-readout">
         {isLoud
           ? 'dynamic badge carries both tokens — accent border, same pill shape'
           : 'dynamic badge carries only .badge — grey border'}
-      </Text>
+      </text>
       <ActionButton
         testID="compound-badge-toggle"
         title={isLoud ? 'Drop .loud' : 'Add .loud'}
         color="#149eca"
         onPress={() => setIsLoud(current => !current)}
       />
-    </View>
+    </view>
   );
 }

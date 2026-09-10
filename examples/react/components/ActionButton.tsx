@@ -1,4 +1,3 @@
-import { Text } from '@symbiote-native/react';
 
 type IActionButtonProps = {
   title: string;
@@ -29,9 +28,9 @@ export function ActionButton({
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      <Text className="action-button-text" style={{ color }}>
+      <text className="action-button-text" style={{ color }}>
         {title}
-      </Text>
+      </text>
     </pressable>
   );
 }

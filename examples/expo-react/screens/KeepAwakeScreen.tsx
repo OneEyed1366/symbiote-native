@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import {
   isAvailableAsync,
   useKeepAwake,
@@ -9,10 +8,10 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="capability-row">
-      <Text className="capability-label">{label}</Text>
-      <Text className="value-text">{value}</Text>
-    </View>
+    <view className="capability-row">
+      <text className="capability-label">{label}</text>
+      <text className="value-text">{value}</text>
+    </view>
   );
 }
 
@@ -47,43 +46,43 @@ export function KeepAwakeScreen() {
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Keep Awake</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Keep Awake</text>
+            <text className="hero-body">
               @symbiote-native/keep-awake — keeps the screen on for the lifetime
               of a mounted component.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="keep-awake-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Keep screen awake</Text>
-          </View>
+        <view testID="keep-awake-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Keep screen awake</text>
+          </view>
           <ValueRow
             label="Available"
             value={
               isAvailable === null ? 'checking…' : isAvailable ? 'Yes' : 'No'
             }
           />
-          <View testID="keep-awake-toggle-row" className="capability-row">
-            <Text className="capability-label">Keep screen awake</Text>
+          <view testID="keep-awake-toggle-row" className="capability-row">
+            <text className="capability-label">Keep screen awake</text>
             <switch
               testID="keep-awake-switch"
               value={isKeepAwakeOn}
               onValueChange={event => setIsKeepAwakeOn(event.value)}
               trackColor={{ true: lineColor }}
             />
-          </View>
+          </view>
           {isKeepAwakeOn && <KeepAwakeHolder />}
-        </View>
+        </view>
       </scroll-view>
     </safe-area-view>
   );

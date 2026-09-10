@@ -11,7 +11,7 @@
 
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 62;
@@ -24,7 +24,7 @@ function App(): ReactElement {
         refreshing={refreshing}
         onRefresh={() => setRefreshing(true)}
       />
-      <View />
+      <view />
     </scroll-view>
   );
 }

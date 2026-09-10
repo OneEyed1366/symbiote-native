@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import {
   deserializeNavigatorState,
   serializeNavigatorState,
@@ -59,26 +58,26 @@ export function StatePersistenceScreen() {
 
   return (
     <safe-area-view className="screen">
-      <View className="section">
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View
+      <view className="section">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view
             className="hero-badge"
             style={{ backgroundColor: LINE_COLOR.routing }}
           >
-            <Text className="hero-badge-text">SP</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">State persistence</Text>
-            <Text className="hero-body">
+            <text className="hero-badge-text">SP</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">State persistence</text>
+            <text className="hero-body">
               The Stack's own state serialized out and deserialized back in —
               restoring exactly where you left off.
-            </Text>
-          </View>
-        </View>
-        <Text className="info-text">{`current stack depth: ${state.routes.length}`}</Text>
+            </text>
+          </view>
+        </view>
+        <text className="info-text">{`current stack depth: ${state.routes.length}`}</text>
         <ActionButton
           testID="persist-serialize"
           title="Serialize current stack"
@@ -92,15 +91,15 @@ export function StatePersistenceScreen() {
           color={LINE_COLOR.routing}
         />
         {restoreError !== undefined && (
-          <Text className="info-text">{`error: ${restoreError}`}</Text>
+          <text className="info-text">{`error: ${restoreError}`}</text>
         )}
-        <View className="box-list160">
-          <Text testID="persist-snapshot" className="list-row-text">
+        <view className="box-list160">
+          <text testID="persist-snapshot" className="list-row-text">
             {snapshot ??
               'tap Serialize to capture the current route stack as JSON'}
-          </Text>
-        </View>
-      </View>
+          </text>
+        </view>
+      </view>
     </safe-area-view>
   );
 }

@@ -1,5 +1,4 @@
 import { Component, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 
@@ -95,11 +94,11 @@ class LifecycleDemoClass extends Component<
 
   render() {
     return (
-      <View className="section-tight">
-        <Text testID="class-lifecycle-count" className="info-text">
+      <view className="section-tight">
+        <text testID="class-lifecycle-count" className="info-text">
           {`${this.props.label}: count=${this.state.count}, derivedSeed=${this.state.derivedSeed}`}
-        </Text>
-        <View className="row-tight">
+        </text>
+        <view className="row-tight">
           <ActionButton
             testID="class-lifecycle-increment"
             title="setState (+1)"
@@ -112,8 +111,8 @@ class LifecycleDemoClass extends Component<
             onPress={this.onForce}
             color={LINE_COLOR.introspection}
           />
-        </View>
-      </View>
+        </view>
+      </view>
     );
   }
 }
@@ -129,13 +128,13 @@ export function ClassLifecycleDemo() {
   };
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         class extends Component · constructor · render ·
         componentDidMount/Update/WillUnmount · shouldComponentUpdate · static
         getDerivedStateFromProps · getSnapshotBeforeUpdate ·
         this.setState/forceUpdate · static defaultProps
-      </Text>
+      </text>
       {mounted && (
         <LifecycleDemoClass
           seed={seed}
@@ -143,7 +142,7 @@ export function ClassLifecycleDemo() {
           onLog={onLog}
         />
       )}
-      <View className="row-tight">
+      <view className="row-tight">
         <ActionButton
           testID="class-lifecycle-toggle-mount"
           title={mounted ? 'Unmount' : 'Mount'}
@@ -162,17 +161,17 @@ export function ClassLifecycleDemo() {
           onPress={() => setSkipUpdates(current => !current)}
           color={LINE_COLOR.introspection}
         />
-      </View>
-      <View testID="class-lifecycle-log" className="log-box">
+      </view>
+      <view testID="class-lifecycle-log" className="log-box">
         {log.length === 0 && (
-          <Text className="note-text">no lifecycle events logged yet</Text>
+          <text className="note-text">no lifecycle events logged yet</text>
         )}
         {log.map((entry, index) => (
-          <Text key={`${index}-${entry}`} className="note-text">
+          <text key={`${index}-${entry}`} className="note-text">
             {entry}
-          </Text>
+          </text>
         ))}
-      </View>
-    </View>
+      </view>
+    </view>
   );
 }

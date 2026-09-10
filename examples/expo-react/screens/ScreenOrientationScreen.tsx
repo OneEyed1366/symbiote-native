@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import {
   Orientation,
   OrientationLock,
@@ -33,10 +32,10 @@ function orientationLockLabel(orientationLock: OrientationLock): string {
 
 function ValueRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="capability-row">
-      <Text className="capability-label">{label}</Text>
-      <Text className="value-text">{value}</Text>
-    </View>
+    <view className="capability-row">
+      <text className="capability-label">{label}</text>
+      <text className="value-text">{value}</text>
+    </view>
   );
 }
 
@@ -69,37 +68,37 @@ export function ScreenOrientationScreen() {
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Screen Orientation</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Screen Orientation</text>
+            <text className="hero-body">
               @symbiote-native/screen-orientation — lock/unlock orientation,
               plus a live orientation + lock state hook.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="screen-orientation-state-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Current state</Text>
-          </View>
+        <view testID="screen-orientation-state-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Current state</text>
+          </view>
           <ValueRow label="Orientation" value={orientationLabel(orientation)} />
           <ValueRow
             label="Orientation lock"
             value={orientationLockLabel(orientationLock)}
           />
-        </View>
+        </view>
 
-        <View testID="screen-orientation-actions-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Actions</Text>
-          </View>
+        <view testID="screen-orientation-actions-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Actions</text>
+          </view>
           <ActionButton
             testID="screen-orientation-lock-portrait-button"
             title="Lock portrait"
@@ -118,7 +117,7 @@ export function ScreenOrientationScreen() {
             onPress={handleUnlock}
             color={lineColor}
           />
-        </View>
+        </view>
       </scroll-view>
     </safe-area-view>
   );

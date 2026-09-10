@@ -131,7 +131,7 @@ let drawerInstanceCounter = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (state(); as currentState) {
-      <View [style]="rootStyle()" [symbioteHostProps]="rootPanHandlers()">
+      <view [style]="rootStyle()" [symbioteHostProps]="rootPanHandlers()">
         @for (slot of slotOrder(); track slot) {
           @switch (slot) {
             @case ('content') {
@@ -175,7 +175,7 @@ let drawerInstanceCounter = 0;
             }
           }
         }
-      </View>
+      </view>
     }
   `,
 })

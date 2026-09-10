@@ -1,15 +1,5 @@
 import { useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  SectionList,
-  Keyboard,
-  AccessibilityInfo,
-  type IHostInstance,
-  type IFlatListHandle,
-  type ISection,
-} from '@symbiote-native/react';
+import { FlatList, SectionList, Keyboard, AccessibilityInfo, type IHostInstance, type IFlatListHandle, type ISection } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 
 // Verification panel for five feature-parity behaviors with
@@ -49,20 +39,20 @@ export function ParityDemo() {
   );
 
   return (
-    <View className="section-nested">
-      <Text ref={titleRef} className="section-label">
+    <view className="section-nested">
+      <text ref={titleRef} className="section-label">
         Parity checks · longPress · dismiss · animated scroll · sticky · a11y
         focus
-      </Text>
+      </text>
 
       {/* #10 Text.onLongPress synthesis: hold ~0.5s (suppresses tap) vs quick tap */}
-      <Text
+      <text
         onLongPress={() => setLongPressMsg('long press! (tap was suppressed)')}
         onPress={() => setLongPressMsg('tap')}
         className="long-press-row"
       >
         {longPressMsg}
-      </Text>
+      </text>
 
       {/* #15 Keyboard.dismiss: blurs whatever input holds focus without needing a ref. */}
       <text-input
@@ -72,7 +62,7 @@ export function ParityDemo() {
         onBlur={() => setDismissMsg('blurred (keyboard down)')}
         className="focus-input"
       />
-      <Text className="note-text">{dismissMsg}</Text>
+      <text className="note-text">{dismissMsg}</text>
       <ActionButton
         title="Hide keyboard"
         onPress={() => Keyboard.dismiss()}
@@ -82,7 +72,7 @@ export function ParityDemo() {
       {/* #12 animated VirtualizedList scroll: smooth (native command) vs instant.
           A fixed height with no wrapper: the vertical ScrollView clips to its own
           frame (overflow:'scroll' base, like RN), so rows stay inside the box on iOS too. */}
-      <Text className="section-label">FlatList · animated scrollToOffset</Text>
+      <text className="section-label">FlatList · animated scrollToOffset</text>
       <FlatList
         ref={listRef}
         data={parityRows}
@@ -97,13 +87,13 @@ export function ParityDemo() {
           // parityRow's height references the script const PARITY_ROW_H, which a
           // CSS selector has no way to read — that one property stays dynamic
           // alongside the static `className="parity-row"` for justifyContent/padding.
-          <View className="parity-row" style={{ height: PARITY_ROW_H }}>
-            <Text className="info-text">{`row ${item.n}`}</Text>
-          </View>
+          <view className="parity-row" style={{ height: PARITY_ROW_H }}>
+            <text className="info-text">{`row ${item.n}`}</text>
+          </view>
         )}
       />
-      <View className="row">
-        <View className="flex1">
+      <view className="row">
+        <view className="flex1">
           <ActionButton
             title="Scroll ▼ animated"
             onPress={() =>
@@ -114,8 +104,8 @@ export function ParityDemo() {
             }
             color="#7fb5ff"
           />
-        </View>
-        <View className="flex1">
+        </view>
+        <view className="flex1">
           <ActionButton
             title="Top · instant"
             onPress={() =>
@@ -123,15 +113,15 @@ export function ParityDemo() {
             }
             color="#7fb5ff"
           />
-        </View>
-      </View>
+        </view>
+      </view>
 
       {/* #13 sticky section headers. Drag the inner list: each header pins at the top.
           Cross-talk check: as the NEXT header reaches the top it should PUSH the pinned
           one off (nextHeaderLayoutY not yet wired, watch push vs overlap). */}
-      <Text className="section-label">
+      <text className="section-label">
         SectionList · sticky (scroll: next header should push prev off)
-      </Text>
+      </text>
       <SectionList
         testID="sticky-section-list"
         sections={paritySections}
@@ -139,12 +129,12 @@ export function ParityDemo() {
         stickySectionHeadersEnabled
         className="section-list"
         renderSectionHeader={({ section }) => (
-          <Text className="section-header">{section.title}</Text>
+          <text className="section-header">{section.title}</text>
         )}
         renderItem={({ item }) => (
-          <View className="parity-row" style={{ height: PARITY_ROW_H }}>
-            <Text className="info-text">{item.label}</Text>
-          </View>
+          <view className="parity-row" style={{ height: PARITY_ROW_H }}>
+            <text className="info-text">{item.label}</text>
+          </view>
         )}
       />
 
@@ -159,6 +149,6 @@ export function ParityDemo() {
         }}
         color="#7fb5ff"
       />
-    </View>
+    </view>
   );
 }

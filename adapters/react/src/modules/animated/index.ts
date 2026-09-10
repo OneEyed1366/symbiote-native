@@ -28,7 +28,6 @@ import {
   forkEvent,
   unforkEvent,
 } from '@symbiote-native/engine';
-import { View, Text } from '../../components';
 import { FlatList } from '../../components/flat-list';
 import { SectionList } from '../../components/section-list';
 import { createAnimatedComponent } from './create-animated-component';
@@ -43,9 +42,9 @@ export {
   AnimatedTransform,
 } from '@symbiote-native/engine';
 
-// View/Text/Image are pure host primitives, so wrap them eagerly.
-const AnimatedView = createAnimatedComponent(View);
-const AnimatedText = createAnimatedComponent(Text);
+// The tags themselves: View/Text/Image are pure host primitives, so wrap them eagerly.
+const AnimatedView = createAnimatedComponent('view');
+const AnimatedText = createAnimatedComponent('text');
 // The tag, not the `Image` name: that one is the STATICS namespace now (`modules/image`).
 const AnimatedImage = createAnimatedComponent('image');
 

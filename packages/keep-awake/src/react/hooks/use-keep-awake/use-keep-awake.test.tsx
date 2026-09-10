@@ -10,7 +10,7 @@
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import { useKeepAwake } from './index';
 
@@ -54,7 +54,7 @@ function Probe({
   suppressDeactivateWarnings?: boolean;
 }): ReactElement {
   useKeepAwake(tag, { listener, suppressDeactivateWarnings });
-  return createElement(View);
+  return createElement('view');
 }
 
 const fabric = installFabric();

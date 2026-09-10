@@ -1,5 +1,4 @@
 import { Children, type ReactNode } from 'react';
-import { Text, View } from '@symbiote-native/react';
 
 type IChildrenReportProps = { children: ReactNode };
 
@@ -10,20 +9,20 @@ function ChildrenReport({ children }: IChildrenReportProps) {
     forEachHits += 1;
   });
   const wrapped = Children.map(children, (child, index) => (
-    <View key={index} className="row-tight">
-      <Text className="list-row-text">{`${index + 1}.`}</Text>
+    <view key={index} className="row-tight">
+      <text className="list-row-text">{`${index + 1}.`}</text>
       {child}
-    </View>
+    </view>
   ));
   const flatLength = Children.toArray(children).length;
 
   return (
-    <View className="section-tight">
-      <Text testID="children-count" className="info-text">
+    <view className="section-tight">
+      <text testID="children-count" className="info-text">
         {`Children.count=${count} · Children.forEach visited=${forEachHits} · Children.toArray length=${flatLength}`}
-      </Text>
+      </text>
       {wrapped}
-    </View>
+    </view>
   );
 }
 
@@ -33,26 +32,26 @@ function SingleChildFrame({ children }: ISingleChildFrameProps) {
   // Children.only: asserts exactly one child and returns it unwrapped — throws given zero or
   // more than one, unlike Children.map's tolerance for any shape.
   const onlyChild = Children.only(children);
-  return <View className="ref-box">{onlyChild}</View>;
+  return <view className="ref-box">{onlyChild}</view>;
 }
 
 export function ChildrenApiDemo() {
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         Children.map · Children.forEach · Children.count · Children.only ·
         Children.toArray
-      </Text>
+      </text>
       <ChildrenReport>
-        <Text className="list-row-text">first</Text>
-        <Text className="list-row-text">second</Text>
-        <Text className="list-row-text">third</Text>
+        <text className="list-row-text">first</text>
+        <text className="list-row-text">second</text>
+        <text className="list-row-text">third</text>
       </ChildrenReport>
       <SingleChildFrame>
-        <Text testID="children-only-result" className="ref-box-text">
+        <text testID="children-only-result" className="ref-box-text">
           Children.only's single child
-        </Text>
+        </text>
       </SingleChildFrame>
-    </View>
+    </view>
   );
 }

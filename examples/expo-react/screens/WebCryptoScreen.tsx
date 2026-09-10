@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import webCrypto, {
   polyfillWebCrypto,
 } from '@symbiote-native/standard-web-crypto';
@@ -24,10 +23,10 @@ function hasGlobalCrypto(): boolean {
 
 function ValueRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="capability-row">
-      <Text className="capability-label">{label}</Text>
-      <Text className="value-text">{value}</Text>
-    </View>
+    <view className="capability-row">
+      <text className="capability-label">{label}</text>
+      <text className="value-text">{value}</text>
+    </view>
   );
 }
 
@@ -61,27 +60,27 @@ export function WebCryptoScreen() {
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Web Crypto</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Web Crypto</text>
+            <text className="hero-body">
               @symbiote-native/standard-web-crypto — a Web Crypto API
               getRandomValues polyfill over @symbiote-native/crypto's native
               random source, installable onto globalThis.crypto.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="web-crypto-random-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Random bytes</Text>
-          </View>
+        <view testID="web-crypto-random-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Random bytes</text>
+          </view>
           <ActionButton
             testID="web-crypto-random-button"
             title="Generate 16 random bytes"
@@ -91,12 +90,12 @@ export function WebCryptoScreen() {
           {randomBytesHex !== null && (
             <ValueRow label="Bytes (hex)" value={randomBytesHex} />
           )}
-        </View>
+        </view>
 
-        <View testID="web-crypto-polyfill-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Polyfill</Text>
-          </View>
+        <view testID="web-crypto-polyfill-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Polyfill</text>
+          </view>
           <ActionButton
             testID="web-crypto-polyfill-button"
             title="Install polyfill"
@@ -107,7 +106,7 @@ export function WebCryptoScreen() {
             label="globalThis.crypto installed"
             value={isPolyfillInstalled ? 'Yes' : 'No'}
           />
-        </View>
+        </view>
       </scroll-view>
     </safe-area-view>
   );

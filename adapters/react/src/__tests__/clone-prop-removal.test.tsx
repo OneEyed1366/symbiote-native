@@ -10,7 +10,7 @@
 import { createElement, useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
-import { Text, View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 
 interface IFakeNode {
   viewName: string;
@@ -104,7 +104,7 @@ function App(): ReactElement {
   // the bug showed up on device (the button stayed dim after the modal opened).
   const [open, setOpen] = useState(false);
   return createElement(
-    View,
+    'view',
     null,
     createElement(
       'pressable',
@@ -115,10 +115,10 @@ function App(): ReactElement {
         style: ({ pressed }: { pressed: boolean }) =>
           pressed ? { opacity: ACTIVE_OPACITY } : {},
       },
-      createElement(Text, null, 'tap'),
+      createElement('text', null, 'tap'),
     ),
     open
-      ? createElement(View, null, createElement(Text, null, 'opened'))
+      ? createElement('view', null, createElement('text', null, 'opened'))
       : null,
   );
 }

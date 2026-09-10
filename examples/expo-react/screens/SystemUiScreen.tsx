@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import {
   getBackgroundColorAsync,
   setBackgroundColorAsync,
@@ -13,10 +12,10 @@ const PRESET_BLUE = '#3b82f6';
 
 function ValueRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="capability-row">
-      <Text className="capability-label">{label}</Text>
-      <Text className="value-text">{value}</Text>
-    </View>
+    <view className="capability-row">
+      <text className="capability-label">{label}</text>
+      <text className="value-text">{value}</text>
+    </view>
   );
 }
 
@@ -57,26 +56,26 @@ export function SystemUiScreen() {
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">System UI</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">System UI</text>
+            <text className="hero-body">
               @symbiote-native/system-ui — get/set the root view's background
               color.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="system-ui-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Root view background</Text>
-          </View>
+        <view testID="system-ui-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Root view background</text>
+          </view>
           <ValueRow
             label="Current color"
             value={backgroundColor ?? 'not set'}
@@ -99,7 +98,7 @@ export function SystemUiScreen() {
             onPress={() => applyColor(null)}
             color={lineColor}
           />
-        </View>
+        </view>
       </scroll-view>
     </safe-area-view>
   );

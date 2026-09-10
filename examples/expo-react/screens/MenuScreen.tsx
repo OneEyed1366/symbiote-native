@@ -1,4 +1,3 @@
-import { Text, View } from '@symbiote-native/react';
 import { useStackNavigation } from '@symbiote-native/navigation/react';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
@@ -138,16 +137,16 @@ export function MenuScreen() {
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className="menu-hero">
-          <Text className="menu-eyebrow">EXPO MODULES DEMOS</Text>
-          <Text className="menu-hero-title">
+        <view className="menu-hero">
+          <text className="menu-eyebrow">EXPO MODULES DEMOS</text>
+          <text className="menu-hero-title">
             Expo-SDK ports on a real native stack
-          </Text>
-          <Text className="menu-hero-subtitle">
+          </text>
+          <text className="menu-hero-subtitle">
             Each row below demos a different @symbiote-native package built on
             expo-modules-core.
-          </Text>
-        </View>
+          </text>
+        </view>
         {MENU_ITEMS.map(item => {
           const lineInfo = ROUTE_LINE_INFO[item.route];
           return (
@@ -157,17 +156,17 @@ export function MenuScreen() {
               className={`menu-row menu-row-${lineInfo.line}`}
               onPress={() => navigation.push(item.route)}
             >
-              <View className={`menu-badge menu-badge-${lineInfo.line}`}>
-                <Text className="menu-badge-text">{lineInfo.code}</Text>
-              </View>
-              <View className="menu-row-copy">
-                <Text className="menu-row-label">{item.label}</Text>
-                <Text
+              <view className={`menu-badge menu-badge-${lineInfo.line}`}>
+                <text className="menu-badge-text">{lineInfo.code}</text>
+              </view>
+              <view className="menu-row-copy">
+                <text className="menu-row-label">{item.label}</text>
+                <text
                   className={`menu-row-hint menu-row-hint-${lineInfo.line}`}
                 >
                   {item.hint}
-                </Text>
-              </View>
+                </text>
+              </view>
             </pressable>
           );
         })}

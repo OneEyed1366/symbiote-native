@@ -17,7 +17,7 @@ import {
   type ReactNode,
 } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import { useHideAnimation } from './index';
 import type {
@@ -62,7 +62,7 @@ const results: IHideAnimationResult[] = [];
 
 function Probe(props: { config: IHideAnimationConfig }): ReactElement {
   results.push(useHideAnimation(props.config));
-  return createElement(View);
+  return createElement('view');
 }
 
 type IBoundaryProps = { children: ReactNode; onError: (error: Error) => void };

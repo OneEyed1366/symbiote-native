@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import {
   DeviceType,
   brand,
@@ -54,10 +53,10 @@ function deviceTypeLabel(type: DeviceType | null): string {
 
 function ValueRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="capability-row">
-      <Text className="capability-label">{label}</Text>
-      <Text className="value-text">{value}</Text>
-    </View>
+    <view className="capability-row">
+      <text className="capability-label">{label}</text>
+      <text className="value-text">{value}</text>
+    </view>
   );
 }
 
@@ -95,27 +94,27 @@ export function DeviceScreen() {
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Device</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Device</text>
+            <text className="hero-body">
               @symbiote-native/device — brand/model/OS constants resolved
               eagerly at import time, plus one-shot async checks for device
               type, uptime, and root/jailbreak detection.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="device-constants-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Constants</Text>
-          </View>
+        <view testID="device-constants-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Constants</text>
+          </view>
           <ValueRow label="Is real device" value={isDevice ? 'Yes' : 'No'} />
           <ValueRow label="Brand" value={brand ?? 'unknown'} />
           <ValueRow label="Manufacturer" value={manufacturer ?? 'unknown'} />
@@ -125,12 +124,12 @@ export function DeviceScreen() {
           <ValueRow label="OS version" value={osVersion ?? 'unknown'} />
           <ValueRow label="Total memory" value={formatBytes(totalMemory)} />
           <ValueRow label="Device name" value={deviceName ?? 'unknown'} />
-        </View>
+        </view>
 
-        <View testID="device-async-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Async checks</Text>
-          </View>
+        <view testID="device-async-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Async checks</text>
+          </view>
           <ActionButton
             testID="device-type-button"
             title="Get device type"
@@ -159,7 +158,7 @@ export function DeviceScreen() {
               value={isRooted ? 'true' : 'false'}
             />
           )}
-        </View>
+        </view>
       </scroll-view>
     </safe-area-view>
   );

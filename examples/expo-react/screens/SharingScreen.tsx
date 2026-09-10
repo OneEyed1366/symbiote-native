@@ -1,8 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Text,
-  View,
-} from '@symbiote-native/react';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -26,12 +22,12 @@ function CapabilityRow({
   const text =
     status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
-    <View testID={testID} className="capability-row">
-      <Text className="capability-label">{label}</Text>
-      <View className={`status-badge status-badge-${status}`}>
-        <Text className="status-badge-text">{text}</Text>
-      </View>
-    </View>
+    <view testID={testID} className="capability-row">
+      <text className="capability-label">{label}</text>
+      <view className={`status-badge status-badge-${status}`}>
+        <text className="status-badge-text">{text}</text>
+      </view>
+    </view>
   );
 }
 
@@ -79,44 +75,44 @@ export function SharingScreen() {
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Sharing</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Sharing</text>
+            <text className="hero-body">
               @symbiote-native/sharing — hands a local file to the platform
               share sheet (UIActivityViewController on iOS, the Android
               chooser).
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="sharing-capability-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Capabilities</Text>
-          </View>
+        <view testID="sharing-capability-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Capabilities</text>
+          </view>
           <CapabilityRow
             testID="sharing-available"
             label="Available"
             status={isAvailable}
           />
-        </View>
+        </view>
 
-        <View testID="sharing-share-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Share a file</Text>
-          </View>
-          <Text className="info-text">
+        <view testID="sharing-share-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Share a file</text>
+          </view>
+          <text className="info-text">
             A real, readable local file URI is required — a file:// path, not a
             http(s) URL, which is not downloaded first. This app has no
             file-system package, so supply a path that already exists on the
             device.
-          </Text>
+          </text>
           <text-input
             testID="sharing-uri-input"
             value={fileUri}
@@ -132,13 +128,13 @@ export function SharingScreen() {
             onPress={handleShare}
             color={lineColor}
           />
-          <View className="capability-row">
-            <Text className="capability-label">Last result</Text>
-            <Text testID="sharing-result" className="value-text">
+          <view className="capability-row">
+            <text className="capability-label">Last result</text>
+            <text testID="sharing-result" className="value-text">
               {lastResult}
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
       </scroll-view>
     </safe-area-view>
   );

@@ -15,8 +15,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,
   unmount,
-  View,
-  Text,
   Modal,
   KeyboardAvoidingView,
   FlatList,
@@ -54,8 +52,8 @@ function carriesTestId(id: string): IFakeNode | undefined {
 
 // name -> a factory building the element with `testID` set (+ whatever minimal props it needs).
 const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
-  ['View', id => createElement(View, { testID: id })],
-  ['Text', id => createElement(Text, { testID: id }, 'x')],
+  ['View', id => createElement('view', { testID: id })],
+  ['Text', id => createElement('text', { testID: id }, 'x')],
   ['image', id => createElement('image', { testID: id, source: { uri: 'x' } })],
   [
     // The TAG. RN spreads `...props` onto the inner Image (ImageBackground.js:81), so the id lands
@@ -66,7 +64,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         'image-background',
         { testID: id, source: { uri: 'x' } },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
@@ -75,7 +73,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         'scroll-view',
         { testID: id },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   ['text-input', id => createElement('text-input', { testID: id })],
@@ -96,7 +94,11 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
   [
     'pressable',
     id =>
-      createElement('pressable', { testID: id }, createElement(Text, {}, 'x')),
+      createElement(
+        'pressable',
+        { testID: id },
+        createElement('text', {}, 'x'),
+      ),
   ],
   [
     'touchable-opacity',
@@ -104,7 +106,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         'touchable-opacity',
         { testID: id },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
@@ -113,7 +115,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         'touchable-highlight',
         { testID: id },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
@@ -124,7 +126,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         'touchable-without-feedback',
         { testID: id },
-        createElement(View, {}),
+        createElement('view', {}),
       ),
   ],
   [
@@ -136,7 +138,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         'touchable-native-feedback',
         { testID: id },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
@@ -145,7 +147,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         'safe-area-view',
         { testID: id },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
@@ -154,7 +156,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         KeyboardAvoidingView,
         { testID: id },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
@@ -163,7 +165,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         Modal,
         { testID: id, visible: true },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
@@ -172,7 +174,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         'input-accessory-view',
         { testID: id, nativeID: 'acc' },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
@@ -182,7 +184,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
         testID: id,
         data: [1],
         renderItem: (info: { item: unknown }) =>
-          createElement(Text, {}, String(info.item)),
+          createElement('text', {}, String(info.item)),
       }),
   ],
   [
@@ -192,7 +194,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
         testID: id,
         sections: [{ title: 's', data: [1] }],
         renderItem: (info: { item: unknown }) =>
-          createElement(Text, {}, String(info.item)),
+          createElement('text', {}, String(info.item)),
       }),
   ],
   [
@@ -206,7 +208,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
         getItemCount: (data: unknown) =>
           Array.isArray(data) ? data.length : 0,
         renderItem: (info: { item: unknown }) =>
-          createElement(Text, {}, String(info.item)),
+          createElement('text', {}, String(info.item)),
       }),
   ],
   [
@@ -216,7 +218,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
         testID: id,
         sections: [{ title: 's', data: [1] }],
         renderItem: (info: { item: unknown }) =>
-          createElement(Text, {}, String(info.item)),
+          createElement('text', {}, String(info.item)),
       }),
   ],
   [

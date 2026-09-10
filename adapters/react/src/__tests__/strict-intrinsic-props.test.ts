@@ -1,11 +1,15 @@
-// A primitive that has become a public TAG must carry its own strict prop type in the intrinsic
-// table — and this test exists because losing that is SILENT.
+// Which intrinsics carry a STRICT prop type, and which still accept anything.
 //
-// While a primitive is a component, its props come from `FC<IXProps>` and its intrinsic entry is
-// deliberately loose (`HostProps`, index signature); the strictness lives on the component and the
-// entry is plumbing. The day it becomes a tag, the entry IS the app's public type surface — but the
-// entry already exists and already accepts anything, so `<Image nope={1}/>` silently stops being a
-// TS2322 and nothing goes red. There is no failing state to notice.
+// THE PREMISE THIS TEST USED TO HAVE IS GONE, and the replacement is the finding. It used to derive
+// "is this primitive a tag yet" from `export const View = 'view'` in `components.ts` — a capitalized
+// alias whose value was the tag string — and require a strict entry for each one that had crossed.
+// Every alias was deleted on 2026-09-11: an app writes `<view>` / `<text>` directly, so the set the
+// old oracle measured is empty and nothing is a component any more.
+//
+// What that changes is who owns the app's compile-time surface. While a primitive was a component,
+// `FC<IXProps>` supplied strictness and the loose intrinsic entry was plumbing. Now the ENTRY is the
+// whole surface — and only two of them are strict, so `<image nope={1}/>` is not a TS2322 today.
+// That is open debt, pinned below so it shrinks deliberately rather than being rediscovered.
 //
 // Read as source rather than checked by the compiler on purpose: NO test file in this repo is
 // type-checked (every package's tsconfig excludes `**/*.test.ts`, and vitest strips types without
@@ -17,25 +21,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SRC = join(__dirname, '..');
-const componentsSource = readFileSync(join(SRC, 'components.ts'), 'utf8');
-// `jsx-runtime.ts` since the adapter got its own JSX namespace: the table used to merge into
-// `declare module 'react'` from `jsx.ts`, and that merge is what forced the `symbiote-` prefix
-// (@types/react owns `view` / `text` / `image` / `switch` as SVG entries).
 const jsxSource = readFileSync(join(SRC, 'jsx-runtime.ts'), 'utf8');
-
-// A primitive is a TAG here exactly when the barrel exports its name as a string constant whose
-// value is the intrinsic — `export const View = 'view'`. No annotation and no `as const`:
-// a `const` already infers the literal type, and both spellings are lint errors here. Derived from the
-// source rather than listed, so a primitive that crosses is picked up by this test in the same
-// commit that crosses it.
-function taggedIntrinsics(): string[] {
-  const found = [
-    // The tag has no prefix to key on since it was dropped, so the shape of the DECLARATION is the
-    // marker: a barrel const whose value is a lowercase kebab literal.
-    ...componentsSource.matchAll(/export const [A-Za-z]+ = '([a-z][a-z-]*)';/g),
-  ].map(match => match[1]);
-  return [...new Set(found)].sort();
-}
 
 // The names the table declares strictly: everything omitted from the loose Record and re-declared.
 function strictlyDeclared(): string[] {
@@ -48,30 +34,29 @@ function strictlyDeclared(): string[] {
     .sort();
 }
 
-describe('intrinsic prop strictness follows the tags', () => {
-  // why: the control. Every row below compares two derived lists, and two EMPTY lists compare
+// Equality, not a floor: an entry added without a strict type reddens here, and so does one
+// removed. Growing this list is the intended direction — every name still absent is a primitive
+// whose props an app can misspell with nothing red.
+const STRICT = ['text', 'view'];
+
+describe('intrinsic prop strictness', () => {
+  // why: the control. The assertion below compares two derived lists, and two EMPTY lists compare
   // equal — the shape that reports agreement while measuring nothing. If the extraction stops
   // matching (a rename, a formatting change), this fails first and says so.
-  it('control: both extractions find something', () => {
-    expect(
-      taggedIntrinsics().length,
-      'primitives exported as tags',
-    ).toBeGreaterThan(0);
+  it('control: the extraction finds something', () => {
     expect(
       strictlyDeclared().length,
       'strict entries in jsx-runtime.ts',
     ).toBeGreaterThan(0);
   });
 
-  // why: THE assertion. A primitive that is already a tag and is still typed `HostProps` accepts
-  // any prop, so the app loses its compile-time surface with nothing to show for it.
-  it('every primitive that is already a tag has a strict entry', () => {
-    expect(strictlyDeclared()).toEqual(taggedIntrinsics());
+  it('declares exactly the strict entries this adapter has', () => {
+    expect(strictlyDeclared()).toEqual(STRICT);
   });
 
   // why: the table must stay DERIVED from the union. It had drifted four names behind while it was
-  // hand-written — `pressable` among them, the next primitive due to cross — and a
-  // hand-written list cannot report a name that is absent from it.
+  // hand-written — `pressable` among them — and a hand-written list cannot report a name that is
+  // absent from it.
   it('declares the tag set by deriving it, not by listing it', () => {
     expect(jsxSource).toContain('Record<ISymbioteIntrinsic, IHostProps>');
   });

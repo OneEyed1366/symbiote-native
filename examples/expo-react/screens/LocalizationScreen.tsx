@@ -1,14 +1,13 @@
-import { Text, View } from '@symbiote-native/react';
 import { useCalendars, useLocales } from '@symbiote-native/localization/react';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="capability-row">
-      <Text className="capability-label">{label}</Text>
-      <Text className="value-text">{value}</Text>
-    </View>
+    <view className="capability-row">
+      <text className="capability-label">{label}</text>
+      <text className="value-text">{value}</text>
+    </view>
   );
 }
 
@@ -31,26 +30,26 @@ export function LocalizationScreen() {
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Localization</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Localization</text>
+            <text className="hero-body">
               @symbiote-native/localization — locales and calendars, each
               reactive to device settings changes via its own hook.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="localization-locale-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Locale</Text>
-          </View>
+        <view testID="localization-locale-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Locale</text>
+          </view>
           <ValueRow label="Language tag" value={locale.languageTag} />
           <ValueRow
             label="Currency code"
@@ -61,12 +60,12 @@ export function LocalizationScreen() {
             value={locale.currencySymbol ?? 'unknown'}
           />
           <ValueRow label="Text direction" value={locale.textDirection} />
-        </View>
+        </view>
 
-        <View testID="localization-calendar-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Calendar</Text>
-          </View>
+        <view testID="localization-calendar-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Calendar</text>
+          </view>
           <ValueRow label="Calendar" value={calendar.calendar ?? 'unknown'} />
           <ValueRow
             label="Uses 24-hour clock"
@@ -79,7 +78,7 @@ export function LocalizationScreen() {
             }
           />
           <ValueRow label="Time zone" value={calendar.timeZone ?? 'unknown'} />
-        </View>
+        </view>
       </scroll-view>
     </safe-area-view>
   );

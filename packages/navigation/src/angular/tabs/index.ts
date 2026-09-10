@@ -74,8 +74,8 @@ let tabInstanceCounter = 0;
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <View [style]="rootStyle">
-      <View [style]="contentStyle">
+    <view [style]="rootStyle">
+      <view [style]="contentStyle">
         @if (focusedRoute(); as route) {
           @if (componentForRoute(route); as component) {
             <ng-container
@@ -87,9 +87,9 @@ let tabInstanceCounter = 0;
             </ng-container>
           }
         }
-      </View>
+      </view>
       <symbiote-descriptor-outlet [node]="tabBarDescriptor()" />
-    </View>
+    </view>
   `,
 })
 export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {

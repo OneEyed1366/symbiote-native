@@ -1,4 +1,3 @@
-import { Text, View } from '@symbiote-native/react';
 import {
   useRoute,
   useStackNavigation,
@@ -19,17 +18,17 @@ export function DetailsScreen() {
       : 'none';
   return (
     <safe-area-view className="screen">
-      <View className="section">
-        <Text className="section-label">Navigation demo · Details screen</Text>
-        <Text className="info-text">{`route.params: ${paramsLabel}`}</Text>
-        <Text className="info-text">{`canGoBack: ${navigation.canGoBack()}`}</Text>
+      <view className="section">
+        <text className="section-label">Navigation demo · Details screen</text>
+        <text className="info-text">{`route.params: ${paramsLabel}`}</text>
+        <text className="info-text">{`canGoBack: ${navigation.canGoBack()}`}</text>
         <ActionButton
           testID="nav-pop"
           title="← Pop back"
           onPress={() => navigation.pop()}
           color={LINE_COLOR.primitives}
         />
-      </View>
+      </view>
     </safe-area-view>
   );
 }

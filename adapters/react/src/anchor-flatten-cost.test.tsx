@@ -25,7 +25,6 @@ import {
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
-import { View, Text } from './components';
 
 const ROOT_TAG = 8801;
 const ROWS = 1000;
@@ -64,15 +63,15 @@ function BenchmarkRow({
   isSelected: boolean;
 }): React.ReactElement {
   return (
-    <View style={isSelected ? { backgroundColor: 'blue' } : undefined}>
-      <Text>{String(row.id)}</Text>
+    <view style={isSelected ? { backgroundColor: 'blue' } : undefined}>
+      <text>{String(row.id)}</text>
       <pressable>
-        <Text>{row.label}</Text>
+        <text>{row.label}</text>
       </pressable>
       <pressable>
-        <Text>{'x'}</Text>
+        <text>{'x'}</text>
       </pressable>
-    </View>
+    </view>
   );
 }
 
@@ -81,7 +80,7 @@ function List(): React.ReactElement {
   const [selectedId, setSelectedId] = useState(-1);
   driver = { setRows, setSelectedId, rows: () => rows };
   return (
-    <View testID="list">
+    <view testID="list">
       {rows.map(row => (
         <BenchmarkRow
           key={row.id}
@@ -89,7 +88,7 @@ function List(): React.ReactElement {
           isSelected={row.id === selectedId}
         />
       ))}
-    </View>
+    </view>
   );
 }
 

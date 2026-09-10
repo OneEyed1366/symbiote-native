@@ -13,7 +13,6 @@ import './register';
 // NOTHING else, so an app sets that one tsconfig line and gets the tags. What is re-exported here
 // is only the tag-name type, for code that wants to name it.
 export type { ISymbioteIntrinsicTag } from './jsx-runtime';
-export { View, Text } from './components';
 export type { IViewProps, ITextProps } from './components';
 export type {
   IAccessibilityProps,

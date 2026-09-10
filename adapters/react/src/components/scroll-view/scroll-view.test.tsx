@@ -15,7 +15,7 @@
 // prop produces a different visual, never a rejection.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 51;
@@ -38,7 +38,7 @@ function horizontalApp(): React.ReactElement {
         scrolled = event.nativeEvent;
       }}
     >
-      <View />
+      <view />
     </horizontal-scroll-view>
   );
 }
@@ -103,7 +103,7 @@ describe('React <scroll-view> on the engine', () => {
     mount(
       ROOT_TAG,
       <scroll-view>
-        <View />
+        <view />
       </scroll-view>,
     );
     // Absent, not `false`: RN's own ScrollView omits the prop on the vertical axis.
@@ -117,7 +117,7 @@ describe('React <scroll-view> on the engine', () => {
     mount(
       ROOT_TAG,
       <scroll-view>
-        <View />
+        <view />
       </scroll-view>,
     );
     expect(byName('RCTScrollView')!.props.nestedScrollEnabled).toBe(true);
@@ -127,7 +127,7 @@ describe('React <scroll-view> on the engine', () => {
     mount(
       ROOT_TAG,
       <scroll-view nestedScrollEnabled={false}>
-        <View />
+        <view />
       </scroll-view>,
     );
     expect(byName('RCTScrollView')!.props.nestedScrollEnabled).toBe(false);
@@ -158,7 +158,7 @@ describe('React <scroll-view> on the engine', () => {
     mount(
       ROOT_TAG,
       <scroll-view style={{ height: 120 }}>
-        <View />
+        <view />
       </scroll-view>,
     );
 

@@ -1,12 +1,12 @@
 // Proves the StatusBar primitive, the first JS->native consumer of the native-module
 // bridge. The shared fake-Fabric slot records the committed tree; a fake
 // __turboModuleProxy returns a StatusBarManager that records its calls. We mount
-// <View><StatusBar .../></View> and assert StatusBar's effect drove the recorded native
+// <view><StatusBar .../></view> and assert StatusBar's effect drove the recorded native
 // setters with the values our prop->method mapping sends.
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { StatusBar, View, mount, unmount } from '@symbiote-native/react';
+import { StatusBar, mount, unmount } from '@symbiote-native/react';
 import { statusBarImperative } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 
@@ -56,9 +56,9 @@ Object.assign(globalThis, {
 
 function App(): ReactElement {
   return (
-    <View>
+    <view>
       <StatusBar barStyle={BAR_STYLE} hidden animated />
-    </View>
+    </view>
   );
 }
 

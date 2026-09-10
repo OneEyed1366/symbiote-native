@@ -18,7 +18,7 @@
 // No Negative group: a bad stickyHeaderIndices entry matches no child, and nothing throws.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, Text, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 53;
@@ -49,7 +49,7 @@ describe('React reaches the scroll view content-size and sticky seams', () => {
           contentSizes.push([width, height]);
         }}
       >
-        <View />
+        <view />
       </scroll-view>,
     );
 
@@ -87,9 +87,9 @@ describe('React reaches the scroll view content-size and sticky seams', () => {
       ROOT_TAG,
       <scroll-view>
         <sticky-header>
-          <Text>H0</Text>
+          <text>H0</text>
         </sticky-header>
-        <View testID="plain" />
+        <view testID="plain" />
       </scroll-view>,
     );
 

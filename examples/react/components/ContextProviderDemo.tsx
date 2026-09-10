@@ -1,5 +1,4 @@
 import { Component, createContext, useState, type ContextType } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 
@@ -17,9 +16,9 @@ class ThemeReaderClass extends Component {
 
   render() {
     return (
-      <Text testID="context-class-reader" className="info-text">
+      <text testID="context-class-reader" className="info-text">
         {`class reader (static contextType): ${this.context}`}
-      </Text>
+      </text>
     );
   }
 }
@@ -28,11 +27,11 @@ export function ContextProviderDemo() {
   const [theme, setTheme] = useState<IPlaygroundTheme>('midnight');
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         createContext · Context.Provider (React 19 direct render) · static
         contextType
-      </Text>
+      </text>
       {/* React 19: a Context object can be rendered directly as its own provider — no
           `.Provider` suffix needed, though `.Provider` still works identically. */}
       <PlaygroundThemeContext value={theme}>
@@ -46,6 +45,6 @@ export function ContextProviderDemo() {
         }
         color={LINE_COLOR.introspection}
       />
-    </View>
+    </view>
   );
 }

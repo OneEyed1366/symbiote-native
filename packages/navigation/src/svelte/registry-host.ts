@@ -12,7 +12,7 @@
 //
 // therefore compiles to `from_tree([marker, ' ', marker])`, and each ' ' becomes an RCTRawText
 // engine node parented to whatever host tag holds the `{@render children?.()}` call. Inside a
-// plain `view` that is the invalid "text outside a <Text> component" shape; inside
+// plain `view` that is the invalid "text outside a <text> component" shape; inside
 // RNSScreenStack it is worse, since react-native-screens' native side expects only RNSScreen
 // children there.
 //

@@ -10,7 +10,7 @@
 // negative one fails when someone "fixes" it by keying the registry on the Fabric name instead —
 // which would work for this test's `view` and put a press machine on every View in the app.
 import { afterEach, describe, expect, it } from 'vitest';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import {
   clearHostBehaviors,
@@ -39,7 +39,7 @@ describe('a behavior registered under an intrinsic tag', () => {
     const attached = trackAttachesOn('view');
     const rootTag = (nextRootTag += 1);
 
-    mount(rootTag, <View testID="probe" />);
+    mount(rootTag, <view testID="probe" />);
 
     // One for the app's View, plus whatever container chrome the surface mounts — the assertion
     // is that the behavior fired at all, and that it fired on a node carrying the RESOLVED name.

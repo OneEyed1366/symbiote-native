@@ -1,6 +1,6 @@
 // The prop surface of `<activity-indicator>`, for React.
 //
-// No component left to type — the element IS the tag. RN's ActivityIndicator is a centering `<View>`
+// No component left to type — the element IS the tag. RN's ActivityIndicator is a centering `<view>`
 // around a native spinner (ActivityIndicator.js:112) and takes no children, and the engine behavior
 // now builds both nodes (`core/components/src/behaviors/activity-indicator/`). This stays exported
 // because an app that wraps the tag in its own component types the bag it forwards against

@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  I18nManager,
-  Settings,
-} from '@symbiote-native/react';
+import { Image, I18nManager, Settings } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 
 // Three runtime modules, each read live so it only resolves on a
@@ -70,15 +64,15 @@ export function NativeModulesDemo() {
   };
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         Runtime modules · I18nManager / Settings / Image statics
-      </Text>
+      </text>
 
       {/* I18nManager: RTL layout constants, read live */}
-      <Text className="info-text">
+      <text className="info-text">
         {`RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`}
-      </Text>
+      </text>
       <ActionButton
         title={
           rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'
@@ -88,9 +82,9 @@ export function NativeModulesDemo() {
       />
 
       {/* Settings: counter persisted to NSUserDefaults, survives a relaunch */}
-      <Text testID="persist-count" className="info-text">
+      <text testID="persist-count" className="info-text">
         {`persisted taps: ${persisted} · survives relaunch`}
-      </Text>
+      </text>
       <ActionButton
         testID="persist-btn"
         title="Persist a tap"
@@ -99,19 +93,19 @@ export function NativeModulesDemo() {
       />
 
       {/* Image statics: the rendered asset + getSize's measurement of it. */}
-      <View className="row-align-center">
+      <view className="row-align-center">
         <image source={{ uri: LOGO_URI }} className="logo-thumb" />
-        <Text testID="logo-size" className="info-text-flex">
+        <text testID="logo-size" className="info-text-flex">
           {`logo size: ${imageSize}`}
-        </Text>
-      </View>
+        </text>
+      </view>
       {/* prefetch warms a cold url: not cached → (tap) → cached */}
-      <Text className="info-text">{`prefetch cache: ${cacheState}`}</Text>
+      <text className="info-text">{`prefetch cache: ${cacheState}`}</text>
       <ActionButton
         title="Prefetch logo"
         onPress={prefetchLogo}
         color="#7fb5ff"
       />
-    </View>
+    </view>
   );
 }

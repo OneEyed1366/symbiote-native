@@ -1,7 +1,7 @@
-// Host primitives exposed to user code. They ARE the intrinsic tags — a capitalized export whose
-// value is the tag string — so an app writes `<View>` and React commits a host element directly,
-// with no component instance in between. The reconciler maps the tag through
-// `descriptorFor` to a Fabric view name at commit.
+// The public PROP TYPES for the two strict intrinsics, and nothing else. There is no component and
+// no capitalized alias: an app writes `<view>` / `<text>`, React commits a host element directly,
+// and `JSX.IntrinsicElements` (jsx-runtime.ts) is what supplies these types to it. The reconciler
+// maps the tag through `descriptorFor` to a Fabric view name at commit.
 
 import type { Ref, ReactNode } from 'react';
 import type { ISymbioteEvent } from '@symbiote-native/engine';
@@ -90,19 +90,3 @@ export interface ITextProps extends IAccessibilityProps, IAriaProps {
   ref?: Ref<IHostInstance>;
   children?: ReactNode;
 }
-
-// `View` and `Text` are the intrinsic TAGS, not components wrapping them. JSX resolves a
-// capitalized tag to the value in scope, and a value that is a STRING is a host element to React —
-// so `<View/>` compiles to `_jsx('view', …)` with no component instance, while
-// `JSX.IntrinsicElements['view']` still supplies the strict props (a bad prop is TS2322).
-//
-// The two folds their component bodies used to apply both moved down a layer, which is what let
-// the bodies go:
-//
-//   aria / accessibility   the engine folds every node in `fabricProps` (accessibility-props.ts)
-//   id -> nativeID,        the renderer folds by spec in `host-config`'s createInstance
-//   Text's defaults        (`foldHostBag`, driven by HOST_PRIMITIVES)
-//
-// A type annotation rather than `as const`: same literal type, no cast (`ts-js-best-practices`).
-export const View = 'view';
-export const Text = 'text';
