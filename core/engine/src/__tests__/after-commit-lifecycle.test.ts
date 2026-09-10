@@ -15,6 +15,7 @@ import {
   disposeRoot,
   registerHostBehavior,
   routeProp,
+  setNativeProps,
   type ISymbioteNode,
 } from '../index';
 
@@ -125,5 +126,35 @@ describe('unmount sweeps host behaviors', () => {
     expect(detached, 'the spliced child was nominated for teardown').toEqual([
       node,
     ]);
+  });
+});
+
+// THE THIRD HOLE, same shape as the first and found from the other end — by an adapter whose
+// behavior wrote only its own bookkeeping and never saw its hook run.
+//
+// `setNativeProps` + `flushNativeProps` is the targeted path: one surface, one dirty node, a chain
+// clone instead of the general walk. It publishes props exactly as the container commit does, and
+// `afterCommit` asks only that props WERE published — but `commitTargeted` drains
+// `runPostCommitHooks` alone, so the hook is unreachable whenever the only thing that moved is a
+// write the behavior itself made.
+describe('afterCommit on the targeted commit path', () => {
+  it('runs when the only write is a targeted setNativeProps', async () => {
+    const { seen } = registerProbe();
+    const node = createElement(PROBE_VIEW, false, PROBE_TAG);
+    routeProp(node, 'testID', 'targeted');
+    const surface = createSurface((nextRootTag += 1));
+    surface.appendChild(node);
+    surface.commit();
+    const afterMount = seen.length;
+
+    setNativeProps(node, { opacity: 0.5 });
+    // The write is QUEUED, not committed: every setNativeProps in one task publishes together at
+    // the microtask boundary, so the hook cannot have run yet.
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(
+      seen.length,
+      'the targeted commit published props, so the hook owes a turn',
+    ).toBeGreaterThan(afterMount);
   });
 });

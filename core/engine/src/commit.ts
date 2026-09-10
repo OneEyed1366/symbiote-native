@@ -1057,6 +1057,12 @@ function commitTargeted(nodes: ReadonlySet<ISymbioteNode>): boolean {
   profile.commits += 1;
   profile.nodesVisited += cloned.size;
   runPostCommitHooks();
+  // Same reasoning as the container path's drain, reached from the other end: this commit
+  // published props, which is all `afterCommit` asks. Missing here it was unreachable for a
+  // behavior whose only write is its own bookkeeping — no framework prop changes, so no container
+  // commit follows to drain it. `runDeferredAttaches` deliberately stays out: a targeted commit
+  // only happens after a container commit has already assigned tags and drained them.
+  runCommittedHooks(isNodeCommitted);
   dlog(
     `commit targeted root=${rootTag} leaves=${writes.length} ` +
       `union=${branches.size}`,
