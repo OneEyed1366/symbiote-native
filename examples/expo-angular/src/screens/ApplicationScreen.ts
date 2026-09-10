@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import {
   Platform,
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -32,83 +32,83 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 @Component({
   selector: 'ApplicationScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="application-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Application</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Application</text>
+            <text class="hero-body">
               @symbiote-native/application — app version/build/name/id, install
               time, and the Android ID / iOS vendor ID platform-specific
               lookups.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="application-info-card" class="capability-card">
-          <Text class="capability-card-title">App identity</Text>
-          <View class="capability-row">
-            <Text class="capability-label">Version</Text>
-            <Text class="value-text">{{
+        <view testID="application-info-card" class="capability-card">
+          <text class="capability-card-title">App identity</text>
+          <view class="capability-row">
+            <text class="capability-label">Version</text>
+            <text class="value-text">{{
               nativeApplicationVersion ?? 'unknown'
-            }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Build</Text>
-            <Text class="value-text">{{
+            }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Build</text>
+            <text class="value-text">{{
               nativeBuildVersion ?? 'unknown'
-            }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Name</Text>
-            <Text class="value-text">{{ applicationName ?? 'unknown' }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Id</Text>
-            <Text class="value-text">{{ applicationId ?? 'unknown' }}</Text>
-          </View>
-        </View>
+            }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Name</text>
+            <text class="value-text">{{ applicationName ?? 'unknown' }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Id</text>
+            <text class="value-text">{{ applicationId ?? 'unknown' }}</text>
+          </view>
+        </view>
 
-        <View testID="application-install-card" class="capability-card">
-          <Text class="capability-card-title">Install time</Text>
+        <view testID="application-install-card" class="capability-card">
+          <text class="capability-card-title">Install time</text>
           <ActionButton
             testID="application-installation-time-button"
             title="Get installation time"
             (press)="handleGetInstallationTime()"
             [color]="lineColor"
           ></ActionButton>
-          <Text
+          <text
             testID="application-installation-time-result"
             class="value-text"
           >
             {{ installationTimeLabel() }}
-          </Text>
-        </View>
+          </text>
+        </view>
 
         @if (Platform.OS === 'android') {
-          <View testID="application-android-card" class="capability-card">
-            <Text class="capability-card-title">Android</Text>
+          <view testID="application-android-card" class="capability-card">
+            <text class="capability-card-title">Android</text>
             <ActionButton
               testID="application-android-id-button"
               title="Get Android ID"
               (press)="handleGetAndroidId()"
               [color]="lineColor"
             ></ActionButton>
-            <Text testID="application-android-id-result" class="value-text">{{
+            <text testID="application-android-id-result" class="value-text">{{
               androidIdLabel()
-            }}</Text>
+            }}</text>
 
             <ActionButton
               testID="application-install-referrer-button"
@@ -116,27 +116,27 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
               (press)="handleGetInstallReferrer()"
               [color]="lineColor"
             ></ActionButton>
-            <Text
+            <text
               testID="application-install-referrer-result"
               class="value-text"
             >
               {{ installReferrerLabel() }}
-            </Text>
-          </View>
+            </text>
+          </view>
         }
 
         @if (Platform.OS === 'ios') {
-          <View testID="application-ios-card" class="capability-card">
-            <Text class="capability-card-title">iOS</Text>
+          <view testID="application-ios-card" class="capability-card">
+            <text class="capability-card-title">iOS</text>
             <ActionButton
               testID="application-vendor-id-button"
               title="Get vendor ID"
               (press)="handleGetIosIdForVendor()"
               [color]="lineColor"
             ></ActionButton>
-            <Text testID="application-vendor-id-result" class="value-text">{{
+            <text testID="application-vendor-id-result" class="value-text">{{
               vendorIdLabel()
-            }}</Text>
+            }}</text>
 
             <ActionButton
               testID="application-release-type-button"
@@ -144,12 +144,12 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
               (press)="handleGetIosApplicationReleaseType()"
               [color]="lineColor"
             ></ActionButton>
-            <Text testID="application-release-type-result" class="value-text">
+            <text testID="application-release-type-result" class="value-text">
               {{ releaseTypeLabel() }}
-            </Text>
-          </View>
+            </text>
+          </view>
         }
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   `,
 })

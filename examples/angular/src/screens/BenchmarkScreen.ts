@@ -11,13 +11,13 @@ import {
 import {
   ActivityIndicatorElement,
   FlatList,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
+  PressableElement,
+  SafeAreaViewElement,
+  ScrollViewElement,
   SectionList,
   SymbioteHostPropsDirective,
   Text,
-  TextInput,
+  TextInputElement,
   View,
   VListItemDirective,
   VSectionHeaderDirective,
@@ -543,16 +543,16 @@ function formatDuration(durationMs: number | undefined): string {
   standalone: true,
   imports: [PressableElement, Text, TextInputElement, View],
   template: `
-    <View [class]="rowClass">
-      <Text class="bench-row-id">{{ rowId }}</Text>
+    <view [class]="rowClass">
+      <text class="bench-row-id">{{ rowId }}</text>
       <pressable class="flex1" (press)="select.emit(row.id)">
-        <Text class="bench-row-label">{{ row.label }}</Text>
+        <text class="bench-row-label">{{ row.label }}</text>
       </pressable>
       <pressable class="bench-row-remove" (press)="remove.emit(row.id)">
-        <Text class="bench-row-remove-text">×</Text>
+        <text class="bench-row-remove-text">×</text>
       </pressable>
       <text-input class="bench-row-input" [value]="row.label"></text-input>
-    </View>
+    </view>
   `,
 })
 export class BenchmarkRow {
@@ -580,12 +580,12 @@ export class BenchmarkRow {
 @Component({
   selector: 'StickyScrollViewBlock',
   standalone: true,
-  imports: [ScrollView, Text],
+  imports: [ScrollViewElement, Text],
   template: `
-    <Text class="section-label"
-      >STICKY PATH A · ScrollView · stickyHeaderIndices</Text
+    <text class="section-label"
+      >STICKY PATH A · ScrollView · stickyHeaderIndices</text
     >
-    <ScrollView
+    <scroll-view
       testID="benchmark-sticky-scroll"
       class="bench-sticky"
       [stickyHeaderIndices]="headerIndices"
@@ -593,10 +593,10 @@ export class BenchmarkRow {
       [nestedScrollEnabled]="true"
     >
       @for (child of children; track child.key) {
-        <Text [class]="child.className">{{ child.text }}</Text>
+        <text [class]="child.className">{{ child.text }}</text>
       }
-    </ScrollView>
-    <Text class="note-text">{{ note }}</Text>
+    </scroll-view>
+    <text class="note-text">{{ note }}</text>
   `,
 })
 export class StickyScrollViewBlock {
@@ -624,8 +624,8 @@ export class StickyScrollViewBlock {
     VSectionItemDirective,
   ],
   template: `
-    <Text class="section-label"
-      >STICKY PATH B · SectionList · stickySectionHeadersEnabled</Text
+    <text class="section-label"
+      >STICKY PATH B · SectionList · stickySectionHeadersEnabled</text
     >
     <SectionList
       testID="benchmark-sticky-section-list"
@@ -637,17 +637,17 @@ export class StickyScrollViewBlock {
       [getItemLayout]="itemLayout"
     >
       <ng-template vSectionHeader let-section>
-        <Text class="section-header" [style]="headerStyle">{{
+        <text class="section-header" [style]="headerStyle">{{
           section.title
-        }}</Text>
+        }}</text>
       </ng-template>
       <ng-template vSectionItem let-item>
-        <View class="parity-row" [style]="rowStyle">
-          <Text class="list-row-text">{{ itemLabel(item) }}</Text>
-        </View>
+        <view class="parity-row" [style]="rowStyle">
+          <text class="list-row-text">{{ itemLabel(item) }}</text>
+        </view>
       </ng-template>
     </SectionList>
-    <Text class="note-text">{{ note }}</Text>
+    <text class="note-text">{{ note }}</text>
   `,
 })
 export class StickySectionListBlock {
@@ -681,8 +681,8 @@ export class StickySectionListBlock {
     BenchmarkRow,
     FlatList,
     JsFrameRateMeter,
-    SafeAreaView,
-    ScrollView,
+    SafeAreaViewElement,
+    ScrollViewElement,
     StickyScrollViewBlock,
     StickySectionListBlock,
     SymbioteHostPropsDirective,
@@ -691,158 +691,158 @@ export class StickySectionListBlock {
     VListItemDirective,
   ],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="benchmark-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">BM</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Benchmark</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">BM</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Benchmark</text>
+            <text class="hero-body">
               The js-framework-benchmark operations, run on device against the
               engine's commit path — with the JS-thread frame rate beside them.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <Text class="section-label">MEASUREMENTS</Text>
+        <text class="section-label">MEASUREMENTS</text>
         <JsFrameRateMeter [accent]="accent" />
 
         <!-- Buttons and results sit DIRECTLY under the meter, and everything they stress sits
              below: a suite step holds the JS thread, so the dip has to be readable in the same
              screenful as the press that caused it. -->
-        <View class="bench-run-row">
-          <View class="flex1">
+        <view class="bench-run-row">
+          <view class="flex1">
             <ActionButton
               testID="bench-run-suite-all"
               [title]="allMountedTitle()"
               [color]="accent"
               (press)="onRunSuite(mountModeAll)"
             ></ActionButton>
-          </View>
-          <View class="flex1">
+          </view>
+          <view class="flex1">
             <ActionButton
               testID="bench-run-suite-virtualized"
               [title]="virtualizedTitle()"
               [color]="accent"
               (press)="onRunSuite(mountModeVirtualized)"
             ></ActionButton>
-          </View>
-        </View>
+          </view>
+        </view>
 
-        <View class="bench-run-row">
-          <View class="flex1">
+        <view class="bench-run-row">
+          <view class="flex1">
             <ActionButton
               testID="bench-toggle-batch-create"
               [title]="batchCreateTitle()"
               [color]="accent"
               (press)="onToggleBatchCreate()"
             ></ActionButton>
-          </View>
-        </View>
-        <Text class="note-text">{{ batchCreateNote }}</Text>
+          </view>
+        </view>
+        <text class="note-text">{{ batchCreateNote }}</text>
 
         @if (progress() !== undefined) {
-          <View testID="bench-suite-progress" class="bench-progress">
+          <view testID="bench-suite-progress" class="bench-progress">
             <activity-indicator [color]="accent"></activity-indicator>
-            <Text class="bench-progress-text">{{ progressLine() }}</Text>
-            <Text class="bench-progress-count">{{ progressCount() }}</Text>
-          </View>
+            <text class="bench-progress-text">{{ progressLine() }}</text>
+            <text class="bench-progress-count">{{ progressCount() }}</text>
+          </view>
         }
 
         @if (hasSuiteResults()) {
-          <View class="bench-compare-row">
-            <Text class="bench-compare-label"></Text>
-            <Text class="bench-compare-head-cell">ALL MOUNTED</Text>
-            <Text class="bench-compare-head-cell">VIRTUALIZED</Text>
-          </View>
+          <view class="bench-compare-row">
+            <text class="bench-compare-label"></text>
+            <text class="bench-compare-head-cell">ALL MOUNTED</text>
+            <text class="bench-compare-head-cell">VIRTUALIZED</text>
+          </view>
           @for (step of suiteSteps; track step.op) {
-            <View
+            <view
               [symbioteHostProps]="suiteHostProps(step.op)"
               class="bench-compare-row"
             >
-              <Text class="bench-compare-label">{{ step.label }}</Text>
-              <Text class="bench-compare-cell">{{
+              <text class="bench-compare-label">{{ step.label }}</text>
+              <text class="bench-compare-cell">{{
                 allMountedResult(step.op)
-              }}</Text>
-              <Text class="bench-compare-cell">{{
+              }}</text>
+              <text class="bench-compare-cell">{{
                 virtualizedResult(step.op)
-              }}</Text>
-            </View>
+              }}</text>
+            </view>
           }
 
-          <Text class="section-label">ENGINE PER STEP · ALL MOUNTED</Text>
-          <View class="bench-compare-row">
-            <Text class="bench-compare-label"></Text>
-            <Text class="bench-compare-head-cell">VISITED</Text>
-            <Text class="bench-compare-head-cell">WRITES/NOOP</Text>
-            <Text class="bench-compare-head-cell">COMMITS</Text>
-          </View>
+          <text class="section-label">ENGINE PER STEP · ALL MOUNTED</text>
+          <view class="bench-compare-row">
+            <text class="bench-compare-label"></text>
+            <text class="bench-compare-head-cell">VISITED</text>
+            <text class="bench-compare-head-cell">WRITES/NOOP</text>
+            <text class="bench-compare-head-cell">COMMITS</text>
+          </view>
           @for (step of suiteSteps; track step.op) {
-            <View
+            <view
               [symbioteHostProps]="engineHostProps(step.op)"
               class="bench-compare-row"
             >
-              <Text class="bench-compare-label">{{ step.label }}</Text>
-              <Text class="bench-compare-cell">{{
+              <text class="bench-compare-label">{{ step.label }}</text>
+              <text class="bench-compare-cell">{{
                 engineVisited(step.op)
-              }}</Text>
-              <Text class="bench-compare-cell">{{
+              }}</text>
+              <text class="bench-compare-cell">{{
                 engineWrites(step.op)
-              }}</Text>
-              <Text class="bench-compare-cell">{{
+              }}</text>
+              <text class="bench-compare-cell">{{
                 engineCommits(step.op)
-              }}</Text>
-            </View>
+              }}</text>
+            </view>
           }
-          <Text class="note-text">{{ engineNote }}</Text>
+          <text class="note-text">{{ engineNote }}</text>
 
-          <Text class="section-label">FABRIC CALLS · ALL MOUNTED</Text>
-          <View class="bench-compare-row">
-            <Text class="bench-compare-label"></Text>
-            <Text class="bench-compare-head-cell">CREATE/APPEND/CLONE</Text>
-            <Text class="bench-compare-head-cell">PROP KEYS</Text>
-          </View>
+          <text class="section-label">FABRIC CALLS · ALL MOUNTED</text>
+          <view class="bench-compare-row">
+            <text class="bench-compare-label"></text>
+            <text class="bench-compare-head-cell">CREATE/APPEND/CLONE</text>
+            <text class="bench-compare-head-cell">PROP KEYS</text>
+          </view>
           @for (step of suiteSteps; track step.op) {
-            <View
+            <view
               [symbioteHostProps]="fabricHostProps(step.op)"
               class="bench-compare-row"
             >
-              <Text class="bench-compare-label">{{ step.label }}</Text>
-              <Text class="bench-compare-cell">{{ fabricCalls(step.op) }}</Text>
-              <Text class="bench-compare-cell">{{
+              <text class="bench-compare-label">{{ step.label }}</text>
+              <text class="bench-compare-cell">{{ fabricCalls(step.op) }}</text>
+              <text class="bench-compare-cell">{{
                 fabricPropKeys(step.op)
-              }}</Text>
-            </View>
+              }}</text>
+            </view>
           }
-          <Text class="note-text">{{ fabricNote }}</Text>
+          <text class="note-text">{{ fabricNote }}</text>
         } @else {
-          <Text testID="bench-suite-empty" class="note-text"
-            >No suite run yet.</Text
+          <text testID="bench-suite-empty" class="note-text"
+            >No suite run yet.</text
           >
         }
-        <Text class="note-text">{{ suiteNote }}</Text>
+        <text class="note-text">{{ suiteNote }}</text>
 
         <!-- Both sticky paths and the row list sit under the buttons: the meter above stays on
              screen while either box is being dragged — the concrete case the benchmark exists
              for. -->
         <StickyScrollViewBlock />
         <StickySectionListBlock />
-        <Text class="note-text">
+        <text class="note-text">
           Drag inside a box (not the page) and watch the counters above — the
           two boxes differ only in which sticky implementation carries the
           frame.
-        </Text>
+        </text>
 
-        <Text class="section-label">{{ rowsSectionLabel() }}</Text>
+        <text class="section-label">{{ rowsSectionLabel() }}</text>
         <!-- The only row shape: a row component and two real <Pressable>s, plus the unconditional
              <TextInput> — the same instrument every other adapter's column mounts. This used to
              switch across four shapes built to isolate Angular's ~3x Create gap; dropped
@@ -879,41 +879,41 @@ export class StickySectionListBlock {
         <!-- Below the fold on purpose: the single operations are for poking at one commit shape
              while debugging, not for reporting. Their Remove and Append numbers depend on press
              order, which is exactly what the suite above exists to remove. -->
-        <Text class="section-label">OPERATIONS · LAST RUN</Text>
+        <text class="section-label">OPERATIONS · LAST RUN</text>
         @for (operation of operations; track operation.id) {
-          <View class="bench-op-row">
-            <View class="flex1">
+          <view class="bench-op-row">
+            <view class="flex1">
               <ActionButton
                 [testID]="operation.testID"
                 [title]="operation.label"
                 [color]="accent"
                 (press)="operation.run()"
               ></ActionButton>
-            </View>
-            <Text
+            </view>
+            <text
               [symbioteHostProps]="operation.resultHostProps"
               class="bench-op-result"
-              >{{ resultFor(operation.id) }}</Text
+              >{{ resultFor(operation.id) }}</text
             >
-          </View>
+          </view>
         }
 
-        <Text testID="bench-row-count" class="info-text">{{
+        <text testID="bench-row-count" class="info-text">{{
           rowCountLine()
-        }}</Text>
+        }}</text>
 
-        <Text class="section-label">{{ historyLabel }}</Text>
+        <text class="section-label">{{ historyLabel }}</text>
         @if (history().length === 0) {
-          <Text class="note-text"
-            >Run an operation above to record a measurement.</Text
+          <text class="note-text"
+            >Run an operation above to record a measurement.</text
           >
         } @else {
           @for (entry of history(); track entry.seq) {
-            <Text class="bench-history-row">{{ historyLine(entry) }}</Text>
+            <text class="bench-history-row">{{ historyLine(entry) }}</text>
           }
         }
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class BenchmarkScreen implements OnInit, OnDestroy {

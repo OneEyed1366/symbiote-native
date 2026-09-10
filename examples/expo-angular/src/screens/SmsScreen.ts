@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import {
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   TextInputElement,
   View,
@@ -28,53 +28,53 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   imports: [
     ActionButton,
     SafeAreaViewElement,
-    ScrollView,
+    ScrollViewElement,
     Text,
     TextInputElement,
     View,
   ],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="sms-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">SMS</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">SMS</text>
+            <text class="hero-body">
               @symbiote-native/sms — opens the system SMS composer prefilled
               with recipients and a message. Sending stays the user's call; the
               app only drafts.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="sms-capability-card" class="sms-card">
-          <Text class="sms-card-title">Capabilities</Text>
-          <View testID="sms-available" class="sms-row">
-            <Text class="sms-row-label">Available</Text>
-            <View [class]="statusBadgeClass(isAvailable())">
-              <Text class="sms-status-text">{{
+        <view testID="sms-capability-card" class="sms-card">
+          <text class="sms-card-title">Capabilities</text>
+          <view testID="sms-available" class="sms-row">
+            <text class="sms-row-label">Available</text>
+            <view [class]="statusBadgeClass(isAvailable())">
+              <text class="sms-status-text">{{
                 statusLabel(isAvailable())
-              }}</Text>
-            </View>
-          </View>
-          <Text class="sms-note">
+              }}</text>
+            </view>
+          </view>
+          <text class="sms-note">
             NO on the iOS simulator — it ships no Messages app — and on Android
             devices without telephony hardware. A real iPhone answers YES.
-          </Text>
-        </View>
+          </text>
+        </view>
 
-        <View testID="sms-compose-card" class="sms-card">
-          <Text class="sms-card-title">Compose</Text>
+        <view testID="sms-compose-card" class="sms-card">
+          <text class="sms-card-title">Compose</text>
           <text-input
             testID="sms-recipients-input"
             class="text-input"
@@ -97,23 +97,23 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
             (press)="handleSend()"
             [color]="lineColor"
           ></ActionButton>
-        </View>
+        </view>
 
-        <View testID="sms-result-card" class="sms-card">
-          <Text class="sms-card-title">Last result</Text>
-          <View class="sms-row">
-            <Text class="sms-row-label">Status</Text>
-            <Text testID="sms-result" class="sms-value-text">{{
+        <view testID="sms-result-card" class="sms-card">
+          <text class="sms-card-title">Last result</text>
+          <view class="sms-row">
+            <text class="sms-row-label">Status</text>
+            <text testID="sms-result" class="sms-value-text">{{
               lastResult()
-            }}</Text>
-          </View>
-          <Text class="sms-note">
+            }}</text>
+          </view>
+          <text class="sms-note">
             Android always reports unknown: reading the real outcome needs the
             READ_SMS permission Google restricts to default-SMS-app publishers.
             Only iOS distinguishes sent from cancelled.
-          </Text>
-        </View>
-      </ScrollView>
+          </text>
+        </view>
+      </scroll-view>
     </safe-area-view>
   `,
 })

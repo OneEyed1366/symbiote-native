@@ -18,24 +18,24 @@ const tabLineTagLabel = `${tabsLineInfo.code} · ${tabsLineInfo.label}`;
   imports: [SafeAreaViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">TB</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Tabs</Text>
-            <Text class="hero-body">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">TB</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Tabs</text>
+            <text class="hero-body">
               A bottom-tabs navigator — icon, badge, and tint, each tab a real
               native view.
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">{{ 'focused: ' + isFocused() }}</Text>
-      </View>
+            </text>
+          </view>
+        </view>
+        <text class="info-text">{{ 'focused: ' + isFocused() }}</text>
+      </view>
     </safe-area-view>
   `,
 })
@@ -56,13 +56,13 @@ export class TabHomeScreen {
   imports: [SafeAreaViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <Text class="section-label">Search tab</Text>
-        <Text class="info-text">{{ 'focused: ' + isFocused() }}</Text>
-      </View>
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <text class="section-label">Search tab</text>
+        <text class="info-text">{{ 'focused: ' + isFocused() }}</text>
+      </view>
     </safe-area-view>
   `,
 })
@@ -82,13 +82,13 @@ export class TabSearchScreen {
   imports: [SafeAreaViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <Text class="section-label">Profile tab</Text>
-        <Text class="info-text">{{ 'focused: ' + isFocused() }}</Text>
-      </View>
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <text class="section-label">Profile tab</text>
+        <text class="info-text">{{ 'focused: ' + isFocused() }}</text>
+      </view>
     </safe-area-view>
   `,
 })

@@ -57,7 +57,7 @@ import {
 import { interval, map, timer } from 'rxjs';
 import {
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   SymbioteHostPropsDirective,
   Text,
   TextInputElement,
@@ -132,7 +132,7 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
     PlaygroundQueryItemDirective,
     PlaygroundShoutPipe,
     SafeAreaViewElement,
-    ScrollView,
+    ScrollViewElement,
     SlicePipe,
     SymbioteHostPropsDirective,
     Text,
@@ -143,37 +143,37 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
   ],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="pg-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">AP</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">API Playground</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">AP</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">API Playground</text>
+            <text class="hero-body">
               Angular's own idiomatic surface - signals, control flow, DI,
               lifecycle, pipes - live on Symbiote's custom Renderer2 seam.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
         <!-- ================= Signals — core ================= -->
-        <Text class="section-label">Signals — core</Text>
-        <View class="section-nested">
-          <Text class="pg-subsection-label"
-            >signal() / effect() / untracked() / EffectRef</Text
+        <text class="section-label">Signals — core</text>
+        <view class="section-nested">
+          <text class="pg-subsection-label"
+            >signal() / effect() / untracked() / EffectRef</text
           >
-          <Text testID="pg-effect-log" class="info-text">{{
+          <text testID="pg-effect-log" class="info-text">{{
             'effect log: ' + effectLog().join(' | ')
-          }}</Text>
-          <View class="row">
+          }}</text>
+          <view class="row">
             <ActionButton
               testID="pg-ping-tracked"
               title="ping tracked"
@@ -192,22 +192,22 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
               color="#8fa3c4"
               (press)="destroyPingEffect()"
             ></ActionButton>
-          </View>
+          </view>
 
-          <Text class="pg-subsection-label"
+          <text class="pg-subsection-label"
             >custom equal — signal({{ '{' }}x,y{{ '}' }}, {{ '{' }}equal{{
               '}'
-            }})</Text
+            }})</text
           >
-          <Text testID="pg-point-readout" class="info-text">{{
+          <text testID="pg-point-readout" class="info-text">{{
             'point: ' +
               pointSignal().x +
               ',' +
               pointSignal().y +
               ' · update count: ' +
               pointUpdateCount()
-          }}</Text>
-          <View class="row">
+          }}</text>
+          <view class="row">
             <ActionButton
               testID="pg-point-equal"
               title="set equal value"
@@ -220,15 +220,15 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
               color="#f2789a"
               (press)="setPointDifferent()"
             ></ActionButton>
-          </View>
+          </view>
 
-          <Text class="pg-subsection-label"
-            >linkedSignal() — resets on base change, still writable</Text
+          <text class="pg-subsection-label"
+            >linkedSignal() — resets on base change, still writable</text
           >
-          <Text testID="pg-linked-readout" class="info-text">{{
+          <text testID="pg-linked-readout" class="info-text">{{
             'base: ' + linkedBase() + ' · linked: ' + linkedDerived()
-          }}</Text>
-          <View class="row">
+          }}</text>
+          <view class="row">
             <ActionButton
               testID="pg-linked-bump"
               title="bump base"
@@ -241,50 +241,50 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
               color="#5ec8f2"
               (press)="overrideLinkedDerived()"
             ></ActionButton>
-          </View>
+          </view>
 
-          <Text class="pg-subsection-label"
+          <text class="pg-subsection-label"
             >WritableSignal.set/update/asReadonly ·
-            isSignal/isWritableSignal</Text
+            isSignal/isWritableSignal</text
           >
-          <Text testID="pg-manual-counter" class="info-text">{{
+          <text testID="pg-manual-counter" class="info-text">{{
             'manualCounter: ' +
               manualCounter() +
               ' · readonly view: ' +
               manualCounterReadonly()
-          }}</Text>
-          <Text testID="pg-signal-guards" class="info-text">{{
+          }}</text>
+          <text testID="pg-signal-guards" class="info-text">{{
             signalGuardReadout()
-          }}</Text>
+          }}</text>
           <ActionButton
             testID="pg-manual-counter-inc"
             title="increment"
             color="#4fd1a5"
             (press)="incrementManualCounter()"
           ></ActionButton>
-        </View>
+        </view>
 
         <!-- ================= Signals — async data (resource) ================= -->
-        <Text class="section-label">Signals — async data (resource)</Text>
-        <View class="section-nested">
-          <Text testID="pg-resource-readout" class="info-text">{{
+        <text class="section-label">Signals — async data (resource)</text>
+        <view class="section-nested">
+          <text testID="pg-resource-readout" class="info-text">{{
             'resource(): status=' +
               userResource.status() +
               ' loading=' +
               userResource.isLoading() +
               ' value=' +
               (userResource.value() ?? '—')
-          }}</Text>
-          <Text testID="pg-rxresource-readout" class="info-text">{{
+          }}</text>
+          <text testID="pg-rxresource-readout" class="info-text">{{
             'rxResource(): status=' +
               userRxResource.status() +
               ' value=' +
               (userRxResource.value() ?? '—')
-          }}</Text>
-          <Text testID="pg-resource-cancelled" class="info-text">{{
+          }}</text>
+          <text testID="pg-resource-cancelled" class="info-text">{{
             'AbortSignal cancellations: ' + cancelledLoads()
-          }}</Text>
-          <View class="row">
+          }}</text>
+          <view class="row">
             <ActionButton
               testID="pg-resource-reload"
               title="reload next id"
@@ -297,30 +297,30 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
               color="#f2789a"
               (press)="burstReloadUsers()"
             ></ActionButton>
-          </View>
-        </View>
+          </view>
+        </view>
 
         <!-- ================= Signals — RxJS interop ================= -->
-        <Text class="section-label">Signals — RxJS interop</Text>
-        <View class="section-nested">
-          <Text testID="pg-tosignal-readout" class="info-text">{{
+        <text class="section-label">Signals — RxJS interop</text>
+        <view class="section-nested">
+          <text testID="pg-tosignal-readout" class="info-text">{{
             'toSignal(interval(1s)): ' + rxTick()
-          }}</Text>
-          <Text testID="pg-toobservable-readout" class="info-text">{{
+          }}</text>
+          <text testID="pg-toobservable-readout" class="info-text">{{
             'toObservable(manualCounter) log: ' + toObservableLog().join(', ')
-          }}</Text>
-          <Text testID="pg-outputtoobservable-readout" class="info-text">{{
+          }}</text>
+          <text testID="pg-outputtoobservable-readout" class="info-text">{{
             'outputToObservable(counterChild.reset) log: ' +
               outputToObservableLog().join(', ')
-          }}</Text>
-        </View>
+          }}</text>
+        </view>
 
         <!-- ================= Signals — inputs, models, outputs ================= -->
-        <Text class="section-label">Signals — inputs, models, outputs</Text>
-        <View class="section-nested">
-          <Text class="pg-subsection-label"
+        <text class="section-label">Signals — inputs, models, outputs</text>
+        <view class="section-nested">
+          <text class="pg-subsection-label"
             >input.required() · input(transform) · model() · output() ·
-            outputFromObservable()</Text
+            outputFromObservable()</text
           >
           <PlaygroundCounterChild
             label="Counter"
@@ -329,27 +329,27 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
             (reset)="onCounterReset()"
             (incremented)="onCounterIncremented($event)"
           ></PlaygroundCounterChild>
-          <Text testID="pg-counter-parent-readout" class="info-text">{{
+          <text testID="pg-counter-parent-readout" class="info-text">{{
             'parent-side count: ' +
               counterValue() +
               ' · resets: ' +
               counterResetCount() +
               ' · last incremented: ' +
               (lastIncrementedValue() ?? '—')
-          }}</Text>
-          <Text class="rstyle-caption"
+          }}</text>
+          <text class="rstyle-caption"
             >model() (non-required) is the same mechanism as model.required()
-            above, minus the compile-time-required initial binding.</Text
+            above, minus the compile-time-required initial binding.</text
           >
-        </View>
+        </view>
 
         <!-- ================= Template control flow ================= -->
-        <Text class="section-label">Template control flow</Text>
-        <View class="section-nested">
-          <Text class="pg-subsection-label"
-            >&#64;if / &#64;else if / &#64;else</Text
+        <text class="section-label">Template control flow</text>
+        <view class="section-nested">
+          <text class="pg-subsection-label"
+            >&#64;if / &#64;else if / &#64;else</text
           >
-          <Text testID="pg-if-readout" class="info-text">
+          <text testID="pg-if-readout" class="info-text">
             @if (score() > 66) {
               High ({{ score() }})
             } @else if (score() > 33) {
@@ -357,7 +357,7 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
             } @else {
               Low ({{ score() }})
             }
-          </Text>
+          </text>
           <ActionButton
             testID="pg-score-bump"
             title="bump score"
@@ -365,28 +365,28 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
             (press)="bumpScore()"
           ></ActionButton>
 
-          <Text class="pg-subsection-label"
-            >&#64;switch / &#64;case / &#64;default never · &#64;let</Text
+          <text class="pg-subsection-label"
+            >&#64;switch / &#64;case / &#64;default never · &#64;let</text
           >
           @let currentStatus = status();
-          <View testID="pg-switch-readout" class="row">
+          <view testID="pg-switch-readout" class="row">
             @switch (currentStatus) {
               @case ('idle') {
-                <Text class="info-text">switch: idle</Text>
+                <text class="info-text">switch: idle</text>
               }
               @case ('loading') {
-                <Text class="info-text">switch: loading…</Text>
+                <text class="info-text">switch: loading…</text>
               }
               @case ('error') {
-                <Text class="info-text">switch: error</Text>
+                <text class="info-text">switch: error</text>
               }
               @default never;
             }
-          </View>
-          <Text testID="pg-switch-ts-readout" class="rstyle-caption">{{
+          </view>
+          <text testID="pg-switch-ts-readout" class="rstyle-caption">{{
             'describeStatus() — TS-level exhaustiveness twin: ' +
               describeStatus(currentStatus)
-          }}</Text>
+          }}</text>
           <ActionButton
             testID="pg-status-cycle"
             title="cycle status"
@@ -394,8 +394,8 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
             (press)="cycleStatus()"
           ></ActionButton>
 
-          <Text class="pg-subsection-label"
-            >&#64;for + $index/$first/$last/$even/$odd/$count · &#64;empty</Text
+          <text class="pg-subsection-label"
+            >&#64;for + $index/$first/$last/$even/$odd/$count · &#64;empty</text
           >
           @for (
             item of filteredItems();
@@ -406,7 +406,7 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
             let isEven = $even;
             let total = $count
           ) {
-            <Text class="list-row-text">{{
+            <text class="list-row-text">{{
               idx +
                 '/' +
                 total +
@@ -415,10 +415,10 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
                 (isFirst ? ' first' : '') +
                 (isLast ? ' last' : '') +
                 (isEven ? ' even' : ' odd')
-            }}</Text>
+            }}</text>
           } @empty {
-            <Text testID="pg-for-empty" class="list-row-text"
-              >no items match the filter</Text
+            <text testID="pg-for-empty" class="list-row-text"
+              >no items match the filter</text
             >
           }
           <ActionButton
@@ -428,42 +428,42 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
             (press)="toggleItemsFilter()"
           ></ActionButton>
 
-          <Text class="pg-skip-note"
+          <text class="pg-skip-note"
             >&#64;defer is deliberately skipped here (2026-08-17) — its payoff
             is shrinking a browser's pre-paint download, and a Symbiote app
             ships its whole Hermes bytecode bundle at install time, so the
             motivating use case doesn't transfer. See
-            .docs/framework-api-surface/angular.md.</Text
+            .docs/framework-api-surface/angular.md.</text
           >
-        </View>
+        </view>
 
         <!-- ================= Structural / attribute directives ================= -->
-        <Text class="section-label">Structural / attribute directives</Text>
-        <View class="section-nested">
-          <Text class="pg-subsection-label"
+        <text class="section-label">Structural / attribute directives</text>
+        <view class="section-nested">
+          <text class="pg-subsection-label"
             >*ngIf / *ngFor / [ngSwitch] (legacy — superseded by
-            &#64;if/&#64;for/&#64;switch)</Text
+            &#64;if/&#64;for/&#64;switch)</text
           >
-          <Text *ngIf="legacyVisible" testID="pg-legacy-ngif" class="info-text"
-            >*ngIf (legacy): visible</Text
+          <text *ngIf="legacyVisible" testID="pg-legacy-ngif" class="info-text"
+            >*ngIf (legacy): visible</text
           >
-          <Text
+          <text
             *ngFor="let tag of legacyTags; trackBy: trackTag"
             class="list-row-text"
-            >{{ '*ngFor (legacy): ' + tag }}</Text
+            >{{ '*ngFor (legacy): ' + tag }}</text
           >
-          <View [ngSwitch]="legacyMode" class="row">
-            <Text *ngSwitchCase="'a'" class="info-text"
-              >ngSwitchCase (legacy): a</Text
+          <view [ngSwitch]="legacyMode" class="row">
+            <text *ngSwitchCase="'a'" class="info-text"
+              >ngSwitchCase (legacy): a</text
             >
-            <Text *ngSwitchCase="'b'" class="info-text"
-              >ngSwitchCase (legacy): b</Text
+            <text *ngSwitchCase="'b'" class="info-text"
+              >ngSwitchCase (legacy): b</text
             >
-            <Text *ngSwitchDefault class="info-text"
-              >ngSwitchDefault (legacy)</Text
+            <text *ngSwitchDefault class="info-text"
+              >ngSwitchDefault (legacy)</text
             >
-          </View>
-          <View class="row">
+          </view>
+          <view class="row">
             <ActionButton
               testID="pg-legacy-toggle"
               title="toggle *ngIf"
@@ -476,108 +476,108 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
               color="#5ec8f2"
               (press)="cycleLegacyMode()"
             ></ActionButton>
-          </View>
+          </view>
 
-          <Text class="pg-subsection-label"
-            >[ngClass] · [ngStyle] · [(ngModel)]</Text
+          <text class="pg-subsection-label"
+            >[ngClass] · [ngStyle] · [(ngModel)]</text
           >
-          <View
+          <view
             [ngClass]="{ 'pg-swatch': true, 'pg-hb-active': legacyVisible }"
             testID="pg-ngclass"
-          ></View>
-          <View
+          ></view>
+          <view
             [ngStyle]="{
               borderColor: legacyVisible ? '#3d8bd9' : '#41506a',
               borderWidth: 2,
             }"
             class="pg-swatch"
             testID="pg-ngstyle"
-          ></View>
+          ></view>
           <text-input
             testID="pg-ngmodel"
             placeholder="type here"
             [(ngModel)]="ngModelValue"
             class="text-input"
           ></text-input>
-          <Text testID="pg-ngmodel-readout" class="info-text">{{
+          <text testID="pg-ngmodel-readout" class="info-text">{{
             'ngModel value: ' + ngModelValue
-          }}</Text>
+          }}</text>
 
-          <Text class="pg-subsection-label"
-            >[ngTemplateOutlet] + context · ngProjectAs</Text
+          <text class="pg-subsection-label"
+            >[ngTemplateOutlet] + context · ngProjectAs</text
           >
           <ng-template #greetTpl let-name="name">
-            <Text testID="pg-templateoutlet" class="info-text">{{
+            <text testID="pg-templateoutlet" class="info-text">{{
               'templateOutlet says hi to ' + name
-            }}</Text>
+            }}</text>
           </ng-template>
           <ng-container
             *ngTemplateOutlet="greetTpl; context: { name: 'Angular' }"
           ></ng-container>
 
           <PlaygroundCard testID="pg-card-demo">
-            <View card-header class="pg-row">
-              <Text class="section-label"
-                >Card header (ngProjectAs-eligible slot)</Text
+            <view card-header class="pg-row">
+              <text class="section-label"
+                >Card header (ngProjectAs-eligible slot)</text
               >
-            </View>
-            <View playgroundQueryItem label="card body item" class="pg-row">
-              <Text class="info-text"
-                >default-slot body — also a content-projected query target</Text
+            </view>
+            <view playgroundQueryItem label="card body item" class="pg-row">
+              <text class="info-text"
+                >default-slot body — also a content-projected query target</text
               >
-            </View>
+            </view>
           </PlaygroundCard>
 
-          <Text class="pg-subsection-label"
-            >Custom @Directive · exportAs · hostDirectives</Text
+          <text class="pg-subsection-label"
+            >Custom @Directive · exportAs · hostDirectives</text
           >
-          <View
+          <view
             #qi="queryItem"
             playgroundQueryItem
             label="ref demo"
             testID="pg-queryitem-ref"
             class="pg-row"
           >
-            <Text class="info-text">{{ 'exportAs + #ref: ' + qi.label }}</Text>
-          </View>
+            <text class="info-text">{{ 'exportAs + #ref: ' + qi.label }}</text>
+          </view>
           <PlaygroundHostBindingTile
             testID="pg-hostbinding"
             tileLabel="HostBinding"
           ></PlaygroundHostBindingTile>
-        </View>
+        </view>
 
         <!-- ================= Data binding & queries ================= -->
-        <Text class="section-label">Data binding & queries</Text>
-        <View class="section-nested">
-          <Text class="rstyle-caption"
+        <text class="section-label">Data binding & queries</text>
+        <view class="section-nested">
+          <text class="rstyle-caption"
             >Property binding, event binding, interpolation and two-way binding
             are used throughout this screen already. The full class=/[style]
             change-detection regression matrix lives on the "Reactive style"
-            screen.</Text
+            screen.</text
           >
 
-          <Text class="pg-subsection-label"
-            >[attr.x] — undeclared prop trap → [symbioteHostProps]</Text
+          <text class="pg-subsection-label"
+            >[attr.x] — undeclared prop trap → [symbioteHostProps]</text
           >
           @for (row of attrDemoRows; track row) {
-            <View [symbioteHostProps]="attrRowProps(row)" class="pg-row">
-              <Text class="info-text">{{
+            <view [symbioteHostProps]="attrRowProps(row)" class="pg-row">
+              <text class="info-text">{{
                 'row bound via symbioteHostProps: ' + row
-              }}</Text>
-            </View>
+              }}</text>
+            </view>
           }
 
-          <Text class="pg-subsection-label">[class.x] · [style.x.px]</Text>
-          <View
+          <text class="pg-subsection-label">[class.x] · [style.x.px]</text>
+          <view
             [class.pg-hb-active]="styleDotActive()"
             testID="pg-classdot"
             class="pg-swatch"
-          ></View>
-          <View
+          ></view>
+          <view
             [style.borderWidth.px]="styleDotActive() ? 4 : 1"
             class="pg-swatch"
             testID="pg-styledot"
-          ></View>
+          ></view>
           <ActionButton
             testID="pg-styledot-toggle"
             title="toggle"
@@ -585,50 +585,50 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
             (press)="toggleStyleDot()"
           ></ActionButton>
 
-          <Text class="pg-subsection-label"
+          <text class="pg-subsection-label"
             >#ref template variable · @ViewChild/@ViewChildren +
-            viewChild()/viewChildren()</Text
+            viewChild()/viewChildren()</text
           >
-          <View class="row">
-            <View
+          <view class="row">
+            <view
               playgroundQueryItem
               label="tile A"
               testID="pg-query-a"
               class="pg-swatch"
-            ></View>
-            <View
+            ></view>
+            <view
               playgroundQueryItem
               label="tile B"
               testID="pg-query-b"
               class="pg-swatch"
-            ></View>
-            <View
+            ></view>
+            <view
               playgroundQueryItem
               label="tile C"
               testID="pg-query-c"
               class="pg-swatch"
-            ></View>
-          </View>
-          <Text testID="pg-query-readout" class="info-text">{{
+            ></view>
+          </view>
+          <text testID="pg-query-readout" class="info-text">{{
             queryReadout
-          }}</Text>
-          <Text class="rstyle-caption"
+          }}</text>
+          <text class="rstyle-caption"
             >@ContentChild/@ContentChildren + contentChild()/contentChildren()
             live inside the "PlaygroundCard" above, querying its projected
-            content.</Text
+            content.</text
           >
-        </View>
+        </view>
 
         <!-- ================= Content projection ================= -->
-        <Text class="section-label">Content projection</Text>
-        <View class="section-nested">
-          <Text class="pg-subsection-label"
-            >ViewContainerRef.createEmbeddedView(TemplateRef, context)</Text
+        <text class="section-label">Content projection</text>
+        <view class="section-nested">
+          <text class="pg-subsection-label"
+            >ViewContainerRef.createEmbeddedView(TemplateRef, context)</text
           >
           <ng-template #embeddedTpl let-value="value">
-            <Text testID="pg-embedded-view" class="info-text">{{
+            <text testID="pg-embedded-view" class="info-text">{{
               'embedded view: ' + value
-            }}</Text>
+            }}</text>
           </ng-template>
           <ng-container #embeddedAnchor></ng-container>
           <ActionButton
@@ -637,21 +637,21 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
             color="#dd0031"
             (press)="mountEmbeddedView()"
           ></ActionButton>
-        </View>
+        </view>
 
         <!-- ================= Component decorators ================= -->
-        <Text class="section-label">Component decorators</Text>
-        <View class="section-nested">
-          <Text class="rstyle-caption"
+        <text class="section-label">Component decorators</text>
+        <view class="section-nested">
+          <text class="rstyle-caption"
             >@Component/standalone/@Directive/@Pipe are exercised by every
             screen and every component this section already uses.
             ViewEncapsulation has no effect here — this project's own build-time
             class registry replaces it (symbiote-sfc-style-compiler skill);
             CUSTOM_ELEMENTS_SCHEMA is already load-bearing infrastructure, see
-            Button.ts.</Text
+            Button.ts.</text
           >
-          <Text class="pg-subsection-label"
-            >@Input()/@Output() (legacy decorators, still real)</Text
+          <text class="pg-subsection-label"
+            >@Input()/@Output() (legacy decorators, still real)</text
           >
           <ActionButton
             testID="pg-legacy-io"
@@ -660,52 +660,52 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
             (press)="pingTracked()"
           ></ActionButton>
 
-          <Text class="pg-subsection-label"
-            >@HostBinding — see "Custom @Directive" tile above</Text
+          <text class="pg-subsection-label"
+            >@HostBinding — see "Custom @Directive" tile above</text
           >
 
-          <Text class="pg-subsection-label"
+          <text class="pg-subsection-label"
             >@HostListener('layout') · host: {{ '{' }} (layout): ...
-            {{ '}' }}</Text
+            {{ '}' }}</text
           >
-          <View
+          <view
             playgroundLayoutWatcher
             (playgroundLayout)="onPlaygroundLayout($event)"
             testID="pg-layout-watcher"
             class="pg-swatch"
-          ></View>
-          <Text testID="pg-layout-readout" class="info-text">{{
+          ></view>
+          <text testID="pg-layout-readout" class="info-text">{{
             'layout: ' + layoutReadout
-          }}</Text>
-          <View
+          }}</text>
+          <view
             #hm="hostMeta"
             playgroundHostMeta
             testID="pg-hostmeta"
             class="pg-swatch"
-          ></View>
-          <Text testID="pg-hostmeta-readout" class="info-text">{{
+          ></view>
+          <text testID="pg-hostmeta-readout" class="info-text">{{
             'host: metadata active: ' + hm.active
-          }}</Text>
+          }}</text>
 
-          <Text class="pg-subsection-label"
+          <text class="pg-subsection-label"
             >@NgModule (legacy) + importProvidersFrom — see Dependency injection
-            below</Text
+            below</text
           >
-        </View>
+        </view>
 
         <!-- ================= Dependency injection ================= -->
-        <Text class="section-label">Dependency injection</Text>
-        <View class="section-nested">
-          <Text class="rstyle-caption"
+        <text class="section-label">Dependency injection</text>
+        <view class="section-nested">
+          <text class="rstyle-caption"
             >@Injectable(providedIn:'root') · inject() · InjectionToken ·
             provider recipes (useValue/useClass/useExisting/useFactory+deps,
             multi) · @Self()/@SkipSelf()/@Optional() (via inject()'s
             InjectOptions — see PlaygroundDI.ts for why not the
             parameter-decorator form) · EnvironmentInjector/Injector.create() ·
-            runInInjectionContext() — all resolved below.</Text
+            runInInjectionContext() — all resolved below.</text
           >
           <PlaygroundDiConsumer></PlaygroundDiConsumer>
-          <Text class="pg-skip-note"
+          <text class="pg-skip-note"
             >HostAttributeToken is skipped (2026-08-17) — too niche for this
             pass; it reads a static template attribute via compiler metadata
             rather than a live DOM read, so it likely works unmodified but that
@@ -719,17 +719,17 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
             compiles and type-checks but has nowhere to resolve into — neither
             Injector.create() nor anything else in this bootstrap accepts
             EnvironmentProviders, so it stays a type-level proof, not a live
-            readout.</Text
+            readout.</text
           >
-        </View>
+        </view>
 
         <!-- ================= Lifecycle hooks ================= -->
-        <Text class="section-label">Lifecycle hooks</Text>
-        <View class="section-nested">
-          <Text testID="pg-lifecycle-log" class="info-text">{{
+        <text class="section-label">Lifecycle hooks</text>
+        <view class="section-nested">
+          <text testID="pg-lifecycle-log" class="info-text">{{
             'log: ' + lifecycleLog().join(' → ')
-          }}</Text>
-          <View class="row">
+          }}</text>
+          <view class="row">
             <ActionButton
               testID="pg-lifecycle-tick"
               title="bump tick (ngOnChanges)"
@@ -742,82 +742,82 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
               color="#5ec8f2"
               (press)="toggleLifecycleLogger()"
             ></ActionButton>
-          </View>
+          </view>
           @if (showLifecycleLogger) {
             <PlaygroundLifecycleLogger
               [tick]="lifecycleTick"
               (hookFired)="onLifecycleHookFired($event)"
             >
-              <Text class="info-text"
-                >projected content — triggers ngAfterContentInit/Checked</Text
+              <text class="info-text"
+                >projected content — triggers ngAfterContentInit/Checked</text
               >
             </PlaygroundLifecycleLogger>
           }
-          <Text class="pg-skip-note"
+          <text class="pg-skip-note"
             >afterNextRender/afterEveryRender/afterRenderEffect are skipped
             (2026-08-17) — their own framing is "run after the DOM paints",
             which this DOM-less bootstrap has no equivalent of. This project's
             real answer to "run after the native commit" is whenCommitted(node,
             action) (core/engine/src/post-commit.ts,
             angular-adapter-change-detection §1) — already load-bearing for the
-            native-driver Animated and sticky-header attach paths.</Text
+            native-driver Animated and sticky-header attach paths.</text
           >
-        </View>
+        </view>
 
         <!-- ================= Pipes ================= -->
-        <Text class="section-label">Pipes</Text>
-        <View class="section-nested">
-          <Text testID="pg-pipe-async" class="info-text">{{
+        <text class="section-label">Pipes</text>
+        <view class="section-nested">
+          <text testID="pg-pipe-async" class="info-text">{{
             'async: ' + (pipeGalleryAsync$ | async)
-          }}</Text>
-          <Text testID="pg-pipe-date" class="info-text">{{
+          }}</text>
+          <text testID="pg-pipe-date" class="info-text">{{
             'date: ' + (pipeGalleryDate | date: 'short')
-          }}</Text>
-          <Text testID="pg-pipe-currency" class="info-text">{{
+          }}</text>
+          <text testID="pg-pipe-currency" class="info-text">{{
             'currency: ' + (pipeGalleryAmount | currency: 'USD')
-          }}</Text>
-          <Text testID="pg-pipe-number" class="info-text">{{
+          }}</text>
+          <text testID="pg-pipe-number" class="info-text">{{
             'number: ' + (pipeGalleryAmount | number: '1.2-2')
-          }}</Text>
-          <Text testID="pg-pipe-percent" class="info-text">{{
+          }}</text>
+          <text testID="pg-pipe-percent" class="info-text">{{
             'percent: ' + (pipeGalleryPercent | percent)
-          }}</Text>
-          <Text testID="pg-pipe-json" class="info-text">{{
+          }}</text>
+          <text testID="pg-pipe-json" class="info-text">{{
             'json: ' + (pipeGalleryJson | json)
-          }}</Text>
-          <Text testID="pg-pipe-case" class="info-text">{{
+          }}</text>
+          <text testID="pg-pipe-case" class="info-text">{{
             (pipeGalleryText | uppercase) +
               ' · ' +
               (pipeGalleryText | lowercase) +
               ' · ' +
               (pipeGalleryText | titlecase)
-          }}</Text>
-          <Text testID="pg-pipe-slice" class="info-text">{{
+          }}</text>
+          <text testID="pg-pipe-slice" class="info-text">{{
             'slice(1,3): ' + (pipeGallerySlice | slice: 1 : 3)
-          }}</Text>
+          }}</text>
           @for (pair of pipeGalleryMap | keyvalue; track pair.key) {
-            <Text class="list-row-text">{{
+            <text class="list-row-text">{{
               'keyvalue: ' + pair.key + ' → ' + pair.value
-            }}</Text>
+            }}</text>
           }
-          <Text testID="pg-pipe-plural" class="info-text">{{
+          <text testID="pg-pipe-plural" class="info-text">{{
             'i18nPlural: ' +
               (pipeGalleryPluralCount | i18nPlural: pipeGalleryPluralMapping)
-          }}</Text>
-          <Text testID="pg-pipe-select" class="info-text">{{
+          }}</text>
+          <text testID="pg-pipe-select" class="info-text">{{
             'i18nSelect: ' +
               (pipeGallerySelectValue | i18nSelect: pipeGallerySelectMapping)
-          }}</Text>
-          <Text testID="pg-pipe-custom" class="info-text">{{
+          }}</text>
+          <text testID="pg-pipe-custom" class="info-text">{{
             'custom @Pipe: ' + (pipeGalleryText | playgroundShout: 2)
-          }}</Text>
-          <Text class="rstyle-caption"
+          }}</text>
+          <text class="rstyle-caption"
             >CommonModule aggregates every built-in pipe above; this screen
             imports each one individually, matching the project's
-            standalone-by-default convention.</Text
+            standalone-by-default convention.</text
           >
-        </View>
-      </ScrollView>
+        </view>
+      </scroll-view>
     </safe-area-view>
   `,
 })

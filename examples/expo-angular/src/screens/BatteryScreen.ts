@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import {
   Platform,
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -49,73 +49,73 @@ function formatBatteryState(state: BatteryState): string {
 @Component({
   selector: 'BatteryScreen',
   standalone: true,
-  imports: [SafeAreaViewElement, ScrollView, Text, View],
+  imports: [SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="battery-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Battery</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Battery</text>
+            <text class="hero-body">
               @symbiote-native/battery — live battery level, charging state, and
               Low Power/Power Saver mode. The iOS Simulator reports the battery
               API as unavailable; a real device is needed to see live values.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="battery-status-card" class="capability-card">
-          <Text class="capability-card-title">Live status</Text>
-          <View testID="battery-level" class="capability-row">
-            <Text class="capability-label">Battery level</Text>
-            <Text class="value-text">{{ batteryLevelLabel() }}</Text>
-          </View>
-          <View testID="battery-state" class="capability-row">
-            <Text class="capability-label">State</Text>
-            <Text class="value-text">{{ batteryStateLabel() }}</Text>
-          </View>
-          <View testID="battery-low-power-mode" class="capability-row">
-            <Text class="capability-label">Low power mode</Text>
-            <View [class]="statusBadgeClass(lowPowerModeStatus())">
-              <Text class="status-badge-text">{{
+        <view testID="battery-status-card" class="capability-card">
+          <text class="capability-card-title">Live status</text>
+          <view testID="battery-level" class="capability-row">
+            <text class="capability-label">Battery level</text>
+            <text class="value-text">{{ batteryLevelLabel() }}</text>
+          </view>
+          <view testID="battery-state" class="capability-row">
+            <text class="capability-label">State</text>
+            <text class="value-text">{{ batteryStateLabel() }}</text>
+          </view>
+          <view testID="battery-low-power-mode" class="capability-row">
+            <text class="capability-label">Low power mode</text>
+            <view [class]="statusBadgeClass(lowPowerModeStatus())">
+              <text class="status-badge-text">{{
                 statusLabel(lowPowerModeStatus())
-              }}</Text>
-            </View>
-          </View>
-        </View>
+              }}</text>
+            </view>
+          </view>
+        </view>
 
-        <View testID="battery-info-card" class="capability-card">
-          <Text class="capability-card-title">Device info</Text>
-          <View testID="battery-available" class="capability-row">
-            <Text class="capability-label">Available</Text>
-            <View [class]="statusBadgeClass(isAvailable())">
-              <Text class="status-badge-text">{{
+        <view testID="battery-info-card" class="capability-card">
+          <text class="capability-card-title">Device info</text>
+          <view testID="battery-available" class="capability-row">
+            <text class="capability-label">Available</text>
+            <view [class]="statusBadgeClass(isAvailable())">
+              <text class="status-badge-text">{{
                 statusLabel(isAvailable())
-              }}</Text>
-            </View>
-          </View>
+              }}</text>
+            </view>
+          </view>
           @if (Platform.OS === 'android') {
-            <View testID="battery-optimization" class="capability-row">
-              <Text class="capability-label">Battery optimization enabled</Text>
-              <View [class]="statusBadgeClass(batteryOptimizationEnabled())">
-                <Text class="status-badge-text">{{
+            <view testID="battery-optimization" class="capability-row">
+              <text class="capability-label">Battery optimization enabled</text>
+              <view [class]="statusBadgeClass(batteryOptimizationEnabled())">
+                <text class="status-badge-text">{{
                   statusLabel(batteryOptimizationEnabled())
-                }}</Text>
-              </View>
-            </View>
+                }}</text>
+              </view>
+            </view>
           }
-        </View>
-      </ScrollView>
+        </view>
+      </scroll-view>
     </safe-area-view>
   `,
 })

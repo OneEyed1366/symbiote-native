@@ -26,26 +26,26 @@ const drawerLineTagLabel = `${drawerLineInfo.code} · ${drawerLineInfo.label}`;
   imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">DR</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Drawer</Text>
-            <Text class="hero-body">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">DR</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Drawer</text>
+            <text class="hero-body">
               A swipeable drawer sliding in from the right, driven by the
               navigator's own gesture handler.
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">
+            </text>
+          </view>
+        </view>
+        <text class="info-text">
           drawerPosition: right · drawerType: slide — swipe from the RIGHT edge,
           or use a button
-        </Text>
+        </text>
         <ActionButton
           testID="drawer-open"
           title="Open drawer"
@@ -58,7 +58,7 @@ const drawerLineTagLabel = `${drawerLineInfo.code} · ${drawerLineInfo.label}`;
           (press)="toggleDrawer()"
           [color]="lineColorStructure"
         ></ActionButton>
-      </View>
+      </view>
     </safe-area-view>
   `,
 })
@@ -85,18 +85,18 @@ export class DrawerHomeScreen {
   imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <Text class="section-label">Drawer demo · Settings</Text>
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <text class="section-label">Drawer demo · Settings</text>
         <ActionButton
           testID="drawer-close-from-settings"
           title="Close drawer"
           (press)="closeDrawer()"
           [color]="lineColorStructure"
         ></ActionButton>
-      </View>
+      </view>
     </safe-area-view>
   `,
 })
@@ -156,16 +156,16 @@ export class DrawerSettingsScreen {
           testID="drawer-panel"
           class="section-tight drawer-panel"
         >
-          <Text class="section-label">Menu</Text>
+          <text class="section-label">Menu</text>
           @for (route of ctx.state.routes; track route.key) {
             <pressable
               [testID]="'drawer-menu-' + route.name"
               class="menu-row"
               (press)="ctx.navigation.jumpTo(route.name)"
             >
-              <Text class="menu-row-label">{{
+              <text class="menu-row-label">{{
                 drawerLabelFor(ctx.descriptors, route)
-              }}</Text>
+              }}</text>
             </pressable>
           }
         </safe-area-view>

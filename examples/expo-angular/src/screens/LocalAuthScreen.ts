@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import {
   Platform,
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -76,76 +76,76 @@ function securityLevelLabel(level: SecurityLevel): string {
 @Component({
   selector: 'LocalAuthScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="local-auth-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Local auth</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Local auth</text>
+            <text class="hero-body">
               @symbiote-native/local-auth — FaceID/TouchID on iOS, the
               Fingerprint/Biometric API on Android. A simulator with no enrolled
               biometrics reports "not enrolled"; a real device with
               FaceID/TouchID/fingerprint set up is needed to see a live prompt.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="local-auth-capabilities-card" class="auth-card">
-          <View class="auth-card-header">
-            <Text class="auth-card-title">Capabilities</Text>
-          </View>
-          <View testID="local-auth-hardware" class="auth-capability-row">
-            <Text class="auth-capability-label">Hardware present</Text>
-            <View [class]="statusBadgeClass(hasHardware())">
-              <Text class="auth-status-text">{{
+        <view testID="local-auth-capabilities-card" class="auth-card">
+          <view class="auth-card-header">
+            <text class="auth-card-title">Capabilities</text>
+          </view>
+          <view testID="local-auth-hardware" class="auth-capability-row">
+            <text class="auth-capability-label">Hardware present</text>
+            <view [class]="statusBadgeClass(hasHardware())">
+              <text class="auth-status-text">{{
                 statusLabel(hasHardware())
-              }}</Text>
-            </View>
-          </View>
-          <View testID="local-auth-enrolled" class="auth-capability-row">
-            <Text class="auth-capability-label">Enrolled</Text>
-            <View [class]="statusBadgeClass(isEnrolled())">
-              <Text class="auth-status-text">{{
+              }}</text>
+            </view>
+          </view>
+          <view testID="local-auth-enrolled" class="auth-capability-row">
+            <text class="auth-capability-label">Enrolled</text>
+            <view [class]="statusBadgeClass(isEnrolled())">
+              <text class="auth-status-text">{{
                 statusLabel(isEnrolled())
-              }}</Text>
-            </View>
-          </View>
-          <View class="auth-capability-row">
-            <Text class="auth-capability-label">Enrolled level</Text>
-            <Text class="auth-value-text">{{ enrolledLevelLabel() }}</Text>
-          </View>
-          <View class="auth-capability-row">
-            <Text class="auth-capability-label">Supported types</Text>
+              }}</text>
+            </view>
+          </view>
+          <view class="auth-capability-row">
+            <text class="auth-capability-label">Enrolled level</text>
+            <text class="auth-value-text">{{ enrolledLevelLabel() }}</text>
+          </view>
+          <view class="auth-capability-row">
+            <text class="auth-capability-label">Supported types</text>
             @if (supportedTypes(); as types) {
-              <Text class="auth-value-text">{{
+              <text class="auth-value-text">{{
                 supportedTypesLabelOf(types)
-              }}</Text>
+              }}</text>
             } @else {
-              <Text class="auth-value-text">checking…</Text>
+              <text class="auth-value-text">checking…</text>
             }
-          </View>
-        </View>
+          </view>
+        </view>
 
-        <View testID="local-auth-authenticate-card" class="auth-card">
-          <View class="auth-card-header">
-            <Text class="auth-card-title">Authenticate</Text>
-          </View>
-          <Text class="info-text">
+        <view testID="local-auth-authenticate-card" class="auth-card">
+          <view class="auth-card-header">
+            <text class="auth-card-title">Authenticate</text>
+          </view>
+          <text class="info-text">
             Prompts FaceID/TouchID on iOS, or the Biometric/Fingerprint dialog
             on Android.
-          </Text>
+          </text>
           <ActionButton
             testID="local-auth-authenticate-button"
             [title]="isAuthenticating() ? 'Authenticating…' : 'Authenticate'"
@@ -161,14 +161,14 @@ function securityLevelLabel(level: SecurityLevel): string {
             ></ActionButton>
           }
           @if (authResult(); as result) {
-            <View
+            <view
               testID="local-auth-result"
               [class]="
                 'auth-result auth-result-' +
                 (result.success ? 'success' : 'error')
               "
             >
-              <Text class="auth-result-text">
+              <text class="auth-result-text">
                 {{
                   result.success
                     ? 'Success'
@@ -176,11 +176,11 @@ function securityLevelLabel(level: SecurityLevel): string {
                       result.error +
                       (result.warning ? ' (' + result.warning + ')' : '')
                 }}
-              </Text>
-            </View>
+              </text>
+            </view>
           }
-        </View>
-      </ScrollView>
+        </view>
+      </scroll-view>
     </safe-area-view>
   `,
 })

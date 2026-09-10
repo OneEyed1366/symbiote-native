@@ -23,19 +23,19 @@ function openedFromLabel(params: unknown): string {
   imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <View class="section">
-        <Text class="section-label">Navigation demo · Details screen</Text>
-        <Text class="info-text">{{ 'route.params: ' + paramsLabel }}</Text>
-        <Text class="info-text">{{
+      <view class="section">
+        <text class="section-label">Navigation demo · Details screen</text>
+        <text class="info-text">{{ 'route.params: ' + paramsLabel }}</text>
+        <text class="info-text">{{
           'canGoBack: ' + navigation.canGoBack()
-        }}</Text>
+        }}</text>
         <ActionButton
           testID="nav-pop"
           title="← Pop back"
           (press)="navigation.pop()"
           [color]="lineColorPrimitives"
         ></ActionButton>
-      </View>
+      </view>
     </safe-area-view>
   `,
 })

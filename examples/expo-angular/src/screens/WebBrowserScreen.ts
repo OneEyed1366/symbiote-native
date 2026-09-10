@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import {
   Platform,
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   TextInputElement,
   View,
@@ -36,37 +36,37 @@ const DEMO_URL = 'https://symbiote-native.dev';
   imports: [
     ActionButton,
     SafeAreaViewElement,
-    ScrollView,
+    ScrollViewElement,
     Text,
     TextInputElement,
     View,
   ],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="web-browser-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Web Browser</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Web Browser</text>
+            <text class="hero-body">
               @symbiote-native/web-browser — an in-app browser
               (SFSafariViewController on iOS, Custom Tabs on Android) that keeps
               the user inside the app, unlike Linking.openURL.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="web-browser-open-card" class="web-browser-card">
-          <Text class="web-browser-card-title">Open a URL</Text>
+        <view testID="web-browser-open-card" class="web-browser-card">
+          <text class="web-browser-card-title">Open a URL</text>
           <text-input
             testID="web-browser-url-input"
             class="text-input"
@@ -88,52 +88,52 @@ const DEMO_URL = 'https://symbiote-native.dev';
               (press)="handleDismiss()"
               [color]="lineColor"
             ></ActionButton>
-            <Text class="web-browser-note">
+            <text class="web-browser-note">
               The presented browser covers the app, so Dismiss is only reachable
               once the browser is already gone — it then reports that no browser
               was presented.
-            </Text>
+            </text>
           } @else {
-            <Text class="web-browser-note">
+            <text class="web-browser-note">
               Android has no dismiss: a Custom Tab runs in its own task and
               cannot be closed programmatically, so dismissBrowser throws off
               iOS.
-            </Text>
+            </text>
           }
-        </View>
+        </view>
 
-        <View testID="web-browser-result-card" class="web-browser-card">
-          <Text class="web-browser-card-title">Last result</Text>
-          <View class="web-browser-row">
-            <Text class="web-browser-row-label">Open</Text>
-            <Text
+        <view testID="web-browser-result-card" class="web-browser-card">
+          <text class="web-browser-card-title">Last result</text>
+          <view class="web-browser-row">
+            <text class="web-browser-row-label">Open</text>
+            <text
               testID="web-browser-open-result"
               class="web-browser-value-text"
             >
               {{ openResult() }}
-            </Text>
-          </View>
-          <View class="web-browser-row">
-            <Text class="web-browser-row-label">Dismiss</Text>
-            <Text
+            </text>
+          </view>
+          <view class="web-browser-row">
+            <text class="web-browser-row-label">Dismiss</text>
+            <text
               testID="web-browser-dismiss-result"
               class="web-browser-value-text"
             >
               {{ dismissResult() }}
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
         @if (Platform.OS === 'android') {
-          <View testID="web-browser-service-card" class="web-browser-card">
-            <Text class="web-browser-card-title">Custom Tabs service</Text>
-            <Text class="web-browser-note">
+          <view testID="web-browser-service-card" class="web-browser-card">
+            <text class="web-browser-card-title">Custom Tabs service</text>
+            <text class="web-browser-note">
               Android only. Warming the service up before a known URL makes the
               tab open faster; cool it down when you are done.
               getCustomTabsSupportingBrowsersAsync throws on iOS, which has no
               such concept, so this whole card is behind the platform check.
-            </Text>
-            <View class="button-row">
+            </text>
+            <view class="button-row">
               <ActionButton
                 testID="web-browser-warm-up-button"
                 title="Warm up"
@@ -158,28 +158,28 @@ const DEMO_URL = 'https://symbiote-native.dev';
                 (press)="handleListBrowsers()"
                 [color]="lineColor"
               ></ActionButton>
-            </View>
-            <View class="web-browser-row">
-              <Text class="web-browser-row-label">Service package</Text>
-              <Text
+            </view>
+            <view class="web-browser-row">
+              <text class="web-browser-row-label">Service package</text>
+              <text
                 testID="web-browser-service-package"
                 class="web-browser-value-text"
               >
                 {{ servicePackage() }}
-              </Text>
-            </View>
-            <View class="web-browser-row">
-              <Text class="web-browser-row-label">Supporting browsers</Text>
-              <Text
+              </text>
+            </view>
+            <view class="web-browser-row">
+              <text class="web-browser-row-label">Supporting browsers</text>
+              <text
                 testID="web-browser-browsers"
                 class="web-browser-value-text"
               >
                 {{ browsers() }}
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
         }
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   `,
 })

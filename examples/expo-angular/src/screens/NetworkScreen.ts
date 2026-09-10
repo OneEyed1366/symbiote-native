@@ -1,7 +1,7 @@
 import { Component, effect, inject, signal } from '@angular/core';
 import {
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -53,60 +53,60 @@ function yesNoLabel(value: boolean | undefined): string {
 @Component({
   selector: 'NetworkScreen',
   standalone: true,
-  imports: [SafeAreaViewElement, ScrollView, Text, View],
+  imports: [SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="network-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Network</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Network</text>
+            <text class="hero-body">
               @symbiote-native/network — live network state via
               NetworkStateService, plus the device's IP address and
               airplane-mode check. Toggle Wi-Fi or airplane mode on the device
               to see the live card update on its own.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="network-live-card" class="capability-card">
-          <Text class="capability-card-title">Live network state</Text>
-          <View class="capability-row">
-            <Text class="capability-label">Type</Text>
-            <Text class="value-text">{{ networkTypeLabel() }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Connected</Text>
-            <Text class="value-text">{{ connectedLabel() }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Internet reachable</Text>
-            <Text class="value-text">{{ internetReachableLabel() }}</Text>
-          </View>
-        </View>
+        <view testID="network-live-card" class="capability-card">
+          <text class="capability-card-title">Live network state</text>
+          <view class="capability-row">
+            <text class="capability-label">Type</text>
+            <text class="value-text">{{ networkTypeLabel() }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Connected</text>
+            <text class="value-text">{{ connectedLabel() }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Internet reachable</text>
+            <text class="value-text">{{ internetReachableLabel() }}</text>
+          </view>
+        </view>
 
-        <View testID="network-info-card" class="capability-card">
-          <Text class="capability-card-title">Device info</Text>
-          <View class="capability-row">
-            <Text class="capability-label">IP address</Text>
-            <Text class="value-text">{{ ipAddressLabel() }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Airplane mode</Text>
-            <Text class="value-text">{{ airplaneModeLabel() }}</Text>
-          </View>
-        </View>
-      </ScrollView>
+        <view testID="network-info-card" class="capability-card">
+          <text class="capability-card-title">Device info</text>
+          <view class="capability-row">
+            <text class="capability-label">IP address</text>
+            <text class="value-text">{{ ipAddressLabel() }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Airplane mode</text>
+            <text class="value-text">{{ airplaneModeLabel() }}</text>
+          </view>
+        </view>
+      </scroll-view>
     </safe-area-view>
   `,
 })

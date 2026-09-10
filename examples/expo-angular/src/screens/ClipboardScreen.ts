@@ -2,7 +2,7 @@ import { Component, Injector, effect, inject, signal } from '@angular/core';
 import {
   Platform,
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   TextInputElement,
   View,
@@ -41,53 +41,53 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   imports: [
     ActionButton,
     SafeAreaViewElement,
-    ScrollView,
+    ScrollViewElement,
     Text,
     TextInputElement,
     View,
   ],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="clipboard-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Clipboard</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Clipboard</text>
+            <text class="hero-body">
               @symbiote-native/clipboard — read/write the system clipboard, with
               a live change listener. On iOS 16+ a denied paste permission reads
               as empty content, not an error.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="clipboard-value-card" class="capability-card">
-          <Text class="capability-card-title">Clipboard content</Text>
-          <View testID="clipboard-value" class="capability-row">
-            <Text class="capability-label">Current value</Text>
-            <Text class="value-text">{{ clipboardValue() || '(empty)' }}</Text>
-          </View>
-          <View testID="clipboard-has-string" class="capability-row">
-            <Text class="capability-label">Has text</Text>
-            <View [class]="statusBadgeClass(hasString())">
-              <Text class="status-badge-text">{{
+        <view testID="clipboard-value-card" class="capability-card">
+          <text class="capability-card-title">Clipboard content</text>
+          <view testID="clipboard-value" class="capability-row">
+            <text class="capability-label">Current value</text>
+            <text class="value-text">{{ clipboardValue() || '(empty)' }}</text>
+          </view>
+          <view testID="clipboard-has-string" class="capability-row">
+            <text class="capability-label">Has text</text>
+            <view [class]="statusBadgeClass(hasString())">
+              <text class="status-badge-text">{{
                 statusLabel(hasString())
-              }}</Text>
-            </View>
-          </View>
-        </View>
+              }}</text>
+            </view>
+          </view>
+        </view>
 
-        <View testID="clipboard-copy-card" class="capability-card">
-          <Text class="capability-card-title">Copy text</Text>
+        <view testID="clipboard-copy-card" class="capability-card">
+          <text class="capability-card-title">Copy text</text>
           <text-input
             testID="clipboard-input"
             class="text-input"
@@ -101,11 +101,11 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
             (press)="handleCopy()"
             [color]="lineColor"
           ></ActionButton>
-        </View>
+        </view>
 
         @if (Platform.OS === 'ios') {
-          <View testID="clipboard-url-card" class="capability-card">
-            <Text class="capability-card-title">URL</Text>
+          <view testID="clipboard-url-card" class="capability-card">
+            <text class="capability-card-title">URL</text>
             <text-input
               testID="clipboard-url-input"
               class="text-input"
@@ -113,7 +113,7 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
               [value]="inputUrl()"
               (valueChange)="inputUrl.set($event)"
             ></text-input>
-            <View class="button-row">
+            <view class="button-row">
               <ActionButton
                 testID="clipboard-url-get-button"
                 title="Get URL"
@@ -132,22 +132,22 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
                 (press)="handleHasUrl()"
                 [color]="lineColor"
               ></ActionButton>
-            </View>
-            <View testID="clipboard-url-value" class="capability-row">
-              <Text class="capability-label">URL value</Text>
-              <Text class="value-text">{{ urlValue() ?? '(none)' }}</Text>
-            </View>
-            <View testID="clipboard-has-url" class="capability-row">
-              <Text class="capability-label">Has URL</Text>
-              <View [class]="statusBadgeClass(hasUrl())">
-                <Text class="status-badge-text">{{
+            </view>
+            <view testID="clipboard-url-value" class="capability-row">
+              <text class="capability-label">URL value</text>
+              <text class="value-text">{{ urlValue() ?? '(none)' }}</text>
+            </view>
+            <view testID="clipboard-has-url" class="capability-row">
+              <text class="capability-label">Has URL</text>
+              <view [class]="statusBadgeClass(hasUrl())">
+                <text class="status-badge-text">{{
                   statusLabel(hasUrl())
-                }}</Text>
-              </View>
-            </View>
-          </View>
+                }}</text>
+              </view>
+            </view>
+          </view>
         }
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   `,
 })

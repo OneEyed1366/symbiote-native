@@ -113,43 +113,43 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({
   imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">HD</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Header options</Text>
-            <Text class="hero-body">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">HD</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Header options</text>
+            <text class="hero-body">
               Bar buttons, a right-side menu, a native search bar, and
               headerLargeTitle — every headerSearchBarOptions callback wired to
               a live control below.
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">
+            </text>
+          </view>
+        </view>
+        <text class="info-text">
           headerLargeTitle · headerTintColor · headerStyle.backgroundColor
-        </Text>
-        <Text testID="header-last-action" class="info-text">
+        </text>
+        <text testID="header-last-action" class="info-text">
           {{ 'last header action: ' + lastHeaderAction() }}
-        </Text>
-        <Text testID="header-search-text" class="info-text">
+        </text>
+        <text testID="header-search-text" class="info-text">
           {{ 'last search text: ' + lastSearchText() }}
-        </Text>
-        <Text testID="header-search-submitted" class="info-text">
+        </text>
+        <text testID="header-search-submitted" class="info-text">
           {{ 'last search submitted: ' + lastSearchSubmitted() }}
-        </Text>
-        <Text testID="header-search-event" class="info-text">
+        </text>
+        <text testID="header-search-event" class="info-text">
           {{ 'last search bar event: ' + lastSearchBarEvent() }}
-        </Text>
-        <Text class="note-text">
+        </text>
+        <text class="note-text">
           Pull down to reveal the search bar (headerSearchBarOptions), or use
           the buttons below to drive it imperatively through its
           SearchBarCommands ref.
-        </Text>
+        </text>
         <ActionButton
           testID="search-bar-focus"
           title="Focus search bar"
@@ -174,7 +174,7 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({
           (press)="onCancelSearchBar()"
           [color]="lineColorPresentation"
         ></ActionButton>
-      </View>
+      </view>
     </safe-area-view>
   `,
 })

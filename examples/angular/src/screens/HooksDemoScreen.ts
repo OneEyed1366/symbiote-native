@@ -22,40 +22,40 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
   imports: [SafeAreaViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">HK</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Hooks</Text>
-            <Text class="hero-body">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">HK</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Hooks</text>
+            <text class="hero-body">
               injectFocusEffect, injectIsFocused, and injectNavigationState -
               introspecting the navigator's own live state from inside a screen.
-            </Text>
-          </View>
-        </View>
-        <Text testID="hooks-is-focused" class="info-text">{{
+            </text>
+          </view>
+        </view>
+        <text testID="hooks-is-focused" class="info-text">{{
           'injectIsFocused(): ' + isFocused()
-        }}</Text>
-        <Text testID="hooks-focus-count" class="info-text">{{
+        }}</text>
+        <text testID="hooks-focus-count" class="info-text">{{
           'injectFocusEffect focus count: ' + focusCount()
-        }}</Text>
-        <Text class="info-text">{{ blurText() }}</Text>
-        <Text class="section-label"
-          >injectNavigationState() · current route stack</Text
+        }}</text>
+        <text class="info-text">{{ blurText() }}</text>
+        <text class="section-label"
+          >injectNavigationState() · current route stack</text
         >
         @for (
           name of routeNames();
           track name + '-' + $index;
           let index = $index
         ) {
-          <Text class="list-row-text">{{ index + '. ' + name }}</Text>
+          <text class="list-row-text">{{ index + '. ' + name }}</text>
         }
-      </View>
+      </view>
     </safe-area-view>
   `,
 })

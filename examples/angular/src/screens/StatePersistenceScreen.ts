@@ -38,25 +38,25 @@ function isResettableHandle(
   imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">SP</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">State persistence</Text>
-            <Text class="hero-body">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">SP</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">State persistence</text>
+            <text class="hero-body">
               The Stack's own state serialized out and deserialized back in —
               restoring exactly where you left off.
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">{{
+            </text>
+          </view>
+        </view>
+        <text class="info-text">{{
           'current stack depth: ' + state().routes.length
-        }}</Text>
+        }}</text>
         <ActionButton
           testID="persist-serialize"
           title="Serialize current stack"
@@ -70,14 +70,14 @@ function isResettableHandle(
           [color]="lineColorRouting"
         ></ActionButton>
         @if (restoreError(); as error) {
-          <Text class="info-text">{{ 'error: ' + error }}</Text>
+          <text class="info-text">{{ 'error: ' + error }}</text>
         }
-        <View class="box-list160">
-          <Text testID="persist-snapshot" class="list-row-text">{{
+        <view class="box-list160">
+          <text testID="persist-snapshot" class="list-row-text">{{
             snapshotText()
-          }}</Text>
-        </View>
-      </View>
+          }}</text>
+        </view>
+      </view>
     </safe-area-view>
   `,
 })

@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import {
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -30,70 +30,70 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 @Component({
   selector: 'StoreReviewScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="store-review-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Store Review</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Store Review</text>
+            <text class="hero-body">
               @symbiote-native/store-review — the native App Store/Play Store
               review prompt, letting a user rate the app without leaving it.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="store-review-capability-card" class="capability-card">
-          <Text class="capability-card-title">Capabilities</Text>
-          <View testID="store-review-is-available" class="capability-row">
-            <Text class="capability-label">isAvailableAsync()</Text>
-            <View [class]="statusBadgeClass(isAvailable())">
-              <Text class="status-badge-text">{{
+        <view testID="store-review-capability-card" class="capability-card">
+          <text class="capability-card-title">Capabilities</text>
+          <view testID="store-review-is-available" class="capability-row">
+            <text class="capability-label">isAvailableAsync()</text>
+            <view [class]="statusBadgeClass(isAvailable())">
+              <text class="status-badge-text">{{
                 statusLabel(isAvailable())
-              }}</Text>
-            </View>
-          </View>
-          <View testID="store-review-has-action" class="capability-row">
-            <Text class="capability-label">hasAction()</Text>
-            <View [class]="statusBadgeClass(hasReviewAction())">
-              <Text class="status-badge-text">{{
+              }}</text>
+            </view>
+          </view>
+          <view testID="store-review-has-action" class="capability-row">
+            <text class="capability-label">hasAction()</text>
+            <view [class]="statusBadgeClass(hasReviewAction())">
+              <text class="status-badge-text">{{
                 statusLabel(hasReviewAction())
-              }}</Text>
-            </View>
-          </View>
-        </View>
+              }}</text>
+            </view>
+          </view>
+        </view>
 
-        <View testID="store-review-request-card" class="capability-card">
-          <Text class="capability-card-title">Request review</Text>
+        <view testID="store-review-request-card" class="capability-card">
+          <text class="capability-card-title">Request review</text>
           <ActionButton
             testID="store-review-request-button"
             title="Request Review"
             (press)="handleRequestReview()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="store-review-request-result" class="value-text">{{
+          <text testID="store-review-request-result" class="value-text">{{
             lastResult()
-          }}</Text>
-          <Text class="info-text">
+          }}</text>
+          <text class="info-text">
             resolved means the call completed, not that a prompt appeared. On
             Android the Play dialog only shows for a build installed from Google
             Play (internal test track, internal app sharing, or production); a
             sideloaded debug build resolves silently. iOS shows it in debug
             builds. Both stores also enforce a quota.
-          </Text>
-        </View>
-      </ScrollView>
+          </text>
+        </view>
+      </scroll-view>
     </safe-area-view>
   `,
 })

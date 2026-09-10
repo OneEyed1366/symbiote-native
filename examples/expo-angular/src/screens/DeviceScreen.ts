@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import {
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -68,79 +68,79 @@ function deviceTypeLabel(type: DeviceType | null): string {
 @Component({
   selector: 'DeviceScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="device-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Device</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Device</text>
+            <text class="hero-body">
               @symbiote-native/device — brand/model/OS constants, total memory,
               and best-effort root/jailbreak detection.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="device-info-card" class="capability-card">
-          <Text class="capability-card-title">Device info</Text>
-          <View testID="device-is-device" class="capability-row">
-            <Text class="capability-label">Is device</Text>
-            <Text class="value-text">{{ isDevice ? 'Yes' : 'No' }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Brand</Text>
-            <Text class="value-text">{{ brand ?? 'unknown' }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Manufacturer</Text>
-            <Text class="value-text">{{ manufacturer ?? 'unknown' }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Model</Text>
-            <Text class="value-text">{{ modelName ?? 'unknown' }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Device type</Text>
-            <Text class="value-text">{{ staticDeviceTypeLabel }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">OS</Text>
-            <Text class="value-text"
-              >{{ osName ?? 'unknown' }} {{ osVersion ?? '' }}</Text
+        <view testID="device-info-card" class="capability-card">
+          <text class="capability-card-title">Device info</text>
+          <view testID="device-is-device" class="capability-row">
+            <text class="capability-label">Is device</text>
+            <text class="value-text">{{ isDevice ? 'Yes' : 'No' }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Brand</text>
+            <text class="value-text">{{ brand ?? 'unknown' }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Manufacturer</text>
+            <text class="value-text">{{ manufacturer ?? 'unknown' }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Model</text>
+            <text class="value-text">{{ modelName ?? 'unknown' }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Device type</text>
+            <text class="value-text">{{ staticDeviceTypeLabel }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">OS</text>
+            <text class="value-text"
+              >{{ osName ?? 'unknown' }} {{ osVersion ?? '' }}</text
             >
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Total memory</Text>
-            <Text class="value-text">{{ totalMemoryLabel }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Device name</Text>
-            <Text class="value-text">{{ deviceName ?? 'unknown' }}</Text>
-          </View>
-        </View>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Total memory</text>
+            <text class="value-text">{{ totalMemoryLabel }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Device name</text>
+            <text class="value-text">{{ deviceName ?? 'unknown' }}</text>
+          </view>
+        </view>
 
-        <View testID="device-checks-card" class="capability-card">
-          <Text class="capability-card-title">Live checks</Text>
+        <view testID="device-checks-card" class="capability-card">
+          <text class="capability-card-title">Live checks</text>
           <ActionButton
             testID="device-get-type-button"
             title="Get device type"
             (press)="handleGetDeviceType()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="device-type-result" class="value-text">{{
+          <text testID="device-type-result" class="value-text">{{
             deviceTypeResultLabel()
-          }}</Text>
+          }}</text>
 
           <ActionButton
             testID="device-get-uptime-button"
@@ -148,9 +148,9 @@ function deviceTypeLabel(type: DeviceType | null): string {
             (press)="handleGetUptime()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="device-uptime-result" class="value-text">{{
+          <text testID="device-uptime-result" class="value-text">{{
             uptimeResultLabel()
-          }}</Text>
+          }}</text>
 
           <ActionButton
             testID="device-check-rooted-button"
@@ -158,11 +158,11 @@ function deviceTypeLabel(type: DeviceType | null): string {
             (press)="handleCheckRooted()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="device-rooted-result" class="value-text">{{
+          <text testID="device-rooted-result" class="value-text">{{
             isRootedResultLabel()
-          }}</Text>
-        </View>
-      </ScrollView>
+          }}</text>
+        </view>
+      </scroll-view>
     </safe-area-view>
   `,
 })

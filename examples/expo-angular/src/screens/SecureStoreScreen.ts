@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import {
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   TextInputElement,
   View,
@@ -38,75 +38,75 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   imports: [
     ActionButton,
     SafeAreaViewElement,
-    ScrollView,
+    ScrollViewElement,
     Text,
     TextInputElement,
     View,
   ],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="secure-store-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Secure Store</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Secure Store</text>
+            <text class="hero-body">
               @symbiote-native/secure-store — encrypted key/value storage in the
               iOS Keychain and the Android Keystore. Save a value, kill the app,
               relaunch, and read it back.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="secure-store-capability-card" class="secure-store-card">
-          <Text class="secure-store-card-title">Capabilities</Text>
-          <View testID="secure-store-available" class="secure-store-row">
-            <Text class="secure-store-row-label">Available</Text>
-            <View [class]="statusBadgeClass(isAvailable())">
-              <Text class="secure-store-status-text">{{
+        <view testID="secure-store-capability-card" class="secure-store-card">
+          <text class="secure-store-card-title">Capabilities</text>
+          <view testID="secure-store-available" class="secure-store-row">
+            <text class="secure-store-row-label">Available</text>
+            <view [class]="statusBadgeClass(isAvailable())">
+              <text class="secure-store-status-text">{{
                 statusLabel(isAvailable())
-              }}</Text>
-            </View>
-          </View>
-          <View testID="secure-store-biometrics" class="secure-store-row">
-            <Text class="secure-store-row-label">Biometrics usable</Text>
-            <View [class]="statusBadgeClass(canUseBiometrics())">
-              <Text class="secure-store-status-text">{{
+              }}</text>
+            </view>
+          </view>
+          <view testID="secure-store-biometrics" class="secure-store-row">
+            <text class="secure-store-row-label">Biometrics usable</text>
+            <view [class]="statusBadgeClass(canUseBiometrics())">
+              <text class="secure-store-status-text">{{
                 statusLabel(canUseBiometrics())
-              }}</Text>
-            </View>
-          </View>
-        </View>
+              }}</text>
+            </view>
+          </view>
+        </view>
 
-        <View testID="secure-store-value-card" class="secure-store-card">
-          <Text class="secure-store-card-title">Stored value</Text>
-          <View class="secure-store-row">
-            <Text class="secure-store-row-label">{{ demoKey }}</Text>
-            <Text testID="secure-store-value" class="secure-store-value-text">{{
+        <view testID="secure-store-value-card" class="secure-store-card">
+          <text class="secure-store-card-title">Stored value</text>
+          <view class="secure-store-row">
+            <text class="secure-store-row-label">{{ demoKey }}</text>
+            <text testID="secure-store-value" class="secure-store-value-text">{{
               valueLabel()
-            }}</Text>
-          </View>
-          <View class="secure-store-row">
-            <Text class="secure-store-row-label">Last result</Text>
-            <Text
+            }}</text>
+          </view>
+          <view class="secure-store-row">
+            <text class="secure-store-row-label">Last result</text>
+            <text
               testID="secure-store-result"
               class="secure-store-value-text"
-              >{{ lastResult() }}</Text
+              >{{ lastResult() }}</text
             >
-          </View>
-        </View>
+          </view>
+        </view>
 
-        <View testID="secure-store-write-card" class="secure-store-card">
-          <Text class="secure-store-card-title">Write, read, delete</Text>
+        <view testID="secure-store-write-card" class="secure-store-card">
+          <text class="secure-store-card-title">Write, read, delete</text>
           <text-input
             testID="secure-store-input"
             [value]="inputText()"
@@ -139,8 +139,8 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
             (press)="handleDelete()"
             [color]="lineColor"
           ></ActionButton>
-        </View>
-      </ScrollView>
+        </view>
+      </scroll-view>
     </safe-area-view>
   `,
 })

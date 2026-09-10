@@ -12,11 +12,11 @@ import { ActionButton } from './ActionButton';
   standalone: true,
   imports: [ActionButton, Text, View],
   template: `
-    <View class="pg-row">
-      <Text testID="pg-counter-readout" class="info-text">{{
+    <view class="pg-row">
+      <text testID="pg-counter-readout" class="info-text">{{
         label() + ': ' + count() + ' (step ' + step() + ')'
-      }}</Text>
-      <View class="row">
+      }}</text>
+      <view class="row">
         <ActionButton
           testID="pg-counter-dec"
           title="-"
@@ -29,8 +29,8 @@ import { ActionButton } from './ActionButton';
           color="#5ec8f2"
           (press)="increment()"
         ></ActionButton>
-      </View>
-    </View>
+      </view>
+    </view>
   `,
 })
 export class PlaygroundCounterChild {

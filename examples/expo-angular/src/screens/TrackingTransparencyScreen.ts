@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import {
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -23,49 +23,49 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 @Component({
   selector: 'TrackingTransparencyScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="tracking-transparency-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Tracking Transparency</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Tracking Transparency</text>
+            <text class="hero-body">
               @symbiote-native/tracking-transparency — App Tracking Transparency
               permission (iOS-only; Android/web always resolve granted) plus the
               advertising ID.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View
+        <view
           testID="tracking-transparency-permission-card"
           class="capability-card"
         >
-          <Text class="capability-card-title">Permission</Text>
-          <View class="capability-row">
-            <Text class="capability-label">Status</Text>
-            <Text testID="tracking-transparency-status" class="value-text">{{
+          <text class="capability-card-title">Permission</text>
+          <view class="capability-row">
+            <text class="capability-label">Status</text>
+            <text testID="tracking-transparency-status" class="value-text">{{
               statusLabel()
-            }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Granted</Text>
-            <Text testID="tracking-transparency-granted" class="value-text">{{
+            }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Granted</text>
+            <text testID="tracking-transparency-granted" class="value-text">{{
               grantedLabel()
-            }}</Text>
-          </View>
-          <View class="button-row">
+            }}</text>
+          </view>
+          <view class="button-row">
             <ActionButton
               testID="tracking-transparency-get-button"
               title="Get"
@@ -78,24 +78,24 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
               [color]="lineColor"
               (press)="handleRequest()"
             ></ActionButton>
-          </View>
-        </View>
+          </view>
+        </view>
 
-        <View
+        <view
           testID="tracking-transparency-advertising-id-card"
           class="capability-card"
         >
-          <Text class="capability-card-title">Advertising ID</Text>
-          <View class="capability-row">
-            <Text class="capability-label">getAdvertisingId()</Text>
-            <Text
+          <text class="capability-card-title">Advertising ID</text>
+          <view class="capability-row">
+            <text class="capability-label">getAdvertisingId()</text>
+            <text
               testID="tracking-transparency-advertising-id"
               class="value-text"
-              >{{ advertisingIdLabel() }}</Text
+              >{{ advertisingIdLabel() }}</text
             >
-          </View>
-        </View>
-      </ScrollView>
+          </view>
+        </view>
+      </scroll-view>
     </safe-area-view>
   `,
 })

@@ -24,37 +24,37 @@ import './RefApiDemo.css';
   standalone: true,
   imports: [View, Text, ButtonElement],
   template: `
-    <View class="section-nested">
-      <Text class="section-label"
-        >Imperative ref · measure / setNativeProps / findNodeHandle</Text
+    <view class="section-nested">
+      <text class="section-label"
+        >Imperative ref · measure / setNativeProps / findNodeHandle</text
       >
-      <View #boxRef testID="ref-box" class="ref-box">
-        <Text testID="ref-tag" class="ref-box-text">{{
+      <view #boxRef testID="ref-box" class="ref-box">
+        <text testID="ref-tag" class="ref-box-text">{{
           'native tag ' + (tag ?? '—')
-        }}</Text>
-      </View>
-      <Text testID="measure-frame" class="info-text">{{
+        }}</text>
+      </view>
+      <text testID="measure-frame" class="info-text">{{
         'frame: ' + frame
-      }}</Text>
-      <View class="row">
-        <View class="flex-1">
+      }}</text>
+      <view class="row">
+        <view class="flex-1">
           <button
             testID="measure-btn"
             title="Measure"
             (press)="onMeasure()"
             color="#dd0031"
           ></button>
-        </View>
-        <View class="flex-1">
+        </view>
+        <view class="flex-1">
           <button
             testID="flash-btn"
             title="Flash (setNativeProps)"
             (press)="onFlash()"
             color="#f6ad55"
           ></button>
-        </View>
-      </View>
-    </View>
+        </view>
+      </view>
+    </view>
   `,
 })
 export class RefApiDemo implements AfterViewInit {

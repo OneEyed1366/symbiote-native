@@ -27,29 +27,29 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
   imports: [ActionButton, SafeAreaViewElement, Text, TextInputElement, View],
   template: `
     <safe-area-view class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">DL</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Deep linking</Text>
-            <Text class="hero-body">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">DL</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Deep linking</text>
+            <text class="hero-body">
               A typed URL resolved to a route through resolveRouteFromUrl, the
               same path a real deep link or push notification would take.
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">
+            </text>
+          </view>
+        </view>
+        <text class="info-text">
           prefixes: symbiotecanaryangular:// ·
           https://canary-angular.symbiote-native.dev
-        </Text>
-        <Text class="note-text"
+        </text>
+        <text class="note-text"
           >Details → details/:id · HeaderOptions → header-options · TabsDemo →
-          tabs</Text
+          tabs</text
         >
         <text-input
           testID="deep-link-input"
@@ -64,12 +64,12 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           (press)="onResolve()"
           [color]="lineColorRouting"
         ></ActionButton>
-        <View class="parity-list">
-          <Text testID="deep-link-result" class="list-row-text">{{
+        <view class="parity-list">
+          <text testID="deep-link-result" class="list-row-text">{{
             resultText()
-          }}</Text>
-        </View>
-      </View>
+          }}</text>
+        </view>
+      </view>
     </safe-area-view>
   `,
 })

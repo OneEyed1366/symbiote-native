@@ -22,24 +22,24 @@ import './AccessibilityDemo.css';
   standalone: true,
   imports: [View, Text, SymbioteHostPropsDirective],
   template: `
-    <View class="section-nested">
-      <Text class="section-label"
+    <view class="section-nested">
+      <text class="section-label"
         >Accessibility · props → native · aria/role transform ·
-        AccessibilityInfo</Text
+        AccessibilityInfo</text
       >
-      <Text testID="a11y-screen-reader" class="info-text">{{
+      <text testID="a11y-screen-reader" class="info-text">{{
         'screen reader: ' + screenReader
-      }}</Text>
-      <View [symbioteHostProps]="canonicalLabelProps" class="a11y-card">
-        <Text class="info-text">canonical label + role=header</Text>
-      </View>
-      <View [symbioteHostProps]="ariaLabelProps" class="a11y-card">
-        <Text class="info-text">aria-label + role=button</Text>
-      </View>
-      <View [symbioteHostProps]="stateProps" class="a11y-card">
-        <Text class="info-text">state: disabled + selected</Text>
-      </View>
-    </View>
+      }}</text>
+      <view [symbioteHostProps]="canonicalLabelProps" class="a11y-card">
+        <text class="info-text">canonical label + role=header</text>
+      </view>
+      <view [symbioteHostProps]="ariaLabelProps" class="a11y-card">
+        <text class="info-text">aria-label + role=button</text>
+      </view>
+      <view [symbioteHostProps]="stateProps" class="a11y-card">
+        <text class="info-text">state: disabled + selected</text>
+      </view>
+    </view>
   `,
 })
 export class AccessibilityDemo implements OnInit {

@@ -32,16 +32,16 @@ const TAP_KEY = 'symbiote.tapCount';
   standalone: true,
   imports: [View, Text, ButtonElement, ImageElement],
   template: `
-    <View class="section-nested">
-      <Text class="section-label"
-        >Runtime modules · I18nManager / Settings / Image statics</Text
+    <view class="section-nested">
+      <text class="section-label"
+        >Runtime modules · I18nManager / Settings / Image statics</text
       >
-      <Text testID="rtl-status" class="info-text">{{
+      <text testID="rtl-status" class="info-text">{{
         'RTL: ' +
           (rtl.isRTL ? 'on' : 'off') +
           ' · swap L/R: ' +
           (rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no')
-      }}</Text>
+      }}</text>
       <button
         testID="force-rtl-btn"
         [title]="
@@ -51,9 +51,9 @@ const TAP_KEY = 'symbiote.tapCount';
         color="#dd0031"
       ></button>
 
-      <Text testID="persist-count" class="info-text">{{
+      <text testID="persist-count" class="info-text">{{
         'persisted taps: ' + persisted + ' · survives relaunch'
-      }}</Text>
+      }}</text>
       <button
         testID="persist-btn"
         title="Persist a tap"
@@ -61,22 +61,22 @@ const TAP_KEY = 'symbiote.tapCount';
         color="#dd0031"
       ></button>
 
-      <View class="row-align-center">
+      <view class="row-align-center">
         <image [source]="{ uri: LOGO_URI }" class="logo-thumb"></image>
-        <Text testID="logo-size" class="info-text-flex">{{
+        <text testID="logo-size" class="info-text-flex">{{
           'logo size: ' + imageSize
-        }}</Text>
-      </View>
-      <Text testID="cache-state" class="info-text">{{
+        }}</text>
+      </view>
+      <text testID="cache-state" class="info-text">{{
         'prefetch cache: ' + cacheState
-      }}</Text>
+      }}</text>
       <button
         testID="prefetch-btn"
         title="Prefetch logo"
         (press)="prefetchLogo()"
         color="#dd0031"
       ></button>
-    </View>
+    </view>
   `,
 })
 export class NativeModulesDemo implements OnInit, OnDestroy {

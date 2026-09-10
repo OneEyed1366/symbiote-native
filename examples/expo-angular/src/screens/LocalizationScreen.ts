@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import {
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -21,81 +21,81 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 @Component({
   selector: 'LocalizationScreen',
   standalone: true,
-  imports: [SafeAreaViewElement, ScrollView, Text, View],
+  imports: [SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="localization-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Localization</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Localization</text>
+            <text class="hero-body">
               @symbiote-native/localization — the device's locales and
               calendars, live-updated when the user changes their
               language/region settings.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="localization-locale-card" class="capability-card">
-          <Text class="capability-card-title">First locale</Text>
-          <View class="capability-row">
-            <Text class="capability-label">Language tag</Text>
-            <Text testID="localization-language-tag" class="value-text">{{
+        <view testID="localization-locale-card" class="capability-card">
+          <text class="capability-card-title">First locale</text>
+          <view class="capability-row">
+            <text class="capability-label">Language tag</text>
+            <text testID="localization-language-tag" class="value-text">{{
               languageTagLabel()
-            }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Currency code</Text>
-            <Text testID="localization-currency-code" class="value-text">{{
+            }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Currency code</text>
+            <text testID="localization-currency-code" class="value-text">{{
               currencyCodeLabel()
-            }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Currency symbol</Text>
-            <Text testID="localization-currency-symbol" class="value-text">{{
+            }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Currency symbol</text>
+            <text testID="localization-currency-symbol" class="value-text">{{
               currencySymbolLabel()
-            }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Text direction</Text>
-            <Text testID="localization-text-direction" class="value-text">{{
+            }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Text direction</text>
+            <text testID="localization-text-direction" class="value-text">{{
               textDirectionLabel()
-            }}</Text>
-          </View>
-        </View>
+            }}</text>
+          </view>
+        </view>
 
-        <View testID="localization-calendar-card" class="capability-card">
-          <Text class="capability-card-title">First calendar</Text>
-          <View class="capability-row">
-            <Text class="capability-label">Calendar</Text>
-            <Text testID="localization-calendar" class="value-text">{{
+        <view testID="localization-calendar-card" class="capability-card">
+          <text class="capability-card-title">First calendar</text>
+          <view class="capability-row">
+            <text class="capability-label">Calendar</text>
+            <text testID="localization-calendar" class="value-text">{{
               calendarLabel()
-            }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">24-hour clock</Text>
-            <Text testID="localization-24-hour-clock" class="value-text">{{
+            }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">24-hour clock</text>
+            <text testID="localization-24-hour-clock" class="value-text">{{
               uses24HourClockLabel()
-            }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Time zone</Text>
-            <Text testID="localization-time-zone" class="value-text">{{
+            }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Time zone</text>
+            <text testID="localization-time-zone" class="value-text">{{
               timeZoneLabel()
-            }}</Text>
-          </View>
-        </View>
-      </ScrollView>
+            }}</text>
+          </view>
+        </view>
+      </scroll-view>
     </safe-area-view>
   `,
 })

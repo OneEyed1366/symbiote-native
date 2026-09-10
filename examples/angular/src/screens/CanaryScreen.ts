@@ -27,9 +27,9 @@ import {
   PortalDirective,
   PortalOutletDirective,
   PressableElement,
-  RefreshControl,
+  RefreshControlElement,
   SafeAreaViewElement,
-  ScrollView,
+  ScrollViewElement,
   Share,
   StatusBar,
   StyleSheet,
@@ -116,10 +116,10 @@ const overlayTunnel = createTunnel();
     PortalOutletDirective,
     PressableElement,
     RefApiDemo,
-    RefreshControl,
+    RefreshControlElement,
     ResponderDemo,
     SafeAreaViewElement,
-    ScrollView,
+    ScrollViewElement,
     Slider,
     SwitchElement,
     Text,
@@ -132,130 +132,130 @@ const overlayTunnel = createTunnel();
   ],
   template: `
     <safe-area-view testID="angular-safe-area" class="screen">
-      <ScrollView
+      <scroll-view
         testID="angular-canary-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <RefreshControl
+        <refresh-control
           testID="angular-refresh-control"
           [refreshing]="refreshing"
-          (refresh)="onRefresh()"
+          [onRefresh]="onRefresh"
           tintColor="#dd0031"
         />
 
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View testID="angular-hero" class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">CN</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">All primitives</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view testID="angular-hero" class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">CN</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">All primitives</text>
+            <text class="hero-body">
               Every @symbiote-native/angular primitive, driven straight onto
               Fabric — no react-native renderer in the path.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <Text
+        <text
           testID="angular-platform"
           class="hairline-note"
           [style]="platformHairlineStyle"
         >
           {{ platformText }}
-        </Text>
-        <Text testID="angular-dimensions" class="header-note">
+        </text>
+        <text testID="angular-dimensions" class="header-note">
           {{ dimensionsText }}
-        </Text>
-        <Text testID="angular-keyboard" class="header-note">
+        </text>
+        <text testID="angular-keyboard" class="header-note">
           {{
             keyboardHeight > 0
               ? 'keyboard up · ' + keyboardHeight + 'px'
               : 'keyboard down'
           }}
-        </Text>
+        </text>
 
-        <View class="row">
-          <View class="flex-1">
+        <view class="row">
+          <view class="flex-1">
             <ActionButton
               testID="angular-status-bar-hidden-btn"
               [title]="statusBarHidden ? 'Show status bar' : 'Hide status bar'"
               (press)="toggleStatusBarHidden()"
               color="#dd0031"
             ></ActionButton>
-          </View>
-          <View class="flex-1">
+          </view>
+          <view class="flex-1">
             <ActionButton
               testID="angular-status-bar-style-btn"
               [title]="darkStatusBar ? 'Light text' : 'Dark text'"
               (press)="toggleStatusBarStyle()"
               color="#dd0031"
             ></ActionButton>
-          </View>
-        </View>
+          </view>
+        </view>
 
         @if (Platform.OS === 'android') {
-          <View class="row">
-            <View class="flex-1">
+          <view class="row">
+            <view class="flex-1">
               <ActionButton
                 testID="angular-status-bar-bg-btn"
                 [title]="statusBarRed ? 'BG default' : 'BG red'"
                 (press)="toggleStatusBarRed()"
                 color="#dd0031"
               ></ActionButton>
-            </View>
-            <View class="flex-1">
+            </view>
+            <view class="flex-1">
               <ActionButton
                 testID="angular-status-bar-translucent-btn"
                 [title]="statusBarTranslucent ? 'Opaque' : 'Translucent'"
                 (press)="toggleStatusBarTranslucent()"
                 color="#dd0031"
               ></ActionButton>
-            </View>
-          </View>
+            </view>
+          </view>
         }
 
-        <View class="row">
-          <View class="flex-1">
+        <view class="row">
+          <view class="flex-1">
             <ActionButton
               testID="angular-alert-btn"
               title="Alert"
               (press)="onAlert()"
               color="#dd0031"
             ></ActionButton>
-          </View>
+          </view>
           @if (Platform.OS !== 'android') {
-            <View class="flex-1">
+            <view class="flex-1">
               <ActionButton
                 testID="angular-action-sheet-btn"
                 title="Action sheet"
                 (press)="onActionSheet()"
                 color="#dd0031"
               ></ActionButton>
-            </View>
+            </view>
           }
-        </View>
-        <View class="row">
-          <View class="flex-1">
+        </view>
+        <view class="row">
+          <view class="flex-1">
             <ActionButton
               testID="angular-share-btn"
               title="Share"
               (press)="onShare()"
               color="#dd0031"
             ></ActionButton>
-          </View>
-          <View class="flex-1">
+          </view>
+          <view class="flex-1">
             <ActionButton
               testID="angular-vibrate-btn"
               title="Vibrate"
               (press)="onVibrate()"
               color="#dd0031"
             ></ActionButton>
-          </View>
-        </View>
+          </view>
+        </view>
         <ActionButton
           testID="angular-open-url-btn"
           title="Open angular.dev"
@@ -268,8 +268,8 @@ const overlayTunnel = createTunnel();
           class="counter-card"
           (press)="increment()"
         >
-          <Text testID="angular-counter-value" class="counter-text"
-            >tapped {{ count }}×</Text
+          <text testID="angular-counter-value" class="counter-text"
+            >tapped {{ count }}×</text
           >
         </pressable>
 
@@ -280,19 +280,19 @@ const overlayTunnel = createTunnel();
           placeholderTextColor="#6b7280"
           class="text-input"
         ></text-input>
-        <Text testID="angular-greeting-output" class="greeting">{{
+        <text testID="angular-greeting-output" class="greeting">{{
           name ? 'Hello, ' + name : 'Hello, stranger'
-        }}</Text>
+        }}</text>
 
-        <View testID="angular-switch-row" class="switch-row">
-          <Text class="switch-label">spinner</Text>
+        <view testID="angular-switch-row" class="switch-row">
+          <text class="switch-label">spinner</text>
           <switch
             testID="angular-spinner-switch"
             [(value)]="spinning"
             [trackColor]="switchTrackColor"
             thumbColor="#ffffff"
           ></switch>
-        </View>
+        </view>
         <activity-indicator
           testID="angular-spinner-indicator"
           [animating]="spinning"
@@ -300,7 +300,7 @@ const overlayTunnel = createTunnel();
           size="large"
         ></activity-indicator>
 
-        <View testID="angular-native-row" class="native-row">
+        <view testID="angular-native-row" class="native-row">
           <activity-indicator
             testID="angular-small-spinner"
             [animating]="true"
@@ -309,13 +309,13 @@ const overlayTunnel = createTunnel();
             [hidesWhenStopped]="true"
             class="spinner"
           ></activity-indicator>
-          <Text class="native-row-text">
+          <text class="native-row-text">
             host intrinsics exported from @symbiote-native/angular
-          </Text>
-        </View>
+          </text>
+        </view>
 
-        <View class="section-tight">
-          <Text class="switch-label">volume · {{ volumePercent }}%</Text>
+        <view class="section-tight">
+          <text class="switch-label">volume · {{ volumePercent }}%</text>
           <Slider
             testID="angular-volume-slider"
             [(value)]="volume"
@@ -327,7 +327,7 @@ const overlayTunnel = createTunnel();
             thumbTintColor="#ffffff"
             class="slider"
           />
-        </View>
+        </view>
 
         <AnimatedDemo></AnimatedDemo>
         <AnimatedParityDemo></AnimatedParityDemo>
@@ -345,10 +345,10 @@ const overlayTunnel = createTunnel();
           [style]="pressableStyle"
           accessibilityLabel="Angular pressable counter"
         >
-          <Text class="pressable-label">press me (also +1)</Text>
+          <text class="pressable-label">press me (also +1)</text>
         </pressable>
 
-        <Text class="section-label"> FlatList · 24 chips, windowed </Text>
+        <text class="section-label"> FlatList · 24 chips, windowed </text>
         <FlatList
           testID="angular-chips-list"
           [horizontal]="true"
@@ -358,9 +358,9 @@ const overlayTunnel = createTunnel();
           class="chip-list"
         >
           <ng-template vListItem let-item>
-            <View class="chip-card" [style]="chipStyle(item)">
-              <Text class="chip-number">{{ chipIndex(item) }}</Text>
-            </View>
+            <view class="chip-card" [style]="chipStyle(item)">
+              <text class="chip-number">{{ chipIndex(item) }}</text>
+            </view>
           </ng-template>
         </FlatList>
 
@@ -375,12 +375,12 @@ const overlayTunnel = createTunnel();
           (pressMove)="onRetentionMove($event)"
           [style]="retentionStyle"
         >
-          <Text testID="angular-retention-readout" class="info-text">
+          <text testID="angular-retention-readout" class="info-text">
             drag me · dx {{ retentionMove.dx }} · dy {{ retentionMove.dy }}
-          </Text>
+          </text>
         </pressable>
 
-        <Text class="section-label">MVCP · prepend without jump</Text>
+        <text class="section-label">MVCP · prepend without jump</text>
         <FlatList
           testID="angular-mvcp-list"
           [data]="mvcpItems"
@@ -389,9 +389,9 @@ const overlayTunnel = createTunnel();
           class="box-list160"
         >
           <ng-template vListItem let-item>
-            <View class="mvcp-row">
-              <Text class="list-row-text">{{ mvcpLabel(item) }}</Text>
-            </View>
+            <view class="mvcp-row">
+              <text class="list-row-text">{{ mvcpLabel(item) }}</text>
+            </view>
           </ng-template>
           <!-- This list measures its own cells (no getItemLayout), and the divider is CHROME the
                list renders BETWEEN them — so it belongs to the distance from one row to the next,
@@ -401,7 +401,7 @@ const overlayTunnel = createTunnel();
                (core/components buildOffsets). Deliberately on the MVCP list: prepend-without-jump
                is exactly where a few points of offset error show. -->
           <ng-template vListSeparator>
-            <View class="mvcp-divider" />
+            <view class="mvcp-divider" />
           </ng-template>
         </FlatList>
         <ActionButton
@@ -422,7 +422,7 @@ const overlayTunnel = createTunnel();
           class="parity-header"
           [style]="parityHeaderStyle"
         >
-          <Text class="parity-header-text">HEADER — fades as you scroll ↓</Text>
+          <text class="parity-header-text">HEADER — fades as you scroll ↓</text>
         </AnimatedView>
         <AnimatedScrollView
           testID="angular-parity-scroll-box"
@@ -430,13 +430,13 @@ const overlayTunnel = createTunnel();
           [animatedProps]="scrollAnimatedProps"
         >
           @for (i of scrollRows; track i) {
-            <View class="scroll-demo-row">
-              <Text class="list-row-text">scroll me · row {{ i }}</Text>
-            </View>
+            <view class="scroll-demo-row">
+              <text class="list-row-text">scroll me · row {{ i }}</text>
+            </view>
           }
         </AnimatedScrollView>
-        <Text class="tiny-center"
-          >↑ drag inside the box — the bar above reacts</Text
+        <text class="tiny-center"
+          >↑ drag inside the box — the bar above reacts</text
         >
         <!-- Native-driver proof for Animated.event: tap to JAM the JS thread 3s, then drag
             the box above DURING the freeze. If the bar keeps fading/lifting while JS is frozen,
@@ -447,35 +447,35 @@ const overlayTunnel = createTunnel();
           color="#fc8181"
           (press)="freezeJsScroll()"
         ></ActionButton>
-        <Text class="tiny-center"
+        <text class="tiny-center"
           >tap Freeze, then immediately drag the box — bar should still
-          move</Text
+          move</text
         >
 
         <!-- Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect
             is unmistakable on the dark theme. -->
-        <View class="shadow-card">
-          <Text class="note-text">boxShadow · blue glow</Text>
-        </View>
-        <View class="row">
-          <View class="filter-tile">
-            <Text class="tile-text">no filter</Text>
-          </View>
-          <View class="filter-tile filter-tile-dim">
-            <Text class="tile-text">brightness 0.5</Text>
-          </View>
-        </View>
-        <View class="rotated-card">
-          <Text class="tile-text">transformOrigin · top-left</Text>
-        </View>
+        <view class="shadow-card">
+          <text class="note-text">boxShadow · blue glow</text>
+        </view>
+        <view class="row">
+          <view class="filter-tile">
+            <text class="tile-text">no filter</text>
+          </view>
+          <view class="filter-tile filter-tile-dim">
+            <text class="tile-text">brightness 0.5</text>
+          </view>
+        </view>
+        <view class="rotated-card">
+          <text class="tile-text">transformOrigin · top-left</text>
+        </view>
 
         <!-- background-image: a CSS linear-gradient(...) authored entirely in App.css
             (.gradient-card), proving @symbiote-native/css-parser's background-image to RN's
             experimental_backgroundImage raw passthrough works end to end.
             PASS: the panel shows a red-to-orange gradient sweeping left to right. -->
-        <View class="gradient-card">
-          <Text class="tile-text">background-image · linear-gradient</Text>
-        </View>
+        <view class="gradient-card">
+          <text class="tile-text">background-image · linear-gradient</text>
+        </view>
 
         <!-- Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
             width/height→style); a screen reader reads "Angular logo" (alt→accessibilityLabel). -->
@@ -491,14 +491,14 @@ const overlayTunnel = createTunnel();
         <!-- KeyboardAvoidingView enabled toggle. PASS: with enabled ON, focusing the field
             lifts it above the keyboard AND the keyboard is the email layout (proves
             autoComplete/inputMode fold); with enabled OFF the keyboard covers the field. -->
-        <View class="switch-row">
-          <Text class="switch-label">avoid keyboard</Text>
+        <view class="switch-row">
+          <text class="switch-label">avoid keyboard</text>
           <Switch
             testID="angular-kav-switch"
             [(value)]="kavEnabled"
             [trackColor]="switchTrackColor"
           />
-        </View>
+        </view>
         <KeyboardAvoidingView
           [behavior]="Platform.OS === 'ios' ? 'padding' : 'height'"
           [enabled]="kavEnabled"
@@ -516,9 +516,9 @@ const overlayTunnel = createTunnel();
 
         <Image [src]="angularLogoUri" alt="Angular logo" class="logo-image" />
 
-        <View class="bottom-card">
-          <Text class="bottom-text">↑ you scrolled to the bottom</Text>
-        </View>
+        <view class="bottom-card">
+          <text class="bottom-text">↑ you scrolled to the bottom</text>
+        </view>
 
         <ActionButton
           testID="angular-open-modal"
@@ -533,25 +533,25 @@ const overlayTunnel = createTunnel();
           [transparent]="true"
           (requestClose)="closeModal()"
         >
-          <View class="modal-overlay">
-            <View testID="angular-modal-card" class="modal-card">
-              <Text class="modal-title">Angular Modal</Text>
-              <Text class="modal-body">
+          <view class="modal-overlay">
+            <view testID="angular-modal-card" class="modal-card">
+              <text class="modal-title">Angular Modal</text>
+              <text class="modal-body">
                 Committed through the same Fabric childSet from the Angular
                 adapter.
-              </Text>
+              </text>
               <ActionButton
                 testID="angular-close-modal"
                 title="Close"
                 (press)="closeModal()"
                 [color]="lineColorPrimitives"
               ></ActionButton>
-            </View>
-          </View>
+            </view>
+          </view>
         </Modal>
 
         <!-- createPortal: moves the toast card OUT of this scroll content and INTO the
-            overlay-host View rendered as a sibling of ScrollView below — same surface, so it
+            overlay-host View rendered as a sibling of scroll-view below — same surface, so it
             repaints on the ONE change-detection pass this tree already runs. *portal is a
             structural directive, same idiom as *ngIf: it sits directly on the content, no
             separate <ng-template>/[content] indirection. -->
@@ -562,19 +562,19 @@ const overlayTunnel = createTunnel();
           [color]="lineColorPrimitives"
         ></ActionButton>
         @if (toastVisible) {
-          <View
+          <view
             *portal="overlayHost"
             testID="angular-toast-card"
             class="modal-card"
           >
-            <Text class="modal-body">Ported via createPortal ✦</Text>
+            <text class="modal-body">Ported via createPortal ✦</text>
             <ActionButton
               testID="angular-toast-dismiss-btn"
               title="Dismiss"
               (press)="dismissToast()"
               [color]="lineColorPrimitives"
             ></ActionButton>
-          </View>
+          </view>
         }
 
         <!-- createTunnel: no ref, no target node — *tunnelIn sits directly on the content
@@ -588,19 +588,19 @@ const overlayTunnel = createTunnel();
           [color]="lineColorPrimitives"
         ></ActionButton>
         @if (tunnelToastVisible) {
-          <View
+          <view
             *tunnelIn="overlayTunnel"
             testID="angular-tunnel-toast-card"
             class="modal-card"
           >
-            <Text class="modal-body">Ported via createTunnel ✦</Text>
+            <text class="modal-body">Ported via createTunnel ✦</text>
             <ActionButton
               testID="angular-tunnel-toast-dismiss-btn"
               title="Dismiss"
               (press)="dismissTunnelToast()"
               [color]="lineColorPrimitives"
             ></ActionButton>
-          </View>
+          </view>
         }
 
         <image-background
@@ -611,26 +611,26 @@ const overlayTunnel = createTunnel();
           class="image-background"
           imageStyle="image-background-image"
         >
-          <Text testID="angular-image-bg-label" class="image-background-label">
+          <text testID="angular-image-bg-label" class="image-background-label">
             Angular children paint on top of the image
-          </Text>
+          </text>
         </image-background>
-      </ScrollView>
+      </scroll-view>
 
       <!-- The portal target: a persistent, empty View sitting above the scroll content.
           pointerEvents="box-none" lets touches pass through everywhere except an actual
-          ported child (the toast card). Rendered here — a sibling of ScrollView, same
+          ported child (the toast card). Rendered here — a sibling of scroll-view, same
           surface — so createPortal above can reach it via its exported ViewContainerRef;
           createTunnel's Out below works identically wherever it's mounted. -->
-      <View
+      <view
         testID="angular-overlay-host"
         pointerEvents="box-none"
         class="overlay-host"
       >
         <ng-container portalOutlet #overlayHost="portalOutlet"></ng-container>
         <tunnel-out [tunnel]="overlayTunnel" />
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   `,
 })
 export class CanaryScreen implements OnInit, OnDestroy {

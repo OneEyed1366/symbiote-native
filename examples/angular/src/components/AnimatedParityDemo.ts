@@ -37,35 +37,35 @@ const SCROLL_DURATION_MS = 180;
   standalone: true,
   imports: [View, Text, ButtonElement, AnimatedView],
   template: `
-    <View class="section-nested">
-      <Text class="section-label"
-        >Animated · ValueXY / tracking / diffClamp</Text
+    <view class="section-nested">
+      <text class="section-label"
+        >Animated · ValueXY / tracking / diffClamp</text
       >
 
-      <Text class="drag-hint">drag the purple box →</Text>
-      <View class="xy-frame">
+      <text class="drag-hint">drag the purple box →</text>
+      <view class="xy-frame">
         <AnimatedView
           testID="xy-box"
           [animatedProps]="panResponder.panHandlers"
           class="xy-box"
           [style]="{ transform: xy.getTranslateTransform() }"
         ></AnimatedView>
-      </View>
+      </view>
 
-      <View class="track-row">
+      <view class="track-row">
         <AnimatedView
           testID="lead-dot"
           class="lead-dot"
           [style]="{ transform: [{ translateX: lead }] }"
         ></AnimatedView>
-      </View>
-      <View class="track-row">
+      </view>
+      <view class="track-row">
         <AnimatedView
           testID="follow-dot"
           class="follow-dot"
           [style]="{ transform: [{ translateX: follow }] }"
         ></AnimatedView>
-      </View>
+      </view>
       <button
         testID="track-btn"
         title="Move target (follower chases)"
@@ -73,34 +73,34 @@ const SCROLL_DURATION_MS = 180;
         color="#dd0031"
       ></button>
 
-      <View class="collapse-frame">
+      <view class="collapse-frame">
         <AnimatedView
           testID="collapse-header"
           class="collapse-header"
           [style]="{ transform: [{ translateY: headerOffset }] }"
         >
-          <Text class="collapse-header-text">collapsing header</Text>
+          <text class="collapse-header-text">collapsing header</text>
         </AnimatedView>
-      </View>
-      <View class="row-tight">
-        <View class="flex-1">
+      </view>
+      <view class="row-tight">
+        <view class="flex-1">
           <button
             testID="scroll-down-btn"
             title="Scroll ↓"
             (press)="scrollBy(40)"
             color="#38b2ac"
           ></button>
-        </View>
-        <View class="flex-1">
+        </view>
+        <view class="flex-1">
           <button
             testID="scroll-up-btn"
             title="Scroll ↑"
             (press)="scrollBy(-40)"
             color="#38b2ac"
           ></button>
-        </View>
-      </View>
-    </View>
+        </view>
+      </view>
+    </view>
   `,
 })
 export class AnimatedParityDemo implements OnInit, OnDestroy {

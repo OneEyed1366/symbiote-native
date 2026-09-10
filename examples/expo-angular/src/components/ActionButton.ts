@@ -19,7 +19,7 @@ import { PressableElement, Text } from '@symbiote-native/angular';
       class="action-button"
       [style]="buttonStyle"
     >
-      <Text class="action-button-text" [style]="textStyle">{{ title }}</Text>
+      <text class="action-button-text" [style]="textStyle">{{ title }}</text>
     </pressable>
   `,
 })

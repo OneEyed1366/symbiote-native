@@ -107,26 +107,26 @@ export const playgroundLegacyProviders: EnvironmentProviders =
     { provide: PLAYGROUND_GREETING_TAGS, useValue: ['demo'], multi: true },
   ],
   template: `
-    <View class="pg-row">
-      <Text testID="pg-di-self" class="info-text">{{
+    <view class="pg-row">
+      <text testID="pg-di-self" class="info-text">{{
         'component scope (@Self): ' + selfGreeting
-      }}</Text>
-      <Text testID="pg-di-skipself" class="info-text">{{
+      }}</text>
+      <text testID="pg-di-skipself" class="info-text">{{
         'root scope (@SkipSelf): ' + skipSelfGreeting
-      }}</Text>
-      <Text testID="pg-di-distinct" class="info-text">{{
+      }}</text>
+      <text testID="pg-di-distinct" class="info-text">{{
         'distinct injectors: ' + (selfIsDistinctFromSkipSelf ? 'yes' : 'no')
-      }}</Text>
-      <Text testID="pg-di-optional" class="info-text">{{
+      }}</text>
+      <text testID="pg-di-optional" class="info-text">{{
         'optional, unprovided token: ' + optionalReadout
-      }}</Text>
-      <Text testID="pg-di-tags" class="info-text">{{
+      }}</text>
+      <text testID="pg-di-tags" class="info-text">{{
         'multi providers: ' + tags.join(', ')
-      }}</Text>
-      <Text testID="pg-di-injector" class="info-text">{{
+      }}</text>
+      <text testID="pg-di-injector" class="info-text">{{
         'Injector.create() + runInInjectionContext: ' + standaloneGreeting
-      }}</Text>
-    </View>
+      }}</text>
+    </view>
   `,
 })
 export class PlaygroundDiConsumer {

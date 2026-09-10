@@ -39,9 +39,9 @@ const TILE_BASE_STYLE: IViewStyle = { borderWidth: 2, borderRadius: 8 };
       [style]="innerStyle"
       (press)="toggle()"
     >
-      <Text class="rstyle-tile-text">{{
+      <text class="rstyle-tile-text">{{
         active ? tileLabel + ' · on' : tileLabel + ' · off'
-      }}</Text>
+      }}</text>
     </pressable>
   `,
 })
