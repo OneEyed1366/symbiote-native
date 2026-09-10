@@ -1,5 +1,5 @@
 import { For, createSignal, onCleanup } from 'solid-js';
-import { Platform, ScrollView } from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   BrightnessMode,
   addBrightnessListener,
@@ -122,7 +122,7 @@ export function BrightnessScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="brightness-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -222,7 +222,7 @@ export function BrightnessScreen() {
             color={lineColor}
           />
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

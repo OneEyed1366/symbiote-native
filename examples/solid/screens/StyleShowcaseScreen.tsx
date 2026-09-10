@@ -27,7 +27,7 @@
 
 import { createSignal, onCleanup, onMount } from 'solid-js';
 import type { JSX } from '@symbiote-native/solid/jsx-runtime';
-import { Animated, ScrollView } from '@symbiote-native/solid';
+import { Animated } from '@symbiote-native/solid';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -153,7 +153,7 @@ export function StyleShowcaseScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="style-showcase-scroll"
         class="screen"
         contentContainerStyle="demo-section"
@@ -598,7 +598,7 @@ export function StyleShowcaseScreen() {
             Outside the file that declares them, write literals.
           </text>
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

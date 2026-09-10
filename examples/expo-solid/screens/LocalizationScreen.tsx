@@ -1,4 +1,3 @@
-import { ScrollView } from '@symbiote-native/solid';
 import {
   createCalendars,
   createLocales,
@@ -32,7 +31,7 @@ export function LocalizationScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="localization-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -89,7 +88,7 @@ export function LocalizationScreen() {
             value={calendar().timeZone ?? 'unknown'}
           />
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

@@ -1,5 +1,4 @@
 import { createSignal } from 'solid-js';
-import { ScrollView } from '@symbiote-native/solid';
 import {
   getBackgroundColorAsync,
   setBackgroundColorAsync,
@@ -47,7 +46,7 @@ export function SystemUiScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="system-ui-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -95,7 +94,7 @@ export function SystemUiScreen() {
             color={lineColor}
           />
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

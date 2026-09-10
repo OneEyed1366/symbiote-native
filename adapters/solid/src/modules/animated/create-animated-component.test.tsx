@@ -96,8 +96,9 @@ describe('Solid createAnimatedComponent', () => {
     await tick();
 
     // View hands back the host node itself, so the caller's ref and the leaf's target coincide
-    // here; the ScrollView case (a handle carrying getScrollNode) is covered by the sticky-header
-    // suite, which drives this same wrap through scroll-view/sticky-header.tsx.
+    // here. There is no `Animated.ScrollView` any more (`modules/animated/index.ts`'s own header) —
+    // a native-driven scroll listener is `<scroll-view onScroll={Animated.event(...)}>` like any
+    // other host node's `on*` prop, resolved by `bindAnimatedEvent` with no wrap of this kind at all.
     expect(isSymbioteNode(received)).toBe(true);
     expect(isSymbioteNode(received) ? getNativeTag(received) : undefined).toBe(
       appView().tag,

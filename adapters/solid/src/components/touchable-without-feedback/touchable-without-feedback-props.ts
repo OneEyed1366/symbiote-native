@@ -13,7 +13,7 @@
 import type { IPressTimingProps } from '@symbiote-native/components';
 
 import type { JSX } from '../../jsx-runtime';
-import type { IPressableProps } from '../pressable';
+import type { IPressableProps } from '../pressable-props';
 
 export interface ITouchableWithoutFeedbackProps
   extends Omit<IPressableProps, 'style' | 'children'>, IPressTimingProps {

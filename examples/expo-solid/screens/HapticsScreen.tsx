@@ -1,5 +1,5 @@
 import { For, Show, createSignal, type Accessor } from 'solid-js';
-import { Platform, ScrollView } from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -96,7 +96,7 @@ export function HapticsScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="haptics-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -198,7 +198,7 @@ export function HapticsScreen() {
             </view>
           )}
         </Show>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

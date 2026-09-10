@@ -1,5 +1,4 @@
 import { createSignal, onCleanup } from 'solid-js';
-import { ScrollView, TextInput } from '@symbiote-native/solid';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -77,7 +76,7 @@ export function SmsScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="sms-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -119,7 +118,7 @@ export function SmsScreen() {
           <view class="feature-card-header">
             <text class="feature-card-title">Compose</text>
           </view>
-          <TextInput
+          <text-input
             testID="sms-recipients-input"
             value={recipients()}
             onValueChange={event => setRecipients(event.text)}
@@ -128,7 +127,7 @@ export function SmsScreen() {
             autoCapitalize="none"
             class="text-input"
           />
-          <TextInput
+          <text-input
             testID="sms-message-input"
             value={message()}
             onValueChange={event => setMessage(event.text)}
@@ -155,7 +154,7 @@ export function SmsScreen() {
             or cancelled.
           </text>
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

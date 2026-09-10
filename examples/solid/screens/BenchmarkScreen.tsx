@@ -38,10 +38,7 @@ import {
 import { createStore, produce } from 'solid-js/store';
 import {
   FlatList,
-  Pressable,
-  ScrollView,
   SectionList,
-  TextInput,
   type ISection,
 } from '@symbiote-native/solid';
 import {
@@ -133,7 +130,7 @@ const ROW_BATCH_LARGE = 10000;
 // below exist, so the claim can be measured instead of asserted.
 // ONE row shape, everywhere. The `plain` / `with-input` pair existed to price a single TextInput
 // as a delta inside one column; that number has been taken, so the arm now only splits every
-// future measurement in two. Ten views, not eleven: a lowered `<TextInput>` is a single native
+// future measurement in two. Ten views, not eleven: a lowered `<text-input>` is a single native
 // input, and its `value` is a prop rather than a child, so it adds no RawText.
 const NATIVE_VIEWS_PER_ROW = 10;
 // Fixed so getItemLayout is exact in virtualized mode and both modes lay rows out identically.
@@ -417,15 +414,15 @@ function BenchmarkRow(props: IBenchmarkRowProps) {
       class={props.isSelected ? 'bench-row bench-row-selected' : 'bench-row'}
     >
       <text class="bench-row-id">{String(props.row.id)}</text>
-      <Pressable class="flex1" onPress={() => props.onSelect(props.row.id)}>
+      <pressable class="flex1" onPress={() => props.onSelect(props.row.id)}>
         <text class="bench-row-label">{props.row.label}</text>
-      </Pressable>
-      <Pressable
+      </pressable>
+      <pressable
         class="bench-row-remove"
         onPress={() => props.onRemove(props.row.id)}
       >
         <text class="bench-row-remove-text">×</text>
-      </Pressable>
+      </pressable>
       {/* LAST, so the other nine views keep the positions every earlier payload diff was read at.
 
           No `multiline` — it selects a different native view. No `onChangeText` — a listener would
@@ -435,7 +432,7 @@ function BenchmarkRow(props: IBenchmarkRowProps) {
 
           `value`, not `defaultValue`: controlled is the shape that exercises the behavior's
           afterCommit handshake, which is the part lowering moved onto the node. */}
-      <TextInput class="bench-row-input" value={props.row.label} />
+      <text-input class="bench-row-input" value={props.row.label} />
     </view>
   );
 }
@@ -471,7 +468,7 @@ function StickyScrollViewBlock() {
       <text class="section-label">
         STICKY PATH A · ScrollView · stickyHeaderIndices
       </text>
-      <ScrollView
+      <scroll-view
         testID="benchmark-sticky-scroll"
         class="bench-sticky"
         stickyHeaderIndices={headerIndices}
@@ -479,7 +476,7 @@ function StickyScrollViewBlock() {
         nestedScrollEnabled
       >
         {stickyChildren}
-      </ScrollView>
+      </scroll-view>
       <text class="note-text">
         {`${STICKY_SECTION_COUNT} sections, every row mounted — no virtualization in the frame.`}
       </text>
@@ -1004,7 +1001,7 @@ export function BenchmarkScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="benchmark-scroll"
         class="screen"
         contentContainerStyle="content"
@@ -1301,7 +1298,7 @@ export function BenchmarkScreen() {
             )}
           </For>
         </Show>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

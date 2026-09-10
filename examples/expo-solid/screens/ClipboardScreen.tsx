@@ -1,5 +1,5 @@
 import { createEffect, createSignal } from 'solid-js';
-import { Platform, ScrollView, TextInput } from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   getStringAsync,
   getUrlAsync,
@@ -110,7 +110,7 @@ export function ClipboardScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="clipboard-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -156,7 +156,7 @@ export function ClipboardScreen() {
           <view class="feature-card-header">
             <text class="feature-card-title">Copy text</text>
           </view>
-          <TextInput
+          <text-input
             testID="clipboard-copy-input"
             value={inputText()}
             onValueChange={event => setInputText(event.text)}
@@ -190,7 +190,7 @@ export function ClipboardScreen() {
               label="Has URL"
               status={hasUrl()}
             />
-            <TextInput
+            <text-input
               testID="clipboard-url-input"
               value={urlText()}
               onValueChange={event => setUrlText(event.text)}
@@ -206,7 +206,7 @@ export function ClipboardScreen() {
             />
           </view>
         )}
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

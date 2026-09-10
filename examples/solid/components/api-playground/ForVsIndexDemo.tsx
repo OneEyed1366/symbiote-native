@@ -15,7 +15,6 @@
 // every row reads.
 
 import { For, Index, createSelector, createSignal } from 'solid-js';
-import { Pressable } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -56,7 +55,7 @@ export function ForVsIndexDemo() {
           // new row, and this stamp is exactly what makes that visible.
           const bornAt = pass();
           return (
-            <Pressable
+            <pressable
               class={isSelected(position()) ? 'ap-item ap-item-on' : 'ap-item'}
               testID={`for-row-${position()}`}
               onPress={() => setSelected(position())}
@@ -66,7 +65,7 @@ export function ForVsIndexDemo() {
                   {`${label} · row created on pass ${bornAt}`}
                 </text>
               )}
-            </Pressable>
+            </pressable>
           );
         }}
       </For>

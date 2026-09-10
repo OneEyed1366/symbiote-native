@@ -1,5 +1,4 @@
 import { For } from 'solid-js';
-import { Pressable, ScrollView } from '@symbiote-native/solid';
 import { useStackNavigation } from '@symbiote-native/navigation/solid';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
@@ -134,7 +133,7 @@ export function MenuScreen() {
   const navigation = useStackNavigation();
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="menu-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -153,7 +152,7 @@ export function MenuScreen() {
           {item => {
             const lineInfo = ROUTE_LINE_INFO[item.route];
             return (
-              <Pressable
+              <pressable
                 testID={`menu-row-${item.route}`}
                 class={`menu-row menu-row-${lineInfo.line}`}
                 onPress={() => navigation().push(item.route)}
@@ -173,11 +172,11 @@ export function MenuScreen() {
                     </view>
                   </>
                 )}
-              </Pressable>
+              </pressable>
             );
           }}
         </For>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

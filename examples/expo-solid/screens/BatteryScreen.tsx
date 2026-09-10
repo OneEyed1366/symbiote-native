@@ -1,5 +1,5 @@
 import { createSignal, onCleanup } from 'solid-js';
-import { Platform, ScrollView } from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   BatteryState,
   isAvailableAsync,
@@ -104,7 +104,7 @@ export function BatteryScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="battery-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -162,7 +162,7 @@ export function BatteryScreen() {
             />
           )}
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

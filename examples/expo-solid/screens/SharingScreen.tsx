@@ -1,5 +1,4 @@
 import { createSignal, onCleanup } from 'solid-js';
-import { ScrollView, TextInput } from '@symbiote-native/solid';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -70,7 +69,7 @@ export function SharingScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="sharing-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -113,7 +112,7 @@ export function SharingScreen() {
             file-system package, so supply a path that already exists on the
             device.
           </text>
-          <TextInput
+          <text-input
             testID="sharing-uri-input"
             value={fileUri()}
             onValueChange={event => setFileUri(event.text)}
@@ -135,7 +134,7 @@ export function SharingScreen() {
             </text>
           </view>
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

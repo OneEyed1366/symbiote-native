@@ -14,7 +14,7 @@
 import type { INativeFeedbackBackground } from '@symbiote-native/components';
 
 import type { JSX } from '../../jsx-runtime';
-import type { IPressableProps } from '../pressable';
+import type { IPressableProps } from '../pressable-props';
 
 export interface ITouchableNativeFeedbackProps extends Omit<
   IPressableProps,

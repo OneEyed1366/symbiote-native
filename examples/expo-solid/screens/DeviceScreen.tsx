@@ -1,5 +1,4 @@
 import { createSignal } from 'solid-js';
-import { ScrollView } from '@symbiote-native/solid';
 import {
   DeviceType,
   brand,
@@ -92,7 +91,7 @@ export function DeviceScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="device-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -164,7 +163,7 @@ export function DeviceScreen() {
             />
           )}
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

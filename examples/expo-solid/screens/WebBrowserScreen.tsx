@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js';
-import { Platform, ScrollView, TextInput } from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -113,7 +113,7 @@ export function WebBrowserScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="web-browser-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -139,7 +139,7 @@ export function WebBrowserScreen() {
           <view class="feature-card-header">
             <text class="feature-card-title">Open a url</text>
           </view>
-          <TextInput
+          <text-input
             testID="web-browser-url-input"
             value={url()}
             onValueChange={event => setUrl(event.text)}
@@ -216,7 +216,7 @@ export function WebBrowserScreen() {
             />
           </view>
         ) : null}
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

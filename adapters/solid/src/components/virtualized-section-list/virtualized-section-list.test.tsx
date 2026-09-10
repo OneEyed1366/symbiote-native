@@ -17,6 +17,7 @@ import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
+import '../../register';
 import {
   VirtualizedSectionList,
   type IVirtualizedSectionListHandle,

@@ -1,5 +1,4 @@
 import { Show, createSignal, type Accessor } from 'solid-js';
-import { ScrollView } from '@symbiote-native/solid';
 import webCrypto, {
   polyfillWebCrypto,
 } from '@symbiote-native/standard-web-crypto';
@@ -56,7 +55,7 @@ export function WebCryptoScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="web-crypto-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -110,7 +109,7 @@ export function WebCryptoScreen() {
             value={isPolyfillInstalled() ? 'Yes' : 'No'}
           />
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

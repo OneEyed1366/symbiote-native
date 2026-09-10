@@ -22,7 +22,6 @@ import {
   FlatList,
   Keyboard,
   SectionList,
-  TextInput,
   type IFlatListHandle,
   type IHostInstance,
   type ISection,
@@ -105,7 +104,7 @@ export function ParityDemo() {
       </text>
 
       {/* Keyboard.dismiss: blurs whatever input holds focus, no ref needed */}
-      <TextInput
+      <text-input
         placeholder="focus me…"
         placeholderTextColor="#41506a"
         class="parity-input"

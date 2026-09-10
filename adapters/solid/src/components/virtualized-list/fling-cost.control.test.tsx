@@ -17,6 +17,7 @@ import {
 } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
+import '../../register';
 import { VirtualizedList } from './index';
 
 const ROOT_TAG = 831;

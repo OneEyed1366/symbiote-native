@@ -12,7 +12,6 @@
 import { createSignal } from 'solid-js';
 import { ListDiagnostics } from './ListDiagnostics';
 import {
-  Pressable,
   SectionList,
   type ISectionListHandle,
 } from '@symbiote-native/solid';
@@ -56,13 +55,13 @@ export function SectionsScreen() {
   return (
     <view class="screen-body">
       <view class="toolbar">
-        <Pressable class="chip" onPress={() => setSticky(current => !current)}>
+        <pressable class="chip" onPress={() => setSticky(current => !current)}>
           {() => (
             <text class="chip-label">sticky: {sticky() ? 'on' : 'off'}</text>
           )}
-        </Pressable>
+        </pressable>
         {/* itemIndex 0 targets the section HEADER, not the first row — RN's own convention. */}
-        <Pressable
+        <pressable
           class="chip"
           onPress={() =>
             list?.scrollToLocation({
@@ -73,7 +72,7 @@ export function SectionsScreen() {
           }
         >
           {() => <text class="chip-label">Jump to D</text>}
-        </Pressable>
+        </pressable>
       </view>
 
       <ListDiagnostics />

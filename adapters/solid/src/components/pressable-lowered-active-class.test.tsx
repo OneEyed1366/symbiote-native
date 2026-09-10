@@ -1,10 +1,7 @@
-// The LOWERED twin of pressable-active-class.test.tsx, and the shape the canary actually ships.
-//
-// That file pins a REFUSED Pressable — the component path, where `host.setPressed` drives the
-// engine call itself. Nothing covered the other side: an element the transform turned into
-// `pressable`, whose press machine lives on the node. Reported from device 2026-08-31 as
-// "buttons give no visual feedback, callbacks fire", which is exactly what a machine that presses
-// without republishing the style looks like.
+// `pressable` as a tag, and the only shape left since the component was retired 2026-09-11 —
+// there is no "refused" arm any more. Reported from device 2026-08-31 as "buttons give no visual
+// feedback, callbacks fire", which is exactly what a machine that presses without republishing
+// the style looks like.
 //
 // The subject is `examples/solid/components/ActionButton` verbatim in shape — a class for the look,
 // an OBJECT style for the per-instance tint, a zero-arity child — because the two style halves are

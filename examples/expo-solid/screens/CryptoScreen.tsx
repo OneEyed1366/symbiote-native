@@ -1,5 +1,4 @@
 import { createSignal } from 'solid-js';
-import { ScrollView } from '@symbiote-native/solid';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -53,7 +52,7 @@ export function CryptoScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="crypto-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -115,7 +114,7 @@ export function CryptoScreen() {
             <ValueRow label="Bytes" value={randomBytes()!} />
           )}
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

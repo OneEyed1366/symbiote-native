@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js';
-import { Platform, ScrollView } from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   applicationId,
   applicationName,
@@ -69,7 +69,7 @@ export function ApplicationScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="application-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -170,7 +170,7 @@ export function ApplicationScreen() {
             )}
           </view>
         )}
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

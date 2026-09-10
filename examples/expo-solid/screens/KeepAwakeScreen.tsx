@@ -1,5 +1,4 @@
 import { Show, createSignal } from 'solid-js';
-import { ScrollView } from '@symbiote-native/solid';
 import { isAvailableAsync } from '@symbiote-native/keep-awake';
 import { createKeepAwake } from '@symbiote-native/keep-awake/solid';
 import { ROUTE_NAME } from '../routes';
@@ -39,7 +38,7 @@ export function KeepAwakeScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="keep-awake-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -87,7 +86,7 @@ export function KeepAwakeScreen() {
             <KeepAwakeHolder />
           </Show>
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

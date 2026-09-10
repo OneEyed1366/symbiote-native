@@ -351,8 +351,17 @@ const nodeOps: RendererOptions<IHostNode> = {
   // getFirstChild(parent) to replace text in place). Hiding a node the runtime itself inserted
   // desyncs that record from the real tree. Anchors are invisible to FABRIC — the commit walk skips
   // them — not to tree traversal.
+  //
+  // `childHost` redirected, same as the engine's own `appendChild`/`insertBefore`/`removeChild`
+  // (`hostFor`, core/engine/src/node.ts): a composed primitive's real children live on the slot it
+  // built, not on the owner it was asked to insert into, and `insert()`'s reconciliation reads this
+  // to know what is ALREADY there before deciding what to insert/move/remove. Reading the owner's
+  // own (single-child) array here would have every dynamic child on a bare `<scroll-view>` diffed
+  // against the wrong node — invisible on VirtualizedList, which never calls `insert()` on the
+  // owner directly, and wrong for any app writing `<scroll-view>{dynamicChildren}</scroll-view>`.
   getFirstChild(node) {
-    return node.children[0];
+    if (isSurface(node)) return node.children[0];
+    return (node.childHost ?? node).children[0];
   },
 
   getNextSibling(node) {

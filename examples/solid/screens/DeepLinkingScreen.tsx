@@ -8,7 +8,6 @@
 // from /solid — it is a pure function over the config, owning no reactivity to wire.
 
 import { createSignal } from 'solid-js';
-import { TextInput } from '@symbiote-native/solid';
 import { resolveRouteFromUrl } from '@symbiote-native/navigation';
 import { ActionButton } from '../components/ActionButton';
 import {
@@ -62,7 +61,7 @@ export function DeepLinkingScreen() {
           Details → details/:id · HeaderOptions → header-options · TabsDemo →
           tabs
         </text>
-        <TextInput
+        <text-input
           testID="deep-link-input"
           value={url()}
           onValueChange={event => setUrl(event.text)}

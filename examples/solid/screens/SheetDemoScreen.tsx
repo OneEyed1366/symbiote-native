@@ -4,7 +4,6 @@
 // native sheet the same way a real app would toggle it from a button. Solid twin of
 // examples/svelte/screens/SheetDemoScreen.svelte.
 
-import { ScrollView } from '@symbiote-native/solid';
 import { useStackNavigation } from '@symbiote-native/navigation/solid';
 import type { ISolidScreenOptions } from '@symbiote-native/navigation/solid';
 import { ActionButton } from '../components/ActionButton';
@@ -52,7 +51,7 @@ export function SheetDemoScreen() {
   const navigation = useStackNavigation();
 
   return (
-    <ScrollView class="screen" contentContainerStyle="demo-section">
+    <scroll-view class="screen" contentContainerStyle="demo-section">
       <view class={`line-tag line-tag-${lineInfo.line}`}>
         <text class="line-tag-text">
           {`${lineInfo.code} · ${lineInfo.label}`}
@@ -83,6 +82,6 @@ export function SheetDemoScreen() {
         onPress={() => navigation().pop()}
         color={LINE_COLOR.presentation}
       />
-    </ScrollView>
+    </scroll-view>
   );
 }

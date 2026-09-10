@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
 import { mount, unmount } from '../../render';
+import '../../register';
 import { SectionList, type ISectionListHandle } from './index';
 
 const ROOT_TAG = 823;

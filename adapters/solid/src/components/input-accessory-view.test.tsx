@@ -20,7 +20,6 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 // only this module installs it. An app reaches it through the package barrel; a test does not.
 import '../register';
 import { mount, unmount } from '../render';
-import { TextInput } from './text-input';
 // SIDE-EFFECT IMPORT, and the suite is worthless without it: `input-accessory-view` gets its
 // nativeID / backgroundColor / style mapping from a host behavior, and only `register` installs it.
 
@@ -97,7 +96,7 @@ describe('Solid InputAccessoryView on the engine', () => {
     it('keeps the nativeID <-> inputAccessoryViewID docking pair intact', async () => {
       mount(ROOT_TAG, () => (
         <view>
-          <TextInput inputAccessoryViewID={NATIVE_ID} />
+          <text-input inputAccessoryViewID={NATIVE_ID} />
           <input-accessory-view nativeID={NATIVE_ID} />
         </view>
       ));

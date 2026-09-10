@@ -1,5 +1,4 @@
 import { createSignal } from 'solid-js';
-import { ScrollView } from '@symbiote-native/solid';
 import { getAdvertisingId } from '@symbiote-native/tracking-transparency';
 import { createPermissions } from '@symbiote-native/tracking-transparency/solid';
 import { ActionButton } from '../components/ActionButton';
@@ -35,7 +34,7 @@ export function TrackingTransparencyScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="tracking-transparency-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -97,7 +96,7 @@ export function TrackingTransparencyScreen() {
           </view>
           <ValueRow label="Advertising ID" value={advertisingId() ?? 'null'} />
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

@@ -5,7 +5,6 @@ import {
   type Accessor,
   type JSX,
 } from 'solid-js';
-import { ScrollView } from '@symbiote-native/solid';
 import {
   Accelerometer,
   DeviceMotion,
@@ -182,7 +181,7 @@ export function SensorsScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="sensors-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -296,7 +295,7 @@ export function SensorsScreen() {
             )}
           </Show>
         </SensorCard>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

@@ -1,4 +1,3 @@
-import { ScrollView } from '@symbiote-native/solid';
 import {
   Orientation,
   OrientationLock,
@@ -63,7 +62,7 @@ export function ScreenOrientationScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="screen-orientation-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -121,7 +120,7 @@ export function ScreenOrientationScreen() {
             color={lineColor}
           />
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

@@ -1,5 +1,4 @@
 import { createSignal, onCleanup } from 'solid-js';
-import { ScrollView } from '@symbiote-native/solid';
 import {
   hasAction,
   isAvailableAsync,
@@ -55,7 +54,7 @@ export function StoreReviewScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="store-review-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -126,7 +125,7 @@ export function StoreReviewScreen() {
             builds. Both stores also enforce a quota.
           </text>
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

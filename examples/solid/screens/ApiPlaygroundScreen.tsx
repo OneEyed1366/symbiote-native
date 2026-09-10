@@ -14,7 +14,6 @@
 //   - `Switch`/`Match` come from solid-js, not from @symbiote-native/solid: RN's toggle component
 //     owns the `Switch` name in that barrel. ShowSwitchDemo carries the note on screen.
 
-import { ScrollView } from '@symbiote-native/solid';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 import { SignalMemoDemo } from '../components/api-playground/SignalMemoDemo';
@@ -40,7 +39,7 @@ const ACCENT = LINE_COLOR.primitives;
 export function ApiPlaygroundScreen() {
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="api-playground-scroll"
         class="screen"
         contentContainerStyle="ap-content"
@@ -73,7 +72,7 @@ export function ApiPlaygroundScreen() {
         <LifecycleDemo />
         <ContextDemo />
         <PropsUtilsDemo />
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

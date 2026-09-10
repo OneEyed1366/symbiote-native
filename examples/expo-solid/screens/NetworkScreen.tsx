@@ -1,5 +1,4 @@
 import { createEffect, createSignal } from 'solid-js';
-import { ScrollView } from '@symbiote-native/solid';
 import {
   NetworkStateType,
   getIpAddressAsync,
@@ -69,7 +68,7 @@ export function NetworkScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="network-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -145,7 +144,7 @@ export function NetworkScreen() {
             </text>
           </view>
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

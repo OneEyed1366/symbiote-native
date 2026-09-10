@@ -11,7 +11,6 @@
 // (.claude/rules/solid-descriptor-bridge.md §3).
 
 import { For } from 'solid-js';
-import { Pressable, ScrollView } from '@symbiote-native/solid';
 import { useStackNavigation } from '@symbiote-native/navigation/solid';
 import { MENU_ROWS } from '../routes';
 import { ROUTE_LINE_INFO } from '../navigation-lines';
@@ -24,7 +23,7 @@ export function MenuScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="menu-scroll"
         class="screen"
         contentContainerStyle="menu-content"
@@ -47,7 +46,7 @@ export function MenuScreen() {
             // MENU_ROWS is a module constant, so there is nothing here to keep reactive.
             const lineInfo = ROUTE_LINE_INFO[row.route];
             return (
-              <Pressable
+              <pressable
                 testID={`menu-row-${row.route}`}
                 class={`menu-row menu-row-${lineInfo.line}`}
                 onPress={() => navigation().push(row.route)}
@@ -61,11 +60,11 @@ export function MenuScreen() {
                     {row.blurb}
                   </text>
                 </view>
-              </Pressable>
+              </pressable>
             );
           }}
         </For>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

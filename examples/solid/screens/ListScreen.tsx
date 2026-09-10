@@ -12,7 +12,6 @@
 import { createSignal } from 'solid-js';
 import {
   FlatList,
-  Pressable,
   type IFlatListHandle,
 } from '@symbiote-native/solid';
 import { ListDiagnostics } from './ListDiagnostics';
@@ -60,27 +59,27 @@ export function ListScreen() {
   return (
     <view class="screen-body">
       <view class="toolbar">
-        <Pressable
+        <pressable
           class="chip"
           onPress={() => list?.scrollToOffset({ offset: 0, animated: true })}
         >
           {() => <text class="chip-label">Top</text>}
-        </Pressable>
+        </pressable>
         {/* scrollToIndex on a multi-column list resolves against ROWS, so index 10 is the 11th
             ROW — the 21st and 22nd tiles. Deliberately well inside the data: an out-of-range
             index now throws RN's invariant rather than clamping. */}
-        <Pressable
+        <pressable
           class="chip"
           onPress={() => list?.scrollToIndex({ index: 10, animated: true })}
         >
           {() => <text class="chip-label">Row 10</text>}
-        </Pressable>
-        <Pressable
+        </pressable>
+        <pressable
           class="chip"
           onPress={() => list?.scrollToEnd({ animated: true })}
         >
           {() => <text class="chip-label">End</text>}
-        </Pressable>
+        </pressable>
       </view>
 
       <view class="readout">

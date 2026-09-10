@@ -1,5 +1,5 @@
 import { Show, createSignal, onCleanup, type Accessor } from 'solid-js';
-import { Platform, ScrollView } from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   AuthenticationType,
   SecurityLevel,
@@ -157,7 +157,7 @@ export function LocalAuthScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="local-auth-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -254,7 +254,7 @@ export function LocalAuthScreen() {
             )}
           </Show>
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

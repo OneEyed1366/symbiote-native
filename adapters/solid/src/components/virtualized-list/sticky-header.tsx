@@ -1,6 +1,16 @@
 // Sticky headers — the Solid lifecycle half of the JS layer RN implements in ScrollView.js /
 // ScrollViewStickyHeader.js.
 //
+// PRIVATE TO VIRTUALIZED-LIST since 2026-09-11. It used to live under `../scroll-view` and back
+// that component's `stickyHeaderIndices` too; the tag `<scroll-view>` now honors that prop through
+// the engine's own `sticky-header` intrinsic (`core/components/src/behaviors/scroll-view/sticky.ts`)
+// with no adapter code at all — see that primitive's props header. VirtualizedList still needs its
+// OWN implementation because it hand-builds its scroll host (`shared.tsx`'s own header explains
+// why) rather than emitting the tag, so it wraps a flagged CELL itself instead of leaning on the
+// engine's per-child walk. `wrapStickyHeaders`/`IStickyWrapInputs` — the generic child-array wrapper
+// ScrollView used and this file never called — were dropped with the move; `virtualized-list/
+// shared.tsx` wraps the cell it already owns directly.
+//
 // RN does stickiness PURELY IN JS: ScrollView wraps each flagged child in a ScrollViewStickyHeader
 // fed by ONE scroll AnimatedValue, and the native scroll view ignores `stickyHeaderIndices`
 // entirely — forwarding that array to Fabric is a silent no-op, so we replicate the JS layer
@@ -36,21 +46,15 @@ import {
   AnimatedInterpolation,
   Platform,
   dlog,
-  isSymbioteNode,
   type AnimatedValue,
   type ISymbioteEvent,
 } from '@symbiote-native/engine';
 
 // The framework-agnostic sticky inputs (IStickyHeaderProps) plus Solid's own children slot — the
-// per-adapter half of <prop_types_split_agnostic_vs_per_adapter>. A custom `StickyHeaderComponent`
-// must accept this exact shape.
+// per-adapter half of <prop_types_split_agnostic_vs_per_adapter>.
 export type IStickyHeaderComponentProps = IStickyHeaderProps & {
   children?: JSX.Element;
 };
-
-export type IStickyHeaderComponentType = (
-  props: IStickyHeaderComponentProps,
-) => JSX.Element;
 
 // One sticky header. Measures its own y/height through onLayout, interpolates the shared scroll
 // offset into a translateY that pins it to the top (or the bottom, inverted) until the next header
@@ -217,55 +221,4 @@ export function ScrollViewStickyHeader(
       {props.children}
     </view>
   );
-}
-
-// How the parent ScrollView hands this file its live cross-talk state. Every field is an ACCESSOR,
-// never a value, for the reason in the module header: they are read inside the header's own
-// computations, not inside the wrap.
-export interface IStickyWrapInputs {
-  stickyHeaderIndices: number[];
-  scrollAnimatedValue: AnimatedValue;
-  readInverted: () => boolean | undefined;
-  readScrollViewHeight: () => number | undefined;
-  // The measured y of the header AFTER this one — its collision point. Reads the parent's layout
-  // version signal, so a later header measuring re-runs only the header that needs it.
-  readNextHeaderLayoutY: (indexOfIndex: number) => number | undefined;
-  StickyHeaderComponent: IStickyHeaderComponentType | undefined;
-  onHeaderLayoutY: (index: number, y: number) => void;
-}
-
-// Wrap each child flagged by `stickyHeaderIndices` in the sticky header component, fed by the shared
-// scroll AnimatedValue (RN ScrollView.js's render-time children.map). Unflagged children pass
-// through untouched.
-//
-// Cross-talk (RN's _headerLayoutYs + _onStickyHeaderLayout): each header reports its own y through
-// `onHeaderLayoutY`, and every header is fed the y of the NEXT flagged one — the point past which it
-// gets pushed off. The LAST flagged header has no successor, so its nextHeaderLayoutY stays
-// undefined and it sticks indefinitely, which is correct.
-export function wrapStickyHeaders(
-  children: readonly JSX.Element[],
-  inputs: IStickyWrapInputs,
-): JSX.Element[] {
-  const Wrapper = inputs.StickyHeaderComponent ?? ScrollViewStickyHeader;
-  return children.map((child, index) => {
-    const indexOfIndex = inputs.stickyHeaderIndices.indexOf(index);
-    // A non-node child (a bare string or number in a scroll view) has no frame to pin and cannot be
-    // wrapped meaningfully, so it passes through like an unflagged one.
-    if (indexOfIndex === -1 || !isSymbioteNode(child)) return child;
-    dlog(`Solid ScrollView sticky-header wrap index=${index}`);
-    return (
-      <Wrapper
-        nextHeaderLayoutY={inputs.readNextHeaderLayoutY(indexOfIndex)}
-        onLayout={(event: ISymbioteEvent): void => {
-          const y = readLayoutNumber(event, 'y');
-          if (y !== undefined) inputs.onHeaderLayoutY(index, y);
-        }}
-        scrollAnimatedValue={inputs.scrollAnimatedValue}
-        inverted={inputs.readInverted()}
-        scrollViewHeight={inputs.readScrollViewHeight()}
-      >
-        {child}
-      </Wrapper>
-    );
-  });
 }

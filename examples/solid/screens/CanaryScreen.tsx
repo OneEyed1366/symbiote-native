@@ -3,15 +3,16 @@
 // @symbiote-native/solid, driven straight onto Fabric; React Native's own renderer is never in the
 // path. Run with DEBUG=1 to watch each interaction commit incrementally in Metro's logs.
 //
-// SafeAreaView is the root and the ScrollView its only child, so the background paints the full
+// SafeAreaView is the root and the scroll-view tag its only child, so the background paints the full
 // screen including the status-bar strip (the inset is padding on the children, not a smaller
 // frame) and the pull-to-refresh spinner lands below the notch instead of spinning behind it.
 //
 // THREE SOLID RULES THIS FILE OBEYS, all from .claude/rules/solid-descriptor-bridge.md:
 //   §3 every control-flow component is imported explicitly — an un-imported <Show>/<For> resolves
 //      against the renderer module and reads `undefined`, which fails at RUNTIME, not at build.
-//   §4 Pressable's function child takes an ACCESSOR and is called untracked, so a signal read at
-//      the child's top level would be frozen; every state() read below sits inside the JSX.
+//   §4 a render-prop (FlatList's renderItem, VirtualizedList's) takes an ACCESSOR and is called
+//      untracked, so a signal read at the callback's top level would be frozen; every info()/
+//      item() read below sits inside the returned JSX.
 //   §4 a ternary must stay INLINE in the JSX — babel-preset-solid memoizes the condition only
 //      there. Extracting one into a helper turns a leaf update into a subtree rebuild.
 //
@@ -32,13 +33,9 @@ import {
   Modal,
   PixelRatio,
   Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
   Share,
   StatusBar,
   StyleSheet,
-  TextInput,
   Vibration,
   createColorScheme,
   createWindowDimensions,
@@ -110,6 +107,8 @@ export function CanaryScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Canary];
 
   const [count, setCount] = createSignal(0);
+  // Mirrors the pressable-card's press state — a bare `pressable` tag has no render-prop channel.
+  const [cardPressed, setCardPressed] = createSignal(false);
   const [name, setName] = createSignal('');
   const [spinning, setSpinning] = createSignal(true);
   const [volume, setVolume] = createSignal(0.5);
@@ -227,18 +226,16 @@ export function CanaryScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="canary-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing()}
-            onRefresh={onRefresh}
-            tintColor={LINE_COLOR.primitives}
-          />
-        }
       >
+        <refresh-control
+          refreshing={refreshing()}
+          onRefresh={onRefresh}
+          tintColor={LINE_COLOR.primitives}
+        />
         {/* JS->native: StatusBar renders nothing; it drives the iOS status bar (the top strip:
             clock, wi-fi, battery) imperatively from these props. */}
         <StatusBar
@@ -412,7 +409,7 @@ export function CanaryScreen() {
         </view>
 
         {/* TextInput + greeting. text-input is shared with the KAV email field below. */}
-        <TextInput
+        <text-input
           testID="greeting-input"
           value={name()}
           onValueChange={event => setName(event.text)}
@@ -498,27 +495,28 @@ export function CanaryScreen() {
         />
 
         {/* Pressable's static look lives in .pressable-card; only the press-state-dependent colors
-            stay a style function. The child takes an ACCESSOR and is called untracked (§4), so both
-            state() reads sit inside the JSX where the compiler keeps them reactive. */}
-        <Pressable
+            stay a style function. `style` still takes it directly — the engine resolves it at
+            both values of `pressed`. The child has no such channel any more (a bare tag has no
+            render-prop), so it reads a signal mirrored off onPressIn/onPressOut instead. */}
+        <pressable
           onPress={() => setCount(value => value + 1)}
+          onPressIn={() => setCardPressed(true)}
+          onPressOut={() => setCardPressed(false)}
           class="pressable-card"
           style={state => ({
             backgroundColor: state.pressed ? '#0b1020' : '#151c33',
             borderColor: LINE_COLOR.primitives,
           })}
         >
-          {state => (
-            <text
-              class="pressable-label"
-              style={{
-                color: state().pressed ? LINE_COLOR.primitives : '#9aa6c4',
-              }}
-            >
-              {state().pressed ? 'holding…' : 'press me (also +1)'}
-            </text>
-          )}
-        </Pressable>
+          <text
+            class="pressable-label"
+            style={{
+              color: cardPressed() ? LINE_COLOR.primitives : '#9aa6c4',
+            }}
+          >
+            {cardPressed() ? 'holding…' : 'press me (also +1)'}
+          </text>
+        </pressable>
 
         {/* Horizontal FlatList: real windowing. */}
         <text class="section-label">FlatList · 24 chips, windowed</text>
@@ -556,7 +554,7 @@ export function CanaryScreen() {
             highlighted (inside the measured rect + 80px bottom retention). Drag UP off the top:
             highlight drops. Proves measured-rect retention rather than a symmetric-radius
             approximation. The dx/dy readout tracks the move offset. */}
-        <Pressable
+        <pressable
           hitSlop={{ top: 0, bottom: 40, left: 0, right: 0 }}
           pressRetentionOffset={{ top: 0, bottom: 80, left: 0, right: 0 }}
           onPressMove={event =>
@@ -575,11 +573,11 @@ export function CanaryScreen() {
               {`drag me · dx ${retentionMove.dx} · dy ${retentionMove.dy}`}
             </text>
           )}
-        </Pressable>
+        </pressable>
 
         {/* maintainVisibleContentPosition. PASS: scroll down a bit, tap Prepend: the rows you are
             looking at DO NOT jump; new items appear above without shifting the viewport. FAIL: the
-            list jumps to the top. box-list160 is shared with the Animated.ScrollView below. */}
+            list jumps to the top. box-list160 is shared with the scroll-driven header demo below. */}
         <text class="section-label">MVCP · prepend without jump</text>
         <FlatList<IMvcpRow>
           data={mvcpItems()}
@@ -606,10 +604,11 @@ export function CanaryScreen() {
           onPress={prependRows}
         />
 
-        {/* Animated.ScrollView scroll-driven header (native driver). PASS: drag INSIDE the box
-            below (not the page): the bright bar above SMOOTHLY fades to near-invisible and lifts,
-            on the UI thread (no jank, no per-frame JS). Proves Animated.ScrollView +
-            Animated.event native attach. */}
+        {/* Scroll-driven header (native driver). PASS: drag INSIDE the box below (not the page):
+            the bright bar above SMOOTHLY fades to near-invisible and lifts, on the UI thread (no
+            jank, no per-frame JS). Proves `<scroll-view onScroll={Animated.event(...)}>` native
+            attach — no `Animated.ScrollView` wrapper needed, `bindAnimatedEvent` resolves any
+            `on*` prop on any host node. */}
         <view
           class="parity-header"
           style={{
@@ -632,7 +631,7 @@ export function CanaryScreen() {
           <text class="parity-header-text">HEADER — fades as you scroll ↓</text>
         </view>
         {/* box-list160 is shared with the MVCP FlatList above. */}
-        <Animated.ScrollView
+        <scroll-view
           class="box-list160"
           scrollEventThrottle={16}
           onScroll={Animated.event(
@@ -647,7 +646,7 @@ export function CanaryScreen() {
               </view>
             )}
           </For>
-        </Animated.ScrollView>
+        </scroll-view>
         <text class="tiny-center">
           ↑ drag inside the box — the bar above reacts
         </text>
@@ -740,7 +739,7 @@ export function CanaryScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           enabled={kavEnabled()}
         >
-          <TextInput
+          <text-input
             autoComplete="email"
             inputMode="email"
             enterKeyHint="done"
@@ -785,7 +784,7 @@ export function CanaryScreen() {
             </view>
           </view>
         </Modal>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

@@ -21,7 +21,6 @@
 import { For } from 'solid-js';
 import { Drawer } from '@symbiote-native/navigation/solid';
 import type { IDrawerScreenOptions } from '@symbiote-native/navigation/solid';
-import { Pressable } from '@symbiote-native/solid';
 import { DrawerHomeScreen } from './DrawerHomeScreen';
 import { DrawerSettingsScreen } from './DrawerSettingsScreen';
 import './DrawerDemoScreen.css';
@@ -52,7 +51,7 @@ export function DrawerDemoScreen() {
           <text class="section-label">Menu</text>
           <For each={slot().state.routes}>
             {route => (
-              <Pressable
+              <pressable
                 testID={`drawer-menu-${route.name}`}
                 class="drawer-menu-row"
                 onPress={() => slot().navigation.jumpTo(route.name)}
@@ -61,7 +60,7 @@ export function DrawerDemoScreen() {
                   {slot().descriptors[route.key]?.options.drawerLabel ??
                     route.name}
                 </text>
-              </Pressable>
+              </pressable>
             )}
           </For>
         </safe-area-view>

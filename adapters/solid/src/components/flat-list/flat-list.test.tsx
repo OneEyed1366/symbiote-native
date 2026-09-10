@@ -15,6 +15,7 @@ import type {
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import type { JSX } from '../../jsx-runtime';
 import { mount, unmount } from '../../render';
+import '../../register';
 import { FlatList, type IFlatListHandle } from './index';
 
 const ROOT_TAG = 823;

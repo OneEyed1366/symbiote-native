@@ -6,14 +6,7 @@
 // SafeAreaView above this lives in CanaryScreen.tsx, shared by all four tabs.
 
 import { createSignal } from 'solid-js';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  TextInput,
-} from '@symbiote-native/solid';
+import { KeyboardAvoidingView, Modal } from '@symbiote-native/solid';
 
 const REFRESH_MS = 1_200;
 
@@ -23,6 +16,9 @@ export function ControlsScreen() {
   const [refreshing, setRefreshing] = createSignal(false);
   const [note, setNote] = createSignal('');
   const [sheetOpen, setSheetOpen] = createSignal(false);
+  // Mirrors press state locally — a bare `pressable` tag has no render-prop channel any more
+  // (see `pressable-props.ts`'s header).
+  const [rowPressed, setRowPressed] = createSignal(false);
 
   const refresh = (): void => {
     setRefreshing(true);
@@ -31,18 +27,17 @@ export function ControlsScreen() {
 
   return (
     <KeyboardAvoidingView class="avoider" behavior="padding">
-      <ScrollView
+      <scroll-view
         class="scroll"
         contentContainerStyle="content"
         keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing()}
-            onRefresh={refresh}
-            tintColor="#7aa2e3"
-          />
-        }
       >
+        {/* A CHILD, not a prop: the scroll behavior claims it and places it per platform. */}
+        <refresh-control
+          refreshing={refreshing()}
+          onRefresh={refresh}
+          tintColor="#7aa2e3"
+        />
         <view class="card">
           {/* No hand-written resolveImageSource any more: the shared render fn resolves the asset
               inside the render accessor, which runs after bootstrapHost installed the resolver. */}
@@ -74,23 +69,21 @@ export function ControlsScreen() {
             <switch value={false} onValueChange={() => {}} />
           </view>
 
-          {/* The state arrives as an ACCESSOR, unlike React/Vue/Svelte. Calling it inside the leaf
-              is the point: this function runs once, and Solid's `insert` replaces a subtree rather
-              than diffing it (.claude/rules/solid-descriptor-bridge.md §4). */}
-          <Pressable class="row" onPress={() => setBusy(current => !current)}>
-            {state => (
-              <>
-                <text class="row-label">
-                  {state().pressed ? 'Pressed…' : 'Tap to toggle the spinner'}
-                </text>
-                {busy() ? (
-                  <activity-indicator size="small" color="#7aa2e3" />
-                ) : (
-                  <text class="row-label">off</text>
-                )}
-              </>
+          <pressable
+            class="row"
+            onPress={() => setBusy(current => !current)}
+            onPressIn={() => setRowPressed(true)}
+            onPressOut={() => setRowPressed(false)}
+          >
+            <text class="row-label">
+              {rowPressed() ? 'Pressed…' : 'Tap to toggle the spinner'}
+            </text>
+            {busy() ? (
+              <activity-indicator size="small" color="#7aa2e3" />
+            ) : (
+              <text class="row-label">off</text>
             )}
-          </Pressable>
+          </pressable>
         </view>
 
         {/* Filler, so the scroll offset is genuinely native-owned rather than a no-op. */}
@@ -109,7 +102,7 @@ export function ControlsScreen() {
             it, so the echo below proves the round trip rather than the keyboard's own display. */}
         <view class="card">
           <text class="section">TextInput</text>
-          <TextInput
+          <text-input
             class="input"
             value={note()}
             onValueChange={event => setNote(event.text)}
@@ -124,10 +117,10 @@ export function ControlsScreen() {
           </text>
         </view>
 
-        <Pressable class="card" onPress={() => setSheetOpen(true)}>
+        <pressable class="card" onPress={() => setSheetOpen(true)}>
           {() => <text class="section">Open the Modal</text>}
-        </Pressable>
-      </ScrollView>
+        </pressable>
+      </scroll-view>
 
       <Modal
         visible={sheetOpen()}
@@ -142,9 +135,9 @@ export function ControlsScreen() {
               Not a JS overlay — RCTModalHostView commits through the same
               childSet as the rest of the tree.
             </text>
-            <Pressable class="row" onPress={() => setSheetOpen(false)}>
+            <pressable class="row" onPress={() => setSheetOpen(false)}>
               {() => <text class="row-label">Close</text>}
-            </Pressable>
+            </pressable>
           </view>
         </view>
       </Modal>

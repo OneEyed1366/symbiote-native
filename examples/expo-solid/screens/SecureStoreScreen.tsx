@@ -1,5 +1,4 @@
 import { createSignal, onCleanup } from 'solid-js';
-import { ScrollView, TextInput } from '@symbiote-native/solid';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
@@ -120,7 +119,7 @@ export function SecureStoreScreen() {
 
   return (
     <safe-area-view class="screen">
-      <ScrollView
+      <scroll-view
         testID="secure-store-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
@@ -180,7 +179,7 @@ export function SecureStoreScreen() {
           <view class="feature-card-header">
             <text class="feature-card-title">Write, read, delete</text>
           </view>
-          <TextInput
+          <text-input
             testID="secure-store-input"
             value={inputText()}
             onValueChange={event => setInputText(event.text)}
@@ -213,7 +212,7 @@ export function SecureStoreScreen() {
             color={lineColor}
           />
         </view>
-      </ScrollView>
+      </scroll-view>
     </safe-area-view>
   );
 }

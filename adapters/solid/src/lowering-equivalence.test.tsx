@@ -38,8 +38,6 @@ import {
 import './register';
 import type { JSX } from './jsx-runtime';
 import { mount, unmount } from './render';
-import { Pressable } from './components/pressable';
-import { TextInput } from './components/text-input';
 
 const require_ = createRequire(import.meta.url);
 const { HOST_PRIMITIVES } = require_(
@@ -139,6 +137,15 @@ const TAG_ONLY: readonly string[] = [
   // runs below the adapter, so the component held nothing. Coverage is
   // `src/components/safe-area-view.test.tsx`, which now drives the tag.
   'SafeAreaView',
+  // Wrapperless since 2026-09-11: the press machine, the aria/focusable folds and the ripple fold
+  // all live on the engine node now. Coverage is `pressable.test.tsx` (converted to drive the tag)
+  // plus `core/components/src/behaviors/pressable.test.ts`.
+  'Pressable',
+  // Wrapperless since 2026-09-11, and it has TWO tags rather than one to begin with — see
+  // `bare-tag-intrinsic-choice.test.tsx` for the single-line/multiline pair, which this file's
+  // CASES shape (one component, one lowered) cannot express anyway. Coverage is that file plus
+  // `core/components/src/behaviors/text-input.test.ts`.
+  'TextInput',
 ];
 
 const PAIRED = Object.keys(HOST_PRIMITIVES).filter(
@@ -168,16 +175,6 @@ const CASES: Record<string, ICase> = {
     // Text is the primitive whose defaults the renderer seeds, so its absolute expectation is the
     // one that would catch `seedTextDefaults` dying — which no arm comparison could.
     expected: { ...FOLDED, ellipsizeMode: 'tail', allowFontScaling: true },
-  },
-  Pressable: {
-    component: () => <Pressable {...PROBE} />,
-    lowered: () => <pressable {...PROBE} />,
-    expected: FOLDED,
-  },
-  TextInput: {
-    component: () => <TextInput {...PROBE} />,
-    lowered: () => <text-input {...PROBE} />,
-    expected: FOLDED,
   },
 };
 

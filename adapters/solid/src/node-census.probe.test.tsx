@@ -5,7 +5,7 @@ import { describe, it } from 'vitest';
 import { createSignal, For } from 'solid-js';
 import { installFabric } from '@symbiote-native/test-utils';
 import { censusRetainedTree, readCommitProfile } from '@symbiote-native/engine';
-import { mount, unmount, Pressable } from './index';
+import { mount, unmount } from './index';
 
 const fabric = installFabric();
 const ROOT_TAG = 4244;
@@ -20,12 +20,12 @@ function Row(props: { id: number }) {
   return (
     <view class="bench-row">
       <text class="bench-row-id">{String(props.id)}</text>
-      <Pressable class="flex1" onPress={noop}>
+      <pressable class="flex1" onPress={noop}>
         <text class="bench-row-label">{`row label number ${props.id}`}</text>
-      </Pressable>
-      <Pressable class="bench-row-remove" onPress={noop}>
+      </pressable>
+      <pressable class="bench-row-remove" onPress={noop}>
         <text class="bench-row-remove-text">x</text>
-      </Pressable>
+      </pressable>
     </view>
   );
 }

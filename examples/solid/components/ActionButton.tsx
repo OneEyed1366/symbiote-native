@@ -5,8 +5,6 @@
 // NOTHING here destructures `props` — a Solid component body runs ONCE, so a destructure would
 // freeze the button at its mount-time config.
 
-import { Pressable } from '@symbiote-native/solid';
-
 interface IActionButtonProps {
   title: string;
   onPress: () => void;
@@ -16,20 +14,16 @@ interface IActionButtonProps {
 
 export function ActionButton(props: IActionButtonProps) {
   return (
-    <Pressable
+    <pressable
       testID={props.testID}
       onPress={() => props.onPress()}
       class="action-button"
-      // The pressed look, as a `style` FUNCTION of press state — RN's own idiom. It briefly lived
-      // in `.action-button:active` instead, because a functional style used to force this element
-      // to stay a component and 146 instantiation sites ride on this one definition. That
-      // constraint is GONE: `babel-lower-host-primitives` specialises the callback into
-      // `style` + `activeStyle` at build time, so the idiom and the intrinsic tag stopped being a
-      // trade-off — and pseudo-class state is now off in the parser, so the CSS route would
-      // silently paint nothing.
+      // The pressed look, as a `style` FUNCTION of press state — RN's own idiom, resolved by the
+      // engine at both values of `pressed` (`isStyleCallback`, `core/engine/src/node.ts`) whether
+      // or not anything reads press state elsewhere.
       //
-      // `props.color` is read INSIDE the callback, which is what keeps it reactive: the transform
-      // emits the body once per state, so a colour captured outside would freeze at first render.
+      // `props.color` is read INSIDE the callback, which is what keeps it reactive: the engine
+      // calls the body once per state, so a colour captured outside would freeze at first render.
       style={({ pressed }: { pressed: boolean }) => ({
         borderColor: props.color,
         opacity: pressed ? 0.6 : 1,
@@ -40,6 +34,6 @@ export function ActionButton(props: IActionButtonProps) {
           {props.title}
         </text>
       )}
-    </Pressable>
+    </pressable>
   );
 }

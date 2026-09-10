@@ -16,8 +16,8 @@ import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
+import '../../register';
 import { VirtualizedList } from './index';
-import { VirtualizedList as AndroidVirtualizedList } from './index.android';
 
 const ROOT_TAG = 819;
 const SCROLL_VIEW = 'RCTScrollView';
@@ -1299,42 +1299,16 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toHaveLength(1);
     });
 
-    // why: an Android ScrollView hosts exactly ONE child, so RN cannot place the refresh control
-    // beside the content there — AndroidSwipeRefreshLayout WRAPS the scroll host instead. The wrapper
-    // then owns the frame, so RN's splitLayoutProps routes the LAYOUT half of the style (flex,
-    // margin, size, position) onto it and leaves the VISUAL half (background, padding, border) on the
-    // inner scroll view. Dumping the whole style on one of the two collapses the wrapper to zero
-    // height or loses the app's layout.
-    it('wraps the scroll host in the Android RefreshControl and splits the style across the two', async () => {
-      mount(ROOT_TAG, () => (
-        <AndroidVirtualizedList<IRow>
-          data={DATA}
-          getItem={getItem}
-          getItemCount={getItemCount}
-          getItemLayout={getItemLayout}
-          initialNumToRender={2}
-          windowSize={1}
-          onRefresh={() => {}}
-          refreshing={false}
-          style={{ flex: 1, backgroundColor: 'red' }}
-          renderItem={info => <text>{info().item.label}</text>}
-        />
-      ));
-      await settleViewport();
-
-      const control = committed(REFRESH_CONTROL);
-      expect(
-        control.children.map(child => child.viewName),
-        'the scroll host nests INSIDE the refresh control',
-      ).toEqual([SCROLL_VIEW]);
-      expect(control.props.flex, 'the layout half rides the wrapper').toBe(1);
-      expect(control.props.backgroundColor).toBeUndefined();
-      const scroll = committed(SCROLL_VIEW).props;
-      expect(scroll.backgroundColor, 'the visual half stays inside').toBe(
-        'red',
-      );
-      expect(scroll.flex).toBeUndefined();
-    });
+    // The Android wrap-and-split-style case moved out of this file entirely (2026-09-11): since
+    // VirtualizedList no longer builds its own scroll/content pair, WHICH platform wraps the
+    // RefreshControl is decided by which `<scroll-view>` behavior is registered
+    // (`core/components/src/behaviors/scroll-view/index.{ios,android}.ts`), not by which
+    // `VirtualizedList` factory an app imports — `./index.ios` and `./index.android` now produce
+    // byte-identical output, matching Vue's and Svelte's single, unsplit `VirtualizedList`. Headless
+    // registration is locked to the iOS variant for the whole process
+    // (`core/components/src/behaviors/scroll-view/index.ts` re-exports `index.ios`, same as Metro's
+    // own platform default), so an adapter-level test importing `index.android` here would still
+    // exercise the iOS-registered behavior — it is `wrap-android.test.ts`'s subject, not this file's.
 
     // why: RN implements sticky headers PURELY IN JS — the native scroll view ignores
     // stickyHeaderIndices entirely, so forwarding the array is a silent no-op that hides a missing
