@@ -2,10 +2,17 @@
 // @symbiote-native/engine. React is a known-good driver: it proves the native pipe
 // and the shared clone-on-write engine before any non-React adapter has to.
 
-// The intrinsic-element table. Re-exported (rather than left as an ambient `.d.ts`) so a consuming
-// app's program includes it and `<View/>` resolves its props — see src/jsx.ts.
-export type { ISymbioteIntrinsicTag } from './jsx';
-export { View, Text } from './components';
+// Bare side-effect import, deliberately NOT a re-export and deliberately not beside one of the
+// same specifier: it installs the engine's host behaviors, which is what makes a bare
+// `<pressable>` / `<text-input>` / `<switch>` carry its machine. Any other shape is dropped by
+// Metro's inlineRequires in a release build — see register.ts.
+import './register';
+
+// The intrinsic-element table now reaches an app through `jsxImportSource`, not through this
+// barrel: TypeScript resolves the JSX namespace from `@symbiote-native/react/jsx-runtime` and
+// NOTHING else, so an app sets that one tsconfig line and gets the tags. What is re-exported here
+// is only the tag-name type, for code that wants to name it.
+export type { ISymbioteIntrinsicTag } from './jsx-runtime';
 export type { IViewProps, ITextProps } from './components';
 export type {
   IAccessibilityProps,
@@ -17,29 +24,47 @@ export type {
   IAccessibilityActionInfo,
 } from '@symbiote-native/components';
 export type { IResponderProps } from './utils/responder-props';
-export { Image, setImageSourceResolver } from './components/image';
+// `Image` is a TAG — `<image>` — and the name now carries only RN's STATICS
+// (`Image.getSize(...)`), an imperative API with no view. The wrapper's whole source/style
+// translation runs on the tag as the engine's `registerImageBehavior`.
+export { Image } from './modules/image';
+export { setImageSourceResolver } from '@symbiote-native/components';
+export type { IImageProps } from './components/image/image-props';
 export type {
-  IImageProps,
   IImageSource,
   IImageSourceProp,
   IResizeMode,
   IImageSize,
   IImageCacheStatus,
-} from './components/image';
-export { ImageBackground } from './components/image-background';
-export type { IImageBackgroundProps } from './components/image-background';
-export { ScrollView } from './components/scroll-view';
+} from '@symbiote-native/components';
+// `ImageBackground` is a TAG — `<image-background>` — and there is nothing to import in its place.
+// The prop type stays, for a component forwarding a bag.
+export type { IImageBackgroundProps } from './components/image-background-props';
+// `ScrollView` is a TAG — `<scroll-view>`, and `horizontal` is the SEPARATE tag
+// `<horizontal-scroll-view>` because Android scrolls the two axes with different ViewManagers.
+// The engine builds the content node, routes `contentContainerStyle` onto it, places a
+// `<refresh-control>` CHILD per platform, and pins `<sticky-header>` children. The imperative
+// scroll API needs nothing from this barrel: a `ref` hands back the engine node, and
+// `scrollTo` / `scrollToEnd` / `flashScrollIndicators` are methods ON it — which is all
+// `buildScrollViewHandle` ever delegated to.
 export type {
   IScrollViewProps,
   IScrollViewHandle,
-} from './components/scroll-view';
-export { TextInput } from './components/text-input';
+} from './components/scroll-view/scroll-view-props';
+// `TextInput` is a TAG — `<text-input>`, and `multiline` picks `text-input-multiline` underneath —
+// so there is nothing to import in its place. The controlled handshake, the focus mirror and
+// `autoFocus` all live on the engine node now; the imperative API comes from
+// `buildTextInputHandle` — imported from `@symbiote-native/components`, not re-exported here: four
+// adapters reach it that way and `tests/adapter-barrel-parity.test.ts` compares the sets.
+export type { ITextInputProps } from './components/text-input/text-input-props';
 export type {
-  ITextInputProps,
   ITextInputHandle,
-} from './components/text-input';
-export { InputAccessoryView } from './components/input-accessory-view';
-export type { IInputAccessoryViewProps } from './components/input-accessory-view';
+  ITextInputChangeEvent,
+} from '@symbiote-native/components';
+// `InputAccessoryView` is a TAG — `<input-accessory-view>` — and there is nothing to import in its
+// place. The wrapper's body was the shared host-node assembly, which the engine behavior now runs
+// on the tag itself. The prop type stays, for a component forwarding a bag.
+export type { IInputAccessoryViewProps } from './components/input-accessory-view-props';
 export { KeyboardAvoidingView } from './components/keyboard-avoiding-view';
 export type {
   IKeyboardAvoidingViewProps,
@@ -48,14 +73,27 @@ export type {
 export { StatusBar } from './modules/status-bar';
 export type { IStatusBarProps, IStatusBarStyle } from './modules/status-bar';
 
-export { Switch } from './components/switch';
-export type { ISwitchProps, ISwitchTrackColor } from './components/switch';
-export { ActivityIndicator } from './components/activity-indicator';
-export type { IActivityIndicatorProps } from './components/activity-indicator';
-export { SafeAreaView } from './components/safe-area-view';
-export type { ISafeAreaViewProps } from './components/safe-area-view';
-export { RefreshControl } from './components/refresh-control';
-export type { IRefreshControlProps } from './components/refresh-control';
+// `Switch` is a TAG — `<switch>` — and there is nothing to import in its place. The controlled
+// lifecycle its wrapper ran (the lastNativeReport mirror, the snap-back view command) lives on the
+// engine node now; the prop type stays, for a component forwarding a bag.
+export type { ISwitchProps } from './components/switch/switch-props';
+export type {
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from '@symbiote-native/components';
+// `ActivityIndicator` is a TAG — `<activity-indicator>` — and there is nothing to import in its
+// place. RN's ActivityIndicator has no statics, so the name exports nothing at all now; the prop
+// type stays, for a component forwarding a bag.
+export type { IActivityIndicatorProps } from './components/activity-indicator-props';
+// `SafeAreaView` is a TAG — `<safe-area-view>` — and there is nothing to import in its place. The
+// wrapper was a passthrough: RN does the inset math natively, and its two folds moved down (aria to
+// the engine's `fabricProps`, `id -> nativeID` to `foldHostBag`). The prop type stays, for a
+// component forwarding a bag.
+export type { ISafeAreaViewProps } from './components/safe-area-view-props';
+// `RefreshControl` is a TAG — `<refresh-control>` — and there is nothing to import in its place.
+// Its wrapper was a passthrough; the controlled-spinner handshake lives on the engine node
+// (`registerRefreshControlBehavior`). The prop type stays, for a component forwarding a bag.
+export type { IRefreshControlProps } from './components/refresh-control-props';
 export { Modal } from './components/modal';
 export type {
   IModalProps,
@@ -64,20 +102,31 @@ export type {
   IModalOrientation,
 } from './components/modal';
 
-export { Pressable } from './components/pressable';
-export type { IPressableProps, IPressState } from './components/pressable';
-export {
-  TouchableOpacity,
-  TouchableHighlight,
-  TouchableWithoutFeedback,
-} from './components/touchable';
+// `Pressable` is a TAG — `<pressable>` — and there is nothing to import in its place. Its press
+// machine lives on the engine node (`registerPressableBehavior`), which is also what let the
+// wrapper's `android_ripple` child go: RN paints the ripple on the responder itself
+// (Pressable.js:251), never on an inner view. The prop types stay, for a component forwarding a
+// bag.
+export type {
+  IPressableProps,
+  IPressState,
+} from './components/pressable/pressable-props';
+// `TouchableOpacity` and `TouchableHighlight` are TAGS too — `<touchable-opacity>` and
+// `<touchable-highlight>`. Each holds its own press machine PLUS its own feedback (the opacity
+// fade, the underlay swap), which is why they carry their own tags rather than sharing
+// `pressable`: one node may hold exactly one press machine.
 export type {
   ITouchableOpacityProps,
   ITouchableHighlightProps,
-  ITouchableWithoutFeedbackProps,
-} from './components/touchable';
-export { Button } from './components/button';
-export type { IButtonProps } from './components/button';
+} from './components/touchable/touchable-props';
+// `TouchableWithoutFeedback` is a TAG — `<touchable-without-feedback>` — and RN gives it no statics,
+// so like `Button` the name exports nothing now; only the prop type stays, for a component
+// forwarding a bag.
+export type { ITouchableWithoutFeedbackProps } from './components/touchable-without-feedback/touchable-without-feedback-props';
+// `Button` is a TAG — `<button>` — and there is nothing to import in its place. RN's Button has no
+// statics (unlike `TouchableNativeFeedback`), so the name exports nothing at all now; the
+// prop type stays, for a component forwarding a bag.
+export type { IButtonProps } from './components/button-props';
 
 export { FlatList } from './components/flat-list';
 export type { IFlatListProps, IFlatListHandle } from './components/flat-list';
@@ -285,13 +334,16 @@ export type {
 // Android-only surface (the second-platform pass): a thin JS shim over an Android Fabric view,
 // inert on iOS (no native view -> degrades to a plain container). The Android-only MODULES
 // (ToastAndroid, PermissionsAndroid, BackHandler) sit in the engine block above.
-export { TouchableNativeFeedback } from './components/touchable-native-feedback';
+// `TouchableNativeFeedback` is now RN's STATIC NAMESPACE, not a component: the element is the tag
+// `<touchable-native-feedback>`, which commits no node of its own and clones onto its single child.
+// `TouchableNativeFeedback.Ripple(…)` / `.SelectableBackground(…)` are unchanged.
+export { TouchableNativeFeedback } from '@symbiote-native/components';
 export type {
-  ITouchableNativeFeedbackProps,
   INativeFeedbackBackground,
   IThemeAttrBackground,
   IRippleBackground,
-} from './components/touchable-native-feedback';
+} from '@symbiote-native/components';
+export type { ITouchableNativeFeedbackProps } from './components/touchable-native-feedback/touchable-native-feedback-props';
 export type {
   ISymbioteEvent,
   ISymbioteNode,

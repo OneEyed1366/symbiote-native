@@ -12,9 +12,6 @@
 import { createSignal } from 'solid-js';
 import {
   FlatList,
-  Pressable,
-  Text,
-  View,
   type IFlatListHandle,
 } from '@symbiote-native/solid';
 import { ListDiagnostics } from './ListDiagnostics';
@@ -60,39 +57,39 @@ export function ListScreen() {
   };
 
   return (
-    <View class="screen-body">
-      <View class="toolbar">
-        <Pressable
+    <view class="screen-body">
+      <view class="toolbar">
+        <pressable
           class="chip"
           onPress={() => list?.scrollToOffset({ offset: 0, animated: true })}
         >
-          {() => <Text class="chip-label">Top</Text>}
-        </Pressable>
+          {() => <text class="chip-label">Top</text>}
+        </pressable>
         {/* scrollToIndex on a multi-column list resolves against ROWS, so index 10 is the 11th
             ROW — the 21st and 22nd tiles. Deliberately well inside the data: an out-of-range
             index now throws RN's invariant rather than clamping. */}
-        <Pressable
+        <pressable
           class="chip"
           onPress={() => list?.scrollToIndex({ index: 10, animated: true })}
         >
-          {() => <Text class="chip-label">Row 10</Text>}
-        </Pressable>
-        <Pressable
+          {() => <text class="chip-label">Row 10</text>}
+        </pressable>
+        <pressable
           class="chip"
           onPress={() => list?.scrollToEnd({ animated: true })}
         >
-          {() => <Text class="chip-label">End</Text>}
-        </Pressable>
-      </View>
+          {() => <text class="chip-label">End</text>}
+        </pressable>
+      </view>
 
-      <View class="readout">
-        <Text class="row-label">
+      <view class="readout">
+        <text class="row-label">
           {tiles().length} tiles · onEndReached ×{endHits()}
-        </Text>
-        <Text class="row-label">
+        </text>
+        <text class="row-label">
           visible: {visible().length === 0 ? '—' : visible().join(' ')}
-        </Text>
-      </View>
+        </text>
+      </view>
 
       <ListDiagnostics />
 
@@ -118,25 +115,25 @@ export function ListScreen() {
         refreshing={refreshing()}
         onRefresh={refresh}
         renderItem={info => (
-          <View class="tile" style={{ backgroundColor: info().item.hue }}>
-            <Text class="tile-label">{info().item.label}</Text>
-          </View>
+          <view class="tile" style={{ backgroundColor: info().item.hue }}>
+            <text class="tile-label">{info().item.label}</text>
+          </view>
         )}
         ListHeaderComponent={
-          <View class="card">
-            <Text class="section">FlatList · two columns</Text>
-            <Text class="subtitle">
+          <view class="card">
+            <text class="section">FlatList · two columns</text>
+            <text class="subtitle">
               Scroll to the bottom and the list appends another page. Pull down
               to reset it.
-            </Text>
-          </View>
+            </text>
+          </view>
         }
         ListFooterComponent={
-          <View class="footer">
-            <Text class="row-label">end of the loaded pages</Text>
-          </View>
+          <view class="footer">
+            <text class="row-label">end of the loaded pages</text>
+          </view>
         }
       />
-    </View>
+    </view>
   );
 }

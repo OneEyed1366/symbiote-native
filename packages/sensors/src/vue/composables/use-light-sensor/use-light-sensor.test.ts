@@ -57,7 +57,7 @@ function mountLightSensor(
     defineComponent({
       setup: () => {
         measurement = useLightSensor(updateIntervalMs);
-        return () => h('symbiote-text', {}, 'sensor');
+        return () => h('text', {}, 'sensor');
       },
     }),
   );

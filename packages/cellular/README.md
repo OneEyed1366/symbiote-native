@@ -156,9 +156,12 @@ onMounted(() => {
   );
 </script>
 
-<Text>{generation === null ? 'checking…' : CellularGeneration[generation]}</Text>
+<Text>{generation === null ? 'checking…' : CellularGeneration[generation]}</Text
+>
 <Text>{carrierName ?? 'checking…'}</Text>
-<Text>{permissions.status === null ? 'checking…' : permissions.status.status}</Text>
+<Text
+  >{permissions.status === null ? 'checking…' : permissions.status.status}</Text
+>
 <Button title="Request permission" onPress={() => permissions.request()} />
 ```
 
@@ -173,7 +176,9 @@ import {
 import { createPermissions } from '@symbiote-native/cellular/solid';
 
 function CellularScreen() {
-  const [generation, setGeneration] = createSignal<CellularGeneration | null>(null);
+  const [generation, setGeneration] = createSignal<CellularGeneration | null>(
+    null,
+  );
   const [carrierName, setCarrierName] = createSignal<string | null>(null);
   const { status, request: requestPermission } = createPermissions();
 
@@ -187,7 +192,9 @@ function CellularScreen() {
   return (
     <>
       <Text>
-        {generation() === null ? 'checking…' : CellularGeneration[generation()!]}
+        {generation() === null
+          ? 'checking…'
+          : CellularGeneration[generation()!]}
       </Text>
       <Text>{carrierName() ?? 'checking…'}</Text>
       <Text>{status() === null ? 'checking…' : status()!.status}</Text>

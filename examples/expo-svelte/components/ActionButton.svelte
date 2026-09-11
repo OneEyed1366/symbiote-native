@@ -4,7 +4,6 @@
   // Text line. One consistent bordered pill, tinted in the caller's own `color`, so every screen's
   // per-feature color-coding is preserved while the chrome stays consistent. Svelte twin of
   // examples/expo-vue-sfc/components/ActionButton.vue and examples/svelte's own ActionButton.
-  import { Pressable, Text } from '@symbiote-native/svelte';
 
   let {
     title,
@@ -15,11 +14,11 @@
     $props();
 </script>
 
-<Pressable
+<pressable
   {testID}
   {onPress}
   class="action-button"
   style={({ pressed }) => ({ borderColor: color, opacity: pressed ? 0.6 : 1 })}
 >
-  <Text class="action-button-text" style={{ color }}>{title}</Text>
-</Pressable>
+  <text class="action-button-text" style={{ color }}>{title}</text>
+</pressable>

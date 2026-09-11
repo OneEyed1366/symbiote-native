@@ -40,9 +40,8 @@ import {
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
-import { Pressable } from '../components/pressable';
 import { TextHost as Text, ViewHost as View } from '../primitives';
-import { TextInput } from '../components/text-input';
+import { PressableElement, TextInputElement } from '../elements';
 import { registerComposedComponent } from '../anchor-host-registry';
 
 const ROOT_TAG = 4242;
@@ -51,7 +50,10 @@ const SCREEN_PATH = 'examples/angular/src/screens/BenchmarkScreen.ts';
 // What the row shape is supposed to cost, per row, on each side of the toggle. NATIVE_VIEWS is
 // the canary row every adapter builds: 1 View + 3x(Text + RawText) + 2 press targets.
 const NATIVE_VIEWS_PER_ROW = 9;
-const COMPOSED_NODES_PER_ROW = 12;
+// Was 12 while `Pressable` was a component: the row's own host anchor plus one per Pressable.
+// `<pressable>` is a TAG since 2026-09-11 and commits a real painting node, so the only anchor left
+// is the row component's own — which is what this A/B was built to isolate in the first place.
+const COMPOSED_NODES_PER_ROW = 10;
 const FLAT_NODES_PER_ROW = 9;
 // The with-input arm's own view count: NATIVE_VIEWS_PER_ROW + one real <TextInput> — see
 // examples/angular's ROW_CONTENT.
@@ -109,52 +111,52 @@ const ROW_CLASS_SELECTED = 'bench-row bench-row-selected';
 // (`.claude/rules/fabric-boolean-event-gates.md`). Not fenced against the screen — see the `it`
 // at the end for why fencing a fixture with no literal counterpart would just go vacuous.
 const COMPOSED_ROW_TEMPLATE = `
-    <View [class]="rowClass">
-      <Text class="bench-row-id">{{ rowId }}</Text>
-      <Pressable class="flex1" (press)="select.emit(row.id)">
-        <Text class="bench-row-label">{{ row.label }}</Text>
-      </Pressable>
-      <Pressable class="bench-row-remove" (press)="remove.emit(row.id)">
-        <Text class="bench-row-remove-text">×</Text>
-      </Pressable>
-    </View>
+    <view [class]="rowClass">
+      <text class="bench-row-id">{{ rowId }}</text>
+      <pressable class="flex1" (press)="select.emit(row.id)">
+        <text class="bench-row-label">{{ row.label }}</text>
+      </pressable>
+      <pressable class="bench-row-remove" (press)="remove.emit(row.id)">
+        <text class="bench-row-remove-text">×</text>
+      </pressable>
+    </view>
   `;
 
 // THE SCREEN'S ONLY ROW as of 2026-09-01 (formerly its `ROW_CONTENT.WithInput` arm; the toggle
 // that picked between this and `COMPOSED_ROW_TEMPLATE` above is gone, and this is what stayed).
 // The one constant here still fenced against the screen — see the `it` at the end.
 const WITH_INPUT_ROW_TEMPLATE = `
-    <View [class]="rowClass">
-      <Text class="bench-row-id">{{ rowId }}</Text>
-      <Pressable class="flex1" (press)="select.emit(row.id)">
-        <Text class="bench-row-label">{{ row.label }}</Text>
-      </Pressable>
-      <Pressable class="bench-row-remove" (press)="remove.emit(row.id)">
-        <Text class="bench-row-remove-text">×</Text>
-      </Pressable>
-      <TextInput class="bench-row-input" [value]="row.label" />
-    </View>
+    <view [class]="rowClass">
+      <text class="bench-row-id">{{ rowId }}</text>
+      <pressable class="flex1" (press)="select.emit(row.id)">
+        <text class="bench-row-label">{{ row.label }}</text>
+      </pressable>
+      <pressable class="bench-row-remove" (press)="remove.emit(row.id)">
+        <text class="bench-row-remove-text">×</text>
+      </pressable>
+      <text-input class="bench-row-input" [value]="row.label"></text-input>
+    </view>
   `;
 
 // FIXTURE ONLY as of 2026-09-01, same reasoning as COMPOSED_ROW_TEMPLATE above — the screen's
 // `flat` row shape (zero composed components) is gone entirely, not merged into anything. Kept
 // for the same adapter-property tests; not fenced against the screen.
 const FLAT_ROW_TEMPLATE = `
-            <View [class]="rowClassFor(row)">
-              <Text class="bench-row-id">{{ row.id }}</Text>
-              <View class="flex1" (press)="onSelect(row.id)">
-                <Text class="bench-row-label">{{ row.label }}</Text>
-              </View>
-              <View class="bench-row-remove" (press)="onRemove(row.id)">
-                <Text class="bench-row-remove-text">×</Text>
-              </View>
-            </View>
+            <view [class]="rowClassFor(row)">
+              <text class="bench-row-id">{{ row.id }}</text>
+              <view class="flex1" (press)="onSelect(row.id)">
+                <text class="bench-row-label">{{ row.label }}</text>
+              </view>
+              <view class="bench-row-remove" (press)="onRemove(row.id)">
+                <text class="bench-row-remove-text">×</text>
+              </view>
+            </view>
 `;
 
 @Component({
   selector: 'BenchmarkRow',
   standalone: true,
-  imports: [Pressable, Text, View],
+  imports: [PressableElement, Text, View],
   template: COMPOSED_ROW_TEMPLATE,
 })
 class BenchmarkRow {
@@ -175,7 +177,7 @@ class BenchmarkRow {
 @Component({
   selector: 'BenchmarkRowWithInput',
   standalone: true,
-  imports: [Pressable, Text, TextInput, View],
+  imports: [PressableElement, Text, TextInputElement, View],
   template: WITH_INPUT_ROW_TEMPLATE,
 })
 class BenchmarkRowWithInput {
@@ -203,7 +205,7 @@ const selectedSignal = signal<number | undefined>(undefined);
   standalone: true,
   imports: [BenchmarkRow, View],
   template: `
-    <View>
+    <view>
       @for (row of rows(); track row.id) {
         <BenchmarkRow
           [row]="row"
@@ -212,7 +214,7 @@ const selectedSignal = signal<number | undefined>(undefined);
           (remove)="onRemove($event)"
         />
       }
-    </View>
+    </view>
   `,
 })
 class ComposedRowHost {
@@ -233,7 +235,7 @@ class ComposedRowHost {
   standalone: true,
   imports: [BenchmarkRowWithInput, View],
   template: `
-    <View>
+    <view>
       @for (row of rows(); track row.id) {
         <BenchmarkRowWithInput
           [row]="row"
@@ -242,7 +244,7 @@ class ComposedRowHost {
           (remove)="onRemove($event)"
         />
       }
-    </View>
+    </view>
   `,
 })
 class WithInputRowHost {
@@ -263,11 +265,11 @@ class WithInputRowHost {
   standalone: true,
   imports: [Text, View],
   template: `
-    <View>
+    <view>
       @for (row of rows(); track row.id) {
         ${FLAT_ROW_TEMPLATE}
       }
-    </View>
+    </view>
   `,
 })
 class FlatRowHost {
@@ -324,12 +326,30 @@ type ICommittedShape = {
 // negative control (a Pressable with no listener commits none of the four; one with exactly
 // `(accessibilityAction)` commits only that key) before deleting the subtraction — a green
 // comparison alone would not have told the two failure directions apart.
+// Subtracted from BOTH sides, and unlike the four above this one is not debt. RN makes a pressable
+// accessible unless the app opts out (`Pressable.js:252`), so a composed `<Pressable>` commits
+// `accessible: true` while the flat row's stand-in — a bare `<view (press)>` — correctly does not:
+// RN's View has no such default. It is the first prop on which the flat row's deliberate surrender
+// of Pressable's accessibility fold is VISIBLE, every earlier one being absent-when-unset. That the
+// composed side really does commit it is pinned by pressable.test.ts and lowering-equivalence.test.ts,
+// so subtracting it here loses no coverage. Delete this when the flat row stops standing in for a
+// Pressable.
+// `focusable` joined it 2026-09-09 for the identical reason and it is the sharper case: RN's
+// Touchable* formula (TouchableOpacity.js:336-340) needs a press handler and a non-disabled state,
+// and the composed row supplies both — while a bare `<view (press)>` has no Pressable to compute
+// anything. Same non-debt reading, same deletion condition.
+const PRESSABLE_ONLY_DEFAULTS = ['accessible', 'focusable'];
+
 function shapeOf(nodes: readonly IFakeNode[]): ICommittedShape[] {
-  return nodes.map(node => ({
-    viewName: node.viewName,
-    props: node.props,
-    children: shapeOf(node.children),
-  }));
+  return nodes.map(node => {
+    const props = { ...node.props };
+    for (const key of PRESSABLE_ONLY_DEFAULTS) delete props[key];
+    return {
+      viewName: node.viewName,
+      props,
+      children: shapeOf(node.children),
+    };
+  });
 }
 
 function viewNamesOf(nodes: readonly IFakeNode[]): string[] {
@@ -436,10 +456,6 @@ describe('benchmark row shapes', () => {
         composedFew.engineNodes - composedFew.anchors,
         composedMany.engineNodes - composedMany.anchors,
       ),
-      composedFlattens: perRow(
-        composedFew.childFlattens,
-        composedMany.childFlattens,
-      ),
       flatNodes: perRow(flatFew.engineNodes, flatMany.engineNodes),
       flatAnchors: perRow(flatFew.anchors, flatMany.anchors),
       flatRenderable: perRow(
@@ -451,25 +467,32 @@ describe('benchmark row shapes', () => {
       flatFew.childFlattens,
       flatMany.childFlattens,
     );
+    const composedFlattensPerRow = perRow(
+      composedFew.childFlattens,
+      composedMany.childFlattens,
+    );
 
     expect(measured).toEqual({
-      // The claim under test: same renderable tree, three extra retained nodes per row, and all
-      // three of them anchors - the row component's host plus one per Pressable.
+      // The claim under test: same renderable tree, ONE extra retained node per row, and it is an
+      // anchor — the row component's own host. The two Pressable anchors left with the wrapper.
       composedNodes: COMPOSED_NODES_PER_ROW,
       composedAnchors: COMPOSED_NODES_PER_ROW - FLAT_NODES_PER_ROW,
       composedRenderable: FLAT_NODES_PER_ROW,
-      // What an anchor costs the walk even though it never paints: two parents per row whose
-      // children hold one (the row's own host, and the row View holding the two Pressables), so
-      // renderableChildren's fast path is defeated and re-allocates on both.
-      composedFlattens: 2,
       flatNodes: FLAT_NODES_PER_ROW,
       flatAnchors: 0,
       flatRenderable: FLAT_NODES_PER_ROW,
     });
-    // Flat's own flatten count is not in that table because it does not scale with rows at all -
-    // the fixture's @for anchor defeats one scan whatever the row count, and the per-row delta is
-    // noise around zero. Growth is the property under test.
+    // Neither flatten count is in that table, because neither scales with rows — the fixture's
+    // @for anchor defeats one scan whatever the row count, and the per-row delta is noise around
+    // zero. Growth is the property under test, and composed no longer has any.
+    //
+    // Composed's USED to be 2/row, and both of those were Pressable's: the row View held two
+    // anchor children, so `renderableChildren` re-allocated there once per row. `<pressable>` is a
+    // tag now and paints, so the only anchor left is the row component's own host — and every
+    // row's sits under ONE parent (the list View), which flattens once per commit rather than once
+    // per row. Deleting the wrapper removed a per-row cost from the commit WALK, not just a node.
     expect(flatFlattensPerRow).toBeLessThanOrEqual(0);
+    expect(composedFlattensPerRow).toBeLessThanOrEqual(1);
   });
 
   // ROW_CONTENT.WithInput: one extra native view, and NOTHING else moves — same view names as
@@ -488,16 +511,13 @@ describe('benchmark row shapes', () => {
     expect(withInputMany.viewNames).toHaveLength(
       WITH_INPUT_VIEWS_PER_ROW * MANY_ROWS + FIXTURE_CHROME_VIEWS,
     );
-    // Engine side costs MORE than the one Fabric view: TextInput's own composed template is
-    // `@if (isMultiline) {…} @else {…}`, and (measured directly, headless, walking the engine
-    // tree of a lone <TextInput>) that costs its own host anchor PLUS one anchor per @if branch —
-    // 3 anchors total for 1 renderable native view, the same "@if reserves a structural slot
-    // whether or not it renders" cost BenchmarkRowWithInput's own comment names, just paid inside
-    // TextInput's implementation instead of this screen's. So the delta is +4 nodes / +3 anchors,
-    // not +1 — this is Angular's un-lowered TextInput being expensive on the engine side even
-    // where Fabric sees only one more view.
-    const TEXT_INPUT_ENGINE_NODES = 4;
-    const TEXT_INPUT_ANCHORS = 3;
+    // Engine side now costs exactly the one Fabric view, and the delta is the whole point of the
+    // tag migration. While `<TextInput>` was a component its template was
+    // `@if (isMultiline) {…} @else {…}`, so it cost its own host anchor PLUS one per @if branch —
+    // +4 nodes / +3 anchors for one painting view. `<text-input>` is a tag: the multiline choice is
+    // the ENGINE's (`intrinsicWhen`), there is no template and no branch, so it is +1 / +0.
+    const TEXT_INPUT_ENGINE_NODES = 1;
+    const TEXT_INPUT_ANCHORS = 0;
     expect(perRow(withInputFew.engineNodes, withInputMany.engineNodes)).toBe(
       COMPOSED_NODES_PER_ROW + TEXT_INPUT_ENGINE_NODES,
     );

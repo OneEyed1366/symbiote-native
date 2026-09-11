@@ -29,28 +29,32 @@ import {
   forkEvent,
   unforkEvent,
 } from '@symbiote-native/engine';
-import { View, Text } from '../../components';
-import { Image } from '../../components/image';
-import { ScrollView } from '../../components/scroll-view';
 import { FlatList } from '../../components/flat-list';
 import { SectionList } from '../../components/section-list';
 import { createAnimatedComponent } from './create-animated-component';
 
 export { createAnimatedComponent } from './create-animated-component';
 
-// View/Text are pure host primitives; Image is the functional renderImage wrapper, and all expose
-// their host node via ref fall-through, so wrap them eagerly.
-const AnimatedView = createAnimatedComponent(View);
-const AnimatedText = createAnimatedComponent(Text);
-const AnimatedImage = createAnimatedComponent(Image);
+// The TAGS, not components — there are no View/Text/Image components left to alias, and a string
+// base is what `createAnimatedComponent` already handles (`animated-tag-base.test.ts`): it renders
+// the intrinsic and the ref falls through to the raw engine node, the same fall-through the
+// functional wrappers used to provide.
+//
+// Wrapping is itself vestigial — the engine resolves an AnimatedNode written into any prop of any
+// host node (`core/engine/src/animated/host-binding.ts`), so `<view :style="{ opacity: v }">` needs
+// no wrapper at all. These stay as RN-compatible aliases until the namespace is retired.
+const AnimatedView = createAnimatedComponent('view');
+const AnimatedText = createAnimatedComponent('text');
+const AnimatedImage = createAnimatedComponent('image');
+// `scroll-view` is a TAG now too (no more component, no more scroll-view/sticky-header cycle to
+// dodge), so it takes the same eager shape as View/Text/Image above.
+const AnimatedScrollView = createAnimatedComponent('scroll-view');
 
-// LAZY, memoized getters, mirroring RN's `get ScrollView()`. Every scrolling container reaches
-// scroll-view/sticky-header, which imports this Animated namespace back, so a wrap at module
-// scope captures whatever the half-evaluated cycle holds at that instant. Under a bundler's ESM
-// interop that is `undefined`, not a ReferenceError - the wrapper builds fine and then renders
-// nothing. Deferring past module init is what keeps it from firing. FlatList and SectionList
-// reach ScrollView through VirtualizedList, so they sit on the same cycle and take the same shape.
-let animatedScrollView: ReturnType<typeof createAnimatedComponent> | undefined;
+// LAZY, memoized getters, mirroring RN's `get FlatList()`. Kept deferred past module init even
+// though the scroll-view cycle these once rode is gone (ScrollView above is eager now) — neither
+// FlatList nor VirtualizedList imports this module, so there is no proven cycle left, but nothing
+// forces one to stay absent either. Cheap insurance against a half-evaluated module handing back
+// `undefined` and rendering nothing.
 let animatedFlatList: ReturnType<typeof createAnimatedComponent> | undefined;
 let animatedSectionList: ReturnType<typeof createAnimatedComponent> | undefined;
 
@@ -89,10 +93,7 @@ export const Animated = {
   View: AnimatedView,
   Text: AnimatedText,
   Image: AnimatedImage,
-  get ScrollView(): ReturnType<typeof createAnimatedComponent> {
-    animatedScrollView ??= createAnimatedComponent(ScrollView);
-    return animatedScrollView;
-  },
+  ScrollView: AnimatedScrollView,
   get FlatList(): ReturnType<typeof createAnimatedComponent> {
     animatedFlatList ??= createAnimatedComponent(FlatList);
     return animatedFlatList;

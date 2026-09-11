@@ -8,7 +8,7 @@
 -->
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { View, Text, AccessibilityInfo } from '@symbiote-native/vue';
+import { AccessibilityInfo } from '@symbiote-native/vue';
 
 const screenReader = ref('querying…');
 
@@ -27,40 +27,40 @@ onMounted(() => {
 </script>
 
 <template>
-  <View class="section-nested">
-    <Text class="section-label"
+  <view class="section-nested">
+    <text class="section-label"
       >Accessibility · props → native · aria/role transform ·
-      AccessibilityInfo</Text
+      AccessibilityInfo</text
     >
     <!-- getter readout: 'off' (no screen reader) proves the module resolved -->
-    <Text class="info-text">{{ `screen reader: ${screenReader}` }}</Text>
+    <text class="info-text">{{ `screen reader: ${screenReader}` }}</text>
     <!-- canonical accessibility*: content-desc 'a11y-canonical-label' + role=header -->
-    <View
+    <view
       :accessible="true"
       accessibility-role="header"
       accessibility-label="a11y-canonical-label"
       class="a11y-card"
     >
-      <Text class="info-text">canonical label + role=header</Text>
-    </View>
+      <text class="info-text">canonical label + role=header</text>
+    </view>
     <!-- web aria and role aliases MUST fold: content-desc should be
          'a11y-aria-label', a raw aria-label attribute must not reach the native node -->
-    <View
+    <view
       :accessible="true"
       role="button"
       aria-label="a11y-aria-label"
       class="a11y-card"
     >
-      <Text class="info-text">aria-label + role=button</Text>
-    </View>
+      <text class="info-text">aria-label + role=button</text>
+    </view>
     <!-- accessibilityState: uiautomator shows enabled=false / selected=true -->
-    <View
+    <view
       :accessible="true"
       accessibility-label="a11y-state"
       :accessibility-state="{ disabled: true, selected: true }"
       class="a11y-card"
     >
-      <Text class="info-text">state: disabled + selected</Text>
-    </View>
-  </View>
+      <text class="info-text">state: disabled + selected</text>
+    </view>
+  </view>
 </template>

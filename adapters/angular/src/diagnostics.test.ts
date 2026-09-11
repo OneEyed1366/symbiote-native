@@ -32,7 +32,7 @@ Component({
   selector: 'symbiote-counter-test',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-view [testID]="label()"></symbiote-view>`,
+  template: `<view [testID]="label()"></view>`,
 })(CounterApp);
 
 beforeEach(() => {

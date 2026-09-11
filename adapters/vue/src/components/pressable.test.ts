@@ -1,9 +1,13 @@
-// Vue lifecycle coverage for the shared Pressable machine. Core tests own timing and transition
-// semantics; this proves Vue's setup-scope runtime is disposed by onUnmounted rather than letting a
-// delayed callback write into a dead ref/emitter.
+// Vue TEARDOWN coverage for the shared Pressable machine. Core tests own timing and transition
+// semantics; this proves an armed `unstable_pressDelay` timer dies with the surface rather than
+// firing a callback into a torn-down tree.
+//
+// It used to prove the wrapper's `onUnmounted(disposePressRuntime)`. The wrapper is gone —
+// `<pressable>` is a tag and the machine lives on the engine node — so the same assertion now
+// covers the engine's own behavior sweep, which is the layer that has to hold it for every adapter.
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, Pressable, unmount } from '@symbiote-native/vue';
+import { mount, unmount } from '@symbiote-native/vue';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 518;
@@ -40,7 +44,7 @@ describe('Vue Pressable lifecycle', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(Pressable, {
+          h('pressable', {
             unstable_pressDelay: PRESS_DELAY_MS,
             onPressIn: () => {
               pressIns++;

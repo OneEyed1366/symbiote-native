@@ -68,3 +68,25 @@ So when a canary looks broken, rank the hypotheses in this order:
 3. Is the adapter wrong?
 
 Three of today's five investigations stopped at step 1.
+
+## The five canaries are PORTS of one screen, so the cheap audit is a cross-example diff
+
+Found 2026-09-08 on `examples/svelte`: `.hero-badge` is a 44x44 rounded square whose fill is an
+inline binding, not a CSS rule — Vue and React both write
+`style={{ backgroundColor: LINE_COLOR.primitives }}`, Svelte never did. So the badge painted
+`#1a1a1a` text on the card's own `#262626`, i.e. category 2 above, reached from the other side: the
+two "fills" match because one of them was never bound.
+
+**Two audits reported it clean.** Every class the screen uses has a rule in `App.css` (checked by
+set-differencing markup classes against `^\.` rules — empty), and `svelte-check` sees a valid
+binding-free element. Nothing is missing; a value simply was never supplied.
+
+The audit that finds it is the one that exploits what these files ARE — one screen written five
+times:
+
+```bash
+command grep -n -A6 "hero-badge" examples/{vue-sfc,react,svelte}/screens/CanaryScreen.*
+```
+
+Read the SHORTEST block as the finding. This applies to any element whose look comes from an inline
+binding rather than a class, which is exactly the elements a stylesheet audit cannot see.

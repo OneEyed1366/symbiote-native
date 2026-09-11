@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { View, Text } from '@symbiote-native/react';
 import { firstTouchX } from './event-utils';
 
 // Responder: the gesture capabilities exposed here, shown so the grabbed
@@ -29,19 +28,19 @@ export function ResponderDemo() {
   const grabbed = useRef<number | null>(null);
 
   return (
-    <View className="section-tight">
-      <Text className="section-label">
+    <view className="section-tight">
+      <text className="section-label">
         Responder · drag a chip vs hand-off to the strip
-      </Text>
-      <Text className="info-text">{status}</Text>
+      </text>
+      <text className="info-text">{status}</text>
       {/* the separate transfer indicator, lit only when the strip steals the gesture */}
-      <Text
+      <text
         className="transfer-text"
         style={{ color: transfer ? '#f6ad55' : '#41506a' }}
       >
         {transfer || 'transfer: —'}
-      </Text>
-      <View
+      </text>
+      <view
         // Claims the gesture only once the finger has travelled past the threshold,
         // stealing it from whichever chip currently holds it, the transfer path.
         onMoveShouldSetResponder={event =>
@@ -67,12 +66,12 @@ export function ResponderDemo() {
         onResponderTerminate={() => setRowDx(0)}
         className="strip-box"
       >
-        <View
+        <view
           className="row-tight"
           style={{ transform: [{ translateX: rowDx }] }}
         >
           {RESPONDER_CHIPS.map(index => (
-            <View
+            <view
               key={index}
               testID={`resp-chip-${index}`}
               // Grabs on start and drags itself; yields to the strip past the threshold.
@@ -107,11 +106,11 @@ export function ResponderDemo() {
                 transform: [{ translateX: activeChip === index ? chipDx : 0 }],
               }}
             >
-              <Text className="chip-text">{index}</Text>
-            </View>
+              <text className="chip-text">{index}</text>
+            </view>
           ))}
-        </View>
-      </View>
-    </View>
+        </view>
+      </view>
+    </view>
   );
 }

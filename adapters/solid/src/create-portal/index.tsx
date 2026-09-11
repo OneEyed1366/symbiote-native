@@ -65,7 +65,7 @@ function assertPortalTarget(target: IPortalTarget): IPortalTarget {
   if (target instanceof SymbioteSurface || isSymbioteNode(target))
     return target;
   throw new Error(
-    'Portal `mount` must be an already-mounted host node (a ref off a rendered <View>) or a surface — got something else. Did you pass the signal instead of CALLING it (`mount={overlay()}`), read it before the target element existed (gate the Portal behind <Show when={overlay()}>), or pass a CSS-selector-style string?',
+    'Portal `mount` must be an already-mounted host node (a ref off a rendered <view>) or a surface — got something else. Did you pass the signal instead of CALLING it (`mount={overlay()}`), read it before the target element existed (gate the Portal behind <Show when={overlay()}>), or pass a CSS-selector-style string?',
   );
 }
 

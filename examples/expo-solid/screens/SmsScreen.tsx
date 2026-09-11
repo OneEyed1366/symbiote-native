@@ -1,11 +1,4 @@
 import { createSignal, onCleanup } from 'solid-js';
-import {
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/solid';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -23,14 +16,18 @@ function CapabilityRow(props: {
   status: ICapabilityStatus;
 }) {
   const text = () =>
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
-    <View testID={props.testID} class="capability-row">
-      <Text class="capability-label">{props.label}</Text>
-      <View class={`status-badge status-badge-${props.status}`}>
-        <Text class="status-badge-text">{text()}</Text>
-      </View>
-    </View>
+    <view testID={props.testID} class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <view class={`status-badge status-badge-${props.status}`}>
+        <text class="status-badge-text">{text()}</text>
+      </view>
+    </view>
   );
 }
 
@@ -46,7 +43,8 @@ export function SmsScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Sms];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [isAvailable, setIsAvailable] = createSignal<ICapabilityStatus>('checking');
+  const [isAvailable, setIsAvailable] =
+    createSignal<ICapabilityStatus>('checking');
   const [recipients, setRecipients] = createSignal('');
   const [message, setMessage] = createSignal('Sent from the Symbiote canary');
   const [lastResult, setLastResult] = createSignal('idle');
@@ -77,62 +75,62 @@ export function SmsScreen() {
   };
 
   return (
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="sms-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">SMS</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">SMS</text>
+            <text class="hero-body">
               @symbiote-native/sms — opens the system SMS composer prefilled
               with recipients and a message. It never sends anything by itself;
               the user does.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="sms-capability-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Capabilities</Text>
-          </View>
+        <view testID="sms-capability-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Capabilities</text>
+          </view>
           <CapabilityRow
             testID="sms-available"
             label="Available"
             status={isAvailable()}
           />
-          <Text class="info-text">
+          <text class="info-text">
             NO is expected on the iOS simulator, which has no Messages app, and
             on Android devices without telephony hardware. Only a real phone
             reports YES.
-          </Text>
-        </View>
+          </text>
+        </view>
 
-        <View testID="sms-compose-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Compose</Text>
-          </View>
-          <TextInput
+        <view testID="sms-compose-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Compose</text>
+          </view>
+          <text-input
             testID="sms-recipients-input"
             value={recipients()}
-            onValueChange={setRecipients}
+            onValueChange={event => setRecipients(event.text)}
             placeholder="0123456789, 9876543210"
             placeholderTextColor="#41506a"
             autoCapitalize="none"
             class="text-input"
           />
-          <TextInput
+          <text-input
             testID="sms-message-input"
             value={message()}
-            onValueChange={setMessage}
+            onValueChange={event => setMessage(event.text)}
             placeholder="Message"
             placeholderTextColor="#41506a"
             class="text-input"
@@ -143,20 +141,20 @@ export function SmsScreen() {
             onPress={handleSend}
             color={lineColor}
           />
-          <View class="capability-row">
-            <Text class="capability-label">Last result</Text>
-            <Text testID="sms-result" class="value-text">
+          <view class="capability-row">
+            <text class="capability-label">Last result</text>
+            <text testID="sms-result" class="value-text">
               {lastResult()}
-            </Text>
-          </View>
-          <Text class="info-text">
+            </text>
+          </view>
+          <text class="info-text">
             Android always reports unknown — reading the real outcome needs
             READ_SMS, which Google restricts to default-SMS-app publishers.
             Treat it as the composer closed, not as a failure. iOS reports sent
             or cancelled.
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          </text>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

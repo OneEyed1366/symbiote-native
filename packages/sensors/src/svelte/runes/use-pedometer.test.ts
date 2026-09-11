@@ -84,7 +84,7 @@ async function loadProbe(): Promise<Component> {
        const pedometer = usePedometer();
        $effect(() => { onValue(pedometer.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'PedometerProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

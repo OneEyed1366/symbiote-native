@@ -1,5 +1,4 @@
 import { Fragment, Profiler, StrictMode, useEffect, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 
@@ -8,9 +7,9 @@ function FragmentRows() {
   // so they lay out exactly as if they were direct siblings of whatever renders <FragmentRows />.
   return (
     <>
-      <Text className="list-row-text">fragment row 1</Text>
-      <Text className="list-row-text">fragment row 2</Text>
-      <Text className="list-row-text">fragment row 3</Text>
+      <text className="list-row-text">fragment row 1</text>
+      <text className="list-row-text">fragment row 2</text>
+      <text className="list-row-text">fragment row 3</text>
     </>
   );
 }
@@ -21,9 +20,9 @@ function StrictCounter() {
     setMountEffects(current => current + 1);
   }, []);
   return (
-    <Text testID="strict-mode-mounts" className="info-text">
+    <text testID="strict-mode-mounts" className="info-text">
       {`mount effect ran ${mountEffects} time(s) — StrictMode double-invokes it in dev`}
-    </Text>
+    </text>
   );
 }
 
@@ -32,8 +31,8 @@ export function FragmentProfilerStrictModeDemo() {
   const [bump, setBump] = useState(0);
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">Fragment · Profiler · StrictMode</Text>
+    <view className="section-nested">
+      <text className="section-label">Fragment · Profiler · StrictMode</text>
       <Fragment>
         <FragmentRows />
       </Fragment>
@@ -43,9 +42,9 @@ export function FragmentProfilerStrictModeDemo() {
           setRenderDuration(`${phase} took ${actualDuration.toFixed(2)}ms`)
         }
       >
-        <Text testID="profiler-duration" className="info-text">
+        <text testID="profiler-duration" className="info-text">
           {`Profiler onRender: ${renderDuration} (bump ${bump})`}
-        </Text>
+        </text>
       </Profiler>
       <ActionButton
         testID="profiler-rerender"
@@ -56,6 +55,6 @@ export function FragmentProfilerStrictModeDemo() {
       <StrictMode>
         <StrictCounter />
       </StrictMode>
-    </View>
+    </view>
   );
 }

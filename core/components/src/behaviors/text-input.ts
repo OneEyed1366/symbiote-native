@@ -42,14 +42,15 @@ import {
   resolveTextInputProps,
   shouldCommandText,
   textFromChange,
+  type ITextInputChangeEvent,
   type ITextInputHandle,
 } from '../state/text-input';
 
 // Both spellings, because `multiline` picks between two Fabric views and a lowering transform
 // resolves that statically. The behavior is registered for both so it does not care which one the
 // transform emitted.
-export const TEXT_INPUT_TAG = 'symbiote-text-input';
-export const TEXT_INPUT_MULTILINE_TAG = 'symbiote-text-input-multiline';
+export const TEXT_INPUT_TAG = 'text-input';
+export const TEXT_INPUT_MULTILINE_TAG = 'text-input-multiline';
 
 interface IBehaviorState {
   // The count native last acknowledged, echoed back on every controlled write so native's own
@@ -99,7 +100,7 @@ function callAppListener(
   if (typeof listener === 'function') listener(event);
 }
 
-// `onValueChange(text, event)` is NOT a Fabric event — it is a fold the component wrapper used to do
+// `onValueChange(event)` is NOT a Fabric event — it is a fold the component wrapper used to do
 // over the raw `change` payload, so it lives in `node.props` as a plain function key and
 // `fabricProps` drops it on the way to native. A lowered element has no wrapper to run that fold, so
 // before this the callback was simply never called: the field echoed keystrokes natively (native
@@ -110,13 +111,20 @@ function callAppListener(
 // fork, where all five adapters inherit it. Refusing to lower an element carrying the prop was the
 // other candidate and is strictly worse — it makes the optimisation opt out of the idiom the
 // ecosystem actually writes, to avoid a fold the runtime can do in three lines.
+//
+// The listener takes ONE argument, `text` carried on the event itself (`ITextInputChangeEvent`),
+// not `(text, event)` — Svelte's compiler forces every individual `on*` attribute through a native
+// listener wrapper that calls with exactly one argument, always a real object, so a second
+// argument is silently dropped and a bare string as the sole argument crashes.
 function callValueChange(
   node: ISymbioteNode,
   text: string,
   event: ISymbioteEvent,
 ): void {
   const listener = node.props.onValueChange;
-  if (typeof listener === 'function') listener(text, event);
+  if (typeof listener !== 'function') return;
+  const changeEvent: ITextInputChangeEvent = Object.assign(event, { text });
+  listener(changeEvent);
 }
 
 // The W3C/legacy alias fold the WRAPPER runs in its component body — `inputMode` -> `keyboardType`,
@@ -144,8 +152,31 @@ function booleanOf(value: unknown): boolean | undefined {
   return typeof value === 'boolean' ? value : undefined;
 }
 
+// `multiline` picks between TWO Fabric views, so the TAG decides it and no later prop write moves a
+// node between them. Two of the three paths that build the node resolve it before the engine ever
+// sees the prop — the wrapper CONSUMES it to pick its intrinsic, a lowering transform reads a
+// literal at compile time — and the third, an author writing the tag by hand, has neither. That
+// leaves two silent, device-only divergences, measured on the committed payload:
+//
+//   <text-input-multiline value="a" />   RCTMultilineTextInputView, folded as SINGLE-line:
+//                                        submitBehavior 'blurAndSubmit', so Return blurs instead
+//                                        of inserting a newline
+//   <text-input multiline value="b" />   RCTSinglelineTextInputView carrying the multiline fold
+//
+// So the tag is the authority here, and a prop that contradicts it throws rather than being
+// quietly overridden — an ignored `multiline` is a wrong native view with nothing to read.
+// Found on Solid, fixed here because all five adapters produce the same two divergences: a
+// decision the wrapper used to make by CONSUMING a prop has no owner once the author writes the
+// tag directly.
+// The COMPLAINT cannot live here, only the correction. `foldPayload` runs inside the commit, so a
+// throw from it surfaces as an uncaught exception a tick after the author's write with no frame
+// naming the call site — measured: a test awaiting the mount sees `nothing committed` instead of
+// the error. Refusing a contradicting prop therefore stays in each adapter's own prop-write path,
+// where the author's stack still exists (Solid's `renderer.ts` is the reference); this file only
+// guarantees that whatever the props say, the payload matches the TAG.
 function foldPayload(
   props: Readonly<Record<string, unknown>>,
+  isMultilineTag: boolean,
 ): Record<string, unknown> {
   const folded = resolveTextInputProps({
     inputMode: stringOf(props.inputMode),
@@ -156,10 +187,7 @@ function foldPayload(
     editable: booleanOf(props.editable),
     submitBehavior: stringOf(props.submitBehavior),
     blurOnSubmit: booleanOf(props.blurOnSubmit),
-    // The tag already decided this at compile time, but the behavior is registered for BOTH tags
-    // with one object, so the prop is the only thing it can read. Absent reads as single-line,
-    // which is the tag the transform emits when `multiline` is absent — the two agree.
-    multiline: props.multiline === true,
+    multiline: isMultilineTag,
     cursorColor: stringOf(props.cursorColor),
     selectionColor: stringOf(props.selectionColor),
     selectionHandleColor: stringOf(props.selectionHandleColor),
@@ -343,16 +371,19 @@ export function buildTextInputHandle(node: ISymbioteNode): ITextInputHandle {
 // Idempotent: an adapter entry may be imported more than once in a bundle, and re-registering the
 // same tag with an equivalent behavior must not double-install anything.
 export function registerTextInputBehavior(): void {
-  const behavior = {
+  const behaviorFor = (isMultilineTag: boolean) => ({
     attach,
     attachAfterCommit,
     afterCommit,
     detach,
-    foldPayload,
+    // The one thing the two registrations do NOT share: the tag is what answers `multiline`, so
+    // each closes over its own answer. Everything else is the same machine.
+    foldPayload: (props: Readonly<Record<string, unknown>>) =>
+      foldPayload(props, isMultilineTag),
     // The three the machine needs as INPUTS. Without the stash the app's own `onChange` would
     // evict the machine from the very event the controlled handshake runs on.
     ownedListeners: ['change', 'focus', 'blur'],
-  };
-  registerHostBehavior(TEXT_INPUT_TAG, behavior);
-  registerHostBehavior(TEXT_INPUT_MULTILINE_TAG, behavior);
+  });
+  registerHostBehavior(TEXT_INPUT_TAG, behaviorFor(false));
+  registerHostBehavior(TEXT_INPUT_MULTILINE_TAG, behaviorFor(true));
 }

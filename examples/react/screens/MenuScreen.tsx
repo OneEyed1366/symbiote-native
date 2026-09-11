@@ -1,10 +1,3 @@
-import {
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/react';
 import { useStackNavigation } from '@symbiote-native/navigation/react';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
@@ -94,47 +87,47 @@ const MENU_ITEMS: readonly IMenuItem[] = [
 export function MenuScreen() {
   const navigation = useStackNavigation();
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="menu-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className="menu-hero">
-          <Text className="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
-          <Text className="menu-hero-title">Twelve stops along the stack</Text>
-          <Text className="menu-hero-subtitle">
+        <view className="menu-hero">
+          <text className="menu-eyebrow">NAVIGATION DEMO SUITE</text>
+          <text className="menu-hero-title">Twelve stops along the stack</text>
+          <text className="menu-hero-subtitle">
             Each row below drives a different line of
             @symbiote-native/navigation — Primitives, Presentation, Structure,
             Introspection, Routing — on a real native stack, plus a Performance
             stop timing the engine's own commit path and a Styling stop showing
             the whole CSS compiler surface.
-          </Text>
-        </View>
+          </text>
+        </view>
         {MENU_ITEMS.map(item => {
           const lineInfo = ROUTE_LINE_INFO[item.route];
           return (
-            <Pressable
+            <pressable
               key={item.route}
               testID={`menu-row-${item.route}`}
               className={`menu-row menu-row-${lineInfo.line}`}
               onPress={() => navigation.push(item.route)}
             >
-              <View className={`menu-badge menu-badge-${lineInfo.line}`}>
-                <Text className="menu-badge-text">{lineInfo.code}</Text>
-              </View>
-              <View className="menu-row-copy">
-                <Text className="menu-row-label">{item.label}</Text>
-                <Text
+              <view className={`menu-badge menu-badge-${lineInfo.line}`}>
+                <text className="menu-badge-text">{lineInfo.code}</text>
+              </view>
+              <view className="menu-row-copy">
+                <text className="menu-row-label">{item.label}</text>
+                <text
                   className={`menu-row-hint menu-row-hint-${lineInfo.line}`}
                 >
                   {item.hint}
-                </Text>
-              </View>
-            </Pressable>
+                </text>
+              </view>
+            </pressable>
           );
         })}
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

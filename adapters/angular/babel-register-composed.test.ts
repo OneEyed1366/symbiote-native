@@ -41,7 +41,7 @@ export class AnimatedView {
 const PRIMITIVE_SNIPPET = `
 import * as i0 from "@angular/core";
 export class ViewHost {
-    static ɵcmp = i0.ɵɵngDeclareComponent({ minVersion: "14.0.0", version: "22.0.5", type: ViewHost, isStandalone: true, selector: "symbiote-view", inputs: {}, ngImport: i0, template: '', isInline: true });
+    static ɵcmp = i0.ɵɵngDeclareComponent({ minVersion: "14.0.0", version: "22.0.5", type: ViewHost, isStandalone: true, selector: "view", inputs: {}, ngImport: i0, template: '', isInline: true });
 }
 `;
 
@@ -113,7 +113,7 @@ describe('babel-register-composed', () => {
       );
     });
 
-    // why: registering a real Fabric primitive (symbiote-view, ...) as an anchor host would be
+    // why: registering a real Fabric primitive (view, ...) as an anchor host would be
     // wrong — a primitive IS the real native view, not a composed wrapper needing an anchor. The
     // plugin must filter PRIMITIVE_SELECTORS out, not just append everything it finds.
     it('does not register a real Fabric primitive selector', () => {
@@ -169,8 +169,23 @@ const COMPONENT_NAMES_DIR = path.resolve(
 
 function selectorsDeclaredIn(filename: string): Set<string> {
   const source = readFileSync(path.join(COMPONENT_NAMES_DIR, filename), 'utf8');
+  // The tags carry no `symbiote-` prefix any more, so there is no marker to key on and the
+  // extractor has to be bounded by the TABLE instead: everything between the `_NAMES` literal's
+  // braces, nothing else in the file.
+  //
+  // The quotes are not part of the shape. Prettier drops them from a key that is a valid
+  // identifier, so `view` / `text` / `image` / `modal` / `switch` / `pressable` are bare while
+  // every hyphenated name keeps them — a pattern requiring quotes silently found 13 of 19, and
+  // it went red on a FORMATTING pass with no source change behind it.
+  const table =
+    /_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = \{([\s\S]*?)\n\};/.exec(
+      source,
+    );
+  if (table?.[1] === undefined)
+    throw new Error(`no name table found in ${filename}`);
+
   const selectors = new Set<string>();
-  for (const match of source.matchAll(/'(symbiote-[a-z-]+)':/g)) {
+  for (const match of table[1].matchAll(/^\s*'?([a-z][a-z-]*)'?\s*:/gm)) {
     const [, selector] = match;
     if (selector !== undefined) selectors.add(selector);
   }

@@ -83,6 +83,35 @@ early return lives in `commitContainer` itself, below that call — so a React h
 no-op exactly like a Vue, Svelte or Angular one. Never treat "the post-commit hook will fire" as
 guaranteed; it is conditional on the tree actually changing, in every adapter.
 
+### The design consequence: `afterCommit` cannot observe anything that changes no PAYLOAD
+
+Not a harness problem — a hazard in the seam itself, and it reads as a working design right up until
+the case that matters. `IHostBehavior.afterCommit` is the obvious home for "react to a change the
+behavior was not handed directly", and it can only ever see changes that dirty a node.
+
+Measured 2026-09-03 wiring ScrollView's synthesized `onContentSizeChange`. The behavior must put
+`onLayout` on its content view exactly when the app passed a handler, so it watched for the handler
+in `afterCommit`. A LISTENER change writes no prop — `node.listeners` never reaches Fabric, and an
+ungated event name sets no flag — so:
+
+```
+app WIRES the handler     works    the mount commit is a real commit for other reasons
+app DROPS the handler     DEAD     the commit is a no-op, hooks skipped, the wiring never reverts
+```
+
+Half the contract, green suite, and the working half working by coincidence. `markPropsDirty` on the
+flip does not fix it either: the node is dirty, `fabricProps` produces an identical payload,
+`propsEqual` reports no change, and `result.changed` is still false.
+
+So the rule for a behavior seam: **an event a commit cannot represent needs its own notification, at
+the point the change happens.** `onOwnedListenerChange` is that for listeners — fired from
+`setEventListener` on a PRESENCE flip only (never on the fresh closure a framework hands over each
+render, for the same reason listeners do not mark dirty). Being synchronous, it also removes the
+two-pass mount `afterCommit` would have cost.
+
+The cheap check before choosing `afterCommit` for anything: ask what Fabric prop moves when the
+thing you are watching changes. No answer means no commit, and no commit means no hook.
+
 ## Clearing a node's flags can ORPHAN a dirty descendant — `markDirty`'s early exit is the reason
 
 `markDirty` walks up `while (!current.dirty)` and stops at the first already-dirty ancestor. That is

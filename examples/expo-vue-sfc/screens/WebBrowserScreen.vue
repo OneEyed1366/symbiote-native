@@ -6,14 +6,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -97,34 +90,34 @@ function handleCoolDown(): void {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <ScrollView
+  <safe-area-view class="screen">
+    <scroll-view
       testID="web-browser-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Web Browser</Text>
-          <Text class="hero-body"
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Web Browser</text>
+          <text class="hero-body"
             >@symbiote-native/web-browser — an in-app browser that keeps the
             user inside the app, unlike Linking.openURL, plus the OAuth auth
-            session built on it.</Text
+            session built on it.</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="web-browser-open-card" class="web-browser-card">
-        <Text class="web-browser-card-title">Open a page</Text>
-        <TextInput
+      <view testID="web-browser-open-card" class="web-browser-card">
+        <text class="web-browser-card-title">Open a page</text>
+        <text-input
           testID="web-browser-url-input"
           v-model="url"
           placeholder="https://example.com"
@@ -145,37 +138,37 @@ function handleCoolDown(): void {
           :onPress="handleDismiss"
           :color="lineColor"
         />
-        <View class="web-browser-row">
-          <Text class="web-browser-row-label">Last result</Text>
-          <Text testID="web-browser-result" class="web-browser-value-text">{{
+        <view class="web-browser-row">
+          <text class="web-browser-row-label">Last result</text>
+          <text testID="web-browser-result" class="web-browser-value-text">{{
             lastResult
-          }}</Text>
-        </View>
-        <Text class="web-browser-note"
+          }}</text>
+        </view>
+        <text class="web-browser-note"
           >iOS resolves once the browser closes (cancel, or dismiss when closed
           from code); Android resolves opened as soon as the Custom Tab launches
-          and never reports the close. Dismiss is iOS-only.</Text
+          and never reports the close. Dismiss is iOS-only.</text
         >
-      </View>
+      </view>
 
-      <View
+      <view
         v-if="Platform.OS === 'android'"
         testID="web-browser-custom-tabs-card"
         class="web-browser-card"
       >
-        <Text class="web-browser-card-title">Custom Tabs service</Text>
+        <text class="web-browser-card-title">Custom Tabs service</text>
         <ActionButton
           testID="web-browser-list-browsers-button"
           title="List supporting browsers"
           :onPress="handleListBrowsers"
           :color="lineColor"
         />
-        <View class="web-browser-row">
-          <Text class="web-browser-row-label">Browsers</Text>
-          <Text testID="web-browser-browsers" class="web-browser-value-text">{{
+        <view class="web-browser-row">
+          <text class="web-browser-row-label">Browsers</text>
+          <text testID="web-browser-browsers" class="web-browser-value-text">{{
             supportingBrowsers ?? '(not queried)'
-          }}</Text>
-        </View>
+          }}</text>
+        </view>
         <ActionButton
           testID="web-browser-warm-up-button"
           title="Warm up"
@@ -188,19 +181,19 @@ function handleCoolDown(): void {
           :onPress="handleCoolDown"
           :color="lineColor"
         />
-        <View class="web-browser-row">
-          <Text class="web-browser-row-label">Service package</Text>
-          <Text
+        <view class="web-browser-row">
+          <text class="web-browser-row-label">Service package</text>
+          <text
             testID="web-browser-service-package"
             class="web-browser-value-text"
-            >{{ servicePackage ?? '(not warmed up)' }}</Text
+            >{{ servicePackage ?? '(not warmed up)' }}</text
           >
-        </View>
-        <Text class="web-browser-note"
+        </view>
+        <text class="web-browser-note"
           >Android only. Listing the browsers throws on iOS, so this whole card
-          is behind a Platform.OS check.</Text
+          is behind a Platform.OS check.</text
         >
-      </View>
-    </ScrollView>
-  </SafeAreaView>
+      </view>
+    </scroll-view>
+  </safe-area-view>
 </template>

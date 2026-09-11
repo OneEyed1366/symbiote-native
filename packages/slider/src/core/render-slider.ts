@@ -1,5 +1,5 @@
 // Slider: the render half (framework-agnostic). Mirrors the library's React wrapper layout: an
-// outer `symbiote-view` (default platform style + the caller's style, centered) hosting the
+// outer `view` (default platform style + the caller's style, centered) hosting the
 // native `RNCSlider` leaf, plus an optional step-indicator overlay sibling. The native leaf
 // carries the folded value/limit/color/image props and the responder claims the wrapper does;
 // every event handler + the ref ride in `passthrough` and the engine routes them against the
@@ -103,5 +103,5 @@ export function renderSlider(
     style: resolveSliderWrapperStyle(view.style, platform),
   };
   if (options.onLayout !== undefined) wrapperProps.onLayout = options.onLayout;
-  return el('symbiote-view', wrapperProps, children);
+  return el('view', wrapperProps, children);
 }

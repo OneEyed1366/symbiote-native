@@ -50,7 +50,7 @@ let fixture: AnimatedAnchorFixture | undefined;
   imports: [AnimatedView],
   template: `
     <AnimatedView [animatedProps]="probeProps" [class.dark]="dark">
-      <symbiote-text>Hi</symbiote-text>
+      <text>Hi</text>
     </AnimatedView>
   `,
 })

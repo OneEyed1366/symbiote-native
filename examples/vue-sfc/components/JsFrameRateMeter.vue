@@ -21,7 +21,6 @@ export const commitProfileGate = { isHeldByBenchmark: false };
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
-import { Text, View } from '@symbiote-native/vue';
 import { readCommitProfile } from '@symbiote-native/engine';
 import ActionButton from './ActionButton.vue';
 
@@ -145,69 +144,69 @@ const onReset = (): void => {
 </script>
 
 <template>
-  <View class="bench-meter">
-    <Text class="section-label">JS-THREAD FRAME RATE</Text>
-    <View class="bench-meter-row">
-      <View class="bench-metric">
-        <Text
+  <view class="bench-meter">
+    <text class="section-label">JS-THREAD FRAME RATE</text>
+    <view class="bench-meter-row">
+      <view class="bench-metric">
+        <text
           testID="bench-fps"
           class="bench-metric-value"
           :style="{ color: accent }"
-          >{{ framesPerSecond }}</Text
+          >{{ framesPerSecond }}</text
         >
-        <Text class="bench-metric-label">fps</Text>
-      </View>
-      <View class="bench-metric">
-        <Text
+        <text class="bench-metric-label">fps</text>
+      </view>
+      <view class="bench-metric">
+        <text
           testID="bench-dropped"
           class="bench-metric-value"
           :style="{ color: accent }"
-          >{{ droppedFrames }}</Text
+          >{{ droppedFrames }}</text
         >
-        <Text class="bench-metric-label">dropped</Text>
-      </View>
-      <View class="bench-metric">
-        <Text class="bench-metric-value" :style="{ color: accent }">{{
+        <text class="bench-metric-label">dropped</text>
+      </view>
+      <view class="bench-metric">
+        <text class="bench-metric-value" :style="{ color: accent }">{{
           worstFrameMs.toFixed(0)
-        }}</Text>
-        <Text class="bench-metric-label">worst ms</Text>
-      </View>
-    </View>
-    <Text class="section-label">ENGINE RECONCILE WALK</Text>
-    <View class="bench-meter-row">
-      <View class="bench-metric">
-        <Text
+        }}</text>
+        <text class="bench-metric-label">worst ms</text>
+      </view>
+    </view>
+    <text class="section-label">ENGINE RECONCILE WALK</text>
+    <view class="bench-meter-row">
+      <view class="bench-metric">
+        <text
           testID="bench-walk-share"
           class="bench-metric-value"
           :style="{ color: accent }"
-          >{{ walk.sharePercent.toFixed(1) }}</Text
+          >{{ walk.sharePercent.toFixed(1) }}</text
         >
-        <Text class="bench-metric-label">% of window</Text>
-      </View>
-      <View class="bench-metric">
-        <Text
+        <text class="bench-metric-label">% of window</text>
+      </view>
+      <view class="bench-metric">
+        <text
           testID="bench-walk-nodes-per-commit"
           class="bench-metric-value"
           :style="{ color: accent }"
-          >{{ walk.nodesPerCommit.toFixed(0) }}</Text
+          >{{ walk.nodesPerCommit.toFixed(0) }}</text
         >
-        <Text class="bench-metric-label">nodes / commit</Text>
-      </View>
-      <View class="bench-metric">
-        <Text
+        <text class="bench-metric-label">nodes / commit</text>
+      </view>
+      <view class="bench-metric">
+        <text
           testID="bench-walk-ms-per-commit"
           class="bench-metric-value"
           :style="{ color: accent }"
-          >{{ walk.msPerCommit.toFixed(1) }}</Text
+          >{{ walk.msPerCommit.toFixed(1) }}</text
         >
-        <Text class="bench-metric-label">ms / commit</Text>
-      </View>
-    </View>
+        <text class="bench-metric-label">ms / commit</text>
+      </view>
+    </view>
     <ActionButton
       testID="bench-fps-reset"
       title="Reset frame counters"
       :onPress="onReset"
       :color="accent"
     />
-  </View>
+  </view>
 </template>

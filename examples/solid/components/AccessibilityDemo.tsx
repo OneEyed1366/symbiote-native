@@ -10,7 +10,7 @@
 // card's accessibilityState expects enabled=false/selected=true in uiautomator.
 
 import { createSignal } from 'solid-js';
-import { AccessibilityInfo, Text, View } from '@symbiote-native/solid';
+import { AccessibilityInfo } from '@symbiote-native/solid';
 import './AccessibilityDemo.css';
 
 export function AccessibilityDemo() {
@@ -28,39 +28,39 @@ export function AccessibilityDemo() {
   AccessibilityInfo.announceForAccessibility('symbiote accessibility online');
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">
+    <view class="section-nested">
+      <text class="section-label">
         Accessibility · props → native · aria/role transform · AccessibilityInfo
-      </Text>
+      </text>
       {/* getter readout: 'off' (no screen reader) already proves the module resolved */}
-      <Text class="a11y-text">{`screen reader: ${screenReader()}`}</Text>
+      <text class="a11y-text">{`screen reader: ${screenReader()}`}</text>
 
-      <View
+      <view
         accessible
         accessibilityRole="header"
         accessibilityLabel="a11y-canonical-label"
         class="a11y-card"
       >
-        <Text class="a11y-text">canonical label + role=header</Text>
-      </View>
+        <text class="a11y-text">canonical label + role=header</text>
+      </view>
 
-      <View
+      <view
         accessible
         role="button"
         aria-label="a11y-aria-label"
         class="a11y-card"
       >
-        <Text class="a11y-text">aria-label + role=button</Text>
-      </View>
+        <text class="a11y-text">aria-label + role=button</text>
+      </view>
 
-      <View
+      <view
         accessible
         accessibilityLabel="a11y-state"
         accessibilityState={{ disabled: true, selected: true }}
         class="a11y-card"
       >
-        <Text class="a11y-text">state: disabled + selected</Text>
-      </View>
-    </View>
+        <text class="a11y-text">state: disabled + selected</text>
+      </view>
+    </view>
   );
 }

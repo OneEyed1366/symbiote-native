@@ -128,7 +128,7 @@ async function loadMarkerParent(): Promise<Component> {
        import Slider from './.smoke-compiled-slider.mjs';
      </script>
      {#snippet marker({ stepMarked, index })}
-       <symbiote-view p={{ testID: 'marker-' + index, style: { opacity: stepMarked ? 1 : 0 } }} />
+       <view p={{ testID: 'marker-' + index, style: { opacity: stepMarked ? 1 : 0 } }} />
      {/snippet}
      <Slider value={0.5} minimumValue={0} maximumValue={1} step={0.25} stepMarker={marker} />`,
     'MarkerParent.svelte',
@@ -199,7 +199,7 @@ describe('Slider (real compiled index.svelte)', () => {
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
       expect(props.step).toBe(0.1);
-      // The native leaf lives under a symbiote-view wrapper (RCTView), not at the root.
+      // The native leaf lives under a view wrapper (RCTView), not at the root.
       expect(fabric.find(n => n.viewName === 'RCTView')).toBeDefined();
     });
 

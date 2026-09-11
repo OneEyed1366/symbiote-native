@@ -195,7 +195,9 @@ function handleAuthenticate(): void {
 
 <View>
   <Text>
-    {hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled'}
+    {hasHardware && isEnrolled
+      ? 'Ready to authenticate'
+      : 'No biometrics enrolled'}
   </Text>
   <Pressable onPress={handleAuthenticate}>
     <Text>Authenticate</Text>
@@ -206,7 +208,8 @@ function handleAuthenticate(): void {
     </Pressable>
   {/if}
   {#if authResult}
-    <Text>{authResult.success ? 'Success' : `Failed: ${authResult.error}`}</Text>
+    <Text>{authResult.success ? 'Success' : `Failed: ${authResult.error}`}</Text
+    >
   {/if}
 </View>
 ```
@@ -257,9 +260,7 @@ function LocalAuthScreen() {
       )}
       <Show when={authResult()} keyed>
         {result => (
-          <Text>
-            {result.success ? 'Success' : `Failed: ${result.error}`}
-          </Text>
+          <Text>{result.success ? 'Success' : `Failed: ${result.error}`}</Text>
         )}
       </Show>
     </View>

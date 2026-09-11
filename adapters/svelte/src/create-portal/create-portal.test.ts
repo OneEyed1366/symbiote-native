@@ -165,16 +165,16 @@ describe('Portal', () => {
          import { Portal } from './index.ts';
          ${OVERLAY_TARGET}
        </script>
-       <symbiote-view p={{ testID: 'root' }}>
-         <symbiote-view p={{ testID: 'source' }}>
+       <view p={{ testID: 'root' }}>
+         <view p={{ testID: 'source' }}>
            {#if overlay}
              <Portal mount={overlay}>
-               {#snippet children()}<symbiote-text p={{ testID: 'ported' }}>ported in</symbiote-text>{/snippet}
+               {#snippet children()}<text p={{ testID: 'ported' }}>ported in</text>{/snippet}
              </Portal>
            {/if}
-         </symbiote-view>
-         <symbiote-view p={{ testID: 'overlay-host' }} bind:this={overlay}></symbiote-view>
-       </symbiote-view>`,
+         </view>
+         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+       </view>`,
       'portal-basic',
     );
 
@@ -217,14 +217,14 @@ describe('Portal', () => {
          import { Portal } from './index.ts';
          ${OVERLAY_TARGET}
        </script>
-       <symbiote-view p={{ testID: 'root' }}>
+       <view p={{ testID: 'root' }}>
          {#if overlay}
            <Portal mount={overlay}>
-             {#snippet children()}<symbiote-text p={{ testID: 'ported' }}>direct</symbiote-text>{/snippet}
+             {#snippet children()}<text p={{ testID: 'ported' }}>direct</text>{/snippet}
            </Portal>
          {/if}
-         <symbiote-view p={{ testID: 'overlay-host' }} bind:this={overlay}></symbiote-view>
-       </symbiote-view>`,
+         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+       </view>`,
       'portal-direct-child',
     );
 
@@ -243,7 +243,7 @@ describe('Portal', () => {
   // every dynamic overlay (a toast with a countdown, a live status line) silently freezes.
   //
   // The dynamic part is an {#if} at the PORTAL's own children level, swapping whole elements,
-  // deliberately: putting `{label}` inside one <symbiote-text> would prove nothing about Portal —
+  // deliberately: putting `{label}` inside one <text> would prove nothing about Portal —
   // that text node's own template_effect owns the update and would satisfy the assertion even if
   // Portal had handed its snippet over as a dead snapshot (the trap recorded in
   // .claude/rules/test-harness-false-greens.md).
@@ -256,20 +256,20 @@ describe('Portal', () => {
          const control = { swap: () => { label = 'second'; } };
          ${ON_READY}
        </script>
-       <symbiote-view p={{ testID: 'root' }}>
+       <view p={{ testID: 'root' }}>
          {#if overlay}
            <Portal mount={overlay}>
              {#snippet children()}
                {#if label === 'first'}
-                 <symbiote-text p={{ testID: 'ported' }}>first</symbiote-text>
+                 <text p={{ testID: 'ported' }}>first</text>
                {:else}
-                 <symbiote-text p={{ testID: 'ported' }}>second</symbiote-text>
+                 <text p={{ testID: 'ported' }}>second</text>
                {/if}
              {/snippet}
            </Portal>
          {/if}
-         <symbiote-view p={{ testID: 'overlay-host' }} bind:this={overlay}></symbiote-view>
-       </symbiote-view>`,
+         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+       </view>`,
       'portal-reactive',
     );
 
@@ -321,15 +321,15 @@ describe('Portal', () => {
          ${ON_READY}
          let target = $derived(useB ? hostB : hostA);
        </script>
-       <symbiote-view p={{ testID: 'root' }}>
+       <view p={{ testID: 'root' }}>
          {#if target}
            <Portal mount={target}>
-             {#snippet children()}<symbiote-text p={{ testID: 'ported' }}>movable</symbiote-text>{/snippet}
+             {#snippet children()}<text p={{ testID: 'ported' }}>movable</text>{/snippet}
            </Portal>
          {/if}
-         <symbiote-view p={{ testID: 'host-a' }} bind:this={hostA}></symbiote-view>
-         <symbiote-view p={{ testID: 'host-b' }} bind:this={hostB}></symbiote-view>
-       </symbiote-view>`,
+         <view p={{ testID: 'host-a' }} bind:this={hostA}></view>
+         <view p={{ testID: 'host-b' }} bind:this={hostB}></view>
+       </view>`,
       'portal-move',
     );
 
@@ -380,14 +380,14 @@ describe('Portal', () => {
          const control = { hide: () => { visible = false; }, target: () => overlay };
          ${ON_READY}
        </script>
-       <symbiote-view p={{ testID: 'root' }}>
+       <view p={{ testID: 'root' }}>
          {#if visible && overlay}
            <Portal mount={overlay}>
-             {#snippet children()}<symbiote-text p={{ testID: 'ported' }}>transient</symbiote-text>{/snippet}
+             {#snippet children()}<text p={{ testID: 'ported' }}>transient</text>{/snippet}
            </Portal>
          {/if}
-         <symbiote-view p={{ testID: 'overlay-host' }} bind:this={overlay}></symbiote-view>
-       </symbiote-view>`,
+         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+       </view>`,
       'portal-unmount',
     );
 
@@ -432,13 +432,13 @@ describe('Portal', () => {
          const control = { use: (value) => { target = value; } };
          ${ON_READY}
        </script>
-       <symbiote-view p={{ testID: 'source' }}>
+       <view p={{ testID: 'source' }}>
          {#if target}
            <Portal mount={target}>
-             {#snippet children()}<symbiote-text p={{ testID: 'ported' }}>top level</symbiote-text>{/snippet}
+             {#snippet children()}<text p={{ testID: 'ported' }}>top level</text>{/snippet}
            </Portal>
          {/if}
-       </symbiote-view>`,
+       </view>`,
       'portal-surface',
     );
 
@@ -479,16 +479,16 @@ describe('Portal', () => {
          ${OVERLAY_TARGET}
          let node = $derived(hostInstance(overlay));
        </script>
-       <symbiote-view p={{ testID: 'root' }}>
-         <symbiote-view p={{ testID: 'source' }}>
+       <view p={{ testID: 'root' }}>
+         <view p={{ testID: 'source' }}>
            {#if node}
              <Portal mount={node}>
-               {#snippet children()}<symbiote-text p={{ testID: 'ported' }}>raw node</symbiote-text>{/snippet}
+               {#snippet children()}<text p={{ testID: 'ported' }}>raw node</text>{/snippet}
              </Portal>
            {/if}
-         </symbiote-view>
-         <symbiote-view p={{ testID: 'overlay-host' }} bind:this={overlay}></symbiote-view>
-       </symbiote-view>`,
+         </view>
+         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+       </view>`,
       'portal-raw-node',
     );
 
@@ -525,7 +525,7 @@ describe('Portal', () => {
        </script>
        <svelte:boundary {onerror}>
          <Portal mount={target}>
-           {#snippet children()}<symbiote-text p={{}}>nope</symbiote-text>{/snippet}
+           {#snippet children()}<text p={{}}>nope</text>{/snippet}
          </Portal>
        </svelte:boundary>`,
       'portal-bad-target',
@@ -560,7 +560,7 @@ describe('Portal vs createTunnel — where the content’s context resolves', ()
      import { getContext } from 'svelte';
      const origin = getContext('origin') ?? 'nowhere';
    </script>
-   <symbiote-text p={{ testID: 'consumer' }}>{origin}</symbiote-text>`;
+   <text p={{ testID: 'consumer' }}>{origin}</text>`;
 
   const PROVIDER_SOURCE = `<script>
      import { setContext } from 'svelte';
@@ -584,7 +584,7 @@ describe('Portal vs createTunnel — where the content’s context resolves', ()
          import Provider from './.smoke-compiled-ctx-provider.mjs';
          ${OVERLAY_TARGET}
        </script>
-       <symbiote-view p={{ testID: 'root' }}>
+       <view p={{ testID: 'root' }}>
          <Provider origin="call site">
            {#snippet children()}
              {#if overlay}
@@ -596,10 +596,10 @@ describe('Portal vs createTunnel — where the content’s context resolves', ()
          </Provider>
          <Provider origin="landing site">
            {#snippet children()}
-             <symbiote-view p={{ testID: 'overlay-host' }} bind:this={overlay}></symbiote-view>
+             <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
            {/snippet}
          </Provider>
-       </symbiote-view>`,
+       </view>`,
       'ctx-portal',
     );
 
@@ -644,7 +644,7 @@ describe('Portal vs createTunnel — where the content’s context resolves', ()
          import Provider from './.smoke-compiled-ctx-tunnel-provider.mjs';
          const tunnel = createTunnel();
        </script>
-       <symbiote-view p={{ testID: 'root' }}>
+       <view p={{ testID: 'root' }}>
          <Provider origin="call site">
            {#snippet children()}
              <TunnelIn tunnel={tunnel}>
@@ -657,7 +657,7 @@ describe('Portal vs createTunnel — where the content’s context resolves', ()
              <TunnelOut tunnel={tunnel} />
            {/snippet}
          </Provider>
-       </symbiote-view>`,
+       </view>`,
       'ctx-tunnel',
     );
 
@@ -700,16 +700,16 @@ describe('the community `use:portal` action over the DOM shim', () => {
            return { destroy() { node.remove(); } };
          }
        </script>
-       <symbiote-view p={{ testID: 'root' }}>
-         <symbiote-view p={{ testID: 'source' }}>
+       <view p={{ testID: 'root' }}>
+         <view p={{ testID: 'source' }}>
            {#if overlay}
-             <symbiote-view p={{ testID: 'action-wrapper' }} use:portal={overlay}>
-               <symbiote-text p={{ testID: 'action-ported' }}>via action</symbiote-text>
-             </symbiote-view>
+             <view p={{ testID: 'action-wrapper' }} use:portal={overlay}>
+               <text p={{ testID: 'action-ported' }}>via action</text>
+             </view>
            {/if}
-         </symbiote-view>
-         <symbiote-view p={{ testID: 'overlay-host' }} bind:this={overlay}></symbiote-view>
-       </symbiote-view>`,
+         </view>
+         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+       </view>`,
       'portal-action',
     );
 

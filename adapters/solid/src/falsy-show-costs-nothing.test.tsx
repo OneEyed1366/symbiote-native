@@ -16,8 +16,6 @@ import { Show } from 'solid-js';
 import { installFabric } from '@symbiote-native/test-utils';
 import { censusRetainedTree } from '@symbiote-native/engine';
 import { mount, unmount } from './render';
-import { View } from './components/view';
-import { Text } from './components/text';
 
 const fabric = installFabric();
 
@@ -45,17 +43,17 @@ async function costOf(
 describe('a falsy <Show> in a row', () => {
   it('adds neither a native node nor a retained one', async () => {
     const plain = await costOf(9500, () => (
-      <View>
-        <Text>a</Text>
-      </View>
+      <view>
+        <text>a</text>
+      </view>
     ));
     const withFalsyShow = await costOf(9501, () => (
-      <View>
-        <Text>a</Text>
+      <view>
+        <text>a</text>
         <Show when={false}>
-          <Text>b</Text>
+          <text>b</text>
         </Show>
-      </View>
+      </view>
     ));
 
     expect(withFalsyShow).toEqual(plain);
@@ -66,17 +64,17 @@ describe('a falsy <Show> in a row', () => {
   // as "costs nothing" for any conditional at all.
   it('costs both when the condition is true', async () => {
     const plain = await costOf(9502, () => (
-      <View>
-        <Text>a</Text>
-      </View>
+      <view>
+        <text>a</text>
+      </view>
     ));
     const withTruthyShow = await costOf(9503, () => (
-      <View>
-        <Text>a</Text>
+      <view>
+        <text>a</text>
         <Show when={true}>
-          <Text>b</Text>
+          <text>b</text>
         </Show>
-      </View>
+      </view>
     ));
 
     expect(withTruthyShow.created).toBeGreaterThan(plain.created);

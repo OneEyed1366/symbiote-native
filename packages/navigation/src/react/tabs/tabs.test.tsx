@@ -1,7 +1,7 @@
 // Co-located React-driven test (ADR 0025) for the @symbiote-native/navigation React Tab
 // navigator. Unlike Stack (which drives real native RNSScreen views and needs an injected
 // codegen-shaped ViewConfig - see stack.test.tsx), the tab bar is a PURE-JS UI painted from
-// ordinary `symbiote-view`/`symbiote-text` primitives, so no ViewConfig source is needed here at
+// ordinary `view`/`text` primitives, so no ViewConfig source is needed here at
 // all. Proves: only the focused route's screen mounts, jumpTo() moves focus, a tap (synthesized
 // by the engine from a topTouchStart/topTouchEnd pair - core/engine/src/events/index.ts - on the
 // tab button) drives the same jumpTo, and per-tab options (label/badge/tint) reach the tab bar.
@@ -56,7 +56,7 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   return found;
 }
 
-// The tab bar row: the second child of Tab's root `symbiote-view` (content wrapper first, bar
+// The tab bar row: the second child of Tab's root `view` (content wrapper first, bar
 // second - see react/tabs.ts's final createElement).
 function tabBarRow(): IFakeNode {
   const root = fabric.appRoot();
@@ -82,18 +82,18 @@ function tapItem(index: number): void {
 }
 
 function HomeScreen(): ReturnType<typeof createElement> {
-  return createElement('symbiote-text', {}, 'home');
+  return createElement('text', {}, 'home');
 }
 
 function ProfileScreen(): ReturnType<typeof createElement> {
-  return createElement('symbiote-text', {}, 'profile');
+  return createElement('text', {}, 'profile');
 }
 
 // Publishes the live route so the unregister tests below can prove the SURVIVING route kept its
 // identity (key) and accumulated params, not just its label in the bar.
 function TrackedHomeScreen(): ReturnType<typeof createElement> {
   capturedHomeRoute = useRoute();
-  return createElement('symbiote-text', {}, 'home');
+  return createElement('text', {}, 'home');
 }
 
 type ITabHandleRef = { current: ITabNavigatorHandle | null };
@@ -234,7 +234,7 @@ describe('React Tab navigator', () => {
       let receivedParams: unknown;
       function ParamsScreen(): ReturnType<typeof createElement> {
         receivedParams = useRoute().params;
-        return createElement('symbiote-text', {}, 'params');
+        return createElement('text', {}, 'params');
       }
       const ref = createRef<ITabNavigatorHandle>();
       mount(
@@ -295,11 +295,11 @@ describe('React Tab navigator', () => {
         // Merely proving the handle is a real ITabNavigatorHandle (jumpTo/setParams), not the
         // Stack-only shape this Context value was hard-typed to before the widened union.
         expect(typeof navigation.jumpTo).toBe('function');
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
       function TrackedProfileScreen(): ReturnType<typeof createElement> {
         profileIsFocused = useIsFocused();
-        return createElement('symbiote-text', {}, 'profile');
+        return createElement('text', {}, 'profile');
       }
 
       const ref = createRef<ITabNavigatorHandle>();
@@ -343,7 +343,7 @@ describe('React Tab navigator', () => {
             return () => events.push('cleanup');
           }, []),
         );
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
 
       const ref = createRef<ITabNavigatorHandle>();

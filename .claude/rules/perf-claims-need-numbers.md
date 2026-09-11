@@ -95,3 +95,41 @@ changing a benchmark. The must-apply points:
   compares two implementations, not two renderers. Deviation list, the debug numbers, the
   mechanism by which beating stock is legitimate, and the four explanations already ruled out:
   `symbiote-perf-measurement`, "The stock-React-Native baseline".
+
+## An unawaited mutation at the END of a suite stops the NEXT suite's stopwatch
+
+Device-found 2026-09-10 on `examples/svelte`. Every benchmark runner here ends by writing its
+results and clearing the progress block:
+
+```js
+suiteResults = { ...suiteResults, [mode]: entries };
+progress = undefined;
+```
+
+Those two writes CHANGE THE TREE, so they produce a commit — and nothing awaits it. Harmless while a
+suite is the last thing that runs. The moment a second suite starts, its first `runStep` installs a
+`pending` stopwatch synchronously, the orphan commit lands microtasks later, and the post-commit hook
+stops that stopwatch with a commit belonging to the previous run.
+
+`PrimitiveBenchScreen` runs thirteen suites back to back and made it unmissable:
+
+```
+<view>    Create  27.0 ms   FABRIC 1000/0/11      the first section, correct
+<text>    Create   0.4 ms   FABRIC    0/0/12      a thousand cells, ZERO createNode
+<image>   Create   0.4 ms   FABRIC    0/0/12
+…every section after the first
+```
+
+The steps after `Create` were all correct, so the defect reads as one implausible row rather than as
+a broken screen. Fix: wrap the epilogue in an awaited `runStep`, in every runner.
+
+Two things generalise:
+
+- **A counter column is the instrument's own check, not decoration.** `Create` and `Append` must
+  report a non-zero `createNode`; a duration with no work behind it is a mis-attributed commit, not
+  a fast step. Without the FABRIC column this would have read as "the tag path is 60x faster" and
+  gone into a table.
+- **The quiet version of this bug is the one to look for.** On `BenchmarkScreen` the same orphan
+  shifts a whole run by ONE step — every row then carries a plausible number belonging to its
+  neighbour, and nothing looks wrong. That screen invites it (the table has two columns, so
+  all-mounted and virtualized are pressed back to back); it was fixed the same way, unprompted.

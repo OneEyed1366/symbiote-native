@@ -4,7 +4,6 @@
 // examples/svelte/screens/NestedTabHomeScreen.svelte.
 
 import { createMemo } from 'solid-js';
-import { SafeAreaView, Text, View } from '@symbiote-native/solid';
 import { useNavigation } from '@symbiote-native/navigation/solid';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -32,38 +31,38 @@ export function NestedTabHomeScreen() {
   }
 
   return (
-    <SafeAreaView class="screen">
-      <View class="demo-section">
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">
+    <safe-area-view class="screen">
+      <view class="demo-section">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">
             {`${lineInfo.code} · ${lineInfo.label}`}
-          </Text>
-        </View>
-        <View class="hero-card">
-          <View
+          </text>
+        </view>
+        <view class="hero-card">
+          <view
             class="hero-badge"
             style={{ backgroundColor: LINE_COLOR.structure }}
           >
-            <Text class="hero-badge-text">NN</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Nested navigators</Text>
-            <Text class="hero-body">
+            <text class="hero-badge-text">NN</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Nested navigators</text>
+            <text class="hero-body">
               A Tab navigator nested inside a Stack screen, reaching its
               parent's own navigation handle through getParent().
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">
+            </text>
+          </view>
+        </view>
+        <text class="info-text">
           {`parent navigator reachable via getParent(): ${canPopParent() ? 'yes (Stack)' : 'no'}`}
-        </Text>
+        </text>
         <ActionButton
           testID="nested-pop-parent"
           title="Pop parent Stack (via getParent)"
           onPress={popParent}
           color={LINE_COLOR.structure}
         />
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   );
 }

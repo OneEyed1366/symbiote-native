@@ -2,7 +2,7 @@
 // The source's own header documents 5 accepted input shapes: a bare number, an engine host
 // node / public instance (same identity via the toPublicInstance graft — no separate wrapper
 // object), an Angular ElementRef wrapping the host node, a SymbiotePrimitiveHost component
-// instance (the REAL shape an Angular template ref like `<View #myView>` actually produces —
+// instance (the REAL shape an Angular template ref like `<view #myView>` actually produces —
 // see index.ts's top comment), and null/undefined. All five are exercised below; the previous
 // version of this file only covered 3 of the 5 (missing ElementRef and the component-instance
 // wrapper, arguably the most-used real-world path).
@@ -82,7 +82,7 @@ describe('Angular findNodeHandle on the engine', () => {
     });
 
     // why: this is what an Angular template ref on a bare primitive actually resolves to per
-    // index.ts's own header comment — `<View #myView>` hands the CONSUMER
+    // index.ts's own header comment — `<view #myView>` hands the CONSUMER
     // SymbiotePrimitiveHost's component instance, not the engine node directly. Any object
     // exposing a `nativeElement` getter (real or duck-typed) must resolve the same way, since
     // resolveHostNode's structural check (`typeof maybeHost.nativeElement !== 'undefined'`) has

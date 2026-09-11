@@ -56,7 +56,7 @@ export interface IModalProps extends IAccessibilityProps, IAriaProps {
   allowSwipeDismissal?: boolean;
   style?: IStyleProp<IViewStyle>;
   // Like `style`, targets the CONTAINER View renderModal wraps the children in, not the outer
-  // symbiote-modal host — IS in HANDLED_ATTRS below (unlike a plain passthrough prop) so it is
+  // modal host — IS in HANDLED_ATTRS below (unlike a plain passthrough prop) so it is
   // applied explicitly on the container in the final h() call, matching where style lands.
   class?: IClassNameValue;
 }
@@ -196,7 +196,7 @@ export const Modal = defineComponent<IModalProps, IModalEmits>(
         passthrough: resolveAccessibilityProps(forwardAttrs(attrs)),
       });
 
-      // root = symbiote-modal > [container]; the slot children nest UNDER the container View, never
+      // root = modal > [container]; the slot children nest UNDER the container View, never
       // as a direct sibling of the host (RN's modal content layout).
       const [container] = root.children;
       if (typeof container === 'string') return null;

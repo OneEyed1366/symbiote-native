@@ -1,5 +1,4 @@
 import { defineComponent } from 'vue';
-import { Pressable, SafeAreaView, Text, View } from '@symbiote-native/vue';
 import { Drawer, useDrawerNavigation } from '@symbiote-native/navigation/vue';
 import type { IDrawerContentSlotProps } from '@symbiote-native/navigation/vue';
 import { ROUTE_NAME } from '../routes';
@@ -14,30 +13,30 @@ const DrawerHomeScreen = defineComponent(
   () => {
     const navigation = useDrawerNavigation();
     return () => (
-      <SafeAreaView class="screen">
-        <View class="section">
-          <View class={`line-tag line-tag-${drawerLineInfo.line}`}>
-            <Text class="line-tag-text">{`${drawerLineInfo.code} · ${drawerLineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View
+      <safe-area-view class="screen">
+        <view class="section">
+          <view class={`line-tag line-tag-${drawerLineInfo.line}`}>
+            <text class="line-tag-text">{`${drawerLineInfo.code} · ${drawerLineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view
               class="hero-badge"
               style={{ backgroundColor: LINE_COLOR.structure }}
             >
-              <Text class="hero-badge-text">DR</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Drawer</Text>
-              <Text class="hero-body">
+              <text class="hero-badge-text">DR</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Drawer</text>
+              <text class="hero-body">
                 A swipeable drawer sliding in from the right, driven by the
                 navigator's own gesture handler.
-              </Text>
-            </View>
-          </View>
-          <Text class="info-text">
+              </text>
+            </view>
+          </view>
+          <text class="info-text">
             drawerPosition: right · drawerType: slide — swipe from the RIGHT
             edge, or use a button
-          </Text>
+          </text>
           <ActionButton
             testID="drawer-open"
             title="Open drawer"
@@ -50,8 +49,8 @@ const DrawerHomeScreen = defineComponent(
             onPress={() => navigation.value.toggleDrawer()}
             color={LINE_COLOR.structure}
           />
-        </View>
-      </SafeAreaView>
+        </view>
+      </safe-area-view>
     );
   },
   { name: 'DrawerHomeScreen' },
@@ -61,20 +60,20 @@ const DrawerSettingsScreen = defineComponent(
   () => {
     const navigation = useDrawerNavigation();
     return () => (
-      <SafeAreaView class="screen">
-        <View class="section">
-          <View class={`line-tag line-tag-${drawerLineInfo.line}`}>
-            <Text class="line-tag-text">{`${drawerLineInfo.code} · ${drawerLineInfo.label}`}</Text>
-          </View>
-          <Text class="section-label">Drawer demo · Settings</Text>
+      <safe-area-view class="screen">
+        <view class="section">
+          <view class={`line-tag line-tag-${drawerLineInfo.line}`}>
+            <text class="line-tag-text">{`${drawerLineInfo.code} · ${drawerLineInfo.label}`}</text>
+          </view>
+          <text class="section-label">Drawer demo · Settings</text>
           <ActionButton
             testID="drawer-close-from-settings"
             title="Close drawer"
             onPress={() => navigation.value.closeDrawer()}
             color={LINE_COLOR.structure}
           />
-        </View>
-      </SafeAreaView>
+        </view>
+      </safe-area-view>
     );
   },
   { name: 'DrawerSettingsScreen' },
@@ -86,21 +85,21 @@ function renderDrawerContent({
   navigation,
 }: IDrawerContentSlotProps) {
   return (
-    <SafeAreaView testID="drawer-panel" class="section-tight drawer-panel">
-      <Text class="section-label">Menu</Text>
+    <safe-area-view testID="drawer-panel" class="section-tight drawer-panel">
+      <text class="section-label">Menu</text>
       {state.routes.map(route => (
-        <Pressable
+        <pressable
           key={route.key}
           testID={`drawer-menu-${route.name}`}
           class="menu-row"
           onPress={() => navigation.jumpTo(route.name)}
         >
-          <Text class="menu-row-label">
+          <text class="menu-row-label">
             {descriptors[route.key]?.options.drawerLabel ?? route.name}
-          </Text>
-        </Pressable>
+          </text>
+        </pressable>
       ))}
-    </SafeAreaView>
+    </safe-area-view>
   );
 }
 

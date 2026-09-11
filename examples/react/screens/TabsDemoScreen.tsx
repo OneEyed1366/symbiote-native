@@ -1,4 +1,3 @@
-import { SafeAreaView, Text, View } from '@symbiote-native/react';
 import { Tab, useIsFocused } from '@symbiote-native/navigation/react';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -7,62 +6,62 @@ const tabsLineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TabsDemo];
 
 function TabLineTag() {
   return (
-    <View className={`line-tag line-tag-${tabsLineInfo.line}`}>
-      <Text className="line-tag-text">{`${tabsLineInfo.code} · ${tabsLineInfo.label}`}</Text>
-    </View>
+    <view className={`line-tag line-tag-${tabsLineInfo.line}`}>
+      <text className="line-tag-text">{`${tabsLineInfo.code} · ${tabsLineInfo.label}`}</text>
+    </view>
   );
 }
 
 function TabHomeScreen() {
   const isFocused = useIsFocused();
   return (
-    <SafeAreaView className="screen">
-      <View className="section">
+    <safe-area-view className="screen">
+      <view className="section">
         <TabLineTag />
-        <View className="hero-card">
-          <View
+        <view className="hero-card">
+          <view
             className="hero-badge"
             style={{ backgroundColor: LINE_COLOR.structure }}
           >
-            <Text className="hero-badge-text">TB</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Tabs</Text>
-            <Text className="hero-body">
+            <text className="hero-badge-text">TB</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Tabs</text>
+            <text className="hero-body">
               A bottom-tabs navigator — icon, badge, and tint, each tab a real
               native view.
-            </Text>
-          </View>
-        </View>
-        <Text className="info-text">{`focused: ${isFocused}`}</Text>
-      </View>
-    </SafeAreaView>
+            </text>
+          </view>
+        </view>
+        <text className="info-text">{`focused: ${isFocused}`}</text>
+      </view>
+    </safe-area-view>
   );
 }
 
 function TabSearchScreen() {
   const isFocused = useIsFocused();
   return (
-    <SafeAreaView className="screen">
-      <View className="section">
+    <safe-area-view className="screen">
+      <view className="section">
         <TabLineTag />
-        <Text className="section-label">Search tab</Text>
-        <Text className="info-text">{`focused: ${isFocused}`}</Text>
-      </View>
-    </SafeAreaView>
+        <text className="section-label">Search tab</text>
+        <text className="info-text">{`focused: ${isFocused}`}</text>
+      </view>
+    </safe-area-view>
   );
 }
 
 function TabProfileScreen() {
   const isFocused = useIsFocused();
   return (
-    <SafeAreaView className="screen">
-      <View className="section">
+    <safe-area-view className="screen">
+      <view className="section">
         <TabLineTag />
-        <Text className="section-label">Profile tab</Text>
-        <Text className="info-text">{`focused: ${isFocused}`}</Text>
-      </View>
-    </SafeAreaView>
+        <text className="section-label">Profile tab</text>
+        <text className="info-text">{`focused: ${isFocused}`}</text>
+      </view>
+    </safe-area-view>
   );
 }
 

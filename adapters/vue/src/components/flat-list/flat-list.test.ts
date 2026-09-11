@@ -138,9 +138,7 @@ describe('Vue FlatList on the engine', () => {
                 }),
               },
               {
-                item: ({ item }: { item: IRow }) => [
-                  h('symbiote-text', {}, item.label),
-                ],
+                item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
               },
             ),
         }),
@@ -178,9 +176,7 @@ describe('Vue FlatList on the engine', () => {
                 keyExtractor: (item: IRow) => `k-${item.id}`,
               },
               {
-                item: ({ item }: { item: IRow }) => [
-                  h('symbiote-text', {}, item.label),
-                ],
+                item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
               },
             ),
         }),
@@ -220,11 +216,9 @@ describe('Vue FlatList on the engine', () => {
               },
               {
                 item: ({ item }: { item: IRow }) => [
-                  h(
-                    'symbiote-view',
-                    { style: { width: ITEM_WIDTH, height: 40 } },
-                    [h('symbiote-text', {}, item.label)],
-                  ),
+                  h('view', { style: { width: ITEM_WIDTH, height: 40 } }, [
+                    h('text', {}, item.label),
+                  ]),
                 ],
               },
             ),
@@ -257,9 +251,7 @@ describe('Vue FlatList on the engine', () => {
                 keyExtractor: (item: IRow) => `k-${item.id}`,
               },
               {
-                item: ({ item }: { item: IRow }) => [
-                  h('symbiote-text', {}, item.label),
-                ],
+                item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
               },
             ),
         }),
@@ -285,9 +277,7 @@ describe('Vue FlatList on the engine', () => {
                 keyExtractor: (item: IRow) => `k-${item.id}`,
               },
               {
-                item: ({ item }: { item: IRow }) => [
-                  h('symbiote-text', {}, item.label),
-                ],
+                item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
               },
             ),
         }),
@@ -323,9 +313,7 @@ describe('Vue FlatList on the engine', () => {
                 }),
               },
               {
-                item: ({ item }: { item: IRow }) => [
-                  h('symbiote-text', {}, item.label),
-                ],
+                item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
               },
             ),
         }),

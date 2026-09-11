@@ -113,7 +113,7 @@ async function loadProbe(): Promise<Component> {
        const networkState = useNetworkState();
        $effect(() => { onValue(networkState.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'NetworkStateProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

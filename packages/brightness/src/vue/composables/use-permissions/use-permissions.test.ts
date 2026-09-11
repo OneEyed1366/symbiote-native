@@ -79,7 +79,7 @@ function mountPermissions(): ReturnType<typeof usePermissions> {
     defineComponent({
       setup: () => {
         result = usePermissions();
-        return () => h('symbiote-text', {}, 'brightness');
+        return () => h('text', {}, 'brightness');
       },
     }),
   );

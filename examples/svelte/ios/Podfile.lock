@@ -1823,7 +1823,7 @@ PODS:
     - React-utils (= 0.86.0)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.0)
-  - symbiote-navigation (2.2.0):
+  - symbiote-navigation (3.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1845,9 +1845,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-navigation/common (= 2.2.0)
+    - symbiote-navigation/common (= 3.0.0)
     - Yoga
-  - symbiote-navigation/common (2.2.0):
+  - symbiote-navigation/common (3.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1870,7 +1870,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-slider (5.2.0):
+  - symbiote-slider (6.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1891,9 +1891,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-slider/common (= 5.2.0)
+    - symbiote-slider/common (= 6.0.0)
     - Yoga
-  - symbiote-slider/common (5.2.0):
+  - symbiote-slider/common (6.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1915,7 +1915,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-splash-screen (3.2.0):
+  - symbiote-splash-screen (4.0.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2254,9 +2254,9 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-navigation: f193db371a4040a69f0506b350854afc7afe5d56
-  symbiote-slider: 1e19cb0d5e85b5d47d7386fa1c0992c1771be6f8
-  symbiote-splash-screen: 029fcc03b4f4ac8332a5ab47664286feb9aab35f
+  symbiote-navigation: ae2d566325d1d84d2e2fd48f1ab937d7e7a7369e
+  symbiote-slider: e525888a29cb2f3cde2c8e9ff88b51ce255c6272
+  symbiote-splash-screen: 082b03d52ce7abc1d965eb356d808eae3cccba66
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
 PODFILE CHECKSUM: 52535ff777e36b58e86c45571b57df53c0378d71

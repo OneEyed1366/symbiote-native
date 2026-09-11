@@ -130,7 +130,7 @@ function committedWrapper(testID: string): IFakeNode {
   imports: [KeyboardAvoidingView],
   template: `
     <KeyboardAvoidingView [testID]="'kav'" behavior="padding" class="panel">
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </KeyboardAvoidingView>
   `,
 })
@@ -142,7 +142,7 @@ class KeyboardAvoidingViewHostFixture {}
   imports: [KeyboardAvoidingView],
   template: `
     <KeyboardAvoidingView [testID]="'kav'" behavior="padding" [enabled]="false">
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </KeyboardAvoidingView>
   `,
 })
@@ -154,7 +154,7 @@ class KeyboardAvoidingViewDisabledHostFixture {}
   imports: [KeyboardAvoidingView],
   template: `
     <KeyboardAvoidingView [testID]="'kav'" behavior="height">
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </KeyboardAvoidingView>
   `,
 })
@@ -173,7 +173,7 @@ const boundBehavior: { value: IKeyboardAvoidingBehavior } = {
   imports: [KeyboardAvoidingView],
   template: `
     <KeyboardAvoidingView [testID]="'kav'" [behavior]="behavior.value">
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </KeyboardAvoidingView>
   `,
 })

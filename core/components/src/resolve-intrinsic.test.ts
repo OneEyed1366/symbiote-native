@@ -9,8 +9,8 @@ import { describe, expect, it } from 'vitest';
 import { HOST_PRIMITIVES } from '../host-primitives.cjs';
 import { resolveIntrinsicTag } from './resolve-intrinsic';
 
-const BASE = 'symbiote-text-input';
-const MULTILINE = 'symbiote-text-input-multiline';
+const BASE = 'text-input';
+const MULTILINE = 'text-input-multiline';
 
 describe('resolveIntrinsicTag', () => {
   // why: every assertion below is about TextInput, and TextInput's spec entry has been WITHHELD
@@ -46,12 +46,8 @@ describe('resolveIntrinsicTag', () => {
     // why: a primitive with no alternative must pass through by identity, so a renderer can call
     // this unconditionally on every element without branching per tag.
     it('is identity for a primitive that declares no alternative', () => {
-      expect(resolveIntrinsicTag('symbiote-view', { multiline: true })).toBe(
-        'symbiote-view',
-      );
-      expect(resolveIntrinsicTag('symbiote-text', undefined)).toBe(
-        'symbiote-text',
-      );
+      expect(resolveIntrinsicTag('view', { multiline: true })).toBe('view');
+      expect(resolveIntrinsicTag('text', undefined)).toBe('text');
     });
 
     // why: a renderer may hand this a Fabric name or a third-party tag it knows nothing about.

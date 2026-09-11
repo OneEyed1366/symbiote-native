@@ -16,7 +16,7 @@ export class ShimDocument {
   // Our own event names never delegate (§5c: no camelCase name matches Svelte's 23-name
   // DELEGATED_EVENTS list), but a minimal, unattached node converts any stray read into a
   // no-op instead of a crash — one line, per §4's "provide a stub anyway" call.
-  readonly body: ShimElement = new ShimElement('symbiote-view');
+  readonly body: ShimElement = new ShimElement('view');
 
   createElement(tag: string, options?: { is?: string }): ShimElement {
     const element = new ShimElement(tag);

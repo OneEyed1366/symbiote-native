@@ -1,4 +1,4 @@
-// VirtualizedList: real windowing over the existing ScrollView. Only the cells
+// VirtualizedList: real windowing over the `scroll-view` TAG. Only the cells
 // whose computed offset falls inside the visible window (plus a leading/trailing
 // buffer) are rendered; everything above and below is collapsed into two spacer
 // Views whose sizes sum to the off-screen extent, so the scroll thumb and total
@@ -14,9 +14,28 @@
 // from a `commit` dispatched in a layout effect (before paint, so MVCP's shift lands without a
 // visible jump). Lists have no Descriptor render fn — the cell content is React's own children.
 //
-// Imperative scrolling resolves to an offset in the reducer and rides the ScrollView's native
-// scrollTo command via its handle ref, animated by default. The `contentOffset` prop is only a
-// fallback for the pre-mount window (handle not yet attached).
+// Imperative scrolling resolves to an offset in the reducer and rides the scroll node's native
+// scrollTo command, animated by default. The `contentOffset` prop is only a fallback for the
+// pre-mount window (the node not yet attached).
+//
+// WHAT IS STILL THIS COMPONENT'S, now that the scroll view is a tag and the engine owns its
+// content node, its sticky seam and its RefreshControl placement — checked rather than assumed,
+// because "the wrapper is gone" and "nothing is left" are different claims:
+//
+//   the WINDOW           `reduceList` decides which indices are in view, and this file is what
+//                        turns that into elements. The output SHAPE is decided in JS from the
+//                        app's own data through `renderItem` — the one disqualifier that no
+//                        engine seam removes (`.claude/rules/host-primitive-tier.md`, tier 3).
+//   the CELL WRAPPERS    a measuring `view` per cell with the inversion counter-flip, the two
+//                        spacers, the header/footer/empty slots, the separator INSIDE the cell.
+//   the LIFECYCLE        native events -> actions, effects run with React primitives (timers, a
+//                        forced re-render, a layout effect for MVCP), one state cell.
+//   the HANDLE           `buildScrollViewHandle` over the node a `ref` hands back, plus the list's
+//                        own imperative surface on top of it.
+//
+// What is NOT: the content node, `contentContainerStyle`'s routing, where a RefreshControl goes
+// per platform, and how a sticky header pins. The list names `sticky-header` on a cell and knows
+// nothing else about it.
 
 import {
   createElement,
@@ -50,6 +69,7 @@ import {
   INVERTED_X_STYLE,
   INVERTED_Y_STYLE,
   buildListPlan,
+  buildScrollViewHandle,
   buildViewabilityPairs,
   createInitialListState,
   isSeparatorGapInRange,
@@ -72,12 +92,11 @@ import {
   type IViewabilityConfigCallbackPair,
   type IVirtualizedListHandle,
 } from '@symbiote-native/components';
-import {
-  ScrollView,
-  type IScrollViewHandle,
-  type IScrollViewProps,
-} from '../scroll-view';
-import { RefreshControl } from '../refresh-control';
+import type {
+  IScrollViewHandle,
+  IScrollViewProps,
+} from '../scroll-view/scroll-view-props';
+import type { IRefreshControlProps } from '../refresh-control-props';
 import type {
   IAccessibilityProps,
   IAriaProps,
@@ -130,9 +149,9 @@ export interface IVirtualizedListProps<ItemT>
   // start (the top edge), mirroring onEndReached for the bottom.
   onStartReached?: (info: { distanceFromStart: number }) => void;
   onStartReachedThreshold?: number;
-  // Pull-to-refresh. When onRefresh is set, RN renders a RefreshControl into the
-  // inner ScrollView's refreshControl prop; refreshing is the controlled spinner
-  // state (defaulted to false when nullish), progressViewOffset nudges its rest.
+  // Pull-to-refresh. When onRefresh is set the list writes a `<refresh-control>` as the scroll
+  // tag's first CHILD and the behavior claims it; refreshing is the controlled spinner state
+  // (defaulted to false when nullish), progressViewOffset nudges its rest.
   onRefresh?: () => void;
   refreshing?: boolean | null;
   progressViewOffset?: number;
@@ -327,7 +346,15 @@ export function VirtualizedList<ItemT>(
   const [commandedOffset, setCommandedOffset] = useState<
     { x: number; y: number } | undefined
   >(undefined);
-  const scrollViewRef = useRef<IScrollViewHandle>(null);
+  // The engine node of the scroll TAG. A `ref` on an intrinsic hands back the host instance, so
+  // there is no wrapper left to run a `useImperativeHandle` — `buildScrollViewHandle` is what turns
+  // the node into RN's scroll surface, and it is the same function every other adapter feeds from
+  // its own host-instance accessor. Lazy getter: the node is null until commit.
+  const scrollNodeRef = useRef<ISymbioteNode | null>(null);
+  const scrollHandle = useMemo<IScrollViewHandle>(
+    () => buildScrollViewHandle(() => scrollNodeRef.current),
+    [],
+  );
   // Pending minimumViewTime debounce timer / the incremental-fill timer (adapter owns the timers;
   // the reducer only asks for a delay).
   const viewableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -348,11 +375,11 @@ export function VirtualizedList<ItemT>(
       const target = isHorizontal
         ? { x: clamped, y: EMPTY_OFFSET }
         : { x: EMPTY_OFFSET, y: clamped };
-      if (scrollViewRef.current !== null) {
+      if (scrollNodeRef.current !== null) {
         dlog(
           `VirtualizedList scrollTo offset=${clamped} animated=${animated} (horizontal=${isHorizontal})`,
         );
-        scrollViewRef.current.scrollTo({ x: target.x, y: target.y, animated });
+        scrollHandle.scrollTo({ x: target.x, y: target.y, animated });
         return;
       }
       dlog(
@@ -576,20 +603,24 @@ export function VirtualizedList<ItemT>(
         dispatch({ kind: 'scroll-to-end', animated: params?.animated ?? true });
       },
       flashScrollIndicators: (): void => {
-        scrollViewRef.current?.flashScrollIndicators?.();
+        scrollHandle.flashScrollIndicators?.();
       },
-      getNativeScrollRef: (): IScrollViewHandle | null => scrollViewRef.current,
-      getScrollableNode: (): IScrollViewHandle | null => scrollViewRef.current,
-      getScrollResponder: (): IScrollViewHandle | null => scrollViewRef.current,
-      getScrollNode: (): ISymbioteNode | null =>
-        scrollViewRef.current?.getScrollNode() ?? null,
+      // Null until the tag commits, so these keep RN's "no scroll view yet" answer rather than
+      // handing back a handle that would silently no-op.
+      getNativeScrollRef: (): IScrollViewHandle | null =>
+        scrollNodeRef.current !== null ? scrollHandle : null,
+      getScrollableNode: (): IScrollViewHandle | null =>
+        scrollNodeRef.current !== null ? scrollHandle : null,
+      getScrollResponder: (): IScrollViewHandle | null =>
+        scrollNodeRef.current !== null ? scrollHandle : null,
+      getScrollNode: (): ISymbioteNode | null => scrollNodeRef.current,
       // Manual trigger for RN's recordInteraction: flip the interaction flag so
       // waitForInteraction viewability configs start reporting.
       recordInteraction: (): void => {
         dispatch({ kind: 'record-interaction' });
       },
     }),
-    [dispatch],
+    [dispatch, scrollHandle],
   );
 
   // After-commit pass: run the deferred effects (batch fill, edge-reached, viewability,
@@ -622,21 +653,16 @@ export function VirtualizedList<ItemT>(
     stickyHeaderIndices !== undefined
       ? new Set(stickyHeaderIndices)
       : undefined;
-  let renderedStickyIndices: number[] = [];
 
   const header = resolveElement(ListHeaderComponent);
   if (header !== undefined) {
-    children.push(
-      createElement('symbiote-view', { key: 'list-header' }, header),
-    );
+    children.push(createElement('view', { key: 'list-header' }, header));
   }
 
   if (count === FIRST_INDEX) {
     const empty = resolveElement(ListEmptyComponent);
     if (empty !== undefined) {
-      children.push(
-        createElement('symbiote-view', { key: 'list-empty' }, empty),
-      );
+      children.push(createElement('view', { key: 'list-empty' }, empty));
     }
   } else {
     // The shared plan: spacer extents, in-window cell keys, and the sticky child positions.
@@ -651,11 +677,16 @@ export function VirtualizedList<ItemT>(
       stickyIndices: stickySet,
       hasHeader: header !== undefined,
     });
-    renderedStickyIndices = plan.stickyChildPositions;
+    // `plan.stickyChildPositions` is deliberately NOT read. It was the input to the wrapper's own
+    // JS sticky pass, and the behavior honours `stickyHeaderIndices` by numbering the OWNER's paint
+    // children — which a windowed list cannot supply: it paints a header, a spacer and a slice, so
+    // data index 3 is almost never paint child 3, and the positions would have to be recomputed
+    // every time the window slides. The cells that should pin carry the `sticky-header` TAG
+    // instead, which pins by document order and survives windowing.
 
     if (plan.leadingExtent > EMPTY_OFFSET) {
       children.push(
-        createElement('symbiote-view', {
+        createElement('view', {
           key: 'spacer-leading',
           style: horizontal
             ? { width: plan.leadingExtent }
@@ -679,7 +710,10 @@ export function VirtualizedList<ItemT>(
       });
       children.push(
         createElement(
-          'symbiote-view',
+          // Sticky by construction — `forcedStickyCell` exists only for an index in `stickySet` —
+          // and the SAME tag the in-window branch below uses, so a cell crossing between the two
+          // keeps its element type as well as its key and never remounts.
+          'sticky-header',
           {
             key: `cell-${plan.forcedStickyCell.key}`,
             onLayout: makeCellMeasure(forcedIndex),
@@ -696,7 +730,7 @@ export function VirtualizedList<ItemT>(
 
     if (plan.gapExtent > EMPTY_OFFSET) {
       children.push(
-        createElement('symbiote-view', {
+        createElement('view', {
           key: 'spacer-gap',
           style: horizontal
             ? { width: plan.gapExtent }
@@ -738,9 +772,15 @@ export function VirtualizedList<ItemT>(
           : undefined;
       // Wrap each cell in a measuring View. When inverted, each cell carries the counter-flip so
       // its content reads upright inside the flipped content container.
+      //
+      // A cell the app flagged sticky is wrapped in the `sticky-header` TAG instead — same
+      // position, same key, same `onLayout` (the behavior forwards it rather than replacing it),
+      // and the engine finds this scroll view by walking up. Nothing here computes a child index:
+      // the collision point comes from the owner's DOCUMENT order, which is the one form that
+      // survives windowing.
       children.push(
         createElement(
-          'symbiote-view',
+          stickySet?.has(planCell.index) === true ? 'sticky-header' : 'view',
           {
             key: `cell-${planCell.key}`,
             onLayout: makeCellMeasure(planCell.index),
@@ -758,7 +798,7 @@ export function VirtualizedList<ItemT>(
 
     if (plan.trailingExtent > EMPTY_OFFSET) {
       children.push(
-        createElement('symbiote-view', {
+        createElement('view', {
           key: 'spacer-trailing',
           style: horizontal
             ? { width: plan.trailingExtent }
@@ -770,9 +810,7 @@ export function VirtualizedList<ItemT>(
 
   const footer = resolveElement(ListFooterComponent);
   if (footer !== undefined) {
-    children.push(
-      createElement('symbiote-view', { key: 'list-footer' }, footer),
-    );
+    children.push(createElement('view', { key: 'list-footer' }, footer));
   }
 
   // A horizontal list pins the content container to the full row width so the row overflows for
@@ -793,10 +831,13 @@ export function VirtualizedList<ItemT>(
     ...accessibilityRest,
     style: resolvedStyle,
     contentContainerStyle: resolvedContentContainerStyle,
-    horizontal,
     onScroll,
     onLayout: onViewportLayout,
   };
+  // `horizontal` is NOT in the bag: the axis is the TAG (`horizontal-scroll-view`), because Android
+  // scrolls the two axes with different native ViewManagers. The behavior's own fold deletes the
+  // prop and rewrites it from the tag, so passing it would be at best redundant and at worst a
+  // contradiction it has to warn about.
   if (onScrollBeginDrag !== undefined)
     scrollProps.onScrollBeginDrag = onScrollBeginDrag;
   if (onScrollEndDrag !== undefined)
@@ -814,9 +855,6 @@ export function VirtualizedList<ItemT>(
   // A pending imperative/initial scroll rides down as contentOffset (fresh identity each push).
   if (commandedOffset !== undefined)
     scrollProps.contentOffset = commandedOffset;
-  // Headers in the window stick; an empty list leaves the prop off entirely.
-  if (renderedStickyIndices.length > 0)
-    scrollProps.stickyHeaderIndices = renderedStickyIndices;
   // Forward maintainVisibleContentPosition to the native ScrollView so it anchors in-window cells.
   // minIndexForVisible is bumped by 1 when a ListHeaderComponent occupies child 0.
   if (maintainVisibleContentPosition !== undefined) {
@@ -828,21 +866,30 @@ export function VirtualizedList<ItemT>(
     };
   }
 
-  // Pull-to-refresh: when onRefresh is set, build a RefreshControl for the ScrollView's
-  // refreshControl prop. refreshing is RN-required alongside onRefresh, default false when nullish.
-  if (onRefresh !== undefined) {
+  // Pull-to-refresh: when onRefresh is set, the RefreshControl is an ordinary FIRST CHILD on both
+  // platforms rather than a prop. The scroll behavior CLAIMS it, so the engine keeps it beside the
+  // content view on iOS and inverts the tree on Android; everything after it lands in the content
+  // node the behavior built. refreshing is RN-required alongside onRefresh, default false.
+  const refreshControl =
+    onRefresh !== undefined
+      ? createElement('refresh-control', {
+          key: 'refresh-control',
+          refreshing: refreshing ?? false,
+          onRefresh,
+          progressViewOffset,
+        } satisfies IRefreshControlProps & { key: string })
+      : undefined;
+  if (refreshControl !== undefined) {
     dlog('VirtualizedList wiring RefreshControl (onRefresh provided)');
-    scrollProps.refreshControl = createElement(RefreshControl, {
-      refreshing: refreshing ?? false,
-      onRefresh,
-      progressViewOffset,
-    });
   }
 
-  // The ScrollView handle (ref) backs animated imperative scrolls via its native command.
+  // The scroll TAG, not a wrapper: the engine builds the content node, carries
+  // `contentContainerStyle` onto it and places the refresh control. `ref` hands back the engine
+  // node, which is what `buildScrollViewHandle` drives for the imperative scrolls.
   return createElement(
-    ScrollView,
-    { ...scrollProps, ref: scrollViewRef },
+    horizontal ? 'horizontal-scroll-view' : 'scroll-view',
+    { ...scrollProps, ref: scrollNodeRef },
+    refreshControl,
     ...children,
   );
 }

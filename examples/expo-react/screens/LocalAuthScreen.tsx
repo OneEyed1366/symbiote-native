@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/react';
+import { Platform } from '@symbiote-native/react';
 import {
   AuthenticationType,
   SecurityLevel,
@@ -69,9 +63,9 @@ function CapabilityBadge({ status }: { status: ICapabilityStatus }) {
   const label =
     status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
-    <View className={`auth-status-badge auth-status-badge-${status}`}>
-      <Text className="auth-status-text">{label}</Text>
-    </View>
+    <view className={`auth-status-badge auth-status-badge-${status}`}>
+      <text className="auth-status-text">{label}</text>
+    </view>
   );
 }
 
@@ -85,19 +79,19 @@ function CapabilityRow({
   status: ICapabilityStatus;
 }) {
   return (
-    <View testID={testID} className="auth-capability-row">
-      <Text className="auth-capability-label">{label}</Text>
+    <view testID={testID} className="auth-capability-row">
+      <text className="auth-capability-label">{label}</text>
       <CapabilityBadge status={status} />
-    </View>
+    </view>
   );
 }
 
 function ValueRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="auth-capability-row">
-      <Text className="auth-capability-label">{label}</Text>
-      <Text className="auth-value-text">{value}</Text>
-    </View>
+    <view className="auth-capability-row">
+      <text className="auth-capability-label">{label}</text>
+      <text className="auth-value-text">{value}</text>
+    </view>
   );
 }
 
@@ -162,34 +156,34 @@ export function LocalAuthScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="local-auth-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Local auth</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Local auth</text>
+            <text className="hero-body">
               @symbiote-native/local-auth — FaceID/TouchID on iOS, the
               Fingerprint/Biometric API on Android. A simulator with no enrolled
               biometrics reports "not enrolled"; a real device with
               FaceID/TouchID/fingerprint set up is needed to see a live prompt.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="local-auth-capabilities-card" className="auth-card">
-          <View className="auth-card-header">
-            <Text className="auth-card-title">Capabilities</Text>
-          </View>
+        <view testID="local-auth-capabilities-card" className="auth-card">
+          <view className="auth-card-header">
+            <text className="auth-card-title">Capabilities</text>
+          </view>
           <CapabilityRow
             testID="local-auth-hardware"
             label="Hardware present"
@@ -218,16 +212,16 @@ export function LocalAuthScreen() {
                   : supportedTypes.map(authenticationTypeLabel).join(', ')
             }
           />
-        </View>
+        </view>
 
-        <View testID="local-auth-authenticate-card" className="auth-card">
-          <View className="auth-card-header">
-            <Text className="auth-card-title">Authenticate</Text>
-          </View>
-          <Text className="info-text">
+        <view testID="local-auth-authenticate-card" className="auth-card">
+          <view className="auth-card-header">
+            <text className="auth-card-title">Authenticate</text>
+          </view>
+          <text className="info-text">
             Prompts FaceID/TouchID on iOS, or the Biometric/Fingerprint dialog
             on Android.
-          </Text>
+          </text>
           <ActionButton
             testID="local-auth-authenticate-button"
             title={isAuthenticating ? 'Authenticating…' : 'Authenticate'}
@@ -243,19 +237,19 @@ export function LocalAuthScreen() {
             />
           )}
           {authResult && (
-            <View
+            <view
               testID="local-auth-result"
               className={`auth-result auth-result-${authResult.success ? 'success' : 'error'}`}
             >
-              <Text className="auth-result-text">
+              <text className="auth-result-text">
                 {authResult.success
                   ? 'Success'
                   : `Failed: ${authResult.error}${authResult.warning ? ` (${authResult.warning})` : ''}`}
-              </Text>
-            </View>
+              </text>
+            </view>
           )}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

@@ -35,10 +35,10 @@ import { registerTextInputBehavior } from './text-input';
 const fabric = installFabric();
 let nextRootTag = 9400;
 
-const LOWERED = 'symbiote-text-input';
-const LOWERED_MULTILINE = 'symbiote-text-input-multiline';
-const MANAGED = 'symbiote-text-input-managed';
-const MANAGED_MULTILINE = 'symbiote-text-input-multiline-managed';
+const LOWERED = 'text-input';
+const LOWERED_MULTILINE = 'text-input-multiline';
+const MANAGED = 'text-input-managed';
+const MANAGED_MULTILINE = 'text-input-multiline-managed';
 
 // Built the way an ADAPTER builds it: the Fabric view name and the intrinsic tag are separate
 // arguments, because the node only ever carries the resolved name while the registry is keyed by

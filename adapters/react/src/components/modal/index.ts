@@ -70,11 +70,11 @@ export interface IModalProps extends IAccessibilityProps, IAriaProps {
 }
 
 export const Modal: FC<IModalProps> = rawProps => {
-  // Modal owns its host element (symbiote-modal), so it folds aria/role here; the resolved fields
+  // Modal owns its host element (modal), so it folds aria/role here; the resolved fields
   // ride the host node via `...passthrough`. The events (onShow/onDismiss/onRequestClose/
   // onOrientationChange) are real ViewConfig DirectEvents, so they too ride passthrough raw.
   // className is pulled out here, like style, and applied to the CONTAINER element below — left in
-  // ...passthrough it would land on the outer symbiote-modal host instead (renderModal composes
+  // ...passthrough it would land on the outer modal host instead (renderModal composes
   // `style` into the container's style, not the host's).
   const {
     visible,
@@ -125,7 +125,7 @@ export const Modal: FC<IModalProps> = rawProps => {
     passthrough,
   });
 
-  // root = symbiote-modal > [container]; the user children nest UNDER the container View, never as
+  // root = modal > [container]; the user children nest UNDER the container View, never as
   // a direct sibling of the host (RN's modal content layout).
   const [container] = root.children;
   if (typeof container === 'string') return null;

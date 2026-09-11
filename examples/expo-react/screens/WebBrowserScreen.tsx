@@ -1,12 +1,5 @@
 import { useCallback, useState } from 'react';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/react';
+import { Platform } from '@symbiote-native/react';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -119,37 +112,37 @@ export function WebBrowserScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="web-browser-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Web Browser</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Web Browser</text>
+            <text className="hero-body">
               @symbiote-native/web-browser — an in-app browser that keeps the
               user inside the app, unlike Linking.openURL, plus the OAuth auth
               session.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="web-browser-open-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Open a url</Text>
-          </View>
-          <TextInput
+        <view testID="web-browser-open-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Open a url</text>
+          </view>
+          <text-input
             testID="web-browser-url-input"
             value={url}
-            onValueChange={setUrl}
+            onValueChange={event => setUrl(event.text)}
             placeholder="https://example.com"
             placeholderTextColor="#41506a"
             autoCapitalize="none"
@@ -167,42 +160,42 @@ export function WebBrowserScreen() {
             onPress={handleDismiss}
             color={lineColor}
           />
-          <Text className="info-text">
+          <text className="info-text">
             iOS resolves once the browser closes (cancel, or dismiss when closed
             by dismissBrowser); Android resolves opened as soon as the Custom
             Tab launches. Dismiss is iOS-only and rejects on Android.
-          </Text>
-          <View className="capability-row">
-            <Text className="capability-label">Last result</Text>
-            <Text testID="web-browser-result" className="value-text">
+          </text>
+          <view className="capability-row">
+            <text className="capability-label">Last result</text>
+            <text testID="web-browser-result" className="value-text">
               {lastResult}
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
         {isAndroid ? (
-          <View testID="web-browser-custom-tabs-card" className="feature-card">
-            <View className="feature-card-header">
-              <Text className="feature-card-title">Custom Tabs service</Text>
-            </View>
-            <Text className="info-text">
+          <view testID="web-browser-custom-tabs-card" className="feature-card">
+            <view className="feature-card-header">
+              <text className="feature-card-title">Custom Tabs service</text>
+            </view>
+            <text className="info-text">
               Android only. getCustomTabsSupportingBrowsersAsync throws on iOS —
               its native stub is registered without the Async suffix, so the
               availability check fires before the not-Android branch — so this
               whole card is gated on Platform.OS.
-            </Text>
+            </text>
             <ActionButton
               testID="web-browser-query-browsers-button"
               title="List supporting browsers"
               onPress={handleQueryBrowsers}
               color={lineColor}
             />
-            <View className="capability-row">
-              <Text className="capability-label">Browsers</Text>
-              <Text testID="web-browser-custom-tabs" className="value-text">
+            <view className="capability-row">
+              <text className="capability-label">Browsers</text>
+              <text testID="web-browser-custom-tabs" className="value-text">
                 {customTabsSummary}
-              </Text>
-            </View>
+              </text>
+            </view>
             <ActionButton
               testID="web-browser-warm-up-button"
               title="Warm up"
@@ -221,9 +214,9 @@ export function WebBrowserScreen() {
               onPress={handleCoolDown}
               color={lineColor}
             />
-          </View>
+          </view>
         ) : null}
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

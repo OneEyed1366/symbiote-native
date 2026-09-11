@@ -13,7 +13,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import {
   Animated,
   AnimatedView,
-  Button,
+  ButtonElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -28,12 +28,12 @@ const FREEZE_MS = 1500;
 @Component({
   selector: 'AnimatedDemo',
   standalone: true,
-  imports: [View, Text, Button, AnimatedView],
+  imports: [View, Text, ButtonElement, AnimatedView],
   template: `
-    <View class="section-nested">
-      <Text class="section-label">Animated · JS vs native driver</Text>
+    <view class="section-nested">
+      <text class="section-label">Animated · JS vs native driver</text>
 
-      <View class="pulse-frame">
+      <view class="pulse-frame">
         <AnimatedView
           testID="pulse-dot"
           class="pulse-dot"
@@ -42,43 +42,43 @@ const FREEZE_MS = 1500;
             transform: [{ scale: pulseScale }],
           }"
         ></AnimatedView>
-      </View>
+      </view>
 
-      <View class="slide-track">
+      <view class="slide-track">
         <AnimatedView
           testID="slide-js-dot"
           class="js-slide-dot"
           [style]="{ transform: [{ translateX: jsX }] }"
         ></AnimatedView>
-      </View>
-      <Button
+      </view>
+      <button
         testID="slide-js-btn"
         title="Slide (JS driver)"
         (press)="slideJsDriver()"
         color="#dd0031"
-      ></Button>
+      ></button>
 
-      <View class="slide-track">
+      <view class="slide-track">
         <AnimatedView
           testID="slide-native-dot"
           class="native-slide-dot"
           [style]="{ transform: [{ translateX: nativeX }] }"
         ></AnimatedView>
-      </View>
-      <Button
+      </view>
+      <button
         testID="slide-native-btn"
         title="Slide (native driver)"
         (press)="slideNativeDriver()"
         color="#68d391"
-      ></Button>
+      ></button>
 
-      <Button
+      <button
         testID="freeze-js-btn"
         title="Freeze JS 1.5s"
         (press)="freezeJs()"
         color="#fc8181"
-      ></Button>
-    </View>
+      ></button>
+    </view>
   `,
 })
 export class AnimatedDemo implements OnInit, OnDestroy {

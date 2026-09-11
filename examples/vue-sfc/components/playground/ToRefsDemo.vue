@@ -6,7 +6,6 @@
 -->
 <script setup lang="ts">
 import { reactive, toRef, toRefs } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 
 const state = reactive({ label: 'unchanged', score: 0 });
@@ -24,12 +23,12 @@ function relabel(): void {
 </script>
 
 <template>
-  <View class="a11y-card">
-    <Text class="switch-label">toRef + toRefs</Text>
-    <Text class="list-row-text" testID="torefs-values">{{
+  <view class="a11y-card">
+    <text class="switch-label">toRef + toRefs</text>
+    <text class="list-row-text" testID="torefs-values">{{
       `toRef(state,'label')=${label} · toRefs(state).score=${score} · state.score=${state.score}`
-    }}</Text>
-    <View class="row-tight">
+    }}</text>
+    <view class="row-tight">
       <ActionButton
         testID="torefs-bump-score"
         title="score.value++"
@@ -42,6 +41,6 @@ function relabel(): void {
         :onPress="relabel"
         color="#f5a623"
       />
-    </View>
-  </View>
+    </view>
+  </view>
 </template>

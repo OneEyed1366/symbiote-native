@@ -9,7 +9,6 @@
 -->
 <script setup lang="ts">
 import { shallowRef, triggerRef } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 
 const box = shallowRef({ tick: 0 });
@@ -25,12 +24,12 @@ function mutateAndTrigger(): void {
 </script>
 
 <template>
-  <View class="a11y-card">
-    <Text class="switch-label">shallowRef + triggerRef</Text>
-    <Text class="list-row-text" testID="shallowref-tick">{{
+  <view class="a11y-card">
+    <text class="switch-label">shallowRef + triggerRef</text>
+    <text class="list-row-text" testID="shallowref-tick">{{
       `box.value.tick (as last rendered) = ${box.tick}`
-    }}</Text>
-    <View class="row-tight">
+    }}</text>
+    <view class="row-tight">
       <ActionButton
         testID="shallowref-mutate-silent"
         title="mutate silently"
@@ -43,6 +42,6 @@ function mutateAndTrigger(): void {
         :onPress="mutateAndTrigger"
         color="#f5a623"
       />
-    </View>
-  </View>
+    </view>
+  </view>
 </template>

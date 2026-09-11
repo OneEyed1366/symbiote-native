@@ -34,13 +34,10 @@ import type { Component, Ref } from '@vue/runtime-core';
 import * as engine from '@symbiote-native/engine';
 import { clearGlobalStyles } from '@symbiote-native/engine';
 import * as vueAdapter from '@symbiote-native/vue';
-import {
-  mount,
-  unmount,
-  Pressable as PressableComponent,
-  Text as TextComponent,
-  View as ViewComponent,
-} from '@symbiote-native/vue';
+import { mount, unmount } from '@symbiote-native/vue';
+// The behaviors the bare tags reach. `pressable`'s fold is one of the cases below, and an
+// unregistered tag would commit a bare view with the raw props still on it.
+import './src/register';
 import {
   installFabric,
   waitUntil,
@@ -103,8 +100,9 @@ function evaluate(code: string): Component {
   return component as Component;
 }
 
-const FIXTURE_IMPORTS = `import { View, Text, Pressable } from '@symbiote-native/vue';
-import { liveId, makeId, bag } from '#fixture';`;
+// No primitive import: `view` / `text` / `pressable` are TAGS, and that is the point of the arms
+// below — the folds have to reach a bare element with no component body to run them.
+const FIXTURE_IMPORTS = `import { liveId, makeId, bag } from '#fixture';`;
 
 async function sfcArm(template: string): Promise<Component> {
   const source = `<script setup lang="ts">
@@ -154,13 +152,16 @@ async function render(
   return payloads;
 }
 
-// The three arms of one case. `component` is written with h() against the real wrapper, which is
-// the reference: it is the path that has always folded correctly.
+// The three arms of one case. `handWritten` is Vue's FOURTH path — a bare `h('view', …)` no
+// compiler ever sees — and it is the reference the two compiled arms are held against. It used to
+// be `h(ViewComponent, …)`; the wrappers are gone, so the reference had to become the path that
+// still reaches the renderer with nothing in front of it, which is also the path a transform could
+// never have covered.
 type IFoldCase = {
   what: string;
   sfc: string;
   jsx: string;
-  component: () => unknown;
+  handWritten: () => unknown;
   // What must reach Fabric, per committed node in tree order. The half of the oracle that survives
   // a fold being deleted from the layer all three arms share.
   expected: ReadonlyArray<Record<string, unknown>>;
@@ -168,30 +169,34 @@ type IFoldCase = {
 
 const CASES: readonly IFoldCase[] = [
   {
-    what: 'a static id on a View',
-    sfc: '<View id="x" />',
-    jsx: '<View id="x" />',
-    component: () => h(ViewComponent, { id: 'x' }),
+    what: 'a static id on a view',
+    sfc: '<view id="x" />',
+    jsx: '<view id="x" />',
+    handWritten: () => h('view', { id: 'x' }),
     expected: [{ nativeID: 'x' }],
   },
   {
     // A bound value the transform cannot read as a literal — the shape that would break a
     // compile-time rename reading the attribute's text.
     what: 'a computed id the transform cannot read literally',
-    sfc: '<View :id="makeId()" />',
-    jsx: '<View id={makeId()} />',
-    component: () => h(ViewComponent, { id: 'computed' }),
+    sfc: '<view :id="makeId()" />',
+    jsx: '<view id={makeId()} />',
+    handWritten: () => h('view', { id: 'computed' }),
     expected: [{ nativeID: 'computed' }],
   },
   {
     // Pressable's only fold is the same alias, and it reaches the node through the same patchProp
     // line as View's. Pinned anyway rather than argued from placement — that argument is exactly
     // what this file exists to stop trusting.
-    what: 'a static id on a lowered Pressable',
-    sfc: '<Pressable id="p" />',
-    jsx: '<Pressable id="p" />',
-    component: () => h(PressableComponent, { id: 'p' }),
-    expected: [{ nativeID: 'p' }],
+    what: 'a static id on a pressable',
+    sfc: '<pressable id="p" />',
+    jsx: '<pressable id="p" />',
+    handWritten: () => h('pressable', { id: 'p' }),
+    // `accessible` (Pressable.js:252) and `focusable` (Pressable.js:258) are RN's own defaults;
+    // this previously pinned their absence, i.e. a divergence from RN that every adapter shared.
+    // `focusable` is the ONE-leg Pressable form — a Touchable* resolves its own three-leg version
+    // (TouchableOpacity.js:336-340) and hands the answer down as this prop.
+    expected: [{ nativeID: 'p', accessible: true, focusable: true }],
   },
   {
     // The aria/role fold, which the engine now applies in `fabricProps` — the one point that sees
@@ -200,9 +205,9 @@ const CASES: readonly IFoldCase[] = [
     // the failure this case exists to catch, and full-payload equality states that without a
     // separate "not.toHaveProperty" per alias.
     what: 'role and aria-label fold into accessibility* and leave no alias behind',
-    sfc: '<View role="button" aria-label="x" />',
-    jsx: '<View role="button" aria-label="x" />',
-    component: () => h(ViewComponent, { role: 'button', 'aria-label': 'x' }),
+    sfc: '<view role="button" aria-label="x" />',
+    jsx: '<view role="button" aria-label="x" />',
+    handWritten: () => h('view', { role: 'button', 'aria-label': 'x' }),
     expected: [{ accessibilityRole: 'button', accessibilityLabel: 'x' }],
   },
   {
@@ -215,10 +220,10 @@ const CASES: readonly IFoldCase[] = [
     // overwrite 'explicit' with 'alias' here — and only on the wrapper arm, which is why the arms
     // are compared to each other and not just to `expected`.
     what: 'an explicit accessibilityLabel beats aria-label, and survives a second fold',
-    sfc: '<View accessibility-label="explicit" aria-label="alias" />',
-    jsx: '<View accessibilityLabel="explicit" aria-label="alias" />',
-    component: () =>
-      h(ViewComponent, {
+    sfc: '<view accessibility-label="explicit" aria-label="alias" />',
+    jsx: '<view accessibilityLabel="explicit" aria-label="alias" />',
+    handWritten: () =>
+      h('view', {
         accessibilityLabel: 'explicit',
         'aria-label': 'alias',
       }),
@@ -232,13 +237,13 @@ const CASES: readonly IFoldCase[] = [
     // yields `checked: false` — with every component-level test still green, because the wrapper
     // path happens to agree.
     what: 'aria-checked wins per field inside an explicit accessibilityState',
-    sfc: '<View :accessibility-state="{ checked: false, busy: true }" :aria-checked="true" />',
+    sfc: '<view :accessibility-state="{ checked: false, busy: true }" :aria-checked="true" />',
     // Hyphenated in JSX too, deliberately: RN's public prop IS `aria-checked` and the camelCase
     // spelling is only View.js's own destructuring alias, so `ariaChecked={true}` would be a key
     // nothing folds. Writing it that way here failed this case once — correctly.
-    jsx: '<View accessibilityState={{ checked: false, busy: true }} aria-checked={true} />',
-    component: () =>
-      h(ViewComponent, {
+    jsx: '<view accessibilityState={{ checked: false, busy: true }} aria-checked={true} />',
+    handWritten: () =>
+      h('view', {
         accessibilityState: { checked: false, busy: true },
         'aria-checked': true,
       }),
@@ -261,17 +266,18 @@ const CASES: readonly IFoldCase[] = [
     // (which intrinsic tag, and specialising a functional style), and a spread must refuse both.
     // `View` takes neither, which is why refusing here would cost a common pattern for a hazard it
     // cannot have. The two that must refuse are pinned in spread-hazard.test.ts, with controls.
-    what: 'a spread-carried bag lands the same payload as the wrapper',
-    sfc: '<View v-bind="bag" />',
-    jsx: '<View {...bag} />',
-    component: () => h(ViewComponent, { id: 'x', class: 'k', testID: 't' }),
+    what: 'a spread-carried bag lands the same payload as a written-out one',
+    sfc: '<view v-bind="bag" />',
+    jsx: '<view {...bag} />',
+    handWritten: () => h('view', { id: 'x', class: 'k', testID: 't' }),
     expected: [{ nativeID: 'x', testID: 't' }],
   },
   {
-    what: "RN's two Text defaults on a bare Text",
-    sfc: '<Text>hi</Text>',
-    jsx: '<Text>hi</Text>',
-    component: () => h(TextComponent, null, () => 'hi'),
+    what: "RN's two Text defaults on a bare text",
+    sfc: '<text>hi</text>',
+    jsx: '<text>hi</text>',
+    // An ARRAY child, never a slot function: an element ignores slot children and renders nothing.
+    handWritten: () => h('text', null, ['hi']),
     expected: [
       { ellipsizeMode: 'tail', allowFontScaling: true },
       { text: 'hi' },
@@ -280,10 +286,9 @@ const CASES: readonly IFoldCase[] = [
   {
     // `notFalse`, not `nullish`: only a literal false opts out, and the key is emitted either way.
     what: 'an explicit allowFontScaling=false beside an id',
-    sfc: '<Text id="t" :allow-font-scaling="false">hi</Text>',
-    jsx: '<Text id="t" allowFontScaling={false}>hi</Text>',
-    component: () =>
-      h(TextComponent, { id: 't', allowFontScaling: false }, () => 'hi'),
+    sfc: '<text id="t" :allow-font-scaling="false">hi</text>',
+    jsx: '<text id="t" allowFontScaling={false}>hi</text>',
+    handWritten: () => h('text', { id: 't', allowFontScaling: false }, ['hi']),
     expected: [
       { ellipsizeMode: 'tail', allowFontScaling: false, nativeID: 't' },
       { text: 'hi' },
@@ -293,23 +298,23 @@ const CASES: readonly IFoldCase[] = [
 
 describe('every Vue path folds id and the Text defaults identically', () => {
   it.each(CASES)('$what', async testCase => {
-    const [component, sfc, jsx] = [
+    const [handWritten, sfc, jsx] = [
       await render(
-        defineComponent({ setup: () => () => testCase.component() }),
+        defineComponent({ setup: () => () => testCase.handWritten() }),
       ),
       await render(await sfcArm(testCase.sfc)),
       await render(await jsxArm(testCase.jsx)),
     ];
 
-    expect(sfc, 'the SFC-lowered payload must match the wrapper').toEqual(
-      component,
+    expect(sfc, 'the SFC payload must match a hand-written h()').toEqual(
+      handWritten,
     );
-    expect(jsx, 'the JSX-lowered payload must match the wrapper').toEqual(
-      component,
+    expect(jsx, 'the JSX payload must match a hand-written h()').toEqual(
+      handWritten,
     );
     // Absolute, so a fold deleted from the renderer — under all three arms at once — cannot pass
     // by moving them together.
-    expect(component, 'the wrapper must fold what RN folds').toEqual(
+    expect(handWritten, 'the tag must fold what RN folds').toEqual(
       testCase.expected,
     );
   });
@@ -319,13 +324,13 @@ describe('every Vue path folds id and the Text defaults identically', () => {
   it('folds a prop written after mount, on both lowered paths', async () => {
     const arms: ReadonlyArray<readonly [string, Component]> = [
       [
-        'component',
+        'hand-written',
         defineComponent({
-          setup: () => () => h(ViewComponent, { id: liveId.value }),
+          setup: () => () => h('view', { id: liveId.value }),
         }),
       ],
-      ['sfc', await sfcArm('<View :id="liveId" />')],
-      ['jsx', await jsxArm('<View id={liveId.value} />')],
+      ['sfc', await sfcArm('<view :id="liveId" />')],
+      ['jsx', await jsxArm('<view id={liveId.value} />')],
     ];
 
     for (const [label, component] of arms) {

@@ -9,12 +9,7 @@
   // apart (see the symbiote-expo-native-module skill). Svelte twin of
   // ../../expo-vue-sfc/screens/SensorsScreen.vue — same 4-state card (checking/unavailable/
   // waiting/live) and X/Y/Z reading-chip layout.
-  import {
-    SafeAreaView,
-    ScrollView,
-    Text,
-    View,
-  } from '@symbiote-native/svelte';
+  import { ScrollView } from '@symbiote-native/svelte';
   // The four sensor singletons come from the package ROOT, not from /svelte: the Svelte entry
   // deliberately re-exports only the runes, the measurement types and Pedometer's free functions
   // (packages/sensors/src/svelte/index.ts), so Accelerometer/Gyroscope/Magnetometer/DeviceMotion
@@ -137,236 +132,233 @@
   );
 </script>
 
-<SafeAreaView class="screen">
+<safe-area-view class="screen">
   <ScrollView
     testID="sensors-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View class="hero-badge" style={{ backgroundColor: LINE_COLOR.sensors }}>
-        <Text class="hero-badge-text">{lineInfo.code}</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">Sensors</Text>
-        <Text class="hero-body">
+      </text>
+    </view>
+    <view class="hero-card">
+      <view class="hero-badge" style={{ backgroundColor: LINE_COLOR.sensors }}>
+        <text class="hero-badge-text">{lineInfo.code}</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">Sensors</text>
+        <text class="hero-body">
           @symbiote-native/sensors — live readings from five expo-sensors-backed
           hooks. A simulator reports every CoreMotion/CMPedometer-backed sensor
           as unavailable; a real device is needed to see live readings.
-        </Text>
-      </View>
-    </View><!-- Accelerometer -->
-    <View testID="sensor-card-accelerometer" class="sensor-card">
-      <View class="sensor-card-header">
-        <Text class="sensor-card-title">Accelerometer</Text>
-        <View
+        </text>
+      </view>
+    </view>
+    <!-- Accelerometer -->
+    <view testID="sensor-card-accelerometer" class="sensor-card">
+      <view class="sensor-card-header">
+        <text class="sensor-card-title">Accelerometer</text>
+        <view
           class={`sensor-status-badge sensor-status-badge-${accelerometerStatus.current}`}
         >
-          <Text class="sensor-status-text">
+          <text class="sensor-status-text">
             {SENSOR_STATUS_TEXT[accelerometerStatus.current]}
-          </Text>
-        </View>
-      </View>{#if accelerometerStatus.current === 'checking'}<Text
-          class="info-text"
-        >
+          </text>
+        </view>
+      </view>
+      {#if accelerometerStatus.current === 'checking'}<text class="info-text">
           checking availability…
-        </Text>{:else if accelerometerStatus.current === 'unavailable'}<Text
+        </text>{:else if accelerometerStatus.current === 'unavailable'}<text
           class="info-text"
         >
           not available on this device
-        </Text>{:else if accelerometerStatus.current === 'waiting'}<Text
+        </text>{:else if accelerometerStatus.current === 'waiting'}<text
           class="info-text"
         >
           waiting for first reading…
-        </Text>{:else if accelerometer.current}<View class="sensor-reading-row">
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">X</Text>
-            <Text class="sensor-reading-value">
+        </text>{:else if accelerometer.current}<view class="sensor-reading-row">
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">X</text>
+            <text class="sensor-reading-value">
               {accelerometer.current.x.toFixed(3)}
-            </Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Y</Text>
-            <Text class="sensor-reading-value">
+            </text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Y</text>
+            <text class="sensor-reading-value">
               {accelerometer.current.y.toFixed(3)}
-            </Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Z</Text>
-            <Text class="sensor-reading-value">
+            </text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Z</text>
+            <text class="sensor-reading-value">
               {accelerometer.current.z.toFixed(3)}
-            </Text>
-          </View>
-        </View>{/if}
-    </View><!-- Gyroscope --><View
-      testID="sensor-card-gyroscope"
-      class="sensor-card"
-    >
-      <View class="sensor-card-header">
-        <Text class="sensor-card-title">Gyroscope</Text>
-        <View
+            </text>
+          </view>
+        </view>{/if}
+    </view>
+    <!-- Gyroscope -->
+    <view testID="sensor-card-gyroscope" class="sensor-card">
+      <view class="sensor-card-header">
+        <text class="sensor-card-title">Gyroscope</text>
+        <view
           class={`sensor-status-badge sensor-status-badge-${gyroscopeStatus.current}`}
         >
-          <Text class="sensor-status-text">
+          <text class="sensor-status-text">
             {SENSOR_STATUS_TEXT[gyroscopeStatus.current]}
-          </Text>
-        </View>
-      </View>{#if gyroscopeStatus.current === 'checking'}<Text
-          class="info-text"
-        >
+          </text>
+        </view>
+      </view>
+      {#if gyroscopeStatus.current === 'checking'}<text class="info-text">
           checking availability…
-        </Text>{:else if gyroscopeStatus.current === 'unavailable'}<Text
+        </text>{:else if gyroscopeStatus.current === 'unavailable'}<text
           class="info-text"
         >
           not available on this device
-        </Text>{:else if gyroscopeStatus.current === 'waiting'}<Text
+        </text>{:else if gyroscopeStatus.current === 'waiting'}<text
           class="info-text"
         >
           waiting for first reading…
-        </Text>{:else if gyroscope.current}<View class="sensor-reading-row">
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">X</Text>
-            <Text class="sensor-reading-value">
+        </text>{:else if gyroscope.current}<view class="sensor-reading-row">
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">X</text>
+            <text class="sensor-reading-value">
               {gyroscope.current.x.toFixed(3)}
-            </Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Y</Text>
-            <Text class="sensor-reading-value">
+            </text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Y</text>
+            <text class="sensor-reading-value">
               {gyroscope.current.y.toFixed(3)}
-            </Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Z</Text>
-            <Text class="sensor-reading-value">
+            </text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Z</text>
+            <text class="sensor-reading-value">
               {gyroscope.current.z.toFixed(3)}
-            </Text>
-          </View>
-        </View>{/if}
-    </View><!-- Magnetometer -->
-    <View testID="sensor-card-magnetometer" class="sensor-card">
-      <View class="sensor-card-header">
-        <Text class="sensor-card-title">Magnetometer</Text>
-        <View
+            </text>
+          </view>
+        </view>{/if}
+    </view>
+    <!-- Magnetometer -->
+    <view testID="sensor-card-magnetometer" class="sensor-card">
+      <view class="sensor-card-header">
+        <text class="sensor-card-title">Magnetometer</text>
+        <view
           class={`sensor-status-badge sensor-status-badge-${magnetometerStatus.current}`}
         >
-          <Text class="sensor-status-text">
+          <text class="sensor-status-text">
             {SENSOR_STATUS_TEXT[magnetometerStatus.current]}
-          </Text>
-        </View>
-      </View>{#if magnetometerStatus.current === 'checking'}<Text
-          class="info-text"
-        >
+          </text>
+        </view>
+      </view>
+      {#if magnetometerStatus.current === 'checking'}<text class="info-text">
           checking availability…
-        </Text>{:else if magnetometerStatus.current === 'unavailable'}<Text
+        </text>{:else if magnetometerStatus.current === 'unavailable'}<text
           class="info-text"
         >
           not available on this device
-        </Text>{:else if magnetometerStatus.current === 'waiting'}<Text
+        </text>{:else if magnetometerStatus.current === 'waiting'}<text
           class="info-text"
         >
           waiting for first reading…
-        </Text>{:else if magnetometer.current}<View class="sensor-reading-row">
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">X</Text>
-            <Text class="sensor-reading-value">
+        </text>{:else if magnetometer.current}<view class="sensor-reading-row">
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">X</text>
+            <text class="sensor-reading-value">
               {magnetometer.current.x.toFixed(3)}
-            </Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Y</Text>
-            <Text class="sensor-reading-value">
+            </text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Y</text>
+            <text class="sensor-reading-value">
               {magnetometer.current.y.toFixed(3)}
-            </Text>
-          </View>
-          <View class="sensor-reading-chip">
-            <Text class="sensor-reading-label">Z</Text>
-            <Text class="sensor-reading-value">
+            </text>
+          </view>
+          <view class="sensor-reading-chip">
+            <text class="sensor-reading-label">Z</text>
+            <text class="sensor-reading-value">
               {magnetometer.current.z.toFixed(3)}
-            </Text>
-          </View>
-        </View>{/if}
-    </View><!-- DeviceMotion — rotation is nested and can legitimately be absent from the very first event (the underlying sensor hasn't reported yet), so it is guarded at the field itself; an unguarded nested read throws with no visible error and silently blanks the screen. -->
-    <View testID="sensor-card-device-motion" class="sensor-card">
-      <View class="sensor-card-header">
-        <Text class="sensor-card-title">Device motion</Text>
-        <View
+            </text>
+          </view>
+        </view>{/if}
+    </view>
+    <!-- DeviceMotion — rotation is nested and can legitimately be absent from the very first event (the underlying sensor hasn't reported yet), so it is guarded at the field itself; an unguarded nested read throws with no visible error and silently blanks the screen. -->
+    <view testID="sensor-card-device-motion" class="sensor-card">
+      <view class="sensor-card-header">
+        <text class="sensor-card-title">Device motion</text>
+        <view
           class={`sensor-status-badge sensor-status-badge-${deviceMotionStatus.current}`}
         >
-          <Text class="sensor-status-text">
+          <text class="sensor-status-text">
             {SENSOR_STATUS_TEXT[deviceMotionStatus.current]}
-          </Text>
-        </View>
-      </View>{#if deviceMotionStatus.current === 'checking'}<Text
-          class="info-text"
-        >
+          </text>
+        </view>
+      </view>
+      {#if deviceMotionStatus.current === 'checking'}<text class="info-text">
           checking availability…
-        </Text>{:else if deviceMotionStatus.current === 'unavailable'}<Text
+        </text>{:else if deviceMotionStatus.current === 'unavailable'}<text
           class="info-text"
         >
           not available on this device
-        </Text>{:else if deviceMotionStatus.current === 'waiting'}<Text
+        </text>{:else if deviceMotionStatus.current === 'waiting'}<text
           class="info-text"
         >
           waiting for first reading…
-        </Text>{:else if deviceMotion.current}<Text class="info-text">
+        </text>{:else if deviceMotion.current}<text class="info-text">
           {`interval: ${deviceMotion.current.interval.toFixed(1)}ms`}
-        </Text>{#if deviceMotion.current.rotation}<View
-            class="sensor-reading-row"
-          >
-            <View class="sensor-reading-chip">
-              <Text class="sensor-reading-label">ALPHA</Text>
-              <Text class="sensor-reading-value">
+        </text>
+        {#if deviceMotion.current.rotation}<view class="sensor-reading-row">
+            <view class="sensor-reading-chip">
+              <text class="sensor-reading-label">ALPHA</text>
+              <text class="sensor-reading-value">
                 {deviceMotion.current.rotation.alpha.toFixed(3)}
-              </Text>
-            </View>
-            <View class="sensor-reading-chip">
-              <Text class="sensor-reading-label">BETA</Text>
-              <Text class="sensor-reading-value">
+              </text>
+            </view>
+            <view class="sensor-reading-chip">
+              <text class="sensor-reading-label">BETA</text>
+              <text class="sensor-reading-value">
                 {deviceMotion.current.rotation.beta.toFixed(3)}
-              </Text>
-            </View>
-            <View class="sensor-reading-chip">
-              <Text class="sensor-reading-label">GAMMA</Text>
-              <Text class="sensor-reading-value">
+              </text>
+            </view>
+            <view class="sensor-reading-chip">
+              <text class="sensor-reading-label">GAMMA</text>
+              <text class="sensor-reading-value">
                 {deviceMotion.current.rotation.gamma.toFixed(3)}
-              </Text>
-            </View>
-          </View>{/if}{/if}
-    </View><!-- Pedometer — free functions, no shared instance, so both the availability check and the live subscription go through the standalone core exports instead of a singleton. -->
-    <View testID="sensor-card-pedometer" class="sensor-card">
-      <View class="sensor-card-header">
-        <Text class="sensor-card-title">Pedometer</Text>
-        <View
+              </text>
+            </view>
+          </view>{/if}{/if}
+    </view>
+    <!-- Pedometer — free functions, no shared instance, so both the availability check and the live subscription go through the standalone core exports instead of a singleton. -->
+    <view testID="sensor-card-pedometer" class="sensor-card">
+      <view class="sensor-card-header">
+        <text class="sensor-card-title">Pedometer</text>
+        <view
           class={`sensor-status-badge sensor-status-badge-${pedometerStatus.current}`}
         >
-          <Text class="sensor-status-text">
+          <text class="sensor-status-text">
             {SENSOR_STATUS_TEXT[pedometerStatus.current]}
-          </Text>
-        </View>
-      </View>{#if pedometerStatus.current === 'checking'}<Text
-          class="info-text"
-        >
+          </text>
+        </view>
+      </view>
+      {#if pedometerStatus.current === 'checking'}<text class="info-text">
           checking availability…
-        </Text>{:else if pedometerStatus.current === 'unavailable'}<Text
+        </text>{:else if pedometerStatus.current === 'unavailable'}<text
           class="info-text"
         >
           not available on this device
-        </Text>{:else if pedometerStatus.current === 'waiting'}<Text
+        </text>{:else if pedometerStatus.current === 'waiting'}<text
           class="info-text"
         >
           waiting for first reading…
-        </Text>{:else if pedometer.current}<Text
+        </text>{:else if pedometer.current}<text
           testID="sensors-pedometer-steps"
           class="sensor-reading-value"
         >
           {`${pedometer.current.steps} steps`}
-        </Text>{/if}
-    </View>
+        </text>{/if}
+    </view>
   </ScrollView>
-</SafeAreaView>
+</safe-area-view>

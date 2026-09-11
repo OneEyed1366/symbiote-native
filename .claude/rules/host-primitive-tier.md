@@ -571,11 +571,13 @@ machine would have read `undefined` for both and stayed inert on three of the fi
 coincidences, not a design: nothing enforces any of them, and the two that DO collide were only
 found by reading the wrapper's focus/blur handlers rather than its prop fold.
 
-The fix is a second tag resolving to the same native view — `symbiote-text-input-managed`, declared
-in `component-names/shared.ts` and both platform tables, rendered by `render-text-input.ts` and by
-Angular's hand-written template. The plain name belongs to the LOWERED path because that is the end
-state: when the wrappers stop owning the state, the `-managed` pair is deleted and nothing else
-moves.
+What was done at the time was a second tag resolving to the same native view — declared in
+`component-names/shared.ts` and both platform tables, rendered by `render-text-input.ts` and by
+Angular's hand-written template. **Do not reach for that again.** It buys a rename across every call
+site now and a second rename when the wrapper dies, and the wrapper's deletion is what this
+migration is for — it removes the second owner outright, which is the only thing the extra tag was
+protecting. Three such tags exist (the TextInput pair and Switch's) and they are debt with a
+deletion date, not a technique. Where two owners collide, delete the wrapper.
 
 Three consequences worth carrying:
 
@@ -614,9 +616,14 @@ adapters/*/src` — every literal, every adapter, before trusting a green suite.
   drive a forwarded method through and require the node to actually move. Svelte pinned
   `setNativeProps`; the other three forwards are unreachable in that harness, because the fake slot
   has no `measure` to call.
-- **`registerXBehavior()` goes into `adapters/{vue,svelte,solid}/src/register.ts` only.** React and
-  Angular carry no lowering transform, so no lowered node exists there and neither has a
-  `register.ts` at all — the same reason they skip Pressable's.
+- **`registerXBehavior()` goes into ALL FIVE `adapters/*/src/register.ts`.** This line said
+  `{vue,svelte,solid}` only, on the reasoning that React and Angular carried no lowering transform
+  and therefore no lowered node — true when written, dead the day an app started writing the tag
+  itself. `ls adapters/*/src/register.ts` returns five, and React's own header records that every
+  tag committed inert before that file existed.
+
+  It misled three separate agents on 2026-09-09, each of which checked and corrected it
+  independently. The check is the one-liner above; run it rather than trusting this sentence.
 
 ### The split FORKS the tag, so every tag-keyed table has to be audited for the fork
 
@@ -649,6 +656,26 @@ described this exact failure on the OTHER axis — `intrinsicWhen`, one primitiv
 tags — so the second axis was one line from the first and nobody looked for it.
 
 ## The disqualifier: a render that SYNTHESIZES a node can never be a lowered tag
+
+> **DEAD 2026-09-09. `IHostBehavior.buildStructure` is exactly the missing half**, and both
+> primitives this section disqualifies have since been built on it: ScrollView
+> (`core/components/src/behaviors/scroll-view/`) and ActivityIndicator
+> (`core/components/src/behaviors/activity-indicator/`). A behavior builds its own internal subtree
+> through the ordinary mutation API and returns the node it hosts under; `slotProps` then routes an
+> owner prop onto that node. Read everything below as the MEASUREMENT that motivated the seam, never
+> as a live rule.
+>
+> **The claim was true of the seams that existed, and it was written as a property of the
+> PRIMITIVE.** "A render that synthesizes a node can never be a lowered tag" has no subject and no
+> phase, so it read as permanent and scoped two sessions' work down before anyone re-checked it.
+> `render-activity-indicator.ts` carried the same sentence in its own header for eight days
+> ("WILL NOT BECOME ONE"), and nothing ever failed while it was wrong — which is the whole hazard
+> `.claude/rules/adapter-parity-audit.md` records under "A comment declaring something IMPOSSIBLE".
+>
+> So: an impossibility claim owes a subject and a phase. "Today's seams cannot express X" invites the
+> seam; "X can never be lowered" closes the question. The three that remain genuinely closed are
+> closed on the primitive — a render whose OUTPUT SHAPE is decided in JS from app data
+> (`VirtualizedList`'s `renderItem`), not on what the engine happens to offer this week.
 
 Every tier question above is about cost. This one is not — it is a hard structural line, and it was
 found by assigning a primitive to the wrong tier and having the session refuse to build it.
@@ -688,6 +715,36 @@ there is no shared half to extract     five adapters build the tree, and the sha
 So the last hot primitive is not lowerable, and the reason is structural rather than unbuilt. That
 closes the question rather than deferring it.
 
+**SUPERSEDED 2026-09-03 — the verdict was right and its enabling condition has since been removed.**
+Both escapes this section prices as too expensive were built, and the two aggravating factors it
+names are answered by name:
+
+```
+"a behavior that CREATES a node"                 IHostBehavior.buildStructure + node.childHost
+"a fold cannot route a prop onto a node          IHostBehavior.slotProps — owner prop name -> slot
+ that does not exist"                            prop name, applied in routeProp
+"there is no shared half to extract"             core/components/src/behaviors/scroll-view.ts
+                                                 builds the pair from selectScrollIntrinsics
+```
+
+`buildStructure` runs once at attach and returns the node the app's children belong under;
+`appendChild`/`insertBefore`/`removeChild` redirect through `childHost`, so the adapter keeps naming
+the OWNER and never learns a slot exists. `contentContainerStyle` reaches the content node as its
+`style` through `slotProps`, and the two style precedences the wrapper composes — base UNDER the
+app's on the scroll node, `flexDirection:'row'` OVER it on the content node — are `payloadFold`s on
+either side. Each half is break-tested independently.
+
+The third escape it lists, a `-managed` split, is NOT needed and must not be reintroduced: that
+split exists only to keep two owners apart while a wrapper and a lowered element both emit a tag.
+Tag-only has one path (`component-names/shared.ts` says so at the pair's own declaration).
+
+**The method half is the durable one, and it is this file's own lesson turned on itself: a
+structural verdict is only as structural as the seams that existed when it was taken.** "Not
+lowerable, structurally" and "not lowerable with what the engine can express today" read identically
+in prose and expire differently. Write which one is meant, and name the seam whose absence decides
+it — this section did name both, which is the only reason the supersession is checkable rather than
+a re-litigation.
+
 **Passing the app's children through is not a disqualification; manufacturing a container is.** The
 first version of this rule said "returns a tree", which over-rejects `SafeAreaView`,
 `InputAccessoryView` and every future primitive that takes children — all of them emit ONE element
@@ -716,7 +773,7 @@ primitive silently drops a node and changes layout — an optimisation moving th
 Both escapes were priced (2026-09-01) and both cost more than a spinner is worth:
 
 ```
-a behavior that CREATES a node   needs a commit hook -> a machine -> a `-managed` split.
+a behavior that CREATES a node   needs a commit hook -> a machine -> two owners on one tag.
                                  A new category, not a fold.
 the container in the commit walk NOT the RCTVirtualText precedent it resembles. `viewNameFor`
                                  changes what one node IS and never ADDS one; adding one makes the
@@ -760,3 +817,153 @@ alternatives were being priced.
 So: apply the test BEFORE assigning a primitive to a tier. The wrong axis — "does it have a state
 machine" — is what put ActivityIndicator in the fold-only batch, and only the assigned session
 stopping to check saved a layout regression.
+
+## The synthesized node may be OURS — apply the disqualifier to RN's source, not to our wrapper
+
+`TouchableOpacity`, 2026-09-09. Every adapter's wrapper builds a `pressable` around a faded `view`,
+so the synthesis test above reads SYNTHESIZES and the primitive looks like it needs
+`buildStructure` + a slot. RN builds ONE node: `TouchableOpacity.js:302` renders a single
+`<Animated.View>` carrying the responder handlers AND `style={[props.style, {opacity: anim}]}`.
+
+Our second node was copied from `TouchableNativeFeedback`, which genuinely does clone onto a child.
+Same misreading, same primitive family, as the `android_ripple` entry in
+`.claude/rules/adapter-parity-audit.md` — that one cost a refusal in four transforms before someone
+read upstream.
+
+So the test is "does RN's render emit a node that is not the primitive itself", and a wrapper that
+over-builds turns its own choice into an apparent structural requirement. One grep of the vendored
+source settles it, and here it turned a slot-and-fold design into a single tag.
+
+## A behavior that owns an ANIMATED prop needs its own style layer, not a prop write
+
+Three routes were tried before the one that works, and the two dead ends are worth not re-deriving:
+
+```
+a top-level `opacity` prop     LOSES to the author's own style — `fabricProps` hoists the style
+                               slot AFTER every plain prop, so `style={{opacity: 0.6}}` wins and
+                               the fade is dead for exactly the styled call sites
+`raw.style` on the leaf        the app's next plain `style` write finds nothing animated under
+                               that key and TEARS THE BINDING DOWN. The leaf keys bound props by
+                               NAME, and `style` already belongs to the app
+```
+
+`setAnimatedBehaviorStyle` (`core/engine/src/animated/host-binding.ts`) composes the behavior's
+layer into whatever the app's style is, at bind time. Two properties are load-bearing:
+
+- it composes for the LEAF only and returns the author's value to `routeProp`, so `node.props.style`
+  stays the declarative style. Folding the layer in there instead makes the behavior read its own
+  fade back as the resting value, and `afterCommit` then chases itself — the
+  `list-geometry-feedback-loop` shape.
+- the resting value is published at the FIRST commit, not left until the first press. RN's
+  `Animated.View` carries `{opacity: anim}` from its first render, so a resting Touchable commits
+  the key; a tag that published nothing until a fade ran differed from every wrapper on mount. The
+  nine-row Svelte smoke suite written against the old component is what caught it.
+
+## A `HOST_PRIMITIVES` entry is a switch for every adapter, and the equivalence arms enforce it
+
+Adding `TouchableOpacity` to the spec reddened five audits across three adapters in one run —
+Angular's element-directive coverage and selector drift, both Vue equivalence arms, Solid's mount
+pair. None was a bug in the new primitive: each says "this adapter has no arm for it yet", and the
+Vue/Solid ones cannot pass while those wrappers still build two nodes against the tag's one.
+
+The entry was withheld and the note left in its place, which is this file's own documented practice
+("it goes in after every side is ready, never to prove the transforms work"). The `id -> nativeID`
+alias it would have carried moved to the behavior's own `foldPayload` in the meantime, so the tag is
+not missing the fold — it gets it one layer down, on its own path only.
+
+The sequencing that follows: **collapse the wrappers over the tag first, then add the spec entry.**
+
+Svelte went the whole way in one step — a 40-line forwarder was written and then deleted, because a
+forwarder over a tag holds nothing. Its one remaining job was syncing `{@attach}`, and that exists
+ONLY because it is a component: Svelte rejects `use:`/`class:`/`style:` on a component and an
+attachment is the documented lacuna (`runes/attachments.ts` says so in its own header), while on a
+bare element Svelte handles it natively. So a wrapper whose logic has moved down is not thin — it is
+zero, and the same will hold for the other four.
+
+The evidence that made the deletion safe was already written: the nine-row smoke suite authored
+against the OLD component passes unchanged against the tag, with one edit — the helper that looked
+for a faded CHILD now reads the responder's own props. A suite that survives its subject being
+deleted is testing the behavior rather than the wrapper.
+
+## A port that says "matching RN's iOS shape" is declaring a divergence, not scoping the work
+
+`core/components/src/view/render-button.ts` carried that sentence in its header for months, and
+every reader — including several audits — read it as a note about which platform the file was
+written against. It is the whole finding: Button is the ONE control in RN that ships a finished
+appearance, and on Android that appearance lives on a node the port did not render at all.
+
+Measured 2026-09-09 against `Libraries/Components/Button.js` (441 lines, not deprecated):
+
+```
+                    RN                                            ours, before
+inner <View>        empty on iOS; on Android elevation 4,          ABSENT
+                    bg #2196F3, radius 2 — the entire look
+touchable           Android -> TouchableNativeFeedback             always TouchableOpacity
+color               iOS -> text; Android -> button background      always text
+disabled            per platform, on BOTH nodes                    iOS grey everywhere
+title               Android -> toUpperCase()                       unchanged
+text spacing        margin 8                                       padding 8
+accessible          passed through, defaulted by the touchable     forced true
+accessibilityState  merged                                         replaced with { disabled }
+```
+
+Three things generalise past this instance:
+
+- **Grep for the PLATFORM, not for the props.** `grep -c "Platform\|elevation\|toUpperCase"` over all
+  five adapters' Button returned 0, which is the whole audit in one command. A prop-by-prop diff
+  finds the same gaps ten times slower and misses the missing NODE entirely.
+- **A missing node is invisible to every audit in this repo.** Barrel parity, subpath parity, the
+  fold-parity import diff and the equivalence arms all compare things that exist. Only reading
+  upstream's render finds a node nobody built — the same lesson as the `TouchableOpacity` entry
+  above, pointing the other way (there our wrapper built one RN does not).
+- **A test can pin the divergence.** Solid's asserted `padding: 8`, so the correct value reddened it.
+  That is `test-harness-false-greens.md` §14 — treat a red on an RN-parity fix as a question about
+  which side is wrong, and check upstream before touching either.
+
+What is NOT done and is the honest remainder: RN swaps the touchable itself on Android
+(`TouchableNativeFeedback`, Button.js:280-283), so our Android button fades instead of rippling.
+That is a per-adapter template branch over a component with its own machine, not a shared fold.
+
+And one gap found on the way, wider than Button and left open deliberately: **no adapter's Pressable
+or Touchable* wrapper sets `accessible: accessible !== false`** (Pressable.js:252,
+TouchableOpacity.js:303), so a pressable reaches a screen reader as a plain view unless the app
+writes the prop. Putting it in the shared press behavior's fold reddened four equivalence arms —
+correctly, because only the LOWERED path would have had it. Closing it means editing five wrappers
+in the same commit as the behavior.
+
+## A behavior hook placed after a SHORT-CIRCUIT is unreachable for exactly the case it was added for
+
+Twice in one day, in two different engine files, with the same shape and neither caught by a test.
+
+```
+afterCommit          commitContainer returns on a no-op ABOVE runDeferredAttaches.
+                     A behavior's own foldPayload STRIPS `title`/`color` from the payload, so a
+                     write to either produces a byte-identical commit and the hook never fires —
+                     for precisely the props it was going to be used for.
+
+raw-text payloadFold isEmptyRawText (node.ts) drops a raw-text node whose `props.text` is '',
+                     inside renderableChildren, BEFORE fabric-props runs. So a label that exists
+                     only as a fold result is never committed and the fold never executes — for
+                     precisely the case the hook was added for.
+```
+
+**The generalisable question, and it is one line: what runs BEFORE my hook, and can the feature I am
+adding make that earlier thing skip?** A short-circuit written for performance does not know it is
+also a gate on a hook downstream of it, and the two are usually in different files.
+
+Two things about the repairs, because the instinct is wrong in both cases:
+
+- **Do not move the short-circuit.** Both of these exist on walks that run for every node in every
+  app; teaching either to consult a behavior would put a WeakMap probe or a fold call on that walk
+  to serve a handful of nodes. The `afterCommit` no-op return is what makes an unchanged re-render
+  free, and `isEmptyRawText` is what stops an empty label aborting Fabric's text walk.
+- **Change the INPUT so the short-circuit and the hook read the same thing.** Button routes the
+  owner's `title` onto the raw-text node with `slotProps: { title: 'text' }`, so `props.text` is
+  really there, the skip agrees with the fold, and an empty `title` still commits nothing. A
+  redirect beats a derivation wherever one is available — it also needs no dirty-marking, since the
+  write lands on the target node itself.
+
+And write the hook's own comment to the scope you actually verified. The raw-text fold's first
+comment claimed it made a DERIVED label declarative; it does not, it transforms a label that is
+already there. The consumer found that within the hour, which is the only reason it is a comment
+correction rather than a device bug.

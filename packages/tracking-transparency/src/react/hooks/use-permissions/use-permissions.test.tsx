@@ -4,7 +4,7 @@
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import { usePermissions } from './index';
 import { PermissionStatus, type PermissionResponse } from '../../../core';
@@ -54,7 +54,7 @@ function Probe(): ReactElement {
   errors.push(error);
   latestRequest = request;
   latestGet = get;
-  return createElement(View);
+  return createElement('view');
 }
 
 // Node only reports an unhandled rejection a macrotask after the promise settles, so a plain

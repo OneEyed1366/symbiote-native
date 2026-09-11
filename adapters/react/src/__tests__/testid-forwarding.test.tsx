@@ -15,29 +15,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,
   unmount,
-  View,
-  Text,
-  Image,
-  ImageBackground,
-  ScrollView,
-  TextInput,
-  Switch,
-  ActivityIndicator,
-  Button,
-  Pressable,
-  TouchableOpacity,
-  TouchableHighlight,
-  TouchableWithoutFeedback,
-  TouchableNativeFeedback,
-  SafeAreaView,
   Modal,
   KeyboardAvoidingView,
-  InputAccessoryView,
   FlatList,
   SectionList,
   VirtualizedList,
   VirtualizedSectionList,
-  RefreshControl,
   Animated,
 } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -69,72 +52,103 @@ function carriesTestId(id: string): IFakeNode | undefined {
 
 // name -> a factory building the element with `testID` set (+ whatever minimal props it needs).
 const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
-  ['View', id => createElement(View, { testID: id })],
-  ['Text', id => createElement(Text, { testID: id }, 'x')],
-  ['Image', id => createElement(Image, { testID: id, source: { uri: 'x' } })],
+  ['View', id => createElement('view', { testID: id })],
+  ['Text', id => createElement('text', { testID: id }, 'x')],
+  ['image', id => createElement('image', { testID: id, source: { uri: 'x' } })],
   [
-    'ImageBackground',
+    // The TAG. RN spreads `...props` onto the inner Image (ImageBackground.js:81), so the id lands
+    // on the IMAGE rather than the box it is written on — which is what "some committed node
+    // carries it" is phrased to allow, and what every wrapper did before the tag.
+    'image-background',
     id =>
       createElement(
-        ImageBackground,
+        'image-background',
         { testID: id, source: { uri: 'x' } },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
-    'ScrollView',
-    id =>
-      createElement(ScrollView, { testID: id }, createElement(Text, {}, 'x')),
-  ],
-  ['TextInput', id => createElement(TextInput, { testID: id })],
-  ['Switch', id => createElement(Switch, { testID: id, value: false })],
-  ['ActivityIndicator', id => createElement(ActivityIndicator, { testID: id })],
-  ['Button', id => createElement(Button, { testID: id, title: 'x' })],
-  [
-    'Pressable',
-    id =>
-      createElement(Pressable, { testID: id }, createElement(Text, {}, 'x')),
-  ],
-  [
-    'TouchableOpacity',
+    'scroll-view',
     id =>
       createElement(
-        TouchableOpacity,
+        'scroll-view',
         { testID: id },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
+  ['text-input', id => createElement('text-input', { testID: id })],
+  ['switch', id => createElement('switch', { testID: id, value: false })],
   [
-    'TouchableHighlight',
+    // The TAG. RN spreads `...restProps` onto the spinner (ActivityIndicator.js:99), so the id
+    // lands on the SPINNER rather than the centering host — which is what "some committed node
+    // carries it" is phrased to allow.
+    'activity-indicator',
+    id => createElement('activity-indicator', { testID: id }),
+  ],
+  [
+    // The TAG, not a component. RN's Button takes no children, so the behavior builds the whole
+    // subtree and `testID` stays on the root it is written on.
+    'button',
+    id => createElement('button', { testID: id, title: 'x' }),
+  ],
+  [
+    'pressable',
     id =>
       createElement(
-        TouchableHighlight,
+        'pressable',
         { testID: id },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
-    'TouchableWithoutFeedback',
+    'touchable-opacity',
     id =>
       createElement(
-        TouchableWithoutFeedback,
+        'touchable-opacity',
         { testID: id },
-        createElement(View, {}),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
-    'TouchableNativeFeedback',
+    'touchable-highlight',
     id =>
       createElement(
-        TouchableNativeFeedback,
+        'touchable-highlight',
         { testID: id },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
-    'SafeAreaView',
+    // The other clone-onto-the-child TAG, and the same route as the row below it
+    // (TouchableWithoutFeedback.js:153, in the passthrough list rather than the unconditional half).
+    'touchable-without-feedback',
     id =>
-      createElement(SafeAreaView, { testID: id }, createElement(Text, {}, 'x')),
+      createElement(
+        'touchable-without-feedback',
+        { testID: id },
+        createElement('view', {}),
+      ),
+  ],
+  [
+    // The TAG, not a component — and the id reaches the committed tree by a different route than
+    // every other row here: this tag commits no node, so `testID` lands via the behavior's clone
+    // onto the single child (TouchableNativeFeedback.js:389).
+    'touchable-native-feedback',
+    id =>
+      createElement(
+        'touchable-native-feedback',
+        { testID: id },
+        createElement('text', {}, 'x'),
+      ),
+  ],
+  [
+    'safe-area-view',
+    id =>
+      createElement(
+        'safe-area-view',
+        { testID: id },
+        createElement('text', {}, 'x'),
+      ),
   ],
   [
     'KeyboardAvoidingView',
@@ -142,7 +156,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         KeyboardAvoidingView,
         { testID: id },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
@@ -151,16 +165,16 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(
         Modal,
         { testID: id, visible: true },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
-    'InputAccessoryView',
+    'input-accessory-view',
     id =>
       createElement(
-        InputAccessoryView,
+        'input-accessory-view',
         { testID: id, nativeID: 'acc' },
-        createElement(Text, {}, 'x'),
+        createElement('text', {}, 'x'),
       ),
   ],
   [
@@ -170,7 +184,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
         testID: id,
         data: [1],
         renderItem: (info: { item: unknown }) =>
-          createElement(Text, {}, String(info.item)),
+          createElement('text', {}, String(info.item)),
       }),
   ],
   [
@@ -180,7 +194,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
         testID: id,
         sections: [{ title: 's', data: [1] }],
         renderItem: (info: { item: unknown }) =>
-          createElement(Text, {}, String(info.item)),
+          createElement('text', {}, String(info.item)),
       }),
   ],
   [
@@ -194,7 +208,7 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
         getItemCount: (data: unknown) =>
           Array.isArray(data) ? data.length : 0,
         renderItem: (info: { item: unknown }) =>
-          createElement(Text, {}, String(info.item)),
+          createElement('text', {}, String(info.item)),
       }),
   ],
   [
@@ -204,12 +218,12 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
         testID: id,
         sections: [{ title: 's', data: [1] }],
         renderItem: (info: { item: unknown }) =>
-          createElement(Text, {}, String(info.item)),
+          createElement('text', {}, String(info.item)),
       }),
   ],
   [
-    'RefreshControl',
-    id => createElement(RefreshControl, { testID: id, refreshing: false }),
+    'refresh-control',
+    id => createElement('refresh-control', { testID: id, refreshing: false }),
   ],
   ['Animated.View', id => createElement(Animated.View, { testID: id })],
   ['Animated.Text', id => createElement(Animated.Text, { testID: id }, 'x')],

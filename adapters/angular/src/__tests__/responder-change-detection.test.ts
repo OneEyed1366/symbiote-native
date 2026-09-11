@@ -75,8 +75,8 @@ const flush = (): Promise<void> =>
   standalone: true,
   imports: [View, Text, SymbioteHostPropsDirective],
   template: `
-    <View [symbioteHostProps]="handlers"></View>
-    <Text [symbioteHostProps]="statusProps">{{ status }}</Text>
+    <view [symbioteHostProps]="handlers"></view>
+    <text [symbioteHostProps]="statusProps">{{ status }}</text>
   `,
 })
 class ResponderCdHost {

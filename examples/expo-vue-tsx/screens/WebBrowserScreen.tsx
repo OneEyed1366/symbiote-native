@@ -1,13 +1,6 @@
 import { defineComponent, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -114,32 +107,32 @@ export const WebBrowserScreen = defineComponent(
     }
 
     return () => (
-      <SafeAreaView class="screen">
-        <ScrollView
+      <safe-area-view class="screen">
+        <scroll-view
           testID="web-browser-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Web Browser</Text>
-              <Text class="hero-body">
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Web Browser</text>
+              <text class="hero-body">
                 @symbiote-native/web-browser — an in-app browser that keeps the
                 user inside the app, unlike Linking.openURL handing them off to
                 the system browser.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="web-browser-open-card" class="web-browser-card">
-            <Text class="web-browser-card-title">Open a page</Text>
-            <TextInput
+          <view testID="web-browser-open-card" class="web-browser-card">
+            <text class="web-browser-card-title">Open a page</text>
+            <text-input
               testID="web-browser-url-input"
               value={url.value}
               onValueChange={(text: string) => {
@@ -161,47 +154,47 @@ export const WebBrowserScreen = defineComponent(
               onPress={handleDismiss}
               color={lineColor}
             />
-            <Text class="web-browser-note">
+            <text class="web-browser-note">
               iOS resolves once the browser closes — cancel when the user
               dismissed it, dismiss when the Dismiss button did. Android
               resolves opened the moment the Custom Tab launches and never
               reports the close, and cannot be dismissed programmatically.
-            </Text>
-          </View>
+            </text>
+          </view>
 
-          <View testID="web-browser-result-card" class="web-browser-card">
-            <Text class="web-browser-card-title">Last result</Text>
-            <View class="web-browser-row">
-              <Text class="web-browser-row-label">Outcome</Text>
-              <Text testID="web-browser-result" class="web-browser-value-text">
+          <view testID="web-browser-result-card" class="web-browser-card">
+            <text class="web-browser-card-title">Last result</text>
+            <view class="web-browser-row">
+              <text class="web-browser-row-label">Outcome</text>
+              <text testID="web-browser-result" class="web-browser-value-text">
                 {lastResult.value}
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
           {isAndroid && (
-            <View testID="web-browser-service-card" class="web-browser-card">
-              <Text class="web-browser-card-title">Custom Tabs service</Text>
-              <View class="web-browser-row">
-                <Text class="web-browser-row-label">Warmed service</Text>
-                <Text
+            <view testID="web-browser-service-card" class="web-browser-card">
+              <text class="web-browser-card-title">Custom Tabs service</text>
+              <view class="web-browser-row">
+                <text class="web-browser-row-label">Warmed service</text>
+                <text
                   testID="web-browser-service-package"
                   class="web-browser-value-text"
                 >
                   {servicePackage.value === null
                     ? '(none)'
                     : servicePackage.value}
-                </Text>
-              </View>
-              <View class="web-browser-row">
-                <Text class="web-browser-row-label">Supporting browsers</Text>
-                <Text
+                </text>
+              </view>
+              <view class="web-browser-row">
+                <text class="web-browser-row-label">Supporting browsers</text>
+                <text
                   testID="web-browser-supporting-browsers"
                   class="web-browser-value-text"
                 >
                   {supportingBrowsers.value}
-                </Text>
-              </View>
+                </text>
+              </view>
               <ActionButton
                 testID="web-browser-warm-up-button"
                 title="Warm up"
@@ -220,16 +213,16 @@ export const WebBrowserScreen = defineComponent(
                 onPress={handleListBrowsers}
                 color={lineColor}
               />
-              <Text class="web-browser-note">
+              <text class="web-browser-note">
                 Android only. getCustomTabsSupportingBrowsersAsync throws on iOS
                 — its native stub is registered without the Async suffix, so the
                 availability check fires before the empty-result branch is
                 reached.
-              </Text>
-            </View>
+              </text>
+            </view>
           )}
-        </ScrollView>
-      </SafeAreaView>
+        </scroll-view>
+      </safe-area-view>
     );
   },
   { name: 'WebBrowserScreen' },

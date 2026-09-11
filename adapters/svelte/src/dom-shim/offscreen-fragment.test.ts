@@ -58,7 +58,7 @@ function liveRoot(): ShimElement {
 }
 
 function markerView(testID: string): ShimElement {
-  const element = new ShimElement('symbiote-view');
+  const element = new ShimElement('view');
   element.p = { testID };
   return element;
 }

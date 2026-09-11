@@ -31,5 +31,3 @@ export interface IHostPrimitive {
 }
 
 export declare const HOST_PRIMITIVES: Readonly<Record<string, IHostPrimitive>>;
-export declare const REFUSAL_CATEGORIES: Readonly<Record<string, string>>;
-export declare const LOWERING_RUNS_LAST: string;

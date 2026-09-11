@@ -1,5 +1,4 @@
 import { useDebugValue, useId, useState, useSyncExternalStore } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { CaveatNote } from './CaveatNote';
 import { LINE_COLOR } from '../navigation-lines';
@@ -35,25 +34,25 @@ export function HooksMiscDemo() {
   const externalValue = useSyncExternalStore(subscribe, getExternalSnapshot);
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         useDebugValue · useId · useSyncExternalStore
-      </Text>
-      <Text
+      </text>
+      <text
         testID="hooks-misc-id"
         className="info-text"
-      >{`useId(): ${id}`}</Text>
-      <Text className="info-text">{`custom hook flag (useDebugValue-labeled): ${flag ? 'on' : 'off'}`}</Text>
+      >{`useId(): ${id}`}</text>
+      <text className="info-text">{`custom hook flag (useDebugValue-labeled): ${flag ? 'on' : 'off'}`}</text>
       <ActionButton
         testID="hooks-misc-toggle"
         title="Toggle flag"
         onPress={toggleFlag}
         color={LINE_COLOR.introspection}
       />
-      <Text
+      <text
         testID="hooks-misc-external"
         className="info-text"
-      >{`useSyncExternalStore reads: ${externalValue}`}</Text>
+      >{`useSyncExternalStore reads: ${externalValue}`}</text>
       <ActionButton
         testID="hooks-misc-bump"
         title="Bump external store"
@@ -65,6 +64,6 @@ export function HooksMiscDemo() {
         never calls reconciler.injectIntoDevTools, so the hook runs but nothing
         displays it.
       </CaveatNote>
-    </View>
+    </view>
   );
 }

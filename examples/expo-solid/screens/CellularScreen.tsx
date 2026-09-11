@@ -1,5 +1,5 @@
 import { createSignal, onCleanup } from 'solid-js';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   CellularGeneration,
   allowsVoipAsync,
@@ -46,12 +46,18 @@ export function CellularScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Cellular];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [generation, setGeneration] = createSignal<CellularGeneration | null>(null);
+  const [generation, setGeneration] = createSignal<CellularGeneration | null>(
+    null,
+  );
   const [allowsVoip, setAllowsVoip] = createSignal<boolean | null>(null);
   const [isoCountryCode, setIsoCountryCode] = createSignal<string | null>(null);
   const [carrierName, setCarrierName] = createSignal<string | null>(null);
-  const [mobileCountryCode, setMobileCountryCode] = createSignal<string | null>(null);
-  const [mobileNetworkCode, setMobileNetworkCode] = createSignal<string | null>(null);
+  const [mobileCountryCode, setMobileCountryCode] = createSignal<string | null>(
+    null,
+  );
+  const [mobileNetworkCode, setMobileNetworkCode] = createSignal<string | null>(
+    null,
+  );
   const permissions = createPermissions();
 
   let disposed = false;
@@ -80,88 +86,88 @@ export function CellularScreen() {
     permissions.status() === null ? 'checking…' : permissions.status()!.status;
 
   return (
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="cellular-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Cellular</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Cellular</text>
+            <text class="hero-body">
               @symbiote-native/cellular — cellular generation and carrier/SIM
               info. Every field except generation is Android-only upstream
               (iOS/web return null); a physical device with an active SIM is
               needed for real values.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="cellular-info-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Cellular info</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Generation</Text>
-            <Text class="value-text">
-              {generation() === null ? 'checking…' : generationLabel(generation()!)}
-            </Text>
-          </View>
+        <view testID="cellular-info-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Cellular info</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Generation</text>
+            <text class="value-text">
+              {generation() === null
+                ? 'checking…'
+                : generationLabel(generation()!)}
+            </text>
+          </view>
           {Platform.OS === 'android' && (
             <>
-              <View class="capability-row">
-                <Text class="capability-label">Allows VoIP</Text>
-                <Text class="value-text">{valueLabel(allowsVoip())}</Text>
-              </View>
-              <View class="capability-row">
-                <Text class="capability-label">ISO country code</Text>
-                <Text class="value-text">{valueLabel(isoCountryCode())}</Text>
-              </View>
-              <View class="capability-row">
-                <Text class="capability-label">Carrier name</Text>
-                <Text class="value-text">{valueLabel(carrierName())}</Text>
-              </View>
-              <View class="capability-row">
-                <Text class="capability-label">Mobile country code</Text>
-                <Text class="value-text">
+              <view class="capability-row">
+                <text class="capability-label">Allows VoIP</text>
+                <text class="value-text">{valueLabel(allowsVoip())}</text>
+              </view>
+              <view class="capability-row">
+                <text class="capability-label">ISO country code</text>
+                <text class="value-text">{valueLabel(isoCountryCode())}</text>
+              </view>
+              <view class="capability-row">
+                <text class="capability-label">Carrier name</text>
+                <text class="value-text">{valueLabel(carrierName())}</text>
+              </view>
+              <view class="capability-row">
+                <text class="capability-label">Mobile country code</text>
+                <text class="value-text">
                   {valueLabel(mobileCountryCode())}
-                </Text>
-              </View>
-              <View class="capability-row">
-                <Text class="capability-label">Mobile network code</Text>
-                <Text class="value-text">
+                </text>
+              </view>
+              <view class="capability-row">
+                <text class="capability-label">Mobile network code</text>
+                <text class="value-text">
                   {valueLabel(mobileNetworkCode())}
-                </Text>
-              </View>
+                </text>
+              </view>
             </>
           )}
-        </View>
+        </view>
 
-        <View testID="cellular-permission-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Permission</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">
-              Phone-state permission status
-            </Text>
-            <Text class="value-text">{permissionLabel()}</Text>
-          </View>
+        <view testID="cellular-permission-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Permission</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Phone-state permission status</text>
+            <text class="value-text">{permissionLabel()}</text>
+          </view>
           <ActionButton
             testID="cellular-request-permission"
             title="Request permission"
             onPress={() => permissions.request()}
             color={lineColor}
           />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

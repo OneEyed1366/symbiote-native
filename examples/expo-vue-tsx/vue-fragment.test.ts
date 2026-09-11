@@ -9,7 +9,7 @@
 
 import { defineComponent, Fragment, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, View, Text } from '@symbiote-native/vue';
+import { mount, unmount } from '@symbiote-native/vue';
 import { installFabric } from '@symbiote-native/test-utils';
 
 interface IRow {
@@ -44,11 +44,11 @@ async function mountApp(): Promise<void> {
       // An explicit Fragment is exactly what `v-for` compiles to. Vue brackets it with
       // empty-text anchors, the case that used to throw on insert into the View.
       return () =>
-        h(View, null, () => [
+        h('view', null, () => [
           h(
             Fragment,
             null,
-            rows.value.map(row => h(Text, { key: row.id }, () => row.label)),
+            rows.value.map(row => h('text', { key: row.id }, () => row.label)),
           ),
         ]);
     },

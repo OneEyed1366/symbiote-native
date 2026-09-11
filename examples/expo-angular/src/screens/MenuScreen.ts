@@ -1,8 +1,8 @@
 import { Component } from '@angular/core';
 import {
-  Pressable,
-  SafeAreaView,
-  ScrollView,
+  PressableElement,
+  SafeAreaViewElement,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -141,41 +141,47 @@ const MENU_ITEMS: readonly IMenuItem[] = [
 @Component({
   selector: 'MenuScreen',
   standalone: true,
-  imports: [Pressable, SafeAreaView, ScrollView, Text, View],
+  imports: [
+    PressableElement,
+    SafeAreaViewElement,
+    ScrollViewElement,
+    Text,
+    View,
+  ],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="menu-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class="menu-hero">
-          <Text class="menu-eyebrow">EXPO MODULES DEMOS</Text>
-          <Text class="menu-hero-title"
-            >Expo-SDK ports on a real native stack</Text
+        <view class="menu-hero">
+          <text class="menu-eyebrow">EXPO MODULES DEMOS</text>
+          <text class="menu-hero-title"
+            >Expo-SDK ports on a real native stack</text
           >
-          <Text class="menu-hero-subtitle">
+          <text class="menu-hero-subtitle">
             Each row below demos a different @symbiote-native package built on
             expo-modules-core.
-          </Text>
-        </View>
+          </text>
+        </view>
         @for (item of menuItems; track item.route) {
-          <Pressable
+          <pressable
             [testID]="'menu-row-' + item.route"
             [class]="rowClass(item)"
             (press)="navigation.push(item.route)"
           >
-            <View [class]="badgeClass(item)">
-              <Text class="menu-badge-text">{{ lineInfoFor(item).code }}</Text>
-            </View>
-            <View class="menu-row-copy">
-              <Text class="menu-row-label">{{ item.label }}</Text>
-              <Text [class]="hintClass(item)">{{ item.hint }}</Text>
-            </View>
-          </Pressable>
+            <view [class]="badgeClass(item)">
+              <text class="menu-badge-text">{{ lineInfoFor(item).code }}</text>
+            </view>
+            <view class="menu-row-copy">
+              <text class="menu-row-label">{{ item.label }}</text>
+              <text [class]="hintClass(item)">{{ item.hint }}</text>
+            </view>
+          </pressable>
         }
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class MenuScreen {

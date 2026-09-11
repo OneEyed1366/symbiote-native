@@ -120,7 +120,7 @@ async function loadProbe(): Promise<Component> {
        const measurement = useDeviceMotion(updateIntervalMs);
        $effect(() => { onValue(measurement.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'DeviceMotionProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

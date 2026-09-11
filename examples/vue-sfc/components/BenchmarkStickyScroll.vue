@@ -11,7 +11,6 @@
 -->
 <script setup lang="ts">
 import { h, type FunctionalComponent, type VNode } from 'vue';
-import { ScrollView, Text } from '@symbiote-native/vue';
 
 const STICKY_SECTION_COUNT = 200;
 const STICKY_ROWS_PER_SECTION = 3;
@@ -26,13 +25,13 @@ const headerIndices = Array.from(
 function buildStickyChildren(): VNode[] {
   return Array.from({ length: STICKY_SECTION_COUNT }, (_value, section) => [
     h(
-      Text,
+      'text',
       { key: `sticky-header-${section}`, class: 'section-header' },
       () => `SECTION ${section + 1}`,
     ),
     ...Array.from({ length: STICKY_ROWS_PER_SECTION }, (_rowValue, row) =>
       h(
-        Text,
+        'text',
         { key: `sticky-row-${section}-${row}`, class: 'list-row-text' },
         () => `row ${section + 1}.${row + 1}`,
       ),
@@ -40,14 +39,18 @@ function buildStickyChildren(): VNode[] {
   ]).flat();
 }
 
-// The one thing this block cannot say in template syntax. The adapter maps stickyHeaderIndices
-// over the ScrollView's default slot POSITIONALLY, and a template `v-for` compiles to a single
-// Fragment vnode - index 4 would then address nothing and the whole list would end up inside one
-// sticky wrapper. Built with h() so the slot really is 800 flat siblings, which is what the
-// indices above mean.
+// The one thing this block cannot say in template syntax. The behavior resolves
+// stickyHeaderIndices over the scroll tag's own children POSITIONALLY, and a template `v-for`
+// compiles to a single Fragment vnode - index 4 would then address nothing and the whole list
+// would end up inside one sticky wrapper. Built with h() so the children really are 800 flat
+// siblings, which is what the indices above mean.
+//
+// `scroll-view` is a TAG (an element vnode), not a component — its children must be an ARRAY,
+// never a function: an element vnode silently refuses a function child
+// (`.claude/rules/capitalized-intrinsic-tag-feasibility.md`).
 const StickyScrollBody: FunctionalComponent = () =>
   h(
-    ScrollView,
+    'scroll-view',
     {
       testID: 'benchmark-sticky-scroll',
       class: 'bench-sticky',
@@ -55,16 +58,16 @@ const StickyScrollBody: FunctionalComponent = () =>
       scrollEventThrottle: 16,
       nestedScrollEnabled: true,
     },
-    () => buildStickyChildren(),
+    buildStickyChildren(),
   );
 </script>
 
 <template>
-  <Text class="section-label"
-    >STICKY PATH A · ScrollView · stickyHeaderIndices</Text
+  <text class="section-label"
+    >STICKY PATH A · ScrollView · stickyHeaderIndices</text
   >
   <StickyScrollBody />
-  <Text class="note-text">{{
+  <text class="note-text">{{
     `${STICKY_SECTION_COUNT} sections, every row mounted — no virtualization in the frame.`
-  }}</Text>
+  }}</text>
 </template>

@@ -1,5 +1,10 @@
 import { Component, inject } from '@angular/core';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  SafeAreaViewElement,
+  ScrollViewElement,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   Orientation,
   OrientationLock,
@@ -23,50 +28,50 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 @Component({
   selector: 'ScreenOrientationScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="screen-orientation-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Screen Orientation</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Screen Orientation</text>
+            <text class="hero-body">
               @symbiote-native/screen-orientation — lock the screen to
               portrait/landscape, or unlock it back to the system default, with
               live orientation-change updates.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="screen-orientation-live-card" class="capability-card">
-          <Text class="capability-card-title">Live orientation</Text>
-          <View class="capability-row">
-            <Text class="capability-label">Orientation</Text>
-            <Text testID="screen-orientation-value" class="value-text">{{
+        <view testID="screen-orientation-live-card" class="capability-card">
+          <text class="capability-card-title">Live orientation</text>
+          <view class="capability-row">
+            <text class="capability-label">Orientation</text>
+            <text testID="screen-orientation-value" class="value-text">{{
               orientationLabel()
-            }}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Orientation lock</Text>
-            <Text testID="screen-orientation-lock-value" class="value-text">{{
+            }}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Orientation lock</text>
+            <text testID="screen-orientation-lock-value" class="value-text">{{
               orientationLockLabel()
-            }}</Text>
-          </View>
-        </View>
+            }}</text>
+          </view>
+        </view>
 
-        <View testID="screen-orientation-actions-card" class="capability-card">
-          <Text class="capability-card-title">Actions</Text>
-          <View class="button-row">
+        <view testID="screen-orientation-actions-card" class="capability-card">
+          <text class="capability-card-title">Actions</text>
+          <view class="button-row">
             <ActionButton
               testID="screen-orientation-lock-portrait"
               title="Lock portrait"
@@ -85,10 +90,10 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
               [color]="lineColor"
               (press)="handleUnlock()"
             ></ActionButton>
-          </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          </view>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class ScreenOrientationScreen {

@@ -1,6 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   isAvailableAsync,
   useKeepAwake,
@@ -11,10 +11,10 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="auth-capability-row">
-      <Text class="auth-capability-label">{props.label}</Text>
-      <Text class="auth-value-text">{props.value}</Text>
-    </View>
+    <view class="auth-capability-row">
+      <text class="auth-capability-label">{props.label}</text>
+      <text class="auth-value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -57,32 +57,32 @@ export const KeepAwakeScreen = defineComponent(
     }
 
     return () => (
-      <SafeAreaView class="screen">
-        <ScrollView
+      <safe-area-view class="screen">
+        <scroll-view
           testID="keep-awake-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Keep Awake</Text>
-              <Text class="hero-body">
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Keep Awake</text>
+              <text class="hero-body">
                 @symbiote-native/keep-awake — keeps the screen on for as long as
                 a component holding useKeepAwake() stays mounted.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="keep-awake-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Screen lock</Text>
-            </View>
+          <view testID="keep-awake-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Screen lock</text>
+            </view>
             <ValueRow
               label="isAvailableAsync"
               value={
@@ -103,9 +103,9 @@ export const KeepAwakeScreen = defineComponent(
               color={lineColor}
             />
             {isHeld.value ? <KeepAwakeHolder /> : null}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+          </view>
+        </scroll-view>
+      </safe-area-view>
     );
   },
   { name: 'KeepAwakeScreen' },

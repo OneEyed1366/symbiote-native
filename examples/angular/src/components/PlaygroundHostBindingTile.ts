@@ -1,5 +1,9 @@
 import { Component, ElementRef, HostBinding, inject } from '@angular/core';
-import { Pressable, Text, anchorHostStyle } from '@symbiote-native/angular';
+import {
+  PressableElement,
+  Text,
+  anchorHostStyle,
+} from '@symbiote-native/angular';
 import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import { PlaygroundQueryItemDirective } from './PlaygroundDirectives';
 
@@ -25,20 +29,20 @@ const TILE_BASE_STYLE: IViewStyle = { borderWidth: 2, borderRadius: 8 };
 @Component({
   selector: 'PlaygroundHostBindingTile',
   standalone: true,
-  imports: [Pressable, Text],
+  imports: [PressableElement, Text],
   hostDirectives: [
     { directive: PlaygroundQueryItemDirective, inputs: ['label: tileLabel'] },
   ],
   template: `
-    <Pressable
+    <pressable
       testID="pg-hostbinding-tile"
       [style]="innerStyle"
       (press)="toggle()"
     >
-      <Text class="rstyle-tile-text">{{
+      <text class="rstyle-tile-text">{{
         active ? tileLabel + ' · on' : tileLabel + ' · off'
-      }}</Text>
-    </Pressable>
+      }}</text>
+    </pressable>
   `,
 })
 export class PlaygroundHostBindingTile {

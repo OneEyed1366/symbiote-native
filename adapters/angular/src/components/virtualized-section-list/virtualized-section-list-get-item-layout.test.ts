@@ -36,7 +36,7 @@ const sections: ISection<IRow>[] = [
       [getItemLayout]="getItemLayout"
     >
       <ng-template vSectionItem let-item>
-        <symbiote-text [testID]="item.id">{{ item.id }}</symbiote-text>
+        <text [testID]="item.id">{{ item.id }}</text>
       </ng-template>
     </VirtualizedSectionList>
   `,

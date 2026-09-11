@@ -19,8 +19,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
-import { Text } from './components/text';
-import { View } from './components/view';
 import type { JSX } from './jsx-runtime';
 
 const WRAPPER_ROOT = 8_701;
@@ -73,8 +71,8 @@ describe('a bare intrinsic commits the wrapper payload', () => {
       onLayout: () => undefined,
     };
 
-    const wrapper = await payloadOf(WRAPPER_ROOT, () => <View {...props} />);
-    const tag = await payloadOf(TAG_ROOT, () => <symbiote-view {...props} />);
+    const wrapper = await payloadOf(WRAPPER_ROOT, () => <view {...props} />);
+    const tag = await payloadOf(TAG_ROOT, () => <view {...props} />);
 
     expect(tag.view).toBe(wrapper.view);
     expect(keysOf(tag.props)).toEqual(keysOf(wrapper.props));
@@ -91,8 +89,8 @@ describe('a bare intrinsic commits the wrapper payload', () => {
     // absence — asserted here rather than assumed (.claude/rules/fabric-boolean-event-gates.md).
     const props = { testID: 'plain' };
 
-    const wrapper = await payloadOf(WRAPPER_ROOT, () => <View {...props} />);
-    const tag = await payloadOf(TAG_ROOT, () => <symbiote-view {...props} />);
+    const wrapper = await payloadOf(WRAPPER_ROOT, () => <view {...props} />);
+    const tag = await payloadOf(TAG_ROOT, () => <view {...props} />);
 
     expect(keysOf(tag.props)).toEqual(keysOf(wrapper.props));
     expect(keysOf(wrapper.props)).not.toContain('nativeID');
@@ -101,8 +99,8 @@ describe('a bare intrinsic commits the wrapper payload', () => {
   it('Text: the two defaults reach the bare tag from the renderer', async () => {
     const props = { numberOfLines: 1 };
 
-    const wrapper = await payloadOf(WRAPPER_ROOT, () => <Text {...props} />);
-    const tag = await payloadOf(TAG_ROOT, () => <symbiote-text {...props} />);
+    const wrapper = await payloadOf(WRAPPER_ROOT, () => <text {...props} />);
+    const tag = await payloadOf(TAG_ROOT, () => <text {...props} />);
 
     expect(tag.view).toBe(wrapper.view);
     expect(keysOf(tag.props)).toEqual(keysOf(wrapper.props));
@@ -114,8 +112,8 @@ describe('a bare intrinsic commits the wrapper payload', () => {
   it('Text: allowFontScaling={false} is the case a plain ?? would get wrong', async () => {
     const props = { allowFontScaling: false, ellipsizeMode: 'clip' };
 
-    const wrapper = await payloadOf(WRAPPER_ROOT, () => <Text {...props} />);
-    const tag = await payloadOf(TAG_ROOT, () => <symbiote-text {...props} />);
+    const wrapper = await payloadOf(WRAPPER_ROOT, () => <text {...props} />);
+    const tag = await payloadOf(TAG_ROOT, () => <text {...props} />);
 
     expect(tag.props).toEqual(wrapper.props);
     expect(tag.props.allowFontScaling).toBe(false);

@@ -41,19 +41,19 @@ let capturedHost: HostApp | undefined;
   standalone: true,
   imports: [ViewHost, TextHost, PortalDirective, PortalOutletDirective],
   template: `
-    <View>
-      <View testID="overlay-host-a">
+    <view>
+      <view testID="overlay-host-a">
         <ng-container portalOutlet #overlayHostA="portalOutlet"></ng-container>
-      </View>
-      <View testID="overlay-host-b">
+      </view>
+      <view testID="overlay-host-b">
         <ng-container portalOutlet #overlayHostB="portalOutlet"></ng-container>
-      </View>
+      </view>
       @if (visible()) {
-        <View *portal="useFirstOutlet() ? overlayHostA : overlayHostB"
-          ><Text>portaled content</Text></View
+        <view *portal="useFirstOutlet() ? overlayHostA : overlayHostB"
+          ><text>portaled content</text></view
         >
       }
-    </View>
+    </view>
   `,
 })
 class HostApp {
@@ -110,7 +110,7 @@ function isDescendantOf(root: IFakeNode, target: IFakeNode): boolean {
   );
 }
 
-// Matches the plain wrapper View authored by `<View *portal="…">` — deepest RCTView containing
+// Matches the plain wrapper View authored by `<view *portal="…">` — deepest RCTView containing
 // the text and carrying none of the outlet testIDs, so ancestor Views along the way don't
 // shadow it (DFS visits the deepest match last and it wins).
 function portaledContent(): IFakeNode | undefined {
@@ -128,7 +128,7 @@ function portaledContent(): IFakeNode | undefined {
   selector: 'symbiote-portal-bad-outlet-app',
   standalone: true,
   imports: [ViewHost, PortalOutletDirective],
-  template: `<View portalOutlet #bad="portalOutlet" testID="bad-host"></View>`,
+  template: `<view portalOutlet #bad="portalOutlet" testID="bad-host"></view>`,
 })
 class BadOutletApp {}
 

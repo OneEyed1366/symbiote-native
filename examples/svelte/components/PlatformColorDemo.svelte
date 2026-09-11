@@ -5,8 +5,6 @@
   // strings (processColor), so no special handling reaches Fabric. Name resolution is
   // device-only: a wrong name silently falls back, so this is verified on simulator.
   import {
-    View,
-    Text,
     PlatformColor,
     DynamicColorIOS,
     useColorScheme,
@@ -17,27 +15,27 @@
   const scheme = useColorScheme();
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">
+<view class="section-nested">
+  <text class="section-label">
     {`PlatformColor · semantic + DynamicColorIOS (${scheme.current ?? 'unknown'})`}
-  </Text>
-  <View class="row">
-    <View
+  </text>
+  <view class="row">
+    <view
       class="color-tile"
       style={{ backgroundColor: PlatformColor('systemBlue') }}
     >
-      <Text class="tile-label">systemBlue</Text>
-    </View>
-    <View
+      <text class="tile-label">systemBlue</text>
+    </view>
+    <view
       class="color-tile-bordered"
       style={{
         backgroundColor: DynamicColorIOS({ light: '#dbeafe', dark: '#13243a' }),
         borderColor: PlatformColor('separator'),
       }}
     >
-      <Text class="bold-label" style={{ color: PlatformColor('label') }}>
+      <text class="bold-label" style={{ color: PlatformColor('label') }}>
         dynamic
-      </Text>
-    </View>
-  </View>
-</View>
+      </text>
+    </view>
+  </view>
+</view>

@@ -12,8 +12,8 @@ import {
 import {
   Animated,
   AnimatedView,
-  SafeAreaView,
-  ScrollView,
+  SafeAreaViewElement,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -114,11 +114,11 @@ export class ShowcaseToggle {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Text, View],
   template: `
-    <View class="sc-pair-half">
-      <Text class="sc-tile-label">{{ label }}</Text>
+    <view class="sc-pair-half">
+      <text class="sc-tile-label">{{ label }}</text>
       <ng-content></ng-content>
-      <Text class="sc-tile-caption">{{ caption }}</Text>
-    </View>
+      <text class="sc-tile-caption">{{ caption }}</text>
+    </view>
   `,
 })
 export class ShowcaseTile {
@@ -132,144 +132,144 @@ export class ShowcaseTile {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     AnimatedView,
-    SafeAreaView,
-    ScrollView,
+    SafeAreaViewElement,
+    ScrollViewElement,
     ShowcaseTile,
     ShowcaseToggle,
     Text,
     View,
   ],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="style-showcase-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
 
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">ST</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Styling showcase</Text>
-            <Text class="hero-body">
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">ST</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Styling showcase</text>
+            <text class="hero-body">
               Six stylesheets driving one screen — plain CSS, CSS Modules, SCSS,
               Less, Stylus, and a sheet of things the compiler refuses. Every
               tile is built so a dropped rule is visible rather than silent.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
         <!-- ---- compiled verbatim ---------------------------------------------------- -->
 
-        <View class="sc-panel">
-          <Text class="sc-panel-title">
+        <view class="sc-panel">
+          <text class="sc-panel-title">
             1 · Declarations, as the compiler emits them
-          </Text>
-          <Text class="sc-panel-note">
+          </text>
+          <text class="sc-panel-note">
             lightningcss hands back a typed value tree, so a shorthand arrives
             already expanded into four sides and a corner longhand as the pair
             it really is. Neither was true of the hand-rolled evaluator this
             replaced.
-          </Text>
+          </text>
 
-          <Text class="sc-tile-label">SHORTHAND EXPANSION</Text>
-          <View class="sc-shorthand-box" testID="sc-shorthand-box">
-            <View class="sc-shorthand-core"></View>
-          </View>
-          <Text class="sc-tile-caption">
+          <text class="sc-tile-label">SHORTHAND EXPANSION</text>
+          <view class="sc-shorthand-box" testID="sc-shorthand-box">
+            <view class="sc-shorthand-core"></view>
+          </view>
+          <text class="sc-tile-caption">
             padding: 6px 12px 26px 38px · border-width: 1px 4px 10px 20px — four
             different values on each. Uniform insets mean only the first value
             survived.
-          </Text>
+          </text>
 
-          <View class="sc-pair">
+          <view class="sc-pair">
             <ShowcaseTile
               label="BORDER-RADIUS"
               caption="the shorthand — always worked"
             >
-              <View
+              <view
                 class="sc-corner-shorthand"
                 testID="sc-corner-shorthand"
-              ></View>
+              ></view>
             </ShowcaseTile>
             <ShowcaseTile
               label="FOUR LONGHANDS"
               caption="28 / 4 / 28 / 4 — a leaf. A square here is the bug this screen was built for."
             >
-              <View
+              <view
                 class="sc-corner-longhand"
                 testID="sc-corner-longhand"
-              ></View>
+              ></view>
             </ShowcaseTile>
-          </View>
+          </view>
 
-          <View class="sc-pair">
+          <view class="sc-pair">
             <ShowcaseTile
               label="BACKGROUND-IMAGE"
               caption="a real native Fabric prop"
             >
-              <View class="sc-gradient-tile" testID="sc-gradient-tile"></View>
+              <view class="sc-gradient-tile" testID="sc-gradient-tile"></view>
             </ShowcaseTile>
             <ShowcaseTile label="+ FILTER" [caption]="filterTileCaption">
-              <View class="sc-filter-tile" testID="sc-filter-tile"></View>
+              <view class="sc-filter-tile" testID="sc-filter-tile"></view>
             </ShowcaseTile>
-          </View>
+          </view>
 
-          <View class="sc-pair">
+          <view class="sc-pair">
             <ShowcaseTile
               label="ROTATE, DEFAULT ORIGIN"
               caption="pivots about centre"
             >
-              <View class="sc-origin-frame">
-                <View class="sc-origin-square" testID="sc-origin-centre"></View>
-              </View>
+              <view class="sc-origin-frame">
+                <view class="sc-origin-square" testID="sc-origin-centre"></view>
+              </view>
             </ShowcaseTile>
             <ShowcaseTile
               label="+ TRANSFORM-ORIGIN"
               caption="top left — the same rotation, visibly offset"
             >
-              <View class="sc-origin-frame">
-                <View
+              <view class="sc-origin-frame">
+                <view
                   class="sc-origin-square-corner"
                   testID="sc-origin-corner"
-                ></View>
-              </View>
+                ></view>
+              </view>
             </ShowcaseTile>
-          </View>
+          </view>
 
-          <Text class="sc-tile-label">BOX-SHADOW · TWO LAYERS</Text>
-          <View class="sc-shadow-tile" testID="sc-shadow-tile"></View>
-          <Text class="sc-tile-caption">
+          <text class="sc-tile-label">BOX-SHADOW · TWO LAYERS</text>
+          <view class="sc-shadow-tile" testID="sc-shadow-tile"></view>
+          <text class="sc-tile-caption">
             Handed through as raw CSS text and parsed by the engine's own
             processBoxShadow port, so spread radius and multiple layers survive.
-          </Text>
-        </View>
+          </text>
+        </view>
 
         <!-- ---- specificity ---------------------------------------------------------- -->
 
-        <View class="sc-panel">
-          <Text class="sc-panel-title">
+        <view class="sc-panel">
+          <text class="sc-panel-title">
             2 · Specificity beats position; position breaks a tie
-          </Text>
-          <Text class="sc-panel-note">
+          </text>
+          <text class="sc-panel-note">
             The file order is adversarial on purpose.
             \`.sc-spec-tile.sc-spec-strong\` is declared ABOVE the plain
             \`.sc-spec-tile\` and still wins the fill, because (0,2,0) outranks
             (0,1,0). \`.sc-spec-early\` and \`.sc-spec-late\` are equally
             specific, so the border goes to whichever is later in the file.
-          </Text>
-          <View [class]="specClass()" testID="sc-spec-tile">
-            <Text class="sc-spec-text">{{ specText() }}</Text>
-          </View>
-          <Text class="sc-readout" testID="sc-spec-readout">
+          </text>
+          <view [class]="specClass()" testID="sc-spec-tile">
+            <text class="sc-spec-text">{{ specText() }}</text>
+          </view>
+          <text class="sc-readout" testID="sc-spec-readout">
             {{ specClass() }}
-          </Text>
-          <Text class="sc-tile-caption">{{ specBorderCaption() }}</Text>
+          </text>
+          <text class="sc-tile-caption">{{ specBorderCaption() }}</text>
           <ShowcaseToggle
             testID="sc-spec-strong-toggle"
             label=".sc-spec-strong"
@@ -282,27 +282,27 @@ export class ShowcaseTile {
             [active]="hasOrderPair()"
             (toggle)="hasOrderPair.set(!hasOrderPair())"
           ></ShowcaseToggle>
-        </View>
+        </view>
 
         <!-- ---- compound selectors --------------------------------------------------- -->
 
-        <View class="sc-panel">
-          <Text class="sc-panel-title">
+        <view class="sc-panel">
+          <text class="sc-panel-title">
             3 · Compound selectors — eight combinations, four tokens
-          </Text>
-          <Text class="sc-panel-note">
+          </text>
+          <text class="sc-panel-note">
             Rules keyed on one, two, and all three modifiers over a shared base.
             With everything on, the node carries FOUR class tokens — the count
             at which the retired collapse-and-permute registry silently stopped
             matching. Each rule restates only what it changes, so the base's
             size and centring have to survive underneath all of them.
-          </Text>
-          <View [class]="triClass()" testID="sc-tri-tile">
-            <Text class="sc-tri-text">{{ triText() }}</Text>
-          </View>
-          <Text class="sc-readout" testID="sc-tri-readout">
+          </text>
+          <view [class]="triClass()" testID="sc-tri-tile">
+            <text class="sc-tri-text">{{ triText() }}</text>
+          </view>
+          <text class="sc-readout" testID="sc-tri-readout">
             {{ triClass() }}
-          </Text>
+          </text>
           <ShowcaseToggle
             testID="sc-tri-a-toggle"
             label=".sc-t-a · lime ring"
@@ -321,31 +321,31 @@ export class ShowcaseTile {
             [active]="hasTokenC()"
             (toggle)="hasTokenC.set(!hasTokenC())"
           ></ShowcaseToggle>
-        </View>
+        </view>
 
         <!-- ---- class + inline style ------------------------------------------------- -->
 
-        <View class="sc-panel">
-          <Text class="sc-panel-title">
+        <view class="sc-panel">
+          <text class="sc-panel-title">
             4 · A class and an inline style on one node
-          </Text>
-          <Text class="sc-panel-note">
+          </text>
+          <text class="sc-panel-note">
             The engine keeps the two halves apart in a WeakMap and always writes
             them as [classStyle, explicitStyle] in that fixed order, so the
             explicit half wins whichever prop the framework happened to set
             last. Flip either half to see the other alone.
-          </Text>
-          <View
+          </text>
+          <view
             [class]="mergeClass()"
             [style]="mergeStyle()"
             testID="sc-merge-tile"
           >
-            <Text class="sc-merge-text">{{ mergeReadout() }}</Text>
-          </View>
-          <Text class="sc-tile-caption">
+            <text class="sc-merge-text">{{ mergeReadout() }}</text>
+          </view>
+          <text class="sc-tile-caption">
             The lime ring and the corners come from the class either way — the
             inline object names only backgroundColor, so it overrides only that.
-          </Text>
+          </text>
           <ShowcaseToggle
             testID="sc-merge-class-toggle"
             label="class"
@@ -358,214 +358,214 @@ export class ShowcaseTile {
             [active]="hasMergeInline()"
             (toggle)="hasMergeInline.set(!hasMergeInline())"
           ></ShowcaseToggle>
-        </View>
+        </view>
 
         <!-- ---- animation over a class ----------------------------------------------- -->
 
-        <View class="sc-panel">
-          <Text class="sc-panel-title">
+        <view class="sc-panel">
+          <text class="sc-panel-title">
             5 · An animation on top of a class
-          </Text>
-          <Text class="sc-panel-note">
+          </text>
+          <text class="sc-panel-note">
             The class owns the whole static look; the Animated.Value writes only
             transform and opacity. If a frame clobbered the resolved class the
             tile would lose its ring and its corners mid-pulse rather than
             merely stop moving — the two are independent, and the ring is the
             tell.
-          </Text>
-          <View class="sc-anim-frame">
+          </text>
+          <view class="sc-anim-frame">
             <AnimatedView
               class="sc-anim-tile"
               testID="sc-anim-tile"
               [style]="pulseStyle"
             >
-              <Text class="sc-anim-text">class + frame</Text>
+              <text class="sc-anim-text">class + frame</text>
             </AnimatedView>
-          </View>
-        </View>
+          </view>
+        </view>
 
         <!-- ---- CSS Modules ---------------------------------------------------------- -->
 
-        <View class="sc-panel">
-          <Text class="sc-panel-title">6 · CSS Modules</Text>
-          <Text class="sc-panel-note">
+        <view class="sc-panel">
+          <text class="sc-panel-title">6 · CSS Modules</text>
+          <text class="sc-panel-note">
             Every class in StyleShowcase.module.css is renamed per file, so none
             of it can collide with App.css. The default export maps the AUTHORED
             name — kebab and all — to the renamed one, and css-dts generates the
             sibling .d.ts so a typo is a type error rather than the literal
             string "undefined" reaching the class prop.
-          </Text>
-          <View class="sc-chip-row">
-            <View [class]="chipBaseClass" testID="sc-chip-base">
-              <Text [class]="chipTextClass">base</Text>
-            </View>
-            <View [class]="chipTintedClass" testID="sc-chip-tinted">
-              <Text [class]="chipTextClass">composes base</Text>
-            </View>
-            <View [class]="chipLoudClass" testID="sc-chip-loud">
-              <Text [class]="chipTextClass">composes tinted</Text>
-            </View>
-          </View>
-          <Text class="sc-tile-caption">
+          </text>
+          <view class="sc-chip-row">
+            <view [class]="chipBaseClass" testID="sc-chip-base">
+              <text [class]="chipTextClass">base</text>
+            </view>
+            <view [class]="chipTintedClass" testID="sc-chip-tinted">
+              <text [class]="chipTextClass">composes base</text>
+            </view>
+            <view [class]="chipLoudClass" testID="sc-chip-loud">
+              <text [class]="chipTextClass">composes tinted</text>
+            </view>
+          </view>
+          <text class="sc-tile-caption">
             Two hops of composes. Each hop restates only background-color, so
             the three fills read left to right in the emitted token order —
             composed-first, which is what lets a composer override what it
             composes. The pill shape comes from the base and survives both.
-          </Text>
-          <View class="sc-chip-row">
-            <View [class]="chipGlobalClass" testID="sc-chip-global">
-              <Text [class]="chipTextClass">+ :global mark</Text>
-            </View>
-          </View>
-          <Text class="sc-tile-caption">
+          </text>
+          <view class="sc-chip-row">
+            <view [class]="chipGlobalClass" testID="sc-chip-global">
+              <text [class]="chipTextClass">+ :global mark</text>
+            </view>
+          </view>
+          <text class="sc-tile-caption">
             :global(.sc-global-mark) opts out of the rename, so it registers
             under its bare name and squares off two corners of the pill. We
             export it keyed as itself — upstream CSS Modules omits a global,
             which would force the author back to a bare string literal.
-          </Text>
-          <Text class="sc-readout" testID="sc-chip-readout">
+          </text>
+          <text class="sc-readout" testID="sc-chip-readout">
             {{ chipLoudClass }}
-          </Text>
-        </View>
+          </text>
+        </view>
 
         <!-- ---- preprocessors -------------------------------------------------------- -->
 
-        <View class="sc-panel">
-          <Text class="sc-panel-title">7 · SCSS · Less · Stylus</Text>
-          <Text class="sc-panel-note">
+        <view class="sc-panel">
+          <text class="sc-panel-title">7 · SCSS · Less · Stylus</text>
+          <text class="sc-panel-note">
             Each source reduces to plain CSS before the compiler sees it, so
             everything above applies identically regardless of language. Each
             tile leans on a variable, a parametric mixin, and arithmetic, so its
             padding is a number the source never spells — 26 / 22 / 18 px, from
             13 / 11 / 9 doubled.
-          </Text>
-          <View class="sc-chip-row">
-            <View [class]="scssTileClass()" testID="sc-scss-tile">
-              <Text class="scss-tile-text">SCSS</Text>
-            </View>
-            <View [class]="lessTileClass()" testID="sc-less-tile">
-              <Text class="less-tile-text">Less</Text>
-            </View>
-            <View [class]="stylTileClass()" testID="sc-styl-tile">
-              <Text class="styl-tile-text">Stylus</Text>
-            </View>
-          </View>
-          <Text class="sc-tile-caption">
+          </text>
+          <view class="sc-chip-row">
+            <view [class]="scssTileClass()" testID="sc-scss-tile">
+              <text class="scss-tile-text">SCSS</text>
+            </view>
+            <view [class]="lessTileClass()" testID="sc-less-tile">
+              <text class="less-tile-text">Less</text>
+            </view>
+            <view [class]="stylTileClass()" testID="sc-styl-tile">
+              <text class="styl-tile-text">Stylus</text>
+            </view>
+          </view>
+          <text class="sc-tile-caption">
             Three different corner radii (14 / 18 / 22) from three mixin calls.
             The toggle turns on each file's \`&.x-tile-on\` nest, which compiles
             to a COMPOUND selector — nesting that produced a descendant would
             hit the limit two panels down.
-          </Text>
+          </text>
           <ShowcaseToggle
             testID="sc-preprocessor-toggle"
             label="nested &.on rule"
             [active]="arePreprocessorsOn()"
             (toggle)="arePreprocessorsOn.set(!arePreprocessorsOn())"
           ></ShowcaseToggle>
-        </View>
+        </view>
 
         <!-- ---- limits --------------------------------------------------------------- -->
 
-        <View class="sc-panel">
-          <Text class="sc-panel-title">
+        <view class="sc-panel">
+          <text class="sc-panel-title">
             8 · Deliberately not supported — and one that is wrong, not absent
-          </Text>
-          <Text class="sc-panel-note">
+          </text>
+          <text class="sc-panel-note">
             Each of these prints a warning into the Metro output under the
             [@symbiote-native/css-parser] prefix, naming this file (and, for a
             parse error, line:column). If a tile below misbehaves, that log is
             where the reason is.
-          </Text>
+          </text>
 
-          <Text class="sc-tile-label">@MEDIA · @SUPPORTS · @CONTAINER</Text>
-          <View class="sc-limit-cond" testID="sc-limit-cond">
-            <Text class="sc-combo-text">must stay slate</Text>
-          </View>
-          <Text class="sc-tile-caption">
+          <text class="sc-tile-label">@MEDIA · @SUPPORTS · @CONTAINER</text>
+          <view class="sc-limit-cond" testID="sc-limit-cond">
+            <text class="sc-combo-text">must stay slate</text>
+          </view>
+          <text class="sc-tile-caption">
             All three are dropped whole, rules included — React Native evaluates
             no CSS condition at all. Each one here would repaint this tile red.
             Branch in JS instead: useWindowDimensions, Platform.
-          </Text>
+          </text>
 
-          <Text class="sc-tile-label">CALC() ACROSS UNIT FAMILIES</Text>
-          <View class="sc-limit-calc-wrap">
-            <View class="sc-limit-calc-ok" testID="sc-limit-calc-ok">
-              <Text class="sc-limit-calc-text">width: 100% — fine</Text>
-            </View>
-            <View class="sc-limit-calc-bad" testID="sc-limit-calc-bad">
-              <Text class="sc-limit-calc-text">
+          <text class="sc-tile-label">CALC() ACROSS UNIT FAMILIES</text>
+          <view class="sc-limit-calc-wrap">
+            <view class="sc-limit-calc-ok" testID="sc-limit-calc-ok">
+              <text class="sc-limit-calc-text">width: 100% — fine</text>
+            </view>
+            <view class="sc-limit-calc-bad" testID="sc-limit-calc-bad">
+              <text class="sc-limit-calc-text">
                 width: calc(100% - 48px) — dropped
-              </Text>
-            </View>
-          </View>
-          <Text class="sc-tile-caption">
+              </text>
+            </view>
+          </view>
+          <text class="sc-tile-caption">
             RN has no unit meaning "a percentage minus points", so the
             declaration is refused rather than approximated — the red box has no
             width at all and shrinks to its text. It used to become width: 100,
             which RN reads as 100 POINTS. Use flex or parent padding; calc()
             within one unit family still evaluates.
-          </Text>
+          </text>
 
-          <Text class="sc-tile-label">
+          <text class="sc-tile-label">
             THE COMBINATOR — WRONG, NOT MISSING
-          </Text>
-          <View class="sc-combo-parent" testID="sc-combo-parent">
-            <View class="sc-combo-child" testID="sc-combo-nested-child">
-              <Text class="sc-combo-text">
+          </text>
+          <view class="sc-combo-parent" testID="sc-combo-parent">
+            <view class="sc-combo-child" testID="sc-combo-nested-child">
+              <text class="sc-combo-text">
                 nested child · the web paints this red, here it stays plain
-              </Text>
-            </View>
-            <View
+              </text>
+            </view>
+            <view
               class="sc-combo-parent sc-combo-child"
               testID="sc-combo-merged"
             >
-              <Text class="sc-combo-text">
+              <text class="sc-combo-text">
                 both names on ONE node · the web paints nothing, here it goes
                 red
-              </Text>
-            </View>
-          </View>
-          <Text class="sc-tile-caption">
+              </text>
+            </view>
+          </view>
+          <text class="sc-tile-caption">
             \`.sc-combo-parent .sc-combo-child\` keeps only its class tokens, so
             it matches exactly like \`.a.b\`. A descendant rule therefore never
             fires where it was meant to and does fire where it was not. Give the
             child its own class; never write a descendant, child, or sibling
             rule.
-          </Text>
+          </text>
 
-          <Text class="sc-tile-label">VAR() DOES NOT CROSS FILES</Text>
-          <View class="sc-pair">
+          <text class="sc-tile-label">VAR() DOES NOT CROSS FILES</text>
+          <view class="sc-pair">
             <ShowcaseTile
               label="LOCAL TOKEN"
               caption="--sc-limit-lime is declared in this sheet"
             >
-              <View
+              <view
                 class="sc-limit-var sc-limit-var-local"
                 testID="sc-limit-var-local"
               >
-                <Text class="sc-combo-text">resolves</Text>
-              </View>
+                <text class="sc-combo-text">resolves</text>
+              </view>
             </ShowcaseTile>
             <ShowcaseTile
               label="APP.CSS TOKEN"
               caption="--mist belongs to App.css — dropped, so the ring falls back to black"
             >
-              <View
+              <view
                 class="sc-limit-var sc-limit-var-foreign"
                 testID="sc-limit-var-foreign"
               >
-                <Text class="sc-combo-text">dropped</Text>
-              </View>
+                <text class="sc-combo-text">dropped</text>
+              </view>
             </ShowcaseTile>
-          </View>
-          <Text class="sc-tile-caption">
+          </view>
+          <text class="sc-tile-caption">
             Custom properties are collected per compiled file and substituted at
             build time, so a token from another sheet does not exist here.
             Outside the file that declares them, write literals.
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          </text>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class StyleShowcaseScreen implements OnInit, OnDestroy {

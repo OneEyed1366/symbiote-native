@@ -53,15 +53,13 @@ const rows: IRow[] = Array.from({ length: 5 }, (_unused, index) => ({
       [style]="{ height: 120 }"
     >
       <ng-template vListHeader>
-        <symbiote-text testID="header">header</symbiote-text>
+        <text testID="header">header</text>
       </ng-template>
       <ng-template vListItem let-item>
-        <symbiote-text [testID]="'row-' + item.n">{{
-          'row ' + item.n
-        }}</symbiote-text>
+        <text [testID]="'row-' + item.n">{{ 'row ' + item.n }}</text>
       </ng-template>
       <ng-template vListFooter>
-        <symbiote-text testID="footer">footer</symbiote-text>
+        <text testID="footer">footer</text>
       </ng-template>
     </FlatList>
   `,

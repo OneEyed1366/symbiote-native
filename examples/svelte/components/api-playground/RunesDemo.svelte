@@ -3,7 +3,6 @@
   // Yes/Partial row except $bindable/$props()/$props.id() (NumberStepper.svelte owns those — see
   // ApiPlaygroundScreen.svelte's composition) and $host() (No — needs the `customElement`
   // compiler option and a real HTMLElement dispatch target, neither of which exists here).
-  import { Text, View } from '@symbiote-native/svelte';
   import { dlog } from '@symbiote-native/engine';
   import ActionButton from '../ActionButton.svelte';
 
@@ -90,36 +89,36 @@
   });
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">Runes · $state, $derived, $effect family</Text>
-  <View class="row-align-center">
+<view class="section-nested">
+  <text class="section-label">Runes · $state, $derived, $effect family</text>
+  <view class="row-align-center">
     <ActionButton
       testID="runes-decrement"
       title="−"
       color={ACCENT}
       onPress={() => (count -= 1)}
     />
-    <Text class="info-text-flex" testID="runes-count">
+    <text class="info-text-flex" testID="runes-count">
       {`count: ${count} · $derived doubled: ${doubled} · $derived.by parity: ${parity}`}
-    </Text>
+    </text>
     <ActionButton
       testID="runes-increment"
       title="+"
       color={ACCENT}
       onPress={() => (count += 1)}
     />
-  </View>
-  <Text class="note-text" testID="runes-effect-readout">
+  </view>
+  <text class="note-text" testID="runes-effect-readout">
     {`$effect ran ${effectRuns} time(s) so far (tracks count) · $effect.pre: ${preEffectLog}`}
-  </Text>
-  <Text class="note-text">
+  </text>
+  <text class="note-text">
     Partial — $effect.pre runs mechanically, but has no synchronous pre-commit
     layout value to read here.
-  </Text>
-  <Text class="note-text" testID="runes-tracking-readout">
+  </text>
+  <text class="note-text" testID="runes-tracking-readout">
     {`$effect.tracking() at component init: ${trackedAtInit} · inside a $derived.by: ${trackedInsideDerived}`}
-  </Text>
-  <View class="row-align-center">
+  </text>
+  <view class="row-align-center">
     <ActionButton
       testID="runes-mutate-raw"
       title="Mutate $state.raw (no re-render)"
@@ -132,22 +131,22 @@
       color={ACCENT}
       onPress={reassignRaw}
     />
-  </View>
-  <Text class="info-text" testID="runes-raw-readout">
+  </view>
+  <text class="info-text" testID="runes-raw-readout">
     {`$state.raw n (updates only on reassignment): ${rawBox.n}`}
-  </Text>
+  </text>
   <ActionButton
     testID="runes-snapshot"
     title="$state.snapshot(rawBox)"
     color={ACCENT}
     onPress={takeSnapshot}
   />
-  <Text class="info-text" testID="runes-snapshot-readout">
+  <text class="info-text" testID="runes-snapshot-readout">
     {snapshotText === undefined
       ? 'tap to capture a plain deep copy of $state.raw'
       : `snapshot: ${snapshotText}`}
-  </Text>
-  <View class="row-align-center">
+  </text>
+  <view class="row-align-center">
     <ActionButton
       testID="runes-root-start"
       title="Start $effect.root"
@@ -160,11 +159,11 @@
       color={ACCENT}
       onPress={stopRootEffect}
     />
-  </View>
-  <Text class="info-text" testID="runes-root-readout">
+  </view>
+  <text class="info-text" testID="runes-root-readout">
     {`$effect.root status: ${rootEffectStatus}`}
-  </Text>
-  <Text class="note-text" testID="runes-inspect-readout">
+  </text>
+  <text class="note-text" testID="runes-inspect-readout">
     {`$inspect.with: ${inspectWithLog} · $inspect.trace'd derived value: ${tracedDouble} (see Metro console for both plus plain $inspect(count))`}
-  </Text>
-</View>
+  </text>
+</view>

@@ -1,7 +1,13 @@
-// A bare intrinsic tag must commit what its WRAPPER commits. The wrapper applies its folds in a
-// component body; a tag has no body, so the same folds have to live in the renderer — and nothing
-// is left behind to report the gap if they do not (`.claude/rules/adapter-parity-audit.md`, "the
-// sixth surface").
+// A bare intrinsic tag must commit what its WRAPPER used to commit. The wrapper applied its folds
+// in a component body; a tag has no body, so the same folds have to live in the renderer — and
+// nothing is left behind to report the gap if they do not
+// (`.claude/rules/adapter-parity-audit.md`, "the sixth surface").
+//
+// THE WRAPPER ARM IS GONE, and with it the comparison this file was built as — every primitive is a
+// tag now, so there is no second spelling to be equal to. What is left is the ABSOLUTE half, which
+// was always the load-bearing one: a cross-arm check cannot see a fold deleted from the layer BOTH
+// arms share, and Vue's folds all live in that layer (`.claude/rules/test-harness-false-greens.md`
+// §16, measured on this adapter). Each `toEqual` below names the payload RN produces.
 //
 // `tests/lowered-primitive-fold-parity.test.ts` guards this repo-wide by diffing each wrapper's
 // shared-layer IMPORTS against the behavior's, which is a proxy: a fold applied inline, or one
@@ -10,8 +16,11 @@
 
 import { describe, expect, it } from 'vitest';
 import { defineComponent, h, type VNodeProps } from '@vue/runtime-core';
-import { Pressable, Text, View, mount, unmount } from '@symbiote-native/vue';
+import { mount, unmount } from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// The press machine `pressable` reaches. An unregistered tag commits a bare view with the app's
+// props raw on it, which is a different tree than the one asserted below.
+import '../register';
 
 const ROOT_TAG = 7301;
 const fabric = installFabric();
@@ -78,53 +87,47 @@ async function subtree(
   return shape;
 }
 
-describe('a bare tag commits what its wrapper commits', () => {
-  it('View: kebab attrs fold to camelCase and id becomes nativeID', async () => {
+describe('a bare tag commits what a wrapper used to', () => {
+  it('view: kebab attrs fold to camelCase and id becomes nativeID', async () => {
     // Both folds run in patchProp (normalizeVueAttrKey, then PROP_ALIASES) rather than at compile
-    // time, because Vue has FOUR paths to a node — lowered SFC, lowered TSX, the wrapper, and a
-    // hand-written h('symbiote-view', …) — and a transform covers only two of them.
-    const props = { 'accessibility-label': 'hi', id: 'row-1' };
+    // time, because Vue has THREE paths to a node — SFC, TSX, and a hand-written h('view', …) —
+    // and a transform could only ever have covered the first two.
+    const tag = await commit('view', {
+      'accessibility-label': 'hi',
+      id: 'row-1',
+    });
 
-    const wrapper = await commit(View, props);
-    const tag = await commit('symbiote-view', props);
-
-    // Pinned by VALUE, not just compared: two empty payloads are also "equal", and the fold being
-    // the thing under test means the committed names are the assertion.
-    expect(wrapper).toEqual({ accessibilityLabel: 'hi', nativeID: 'row-1' });
-    expect(tag).toEqual(wrapper);
+    expect(tag).toEqual({ accessibilityLabel: 'hi', nativeID: 'row-1' });
   });
 
-  it('Pressable: the stateful primitive matches too, subtree included', async () => {
-    // The other two are fold-only; this one owns a press machine, which the tag path reaches
-    // through the behavior registered for `symbiote-pressable` rather than through a component.
+  it('pressable: the stateful primitive folds too, subtree included', async () => {
+    // The other two are fold-only; this one owns a press machine, which the tag reaches through
+    // the behavior registered for `pressable`.
     //
-    // Compared as a whole committed FOREST, not as one node's props: the wrapper and the tag could
-    // agree on every key and still differ in tree SHAPE, and a single-node check cannot see that.
-    // The first row is the surface's own container. Both paths commit the Pressable as ONE node —
-    // measured, not assumed; the wrapper adds no inner responder view at these props.
-    const props = { accessibilityLabel: 'go', testID: 't' };
+    // Asserted as a whole committed FOREST, not as one node's props: a payload can carry every
+    // right key and still sit in the wrong tree SHAPE, and a single-node check cannot see that.
+    // The first row is the surface's own container.
+    const tag = await subtree('pressable', {
+      accessibilityLabel: 'go',
+      testID: 't',
+    });
 
-    const wrapper = await subtree(Pressable, props);
-    const tag = await subtree('symbiote-pressable', props);
-
-    expect(wrapper).toEqual([
+    expect(tag).toEqual([
       'RCTView{flex,pointerEvents}',
-      'RCTView{accessibilityLabel,testID}',
+      // `accessible` (Pressable.js:252) and `focusable` (Pressable.js:258) are RN's defaults, and
+      // the behavior is the only thing that supplies them now.
+      'RCTView{accessibilityLabel,accessible,focusable,testID}',
     ]);
-    expect(tag).toEqual(wrapper);
   });
 
-  it("Text: RN's defaults reach the tag", async () => {
+  it("text: RN's defaults reach the tag", async () => {
     // These come from seedTextDefaults in createElement, NOT from textDefaultFor in patchProp —
     // that one fires only when a value is an explicit `undefined`, so it is never reached by a
-    // Text carrying no props at all. Disabling it leaves this test green; disabling
-    // seedTextDefaults empties the tag's payload while the wrapper keeps its own resolveTextProps
-    // copy. Two independent mechanisms that happen to agree: when the wrapper goes, the seed is
-    // the one that must survive.
-    const wrapper = await commit(Text, {}, 'hi');
-    const tag = await commit('symbiote-text', {}, 'hi');
+    // text carrying no props at all. Disabling it leaves this test green; disabling
+    // seedTextDefaults empties the payload. The wrapper's own `resolveTextProps` copy was the
+    // second of two mechanisms that happened to agree; the seed is the one that survived.
+    const tag = await commit('text', {}, 'hi');
 
-    expect(wrapper).toEqual({ ellipsizeMode: 'tail', allowFontScaling: true });
-    expect(tag).toEqual(wrapper);
+    expect(tag).toEqual({ ellipsizeMode: 'tail', allowFontScaling: true });
   });
 });

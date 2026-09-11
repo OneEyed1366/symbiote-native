@@ -23,10 +23,7 @@ const tick = (): Promise<void> =>
   selector: 'style-alias-host',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-view
-    testID="probe"
-    [symbioteStyle]="style"
-  ></symbiote-view>`,
+  template: `<view testID="probe" [symbioteStyle]="style"></view>`,
 })
 class StyleAliasHost {
   readonly style = [{ opacity: 0.5 }, { width: 12 }];

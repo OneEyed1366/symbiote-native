@@ -37,7 +37,10 @@ function resolveWatchTsconfig(tsconfigName) {
   // broke `@types/node` resolution (TS2688) even though the extended real config was found fine.
   const buildDir = path.resolve(projectRoot, 'build');
   fs.mkdirSync(buildDir, { recursive: true });
-  const watchConfigPath = path.join(buildDir, `symbiote-angular-dev-watch-${process.pid}.json`);
+  const watchConfigPath = path.join(
+    buildDir,
+    `symbiote-angular-dev-watch-${process.pid}.json`,
+  );
   fs.writeFileSync(
     watchConfigPath,
     JSON.stringify({
@@ -53,7 +56,10 @@ function resolveWatchTsconfig(tsconfigName) {
 // reliably blows past macOS's per-process fd limit (EMFILE) — doubly likely here since ngc
 // --watch adds a second watcher on top of Metro's own. Warn instead of letting everyone
 // individually debug a native stack trace down to this one missing binary.
-const watchmanCheck = spawnSync('watchman', ['--version'], { stdio: 'ignore', shell: true });
+const watchmanCheck = spawnSync('watchman', ['--version'], {
+  stdio: 'ignore',
+  shell: true,
+});
 if (watchmanCheck.status !== 0) {
   console.warn(
     '[symbiote-angular-dev] watchman not found on PATH. Metro will fall back to watching files ' +
@@ -62,7 +68,10 @@ if (watchmanCheck.status !== 0) {
   );
 }
 
-const initialBuild = spawnSync('ngc', ['-p', TSCONFIG], { stdio: 'inherit', shell: true });
+const initialBuild = spawnSync('ngc', ['-p', TSCONFIG], {
+  stdio: 'inherit',
+  shell: true,
+});
 if (initialBuild.status !== 0) {
   process.exit(initialBuild.status ?? 1);
 }
@@ -72,7 +81,10 @@ const ngcWatch = spawn('ngc', ['-p', watchTsconfigPath, '--watch'], {
   stdio: 'inherit',
   shell: true,
 });
-const metro = spawn('react-native', ['start', ...metroArgs], { stdio: 'inherit', shell: true });
+const metro = spawn('react-native', ['start', ...metroArgs], {
+  stdio: 'inherit',
+  shell: true,
+});
 
 function stopNgcWatch() {
   ngcWatch.kill();

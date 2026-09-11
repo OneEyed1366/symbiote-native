@@ -10,7 +10,6 @@
 
 import { createContext, createSignal, useContext } from 'solid-js';
 import type { Accessor } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -33,17 +32,17 @@ const ThemeContext = createContext<IThemeContext>(DEFAULT_THEME);
 function ThemeLabel(props: { testID: string; caption: string }) {
   const theme = useContext(ThemeContext);
   return (
-    <Text class="ap-value" testID={props.testID}>
+    <text class="ap-value" testID={props.testID}>
       {`${props.caption}: ${theme.tone()}`}
-    </Text>
+    </text>
   );
 }
 
 function ThemeCard(props: { testID: string; caption: string }) {
   return (
-    <View class="ap-panel">
+    <view class="ap-panel">
       <ThemeLabel testID={props.testID} caption={props.caption} />
-    </View>
+    </view>
   );
 }
 
@@ -73,8 +72,8 @@ export function ContextDemo() {
   };
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">createContext · useContext</Text>
+    <view class="section-nested">
+      <text class="section-label">createContext · useContext</text>
       <ThemeContext.Provider value={value}>
         <ThemeCard testID="context-inside" caption="inside the Provider" />
         <ToneToggle />
@@ -83,6 +82,6 @@ export function ContextDemo() {
         testID="context-outside"
         caption="outside the Provider (default value)"
       />
-    </View>
+    </view>
   );
 }

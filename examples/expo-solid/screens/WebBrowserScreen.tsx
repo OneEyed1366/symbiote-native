@@ -1,12 +1,5 @@
 import { createSignal } from 'solid-js';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -74,7 +67,9 @@ export function WebBrowserScreen() {
           `warmed up: ${result.servicePackage ?? '(no service package)'}`,
         );
       })
-      .catch((error: Error) => setLastResult(`warm-up failed: ${error.message}`));
+      .catch((error: Error) =>
+        setLastResult(`warm-up failed: ${error.message}`),
+      );
   };
 
   const handleMayInit = () => {
@@ -84,7 +79,9 @@ export function WebBrowserScreen() {
           `may-init: ${result.servicePackage ?? '(no service package)'}`,
         ),
       )
-      .catch((error: Error) => setLastResult(`may-init failed: ${error.message}`));
+      .catch((error: Error) =>
+        setLastResult(`may-init failed: ${error.message}`),
+      );
   };
 
   const handleCoolDown = () => {
@@ -115,37 +112,37 @@ export function WebBrowserScreen() {
   };
 
   return (
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="web-browser-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Web Browser</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Web Browser</text>
+            <text class="hero-body">
               @symbiote-native/web-browser — an in-app browser that keeps the
               user inside the app, unlike Linking.openURL, plus the OAuth auth
               session.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="web-browser-open-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Open a url</Text>
-          </View>
-          <TextInput
+        <view testID="web-browser-open-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Open a url</text>
+          </view>
+          <text-input
             testID="web-browser-url-input"
             value={url()}
-            onValueChange={setUrl}
+            onValueChange={event => setUrl(event.text)}
             placeholder="https://example.com"
             placeholderTextColor="#41506a"
             autoCapitalize="none"
@@ -163,42 +160,42 @@ export function WebBrowserScreen() {
             onPress={handleDismiss}
             color={lineColor}
           />
-          <Text class="info-text">
+          <text class="info-text">
             iOS resolves once the browser closes (cancel, or dismiss when closed
             by dismissBrowser); Android resolves opened as soon as the Custom
             Tab launches. Dismiss is iOS-only and rejects on Android.
-          </Text>
-          <View class="capability-row">
-            <Text class="capability-label">Last result</Text>
-            <Text testID="web-browser-result" class="value-text">
+          </text>
+          <view class="capability-row">
+            <text class="capability-label">Last result</text>
+            <text testID="web-browser-result" class="value-text">
               {lastResult()}
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
         {isAndroid ? (
-          <View testID="web-browser-custom-tabs-card" class="feature-card">
-            <View class="feature-card-header">
-              <Text class="feature-card-title">Custom Tabs service</Text>
-            </View>
-            <Text class="info-text">
+          <view testID="web-browser-custom-tabs-card" class="feature-card">
+            <view class="feature-card-header">
+              <text class="feature-card-title">Custom Tabs service</text>
+            </view>
+            <text class="info-text">
               Android only. getCustomTabsSupportingBrowsersAsync throws on iOS —
               its native stub is registered without the Async suffix, so the
               availability check fires before the not-Android branch — so this
               whole card is gated on Platform.OS.
-            </Text>
+            </text>
             <ActionButton
               testID="web-browser-query-browsers-button"
               title="List supporting browsers"
               onPress={handleQueryBrowsers}
               color={lineColor}
             />
-            <View class="capability-row">
-              <Text class="capability-label">Browsers</Text>
-              <Text testID="web-browser-custom-tabs" class="value-text">
+            <view class="capability-row">
+              <text class="capability-label">Browsers</text>
+              <text testID="web-browser-custom-tabs" class="value-text">
                 {customTabsSummary()}
-              </Text>
-            </View>
+              </text>
+            </view>
             <ActionButton
               testID="web-browser-warm-up-button"
               title="Warm up"
@@ -217,9 +214,9 @@ export function WebBrowserScreen() {
               onPress={handleCoolDown}
               color={lineColor}
             />
-          </View>
+          </view>
         ) : null}
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

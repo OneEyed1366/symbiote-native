@@ -2,13 +2,8 @@
   // @symbiote-native/sharing tour stop — an isAvailableAsync capability row plus a share card
   // driving shareAsync against a file URI the user types in. Svelte twin of
   // ../../expo-vue-sfc/screens/SharingScreen.vue.
-  import {
-    SafeAreaView,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
-  } from '@symbiote-native/svelte';
+  import { ScrollView } from '@symbiote-native/svelte';
+  import type { ITextInputChangeEvent } from '@symbiote-native/svelte';
   import {
     isAvailableAsync,
     shareAsync,
@@ -63,75 +58,75 @@
   }
 </script>
 
-<SafeAreaView class="screen">
+<safe-area-view class="screen">
   <ScrollView
     testID="sharing-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-        <Text class="hero-badge-text">{lineInfo.code}</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">Sharing</Text>
-        <Text class="hero-body">
+      </text>
+    </view>
+    <view class="hero-card">
+      <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <text class="hero-badge-text">{lineInfo.code}</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">Sharing</text>
+        <text class="hero-body">
           @symbiote-native/sharing — opens the platform share sheet for a local
           file. Outgoing only: it hands a file to another app, it does not
           receive one.
-        </Text>
-      </View>
-    </View>
-    <View testID="sharing-capability-card" class="sharing-card">
-      <Text class="sharing-card-title">Capabilities</Text>
-      <View testID="sharing-available" class="sharing-row">
-        <Text class="sharing-row-label">Available</Text>
-        <View
+        </text>
+      </view>
+    </view>
+    <view testID="sharing-capability-card" class="sharing-card">
+      <text class="sharing-card-title">Capabilities</text>
+      <view testID="sharing-available" class="sharing-row">
+        <text class="sharing-row-label">Available</text>
+        <view
           class={`sharing-status-badge sharing-status-badge-${isAvailable}`}
         >
-          <Text class="sharing-status-text">{toBadgeText(isAvailable)}</Text>
-        </View>
-      </View>
-      <Text class="sharing-note">
+          <text class="sharing-status-text">{toBadgeText(isAvailable)}</text>
+        </view>
+      </view>
+      <text class="sharing-note">
         Reports on the native module, not on any device capability — it is true
         on every iOS and Android build.
-      </Text>
-    </View>
-    <View testID="sharing-share-card" class="sharing-card">
-      <Text class="sharing-card-title">Share a file</Text>
-      <Text class="sharing-note">
+      </text>
+    </view>
+    <view testID="sharing-share-card" class="sharing-card">
+      <text class="sharing-card-title">Share a file</text>
+      <text class="sharing-note">
         A real local file URI is required — something like
         file:///…/document.pdf that already exists and is readable. This app has
         no file-system package to create one, so type a path you know is there.
         Anything else comes back below as the native error.
-      </Text>
-      <TextInput
+      </text>
+      <text-input
         testID="sharing-uri-input"
         value={fileUri}
-        onValueChange={next => (fileUri = next)}
+        onValueChange={(event: ITextInputChangeEvent) => (fileUri = event.text)}
         placeholder="file:///path/to/file.pdf"
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"
         autoCapitalize="none"
         autoCorrect={false}
-      />
+      ></text-input>
       <ActionButton
         testID="sharing-share-button"
         title="Share"
         onPress={handleShare}
         color={lineColor}
       />
-      <View class="sharing-row">
-        <Text class="sharing-row-label">Last result</Text>
-        <Text testID="sharing-result" class="sharing-value-text">
+      <view class="sharing-row">
+        <text class="sharing-row-label">Last result</text>
+        <text testID="sharing-result" class="sharing-value-text">
           {lastResult}
-        </Text>
-      </View>
-    </View>
+        </text>
+      </view>
+    </view>
   </ScrollView>
-</SafeAreaView>
+</safe-area-view>

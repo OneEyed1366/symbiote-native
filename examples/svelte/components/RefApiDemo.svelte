@@ -4,21 +4,13 @@
   // recolors the box bypassing Svelte entirely (no state, no re-render); `findNodeHandle` reads
   // the committed native tag. Port of examples/react/components/RefApiDemo.tsx.
   //
-  // The measured box binds directly to the raw `symbiote-view` host tag, not the public `View`
-  // wrapper — View.svelte forwards no `bind:this` escape hatch of its own (see
-  // pressable/index.svelte's and AnimatedView.svelte's header comments), so only a hand-authored
-  // host tag hands back a real ShimElement `hostInstance()` can unwrap into measure/setNativeProps
-  // (svelte-adapter-dom-shim skill, host-instance.ts + host-instance.test.ts's tested pattern).
-  import {
-    View,
-    Text,
-    findNodeHandle,
-    hostInstance,
-    type ShimElement,
-  } from '@symbiote-native/svelte';
+  // `bind:this` on a host tag hands back a ShimElement, which `hostInstance()` unwraps into the
+  // engine node carrying measure / setNativeProps (svelte-adapter-dom-shim skill, host-instance.ts
+  // + host-instance.test.ts's tested pattern).
+  import { findNodeHandle, hostInstance } from '@symbiote-native/svelte';
   import ActionButton from './ActionButton.svelte';
 
-  let box = $state.raw<ShimElement | null>(null);
+  let box = $state.raw<unknown>(null);
   // useRef-equivalent: an imperative-only scratch flag, never meant to drive a re-render itself.
   let flashed = false;
   let frame = $state('tap “Measure”');
@@ -50,29 +42,29 @@
   }
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">
+<view class="section-nested">
+  <text class="section-label">
     Imperative ref · measure / setNativeProps / findNodeHandle
-  </Text>
-  <symbiote-view p={{ testID: 'ref-box', class: 'ref-box' }} bind:this={box}>
-    <Text class="ref-box-text">{`native tag ${tag ?? '—'}`}</Text>
-  </symbiote-view>
-  <Text testID="measure-frame" class="info-text">{`frame: ${frame}`}</Text>
-  <View class="row">
-    <View class="flex1">
+  </text>
+  <view testID="ref-box" class="ref-box" bind:this={box}>
+    <text class="ref-box-text">{`native tag ${tag ?? '—'}`}</text>
+  </view>
+  <text testID="measure-frame" class="info-text">{`frame: ${frame}`}</text>
+  <view class="row">
+    <view class="flex1">
       <ActionButton
         testID="measure-btn"
         title="Measure"
         onPress={onMeasure}
         color="#7fb5ff"
       />
-    </View>
-    <View class="flex1">
+    </view>
+    <view class="flex1">
       <ActionButton
         title="Flash (setNativeProps)"
         onPress={onFlash}
         color="#f6ad55"
       />
-    </View>
-  </View>
-</View>
+    </view>
+  </view>
+</view>

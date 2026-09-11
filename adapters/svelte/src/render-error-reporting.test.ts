@@ -78,7 +78,7 @@ async function compileComponent(
   return component;
 }
 
-// root-element.ts inserts an unlabeled `symbiote-view` between the box-none AppContainer and the
+// root-element.ts inserts an unlabeled `view` between the box-none AppContainer and the
 // mounted component, so the app's own nodes are one level down.
 function appChildren(): IFakeNode[] {
   return fabric.appRoot().children[0]?.children ?? [];
@@ -96,7 +96,7 @@ function loggedMessages(): string[] {
 // and the one that unwinds a subtree svelte has already begun creating.
 const EXPLODING_SOURCE =
   `<script>throw new Error('${BOOM}');</script>` +
-  `<symbiote-view p={{ testID: 'never' }}></symbiote-view>`;
+  `<view p={{ testID: 'never' }}></view>`;
 
 describe('Negative — a component throws during render, with no <svelte:boundary>', () => {
   it('reports the error instead of blanking the screen in silence', async () => {
@@ -149,7 +149,7 @@ describe('Recovers — a <svelte:boundary> claims the error', () => {
     `<svelte:boundary>` +
     `<Child />` +
     `{#snippet failed(error)}` +
-    `<symbiote-view p={{ testID: 'failed' }}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>` +
+    `<view p={{ testID: 'failed' }}><text p={{}}>{error.message}</text></view>` +
     `{/snippet}` +
     `</svelte:boundary>`;
 

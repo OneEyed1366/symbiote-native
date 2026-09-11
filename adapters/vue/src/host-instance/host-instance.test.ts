@@ -11,7 +11,7 @@
 
 import { defineComponent, h, ref, shallowRef } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, mount, unmount } from '@symbiote-native/vue';
+import { mount, unmount } from '@symbiote-native/vue';
 import {
   createElement,
   isSymbioteNode,
@@ -74,7 +74,7 @@ describe('Vue findNodeHandle on the engine', () => {
       mount(
         ROOT_TAG,
         defineComponent({
-          setup: () => () => h(View, { nativeID: PROBE_ID, ref: setNode }),
+          setup: () => () => h('view', { nativeID: PROBE_ID, ref: setNode }),
         }),
       );
       await tick();
@@ -116,7 +116,7 @@ describe('Vue findNodeHandle on the engine', () => {
       mount(
         ROOT_TAG,
         defineComponent({
-          setup: () => () => h(View, { nativeID: PROBE_ID, ref: setNode }),
+          setup: () => () => h('view', { nativeID: PROBE_ID, ref: setNode }),
         }),
       );
       await tick();
@@ -170,7 +170,7 @@ describe('Vue host ref exposes the engine public instance', () => {
     mount(
       ROOT_TAG,
       defineComponent({
-        setup: () => () => h(View, { nativeID: PROBE_ID, ref: setNode }),
+        setup: () => () => h('view', { nativeID: PROBE_ID, ref: setNode }),
       }),
     );
     await tick();

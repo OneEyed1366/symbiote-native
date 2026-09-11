@@ -137,7 +137,7 @@ async function loadProbe(): Promise<Component> {
        onReady(permissions);
        $effect(() => { onStatus(permissions.status); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'PermissionsProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

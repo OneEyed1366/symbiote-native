@@ -124,8 +124,8 @@ function headerConfigOf(screen: IFakeNode): IFakeNode {
   return header;
 }
 
-const HomeScreen = () => <symbiote-text>home</symbiote-text>;
-const DetailsScreen = () => <symbiote-text>details</symbiote-text>;
+const HomeScreen = () => <text>home</text>;
+const DetailsScreen = () => <text>details</text>;
 
 describe('Solid Stack navigator', () => {
   describe('Positive', () => {
@@ -317,9 +317,7 @@ describe('Solid Stack navigator', () => {
       let handle: INavigatorHandle | null = null;
       const ParamScreen = () => {
         const route = useRoute();
-        return (
-          <symbiote-text>{String(route().params ?? 'none')}</symbiote-text>
-        );
+        return <text>{String(route().params ?? 'none')}</text>;
       };
       mount(ROOT_TAG, () => (
         <Stack ref={h => (handle = h)} initialRouteName="Home">
@@ -343,9 +341,7 @@ describe('Solid Stack navigator', () => {
       let handle: INavigatorHandle | null = null;
       const ParamScreen = () => {
         const route = useRoute();
-        return (
-          <symbiote-text>{String(route().params ?? 'none')}</symbiote-text>
-        );
+        return <text>{String(route().params ?? 'none')}</text>;
       };
       mount(ROOT_TAG, () => (
         <Stack ref={h => (handle = h)} initialRouteName="Home">

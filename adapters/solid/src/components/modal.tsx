@@ -18,8 +18,8 @@
 // user's components, which is the case the render-fn boundary rules OUT of core
 // (.claude/rules/component-render-fn-boundary.md), so the bridge would have nothing to do with the
 // half that matters and would hand back a root whose container child we would then have to reach
-// into to `insert` into. renderModal always paints the SAME two-tag shape (one symbiote-modal host
-// wrapping one collapsable symbiote-view container; only prop VALUES vary), so the tags are written
+// into to `insert` into. renderModal always paints the SAME two-tag shape (one modal host
+// wrapping one collapsable view container; only prop VALUES vary), so the tags are written
 // out and the computed props read off the fixed positions — the same call React's createElement
 // chain, Vue's h() chain and Svelte's markup all make. `children` then reaches the container
 // through the compiler's own `insert`, which is the point of view.tsx's header.
@@ -98,7 +98,7 @@ export interface IModalProps extends IAccessibilityProps, IAriaProps {
   onOrientationChange?: (event: ISymbioteEvent) => void;
   style?: IStyleProp<IViewStyle>;
   // Like `style`, targets the CONTAINER View renderModal wraps the children in, not the outer
-  // symbiote-modal host — the same split React's className and Vue's/Svelte's class apply. Solid's
+  // modal host — the same split React's className and Vue's/Svelte's class apply. Solid's
   // spelling is `class`, matching View, Text, Pressable and Switch.
   class?: IClassNameValue;
   children?: JSX.Element;
@@ -180,7 +180,7 @@ export function Modal(props: IModalProps): JSX.Element {
       passthrough: resolveAccessibilityProps(rest),
     });
 
-  // root = symbiote-modal > [container]; the user children nest UNDER the container View, never as
+  // root = modal > [container]; the user children nest UNDER the container View, never as
   // a direct sibling of the host (RN's modal content layout, render-modal.ts).
   const container = (): IDescriptor => {
     const [first] = descriptor().children;
@@ -201,9 +201,9 @@ export function Modal(props: IModalProps): JSX.Element {
 
   return (
     <Show when={shouldRender()}>
-      <symbiote-modal {...hostBag()}>
-        <symbiote-view {...containerBag()}>{local.children}</symbiote-view>
-      </symbiote-modal>
+      <modal {...hostBag()}>
+        <view {...containerBag()}>{local.children}</view>
+      </modal>
     </Show>
   );
 }

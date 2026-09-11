@@ -6,13 +6,13 @@
 -->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { View, Text, Image, I18nManager, Settings } from '@symbiote-native/vue';
+import { Image, I18nManager, Settings } from '@symbiote-native/vue';
 import ActionButton from './ActionButton.vue';
 
 const LOGO_URI = 'https://vuejs.org/images/logo.png';
 // A distinct cache key for the prefetch demo: same asset, different URL (query
 // string), so nothing has loaded it yet. The cache starts cold and the button
-// visibly warms it, unlike LOGO_URI, which getSize + the <Image> already pulled in.
+// visibly warms it, unlike LOGO_URI, which getSize + the <image> already pulled in.
 const PREFETCH_URI = 'https://vuejs.org/images/logo.png?warm=symbiote';
 const TAP_KEY = 'symbiote.tapCount';
 
@@ -42,7 +42,7 @@ const persistTap = (): void => {
 };
 
 // Image statics: getSize resolves the rendered logo's real pixel dimensions
-// through ImageLoader (the <Image> below paints that same asset).
+// through ImageLoader (the <image> below paints that same asset).
 const imageSize = ref('measuring…');
 onMounted(() => {
   Image.getSize(LOGO_URI)
@@ -78,15 +78,15 @@ const prefetchLogo = (): void => {
 </script>
 
 <template>
-  <View class="section-nested">
-    <Text class="section-label"
-      >Runtime modules · I18nManager / Settings / Image statics</Text
+  <view class="section-nested">
+    <text class="section-label"
+      >Runtime modules · I18nManager / Settings / Image statics</text
     >
 
     <!-- I18nManager: RTL layout constants, read live -->
-    <Text class="info-text">{{
+    <text class="info-text">{{
       `RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`
-    }}</Text>
+    }}</text>
     <ActionButton
       :title="
         rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'
@@ -96,9 +96,9 @@ const prefetchLogo = (): void => {
     />
 
     <!-- Settings: counter persisted to NSUserDefaults, survives a relaunch -->
-    <Text testID="persist-count" class="info-text">{{
+    <text testID="persist-count" class="info-text">{{
       `persisted taps: ${persisted} · survives relaunch`
-    }}</Text>
+    }}</text>
     <ActionButton
       testID="persist-btn"
       title="Persist a tap"
@@ -107,18 +107,18 @@ const prefetchLogo = (): void => {
     />
 
     <!-- Image statics: the rendered asset + getSize's measurement of it -->
-    <View class="row-align-center">
-      <Image :source="{ uri: LOGO_URI }" class="logo-thumb" />
-      <Text testID="logo-size" class="info-text-flex">{{
+    <view class="row-align-center">
+      <image :source="{ uri: LOGO_URI }" class="logo-thumb" />
+      <text testID="logo-size" class="info-text-flex">{{
         `logo size: ${imageSize}`
-      }}</Text>
-    </View>
+      }}</text>
+    </view>
     <!-- prefetch warms a cold url: not cached → (tap) → cached -->
-    <Text class="info-text">{{ `prefetch cache: ${cacheState}` }}</Text>
+    <text class="info-text">{{ `prefetch cache: ${cacheState}` }}</text>
     <ActionButton
       title="Prefetch logo"
       :onPress="prefetchLogo"
       color="#42b883"
     />
-  </View>
+  </view>
 </template>

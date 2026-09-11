@@ -11,7 +11,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { View, Text, type ISymbioteEvent } from '@symbiote-native/vue';
+import { type ISymbioteEvent } from '@symbiote-native/vue';
 import { firstTouchX } from './event-utils';
 
 const RESPONDER_CHIPS = [0, 1, 2, 3, 4];
@@ -84,18 +84,18 @@ const onChipRelease = (index: number): void => {
 </script>
 
 <template>
-  <View class="section-tight">
-    <Text class="section-label"
-      >Responder · drag a chip vs hand-off to the strip</Text
+  <view class="section-tight">
+    <text class="section-label"
+      >Responder · drag a chip vs hand-off to the strip</text
     >
-    <Text class="info-text">{{ status }}</Text>
+    <text class="info-text">{{ status }}</text>
     <!-- the separate transfer indicator, lit only when the strip steals the gesture -->
-    <Text
+    <text
       class="transfer-text"
       :style="{ color: transfer ? '#f6ad55' : '#41506a' }"
-      >{{ transfer || 'transfer: —' }}</Text
+      >{{ transfer || 'transfer: —' }}</text
     >
-    <View
+    <view
       @move-should-set-responder="onStripMoveShouldSet"
       @responder-grant="onStripGrant"
       @responder-move="onStripMove"
@@ -103,8 +103,8 @@ const onChipRelease = (index: number): void => {
       @responder-terminate="onStripTerminate"
       class="strip-box"
     >
-      <View class="row-tight" :style="{ transform: [{ translateX: rowDx }] }">
-        <View
+      <view class="row-tight" :style="{ transform: [{ translateX: rowDx }] }">
+        <view
           v-for="index in RESPONDER_CHIPS"
           :key="index"
           :testID="`resp-chip-${index}`"
@@ -121,11 +121,11 @@ const onChipRelease = (index: number): void => {
             transform: [{ translateX: activeChip === index ? chipDx : 0 }],
           }"
         >
-          <Text class="chip-text">{{ index }}</Text>
-        </View>
-      </View>
-    </View>
-  </View>
+          <text class="chip-text">{{ index }}</text>
+        </view>
+      </view>
+    </view>
+  </view>
 </template>
 
 <!-- No local <style> block here on purpose: every class this component references already

@@ -1,6 +1,6 @@
 // The descriptor→element bridge. A render function in @symbiote-native/components returns a
 // framework-agnostic `Descriptor` tree; this maps it onto React elements. The resulting
-// host element (`symbiote-view`, `symbiote-activity-indicator`, …) flows on through the
+// host element (`view`, `activity-indicator`, …) flows on through the
 // react-reconciler host config → engine → Fabric, exactly like a hand-written JSX host
 // element.
 

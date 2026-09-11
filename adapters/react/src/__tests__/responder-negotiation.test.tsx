@@ -5,7 +5,7 @@
 // +grant, no -> reject), LCA scoping, multi-touch end-vs-release, and transfer ordering.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 160;
@@ -38,7 +38,7 @@ describe('React responder negotiation', () => {
       let childGrant = 0;
       mount(
         ROOT_TAG,
-        <View
+        <view
           testID="cap-parent"
           onStartShouldSetResponderCapture={() => {
             parentCapture++;
@@ -48,7 +48,7 @@ describe('React responder negotiation', () => {
             parentGrant++;
           }}
         >
-          <View
+          <view
             testID="cap-child"
             onStartShouldSetResponder={() => {
               childBubble++;
@@ -58,7 +58,7 @@ describe('React responder negotiation', () => {
               childGrant++;
             }}
           />
-        </View>,
+        </view>,
       );
 
       fabric.fireEvent(handleFor('cap-child'), TOUCH_START);
@@ -79,7 +79,7 @@ describe('React responder negotiation', () => {
       let release = 0;
       mount(
         ROOT_TAG,
-        <View
+        <view
           testID="life"
           onStartShouldSetResponder={() => true}
           onResponderGrant={() => {
@@ -118,7 +118,7 @@ describe('React responder negotiation', () => {
       let parentMove = 0;
       mount(
         ROOT_TAG,
-        <View
+        <view
           testID="move-parent"
           onMoveShouldSetResponder={() => true}
           onResponderGrant={() => {
@@ -128,8 +128,8 @@ describe('React responder negotiation', () => {
             parentMove++;
           }}
         >
-          <View testID="move-child" />
-        </View>,
+          <view testID="move-child" />
+        </view>,
       );
       const child = handleFor('move-child');
       fabric.fireEvent(child, TOUCH_START);
@@ -152,14 +152,14 @@ describe('React responder negotiation', () => {
       let parentGrant = 0;
       mount(
         ROOT_TAG,
-        <View
+        <view
           testID="xfer-parent"
           onMoveShouldSetResponder={() => true}
           onResponderGrant={() => {
             parentGrant++;
           }}
         >
-          <View
+          <view
             testID="xfer-child"
             onStartShouldSetResponder={() => true}
             onResponderGrant={() => {
@@ -170,7 +170,7 @@ describe('React responder negotiation', () => {
               childTerminate++;
             }}
           />
-        </View>,
+        </view>,
       );
       const child = handleFor('xfer-child');
       fabric.fireEvent(child, TOUCH_START);
@@ -190,7 +190,7 @@ describe('React responder negotiation', () => {
       let parentReject = 0;
       mount(
         ROOT_TAG,
-        <View
+        <view
           testID="rej-parent"
           onMoveShouldSetResponder={() => true}
           onResponderGrant={() => {
@@ -200,7 +200,7 @@ describe('React responder negotiation', () => {
             parentReject++;
           }}
         >
-          <View
+          <view
             testID="rej-child"
             onStartShouldSetResponder={() => true}
             onResponderTerminationRequest={() => false}
@@ -208,7 +208,7 @@ describe('React responder negotiation', () => {
               childTerminate++;
             }}
           />
-        </View>,
+        </view>,
       );
       const child = handleFor('rej-child');
       fabric.fireEvent(child, TOUCH_START);
@@ -229,7 +229,7 @@ describe('React responder negotiation', () => {
       let childGrant = 0;
       mount(
         ROOT_TAG,
-        <View
+        <view
           testID="lca-parent"
           onStartShouldSetResponder={() => true}
           onResponderGrant={() => {
@@ -239,8 +239,8 @@ describe('React responder negotiation', () => {
             parentMove++;
           }}
         >
-          <View testID="lca-mid">
-            <View
+          <view testID="lca-mid">
+            <view
               testID="lca-child"
               onMoveShouldSetResponder={() => {
                 childMoveShouldSet++;
@@ -250,8 +250,8 @@ describe('React responder negotiation', () => {
                 childGrant++;
               }}
             />
-          </View>
-        </View>,
+          </view>
+        </view>,
       );
       const child = handleFor('lca-child');
       fabric.fireEvent(child, TOUCH_START);
@@ -272,7 +272,7 @@ describe('React responder negotiation', () => {
       let release = 0;
       mount(
         ROOT_TAG,
-        <View
+        <view
           testID="multi"
           onStartShouldSetResponder={() => true}
           onResponderGrant={() => {
@@ -307,14 +307,14 @@ describe('React responder negotiation', () => {
       const order: string[] = [];
       mount(
         ROOT_TAG,
-        <View
+        <view
           testID="ord-parent"
           onMoveShouldSetResponder={() => true}
           onResponderGrant={() => {
             order.push('grant');
           }}
         >
-          <View
+          <view
             testID="ord-child"
             onStartShouldSetResponder={() => true}
             onResponderTerminationRequest={() => true}
@@ -322,7 +322,7 @@ describe('React responder negotiation', () => {
               order.push('terminate');
             }}
           />
-        </View>,
+        </view>,
       );
       const child = handleFor('ord-child');
       fabric.fireEvent(child, TOUCH_START);

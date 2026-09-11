@@ -1,21 +1,21 @@
 // Proves the View/Text event + alias props thread through to the committed Fabric node:
-//   1. <View onLayout> / <Text onLayout> raise the `layout` event, the listener flags
+//   1. <view onLayout> / <text onLayout> raise the `layout` event, the listener flags
 //      onLayout:true on the node (Fabric only measures a flagged node).
 //   2. id="foo" is RN's W3C alias for nativeID, so it lands as nativeID:'foo' and must
 //      NEVER reach Fabric as a raw `id` prop.
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Text, View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 240;
 
 function App(): ReactElement {
   return (
-    <View id="foo" onLayout={() => {}}>
-      <Text onLayout={() => {}}>hi</Text>
-    </View>
+    <view id="foo" onLayout={() => {}}>
+      <text onLayout={() => {}}>hi</text>
+    </view>
   );
 }
 

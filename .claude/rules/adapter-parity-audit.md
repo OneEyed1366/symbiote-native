@@ -274,6 +274,20 @@ requires transitively from every loose root script listed in `files`).
 
 ## The fifth surface: the LOWERING TRANSFORMS, and no audit sees it
 
+> **THE SUBJECT IS GONE — 2026-09-08. Every lowering transform is deleted, along with
+> `lowering-fixtures.cjs`, `specialize-state-style.cjs`, `REFUSAL_CATEGORIES`, `LOWERING_RUNS_LAST`
+> and the `state-style` subpath on all six packages.** An app writes the intrinsic tag itself, so
+> there is no call site to rewrite and nothing to refuse. `host-primitives.cjs` survives as the
+> PRIMITIVE spec — read at runtime by `resolve-intrinsic.ts` / `fold-host-bag.ts`, and by
+> `adapters/vue/intrinsic-tags.cjs` for element-vs-component.
+>
+> **Read every section from here to "A styled element's prop-key count" as METHOD, never as
+> current state.** The method lessons transfer — a shared table cannot check plumbing it does not
+> run, a green `refuse` proves nothing without a positive control, a substring oracle over a
+> namespace where one name extends another, a spec field dropped between the file and its reader.
+> Every claim in the present tense about a transform, a refusal category or a fixture row is
+> history. This is the file's own rule (§`bagFold` IS RETIRED) applied to the whole layer.
+
 Four transforms now implement the same rule set — `adapters/solid/babel-lower-host-primitives.cjs`,
 `adapters/vue/babel-lower-host-primitives.cjs`, `adapters/vue/metro-vue-transformer.cjs`,
 `adapters/svelte/src/preprocessor/lower-host-primitives.ts`. They read one shared spec
@@ -531,6 +545,30 @@ below it is derived or enumerated.
 
 The cheap check before landing an entry that declines a majority value: grep the value's NAME across
 every transform and renderer. A literal outside a spec read is a shortcut keyed on the coincidence.
+
+### The SECOND entry proposed with `aliases: {}` should have carried the pair — "it would double-fold" is not a mechanism
+
+`TouchableNativeFeedback` was briefed to land WITHOUT `ID_ALIAS`, on the reasoning that its behavior
+already folds `id ?? nativeID` itself (TouchableNativeFeedback.js:373) so the shared alias would fold
+twice. Measured 2026-09-09 through a real mount, both arms — the raw bag, and the same bag through
+`foldHostBag` first — and the committed `nativeID` is identical.
+
+**An alias whose consumer reads `a ?? b` composes with it idempotently, by construction**: the alias
+deletes its source key, and the `??` then reads whichever key survived. "Two layers touch the same
+prop" is not a double fold; a double fold needs an operation that is not idempotent (Switch's
+platform-keyed colour mapping is the one entry in this spec that genuinely is not, and it is kept
+safe by the `-managed` split, not by declining an alias).
+
+The cost of getting it wrong was not neutral, which is what makes it worth a paragraph: `aliases: {}`
+reddens `adapters/solid/src/renderer-alias-fold.test.ts`, whose two assertions are what license the
+renderer folding `id` with ONE string compare on 32 001 prop writes. So the choice was between a real
+per-primitive map on Solid's hot path and an alias that changes nothing observable — for a rationale
+that does not survive a mount.
+
+So the question for the next entry is not "does another layer also touch this prop" but **"is the
+composition of the two operations equal to either one alone"**, and that is a measurement, not a
+reading. SafeAreaView's own entry ended in the same place by the other route: it was landed with
+`aliases: {}` and later given `ID_ALIAS` once the wrappers declared `id`.
 
 Measured 2026-08-31, the hour `TextInput` entered `HOST_PRIMITIVES`. A Solid test located each
 primitive's source by lower-casing the spec key: `./src/components/${key.toLowerCase()}.tsx`. That
@@ -1312,6 +1350,19 @@ identical green.
 
 ## The sixth surface: a lowered primitive silently loses its wrapper's PROP FOLDS
 
+> **THE INSTRUMENT IS RETIRED — 2026-09-11.** `tests/lowered-primitive-fold-parity.test.ts` is
+> deleted: it compared a WRAPPER's shared-layer imports against a behavior's, and no adapter has a
+> wrapper left for any primitive, so its `noWrapper` set reached `adapterNames()` exactly as the
+> file said it would. It retired itself by its own rule.
+>
+> **Read every section from here to "An IDEMPOTENT fold" as METHOD, never as current state.** The
+> method lessons transfer and are the reason this stays: an intersection across five sets is emptied
+> by ONE unlocated wrapper; a locator miss reads as agreement; an INLINE fold is invisible to an
+> import oracle; a red row is a question about the NAME, not an instruction to import it. What
+> replaced it is a stronger oracle the migration made possible — the behavior's own committed
+> payload (`core/components/src/behaviors/<name>.test.ts`) plus each adapter's `*-tag.test.*`,
+> which assert the tree rather than the import list.
+
 Every audit above compares two things that both exist — two barrels, two subpaths, two transforms'
 verdicts. This one compares an implementation against a DELETION. Lowering removes the component
 body, and the body is where the per-primitive prop folds live. Nothing is left behind to report a
@@ -1466,3 +1517,391 @@ Two things worth carrying past this instance:
 That last point is the audit's boundary stated as a fact rather than a caveat: **it measures parity
 with our wrapper, never parity with React Native.** A fold both paths are missing is agreement, and
 agreement is what it reports as healthy.
+
+## A comment declaring something IMPOSSIBLE is a claim about a sibling you did not check
+
+`behaviors/scroll-view/sticky.ts` recorded, as the reason it implements no index form: *"A lowered
+element has no children array to walk and no render to wrap anything in, so the index cannot be
+resolved at all."* Both halves were measured false on 2026-09-07, and the disproof was not a clever
+argument — it was **a sibling adapter already doing it**. `adapters/angular/src/components/scroll-view/projection.ts`
+resolves those same indices on engine nodes today, wraps children with the plain mutation API, and
+even documents the index-drift bug a fresh walk avoids.
+
+The reason the claim survived is that it is true at BUILD time — a transform cannot see children —
+and the file was written while the transform still existed. It was never re-read after the behavior
+started owning the structure, so a statement about one phase stood as a statement about the system.
+
+Two working rules, and the second is the cheap one:
+
+- **An impossibility claim ages worse than any other kind**, because nothing ever fails when it is
+  wrong — it just silently scopes the work down. Give it a phase and a subject ("at build time, a
+  transform cannot…"), never a bare "cannot".
+- **Before recording one, grep whether another adapter already does the thing.** Five adapters
+  solved the same problems five ways; one of them has usually built what you are about to call
+  impossible. This is the mirror of the rule above it — a claim about a sibling is a claim you have
+  not checked — pointed at your own file instead of theirs.
+
+### The fold audit INTERSECTS across adapters, so a fold only SOME wrappers hold is invisible
+
+`tests/lowered-primitive-fold-parity.test.ts` diffs each wrapper's shared-layer value imports
+against the behavior's, **intersected across the five adapters**. That intersection was chosen so a
+per-adapter idiom cannot raise a false positive. It also means a name present in three wrappers and
+absent from two is dropped before the comparison — and "some wrappers have it, some do not" is the
+exact shape of a fold two adapters are already missing.
+
+Device-found 2026-09-08 on `examples/svelte`, a lost `gap` and a lost `padding`:
+
+```
+contentContainerStyle="scroll-content"    a class NAME, what every canary writes
+
+react    shared.ts:306   typeof … === 'string' ? resolveClassName(…)     three separate copies
+vue      shared.ts:327   "                                                of one fold
+angular  shared.ts:554   "
+solid    resolves it too, with its own test
+svelte   pure passthrough  ->  behavior renames it verbatim to `style`
+behavior SLOT_PROPS = { contentContainerStyle: 'style' }   no resolution anywhere
+```
+
+A `style` holding a string is not a style, so the whole rule — padding on all four sides, plus the
+`gap` that gave the screen its vertical rhythm — was dropped with nothing red. `tsc`, 5 499 tests
+and `svelte-check` were all green; the screen just looked squashed.
+
+Three things worth carrying:
+
+- **A duplicated fold is the tell, not the fix.** Three adapters each writing the same six lines is
+  what the shared layer exists to delete; it is also what let two adapters not have it. Grep the
+  fold's OUTPUT across `adapters/*/src/components/**` before assuming the shared layer owns it —
+  the same instruction this file already gives for `Image`'s three implementations.
+- **`ScrollView` is not in the audit at all** — it covers `Pressable` and `TextInput`. A composed
+  primitive whose wrapper survives as a thin passthrough is the case the audit was never pointed at.
+- Fixed in `routeProp`'s slot branch (`core/engine/src/node.ts`): a slot rename targeting `style`
+  routes a STRING as `class` instead, so the registry resolves it once for every adapter. The three
+  wrapper copies are now redundant but harmless — they resolve to an object before the engine sees
+  the prop.
+
+## An IDEMPOTENT fold repeated down a composition chain is invisible to every oracle here
+
+Every audit above reads a name, a subpath, a verdict or a committed payload. None can see a fold
+applied twice, because `(x !== false) !== false === x !== false` — the tree is byte-identical
+whether one node in the chain folds or all four do. Only a source read distinguishes them.
+
+Measured 2026-09-09, closing the `accessible` default across five adapters. Five parallel arms
+produced three different scopes, all committing the same tree:
+
+```
+react solid   Pressable only                    Button also folded (added by the same session)
+vue angular   Pressable + 3 Touchables + TNF    Button also folded
+svelte        the tag's behavior                Button correct — it forwarded raw
+```
+
+**"Match RN line for line" is unsatisfiable here, and that is the finding.** RN's `Touchable*` are
+independent classes rendering a View directly, so each carries its own `accessible !== false`
+(`TouchableOpacity.js:303` and siblings). OURS wrap `Pressable`, which folds. So no placement
+reproduces RN's source, and the question has to be re-asked about ROLE: fold on the node that plays
+the part RN's folding node plays — the responder host — and forward raw above it. RN's own `Button`
+does exactly that (`Button.js:365`), which is what made the four Button folds a real divergence
+rather than a style choice.
+
+Two working notes:
+
+- **A committed-tree oracle cannot arbitrate placement.** When the audit question is "where does the
+  fold live", the instrument is a source grep of the fold's expression across every adapter, read as
+  a grid. `command grep -rn "accessible !== false" adapters core --include="*.ts" --include="*.tsx"`.
+- **A source-text assertion pinning such a line will flip.** `angular-gaps.test.ts` pinned
+  `[accessible]="accessible"`, was "corrected" to `!== false`, and was corrected back the same day.
+  It now carries the RN citation and an explicit do-not-flip-it-back — a pin on an idempotent fold
+  has no failing arm to appeal to, so the comment is the only thing holding it.
+
+### The blind spot, realised: `focusable` is computed by five RN touchables and by nothing of ours
+
+The section above ends by naming this as the audit's boundary — "it measures parity with our wrapper,
+never parity with React Native. A fold both paths are missing is agreement, and agreement is what it
+reports as healthy." Here is the second instance, found 2026-09-09 while giving Button its Android
+shape, and found only because that task read the upstream file rather than our wrapper:
+
+```
+RN  Pressable.js:258                 focusable !== false
+    TouchableOpacity.js:336          focusable !== false && onPress !== undefined && !disabled
+    TouchableHighlight.js:370        same
+    TouchableWithoutFeedback.js:263  same
+    TouchableNativeFeedback.js:369   same
+
+ours  core/engine/src        zero occurrences
+      core/components/src    only behaviors/button.ts, added the same day
+      the five adapters      `focusable` is a declared PROP everywhere and a computed DEFAULT nowhere
+```
+
+`command grep -rn focusable core/components/src` returning one hit is the whole finding. The
+consequence is not cosmetic: a DISABLED touchable stays focusable, so a keyboard, a TV remote or a
+switch-control user can land on a control that cannot be pressed.
+
+Two things this instance teaches beyond the one prop:
+
+- **The two formulas differ, and by primitive rather than by platform.** `Pressable` defaults it on;
+  the four `Touchable*` also require a press handler and a non-disabled state. So "the pressable
+  behavior should just emit RN's default" is wrong — there are two defaults, and the touchables'
+  reads a listener that lives in the STASH, never in the prop bag, which is why `button.ts` needed
+  `onOwnedListenerChange` + `markPropsDirty` + `requestCommitFor` to make a `press` flip re-fold.
+- **A prop DECLARED in five adapters' prop types looks implemented.** Every `IViewProps` carries
+  `focusable?: boolean`, Angular has an `@Input`, Svelte lists it in `canonical-prop-names`. All of
+  that is plumbing for a value an app writes; none of it is the default RN computes when the app
+  writes nothing. When auditing a fold, grep for where the value is COMPUTED, never for where the
+  name appears.
+
+## Adapters disagree on whether PROPS or CHILDREN come first, so any child-dependent redirect is per-adapter
+
+Found 2026-09-09 while designing `touchable-native-feedback` as a tag. The obvious design — point
+`childHost` at the app's single child and let `slotPropsExcept` redirect every prop onto it, which
+is exactly RN's `cloneElement` — is unimplementable, and the reason is not in our code at all:
+
+```
+react solid   props written at createInstance, BEFORE any child exists
+vue           children mounted BEFORE props are patched
+```
+
+A redirect keyed on `node.childHost` therefore fires for every prop on one adapter and for none on
+another, silently. It would have shipped correct on React and dropped the whole clone on Vue, with
+no test in the repo able to see it — the behavior's own unit tests mount through one path.
+
+Two things follow, and the first is the reusable one:
+
+- **Any seam whose correctness depends on the ORDER of "props written" versus "children attached" is
+  not a shared seam.** Before designing on that order, name the four adapters and say what each
+  does. `slotProps` on ScrollView is safe only because its slot is built by `buildStructure` inside
+  `createElement`, i.e. before either.
+- The shape that IS order-independent is a fold: the child gets a `payloadFold` reading the owner, so
+  whenever the payload is next built, the owner's props are whatever they are by then. That is what
+  landed, on a new `onChildInserted` hook — `appendChild`'s existing registry call is behind
+  `parent.childHost !== undefined`, which is false for the first child, so there was no beat at
+  which the app's child was known.
+
+### A HAND-OFF between rounds carries the previous round's claims, and they arrive wearing authority
+
+The rule above is about a claim written in a sibling's comment. This is its live twin: work split
+across rounds ends with a "what round two must do" list, and that list is read as a specification
+rather than as a report.
+
+Measured 2026-09-09, relaying a TouchableNativeFeedback hand-off. Two of its items were false, and
+both were relayed verbatim into the next round's brief:
+
+```
+"No ID_ALIAS — the behavior folds `id ?? nativeID` itself, so the shared alias would double-fold."
+  FALSE. Measured with both arms mounted (raw bag vs the same bag through foldHostBag): the
+  committed nativeID is identical. An alias whose consumer reads `a ?? b` composes idempotently —
+  the alias deletes its source key on the OWNER, whose props never reach Fabric, and the `??` reads
+  whichever survived. Shipping `aliases: {}` would also have reddened Solid's renderer-alias-fold
+  test, which licenses a one-string-compare shortcut on 32 001 prop writes.
+
+"React folds through `foldHostBag` and registers nothing."
+  FALSE. `adapters/react/src/register.ts` has existed since React's bare tags landed, and its own
+  header says every tag committed inert before it. `foldHostBag` is the alias/default half only.
+  The same stale claim stood in `.claude/rules/fold-only-primitive-recipe.md:163`; corrected, with
+  `ls adapters/*/src/register.ts` recorded as the one-command check.
+```
+
+Both were caught because the receiving round was told to verify each item rather than execute it.
+That instruction is the whole repair, and it costs one clause.
+
+Two working notes:
+
+- **A hand-off item phrased as a REASON is the one to check.** "Do X" survives being wrong — the
+  next round finds out. "Do X because Y" propagates Y into a comment, a spec and a rule file, where
+  it outlives the task. Both false items above were the second shape.
+- **A round that touches five adapters cannot be verified by the round that planned it.** The
+  planner's evidence is whatever it happened to open; the executor's is every call site. So the
+  hand-off's job is to name what to check, not what is true.
+
+### A spec entry can be required on ONE PLATFORM only, which no arm of this file's advice predicts
+
+The sections above treat a `HOST_PRIMITIVES` field as a per-primitive question — copy the majority
+value or decline it, and the first entry that declines is where every adapter's shortcut gets priced.
+`Button` is the first entry where the answer is neither, because the primitive it wraps is chosen by
+PLATFORM (`Button.js:281-284`: `Platform.OS === 'android' ? TouchableNativeFeedback : TouchableOpacity`)
+and only one of the two folds `id` itself. Measured on the committed payload with no spec entry:
+
+```
+              nativeID     id          why
+iOS           'from-id'    absent      touchable-opacity's own foldPayload does the rename
+Android       undefined    'from-id'   nothing folds it; `id` is a key no ViewConfig declares,
+                                       so it is dropped and the nativeID never arrives
+```
+
+`aliases: ID_ALIAS` is therefore REQUIRED here, and declining it would have shipped a bug visible on
+one platform only — the slowest kind to find, since a headless suite and an iOS device both report
+health.
+
+Two things follow:
+
+- **Measure a spec field on BOTH platform arms whenever the primitive has a platform branch.** The
+  earlier `SafeAreaView` entry could be settled with one arm because nothing about it forks; Button
+  cannot.
+- **The `TouchableNativeFeedback` round's finding still holds and is what made this cheap.** An alias
+  whose consumer reads `a ?? b` composes idempotently — the alias deletes its source key on the
+  OWNER, whose props never reach Fabric, and the `??` reads whichever survived. So "the behavior
+  already folds it, therefore the alias double-folds" is false, and it was the argument for declining
+  in both rounds. Check composition before declining, not plausibility.
+
+## Never let an agent DELETE a file while forbidding it the reference to that file
+
+A parallel round splitting one migration across agents needs a file-ownership map, and the obvious
+one is wrong. Measured 2026-09-09, four agents porting four primitives to tags at once.
+
+The shared files — every `adapters/*/src/register.ts`, every `index.ts` / `components.ts` barrel,
+`host-primitives.cjs`, `component-names/**` — were reserved for the orchestrator so four agents could
+not collide in them. Each agent was free to delete its own primitive's wrapper. Those two rules are
+incompatible:
+
+```
+agent deletes  adapters/react/src/components/image-background/index.ts
+barrel keeps   export { ImageBackground } from './components/image-background'
+                                                ^ only the orchestrator may touch this
+```
+
+So `tsc --build` was red from the first deletion onward, and stayed red for reasons that were nobody's
+fault and nobody's to fix. **That destroys the instrument**: a red tree is how every agent tells its
+own breakage from a peer's, and once it is red by construction, "is this mine?" stops being answerable
+and every agent burns turns on the question.
+
+The rule is narrow and mechanical: **the agent that deletes a definition owns every reference to it.**
+Where that would collide with a peer, SERIALISE the agents instead of splitting the file — one agent
+at a time, each owning its own primitive's lines everywhere they appear. Slower, and the only shape
+in which "green after each agent" is reachable.
+
+**Serialise for the other reason too.** All four stalled on the stream watchdog within minutes of each
+other, because each was running three vitest projects on one machine. That is not a per-agent fault
+and no brief prevents it — four concurrent full sweeps is simply more than the box has. A round whose
+verification step is the whole suite does not parallelise past two.
+
+And the recovery is cheap, which is worth knowing before anyone reverts: a stalled agent resumes from
+its own transcript with a message, remembers exactly where it was, and can be handed the lifted
+restriction in the same message.
+
+### Split by ADAPTER, not by primitive — that is the axis with no shared files
+
+The incident above split four agents by PRIMITIVE, so every one of them needed the same barrels,
+`register.ts` and spec. Splitting by adapter instead gives each agent `adapters/<fw>/**` plus
+`examples/<fw>*/**` and nothing else — a partition with no shared member, once the shared half
+(spec, behaviors, component-names, the register seam) is already complete. Run 2026-09-10 across
+React, Solid and the engine: zero collisions in a shared file.
+
+Two conditions, and neither is optional. The shared half must genuinely be finished FIRST — this
+axis works only because one adapter (Svelte) had already driven every primitive through the engine,
+so nothing an agent needed was still being invented. And the repo-root `tests/**` plus `.claude/**`
+stay with the orchestrator, on report-only: an agent that finds a needed edit there names it instead
+of making it.
+
+Concurrency still caps at two or three, and for the reason the incident gives — the machine, not the
+files. Give each agent a path-filtered run (`npx vitest run adapters/<fw>`), never the full sweep.
+
+### "Adapter X cannot" is never a finding — it is a report about that adapter's LEFTOVERS
+
+Once the host creates the primitives, an adapter has no business doing anything on top of them. So a
+migration verdict of "this one refuses" is, by construction, a statement about code that has not been
+deleted yet. Twice on 2026-09-10 a refusal was reported with a mechanism attached, and both times the
+mechanism was the thing to remove:
+
+```
+"the three Touchable failures are Solid-side"      two of the three were ENGINE seam defects,
+                                                    reproduced independently by the React agent
+"ScrollView refuses — two owners already build      the two owners are React's leftovers. Svelte
+ the content node"                                  deleted the same code; the engine owns it
+                                                    (behaviors/scroll-view/shared.ts:340)
+```
+
+**The check is one `ls`, against the adapter that already finished:**
+
+```bash
+ls adapters/svelte/src/components/<primitive>/    # props type + tests, no implementation
+ls adapters/<fw>/src/components/<primitive>/      # anything more is what to delete
+```
+
+Both refusals came with real, correct, specific detail, which is what made them persuasive — the
+detail was true and the conclusion did not follow from it. A refusal is only a finding when the
+FINISHED adapter also cannot do it; otherwise the sentence to write is "here is what <fw> still owns
+that <finished> does not".
+
+The orchestrator's failure in both cases was the same: relaying an agent's verdict without running
+the one command that decides it. `verify-the-deciding-side.md` applies to a subagent's report exactly
+as it applies to a sibling's comment — and a report is likelier to be quoted onward, because it
+arrives sounding like work already done.
+
+### A killed agent's last streamed line is a PLAN, not a state — measure the tree
+
+The stream watchdog kills on 600s of silence, and what survives is whatever sentence the agent was
+mid-way through. Read as a status it is actively misleading: "Now the barrel entries for Switch,
+TextInput, Pressable" and "Now TextInput's prop type, then delete both wrappers" both describe work
+NOT yet done, and both were mistaken for descriptions of what the agent had been doing all along.
+
+Measured 2026-09-11, when two agents died in the same minute and the question was whether they had
+been deleting wrappers or quietly rewriting them. Three commands answer it and no reading of the
+transcript does:
+
+```bash
+git status --porcelain adapters/<fw> | awk '{print $1}' | sort | uniq -c     # D vs M vs ??
+git status --porcelain adapters/<fw> | grep '^ D' | sed 's/^...//'           # what actually went
+for f in <the ?? files>; do command grep -cE "^export (const|function|class)" "$f"; done
+```
+
+The third is the one that settles "deleted or rewritten": a replacement `*-props.ts` with **zero**
+runtime exports is the intended shape, and any runtime export in a new adapter file is the thing to
+read before believing anything else. Here it found exactly one — eight lines of two string constants
+breaking a require cycle — and that single hit is what made the other twelve trustworthy.
+
+And check each half separately: of the two agents, one left a fully green tree and the other left 74
+red tests. "Both were killed" says nothing about either.
+
+**Scoping a brief's verification to one directory is NOT enough to survive the watchdog**, which is
+what this round assumed. `npx vitest run adapters/vue` takes 41s and `adapters/angular` 6.5s —
+neither is what stalled them; a long unbroken run of EDITS is. So the instruction that works is
+per-primitive batching — convert one, verify, convert the next — rather than a cheaper verify
+command.
+
+### A bare `grep -r` over `examples/*` measures three trees, and two of them are not source
+
+Measured 2026-09-11, correcting an instruction already sent to an agent. An `examples/<app>` directory
+is an installed npm project, so it carries `node_modules/`, an `ios/Pods/` CocoaPods sandbox — whose
+`React.xcframework` headers name `ScrollView` in dozens of files — and a `build/` tree holding the
+compiled output of the very screens being audited. A migration census over it read:
+
+```
+bare grep -r                 108 <ScrollView · 33 <RefreshControl   across 49 files
+tracked source only          2 files
+```
+
+Two orders of magnitude, in the direction that manufactures work. The instruction that went out named
+49 files and had to be retracted before the agent started rewriting Fabric headers.
+
+The probe that answers the question:
+
+```bash
+git ls-files 'examples/*' | grep -E '\.(ts|tsx|vue|svelte|html)$' | xargs grep -l "<Pattern"
+```
+
+`git ls-files` is the discriminator worth keeping, not `--exclude-dir`: an exclusion list is a
+hand-written enumeration of the junk that happens to be there today, which is this file's own stale-list
+failure one directory over. Tracked-vs-untracked is derived and cannot rot.
+
+The general form, and it is the mirror of the false-green this file records everywhere else: **a probe
+returning a LARGE answer is as unverified as one returning zero.** A count of zero reads as suspicious
+and gets checked; a count of 141 reads as a measurement and gets acted on. Before quoting either, name
+which files the probe could reach.
+
+### And the sweep itself can silently do nothing: BSD `sed` ignores `\b`
+
+Same family, opposite direction, measured 2026-09-11 on macOS. A 69-file rename pass written as
+`sed -i '' 's/\bScrollView\b/scroll-view/g'` edited NOTHING. `\b` is a GNU extension; BSD `sed`
+does not error on it, it simply never matches:
+
+```
+$ echo "ScrollViewX ScrollView" | sed 's/\bScrollView\b/HIT/g'
+ScrollViewX ScrollView
+```
+
+The pass reported success on every file, and the only edits that landed were the handful made by
+hand with `Edit` — so the tree looked half-renamed by some mysterious rule rather than by a dead
+pattern. Use a literal pattern with explicit context (`<ScrollView`, `, ScrollView,`), or `perl -pe`
+if a boundary is genuinely needed; never assume a regex extension crosses a platform.
+
+The check that costs one line, before any multi-file `sed`: run it on ONE file and `git diff` that
+file. A sweep whose dry run changes nothing is a dead pattern, not a clean tree — which is this
+section's own lesson, pointed at the instrument instead of at the census.

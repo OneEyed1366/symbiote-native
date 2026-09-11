@@ -21,7 +21,6 @@
 import { For } from 'solid-js';
 import { Drawer } from '@symbiote-native/navigation/solid';
 import type { IDrawerScreenOptions } from '@symbiote-native/navigation/solid';
-import { Pressable, SafeAreaView, Text } from '@symbiote-native/solid';
 import { DrawerHomeScreen } from './DrawerHomeScreen';
 import { DrawerSettingsScreen } from './DrawerSettingsScreen';
 import './DrawerDemoScreen.css';
@@ -48,23 +47,23 @@ export function DrawerDemoScreen() {
       drawerType="slide"
       drawerStyle={DRAWER_STYLE}
       drawerContent={slot => (
-        <SafeAreaView testID="drawer-panel" class="drawer-panel">
-          <Text class="section-label">Menu</Text>
+        <safe-area-view testID="drawer-panel" class="drawer-panel">
+          <text class="section-label">Menu</text>
           <For each={slot().state.routes}>
             {route => (
-              <Pressable
+              <pressable
                 testID={`drawer-menu-${route.name}`}
                 class="drawer-menu-row"
                 onPress={() => slot().navigation.jumpTo(route.name)}
               >
-                <Text class="drawer-menu-row-label">
+                <text class="drawer-menu-row-label">
                   {slot().descriptors[route.key]?.options.drawerLabel ??
                     route.name}
-                </Text>
-              </Pressable>
+                </text>
+              </pressable>
             )}
           </For>
-        </SafeAreaView>
+        </safe-area-view>
       )}
     >
       <Drawer.Screen

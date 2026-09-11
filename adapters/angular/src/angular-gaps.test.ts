@@ -34,29 +34,20 @@ const expectSourceToDeclare = (source: string, snippet: string): void => {
 // (they read a file and grep it) — no Positive/Negative split applies; each test is its own
 // named regression fence instead.
 describe('Angular adapter gap regressions', () => {
-  // why: VirtualizedList wraps ScrollView (angular-adapter's component-parity model) — if it
-  // declares the accessibility/aria @Input()s but forgets to forward them into
-  // foldedAccessibility, or forgets one of the @Input()s entirely, an app passing
+  // why: VirtualizedList feeds its scroll TAG through scrollViewBag() (`[symbioteHostProps]`,
+  // since 2026-09-11 — ScrollView is no longer a component to bind individual @Input()s onto) —
+  // if it declares the accessibility/aria @Input()s but forgets to spread foldedAccessibility()
+  // into that bag, or forgets one of the @Input()s entirely, an app passing
   // accessibilityLabel/ariaBusy to <VirtualizedList> silently loses it one layer down.
-  it('VirtualizedList exposes accessibility and aria inputs and forwards them to ScrollView', () => {
+  it('VirtualizedList exposes accessibility and aria inputs and forwards them to the scroll tag', () => {
     const source = readSource(
       'adapters/angular/src/components/virtualized-list/index.ts',
     );
 
     expectSourceToDeclare(source, '@Input() accessibilityLabel?: string');
     expectSourceToDeclare(source, '@Input() ariaBusy?: boolean');
-    expectSourceToDeclare(
-      source,
-      '[accessibilityLabel]="foldedAccessibility().accessibilityLabel"',
-    );
-    expectSourceToDeclare(
-      source,
-      '[accessibilityState]="foldedAccessibility().accessibilityState"',
-    );
-    expectSourceToDeclare(
-      source,
-      '[accessibilityRole]="foldedAccessibility().accessibilityRole"',
-    );
+    expectSourceToDeclare(source, '...this.foldedAccessibility()');
+    expectSourceToDeclare(source, '[symbioteHostProps]="scrollViewBag()"');
   });
 
   // why: angular-adapter §0/§6 — Angular has NO runtime component synthesis under AOT/Metro, so
@@ -84,13 +75,17 @@ describe('Angular adapter gap regressions', () => {
       componentSource,
       'if (base === Text) return AnimatedText',
     );
+    // The TAG, not a component identity — `Image` is the statics namespace now, so there is no
+    // class to compare against.
     expectSourceToDeclare(
       componentSource,
-      'if (base === Image) return AnimatedImage',
+      'if (base === IMAGE_TAG) return AnimatedImage',
     );
+    // Same move as Image: ScrollView is a tag now too, so the dispatcher compares against its
+    // tag string, not a class identity.
     expectSourceToDeclare(
       componentSource,
-      'if (base === ScrollView) return AnimatedScrollView',
+      'if (base === SCROLL_VIEW_TAG) return AnimatedScrollView',
     );
     expectSourceToDeclare(
       componentSource,
@@ -133,133 +128,23 @@ describe('Angular adapter gap regressions', () => {
     expectSourceToDeclare(source, '(error)="handleError($event)"');
   });
 
-  // why: guards the OTHER direction of the previous test — that plain Image's own imageProps
-  // bag routes through the SAME resolveImageProps function AnimatedImage calls, so the two
-  // components can never structurally drift apart into two different prop-resolution rules.
-  // `imageProps` is a memoized computed() over the overridable buildImageProps(), not a getter.
-  it('Image prop resolution is shared with AnimatedImage', () => {
-    const imageSource = readSource(
-      'adapters/angular/src/components/image/shared.ts',
-    );
+  // The OTHER direction of the test above — that plain `Image`'s own bag routed through the same
+  // `resolveImageProps` — stood here until `image` became a TAG. There is no second component to
+  // drift from any more: the tag's fold is `registerImageBehavior`, whose oracle is the COMMITTED
+  // payload (`core/components/src/behaviors/image.test.ts`) rather than source text.
 
-    expectSourceToDeclare(imageSource, 'export function resolveImageProps');
-    expectSourceToDeclare(
-      imageSource,
-      'readonly imageProps = computed<Record<string, unknown>>',
-    );
-    expectSourceToDeclare(imageSource, 'return this.buildImageProps()');
-    expectSourceToDeclare(
-      imageSource,
-      'return resolveImageProps(this.imageInputProps)',
-    );
-  });
-
-  // why: RN's real Button surface includes the FULL accessibility + TV-focus prop set
-  // (<adapters_reach_full_feature_parity>, P0) — this asserts that surface exists on THREE
-  // related components in three different forwarding shapes: Button's own individual
-  // `[prop]="expr"` bindings, Touchable's identical individual bindings (Button wraps
-  // TouchableOpacity), and Pressable's DIFFERENT shape — a single `[symbioteHostProps]`
-  // bag (angular-adapter §10's escape hatch for undeclared/dynamic bindings on a bare
-  // primitive) rather than one binding per key. A silent drop on any of the three would ship a
-  // Button/Touchable/Pressable that's accessible-by-eye but broken for assistive tech or TV
-  // remote navigation, with no compiler signal (see the file-level comment above).
-  it('Button forwards its full accessibility and TV-focus surface through TouchableOpacity', () => {
-    const buttonSource = readSource(
-      'adapters/angular/src/components/button.ts',
-    );
-    const touchableSource = readSource(
-      'adapters/angular/src/components/touchable/index.ts',
-    );
-    const pressableSource = readSource(
-      'adapters/angular/src/components/pressable/index.ts',
-    );
-
-    for (const binding of [
-      '[accessible]="true"',
-      '[accessibilityLabelledBy]="accessibilityLabelledBy"',
-      '[importantForAccessibility]="importantForAccessibility"',
-      '[accessibilityLiveRegion]="accessibilityLiveRegion"',
-      '[screenReaderFocusable]="screenReaderFocusable"',
-      '[accessibilityViewIsModal]="accessibilityViewIsModal"',
-      '[accessibilityElementsHidden]="accessibilityElementsHidden"',
-      '[accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"',
-      '[accessibilityLanguage]="accessibilityLanguage"',
-      '[accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"',
-      '[accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"',
-      '[accessibilityLargeContentTitle]="accessibilityLargeContentTitle"',
-      '(accessibilityAction)="accessibilityAction.emit($event)"',
-      '(accessibilityTap)="accessibilityTap.emit($event)"',
-      '(magicTap)="magicTap.emit($event)"',
-      '(accessibilityEscape)="accessibilityEscape.emit($event)"',
-      '[ariaModal]="ariaModal"',
-      '[ariaValueMax]="ariaValueMax"',
-      '[ariaValueMin]="ariaValueMin"',
-      '[ariaValueNow]="ariaValueNow"',
-      '[ariaValueText]="ariaValueText"',
-      '[hasTVPreferredFocus]="hasTVPreferredFocus"',
-      '[nextFocusDown]="nextFocusDown"',
-      '[nextFocusForward]="nextFocusForward"',
-      '[nextFocusLeft]="nextFocusLeft"',
-      '[nextFocusRight]="nextFocusRight"',
-      '[nextFocusUp]="nextFocusUp"',
-    ]) {
-      expectSourceToDeclare(buttonSource, binding);
-    }
-
-    for (const binding of [
-      '[accessible]="accessible"',
-      '[accessibilityLabelledBy]="accessibilityLabelledBy"',
-      '[importantForAccessibility]="importantForAccessibility"',
-      '[accessibilityLiveRegion]="accessibilityLiveRegion"',
-      '[screenReaderFocusable]="screenReaderFocusable"',
-      '[accessibilityViewIsModal]="accessibilityViewIsModal"',
-      '[accessibilityElementsHidden]="accessibilityElementsHidden"',
-      '[accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"',
-      '[accessibilityLanguage]="accessibilityLanguage"',
-      '[accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"',
-      '[accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"',
-      '[accessibilityLargeContentTitle]="accessibilityLargeContentTitle"',
-      '(accessibilityAction)="accessibilityAction.emit($event)"',
-      '(accessibilityTap)="accessibilityTap.emit($event)"',
-      '(magicTap)="magicTap.emit($event)"',
-      '(accessibilityEscape)="accessibilityEscape.emit($event)"',
-      '[ariaModal]="ariaModal"',
-      '[ariaValueMax]="ariaValueMax"',
-      '[ariaValueMin]="ariaValueMin"',
-      '[ariaValueNow]="ariaValueNow"',
-      '[ariaValueText]="ariaValueText"',
-      '[hasTVPreferredFocus]="hasTVPreferredFocus"',
-      '[nextFocusDown]="nextFocusDown"',
-      '[nextFocusForward]="nextFocusForward"',
-      '[nextFocusLeft]="nextFocusLeft"',
-      '[nextFocusRight]="nextFocusRight"',
-      '[nextFocusUp]="nextFocusUp"',
-    ]) {
-      expectSourceToDeclare(touchableSource, binding);
-    }
-
-    // Pressable forwards its resolved props through the shared SymbioteHostPropsDirective
-    // (adapters/angular/src/primitives/shared.ts) rather than one `[prop]="x"` binding per
-    // key, so the contract to check is: the binding exists, and the `hostProps` bag it
-    // reads from actually assembles `accessible` / the folded accessibility bag / TV-focus.
-    // `hostProps` is a computed(), hence the call parens — the binding text changed shape but
-    // the contract did not.
-    expectSourceToDeclare(pressableSource, '[symbioteHostProps]="hostProps()"');
-    expectSourceToDeclare(pressableSource, 'accessible: this.accessible');
-    expectSourceToDeclare(pressableSource, '...this.foldedAccessibility');
-    expectSourceToDeclare(
-      pressableSource,
-      'hasTVPreferredFocus: this.hasTVPreferredFocus',
-    );
-    // The four accessibility gate events moved OFF the template and into this same bag
-    // (2026-09-01, `.claude/rules/fabric-boolean-event-gates.md`) — a template binding here bound
-    // unconditionally on every instance, lighting the Fabric gate whether or not an app ever
-    // subscribed. The handler takes the event NAME rather than the emitter (2026-09-02) because
-    // the gate is no longer decided by `.observed` alone: a wrapper rendering this Pressable is
-    // itself a subscriber, so an injected demand answers for it (`gate-demand.ts`).
-    expectSourceToDeclare(
-      pressableSource,
-      "onAccessibilityAction: this.accessibilityEmitterHandler('accessibilityAction',)",
-    );
-  });
+  // The FULL accessibility + TV-focus surface of `Pressable`, `TouchableOpacity` and
+  // `TouchableHighlight` was fenced here as SOURCE TEXT — a list of `[prop]="expr"` bindings that
+  // had to appear in each wrapper's template — until all three became TAGS (2026-09-11). There is
+  // no Angular source to fence any more, and the replacement is strictly stronger in both halves:
+  //
+  //   the PROP SURFACE   `DECLARES_EVERY_PROP` in `elements.ts` resolves each element directive
+  //                      against its own prop interface under `tsc --build`, so a missing name is a
+  //                      compile error rather than a text mismatch — and it is DERIVED, where the
+  //                      list here was hand-written and could only go stale in the safe direction.
+  //   the `accessible`   RN's `accessible !== false` default now lives in the shared press
+  //   DEFAULT           behavior's fold (`core/components/src/behaviors/pressable.ts`), whose
+  //                      oracle is the committed payload rather than a template string.
+  //
+  // Same retirement, same reasoning, as Button's own arm one release earlier.
 });

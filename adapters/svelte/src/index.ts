@@ -30,27 +30,14 @@ export type {
   ITaskCancelProvider,
 } from './modules/app-registry';
 
+// Nine names are deliberately absent and there is nothing to import in their place: `view`, `text`,
+// `safe-area-view`, `pressable`, `text-input`, `switch`, `image`, `input-accessory-view` and
+// `activity-indicator` are INTRINSIC TAGS an app writes directly. What survives of `Image` and
+// `TouchableNativeFeedback` is a STATICS namespace each, exported with the other imperative
+// namespaces below. See ./components/index.ts for where each deleted wrapper's body went.
 export {
-  View,
-  Text,
-  ActivityIndicator,
-  Image,
-  ImageBackground,
-  InputAccessoryView,
   KeyboardAvoidingView,
-  Switch,
-  TextInput,
   Modal,
-  SafeAreaView,
-  RefreshControl,
-  Pressable,
-  TouchableOpacity,
-  TouchableHighlight,
-  TouchableWithoutFeedback,
-  TouchableNativeFeedback,
-  Button,
-  ScrollView,
-  ScrollViewStickyHeader,
   VirtualizedList,
   FlatList,
   VirtualizedSectionList,
@@ -61,14 +48,15 @@ export type {
   ITextProps,
   IActivityIndicatorProps,
   IImageProps,
-  IImageStatics,
   IImageBackgroundProps,
   IInputAccessoryViewProps,
   IKeyboardAvoidingViewProps,
   IKeyboardAvoidingBehavior,
   ISwitchProps,
+  ISwitchChangeEvent,
   ITextInputProps,
   ITextInputHandle,
+  ITextInputChangeEvent,
   IModalProps,
   ISafeAreaViewProps,
   IRefreshControlProps,
@@ -80,7 +68,6 @@ export type {
   IButtonProps,
   IScrollViewProps,
   IScrollViewHandle,
-  IStickyHeaderComponentProps,
   IVirtualizedListProps,
   IVirtualizedListHandle,
   IFlatListProps,
@@ -178,6 +165,15 @@ export type {
   IDynamicColorIOSTuple,
 } from '@symbiote-native/engine';
 
+// The two namespaces left behind by primitives that became tags, here rather than in the component
+// block above for one reason: they carry no view. `Image` gets an adapter file only because it
+// renames the shared `imageStatics`; TNF's four are pure dict producers and come straight from the
+// shared package. RN points NEW code at `<pressable p={{ android_ripple: {…} }}>`, but they are not
+// redundant — the `touchable-native-feedback` tag folds `background`, and nothing else builds it.
+export { Image } from './modules/image';
+export type { IImageStatics } from './modules/image';
+export { TouchableNativeFeedback } from '@symbiote-native/components';
+
 // Imperative runtime modules: the SAME module every adapter shares, re-exported straight from
 // @symbiote-native/engine so app code names only @symbiote-native/svelte (RN's single import
 // root). Nothing here has a visual or a lifecycle, so there is no Svelte half to write.
@@ -274,6 +270,14 @@ export type { IHostInstance } from './host-instance';
 // wrapper (View/Text) forwards no bind:this of its own.
 export type { ShimElement } from './dom-shim';
 
+// Type-only, and the re-export is the POINT rather than the `ISymbioteIntrinsicTag` name: it is
+// what makes the checker load `intrinsic-elements.ts`, whose `declare global` is the tag alphabet
+// svelte-check reads. A declaration nothing imports applies inside this package only.
+export type {
+  ISymbioteIntrinsicTag,
+  ISymbioteHostAttributes,
+} from './intrinsic-elements';
+
 // The generic Descriptor -> shim-tree bridge (svelte-adapter-dom-shim skill §19) — the Svelte
 // twin of Vue's `descriptorToVue` / React's `descriptorToReact`, which a downstream package
 // wrapping a THIRD-PARTY native view (@symbiote-native/slider, packages/slider/src/svelte) needs
@@ -341,8 +345,7 @@ export {
   type IClassEntry,
 } from './class-value';
 
-// Animated: the Svelte twin of adapters/vue/src/modules/animated. All six RN animated components
-// ship (View/Text/Image/ScrollView/FlatList/SectionList), all of them from the same generic
-// createAnimatedComponent() wrap React, Vue and Solid also export.
-export { Animated, createAnimatedComponent } from './modules/animated';
-export type { IAnimatedComponentProps } from './modules/animated';
+// Animated: the drivers, plus FlatList/SectionList as ALIASES of the plain components. There is no
+// `createAnimatedComponent` — the engine resolves an AnimatedNode in any prop of any host node, so
+// nothing needs wrapping (modules/animated/index.ts).
+export { Animated } from './modules/animated';

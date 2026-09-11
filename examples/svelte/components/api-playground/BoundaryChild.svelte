@@ -1,5 +1,4 @@
 <script lang="ts" module>
-  import { Text } from '@symbiote-native/svelte';
 </script>
 
 <script lang="ts">
@@ -17,6 +16,6 @@
     throw new Error('ApiPlaygroundScreen: BoundaryChild threw on purpose');
 </script>
 
-<Text class="info-text" testID="boundary-child-ok">
+<text class="info-text" testID="boundary-child-ok">
   BoundaryChild mounted without throwing.
-</Text>
+</text>

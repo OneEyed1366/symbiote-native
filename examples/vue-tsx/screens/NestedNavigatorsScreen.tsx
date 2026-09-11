@@ -1,5 +1,4 @@
 import { defineComponent } from 'vue';
-import { SafeAreaView, Text, View } from '@symbiote-native/vue';
 import { Tab, useNavigation } from '@symbiote-native/navigation/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -17,29 +16,29 @@ const NestedTabHomeScreen = defineComponent(
       const parent = navigation.value.getParent();
       const canPopParent = parent !== undefined && 'pop' in parent;
       return (
-        <SafeAreaView class="screen">
-          <View class="section">
-            <View class={`line-tag line-tag-${nestedLineInfo.line}`}>
-              <Text class="line-tag-text">{`${nestedLineInfo.code} · ${nestedLineInfo.label}`}</Text>
-            </View>
-            <View class="hero-card">
-              <View
+        <safe-area-view class="screen">
+          <view class="section">
+            <view class={`line-tag line-tag-${nestedLineInfo.line}`}>
+              <text class="line-tag-text">{`${nestedLineInfo.code} · ${nestedLineInfo.label}`}</text>
+            </view>
+            <view class="hero-card">
+              <view
                 class="hero-badge"
                 style={{ backgroundColor: LINE_COLOR.structure }}
               >
-                <Text class="hero-badge-text">NN</Text>
-              </View>
-              <View class="hero-copy">
-                <Text class="hero-title">Nested navigators</Text>
-                <Text class="hero-body">
+                <text class="hero-badge-text">NN</text>
+              </view>
+              <view class="hero-copy">
+                <text class="hero-title">Nested navigators</text>
+                <text class="hero-body">
                   A Tab navigator nested inside a Stack screen, reaching its
                   parent's own navigation handle through getParent().
-                </Text>
-              </View>
-            </View>
-            <Text class="info-text">
+                </text>
+              </view>
+            </view>
+            <text class="info-text">
               {`parent navigator reachable via getParent(): ${canPopParent ? 'yes (Stack)' : 'no'}`}
-            </Text>
+            </text>
             <ActionButton
               testID="nested-pop-parent"
               title="Pop parent Stack (via getParent)"
@@ -48,8 +47,8 @@ const NestedTabHomeScreen = defineComponent(
               }}
               color={LINE_COLOR.structure}
             />
-          </View>
-        </SafeAreaView>
+          </view>
+        </safe-area-view>
       );
     };
   },
@@ -58,17 +57,17 @@ const NestedTabHomeScreen = defineComponent(
 
 const NestedTabInfoScreen = defineComponent(
   () => () => (
-    <SafeAreaView class="screen">
-      <View class="section">
-        <View class={`line-tag line-tag-${nestedLineInfo.line}`}>
-          <Text class="line-tag-text">{`${nestedLineInfo.code} · ${nestedLineInfo.label}`}</Text>
-        </View>
-        <Text class="section-label">Nested Tab · Info</Text>
-        <Text class="info-text">
+    <safe-area-view class="screen">
+      <view class="section">
+        <view class={`line-tag line-tag-${nestedLineInfo.line}`}>
+          <text class="line-tag-text">{`${nestedLineInfo.code} · ${nestedLineInfo.label}`}</text>
+        </view>
+        <text class="section-label">Nested Tab · Info</text>
+        <text class="info-text">
           A second tab, proving the nested Tab bar switches focus normally.
-        </Text>
-      </View>
-    </SafeAreaView>
+        </text>
+      </view>
+    </safe-area-view>
   ),
   { name: 'NestedTabInfoScreen' },
 );

@@ -20,7 +20,6 @@ import {
   onRenderTracked,
   onRenderTriggered,
 } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 
 defineProps<{ seed: number }>();
@@ -54,16 +53,16 @@ function throwNow(): void {
 </script>
 
 <template>
-  <View class="a11y-card" :style="{ borderWidth: 1, borderColor: '#f5a623' }">
-    <Text class="switch-label">LifecycleLogChild</Text>
-    <Text class="note-text" testID="lifecycle-seed">{{
+  <view class="a11y-card" :style="{ borderWidth: 1, borderColor: '#f5a623' }">
+    <text class="switch-label">LifecycleLogChild</text>
+    <text class="note-text" testID="lifecycle-seed">{{
       `seed prop = ${seed} — bump it from the parent to fire onBeforeUpdate/onUpdated`
-    }}</Text>
+    }}</text>
     <ActionButton
       testID="lifecycle-throw"
       title="throw() → onErrorCaptured + errorHandler"
       :onPress="throwNow"
       color="#f5a623"
     />
-  </View>
+  </view>
 </template>

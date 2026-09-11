@@ -50,24 +50,24 @@ const CHIP_ACTIVE_BORDER = '#ffb3c1';
   standalone: true,
   imports: [View, Text, SymbioteHostPropsDirective],
   template: `
-    <View class="section-tight">
-      <Text class="section-label"
-        >Responder · drag a chip vs hand-off to the strip</Text
+    <view class="section-tight">
+      <text class="section-label"
+        >Responder · drag a chip vs hand-off to the strip</text
       >
-      <Text testID="resp-status" class="info-text">{{ status }}</Text>
-      <Text
+      <text testID="resp-status" class="info-text">{{ status }}</text>
+      <text
         testID="resp-transfer"
         class="transfer-text"
         [style]="{ color: transfer ? '#f6ad55' : '#41506a' }"
-        >{{ transfer || 'transfer: —' }}</Text
+        >{{ transfer || 'transfer: —' }}</text
       >
-      <View [symbioteHostProps]="stripHostProps" class="strip-box">
-        <View
+      <view [symbioteHostProps]="stripHostProps" class="strip-box">
+        <view
           class="row-tight"
           [style]="{ transform: [{ translateX: rowDx }] }"
         >
           @for (chip of chipHandlers; track chip.index) {
-            <View
+            <view
               [symbioteHostProps]="chip.hostProps"
               class="chip"
               [style]="{
@@ -78,12 +78,12 @@ const CHIP_ACTIVE_BORDER = '#ffb3c1';
                 ],
               }"
             >
-              <Text class="chip-text">{{ chip.index }}</Text>
-            </View>
+              <text class="chip-text">{{ chip.index }}</text>
+            </view>
           }
-        </View>
-      </View>
-    </View>
+        </view>
+      </view>
+    </view>
   `,
 })
 export class ResponderDemo {

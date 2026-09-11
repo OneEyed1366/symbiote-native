@@ -6,7 +6,7 @@
 -->
 <script setup lang="ts">
 import { computed } from 'vue';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import { useCalendars, useLocales } from '@symbiote-native/localization/vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -31,93 +31,93 @@ const uses24hourClockText = computed(() => {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <ScrollView
+  <safe-area-view class="screen">
+    <scroll-view
       testID="localization-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Localization</Text>
-          <Text class="hero-body"
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Localization</text>
+          <text class="hero-body"
             >@symbiote-native/localization — the user's preferred locales and
-            calendars, live-updated on device settings changes.</Text
+            calendars, live-updated on device settings changes.</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="localization-locale-card" class="localization-card">
-        <Text class="localization-card-title">First locale</Text>
-        <View class="localization-row">
-          <Text class="localization-row-label">Language tag</Text>
-          <Text
+      <view testID="localization-locale-card" class="localization-card">
+        <text class="localization-card-title">First locale</text>
+        <view class="localization-row">
+          <text class="localization-row-label">Language tag</text>
+          <text
             testID="localization-language-tag-value"
             class="localization-value-text"
-            >{{ locale?.languageTag ?? 'unknown' }}</Text
+            >{{ locale?.languageTag ?? 'unknown' }}</text
           >
-        </View>
-        <View class="localization-row">
-          <Text class="localization-row-label">Currency code</Text>
-          <Text
+        </view>
+        <view class="localization-row">
+          <text class="localization-row-label">Currency code</text>
+          <text
             testID="localization-currency-code-value"
             class="localization-value-text"
-            >{{ locale?.currencyCode ?? 'unknown' }}</Text
+            >{{ locale?.currencyCode ?? 'unknown' }}</text
           >
-        </View>
-        <View class="localization-row">
-          <Text class="localization-row-label">Currency symbol</Text>
-          <Text
+        </view>
+        <view class="localization-row">
+          <text class="localization-row-label">Currency symbol</text>
+          <text
             testID="localization-currency-symbol-value"
             class="localization-value-text"
-            >{{ locale?.currencySymbol ?? 'unknown' }}</Text
+            >{{ locale?.currencySymbol ?? 'unknown' }}</text
           >
-        </View>
-        <View class="localization-row">
-          <Text class="localization-row-label">Text direction</Text>
-          <Text
+        </view>
+        <view class="localization-row">
+          <text class="localization-row-label">Text direction</text>
+          <text
             testID="localization-text-direction-value"
             class="localization-value-text"
-            >{{ locale?.textDirection ?? 'unknown' }}</Text
+            >{{ locale?.textDirection ?? 'unknown' }}</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="localization-calendar-card" class="localization-card">
-        <Text class="localization-card-title">First calendar</Text>
-        <View class="localization-row">
-          <Text class="localization-row-label">Calendar</Text>
-          <Text
+      <view testID="localization-calendar-card" class="localization-card">
+        <text class="localization-card-title">First calendar</text>
+        <view class="localization-row">
+          <text class="localization-row-label">Calendar</text>
+          <text
             testID="localization-calendar-value"
             class="localization-value-text"
-            >{{ calendar?.calendar ?? 'unknown' }}</Text
+            >{{ calendar?.calendar ?? 'unknown' }}</text
           >
-        </View>
-        <View class="localization-row">
-          <Text class="localization-row-label">Uses 24h clock</Text>
-          <Text
+        </view>
+        <view class="localization-row">
+          <text class="localization-row-label">Uses 24h clock</text>
+          <text
             testID="localization-24h-clock-value"
             class="localization-value-text"
-            >{{ uses24hourClockText }}</Text
+            >{{ uses24hourClockText }}</text
           >
-        </View>
-        <View class="localization-row">
-          <Text class="localization-row-label">Time zone</Text>
-          <Text
+        </view>
+        <view class="localization-row">
+          <text class="localization-row-label">Time zone</text>
+          <text
             testID="localization-time-zone-value"
             class="localization-value-text"
-            >{{ calendar?.timeZone ?? 'unknown' }}</Text
+            >{{ calendar?.timeZone ?? 'unknown' }}</text
           >
-        </View>
-      </View>
-    </ScrollView>
-  </SafeAreaView>
+        </view>
+      </view>
+    </scroll-view>
+  </safe-area-view>
 </template>

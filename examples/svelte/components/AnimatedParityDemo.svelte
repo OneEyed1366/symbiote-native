@@ -2,9 +2,10 @@
   // The rest of the Animated surface: ValueXY (2D), tracking (chase a moving target),
   // and diffClamp (a collapsing header). Each is a thin port of the RN node.
   //
-  // A JSX `{...panResponder.panHandlers}` spread stays a spread — Svelte 5 supports
-  // `{...obj}` on components directly, no v-bind-style rewrite needed.
-  import { View, Text, Animated, PanResponder } from '@symbiote-native/svelte';
+  // A JSX `{...panResponder.panHandlers}` spread does NOT survive on a host TAG: Svelte's
+  // spread path drops a handler's return value, which the responder negotiation needs. The bag
+  // (`p={…}`) is the tag's own channel and keeps it — see the markup below.
+  import { Animated, PanResponder } from '@symbiote-native/svelte';
   import ActionButton from './ActionButton.svelte';
 
   const XY_SPAN = 96;
@@ -77,57 +78,60 @@
   };
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">Animated · ValueXY / tracking / diffClamp</Text>
-  <Text class="drag-hint">drag the purple box →</Text>
-  <View class="xy-frame">
-    <Animated.View
-      {...panResponder.panHandlers}
+<view class="section-nested">
+  <text class="section-label">Animated · ValueXY / tracking / diffClamp</text>
+  <text class="drag-hint">drag the purple box →</text>
+  <view class="xy-frame">
+    <!-- `p={…}`, not `{...panHandlers}`. Svelte compiles a spread on an ELEMENT to
+         `attribute_effect` -> `set_attributes`, which wraps every `on*` value in a handler that
+         calls the original and DROPS ITS RETURN VALUE (attributes.js:423). That is harmless for a
+         DOM event and fatal here: the responder negotiation reads
+         `onStartShouldSetResponder`'s answer, so a spread box asks for the gesture and is never
+         heard. The bag channel keeps the return; so does a named attribute. -->
+    <view
+      p={panResponder.panHandlers}
       class="xy-box"
       style={{ transform: xy.getTranslateTransform() }}
     />
-  </View>
-  <View class="track-row">
-    <Animated.View
-      class="lead-dot"
-      style={{ transform: [{ translateX: lead }] }}
-    />
-  </View>
-  <View class="track-row">
-    <Animated.View
+  </view>
+  <view class="track-row">
+    <view class="lead-dot" style={{ transform: [{ translateX: lead }] }} />
+  </view>
+  <view class="track-row">
+    <view
       testID="follow-dot"
       class="follow-dot"
       style={{ transform: [{ translateX: follow }] }}
     />
-  </View>
+  </view>
   <ActionButton
     testID="track-btn"
     title="Move target (follower chases)"
     onPress={moveLead}
     color="#4299e1"
   />
-  <View class="collapse-frame">
-    <Animated.View
+  <view class="collapse-frame">
+    <view
       class="collapse-header"
       style={{ transform: [{ translateY: headerOffset }] }}
     >
-      <Text class="collapse-header-text">collapsing header</Text>
-    </Animated.View>
-  </View>
-  <View class="row-tight">
-    <View class="flex1">
+      <text class="collapse-header-text">collapsing header</text>
+    </view>
+  </view>
+  <view class="row-tight">
+    <view class="flex1">
       <ActionButton
         title="Scroll ↓"
         onPress={() => scrollBy(40)}
         color="#38b2ac"
       />
-    </View>
-    <View class="flex1">
+    </view>
+    <view class="flex1">
       <ActionButton
         title="Scroll ↑"
         onPress={() => scrollBy(-40)}
         color="#38b2ac"
       />
-    </View>
-  </View>
-</View>
+    </view>
+  </view>
+</view>

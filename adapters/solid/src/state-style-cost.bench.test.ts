@@ -15,7 +15,7 @@
 //
 // The `split-hoisted` arm is the optimistic BOUND for the split, not a prediction: it shares both
 // objects so the arm allocates nothing. Measured 2026-09-01, babel-preset-solid does NOT hoist —
-// `<symbiote-pressable style={{opacity:1}} activeStyle={{opacity:0.6}} />` compiles to two inline
+// `<pressable style={{opacity:1}} activeStyle={{opacity:0.6}} />` compiles to two inline
 // object literals inside the element factory — so the realistic arm is `split`, and `hoisted` only
 // says what a future hoisting optimisation could buy.
 import { describe, expect, it } from 'vitest';
@@ -40,11 +40,7 @@ const CALLBACK = (state: { pressed: boolean }): Record<string, unknown> => ({
 function build(arm: 'split' | 'split-hoisted' | 'callback', tag: number): void {
   const surface = createSurface(tag);
   for (let i = 0; i < N; i += 1) {
-    const node: ISymbioteNode = createElement(
-      'RCTView',
-      false,
-      'symbiote-pressable',
-    );
+    const node: ISymbioteNode = createElement('RCTView', false, 'pressable');
     routeProp(node, 'testID', 'row');
     if (arm === 'split') {
       routeProp(node, 'style', { ...RESTING });
@@ -102,7 +98,7 @@ describe('state-style: build-time split vs runtime callback', () => {
     // pressed variant reachable on both arms.
     fabric.reset();
     const sA = createSurface(7001);
-    const a = createElement('RCTView', false, 'symbiote-pressable');
+    const a = createElement('RCTView', false, 'pressable');
     routeProp(a, 'testID', 'row');
     routeProp(a, 'style', { ...RESTING });
     routeProp(a, 'activeStyle', { ...ACTIVE });
@@ -112,7 +108,7 @@ describe('state-style: build-time split vs runtime callback', () => {
 
     fabric.reset();
     const sB = createSurface(7002);
-    const b = createElement('RCTView', false, 'symbiote-pressable');
+    const b = createElement('RCTView', false, 'pressable');
     routeProp(b, 'testID', 'row');
     routeProp(b, 'style', CALLBACK);
     sB.appendChild(b);

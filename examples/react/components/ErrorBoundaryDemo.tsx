@@ -1,5 +1,4 @@
 import { Component, captureOwnerStack, useState, type ReactNode } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 
@@ -29,10 +28,10 @@ class Boundary extends Component<IErrorBoundaryProps, IErrorBoundaryState> {
   render() {
     if (this.state.error === null) return this.props.children;
     return (
-      <View testID="error-boundary-fallback" className="error-fallback">
-        <Text className="error-fallback-title">{`caught: ${this.state.error.message}`}</Text>
+      <view testID="error-boundary-fallback" className="error-fallback">
+        <text className="error-fallback-title">{`caught: ${this.state.error.message}`}</text>
         {this.state.ownerStack !== null && (
-          <Text className="note-text">{`owner stack: ${this.state.ownerStack || '(empty — release build)'}`}</Text>
+          <text className="note-text">{`owner stack: ${this.state.ownerStack || '(empty — release build)'}`}</text>
         )}
         <ActionButton
           testID="error-boundary-reset"
@@ -40,7 +39,7 @@ class Boundary extends Component<IErrorBoundaryProps, IErrorBoundaryState> {
           onPress={this.onReset}
           color={LINE_COLOR.introspection}
         />
-      </View>
+      </view>
     );
   }
 }
@@ -64,14 +63,14 @@ function BombTrigger() {
 
 export function ErrorBoundaryDemo() {
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         Error Boundaries · static getDerivedStateFromError · componentDidCatch ·
         captureOwnerStack
-      </Text>
+      </text>
       <Boundary>
         <BombTrigger />
       </Boundary>
-    </View>
+    </view>
   );
 }

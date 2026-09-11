@@ -122,7 +122,10 @@ describe('switch host behavior', () => {
     await flush();
 
     expect(onValueChange).toHaveBeenCalledTimes(1);
-    expect(onValueChange).toHaveBeenCalledWith(true, expect.anything());
+    // ONE argument, the event, with `value` carried on it — not `(value, event)`.
+    expect(onValueChange).toHaveBeenCalledWith(
+      expect.objectContaining({ value: true }),
+    );
     const setValue = commandsNamed('setValue');
     expect(setValue, 'a setValue command after a rejected toggle').toHaveLength(
       1,
@@ -140,7 +143,8 @@ describe('switch host behavior', () => {
     routeProp(node, 'testID', TEST_ID);
     routeProp(node, 'value', false);
     const surface = mount(node);
-    routeProp(node, 'onValueChange', (next: boolean) => {
+    routeProp(node, 'onValueChange', (event: ISymbioteEvent) => {
+      const next = Reflect.get(event, 'value');
       routeProp(node, 'value', next);
       surface.commit();
     });
@@ -168,7 +172,8 @@ describe('switch host behavior', () => {
     routeProp(node, 'testID', TEST_ID);
     routeProp(node, 'value', false);
     const surface = mount(node);
-    routeProp(node, 'onValueChange', (next: boolean) => {
+    routeProp(node, 'onValueChange', (event: ISymbioteEvent) => {
+      const next = Reflect.get(event, 'value');
       // The app's own scheduling, enqueued WHILE onChange's synchronous portion is still running —
       // e.g. a Promise-based store, or any framework whose commit is itself microtask-timed.
       queueMicrotask(() => {
@@ -221,14 +226,14 @@ describe('switch host behavior', () => {
     expect(committedPropsOf(TEST_ID)).toMatchObject({ value: false });
   });
 
-  // The `symbiote-switch-managed` tag resolves to the SAME native views as `symbiote-switch` — the
+  // The `switch-managed` tag resolves to the SAME native views as `switch` — the
   // wrapper's spelling must not silently orphan itself from either platform table.
-  it('resolves symbiote-switch-managed to the same Fabric view as symbiote-switch, on iOS', () => {
-    expect(descriptorFor('symbiote-switch')).toEqual({
+  it('resolves switch-managed to the same Fabric view as switch, on iOS', () => {
+    expect(descriptorFor('switch')).toEqual({
       component: 'Switch',
       isText: false,
     });
-    expect(descriptorFor('symbiote-switch-managed')).toEqual({
+    expect(descriptorFor('switch-managed')).toEqual({
       component: 'Switch',
       isText: false,
     });

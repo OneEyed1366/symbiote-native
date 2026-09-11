@@ -57,7 +57,7 @@ function mountDeviceMotion(
     defineComponent({
       setup: () => {
         measurement = useDeviceMotion(updateIntervalMs);
-        return () => h('symbiote-text', {}, 'sensor');
+        return () => h('text', {}, 'sensor');
       },
     }),
   );

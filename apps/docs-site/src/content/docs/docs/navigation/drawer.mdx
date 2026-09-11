@@ -309,12 +309,12 @@ type IDrawerDescriptorMap = Record<
 How you supply the content differs by framework, matching each one's own idiom for
 "caller-supplied UI that needs live data":
 
-| Framework | Mechanism                         | Description                                                                                                                                                                      |
-| --------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| React     | `renderDrawerContent` render prop | A `(props) => ReactNode` function passed directly to `<Drawer>`                                                                                                                  |
-| Vue       | `drawerContent` scoped slot       | `<template #drawerContent="{ state, descriptors, navigation }">` in SFC, or a `{ drawerContent: (props) => ... }` slots object in TSX                                            |
-| Angular   | `TemplateRef` via `@ContentChild` | A projected `<ng-template #drawerContent let-ctx>` — the ref variable name **must** be exactly `drawerContent`, read via `@ContentChild('drawerContent', { read: TemplateRef })` |
-| Svelte    | `drawerContent` Snippet prop      | `{#snippet drawerContent(slot: IDrawerContentSlotProps)}...{/snippet}` passed as the `drawerContent` prop on `<Drawer>`                                                          |
+| Framework | Mechanism                         | Description                                                                                                                                                                                    |
+| --------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React     | `renderDrawerContent` render prop | A `(props) => ReactNode` function passed directly to `<Drawer>`                                                                                                                                |
+| Vue       | `drawerContent` scoped slot       | `<template #drawerContent="{ state, descriptors, navigation }">` in SFC, or a `{ drawerContent: (props) => ... }` slots object in TSX                                                          |
+| Angular   | `TemplateRef` via `@ContentChild` | A projected `<ng-template #drawerContent let-ctx>` — the ref variable name **must** be exactly `drawerContent`, read via `@ContentChild('drawerContent', { read: TemplateRef })`               |
+| Svelte    | `drawerContent` Snippet prop      | `{#snippet drawerContent(slot: IDrawerContentSlotProps)}...{/snippet}` passed as the `drawerContent` prop on `<Drawer>`                                                                        |
 | Solid     | `drawerContent` render prop       | `(slot: Accessor<IDrawerContentSlotProps>) => JSX.Element` passed as the `drawerContent` prop on `<Drawer>`; called once, untracked, read `slot()` inside, not at the callback's own top level |
 
 If you skip the render prop/slot/template entirely, the panel slot renders empty — Drawer never

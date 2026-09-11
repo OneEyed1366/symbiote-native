@@ -1,11 +1,4 @@
 import { Show, createSignal } from 'solid-js';
-import {
-  SafeAreaView,
-  ScrollView,
-  Switch,
-  Text,
-  View,
-} from '@symbiote-native/solid';
 import { isAvailableAsync } from '@symbiote-native/keep-awake';
 import { createKeepAwake } from '@symbiote-native/keep-awake/solid';
 import { ROUTE_NAME } from '../routes';
@@ -13,10 +6,10 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="capability-row">
-      <Text class="capability-label">{props.label}</Text>
-      <Text class="value-text">{props.value}</Text>
-    </View>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -44,52 +37,56 @@ export function KeepAwakeScreen() {
   isAvailableAsync().then(setIsAvailable);
 
   return (
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="keep-awake-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Keep Awake</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Keep Awake</text>
+            <text class="hero-body">
               @symbiote-native/keep-awake — keeps the screen on for the lifetime
               of a mounted component.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="keep-awake-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Keep screen awake</Text>
-          </View>
+        <view testID="keep-awake-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Keep screen awake</text>
+          </view>
           <ValueRow
             label="Available"
             value={
-              isAvailable() === null ? 'checking…' : isAvailable() ? 'Yes' : 'No'
+              isAvailable() === null
+                ? 'checking…'
+                : isAvailable()
+                  ? 'Yes'
+                  : 'No'
             }
           />
-          <View testID="keep-awake-toggle-row" class="capability-row">
-            <Text class="capability-label">Keep screen awake</Text>
-            <Switch
+          <view testID="keep-awake-toggle-row" class="capability-row">
+            <text class="capability-label">Keep screen awake</text>
+            <switch
               testID="keep-awake-switch"
               value={isKeepAwakeOn()}
-              onValueChange={setIsKeepAwakeOn}
+              onValueChange={event => setIsKeepAwakeOn(event.value)}
               trackColor={{ true: lineColor }}
             />
-          </View>
+          </view>
           <Show when={isKeepAwakeOn()}>
             <KeepAwakeHolder />
           </Show>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

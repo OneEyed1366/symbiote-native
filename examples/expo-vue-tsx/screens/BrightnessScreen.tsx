@@ -1,11 +1,5 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   BrightnessMode,
   addBrightnessListener,
@@ -25,24 +19,24 @@ type ICapabilityStatus = 'checking' | 'yes' | 'no';
 
 function CapabilityBadge(props: { status: ICapabilityStatus }) {
   return (
-    <View class={`auth-status-badge auth-status-badge-${props.status}`}>
-      <Text class="auth-status-text">
+    <view class={`auth-status-badge auth-status-badge-${props.status}`}>
+      <text class="auth-status-text">
         {props.status === 'checking'
           ? 'CHECKING…'
           : props.status === 'yes'
             ? 'YES'
             : 'NO'}
-      </Text>
-    </View>
+      </text>
+    </view>
   );
 }
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="auth-capability-row">
-      <Text class="auth-capability-label">{props.label}</Text>
-      <Text class="auth-value-text">{props.value}</Text>
-    </View>
+    <view class="auth-capability-row">
+      <text class="auth-capability-label">{props.label}</text>
+      <text class="auth-value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -146,34 +140,34 @@ export const BrightnessScreen = defineComponent(
     );
 
     return () => (
-      <SafeAreaView class="screen">
-        <ScrollView
+      <safe-area-view class="screen">
+        <scroll-view
           testID="brightness-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Brightness</Text>
-              <Text class="hero-body">
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Brightness</text>
+              <text class="hero-body">
                 @symbiote-native/brightness — screen brightness get/set, Android
                 system-brightness mode, and an iOS-only live listener. Requires
                 SYSTEM_BRIGHTNESS permission on Android before setting the
                 system-wide value.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="brightness-live-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Live brightness</Text>
-            </View>
+          <view testID="brightness-live-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Live brightness</text>
+            </view>
             <ValueRow label="Screen brightness" value={brightnessLabel.value} />
             {BRIGHTNESS_STEPS.map(({ label, value }) => (
               <ActionButton
@@ -184,26 +178,26 @@ export const BrightnessScreen = defineComponent(
                 color={lineColor}
               />
             ))}
-          </View>
+          </view>
 
           {Platform.OS === 'android' && (
-            <View testID="brightness-system-card" class="auth-card">
-              <View class="auth-card-header">
-                <Text class="auth-card-title">
+            <view testID="brightness-system-card" class="auth-card">
+              <view class="auth-card-header">
+                <text class="auth-card-title">
                   System brightness (Android only)
-                </Text>
-              </View>
+                </text>
+              </view>
               <ValueRow
                 label="Mode"
                 value={brightnessModeLabel(systemMode.value)}
               />
-              <View
+              <view
                 class="auth-capability-row"
                 testID="brightness-using-system"
               >
-                <Text class="auth-capability-label">Using system value</Text>
+                <text class="auth-capability-label">Using system value</text>
                 <CapabilityBadge status={isUsingSystem.value} />
-              </View>
+              </view>
               <ActionButton
                 testID="brightness-mode-automatic"
                 title="Automatic"
@@ -222,13 +216,13 @@ export const BrightnessScreen = defineComponent(
                 onPress={handleRestoreSystem}
                 color={lineColor}
               />
-            </View>
+            </view>
           )}
 
-          <View testID="brightness-permission-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Permission</Text>
-            </View>
+          <view testID="brightness-permission-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Permission</text>
+            </view>
             <ValueRow
               label="SYSTEM_BRIGHTNESS status"
               value={permissionLabel.value}
@@ -239,9 +233,9 @@ export const BrightnessScreen = defineComponent(
               onPress={() => requestPermission()}
               color={lineColor}
             />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+          </view>
+        </scroll-view>
+      </safe-area-view>
     );
   },
   { name: 'BrightnessScreen' },

@@ -7,7 +7,6 @@
 -->
 <script setup lang="ts">
 import { customRef } from 'vue';
-import { View, Text, TextInput } from '@symbiote-native/vue';
 
 const DEBOUNCE_MS = 400;
 
@@ -31,16 +30,16 @@ const debounced = useDebouncedRef('', DEBOUNCE_MS);
 </script>
 
 <template>
-  <View class="a11y-card">
-    <Text class="switch-label">customRef() — debounced v-model</Text>
-    <TextInput
+  <view class="a11y-card">
+    <text class="switch-label">customRef() — debounced v-model</text>
+    <text-input
       testID="customref-input"
       class="focus-input"
       placeholder="type here…"
       v-model="debounced"
     />
-    <Text class="note-text" testID="customref-committed">{{
+    <text class="note-text" testID="customref-committed">{{
       `debounced (committed ${DEBOUNCE_MS}ms after typing stops) = "${debounced}"`
-    }}</Text>
-  </View>
+    }}</text>
+  </view>
 </template>

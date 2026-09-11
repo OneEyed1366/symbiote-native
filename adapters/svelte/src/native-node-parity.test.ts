@@ -95,18 +95,15 @@ function stripOuter(tree: string): string {
 // Same intended UI on both sides: an outer view wrapping five rows, each row holding a label
 // with an interpolated value and a static suffix.
 const SVELTE_SOURCE = `<script>const rows = [${ROWS.join(', ')}];</script>
-<symbiote-view p={{}}>{#each rows as row}<symbiote-view p={{}}><symbiote-text p={{}}>row {row}</symbiote-text><symbiote-text p={{}}>ok</symbiote-text></symbiote-view>{/each}</symbiote-view>`;
+<view p={{}}>{#each rows as row}<view p={{}}><text p={{}}>row {row}</text><text p={{}}>ok</text></view>{/each}</view>`;
 
 const VueRoot = {
   render() {
     return h(
-      'symbiote-view',
+      'view',
       null,
       ROWS.map(row =>
-        h('symbiote-view', null, [
-          h('symbiote-text', null, `row ${row}`),
-          h('symbiote-text', null, 'ok'),
-        ]),
+        h('view', null, [h('text', null, `row ${row}`), h('text', null, 'ok')]),
       ),
     );
   },

@@ -5,8 +5,6 @@
   file because an SFC holds exactly one component.
 -->
 <script setup lang="ts">
-import { Text, View } from '@symbiote-native/vue';
-
 defineProps<{
   label: string;
   caption: string;
@@ -14,9 +12,9 @@ defineProps<{
 </script>
 
 <template>
-  <View class="sc-pair-half">
-    <Text class="sc-tile-label">{{ label }}</Text>
+  <view class="sc-pair-half">
+    <text class="sc-tile-label">{{ label }}</text>
     <slot />
-    <Text class="sc-tile-caption">{{ caption }}</Text>
-  </View>
+    <text class="sc-tile-caption">{{ caption }}</text>
+  </view>
 </template>

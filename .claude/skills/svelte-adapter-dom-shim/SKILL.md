@@ -3236,3 +3236,117 @@ Two things generalise past Svelte:
   `:active` regression in its transform warnings, see
   `.claude/rules/example-shared-package-staleness.md` — but a green bundle says nothing about
   whether the first render throws.
+
+## §44. An individual `on*`-prefixed ATTRIBUTE on a host tag is eaten by Svelte, not routed to us — device-reproduced 2026-09-09
+
+**SUPERSEDED 2026-09-10 — the `fix` field below (`p={{...}}` bag) was REJECTED as unacceptable
+markup ergonomics by the project owner** ("никто так писать не станет... если да — бан") and
+retracted before shipping. `bind:value`/`$bindable()` and a monkeypatched `Object.defineProperty`
+were investigated as alternatives and both shown infeasible from primary sources (Svelte's
+`binding_properties` hardcodes `valid_elements` to literal native tag names, so `bind:value` on a
+custom element is a compile error regardless of runtime semantics; `handle_event_propagation` has
+TWO throw points, the second a plain property assignment no monkeypatch can intercept).
+
+**The durable fix, landed 2026-09-10: change the CALLBACK CONTRACT instead of the markup.**
+`core/components/src/behaviors/{text-input,switch}.ts` now call `onValueChange` with ONE argument —
+a real object (`ISymbioteEvent` with `text`/`value` mutated onto it via `Object.assign`), never the
+old `(text, event)` / `(value, event)` two-argument shape. `Object.defineProperty` only ever throws
+on a PRIMITIVE sole argument (§44_mechanism below) — an object survives it — so `<text-input
+onValueChange={fn}>` written as a plain individual attribute, exactly the syntax every other prop
+uses, no longer crashes. Zero markup change on any of the 5 adapters; only the callback body's
+destructuring changes (`(text, event) => ...` becomes `event => { const text = event.text; ... }`).
+The `p={{onValueChange}}` stopgap was reverted across `examples/svelte`. `host-tag-invariants.test.ts`'s
+third invariant (below) was narrowed from a blanket per-tag ban on individual `on*` attributes to a
+source-text regression guard scanning `core/components/src/{state,view}` for the specific shape that
+crashes (`/\bon[A-Z]\w*\??:\s*\(\s*\w+\s*:\s*(string|boolean|number)\s*[,)]/` — a bare primitive as a
+callback's first parameter), since no test file in this repo is type-checked (`tsc --build` excludes
+`*.test.ts`, `.claude/rules/test-harness-false-greens.md` §32) so a source-text scan is the only
+enforcer available.
+
+Everything below this point is the ORIGINAL mechanism diagnosis and is still accurate — the crash
+cause, why `onPress` didn't crash, and the general `is_event_attribute` rule all still hold. Only
+the `fix`/`guard`/`verified`/`not_covered` fields describe the superseded interim state.
+
+Typing into a bare `<text-input onValueChange={fn}>` (or toggling `<switch onValueChange={fn}>`)
+crashed: `Uncaught Error: Object.defineProperty() called on non-object`, thrown inside Svelte's own
+`handle_event_propagation` (`events.js:232`), called from `target_handler` (`events.js:63`), called
+from OUR `callValueChange`/`onChange` (`core/components/src/behaviors/text-input.ts`, `switch.ts`).
+
+§44_mechanism := {
+compiled: "svelte@5.56.8 compiles ANY individual `on*`-prefixed attribute — on ANY element, host
+tags included, regardless of tag hyphenation — to `$.event('ValueChange', el, fn)`, which calls
+`dom.addEventListener('ValueChange', target_handler)`. `target_handler` is SVELTE'S OWN wrapper
+(`create_event`), not the app's raw closure — there is no way to recover the original function from
+inside `addEventListener`, Svelte never exposes it.",
+consequence: "our shim's addEventListener forwards target_handler straight into node.props.onValueChange.
+The behavior calls it as `listener(text, event)` / `listener(value, event)` — `target_handler(text, event)`
+reads `text` (a string) or `value` (a boolean) AS IF IT WERE the DOM event, and
+`handle_event_propagation`'s `define_property(event, 'currentTarget', {...})` throws on the primitive.",
+why_onPress_looked_fine: "Pressable/responder/focus callbacks all take the event as their FIRST
+argument, so `target_handler(event)` merely reroutes the call through SVELTE's own dispatch before
+invoking the real handler — silently misrouted, not crashing. Only a callback whose first argument
+is NOT the event (`onValueChange(text, event)`) throws. So `ActionButton.svelte`'s `{onPress}` on
+`<pressable>` (used ~90 times) was ALREADY wrong before this was found — just invisibly.",
+fix: "markup-only, no shim-level fix exists (the raw closure is unrecoverable once Svelte wraps it):
+wrap the callback in the p={{...}} bag — `p={{ onValueChange }}` — so Svelte's compiler only ever
+sees the attribute name \"p\" (does not start with \"on\") and takes the set_custom_element_data /
+property-set path (§3g(c)) instead of the event-attachment path. Applied to every individual on*
+attribute on a host tag found across adapters/svelte/src and examples/svelte — not just the two
+that crashed.",
+guard: "adapters/svelte/src/host-tag-invariants.test.ts gained a third invariant: no individual
+`on*`-attribute on any host tag (host tag set is COMPONENT_DESCRIPTORS' keys, not a hand-listed
+`symbiote-` prefix — that prefix check had gone STALE and matched nothing since primitives dropped
+it, §DIRECTION RESET; fixed in the same pass). Also widened `examples/svelte` back INTO scope — it
+was excluded on the pre-2026-09-07 assumption that app code never authors a host tag, false since
+primitives became public intrinsic tags.",
+verified: "a throwaway-shaped test in bare-tag-authored.test.ts builds the forbidden individual-
+attribute form and asserts it THROWS /Object\\.defineProperty/, proving the mechanism; tag-value-
+change.test.ts proves the p={{ onValueChange }} form calls the app correctly with no throw, for
+both TextInput and Switch, break-tested (renamed the key, confirmed red, reverted).
+host-tag-invariants.test.ts 3/3, adapters/svelte full suite 61 files/347 tests, examples/svelte
+svelte-check 630 files/0 errors.",
+not_covered: "examples/expo-svelte has the same individual-onValueChange-attribute pattern in
+SecureStoreScreen/ClipboardScreen/SharingScreen/SmsScreen/WebBrowserScreen — the invariant test does
+not scan that tree yet. Open follow-up.",
+}
+
+The general form, worth carrying past this one crash: **`is_event_attribute` in Svelte's compiler is
+`name.startsWith('on')`, unconditionally — a BROADER, EARLIER check than `DELEGATED_EVENTS`
+membership (§5c).** DELEGATED_EVENTS only decides fast-document-level dispatch vs. a plain
+per-element `addEventListener`; `is_event_attribute` decides whether the attribute is treated as an
+event attachment AT ALL, and it fires for every `on*` name on every element, hyphenated custom
+elements included. §5c's "lucky break" (no camelCase SymbioteNative name can match the 23-name
+lowercase delegated list) answers a narrower question than it reads as — it was never a guarantee
+that an `on*` prop reaches us as a plain value. Only the `p={{...}}` bag guarantees that, because it
+is the only form where the compiler never sees the individual key name at all.
+
+## §45. `{@attach}` fires BEFORE the engine's own Fabric commit — `.measure()` inside one silently no-ops forever
+
+Device-reproduced 2026-09-10, `examples/svelte/components/api-playground/TemplateSyntaxDemo.svelte`
+("`{@attach}` — measuring the real committed host node" stuck on "measuring…" indefinitely).
+
+§45_mechanism := {
+symptom: "an {@attach} callback calling hostInstance(node)?.measure(cb) (or any of
+dispatchViewCommand/sendAccessibilityEvent/measureInWindow/measureLayout) never invokes cb — no
+throw, no dlog visible outside DEBUG, the UI state it was meant to set just never updates",
+cause: "{@attach} runs the instant the element mounts into SVELTE'S OWN tree — i.e. once the
+ShimElement exists — which is EARLIER than the engine's commit of that node to Fabric
+(`commitContainer`/`completeRoot`, scheduled separately). `measure`/`dispatchViewCommand`/
+`sendAccessibilityEvent` (core/engine/src/commit.ts) all guard on `committedOf(node) !==
+undefined` and silently `dlog(...); return` otherwise — THE SAME shape `vue-adapter-reactivity`
+documents as Vue's async-commit race (there: `getNativeTag()` reads undefined inside `onMounted`).
+Svelte's dom-shim tree build being synchronous does not make the ENGINE's Fabric commit
+synchronous with it — those are two different trees committing on two different schedules.",
+fix: "whenCommitted(node, action) — core/engine/src/commit.ts, exported off the engine barrel,
+'the canonical fix for the Vue async-commit race: defer instead of silently no-opping'. Runs
+`action` immediately if already committed, else re-tries after the commit that assigns a Fabric
+tag. `hostInstance(shim)` already returns the raw `ISymbioteNode` (IHostInstance IS ISymbioteNode,
+core/engine/src/host-instance/index.ts — toPublicInstance is the identity), so it can be handed
+straight to whenCommitted: `whenCommitted(host, () => host.measure(cb))`.",
+generalizes_to: "ANY {@attach} (or bind:this-driven effect) that calls an imperative engine API
+the moment a host ref becomes non-undefined — measure*, dispatchViewCommand, sendAccessibilityEvent,
+setNativeProps, focus/blur right after mount. All of them are keyed on committedOf(node) and all
+of them fail the SAME silent way. `whenCommitted` was written in core/engine 2026-09-07 and had
+ZERO consumers anywhere in adapters/svelte at the time this bug shipped — grep
+`whenCommitted` under `adapters/svelte` before trusting any new {@attach}-based imperative call.",
+}

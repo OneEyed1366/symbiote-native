@@ -98,3 +98,43 @@ Repo state after that pass: **0 crammed pairs** across all 112 source `.svelte` 
 
 Full incident + the preprocessor's own reasoning: `svelte-adapter-dom-shim` §16 (+ §16a
 intra-text, §16b the shim fix, §16c the sweep) and §29–§31.
+
+## A primitive tag is written SELF-CLOSING — the warning is off in `svelte.config.js`
+
+`<pressable class="x" />` is how an app writes a primitive, and Svelte warns on it:
+`element_invalid_self_closing_tag`, on every tag it does not know to be void (`view`, `text`,
+`image`, `switch` escape only because Svelte reads those four as SVG). The warning is about HTML's
+PARSING ambiguity, and nothing in this stack is ever parsed as HTML — `fragments: 'tree'` makes the
+compiler emit `from_tree()`, so every element is built by `createElement`.
+
+Filtered project-wide since 2026-09-10, in all three configs (`adapters/svelte`, `examples/svelte`,
+`examples/expo-svelte`), with the full reasoning in the adapter's:
+
+```js
+compilerOptions: {
+  warningFilter: warning => warning.code !== 'element_invalid_self_closing_tag',
+}
+```
+
+`svelte-check` and the language server are the whole surface — `metro-svelte-transformer.cjs` reads
+`js.code` and discards `warnings`. Measured on svelte 5.56.8 (sveltejs/svelte#14654, `warningFilter`
+ignored in 5.10.0, is long fixed): `examples/svelte` 15 warnings -> 3, and the 3 that remain are
+real Svelte-API ones (`svelte_self_deprecated`, `svelte_component_deprecated`,
+`state_referenced_locally`).
+
+**Do not reach for the two alternatives.** A per-file `<!-- svelte-ignore
+element_invalid_self_closing_tag -->` above the root element does work component-wide, and has to be
+remembered on every new file. And writing an explicit closing tag instead is the trap: at the indent
+a list row sits at, `<touchable-highlight class={…} testID={…}></touchable-highlight>` busts
+`printWidth`, and prettier reflows it into
+
+```
+            <touchable-opacity class={cellClass(row)} testID={row.label}
+            ></touchable-opacity>
+```
+
+which is what sent this rule looking for a config-level answer in the first place.
+
+The blanket filter is safe for a project-specific reason: a React Native app has NO html elements,
+so every lowercase tag is a Symbiote primitive. Re-check that premise before copying this into a
+tree that also renders web.

@@ -9,7 +9,6 @@
   .examples/react/screens/SheetDemoScreen.tsx.
 -->
 <script setup lang="ts">
-import { ScrollView, Text, View } from '@symbiote-native/vue';
 import { useStackNavigation } from '@symbiote-native/navigation/vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -22,30 +21,30 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
 </script>
 
 <template>
-  <ScrollView class="screen" content-container-style="section">
-    <View :class="`line-tag line-tag-${lineInfo.line}`">
-      <Text class="line-tag-text">{{
+  <scroll-view class="screen" content-container-style="section">
+    <view :class="`line-tag line-tag-${lineInfo.line}`">
+      <text class="line-tag-text">{{
         `${lineInfo.code} · ${lineInfo.label}`
-      }}</Text>
-    </View>
-    <View class="hero-card">
-      <View
+      }}</text>
+    </view>
+    <view class="hero-card">
+      <view
         class="hero-badge"
         :style="{ backgroundColor: LINE_COLOR.presentation }"
       >
-        <Text class="hero-badge-text">SH</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">Sheet presentation</Text>
-        <Text class="hero-body"
+        <text class="hero-badge-text">SH</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">Sheet presentation</text>
+        <text class="hero-body"
           >Pushed with stackPresentation: formSheet and three detents — drag the
-          grabber between 30%, 60%, and full height.</Text
+          grabber between 30%, 60%, and full height.</text
         >
-      </View>
-    </View>
-    <Text class="info-text"
+      </view>
+    </view>
+    <text class="info-text"
       >stackPresentation: formSheet · detents 30% / 60% / 100% · drag the
-      grabber</Text
+      grabber</text
     >
     <ActionButton
       testID="sheet-dismiss"
@@ -53,5 +52,5 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
       :onPress="() => navigation.pop()"
       :color="LINE_COLOR.presentation"
     />
-  </ScrollView>
+  </scroll-view>
 </template>

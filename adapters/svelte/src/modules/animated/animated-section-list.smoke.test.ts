@@ -1,20 +1,18 @@
-// Real-compiled-source smoke test for Animated.SectionList: the AnimatedFlatList twin over the
-// section surface. Proves the wrapper renders the real SectionList (so section flattening and the
-// ScrollView shell come along), that an AnimatedValue in `style` is rasterized on the FIRST paint,
-// and that the leaf binds to the host node behind the captured handle — `bind:this` on a list
-// hands back an imperative surface, so only getScrollNode() (this adapter's resolveHostNode)
-// reaches something setNativeProps can drive.
+// Real-compiled-source smoke test for `Animated.SectionList`, which IS `SectionList` — there is
+// no wrapper. The animated-flat-list twin over the section surface: an AnimatedValue in `style`
+// must survive five components' worth of forwarding and reach the engine, which rasterizes it on
+// the FIRST paint and repaints per frame on the committed RCTScrollView.
 //
-// Compile chain: AnimatedSectionList -> SectionList -> VirtualizedSectionList -> VirtualizedList
-// -> RefreshControl + ScrollViewStickyHeader -> AnimatedView. Each link is pre-compiled to a
-// co-located sibling `.mjs` with its specifier rewritten (flat-list.smoke.test.ts's technique);
-// output names are unique to this file because Vitest runs suites concurrently.
+// Compile chain: SectionList -> VirtualizedSectionList -> VirtualizedList -> RefreshControl +
+// ScrollViewStickyHeader -> View. Each link is pre-compiled to a co-located sibling `.mjs` with
+// its specifier rewritten (flat-list.smoke.test.ts's technique); output names are unique to this
+// file because Vitest runs suites concurrently.
 //
 // Scope note: the section-flattening logic is @symbiote-native/components' and is used, not
-// re-verified, here. This file's job is the Animated-specific wiring only.
+// re-verified, here. This file's job is the Svelte delivery path only.
 //
-// No Negative group: AnimatedSectionList.svelte has no throwing/rejecting path — every prop rides
-// the same open IAnimatedComponentProps bag as every other Animated.* component.
+// No Negative group: no prop on this path rejects — a `style` holding nothing animated is simply
+// published unchanged (`bindAnimatedValue` returns its input by identity).
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -23,6 +21,9 @@ import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { AnimatedValue } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// See scroll-view.smoke.test.ts: mounting through the render entry skips `index.ts`, so the host
+// behaviors have to be named here.
+import '../../register';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -36,19 +37,6 @@ globalThis.nativeModuleProxy = undefined;
 
 const ROOT_TAG = 91_108;
 const COMPONENTS_DIR = join(__dirname, '..', '..', 'components');
-const REFRESH_CONTROL_OUT = join(
-  COMPONENTS_DIR,
-  '.smoke-compiled-refresh-control-for-animated-section-list.mjs',
-);
-const VIEW_OUT = join(
-  COMPONENTS_DIR,
-  '.smoke-compiled-view-for-animated-section-list.mjs',
-);
-const STICKY_HEADER_OUT = join(
-  COMPONENTS_DIR,
-  'scroll-view',
-  '.smoke-compiled-sticky-header-for-animated-section-list.mjs',
-);
 const VIRTUALIZED_LIST_OUT = join(
   COMPONENTS_DIR,
   'virtualized-list',
@@ -80,9 +68,6 @@ beforeEach(() => {
 afterEach(() => {
   unmount(ROOT_TAG);
   for (const out of [
-    REFRESH_CONTROL_OUT,
-    VIEW_OUT,
-    STICKY_HEADER_OUT,
     VIRTUALIZED_LIST_OUT,
     VIRTUALIZED_SECTION_LIST_OUT,
     SECTION_LIST_OUT,
@@ -144,40 +129,12 @@ function liveScrollView(): IFakeNode {
 
 function compileChain(): void {
   compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8'),
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
-  );
-  compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'),
-    'View.svelte',
-    VIEW_OUT,
-  );
-  compileRewritten(
-    join(COMPONENTS_DIR, 'scroll-view', 'sticky-header.svelte'),
-    'sticky-header.svelte',
-    STICKY_HEADER_OUT,
-    [
-      [
-        "from '../View.svelte'",
-        "from '../.smoke-compiled-view-for-animated-section-list.mjs'",
-      ],
-    ],
-  );
-  compileRewritten(
-    join(COMPONENTS_DIR, 'virtualized-list', 'index.svelte'),
+    readFileSync(
+      join(COMPONENTS_DIR, 'virtualized-list', 'index.svelte'),
+      'utf8',
+    ),
     'VirtualizedList.svelte',
     VIRTUALIZED_LIST_OUT,
-    [
-      [
-        "from '../RefreshControl.svelte'",
-        "from '../.smoke-compiled-refresh-control-for-animated-section-list.mjs'",
-      ],
-      [
-        "from '../scroll-view/sticky-header.svelte'",
-        "from '../scroll-view/.smoke-compiled-sticky-header-for-animated-section-list.mjs'",
-      ],
-    ],
   );
   compileRewritten(
     join(COMPONENTS_DIR, 'virtualized-section-list', 'index.svelte'),
@@ -211,16 +168,14 @@ async function loadParent(): Promise<Component> {
   compileToFile(
     `<script>
        import SectionList from '../../components/section-list/.smoke-compiled-section-list-for-animated.mjs';
-       import { createAnimatedComponent } from './create-animated-component';
-       const AnimatedSectionList = createAnimatedComponent(SectionList);
        let { sections, style } = $props();
        let handle = $state();
        $effect(() => {
          window.__animatedSectionHandle = handle;
        });
      </script>
-     {#snippet cell({ item })}<symbiote-text p={{ text: item }}></symbiote-text>{/snippet}
-     <AnimatedSectionList bind:this={handle} {sections} {style} item={cell} />`,
+     {#snippet cell({ item })}<text p={{ text: item }}></text>{/snippet}
+     <SectionList bind:this={handle} {sections} {style} item={cell} />`,
     'AnimatedSectionParent.svelte',
     PARENT_OUT,
   );
@@ -251,11 +206,11 @@ const sections = [
 ];
 
 describe('Animated.SectionList (real compiled source) (Positive)', () => {
-  // why: wrapping the real SectionList (rather than hand-authoring a reduced one) is the design
-  // claim — only the real one brings the ScrollView shell and the flattened section stream, so
-  // asserting both the native shape and that real cells landed is what distinguishes a wrap from
-  // a look-alike. <adapters_reach_full_feature_parity>.
-  it('renders the real SectionList shape through the wrapper', async () => {
+  // why: the control for the two animated cases below. They read one prop off one node, which a
+  // list that rendered nothing at all would also satisfy vacuously; this pins the ScrollView shell
+  // and the flattened section stream first, so a red animated case means the VALUE is missing
+  // rather than the tree.
+  it('renders the real SectionList shape', async () => {
     const AnimatedSectionParent = await loadParent();
     mount(ROOT_TAG, AnimatedSectionParent, { sections });
     await tick();
@@ -289,11 +244,12 @@ describe('Animated.SectionList (real compiled source) (Positive)', () => {
     expect(liveScrollView().props.opacity).toBe(0.45);
   });
 
-  // why: `bind:this` on a list captures its IMPERATIVE handle, never the host node, so the leaf
-  // must be bound through getScrollNode() (this adapter's resolveHostNode). Binding the handle
-  // itself type-checks as far as the wrapper is concerned but leaves setNativeProps with nothing
-  // to drive — the frame silently never lands. Asserting the repaint is what catches that.
-  it('binds the leaf to the host node behind the handle, so setValue repaints', async () => {
+  // why: a per-frame write goes through the engine's own targeted setNativeProps commit, never a
+  // Svelte re-render, so nothing above re-runs to correct a leaf bound to the wrong object. The
+  // repaint is what says the subscription landed on the committed host node. `bind:this` is read
+  // alongside it because a list hands back an IMPERATIVE handle, and an animated style must not
+  // cost the caller that surface.
+  it('repaints on setValue while still exposing the list handle', async () => {
     const AnimatedSectionParent = await loadParent();
     const opacity = new AnimatedValue(0.45);
 
@@ -304,7 +260,7 @@ describe('Animated.SectionList (real compiled source) (Positive)', () => {
     const handle = Reflect.get(globalThis, '__animatedSectionHandle');
     expect(
       isSectionHandle(handle),
-      'AnimatedSectionList forwards the SectionList handle via bind:this',
+      'SectionList still forwards its handle via bind:this under an animated style',
     ).toBe(true);
     if (!isSectionHandle(handle)) return;
 

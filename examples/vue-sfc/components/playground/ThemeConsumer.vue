@@ -11,7 +11,6 @@
 -->
 <script setup lang="ts">
 import { inject, hasInjectionContext, getCurrentInstance } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import { THEME_KEY } from './provide-keys';
 
 const props = defineProps<{ depth: number }>();
@@ -22,12 +21,12 @@ const instanceName = getCurrentInstance()?.type.name ?? 'unnamed';
 </script>
 
 <template>
-  <View class="a11y-card" :style="{ borderWidth: 1, borderColor: '#f5a623' }">
-    <Text class="note-text" :testID="`theme-consumer-depth-${depth}`">{{
+  <view class="a11y-card" :style="{ borderWidth: 1, borderColor: '#f5a623' }">
+    <text class="note-text" :testID="`theme-consumer-depth-${depth}`">{{
       theme === undefined
         ? `depth ${depth}: no theme provided`
         : `depth ${depth}: injected tone = "${theme.tone}" · hasInjectionContext()=${hadContext} · instance=${instanceName}`
-    }}</Text>
+    }}</text>
     <ThemeConsumer v-if="depth < 2" :depth="depth + 1" />
-  </View>
+  </view>
 </template>

@@ -5,7 +5,6 @@
 -->
 <script setup lang="ts">
 import { useModel } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 
 const props = defineProps<{ count: number }>();
@@ -19,16 +18,16 @@ function increment(): void {
 </script>
 
 <template>
-  <View class="a11y-card">
-    <Text class="switch-label">useModel() — non-macro v-model</Text>
-    <Text class="list-row-text" testID="usemodel-count">{{
+  <view class="a11y-card">
+    <text class="switch-label">useModel() — non-macro v-model</text>
+    <text class="list-row-text" testID="usemodel-count">{{
       `count=${count}`
-    }}</Text>
+    }}</text>
     <ActionButton
       testID="usemodel-increment"
       title="increment (v-model:count)"
       :onPress="increment"
       color="#f5a623"
     />
-  </View>
+  </view>
 </template>

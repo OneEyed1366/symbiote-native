@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Animated, PanResponder } from '@symbiote-native/react';
+import { Animated, PanResponder } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 
 const XY_SPAN = 96;
@@ -74,35 +74,35 @@ export function AnimatedParityDemo() {
   };
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         Animated · ValueXY / tracking / diffClamp
-      </Text>
+      </text>
 
       {/* ValueXY box you drag with a finger (PanResponder) */}
-      <Text className="drag-hint">drag the purple box →</Text>
-      <View className="xy-frame">
+      <text className="drag-hint">drag the purple box →</text>
+      <view className="xy-frame">
         <Animated.View
           {...panResponder.panHandlers}
           className="xy-box"
           style={{ transform: xy.getTranslateTransform() }}
         />
-      </View>
+      </view>
 
       {/* Tracking: lead dot (blue) and follower (orange) that lags behind it */}
-      <View className="track-row">
+      <view className="track-row">
         <Animated.View
           className="lead-dot"
           style={{ transform: [{ translateX: lead }] }}
         />
-      </View>
-      <View className="track-row">
+      </view>
+      <view className="track-row">
         <Animated.View
           testID="follow-dot"
           className="follow-dot"
           style={{ transform: [{ translateX: follow }] }}
         />
-      </View>
+      </view>
       <ActionButton
         testID="track-btn"
         title="Move target (follower chases)"
@@ -111,30 +111,30 @@ export function AnimatedParityDemo() {
       />
 
       {/* diffClamp collapsing header */}
-      <View className="collapse-frame">
+      <view className="collapse-frame">
         <Animated.View
           className="collapse-header"
           style={{ transform: [{ translateY: headerOffset }] }}
         >
-          <Text className="collapse-header-text">collapsing header</Text>
+          <text className="collapse-header-text">collapsing header</text>
         </Animated.View>
-      </View>
-      <View className="row-tight">
-        <View className="flex1">
+      </view>
+      <view className="row-tight">
+        <view className="flex1">
           <ActionButton
             title="Scroll ↓"
             onPress={() => scrollBy(40)}
             color="#38b2ac"
           />
-        </View>
-        <View className="flex1">
+        </view>
+        <view className="flex1">
           <ActionButton
             title="Scroll ↑"
             onPress={() => scrollBy(-40)}
             color="#38b2ac"
           />
-        </View>
-      </View>
-    </View>
+        </view>
+      </view>
+    </view>
   );
 }

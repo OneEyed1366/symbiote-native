@@ -3,7 +3,6 @@
   // useNavigation() here resolves to the nested Tab's OWN handle, while getParent() walks exactly
   // one hop up the NavigationScope chain to reach the ENCLOSING Stack's handle. Svelte twin of
   // examples/vue-sfc/screens/NestedTabHomeScreen.vue.
-  import { SafeAreaView, Text, View } from '@symbiote-native/svelte';
   import { useNavigation } from '@symbiote-native/navigation/svelte';
   import ActionButton from '../components/ActionButton.svelte';
   import { ROUTE_NAME } from '../routes';
@@ -19,36 +18,36 @@
   }
 </script>
 
-<SafeAreaView class="screen">
-  <View class="section">
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+<safe-area-view class="screen">
+  <view class="section">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View
+      </text>
+    </view>
+    <view class="hero-card">
+      <view
         class="hero-badge"
         style={{ backgroundColor: LINE_COLOR.structure }}
       >
-        <Text class="hero-badge-text">NN</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">Nested navigators</Text>
-        <Text class="hero-body">
+        <text class="hero-badge-text">NN</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">Nested navigators</text>
+        <text class="hero-body">
           A Tab navigator nested inside a Stack screen, reaching its parent's
           own navigation handle through getParent().
-        </Text>
-      </View>
-    </View>
-    <Text class="info-text">
+        </text>
+      </view>
+    </view>
+    <text class="info-text">
       {`parent navigator reachable via getParent(): ${canPopParent ? 'yes (Stack)' : 'no'}`}
-    </Text>
+    </text>
     <ActionButton
       testID="nested-pop-parent"
       title="Pop parent Stack (via getParent)"
       onPress={popParent}
       color={LINE_COLOR.structure}
     />
-  </View>
-</SafeAreaView>
+  </view>
+</safe-area-view>

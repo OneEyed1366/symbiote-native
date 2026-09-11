@@ -15,6 +15,7 @@ import type {
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import type { JSX } from '../../jsx-runtime';
 import { mount, unmount } from '../../render';
+import '../../register';
 import { FlatList, type IFlatListHandle } from './index';
 
 const ROOT_TAG = 823;
@@ -145,9 +146,7 @@ describe('Solid FlatList on the engine', () => {
           data={DATA}
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -171,9 +170,7 @@ describe('Solid FlatList on the engine', () => {
           numColumns={3}
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -211,9 +208,7 @@ describe('Solid FlatList on the engine', () => {
           columnWrapperStyle="rowGap"
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -234,9 +229,7 @@ describe('Solid FlatList on the engine', () => {
           columnWrapperStyle={{ columnGap: 8 }}
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -251,7 +244,7 @@ describe('Solid FlatList on the engine', () => {
     // first of the row below), never the internal IRow wrapper the virtualized stream carries.
     it('hands the row separator the real flanking items, not the IRow wrapper', async () => {
       const separator = (sep: ISeparatorProps<IItem>): JSX.Element => (
-        <symbiote-text>{`gap:${sep.leadingItem?.label}>${sep.trailingItem?.label}`}</symbiote-text>
+        <text>{`gap:${sep.leadingItem?.label}>${sep.trailingItem?.label}`}</text>
       );
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -260,9 +253,7 @@ describe('Solid FlatList on the engine', () => {
           getItemLayout={getItemLayout}
           initialNumToRender={2}
           ItemSeparatorComponent={separator}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -284,9 +275,7 @@ describe('Solid FlatList on the engine', () => {
           getItemLayout={getItemLayout}
           viewabilityConfig={{ itemVisiblePercentThreshold: 0 }}
           onViewableItemsChanged={info => reports.push(info)}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -322,9 +311,7 @@ describe('Solid FlatList on the engine', () => {
               onViewableItemsChanged: info => reports.push(info),
             },
           ]}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -350,9 +337,7 @@ describe('Solid FlatList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -390,9 +375,7 @@ describe('Solid FlatList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -414,9 +397,7 @@ describe('Solid FlatList on the engine', () => {
           initialNumToRender={2}
           testID="the-flat-list"
           aria-label="Orders"
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -439,9 +420,7 @@ describe('Solid FlatList on the engine', () => {
           keyExtractor={keyExtractor}
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -472,9 +451,7 @@ describe('Solid FlatList on the engine', () => {
           horizontal
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -495,9 +472,7 @@ describe('Solid FlatList on the engine', () => {
           inverted
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -524,9 +499,7 @@ describe('Solid FlatList on the engine', () => {
           refreshing
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -545,9 +518,7 @@ describe('Solid FlatList on the engine', () => {
           data={DATA}
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -569,9 +540,7 @@ describe('Solid FlatList on the engine', () => {
           initialNumToRender={2}
           onEndReachedThreshold={0.1}
           onEndReached={info => reached.push(info.distanceFromEnd)}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -594,12 +563,10 @@ describe('Solid FlatList on the engine', () => {
           data={items()}
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          ListHeaderComponent={<symbiote-text>the-header</symbiote-text>}
-          ListFooterComponent={<symbiote-text>the-footer</symbiote-text>}
-          ListEmptyComponent={<symbiote-text>nothing-here</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          ListHeaderComponent={<text>the-header</text>}
+          ListFooterComponent={<text>the-footer</text>}
+          ListEmptyComponent={<text>nothing-here</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -631,9 +598,7 @@ describe('Solid FlatList on the engine', () => {
             const offset = event.nativeEvent.contentOffset;
             if (offset !== undefined) seen.push(offset.y);
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -663,9 +628,7 @@ describe('Solid FlatList on the engine', () => {
             numColumns={columns}
             getItemLayout={getItemLayout}
             initialNumToRender={2}
-            renderItem={info => (
-              <symbiote-text>{info().item.label}</symbiote-text>
-            )}
+            renderItem={info => <text>{info().item.label}</text>}
           />
         ));
         await tick();
@@ -694,9 +657,7 @@ describe('Solid FlatList on the engine', () => {
           onScrollEndDrag={onScrollEndDrag}
           onMomentumScrollBegin={onMomentumScrollBegin}
           onMomentumScrollEnd={onMomentumScrollEnd}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -738,9 +699,7 @@ describe('Solid FlatList on the engine', () => {
           style={{ height: 240 }}
           class="listSkin"
           contentContainerStyle={{ paddingBottom: 24 }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -770,9 +729,7 @@ describe('Solid FlatList on the engine', () => {
           windowSize={1}
           onStartReachedThreshold={0}
           onStartReached={onStartReached}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -802,9 +759,7 @@ describe('Solid FlatList on the engine', () => {
           getItemLayout={getItemLayout}
           initialNumToRender={2}
           initialScrollIndex={8}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -837,9 +792,7 @@ describe('Solid FlatList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -861,11 +814,9 @@ describe('Solid FlatList on the engine', () => {
           data={DATA}
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          ListHeaderComponent={<symbiote-text>the-header</symbiote-text>}
+          ListHeaderComponent={<text>the-header</text>}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -887,9 +838,7 @@ describe('Solid FlatList on the engine', () => {
           getItemLayout={getItemLayout}
           initialNumToRender={2}
           stickyHeaderIndices={[0]}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -925,9 +874,7 @@ describe('Solid FlatList on the engine', () => {
           getItemLayout={getItemLayout}
           initialNumToRender={2}
           windowSize={1}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -964,9 +911,7 @@ describe('Solid FlatList on the engine', () => {
           keyExtractor={keyExtractor}
           getItemLayout={getItemLayout}
           initialNumToRender={4}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -996,9 +941,7 @@ describe('Solid FlatList on the engine', () => {
           columnWrapperStyle={{ columnGap: gap() }}
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1057,9 +1000,7 @@ describe('Solid FlatList on the engine', () => {
           horizontal
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -1084,9 +1025,7 @@ describe('Solid FlatList on the engine', () => {
           numColumns={columns()}
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();

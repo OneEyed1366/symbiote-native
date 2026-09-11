@@ -102,10 +102,15 @@ function collectTexts(): string[] {
   return texts;
 }
 
-// A sticky-header wrapper is the only node carrying a `transform` (its translateY); regular cells
-// and the content container do not. So transform-bearing nodes count the wrapped headers.
+// `collapsable: false` is what the sticky seam sets at CREATE, and nothing else in this tree sets
+// it except the scroll view's own content node (excluded below) — a plain cell wrapper leaves it
+// absent. The translateY `transform` is NOT the oracle here: it needs a measurement round trip,
+// so a create-time `Array.isArray(transform)` reads 0 for a correct tree
+// (`.claude/rules/test-harness-false-greens.md` §34).
 function stickyWrappers(): IFakeNode[] {
-  return fabric.created.filter(n => Array.isArray(n.props.transform));
+  return fabric.created.filter(
+    n => n.props.collapsable === false && n.viewName !== 'RCTScrollContentView',
+  );
 }
 
 function mountSectionList(extra: Record<string, unknown>): Promise<void> {
@@ -118,11 +123,9 @@ function mountSectionList(extra: Record<string, unknown>): Promise<void> {
           { sections: SECTIONS, ...extra },
           {
             sectionHeader: ({ section }: { section: ISectionShape }) => [
-              h('symbiote-text', {}, `header:${section.title}`),
+              h('text', {}, `header:${section.title}`),
             ],
-            item: ({ item }: { item: IRow }) => [
-              h('symbiote-text', {}, item.label),
-            ],
+            item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
           },
         ),
     }),

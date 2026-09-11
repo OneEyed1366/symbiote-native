@@ -10,8 +10,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   AppRegistry,
   setHostRegistrar,
-  Text,
-  View,
   mount,
   unmount,
   type IAppParameters,
@@ -24,9 +22,9 @@ const ROOT_TAG = 210;
 
 function App(): ReactElement {
   return (
-    <View style={{ flex: 1 }}>
-      <Text>hi</Text>
-    </View>
+    <view style={{ flex: 1 }}>
+      <text>hi</text>
+    </view>
   );
 }
 

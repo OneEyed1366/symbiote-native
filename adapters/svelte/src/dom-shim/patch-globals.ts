@@ -42,6 +42,7 @@ const PATCHED_KEYS = [
   'DocumentFragment',
   'document',
   'customElements',
+  'HTMLMediaElement',
 ] as const;
 
 // Real DOM's `CustomElementRegistry`. `set_custom_element_data` (svelte's
@@ -51,11 +52,34 @@ const PATCHED_KEYS = [
 // pipeline (mount-pipeline.smoke.test.ts); `tsc --build` has no way to catch a missing global
 // a compiled Svelte bundle reads. RN/Hermes has no Custom Elements API of its own to collide
 // with (unlike `navigator`/`requestAnimationFrame`, verified against .vendors/react-native —
-// see the header comment above), so patching this is safe. `get()` always returns `undefined`
-// since we never call `customElements.define()`, which is exactly what steers
-// `set_custom_element_data` down the object-bag "set as property" branch every `p={bag}` prop
-// needs (skill §3g(c)).
-const FAKE_CUSTOM_ELEMENT_REGISTRY = { get: (): undefined => undefined };
+// see the header comment above), so patching this is safe.
+//
+// `get()` returns a TRUTHY stand-in, and that is the whole reason `set_custom_element_data` can be
+// made lossless. Its condition (attributes.js:245-265) is a ternary, not a fallback:
+//
+//   setters_cache.has(nodeName) || !customElements || customElements.get(nodeName)
+//     ? get_setters(node).includes(prop)     <- a real setter decides; the value passes through
+//     : value && typeof value === 'object'   <- a HEURISTIC: an object is set as a property and
+//                                               every scalar is handed on as String(value)
+//
+// Returning `undefined` — which it did until 2026-09-07 — selects the heuristic, so
+// `<text-input multiline={false}>` committed the STRING "false" and an object-valued prop with no
+// prototype setter was assigned to a plain JS property and silently lost. Anything truthy steers
+// it to `get_setters`, which reaches `ShimElement.prototype`'s accessors (see
+// `svelte-shim-element-global-must-be-an-ancestor.md` for why that walk terminates where it does).
+// One reader in the whole client runtime, so nothing else is affected.
+const FAKE_CUSTOM_ELEMENT_REGISTRY = {
+  get: (): unknown => ShimElement,
+};
+
+// Same class of trap as `customElements` above, found the same way — by running the pipeline
+// rather than by reading. Svelte's `event()` (dom/elements/events.js) ends its teardown check with
+// a BARE `dom instanceof HTMLMediaElement`, no `typeof` guard, so an undeclared global throws
+// ReferenceError instead of yielding `undefined`. It is reached by every `on<Name>={fn}` an app
+// writes on a bare tag, which is why nothing hit it while the lowering transform funnelled every
+// handler through the `p` bag. Nothing of ours ever derives from it, so an empty class is enough:
+// `instanceof` only has to answer false.
+class FakeHTMLMediaElement {}
 
 type IGlobalRecord = Record<(typeof PATCHED_KEYS)[number], unknown>;
 
@@ -74,6 +98,7 @@ export function patchGlobals(): void {
     DocumentFragment: g.DocumentFragment,
     document: g.document,
     customElements: g.customElements,
+    HTMLMediaElement: g.HTMLMediaElement,
   };
   g.Node = ShimNode;
   // ShimElementBase, NOT ShimElement: `get_setters` stops AT `Element.prototype`, so pointing this
@@ -89,6 +114,7 @@ export function patchGlobals(): void {
   g.DocumentFragment = ShimDocumentFragment;
   g.document = getShimDocument();
   g.customElements = FAKE_CUSTOM_ELEMENT_REGISTRY;
+  g.HTMLMediaElement = FakeHTMLMediaElement;
   dlog('svelte dom-shim: patchGlobals installed');
 }
 

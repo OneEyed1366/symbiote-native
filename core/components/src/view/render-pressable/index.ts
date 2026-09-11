@@ -20,6 +20,40 @@ export function resolveDisabledAccessibilityState(
     : accessibilityState;
 }
 
+// RN computes `focusable` in all five touchables and we computed it nowhere until 2026-09-09, so a
+// DISABLED control stayed focusable — a keyboard, a TV remote or switch control could land on
+// something that cannot be pressed. There are TWO formulas, split by primitive and not by platform;
+// do not collapse them.
+//
+// Pressable defaults it ON (Pressable.js:258). `!== false`, not `?? true`: only a literal `false`
+// opts out, the same shape `accessible` uses one file over.
+export function resolvePressableFocusable(
+  focusable: boolean | undefined,
+): boolean {
+  return focusable !== false;
+}
+
+// The four Touchable* additionally require a press handler and a non-disabled state —
+// TouchableOpacity.js:336-340, TouchableHighlight.js:370-374,
+// TouchableWithoutFeedback.js:263-266, TouchableNativeFeedback.js:369-372, one expression verbatim.
+//
+// `hasOnPress` is RN's `onPress !== undefined` and NOT `hasTouchablePressHandler`, which also counts
+// onPressIn/onPressOut/onLongPress — that gate is the underlay's, and reusing it here would make a
+// press-in-only Touchable focusable where RN leaves it out of the focus order.
+//
+// A Touchable that composes our Pressable passes the result DOWN as the `focusable` prop; Pressable
+// then applies `!== false` to a value that is already boolean, which is why the two compose without
+// either side knowing about the other.
+export function resolveTouchableFocusable(
+  focusable: boolean | undefined,
+  hasOnPress: boolean,
+  disabled: boolean | undefined,
+): boolean {
+  return (
+    resolvePressableFocusable(focusable) && hasOnPress && disabled !== true
+  );
+}
+
 // The 3 agnostic gating predicates behind the listener bag below. Angular has no bag to spread -
 // it binds these directly onto template event outputs (see adapters/angular/src/components/
 // pressable/index.ts), so they're exported and shared rather than folded back into

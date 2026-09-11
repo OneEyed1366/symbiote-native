@@ -17,9 +17,10 @@
 import { createSignal, Show } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// SIDE-EFFECT IMPORT: the tag's fold lives in its behavior, and only this module installs it. An
+// app reaches it through the package barrel; a test importing the renderer directly does not.
+import '../register';
 import { mount, unmount } from '../render';
-import { SafeAreaView } from './safe-area-view';
-import { View } from './view';
 
 const ROOT_TAG = 8_202;
 const SAFE_AREA = 'SafeAreaView';
@@ -65,9 +66,9 @@ describe('Solid SafeAreaView on the engine', () => {
   // the notch inset on device.
   it('commits its own SafeAreaView intrinsic wrapping its children', async () => {
     mount(ROOT_TAG, () => (
-      <SafeAreaView testID={TEST_ID}>
-        <View />
-      </SafeAreaView>
+      <safe-area-view testID={TEST_ID}>
+        <view />
+      </safe-area-view>
     ));
     await tick();
 
@@ -81,9 +82,9 @@ describe('Solid SafeAreaView on the engine', () => {
   // than beside it, or they never get inset at all.
   it('flattens style onto the safe-area node and nests children', async () => {
     mount(ROOT_TAG, () => (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-        <View />
-      </SafeAreaView>
+      <safe-area-view style={{ flex: 1, backgroundColor: '#fff' }}>
+        <view />
+      </safe-area-view>
     ));
     await tick();
 
@@ -98,7 +99,7 @@ describe('Solid SafeAreaView on the engine', () => {
   // bag through resolveAccessibilityProps.
   it('passes the standard ViewProps through to the safe-area node', async () => {
     mount(ROOT_TAG, () => (
-      <SafeAreaView
+      <safe-area-view
         testID={TEST_ID}
         accessibilityLabel={ACCESSIBILITY_LABEL}
         accessible={true}
@@ -117,7 +118,7 @@ describe('Solid SafeAreaView on the engine', () => {
   it('routes onLayout as a topLayout event and raises the flag', async () => {
     let layoutFired = false;
     mount(ROOT_TAG, () => (
-      <SafeAreaView
+      <safe-area-view
         onLayout={() => {
           layoutFired = true;
         }}
@@ -133,7 +134,7 @@ describe('Solid SafeAreaView on the engine', () => {
   // why: closes the other branch — omitting onLayout must leave no stray key on the node, which
   // would otherwise ask native to measure a view nobody is listening to.
   it('omits onLayout from the committed node when the prop is not passed', async () => {
-    mount(ROOT_TAG, () => <SafeAreaView testID={TEST_ID} />);
+    mount(ROOT_TAG, () => <safe-area-view testID={TEST_ID} />);
     await tick();
 
     expect('onLayout' in safeArea().props).toBe(false);
@@ -144,7 +145,7 @@ describe('Solid SafeAreaView on the engine', () => {
   // at its mount-time props while every other test in this file still passed.
   it('re-commits the same native node when a prop changes after mount', async () => {
     const [label, setLabel] = createSignal('before');
-    mount(ROOT_TAG, () => <SafeAreaView accessibilityLabel={label()} />);
+    mount(ROOT_TAG, () => <safe-area-view accessibilityLabel={label()} />);
     await tick();
     const createdAtMount = fabric.counts.createNode;
     expect(safeArea().props.accessibilityLabel).toBe('before');
@@ -164,11 +165,11 @@ describe('Solid SafeAreaView on the engine', () => {
   it('mounts a child that first appears after mount', async () => {
     const [shown, setShown] = createSignal(false);
     mount(ROOT_TAG, () => (
-      <SafeAreaView>
+      <safe-area-view>
         <Show when={shown()}>
-          <View testID="late" />
+          <view testID="late" />
         </Show>
-      </SafeAreaView>
+      </safe-area-view>
     ));
     await tick();
     expect(committed(n => n.props.testID === 'late')).toBeUndefined();
@@ -185,7 +186,7 @@ describe('Solid SafeAreaView on the engine', () => {
   // reader keeps announcing a label the app already removed — green in every other test here.
   it('clears a folded accessibility prop when its aria alias goes undefined', async () => {
     const [label, setLabel] = createSignal<string | undefined>('screen');
-    mount(ROOT_TAG, () => <SafeAreaView aria-label={label()} />);
+    mount(ROOT_TAG, () => <safe-area-view aria-label={label()} />);
     await tick();
     expect(safeArea().props.accessibilityLabel).toBe('screen');
 

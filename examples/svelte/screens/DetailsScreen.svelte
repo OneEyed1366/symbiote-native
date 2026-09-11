@@ -3,7 +3,6 @@
   // proves push/pop, the native header (title from options, back button/back-title), and
   // route.params round-tripping through the navigator handle. Svelte twin of
   // examples/vue-sfc/screens/DetailsScreen.vue.
-  import { SafeAreaView, Text, View } from '@symbiote-native/svelte';
   import {
     useRoute,
     useStackNavigation,
@@ -27,18 +26,18 @@
   });
 </script>
 
-<SafeAreaView class="screen">
-  <View class="section">
-    <Text class="section-label">Navigation demo · Details screen</Text>
-    <Text class="info-text">{`route.params: ${paramsLabel}`}</Text>
-    <Text class="info-text">
+<safe-area-view class="screen">
+  <view class="section">
+    <text class="section-label">Navigation demo · Details screen</text>
+    <text class="info-text">{`route.params: ${paramsLabel}`}</text>
+    <text class="info-text">
       {`canGoBack: ${navigation.current.canGoBack()}`}
-    </Text>
+    </text>
     <ActionButton
       testID="nav-pop"
       title="← Pop back"
       onPress={() => navigation.current.pop()}
       color={LINE_COLOR.primitives}
     />
-  </View>
-</SafeAreaView>
+  </view>
+</safe-area-view>

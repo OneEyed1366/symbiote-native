@@ -14,7 +14,6 @@
 -->
 <script setup lang="ts">
 import { ref, defineComponent, onActivated, onDeactivated, h } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 
 type ITabId = 'a' | 'b' | 'c';
@@ -34,12 +33,16 @@ function makeTab(id: ITabId, color: string) {
       });
       return () =>
         h(
-          View,
+          'view',
           { class: 'a11y-card', style: { borderWidth: 1, borderColor: color } },
           [
-            h(Text, { class: 'switch-label' }, () => `Tab ${id.toUpperCase()}`),
             h(
-              Text,
+              'text',
+              { class: 'switch-label' },
+              () => `Tab ${id.toUpperCase()}`,
+            ),
+            h(
+              'text',
               { class: 'note-text' },
               () =>
                 `activated ${activations.value} time(s) · currently ${active.value ? 'active' : 'mounted, not focused'}`,
@@ -63,12 +66,12 @@ const cacheEnabled = ref(true);
 </script>
 
 <template>
-  <View class="section-tight">
-    <Text class="section-label"
+  <view class="section-tight">
+    <text class="section-label"
       >&lt;KeepAlive&gt; + onActivated/onDeactivated + &lt;component
-      :is&gt;</Text
+      :is&gt;</text
     >
-    <View class="row-tight">
+    <view class="row-tight">
       <ActionButton
         v-for="id in TAB_IDS"
         :key="id"
@@ -77,7 +80,7 @@ const cacheEnabled = ref(true);
         :onPress="() => (activeTab = id)"
         :color="TAB_COLOR"
       />
-    </View>
+    </view>
     <ActionButton
       testID="keepalive-cache-toggle"
       :title="
@@ -90,5 +93,5 @@ const cacheEnabled = ref(true);
       <component :is="tabs[activeTab]" :key="activeTab" />
     </KeepAlive>
     <component :is="tabs[activeTab]" :key="activeTab" v-else />
-  </View>
+  </view>
 </template>

@@ -72,9 +72,8 @@ function listOf(rows: number, windowSize: number): ReactElement {
       index,
     }),
     windowSize,
-    ItemSeparatorComponent: () => createElement('symbiote-text', {}, 'divider'),
-    renderItem: ({ item }) =>
-      createElement('symbiote-text', {}, `row-${item.id}`),
+    ItemSeparatorComponent: () => createElement('text', {}, 'divider'),
+    renderItem: ({ item }) => createElement('text', {}, `row-${item.id}`),
   });
 }
 

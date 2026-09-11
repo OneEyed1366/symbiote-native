@@ -72,9 +72,5 @@ export function renderInputAccessoryView(
   dlog('InputAccessoryView -> RCTInputAccessoryView');
 
   // Empty structural children: the adapter appends the user children directly under the host.
-  return el(
-    'symbiote-input-accessory-view',
-    mapInputAccessoryViewProps(view),
-    [],
-  );
+  return el('input-accessory-view', mapInputAccessoryViewProps(view), []);
 }

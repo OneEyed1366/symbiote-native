@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { SafeAreaView, Text, TextInput, View } from '@symbiote-native/react';
 import { ActionButton } from '../components/ActionButton';
 import { resolveRouteFromUrl } from '@symbiote-native/navigation';
 import {
@@ -27,37 +26,37 @@ export function DeepLinkingScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
 
   return (
-    <SafeAreaView className="screen">
-      <View className="section">
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View
+    <safe-area-view className="screen">
+      <view className="section">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view
             className="hero-badge"
             style={{ backgroundColor: LINE_COLOR.routing }}
           >
-            <Text className="hero-badge-text">DL</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Deep linking</Text>
-            <Text className="hero-body">
+            <text className="hero-badge-text">DL</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Deep linking</text>
+            <text className="hero-body">
               A typed URL resolved to a route through resolveRouteFromUrl, the
               same path a real deep link or push notification would take.
-            </Text>
-          </View>
-        </View>
-        <Text className="info-text">
+            </text>
+          </view>
+        </view>
+        <text className="info-text">
           prefixes: symbiotecanary:// · https://canary.symbiote-native.dev
-        </Text>
-        <Text className="note-text">
+        </text>
+        <text className="note-text">
           Details → details/:id · HeaderOptions → header-options · TabsDemo →
           tabs
-        </Text>
-        <TextInput
+        </text>
+        <text-input
           testID="deep-link-input"
           value={url}
-          onValueChange={setUrl}
+          onValueChange={event => setUrl(event.text)}
           placeholder="symbiotecanary://details/42"
           placeholderTextColor="#41506a"
           className="text-input"
@@ -68,12 +67,12 @@ export function DeepLinkingScreen() {
           onPress={onResolve}
           color={LINE_COLOR.routing}
         />
-        <View className="parity-list">
-          <Text testID="deep-link-result" className="list-row-text">
+        <view className="parity-list">
+          <text testID="deep-link-result" className="list-row-text">
             {resolved ?? 'tap Resolve to see the parsed route'}
-          </Text>
-        </View>
-      </View>
-    </SafeAreaView>
+          </text>
+        </view>
+      </view>
+    </safe-area-view>
   );
 }

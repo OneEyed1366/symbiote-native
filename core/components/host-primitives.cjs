@@ -1,36 +1,33 @@
-// The lowering SPEC — one description of which primitives compile to an intrinsic tag, what each
-// folds, and when a transform must refuse. Data only: no AST, no framework, no code to share.
+// The PRIMITIVE SPEC — one description of which intrinsic tag each primitive is, what it folds,
+// and which of its two Fabric views a prop selects. Data only: no AST, no framework, no code.
 //
-// WHY IT IS A `.cjs` AND NOT PART OF `src/`. Its consumers are Babel plugins and Metro
-// transformers (`adapters/vue/metro-vue-transformer.cjs`, `adapters/{vue,solid}/babel-lower-host-
-// primitives.cjs`), which run before any TS exists and cannot import from `src/`. That constraint
-// is why the map was copied per adapter in the first place — `adapters/vue/src/components.ts`
-// says so out loud: "keeps its own copy of this map (a .cjs cannot import from here)".
+// WHY IT IS A `.cjs` AND NOT PART OF `src/`. Its consumers include build-tool files that run
+// before any TS exists and cannot import from `src/` — `adapters/vue/intrinsic-tags.cjs`, which
+// both Vue compilers read to answer element-vs-component. That constraint is why the map was
+// copied per adapter in the first place.
 //
 // WHAT IT DOES NOT UNIFY, stated here so nobody hunts for a contradiction that is not one: this
-// says WHAT a fold is, never WHICH LAYER applies it. Svelte folds Text's defaults at compile time
-// because a lowered `symbiote-text` has no wrapper left to do it; Vue and Solid apply the same
-// fold at runtime in their renderers, where the wrapper used to. Both are correct.
+// says WHAT a fold is, never WHICH LAYER applies it. Svelte folds Text's defaults in its DOM shim;
+// Vue and Solid apply the same fold in their renderers. Both are correct.
 //
 // Four transforms carried their own copy of this before it existed, and it had already produced a
 // real behaviour split — see `aliases` below.
 
-// `intrinsicWhen` DECLARED AHEAD OF ITS FIRST ENTRY, like the refusal categories below it.
+// `intrinsicWhen` DECLARED AHEAD OF ITS FIRST ENTRY.
 //
 // WHAT IT IS FOR. `TextInput` is the first primitive whose TAG depends on a prop: `multiline`
-// selects between two different Fabric views, `symbiote-text-input` and
-// `symbiote-text-input-multiline` (`src/view/render-text-input.ts:33`), not between two values of
-// one view. A transform prints a static tag, so it can resolve the choice only for a literal.
+// selects between two different Fabric views, `text-input` and
+// `text-input-multiline` (`src/view/render-text-input.ts:33`), not between two values of
+// one view. `src/resolve-intrinsic.ts` reads it at element creation, where the value is known.
 //
 // ONE selector and ONE alternative, deliberately — not a map and not a list. There is exactly one
 // such prop in the whole surface, and a wider field would be invented rather than needed. Absent
 // `intrinsicWhen` means "one tag", so no existing entry changes.
 //
-// THE ACCEPTED STATIC FORMS ARE THREE, and the boundary is IDENTITY, not truthiness: a bare
-// attribute is `true`, an explicit boolean literal is itself, absence is `false`. Everything else
-// refuses — including a truthy non-boolean literal like `multiline={1}`, which a type-shaped check
-// would wave through. The spec types the selector as a boolean; guessing past that is exactly how a
-// silently wrong native view gets committed, and no later prop write can correct one.
+// THE BOUNDARY IS IDENTITY, not truthiness: only `true` picks the alternative, and a truthy
+// non-boolean like `multiline={1}` does not. The spec types the selector as a boolean; guessing
+// past that commits the wrong native view, and no later prop write moves a node between views.
+//
 // THE TYPEDEF BELOW IS NOT WHAT TYPESCRIPT READS. `host-primitives.d.cts` is a hand-written
 // declaration file, and a field added here and not there compiles fine in every `.cjs` transform
 // while failing `tsc` in the one consumer written in TypeScript — measured 2026-08-31, when
@@ -60,7 +57,7 @@
 // Svelte rename at COMPILE time inside the lowering transform; Vue applies it at RUNTIME
 // (`PROP_ALIASES` in `adapters/vue/src/renderer/index.ts`, in `patchProp`) because Vue has FOUR
 // paths to a node — lowered SFC, lowered TSX, the component wrapper, and a hand-written
-// `h('symbiote-view', {id})` — and compile time only covers two of them. A transform reading this
+// `h('view', {id})` — and compile time only covers two of them. A transform reading this
 // spec must therefore not assume it owns the fold. Applying it at both layers happens to be
 // harmless here (the rename deletes `id`, so the second pass sees nothing), but that is a property
 // of THIS alias, not a licence.
@@ -75,12 +72,12 @@ const ID_ALIAS = { id: 'nativeID' };
 /** @type {Record<string, IHostPrimitive>} */
 const HOST_PRIMITIVES = {
   View: {
-    intrinsic: 'symbiote-view',
+    intrinsic: 'view',
     aliases: ID_ALIAS,
     defaults: {},
   },
   // The five-way switch, thrown 2026-08-23 once all three transforms carried the refusals
-  // (`observesState` below). `symbiote-pressable` resolves to the SAME `RCTView` a plain view does
+  // (`observesState` below). `pressable` resolves to the SAME `RCTView` a plain view does
   // — the tag exists only so the host-behavior registry, which is keyed by TAG and never by
   // resolved name, can find the press machine.
   //
@@ -89,12 +86,51 @@ const HOST_PRIMITIVES = {
   // time. (This read "No aliases and no defaults" while the line below already said `ID_ALIAS`, and
   // a Solid test injected a `Pressable` entry with `aliases: {}` on the strength of it.)
   Pressable: {
-    intrinsic: 'symbiote-pressable',
+    intrinsic: 'pressable',
     aliases: ID_ALIAS,
     defaults: {},
     // Turns on `stateInTemplate` and `renderPropChild`. Without them a render-prop button becomes
     // a tag with no machine — the whole reason this entry landed last.
     observesState: true,
+  },
+  // The three that were WITHHELD until their wrappers collapsed, landed 2026-09-11 now that none
+  // exists on any adapter. The condition the old note stated — "it lands when the wrappers collapse
+  // to a forwarder over the tag" — was met by deleting them outright.
+  //
+  // What the entry buys, since the tag and its behavior already worked without one: a hand-written
+  // `<scroll-view>` was resolving as a COMPONENT on Vue, because `adapters/vue/intrinsic-tags.cjs`
+  // derives its element set from this table and both Vue compilers read it. Missing here, the tag
+  // cost a dev-mode resolve warning per element plus the component codegen path — a slot closure
+  // instead of `_createElementBlock`.
+  //
+  // `aliases: ID_ALIAS` even though each behavior's own `foldPayload` already renames `id`. The
+  // two COMPOSE: `foldHostBag` deletes the source key, so the behavior's fold finds no `id` and is
+  // a no-op. Measured on the committed payload rather than reasoned, both arms identical — the
+  // check `adapter-parity-audit.md` demands before declining a majority value, run in the
+  // direction of accepting one.
+  TouchableOpacity: {
+    intrinsic: 'touchable-opacity',
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
+  TouchableHighlight: {
+    intrinsic: 'touchable-highlight',
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
+  // The second primitive whose TAG depends on a prop, and the first where the prop is one RN's own
+  // API takes (`<ScrollView horizontal>`): the axis is a SEPARATE native ViewManager, not a flag on
+  // one view (`behaviors/scroll-view/shared.ts:131`). So an app may write either spelling and
+  // `resolveIntrinsicTag` picks the view, which is also what puts `horizontal-scroll-view` into
+  // Vue's element set — a tag apps write directly and which would otherwise resolve as a component.
+  ScrollView: {
+    intrinsic: 'scroll-view',
+    aliases: ID_ALIAS,
+    defaults: {},
+    intrinsicWhen: {
+      prop: 'horizontal',
+      intrinsic: 'horizontal-scroll-view',
+    },
   },
   // Landed 2026-08-31, on the second attempt. The first threw the switch with the runtime half
   // unwired and was reverted the same hour; both gaps it exposed are closed here, and the record is
@@ -105,20 +141,20 @@ const HOST_PRIMITIVES = {
   //    the three that lower. React and Angular have no lowering transform, so no lowered node ever
   //    exists there and neither carries a `register.ts` — the same reason they skip Pressable's.
   //
-  // 2. The component path no longer shares these tags. It renders `symbiote-text-input-managed`
+  // 2. The component path no longer shares these tags. It renders `text-input-managed`
   //    (`component-names/shared.ts`), because the registry is keyed by TAG and the wrappers run the
   //    same machine in their own lifecycle — one shared tag would have installed both copies on a
   //    wrapper-built node and fired `setInputFocused` twice per focus.
   TextInput: {
-    intrinsic: 'symbiote-text-input',
+    intrinsic: 'text-input',
     aliases: ID_ALIAS,
     defaults: {},
     // `multiline` picks between two SEPARATE native views, not one view with a flag, so the tag is
     // decided at compile time and a runtime selector must refuse — a wrong view here is
-    // uncorrectable by any later prop write. `REFUSAL_CATEGORIES.dynamicIntrinsicChoice`.
+    // uncorrectable by any later prop write.
     intrinsicWhen: {
       prop: 'multiline',
-      intrinsic: 'symbiote-text-input-multiline',
+      intrinsic: 'text-input-multiline',
     },
   },
   // Landed 2026-09-01, same order as TextInput and Image: runtime half built
@@ -129,7 +165,7 @@ const HOST_PRIMITIVES = {
   // `-managed` twin, same reason as TextInput: the behavior carries a machine (mirrors the last
   // value native reported, sends a platform snap-back command on disagreement), so a wrapper-built
   // node — which already runs that same machine in its own lifecycle — must not also get the
-  // engine's copy. `render-switch.ts` emits `symbiote-switch-managed`; this key's `intrinsic` is
+  // engine's copy. `render-switch.ts` emits `switch-managed`; this key's `intrinsic` is
   // the bare tag the behavior registry attaches to.
   //
   // IDEMPOTENCE OF THE FOLD IS MOOT HERE FOR A DIFFERENT REASON THAN IMAGE'S. Image's entry has no
@@ -137,7 +173,7 @@ const HOST_PRIMITIVES = {
   // idempotence is what makes that safe — asserted, not assumed. Switch's fold is NOT trivial (it
   // maps `trackColor`/`thumbColor`/`ios_backgroundColor` to native prop names, keyed on
   // `Platform.OS`) and running it twice would NOT be a no-op — but the question never arises: the
-  // `-managed` split means only the bare `symbiote-switch` tag ever carries this behavior, and the
+  // `-managed` split means only the bare `switch` tag ever carries this behavior, and the
   // wrapper never emits that tag, so no node's payload ever passes through this fold more than
   // once. Unreachable by construction, not idempotent by property — the same distinction
   // TextInput's own entry draws for its fold.
@@ -147,12 +183,43 @@ const HOST_PRIMITIVES = {
   // `stateInTemplate` nor `renderPropChild` applies — unlike Pressable, whose machine is what
   // forced that flag.
   Switch: {
-    intrinsic: 'symbiote-switch',
+    intrinsic: 'switch',
     aliases: ID_ALIAS,
     defaults: {},
   },
+  // Filed as NOT LOWERABLE for a week under `.claude/rules/host-primitive-tier.md`'s "SECOND
+  // disqualifier" — its own node is a single element, but its POSITION is decided by the ScrollView
+  // and differs per platform (iOS a sibling before the content view, Android the scroll view's
+  // PARENT), and a per-node behavior cannot own a decision another component makes.
+  //
+  // That is settled and it was settled elsewhere: the ScrollView states the placement as DATA
+  // (`claimedChildren: { [REFRESH_CONTROL]: platform.claimMode }`, `behaviors/scroll-view/shared.ts`)
+  // and the ENGINE moves the node in `appendChild`. So the claim needs nothing from this primitive's
+  // own behavior — verified on a bare node with no wrapper anywhere, both platforms, in
+  // `behaviors/refresh-control.test.ts`.
+  //
+  // What the behavior owes is therefore only the CONTROLLED HANDSHAKE, and no fold at all: four of
+  // the five wrappers folded exactly `resolveAccessibilityProps`, which the engine already runs at
+  // `fabricProps` on every path — the same reason SafeAreaView has no behavior file.
+  //
+  // ID_ALIAS, and it is the SafeAreaView resolution rather than the SafeAreaView position: none of
+  // the five wrappers declared `id`, and upstream's RefreshControl spreads `...ViewProps`
+  // (RefreshControl.js:70), so that was a standing parity gap rather than a deliberate omission.
+  // The prop is declared on all five in the same change as this alias — half of it in either
+  // direction is broken (a fold for a key nobody can pass, or a raw `id` reaching a view whose
+  // ViewConfig declares none).
+  //
+  // No `-managed` twin: the behavior carries a machine, so it needs one owner per node, and it has
+  // one — the wrappers forward to this tag and none of them runs a mirror any more.
+  RefreshControl: {
+    intrinsic: 'refresh-control',
+    aliases: ID_ALIAS,
+    // None. RN seeds nothing: `refreshing` is required, and every other prop is per-platform
+    // styling the native view defaults itself.
+    defaults: {},
+  },
   Text: {
-    intrinsic: 'symbiote-text',
+    intrinsic: 'text',
     aliases: ID_ALIAS,
     // RN's Text.js applies both unconditionally on the non-virtual path. Each key below cites
     // the upstream line verbatim, because THIS DATA is now the thing that must not drift from RN.
@@ -184,8 +251,27 @@ const HOST_PRIMITIVES = {
   // proven against the wrapper's payload. Adding this key is what makes every transform start
   // lowering `Image` at once, so a fold that had not landed would surface as a raw `src` reaching
   // Fabric — a key no ViewConfig declares, which throws nothing and paints nothing.
+  // THE ENTRY IS NOT OPTIONAL HERE, and the reason has nothing to do with folds: this table is what
+  // `adapters/vue/intrinsic-tags.cjs` derives element-vs-component from, and a hyphenated tag it
+  // does not name compiles to `resolveComponent("image-background")` — children become a slot the
+  // element path never reads, so the subtree renders BLANK with no error. `image`/`view`/`text` are
+  // real SVG element names and survive that gap; this one is not.
+  //
+  // `aliases: ID_ALIAS` was MEASURED against the arm without it rather than reasoned about, because
+  // `behaviors/image-background.ts` folds `id` itself on the built image. Both arms commit
+  // `nativeID` on the image and no `id` anywhere, and the two compose because an alias DELETES its
+  // source key — so the second pass finds nothing. Kept for the property `foldHostBag` provides and
+  // the behavior cannot: the rename happens on the OWNER bag, before the redirect, so any adapter
+  // path that folds bags gets it whether or not the behavior ever runs.
+  ImageBackground: {
+    intrinsic: 'image-background',
+    aliases: ID_ALIAS,
+    // None. The absolute-fill style, the box-dimension proxy and the Image mapping are all derived
+    // from live props at commit, which a compile-time seed cannot express.
+    defaults: {},
+  },
   Image: {
-    intrinsic: 'symbiote-image',
+    intrinsic: 'image',
     aliases: ID_ALIAS,
     // None. Every default RN's Image applies is already inside the shared mapping (the source
     // array shape, the width/height style fold, `alt` -> accessibilityLabel), which the behavior
@@ -202,7 +288,7 @@ const HOST_PRIMITIVES = {
   // where upstream RN renders nothing at all off iOS. That divergence predates the lowering, is
   // identical on both paths, and is with the owner as its own decision.
   InputAccessoryView: {
-    intrinsic: 'symbiote-input-accessory-view',
+    intrinsic: 'input-accessory-view',
     aliases: ID_ALIAS,
     // None. The mapping has no aliasing and no derived value — every consumed name leaves under the
     // same name — so there is nothing for a compile-time seed to do.
@@ -218,7 +304,7 @@ const HOST_PRIMITIVES = {
   //
   // Counted before writing, which is the only thing standing behind that claim: five
   // implementations, zero shared, none synthesizing a node — each renders ONE
-  // `symbiote-safe-area-view` with children on its framework's own channel (React's third argument,
+  // `safe-area-view` with children on its framework's own channel (React's third argument,
   // a Vue slot, a Solid JSX child, Angular's `<ng-content>`, a Svelte snippet). That clears the
   // disqualifier in `.claude/rules/host-primitive-tier.md`.
   //
@@ -234,7 +320,7 @@ const HOST_PRIMITIVES = {
   // so RN accepts `id` where our wrappers do not. It predates lowering, is identical on both paths,
   // and closing it means adding `id` to five wrappers AND this alias together, never one of the two.
   SafeAreaView: {
-    intrinsic: 'symbiote-safe-area-view',
+    intrinsic: 'safe-area-view',
     // ID_ALIAS was deliberately ABSENT here until 2026-09-01, because none of the five wrappers
     // declared `id` and aliasing on the lowered path alone would have made lowering ADD a fold the
     // component spelling does not perform. That exposed a real divergence — Solid's renderer folds
@@ -251,130 +337,96 @@ const HOST_PRIMITIVES = {
     aliases: ID_ALIAS,
     defaults: {},
   },
+  // The one primitive that commits NO NODE: its intrinsic resolves to the engine's anchor, and the
+  // behavior (`src/behaviors/touchable-native-feedback.ts`) clones the owner's props onto the single
+  // child instead — RN's own shape (TouchableNativeFeedback.js:289,339). Entered in the same commit
+  // that deletes the five wrappers, because the registry is keyed by TAG: a wrapper still emitting
+  // its own `pressable` while the behavior is registered would put two press machines on one tree.
+  //
+  // ID_ALIAS, and it was proposed WITHOUT one on the reasoning that the behavior already reads
+  // `id ?? nativeID` itself (:373) so the shared alias would double-fold. Measured instead of
+  // reasoned (`behaviors/touchable-native-feedback.test.ts`, "folds `id` the same whichever layer
+  // renamed it"): the two compose idempotently — the alias renames on the OWNER, whose props never
+  // reach Fabric, and the behavior's `??` then reads the renamed key to the same answer. Declining
+  // the pair would have bought nothing and broken Solid's constant-pair fast path, whose guard
+  // (`adapters/solid/src/renderer-alias-fold.test.ts`) is what makes one string compare legal on
+  // 32 001 prop writes.
+  //
+  // No `defaults`: RN's TNF seeds nothing at all — every value it derives (`accessible`,
+  // `focusable`, `accessibilityState`, the ripple background) depends on ANOTHER prop or on a
+  // listener, which is a fold and not a default.
+  TouchableNativeFeedback: {
+    intrinsic: 'touchable-native-feedback',
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
+  // The SECOND primitive that commits no node, same anchor shape and same reason
+  // (TouchableWithoutFeedback.js:229,286). Its clone list is not TNF's: the passthrough half is
+  // copied only when SET (:281), there is no ripple, and `onBlur`/`onFocus` are cloned where TNF
+  // drops them — read `src/behaviors/touchable-without-feedback.ts`'s header rather than inheriting
+  // the neighbour's fold.
+  //
+  // ID_ALIAS for the reason measured on TNF: the alias renames on the OWNER, whose props never reach
+  // Fabric, and the behavior's own `id ?? nativeID` then reads the renamed key to the same answer.
+  // Upstream's passthrough loop lets an explicit `nativeID` win over `id` here (:280-284, unlike
+  // TNF's :373); NOT reproduced, because with the alias in place that quirk would depend on which
+  // adapter folds where. No `defaults` — every value TWF derives depends on another prop or on a
+  // listener, which is a fold and not a default.
+  TouchableWithoutFeedback: {
+    intrinsic: 'touchable-without-feedback',
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
+  // RN's Button is a touchable wrapping a View wrapping a Text and takes NO children — `title` is a
+  // string prop (Button.js:363-388) — so the behavior owns the whole subtree and the tag is the
+  // only spelling. Entered in the same commit that deletes the five wrappers: the registry is keyed
+  // by TAG, and a wrapper still building its own View/Text under a registered `button` would give
+  // every existing Button a second copy of the subtree.
+  //
+  // ID_ALIAS, and here it is REQUIRED rather than inherited — the one entry so far where declining
+  // it would have shipped a PLATFORM-DEPENDENT bug. Button's touchable is swapped by platform
+  // (Button.js:281-284), and only one of the two arms renames `id` itself: `touchable-opacity`'s
+  // own `foldPayload` does (it has no spec entry to do it for it), the bare press behavior does not
+  // (`Pressable`'s entry does it instead). Measured on the committed payload, no entry here:
+  //
+  //   iOS      nativeID: 'from-id'   id: absent      the touchable-opacity fold
+  //   Android  nativeID: undefined   id: 'from-id'   a key no ViewConfig declares -> dropped
+  //
+  // So the alias is what makes the two platforms agree, and it composes idempotently with the
+  // iOS-side fold exactly as TNF's does: the rename happens on the bag, so `Object.hasOwn(next,
+  // 'id')` one layer down finds nothing left to do.
+  //
+  // No `defaults`: every value RN's Button seeds is derived from another prop or from a listener
+  // (`accessible`, `focusable`, the greyed label, the uppercased title), which is a fold, not a
+  // default.
+  Button: {
+    intrinsic: 'button',
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
+  // RN wraps the native spinner in a centering `<View>` (ActivityIndicator.js:112), so this tag is
+  // that View and the behavior builds `activity-indicator-spinner` under it. Entered in the same
+  // commit that deletes the five wrappers: the registry is keyed by TAG, and a wrapper still
+  // painting its own spinner while the behavior is registered would give every indicator two.
+  //
+  // ID_ALIAS, and unlike Button's it is not platform-dependent — measured on the committed payload,
+  // both platform arms, with the entry absent:
+  //
+  //   iOS      spinner: id 'probe'   nativeID absent    ActivityIndicatorView declares no `id`
+  //   Android  spinner: id 'probe'   nativeID absent    AndroidProgressBar declares no `id`
+  //
+  // i.e. identically broken on both, because the platform half of this primitive is the spinner's
+  // COLOUR and native extras, and nothing about it touches the name fold. The alias renames on the
+  // OWNER's bag, before `slotPropsExcept` routes the survivor down — so the key that reaches the
+  // spinner is `nativeID`, which is where RN's `...restProps` puts it too (ActivityIndicator.js:99).
+  //
+  // No `defaults`: `animating` and `hidesWhenStopped` ARE `notFalse` folds, but they belong to the
+  // SPINNER, and this table's ops are applied to the tag's own bag before any slot routing. They
+  // live in the behavior's spinner fold instead, which is the only layer that can see that node.
+  ActivityIndicator: {
+    intrinsic: 'activity-indicator',
+    aliases: ID_ALIAS,
+    defaults: {},
+  },
 };
-
-// A transform must refuse — leave the element a component — whenever it hits one of these. The
-// categories are framework-independent; how each compiler DETECTS one is not, and stays in that
-// transform. Modelled on the Svelte preprocessor's set, which is the most developed of the three.
-//
-// Refusing is always safe: a refused element simply keeps today's behaviour. Guessing is not — a
-// half-read attribute set is a silently wrong render, on device only. Design every new category
-// around that asymmetry.
-// A stateful primitive carries `observesState: true`, and that flag is what turns the two refusal
-// categories below ON in a transform. Declared in one place so five transforms agree on the
-// spelling rather than inventing five.
-//
-// ADDING A STATEFUL ENTRY TO HOST_PRIMITIVES IS A FIVE-WAY SWITCH and must be the LAST step. Every
-// transform lowers whatever the spec lists, so an entry that lands before a transform can refuse
-// turns a render-prop button into a tag with no machine: a button that does not press, with nothing
-// red in any suite. `Pressable` was held back for exactly that and thrown only once all three
-// transforms carried the detections — verified by grep for `observesState` in
-// adapters/{solid,vue}/*.cjs and adapters/svelte/src/preprocessor/, not by asking.
-const REFUSAL_CATEGORIES = {
-  // `{...spread}` / `v-bind="obj"` — the attribute set cannot be read whole.
-  unreadableAttributeSet: 'an attribute set this transform cannot enumerate',
-  // A computed or otherwise non-literal attribute KEY.
-  unreadableKey: 'an attribute key this transform cannot resolve to a string',
-  // A value shape the transform cannot reproduce in the lowered form.
-  unreadableValue: 'an attribute value this transform cannot read whole',
-  // `bind:` / `use:` / `{@attach}` / a template ref — binds the COMPONENT INSTANCE, which a
-  // lowered element does not have.
-  instanceBoundDirective:
-    'a directive that binds the component instance, not the host node',
-  // RETIRED 2026-08-31 — `bagFold`, "an attribute whose fold needs to see its siblings (role,
-  // aria-*)". Kept as a comment because the retirement carries two lessons the entry itself never
-  // could.
-  //
-  // WHY IT IS GONE. The aria fold moved into the engine — `core/engine/src/accessibility-props.ts`,
-  // called from `fabricProps`, the one point where the whole bag is known on BOTH commit paths — so
-  // a lowered element gets it exactly like a wrapped one. The premise that a per-key element path
-  // cannot fold a composite was right; the conclusion that a TRANSFORM had to refuse was not. The
-  // fold belongs at the layer every path goes through, not at the one layer lowering removes.
-  //
-  // AND IT WAS NEVER IN FORCE. Measured before removing it: of the four transforms, only Solid's
-  // consulted this category. Vue's two lowered such elements happily and Svelte's preprocessor does
-  // not contain the string `role` at all. So every lowered `aria-label` had been reaching Fabric as
-  // a key no ViewConfig declares — the accessibility label silently dropped, on device only. This
-  // constant is a VOCABULARY, not an enforcement point: writing a category down binds nobody, and
-  // a transform that never consults it breaks nothing visible.
-  //
-  // What replaced it is a ROW, not a rule: `aria-bag-fold` in `lowering-fixtures.cjs`, verdict
-  // `lower`, which every transform's runner must answer. Retiring or adding a category owes a row
-  // there in the same change, or the prose goes unenforced again
-  // (`.claude/rules/adapter-parity-audit.md`).
-  // The two below exist for a STATEFUL primitive (Pressable) and nothing refuses on them yet.
-  // They are declared ahead of the spec entry on purpose: the moment a stateful tag appears in
-  // HOST_PRIMITIVES, every transform lowers it, and a transform that cannot yet refuse lowers a
-  // render-prop button into a tag with no machine — a button that does not press, with nothing
-  // red anywhere. So the spec entry goes in LAST, after all five can refuse, and the names live
-  // here from the start so five detections do not invent five spellings of one rule.
-  //
-  // A functional `style` — `style={({pressed}) => …}`. The TEMPLATE reads the press state, which
-  // is exactly what tier 2 cannot do: the state resolves below the framework, through the style
-  // registry's `:active`, and never crosses back up. The migration target is a `:active` CSS rule,
-  // not a smarter transform (`.claude/rules/host-primitive-tier.md`).
-  //
-  // DETECT IT AS AN ALLOW-LIST, NOT AS A HUNT FOR A FUNCTION LITERAL. All five transforms must land
-  // the same side of this or they diverge on the one call site that hoists its style: `style={fn}`
-  // is an Identifier at compile time and no transform can tell whether it holds an object or a
-  // function. So only provably inert value shapes lower — object / array / literal / template
-  // literal — and everything else refuses. The asymmetry is what settles it: a refused element
-  // keeps exactly today's behaviour, while a wrongly lowered one is a button that renders and does
-  // not respond.
-  stateInTemplate: 'a prop whose value is not provably inert at compile time',
-  // NOT A REFUSAL — kept as a named requirement because it was briefly written as one, and the
-  // difference is worth the paragraph.
-  //
-  // The resting/pressed pair needs the style callback invoked twice. A transform that emits the
-  // guard INLINE — `typeof f === 'function' ? f({pressed:false}) : f` — puts the expression in its
-  // own output three times, so `style={getStyle()}` calls the author's function three times,
-  // `style={bag[i]}` evaluates the index three times, and `style={flag ? a : b}` can take
-  // different branches on different reads. Faced with that, the first instinct is to refuse those
-  // shapes.
-  //
-  // THAT IS THE WRONG FIX, and encoding it in this file would have made one transform's emission
-  // defect a law binding the others. The double read is a property of the EMISSION SHAPE, not of
-  // the expression: wrap once — `resolveStateStyle(expr)` — and the expression is evaluated
-  // exactly once while its RESULT is what gets called twice. All three shapes above then lower and
-  // stay correct.
-  //
-  // So the rule for every transform is: **emit the style expression exactly once**, and assert it
-  // on the output text (`occurrences(out, expr) === 1`) rather than trusting the shape. What
-  // survives as a real contract is only that the callback must be PURE in `pressed` — its result is
-  // invoked twice under any emission.
-  //
-  // Caught by the Svelte session after this had been written here as a refusal and sent to two
-  // adapters; the Vue session found the underlying double-read in the first place.
-  emitStyleExpressionOnce:
-    'REQUIREMENT, not a refusal: wrap the style expression once, never repeat it in the output',
-  // A function child with arity >= 1 — `{({pressed}) => …}`. Same rule, through children rather
-  // than props. Arity ZERO is an ordinary lazy child, not a render prop, and must NOT refuse.
-  renderPropChild:
-    'a function child that takes the primitive own state as an argument',
-  // DECLARED AHEAD OF ITS SPEC ENTRY, the same way the two above were, and for the same reason: the
-  // moment `TextInput` appears in HOST_PRIMITIVES every transform lowers it at once, and one that
-  // cannot yet refuse would pick the WRONG Fabric view. Four detections written against a name that
-  // already exists cannot invent four spellings of one rule.
-  //
-  // `multiline` is the first prop in this project that selects between TWO intrinsics —
-  // `symbiote-text-input` and `symbiote-text-input-multiline` are different Fabric views, not one
-  // view with a flag (`core/components/src/view/render-text-input.ts`). A transform prints a static
-  // tag name, so it can resolve `multiline` only when the value is a literal. `multiline={isLong}`
-  // is a RUNTIME value and there is no tag to print — the element must stay a component.
-  //
-  // NOT the same hazard as an unreadable attribute VALUE. A value the transform cannot read is a
-  // prop that ends up wrong; this one ends up committing the wrong native view, which no prop write
-  // can correct afterwards. Refusing keeps today's behaviour exactly.
-  dynamicIntrinsicChoice:
-    'a prop that selects between two intrinsics and is not a compile-time literal',
-};
-
-// Lowering rewrites `class="x"` into an opaque bag expression, so any pass that matches on literal
-// attributes can no longer see it. Reversed against Svelte's style scoper, every scoped class
-// silently stopped being scoped — nothing threw, the styles just stopped applying on device. The
-// hazard belongs to any transform that folds attributes into an expression, not to Svelte, so it
-// is stated once here as an ordering contract.
-const LOWERING_RUNS_LAST =
-  'lowering is the LAST attribute-rewriting pass in its pipeline';
-
-module.exports = { HOST_PRIMITIVES, REFUSAL_CATEGORIES, LOWERING_RUNS_LAST };
+module.exports = { HOST_PRIMITIVES };

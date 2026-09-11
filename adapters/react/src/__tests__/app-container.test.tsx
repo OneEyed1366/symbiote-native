@@ -1,18 +1,18 @@
 // Proves the synthetic root container, symbiote's equivalent of RN's AppContainer
-// (`renderApplication` wraps the app in `<View style={{flex:1}} pointerEvents="box-none">`):
+// (`renderApplication` wraps the app in `<view style={{flex:1}} pointerEvents="box-none">`):
 // every commit puts a single box-none, flex:1 RCTView at the top of the child set,
 // wrapping the app's own top-level nodes.
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Text, View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 function App(): ReactElement {
   return (
-    <View>
-      <Text>hello</Text>
-    </View>
+    <view>
+      <text>hello</text>
+    </view>
   );
 }
 

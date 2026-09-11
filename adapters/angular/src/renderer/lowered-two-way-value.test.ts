@@ -3,8 +3,9 @@
 // an @Output the component derives rather than a Fabric event.
 //
 // It does not need to be a component: both behaviors already call
-// `node.props.onValueChange(value, event)`, RN's own spelling of the same fold. The renderer routes
-// the binding to that prop, so the two paths agree.
+// `node.props.onValueChange(event)`, RN's own spelling of the same fold, with `text`/`value` carried
+// as a field on the event. The renderer routes the binding to that prop and unwraps the field back
+// to a bare value, so the two paths agree.
 //
 // The oracle is the PARENT's field after a native event, not a spy on the callback: a handler that
 // fires into nothing would pass a spy and still leave `[(value)]` broken.
@@ -32,11 +33,8 @@ const model = { text: '', on: false };
   // Bare intrinsics, no primitive imported: a component in scope would take the tag back through
   // the dual selector and this would silently measure the wrapper instead.
   template: `
-    <symbiote-text-input
-      testID="input"
-      [(value)]="state.text"
-    ></symbiote-text-input>
-    <symbiote-switch testID="toggle" [(value)]="state.on"></symbiote-switch>
+    <text-input testID="input" [(value)]="state.text"></text-input>
+    <switch testID="toggle" [(value)]="state.on"></switch>
   `,
 })
 class TwoWayHost {

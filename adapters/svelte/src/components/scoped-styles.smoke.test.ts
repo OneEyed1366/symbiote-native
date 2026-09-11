@@ -9,10 +9,8 @@
 //   2. scoping is REAL — two components each defining their own `.card` do not bleed into each
 //      other, even though the class registry is one flat global Map.
 //
-// Harness shape and its three gotchas are §15 of the svelte-adapter-dom-shim skill. The compiled
-// output is written NEXT TO the real source (not an isolated temp dir) because the compiled
-// `View.svelte` keeps its own relative `../runes/attachments` import, and every variant gets its
-// OWN filename because Node's `import()` caches by path.
+// Harness shape and its three gotchas are §15 of the svelte-adapter-dom-shim skill. Every variant
+// gets its OWN filename because Node's `import()` caches by path.
 //
 // Coverage ledger:
 //   - the preprocessor's TEXT-level rewrite (suffixing, `:global()`, kebab matching, the dynamic
@@ -39,7 +37,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -53,7 +51,6 @@ if (globalThis.navigator === undefined) {
 }
 
 const ROOT_TAG = 91_003;
-const VIEW_OUT = join(__dirname, '.smoke-compiled-scoped-view.mjs');
 const CARD_A_OUT = join(__dirname, '.smoke-compiled-scoped-card-a.mjs');
 const CARD_B_OUT = join(__dirname, '.smoke-compiled-scoped-card-b.mjs');
 const DYNAMIC_OUT = join(__dirname, '.smoke-compiled-scoped-dynamic.mjs');
@@ -64,7 +61,6 @@ const PARTIAL_GLOBAL_OUT = join(
 );
 const PARENT_OUT = join(__dirname, '.smoke-compiled-scoped-parent.mjs');
 const OUTPUTS = [
-  VIEW_OUT,
   CARD_A_OUT,
   CARD_B_OUT,
   DYNAMIC_OUT,
@@ -130,31 +126,22 @@ function findLive(nativeID: string): IFakeNode | undefined {
   return walk(fabric.appRoot().children);
 }
 
-const VIEW_IMPORT = "import View from './.smoke-compiled-scoped-view.mjs';";
-
-const CARD_A = `<script>
-  ${VIEW_IMPORT}
-</script>
-<View class="card" nativeID="a" />
+const CARD_A = `<view class="card" nativeID="a"></view>
 <style>
   .card { padding: 12px; background-color: #262626; }
 </style>
 `;
 
-const CARD_B = `<script>
-  ${VIEW_IMPORT}
-</script>
-<View class="card" nativeID="b" />
+const CARD_B = `<view class="card" nativeID="b"></view>
 <style>
   .card { padding: 3px; }
 </style>
 `;
 
 const DYNAMIC = `<script>
-  ${VIEW_IMPORT}
   let { on = false } = $props();
 </script>
-<View class={['boxed', on && 'lit']} nativeID="d" />
+<view class={['boxed', on && 'lit']} nativeID="d"></view>
 <style>
   .boxed { padding: 7px; }
   .lit { color: #ffffff; }
@@ -166,12 +153,11 @@ const DYNAMIC = `<script>
 // `.card.big` selector's tokens, and the registered key `cardBig__<scope>` is reachable only
 // because the runtime factors the shared suffix back out of `card__<scope> big__<scope>`.
 const COMPOUND = `<script>
-  ${VIEW_IMPORT}
   let { big = false } = $props();
 </script>
-<View class="card" nativeID="plain" />
-<View class="card big" nativeID="compound" />
-<View class={['card', big && 'big']} nativeID="dyn" />
+<view class="card" nativeID="plain"></view>
+<view class="card big" nativeID="compound"></view>
+<view class={['card', big && 'big']} nativeID="dyn"></view>
 <style>
   .card { padding: 8px; background-color: #262626; }
   .card.big { padding: 16px; }
@@ -182,29 +168,19 @@ const COMPOUND = `<script>
 // The two halves are suffixed differently on purpose — the registered key `cardLegacy__<scope>`
 // as a whole, the markup token `legacy` not at all — so this is the arrangement that proves the
 // build-time exemption and the runtime lookup still meet.
-const PARTIAL_GLOBAL = `<script>
-  ${VIEW_IMPORT}
-</script>
-<View class="card legacy" nativeID="partial" />
-<View class="card" nativeID="own" />
+const PARTIAL_GLOBAL = `<view class="card legacy" nativeID="partial"></view>
+<view class="card" nativeID="own"></view>
 <style>
   .card { padding: 8px; background-color: #262626; }
   .card :global(.legacy) { margin: 4px; }
 </style>
 `;
 
-// The real `View.svelte` is compiled once next to its own source, so its relative
-// `../runes/attachments` import still resolves, and every fixture imports THAT file.
 async function buildFixture(
   source: string,
   name: string,
   outPath: string,
 ): Promise<void> {
-  await compileToFile(
-    readFileSync(join(__dirname, 'View.svelte'), 'utf8'),
-    'View.svelte',
-    VIEW_OUT,
-  );
   await compileToFile(source, `${name}.svelte`, outPath);
 }
 

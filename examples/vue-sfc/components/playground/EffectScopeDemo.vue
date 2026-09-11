@@ -14,7 +14,6 @@ import {
   watchEffect,
   type EffectScope,
 } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 
 // Only meaningful when read synchronously during setup() — a component's own setup() runs
@@ -58,14 +57,14 @@ function bumpTicks(): void {
 </script>
 
 <template>
-  <View class="a11y-card">
-    <Text class="switch-label"
-      >effectScope + getCurrentScope + onScopeDispose</Text
+  <view class="a11y-card">
+    <text class="switch-label"
+      >effectScope + getCurrentScope + onScopeDispose</text
     >
-    <Text class="note-text" testID="effectscope-had-scope">{{
+    <text class="note-text" testID="effectscope-had-scope">{{
       `getCurrentScope() at setup() !== undefined: ${hadScopeAtSetup}`
-    }}</Text>
-    <View class="row-tight">
+    }}</text>
+    <view class="row-tight">
       <ActionButton
         testID="effectscope-start"
         title="start scope"
@@ -84,9 +83,9 @@ function bumpTicks(): void {
         :onPress="bumpTicks"
         color="#f5a623"
       />
-    </View>
-    <Text v-for="(entry, index) in log" :key="index" class="list-row-text">{{
+    </view>
+    <text v-for="(entry, index) in log" :key="index" class="list-row-text">{{
       entry
-    }}</Text>
-  </View>
+    }}</text>
+  </view>
 </template>

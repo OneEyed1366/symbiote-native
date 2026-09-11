@@ -9,11 +9,7 @@
 // ignore parameters it doesn't need, so a plain `{#snippet children()}` block (never reading
 // `pressed`) satisfies this type exactly as well as one that does.
 import type { Snippet } from 'svelte';
-import type {
-  IClassNameValue,
-  IStyleProp,
-  IViewStyle,
-} from '@symbiote-native/engine';
+import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import type {
   IAccessibilityProps,
   IAriaProps,
@@ -39,6 +35,10 @@ export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   onLongPress?: IPressHandler;
   delayLongPress?: number;
   disabled?: boolean;
+  // Whether a non-touch input device (hardware keyboard, TV remote) may focus this. Resolved
+  // rather than forwarded — `behaviors/pressable.ts`'s fold applies RN's Pressable.js:258 default,
+  // and a Touchable* resolves the three-leg form before handing it down.
+  focusable?: boolean;
   // false refuses to yield the responder when another view (e.g. a parent ScrollView) asks to
   // take over. RN forwards this to onResponderTerminationRequest, default true.
   cancelable?: boolean;

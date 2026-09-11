@@ -31,7 +31,7 @@ const tick = (): Promise<void> =>
 
 class TestText {}
 Component({
-  selector: 'symbiote-text',
+  selector: 'text',
   standalone: true,
   template: '<ng-content></ng-content>',
 })(TestText);
@@ -41,7 +41,7 @@ Component({
   selector: 'symbiote-app-registry-smoke',
   standalone: true,
   imports: [TestText],
-  template: '<symbiote-text>hi</symbiote-text>',
+  template: '<text>hi</text>',
 })(SmokeComponent);
 
 class WrapperComponent {
@@ -51,8 +51,7 @@ Component({
   selector: 'symbiote-app-registry-wrapper',
   standalone: true,
   imports: [TestText],
-  template:
-    '<symbiote-text>{{ label }}</symbiote-text><ng-content></ng-content>',
+  template: '<text>{{ label }}</text><ng-content></ng-content>',
 })(WrapperComponent);
 
 const fabric = installFabric();

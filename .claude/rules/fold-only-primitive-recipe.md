@@ -48,6 +48,20 @@ Lowering a composition would need a behavior that CREATES a child — new engine
 child-creating behavior is a machine, which fails check (2) below anyway. Treat "the render fn
 returns a tree" as "not in this batch", not as "needs a bigger fold".
 
+**The last paragraph aged out on 2026-09-09, and the sentence that survived it is the one before.**
+`IHostBehavior.buildStructure` IS that new engine surface — it landed for ScrollView, and
+`core/components/src/behaviors/activity-indicator/` is now built on it, spinner and centering
+container both. The prediction that a child-creating behavior must be a machine was also wrong:
+this one owns no timer, no listener and no native handshake, so its `attach`/`detach` are empty and
+the whole thing is two `payloadFold`s plus a `slotProps` redirect.
+
+What still holds is the FIRST half — "MANUFACTURING a container is a disqualification" is a correct
+statement about a FOLD-ONLY recipe, which is what this file is. A composed primitive is simply not
+fold-only; it is a `buildStructure` primitive, a category that did not exist when this was written.
+So the row belongs in a different batch, not out of scope. `.claude/rules/host-primitive-tier.md`'s
+own disqualifier section carries the general form: an impossibility claim owes a subject and a
+phase, or it reads as permanent and scopes work down with nothing ever going red.
+
 ### And a per-platform view NAME does not imply a platform-invariant fold — on ActivityIndicator both differ
 
 **This was assumed the other way and the assumption was wrong**, which is why the step says check
@@ -104,24 +118,33 @@ unknown>` into the typed view and calls `mapImageProps` — the `stringOf` / `bo
 `IHostBehavior` and are deliberately empty; write them out rather than sharing a `noop`, so the
 emptiness reads as a decision.
 
-## 4. THE TAG QUESTION, and it has two answers — decide it with a test, not a precedent
+## 4. THE TAG QUESTION — and there is only ONE tag. Never mint a second
 
 A behavior's fold is keyed on the tag, and `fabricProps` warns why that matters: a wrapper and its
 lowered twin share the component name, so a fold registered on a tag the wrapper also emits runs on
-ALREADY-FOLDED props. TextInput answered this with a `-managed` tag for the wrapper. Image does not
-need one — and the two questions that decide it are separate:
+ALREADY-FOLDED props.
+
+**A SECOND TAG IS NOT AN AVAILABLE ANSWER TO THAT.** Three exist in the tree — the TextInput pair
+and `symbiote-switch-managed` — and they are debt with a deletion date, not a technique: each one
+exists only to keep two owners apart while a wrapper and a lowered element both emit a tag, and this
+migration is removing the wrapper, which removes the second owner. Minting another buys a rename
+across every call site now and a second rename when the wrapper dies. If a fold cannot safely run
+twice, fix the FOLD or move the work into the behavior; if a machine needs a single owner, delete
+the wrapper rather than giving it a private spelling.
+
+The question that remains is therefore about the fold alone, and it is settled by a test:
 
 ```
-1. is the fold idempotent?              no  -> the wrapper needs its own `-managed` tag
-2. does the behavior carry a MACHINE?   yes -> it needs one anyway, idempotent or not
+is the fold idempotent?   no -> make it idempotent, or the primitive is not fold-only
 ```
 
-**Do not infer (1) from TextInput's split; its answer is (2).** Measured 2026-09-01 by reaching
+Measured 2026-09-01 by reaching
 `node.payloadFold` off a real `symbiote-text-input` node and running it twice: TextInput's fold IS
-idempotent — it deletes its alias-only keys and derives the rest. Its split exists because the
-behavior owns `change`/`focus`/`blur` and carries `attach` / `attachAfterCommit` / `afterCommit`,
-so sharing the tag would attach a live machine to a node whose wrapper is already running one.
-Solid's `register.ts` states the rule: one owner per node.
+idempotent — it deletes its alias-only keys and derives the rest. So the second tag it carries was
+never about the fold: the behavior owns `change`/`focus`/`blur` and carries `attach` /
+`attachAfterCommit` / `afterCommit`, and one tag would have put a live machine on a node whose
+wrapper was already running one. Solid's `register.ts` states the rule that matters: one owner per
+node — which the wrapper's deletion satisfies without any tag at all.
 
 Image's mapping is idempotent by construction — every alias it consumes (`src`, `srcSet`, `alt`,
 `width`, `height`) is absent from its own output, `source` comes back in the array shape
@@ -137,9 +160,22 @@ across ~50 call sites and keeps ONE fold implementation for both paths.
 
 ## 5. Register it — and note who registers
 
-`adapters/{angular,solid,svelte,vue}/src/register.ts`, one call each. **React registers nothing** and
-does not need to: it folds in its host config via `foldHostBag`. A new fold-only primitive therefore
-touches four files, not five, and a recipe that says "every adapter" is wrong.
+**All FIVE `adapters/*/src/register.ts`, one call each.** This section read "React registers
+nothing and does not need to: it folds in its host config via `foldHostBag`" — true when it was
+written and false since `adapters/react/src/register.ts` landed, whose own header says React "had no
+registration at all until this file" and that every bare tag committed inert without it. `foldHostBag`
+is the ALIAS/DEFAULT half only; a behavior's `foldPayload`, machine and hooks come from the registry
+and nothing else.
+
+It was relayed as fact into a work brief on 2026-09-09 and cost a round. **The check is one command,
+and it beats any prose in this file:**
+
+```bash
+ls adapters/*/src/register.ts
+```
+
+Five paths is the answer. Same instrument this repo prescribes everywhere else — count the members
+against what is on disk rather than against a sentence.
 
 ## 6. Prove it before the key exists
 
@@ -174,11 +210,33 @@ absent", which are the same green otherwise (`adapter-parity-audit.md` records b
 ## What Image did NOT need, and why the next three probably will not either
 
 No `ownedListeners` (it owns no event), no `attachAfterCommit` (nothing needs a Fabric tag at
-setup), no `afterCommit` (no prop-driven handshake), no `-managed` tag. If a candidate needs any of
-those, it is not fold-only and this recipe is the wrong one — ScrollView, Modal, Switch and
-RefreshControl are the four that carry state or a handle.
+setup), no `afterCommit` (no prop-driven handshake). If a candidate needs any of those, it is not
+fold-only and this recipe is the wrong one — ScrollView, Modal, Switch and RefreshControl are the
+four that carry state or a handle.
 
 ## PARKED: what to do about a primitive whose native view is inherently wrapped
+
+> **SETTLED 2026-09-09, and the answer is option B — the one this section talks itself out of.**
+> `ActivityIndicator` is a tag on all five adapters, its five wrappers are deleted, and
+> `render-activity-indicator.ts` is gone. `ImageBackground` followed on the same shape.
+>
+> **Every cost B is charged with here turned out to be already paid or simply wrong.** "A new engine
+> capability — a behavior that CREATES a node" is `IHostBehavior.buildStructure`, which landed for
+> ScrollView. "A new tag for the container" cost one line in `ISymbioteIntrinsic`. And "a
+> child-creating behavior needs the child's props kept in step, which is a commit hook, which is a
+> machine" is false twice over: the child keeps its own pure `payloadFold` reading the owner, and
+> this behavior owns no timer, no listener and no native handshake — its `attach`/`detach` are empty.
+>
+> A was recommended on the argument that spinners are rare, so the instance cost is not measurably
+> paid. That is still true and it was never the point: what B actually bought was RN parity. The
+> passthrough belongs on the SPINNER (`ActivityIndicator.js:99`) and all five wrappers had put it on
+> the wrapper since the day they were written — a divergence no audit here could see, because both
+> paths agreed with each other.
+>
+> **The reusable half: an option priced as "needs a new engine capability" is priced against one
+> afternoon's engine.** Three of the five costs above expired within a fortnight of being written.
+> When parking a decision on that basis, name the capability so a later reader can check whether it
+> now exists, rather than re-reading the whole trade-off.
 
 `ActivityIndicator` is the first, and the decision is an architecture call rather than a build task.
 RN itself wraps the spinner in a centering `<View>` (`ActivityIndicator.js:112`), so the second node
@@ -192,9 +250,9 @@ paid here in any measurable quantity. The honest objection is uniformity, not pe
 **B. Two-tag lowering.** The transform emits the container tag and the behavior synthesizes the
 spinner child. Cost: a new engine capability — a behavior that CREATES a node — plus a new tag for
 the container (`symbiote-view` is shared, so the registry could not key on it). It also fails this
-recipe's own check (2): a child-creating behavior needs the child's props kept in step, which is a
-commit hook, which is a machine, which is what forces a `-managed` split. So option B is not a
-fold-only primitive at all; it is a new category with its own split to design.
+recipe's own check: a child-creating behavior needs the child's props kept in step, which is a
+commit hook, which is a machine. So option B is not a fold-only primitive at all; it is a new
+category, and one that puts two owners on one node while a wrapper still exists.
 
 **C. Synthesize the container in the engine's commit walk**, the way `RCTVirtualText` is resolved
 (`viewNameFor` in `core/engine/src/commit.ts` re-creates a node when its kind flips). Cost: the walk

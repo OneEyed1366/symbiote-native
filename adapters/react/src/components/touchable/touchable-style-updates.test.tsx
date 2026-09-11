@@ -13,7 +13,7 @@
 
 import { useState, type ReactElement } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { mount, unmount, TouchableOpacity, Text } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 128;
@@ -74,9 +74,9 @@ function StyleUpdateApp(): ReactElement {
   const [style, update] = useState<Record<string, number>>({ margin: 1 });
   setStyle = update;
   return (
-    <TouchableOpacity style={style}>
-      <Text>x</Text>
-    </TouchableOpacity>
+    <touchable-opacity style={style}>
+      <text>x</text>
+    </touchable-opacity>
   );
 }
 

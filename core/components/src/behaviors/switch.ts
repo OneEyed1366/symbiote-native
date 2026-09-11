@@ -54,11 +54,12 @@ import {
   valueFromChange,
   type ISwitchState,
 } from '../state/switch';
+import type { ISwitchChangeEvent } from '../view/render-switch';
 
-// The LOWERED tag — NOT the wrapper's `symbiote-switch-managed` (`render-switch.ts`). One owner
+// The LOWERED tag — NOT the wrapper's `switch-managed` (`render-switch.ts`). One owner
 // per node: the wrapper already runs this same machine in its own lifecycle, so registering here
 // under the tag it emits would attach a second, redundant copy.
-export const SWITCH_TAG = 'symbiote-switch';
+export const SWITCH_TAG = 'switch';
 
 const states = new WeakMap<ISymbioteNode, ISwitchState>();
 
@@ -189,9 +190,14 @@ function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
   // `onValueChange` is not a Fabric event — it is a fold the component wrapper does over the raw
   // `change` payload (same class as TextInput's `onValueChange`, `text-input.ts`'s
   // `callValueChange`), so it lands in `node.props` as a plain function key rather than through
-  // `ownedListeners`.
+  // `ownedListeners`. ONE argument, `value` carried on the event (`ISwitchChangeEvent`) — same
+  // reason as TextInput: Svelte's compiler forces an individual `on*` attribute through a native
+  // listener wrapper that calls with exactly one argument, always a real object.
   const listener = node.props.onValueChange;
-  if (typeof listener === 'function') listener(value, event);
+  if (typeof listener === 'function') {
+    const changeEvent: ISwitchChangeEvent = Object.assign(event, { value });
+    listener(changeEvent);
+  }
 
   // A raw `change` listener authored directly on the bare tag — not part of any adapter's public
   // surface today, but `change` is the name this behavior's own dispatcher owns

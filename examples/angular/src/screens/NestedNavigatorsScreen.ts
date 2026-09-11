@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { SafeAreaView, Text, View } from '@symbiote-native/angular';
+import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
 import {
   Tab,
   TabScreenDirective,
@@ -20,39 +20,39 @@ function canPop(handle: unknown): handle is { pop: () => void } {
 @Component({
   selector: 'NestedTabHomeScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">NN</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Nested navigators</Text>
-            <Text class="hero-body">
+    <safe-area-view class="screen">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">NN</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Nested navigators</text>
+            <text class="hero-body">
               A Tab navigator nested inside a Stack screen, reaching its
               parent's own navigation handle through getParent().
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">
+            </text>
+          </view>
+        </view>
+        <text class="info-text">
           {{
             'parent navigator reachable via getParent(): ' +
               (canPopParent ? 'yes (Stack)' : 'no')
           }}
-        </Text>
+        </text>
         <ActionButton
           testID="nested-pop-parent"
           title="Pop parent Stack (via getParent)"
           (press)="popParent()"
           [color]="lineColorStructure"
         ></ActionButton>
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   `,
 })
 export class NestedTabHomeScreen {
@@ -81,20 +81,20 @@ export class NestedTabHomeScreen {
 @Component({
   selector: 'NestedTabInfoScreen',
   standalone: true,
-  imports: [SafeAreaView, Text, View],
+  imports: [SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <Text class="section-label">Nested Tab · Info</Text>
-        <Text class="info-text"
+    <safe-area-view class="screen">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <text class="section-label">Nested Tab · Info</text>
+        <text class="info-text"
           >A second tab, proving the nested Tab bar switches focus
-          normally.</Text
+          normally.</text
         >
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   `,
 })
 export class NestedTabInfoScreen {

@@ -2,13 +2,8 @@
   // @symbiote-native/sms tour stop — an isAvailableAsync capability row plus a composer card that
   // opens the system SMS composer prefilled with the recipients and message typed below. Svelte
   // twin of ../../expo-vue-sfc/screens/SmsScreen.vue.
-  import {
-    SafeAreaView,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
-  } from '@symbiote-native/svelte';
+  import { ScrollView } from '@symbiote-native/svelte';
+  import type { ITextInputChangeEvent } from '@symbiote-native/svelte';
   import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/svelte';
   import ActionButton from '../components/ActionButton.svelte';
   import { ROUTE_NAME } from '../routes';
@@ -64,78 +59,78 @@
   }
 </script>
 
-<SafeAreaView class="screen">
+<safe-area-view class="screen">
   <ScrollView
     testID="sms-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-        <Text class="hero-badge-text">{lineInfo.code}</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">SMS</Text>
-        <Text class="hero-body">
+      </text>
+    </view>
+    <view class="hero-card">
+      <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <text class="hero-badge-text">{lineInfo.code}</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">SMS</text>
+        <text class="hero-body">
           @symbiote-native/sms — opens the system SMS composer prefilled with
           recipients and a message. The user still has to press send themselves.
-        </Text>
-      </View>
-    </View>
-    <View testID="sms-capability-card" class="sms-card">
-      <Text class="sms-card-title">Capabilities</Text>
-      <View testID="sms-available" class="sms-row">
-        <Text class="sms-row-label">Available</Text>
-        <View class={`sms-status-badge sms-status-badge-${isAvailable}`}>
-          <Text class="sms-status-text">{toBadgeText(isAvailable)}</Text>
-        </View>
-      </View>
-      <Text class="sms-note">
+        </text>
+      </view>
+    </view>
+    <view testID="sms-capability-card" class="sms-card">
+      <text class="sms-card-title">Capabilities</text>
+      <view testID="sms-available" class="sms-row">
+        <text class="sms-row-label">Available</text>
+        <view class={`sms-status-badge sms-status-badge-${isAvailable}`}>
+          <text class="sms-status-text">{toBadgeText(isAvailable)}</text>
+        </view>
+      </view>
+      <text class="sms-note">
         NO on the iOS simulator, which ships no Messages app, and on Android
         devices without telephony hardware. A real iPhone or an Android device
         with a SIM reports YES.
-      </Text>
-    </View>
-    <View testID="sms-compose-card" class="sms-card">
-      <Text class="sms-card-title">Compose</Text>
-      <TextInput
+      </text>
+    </view>
+    <view testID="sms-compose-card" class="sms-card">
+      <text class="sms-card-title">Compose</text>
+      <text-input
         testID="sms-recipients-input"
         value={recipients}
-        onValueChange={next => (recipients = next)}
+        onValueChange={(event: ITextInputChangeEvent) => (recipients = event.text)}
         placeholder="Recipients, comma-separated"
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"
         autoCapitalize="none"
         autoCorrect={false}
-      />
-      <TextInput
+      ></text-input>
+      <text-input
         testID="sms-message-input"
         value={message}
-        onValueChange={next => (message = next)}
+        onValueChange={(event: ITextInputChangeEvent) => (message = event.text)}
         placeholder="Message"
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"
-      />
+      ></text-input>
       <ActionButton
         testID="sms-send-button"
         title="Open composer"
         onPress={handleSend}
         color={lineColor}
       />
-      <View class="sms-row">
-        <Text class="sms-row-label">Last result</Text>
-        <Text testID="sms-result" class="sms-value-text">{lastResult}</Text>
-      </View>
-      <Text class="sms-note">
+      <view class="sms-row">
+        <text class="sms-row-label">Last result</text>
+        <text testID="sms-result" class="sms-value-text">{lastResult}</text>
+      </view>
+      <text class="sms-note">
         iOS reports sent or cancelled; Android always reports unknown, because
         reading the real outcome needs the READ_SMS permission Google restricts
         to default-SMS-app publishers. Treat unknown as "the composer closed".
-      </Text>
-    </View>
+      </text>
+    </view>
   </ScrollView>
-</SafeAreaView>
+</safe-area-view>

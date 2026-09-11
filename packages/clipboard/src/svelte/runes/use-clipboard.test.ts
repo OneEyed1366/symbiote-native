@@ -99,7 +99,7 @@ async function loadProbe(): Promise<Component> {
        const clipboard = useClipboard();
        $effect(() => { onValue(clipboard.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'ClipboardProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

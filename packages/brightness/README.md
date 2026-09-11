@@ -173,13 +173,19 @@ onUnmounted(() => subscription?.remove());
 
   $effect(() => {
     void getBrightnessAsync().then(value => (brightness = value));
-    subscription = addBrightnessListener(event => (brightness = event.brightness));
+    subscription = addBrightnessListener(
+      event => (brightness = event.brightness),
+    );
     return () => subscription?.remove();
   });
 </script>
 
 <View>
-  <Text>{brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`}</Text>
+  <Text
+    >{brightness === null
+      ? 'checking…'
+      : `${Math.round(brightness * 100)}%`}</Text
+  >
   <Pressable onPress={() => setBrightnessAsync(0.5)}>
     <Text>Set to 50%</Text>
   </Pressable>
@@ -203,16 +209,21 @@ import { createPermissions } from '@symbiote-native/brightness/solid';
 
 function BrightnessScreen() {
   const [brightness, setBrightness] = createSignal<number | null>(null);
-  const { status: permissionStatus, request: requestPermission } = createPermissions();
+  const { status: permissionStatus, request: requestPermission } =
+    createPermissions();
 
   getBrightnessAsync().then(setBrightness);
-  const subscription = addBrightnessListener(event => setBrightness(event.brightness));
+  const subscription = addBrightnessListener(event =>
+    setBrightness(event.brightness),
+  );
   onCleanup(() => subscription.remove());
 
   return (
     <View>
       <Text>
-        {brightness() === null ? 'checking…' : `${Math.round(brightness()! * 100)}%`}
+        {brightness() === null
+          ? 'checking…'
+          : `${Math.round(brightness()! * 100)}%`}
       </Text>
       <Pressable onPress={() => setBrightnessAsync(0.5)}>
         <Text>Set to 50%</Text>

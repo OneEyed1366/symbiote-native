@@ -4,7 +4,7 @@
 // router state, useId for route-key generation, useImperativeHandle for the jumpTo/setParams
 // handle - plus the descriptor bridge for the tab-bar leaf, exactly like Stack bridges its header
 // config (react/stack.ts). Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints ordinary
-// `symbiote-view`/`symbiote-text` primitives via the shared render fn, so there is no
+// `view`/`text` primitives via the shared render fn, so there is no
 // react-native-screens ViewConfig to register here - Tab needs no `../register` import.
 
 import {
@@ -256,9 +256,9 @@ const TabImpl = forwardRef<ITabNavigatorHandle, ITabProps>(
         : null;
 
     return createElement(
-      'symbiote-view',
+      'view',
       { style: TAB_ROOT_STYLE },
-      createElement('symbiote-view', { style: TAB_CONTENT_STYLE }, content),
+      createElement('view', { style: TAB_CONTENT_STYLE }, content),
       tabBar,
     );
   },

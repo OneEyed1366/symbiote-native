@@ -150,13 +150,13 @@ export const vShow: ObjectDirective<ISymbioteNode, boolean> = {
 // defect. On a component `v-model="name"` expands to the prop/emit pair `modelValue` +
 // `onUpdate:modelValue`, which the wrapper reads. On an element it expands to a RUNTIME DIRECTIVE:
 //
-//   _withDirectives(_createElementBlock("symbiote-text-input", {
+//   _withDirectives(_createElementBlock("text-input", {
 //     "onUpdate:modelValue": $event => (name.value = $event)
 //   }), [[_vModelText, name.value]])
 //
 // Measured identical on BOTH Vue paths — `@vue/compiler-sfc` and `babel-jsx.cjs` emit the same two
 // lines — which is why the repair is here and not in the two lowering transforms. One runtime
-// implementation also covers a hand-written `h('symbiote-text-input', …)`, the fourth path, exactly
+// implementation also covers a hand-written `h('text-input', …)`, the fourth path, exactly
 // as `PROP_ALIASES` covers all four for `id` -> `nativeID`.
 //
 // AND IT FAILED SILENTLY, which is the part worth remembering. `vModelText` lives in
@@ -167,10 +167,22 @@ export const vShow: ObjectDirective<ISymbioteNode, boolean> = {
 //
 // The two channels below are the machine's, not the DOM's: the value goes down as the `value` prop
 // that `core/components/src/behaviors/text-input.ts` reads for its controlled write, and the text
-// comes back through `onValueChange`, the fold that behavior does over the raw `change` payload.
+// comes back through `onValueChange`, the fold that behavior does over the raw `change` payload —
+// as a single event argument carrying `text`/`value` as a FIELD (`ITextInputChangeEvent` /
+// `ISwitchChangeEvent`), not a second positional argument.
 
-type IValueChangeListener = (text: string, event: ISymbioteEvent) => void;
-type IModelAssign = (value: string | number) => void;
+type IValueChangeListener = (event: ISymbioteEvent) => void;
+type IModelAssign = (value: string | number | boolean) => void;
+
+function textFromChangeEvent(event: ISymbioteEvent): string | undefined {
+  const text = Reflect.get(event, 'text');
+  return typeof text === 'string' ? text : undefined;
+}
+
+function valueFromChangeEvent(event: ISymbioteEvent): boolean | undefined {
+  const value = Reflect.get(event, 'value');
+  return typeof value === 'boolean' ? value : undefined;
+}
 
 interface IModelState {
   // `onUpdate:modelValue` off the vnode, refreshed every beat: Vue re-creates the arrow on each
@@ -237,9 +249,15 @@ function modelStateFor(el: ISymbioteNode): IModelState {
     appListener: undefined,
     trim: false,
     number: false,
-    listener: (text, event) => {
-      state.appListener?.(text, event);
-      state.assign?.(applyModelModifiers(state, text));
+    listener: event => {
+      state.appListener?.(event);
+      const text = textFromChangeEvent(event);
+      if (text !== undefined) {
+        state.assign?.(applyModelModifiers(state, text));
+        return;
+      }
+      const value = valueFromChangeEvent(event);
+      if (value !== undefined) state.assign?.(value);
     },
   };
   modelStates.set(el, state);
@@ -257,7 +275,7 @@ function syncModelListener(el: ISymbioteNode, state: IModelState): void {
 }
 
 // Vue's compiler picks the directive by ELEMENT, and for anything it does not recognise as a DOM
-// input it emits `vModelText` — including a lowered `<symbiote-switch>`. Stringifying there is what
+// input it emits `vModelText` — including a lowered `<switch>`. Stringifying there is what
 // upstream must do (a DOM input's value IS a string) and what we must not: the Switch behavior
 // reads `props.value === true`, so `String(true)` pins the control OFF and no tap can move it.
 // Device-confirmed on `examples/vue-sfc` 2026-09-02, both switches on `CanaryScreen`.
@@ -272,8 +290,9 @@ function isSwitchNode(el: ISymbioteNode): boolean {
 }
 
 function syncModelValue(el: ISymbioteNode, value: unknown): void {
-  // The READ half needs no branch: the behavior calls `onValueChange(value, event)` for both
-  // primitives, and `applyModelModifiers` passes a non-string through untouched.
+  // The READ half needs no branch: the behavior calls `onValueChange(event)` for both primitives
+  // with `text`/`value` carried on the event, and `applyModelModifiers` passes a non-string through
+  // untouched.
   if (isSwitchNode(el)) {
     setProp(el, 'value', value === true);
     requestCommitFor(el);
@@ -396,6 +415,16 @@ type IEventHandler<TEvent> = ((event: TEvent, ...args: never[]) => unknown) & {
  * typed as required, matching upstream Vue's own declaration — its runtime-only `!fn` guard below
  * (for a compiler-generated call site that could pass a falsy handler) isn't reflected in the
  * type there either.
+ *
+ * `@press.self` on a LOWERED element reaches this, and both halves were measured 2026-09-11 rather
+ * than assumed — the question arose because a modifier on a COMPONENT takes Vue's own event path
+ * and only an element emits the helper. `<pressable @press.self>` compiles to
+ * `_withModifiers(fn, ["self"])` imported `from "@symbiote-native/vue/runtime-helpers"` (the Metro
+ * transformer retargets every compiled `from 'vue'`), so the compiler-emitted call lands here and
+ * not on @vue/runtime-dom's. And `ISymbioteEvent` (`core/engine/src/node.ts`) declares `target`,
+ * `currentTarget` and `stopPropagation` as REQUIRED fields with the DOM semantics these guards
+ * read, so `.self` genuinely filters a bubbled press instead of degenerating to
+ * `undefined !== undefined`.
  */
 export function withModifiers<TEvent extends IModifierGuardableEvent>(
   fn: IEventHandler<TEvent>,

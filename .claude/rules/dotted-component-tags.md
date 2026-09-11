@@ -63,3 +63,27 @@ or a doc page, compile the two-line probe against the version in `node_modules`.
 above are four lines of `compile()` / `compileTemplate()` and would have caught this at write
 time. This applies to an ADAPTER SOURCE HEADER as much as to a doc page: a scope boundary stated
 as a capability limit outlives the person who could have checked it.
+
+## NG8002 on a host tag: `CUSTOM_ELEMENTS_SCHEMA` does not rescue a MATCHED component
+
+Second member of this file's "only a real `ngc` build says so" family, found 2026-09-08 when it
+blocked publishing three packages:
+
+```
+src/components/modal/index.ts:119 - NG8002: Can't bind to 'collapsable'
+  since it isn't a known property of 'view'.
+```
+
+`view` matches `ViewHost`, a real `@Component({ selector: 'view, View' })`. A schema only covers an
+element NO directive matches, so `schemas: [CUSTOM_ELEMENTS_SCHEMA]` on the same component is
+irrelevant — the moment a primitive stopped being a hyphenated custom element and became a matched
+host component, every binding it does not declare became a hard AOT error.
+
+Route it through `[symbioteHostProps]` instead, which is what the other adapters' shared render fn
+already emits as one bag (`render-modal.ts` puts `collapsable: false` beside `style`).
+
+**And it stays green everywhere until something actually AOT-builds.** `tsc --build` and the full
+vitest suite both passed with this live; `adapters/angular/build/` was simply stale, so
+`packages/{navigation,slider}` compiled against its old `.d.ts` and only failed once a publish ran
+`clean` first. A binding added to an Angular template is not verified by any check this repo runs
+per-commit — build the adapter, or the error surfaces at release.

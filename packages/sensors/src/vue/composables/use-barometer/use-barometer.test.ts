@@ -57,7 +57,7 @@ function mountBarometer(
     defineComponent({
       setup: () => {
         measurement = useBarometer(updateIntervalMs);
-        return () => h('symbiote-text', {}, 'sensor');
+        return () => h('text', {}, 'sensor');
       },
     }),
   );

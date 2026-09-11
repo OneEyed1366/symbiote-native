@@ -7,13 +7,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   ApplicationReleaseType,
   applicationId,
@@ -86,79 +80,79 @@ function handleGetIosReleaseType(): void {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <ScrollView
+  <safe-area-view class="screen">
+    <scroll-view
       testID="application-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Application</Text>
-          <Text class="hero-body"
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
+          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Application</text>
+          <text class="hero-body"
             >@symbiote-native/application — app version/build/name/ID, install
             time, the Android ID and install referrer on Android, the vendor ID
-            and release type on iOS.</Text
+            and release type on iOS.</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="application-info-card" class="application-card">
-        <Text class="application-card-title">Info</Text>
-        <View class="application-row">
-          <Text class="application-row-label">Name</Text>
-          <Text class="application-value-text">{{
+      <view testID="application-info-card" class="application-card">
+        <text class="application-card-title">Info</text>
+        <view class="application-row">
+          <text class="application-row-label">Name</text>
+          <text class="application-value-text">{{
             applicationName ?? 'unknown'
-          }}</Text>
-        </View>
-        <View class="application-row">
-          <Text class="application-row-label">ID</Text>
-          <Text class="application-value-text">{{
+          }}</text>
+        </view>
+        <view class="application-row">
+          <text class="application-row-label">ID</text>
+          <text class="application-value-text">{{
             applicationId ?? 'unknown'
-          }}</Text>
-        </View>
-        <View class="application-row">
-          <Text class="application-row-label">Version</Text>
-          <Text class="application-value-text">{{
+          }}</text>
+        </view>
+        <view class="application-row">
+          <text class="application-row-label">Version</text>
+          <text class="application-value-text">{{
             nativeApplicationVersion ?? 'unknown'
-          }}</Text>
-        </View>
-        <View class="application-row">
-          <Text class="application-row-label">Build</Text>
-          <Text class="application-value-text">{{
+          }}</text>
+        </view>
+        <view class="application-row">
+          <text class="application-row-label">Build</text>
+          <text class="application-value-text">{{
             nativeBuildVersion ?? 'unknown'
-          }}</Text>
-        </View>
-      </View>
+          }}</text>
+        </view>
+      </view>
 
-      <View testID="application-actions-card" class="application-card">
-        <Text class="application-card-title">Actions</Text>
-        <View class="button-row">
+      <view testID="application-actions-card" class="application-card">
+        <text class="application-card-title">Actions</text>
+        <view class="button-row">
           <ActionButton
             testID="application-installation-time-button"
             title="Get Installation Time"
             :onPress="handleGetInstallationTime"
             :color="lineColor"
           />
-        </View>
-        <View v-if="installationTimeResult !== null" class="application-row">
-          <Text class="application-row-label">Installed</Text>
-          <Text
+        </view>
+        <view v-if="installationTimeResult !== null" class="application-row">
+          <text class="application-row-label">Installed</text>
+          <text
             testID="application-installation-time-value"
             class="application-value-text"
-            >{{ installationTimeResult }}</Text
+            >{{ installationTimeResult }}</text
           >
-        </View>
+        </view>
 
-        <View v-if="Platform.OS === 'android'" class="button-row">
+        <view v-if="Platform.OS === 'android'" class="button-row">
           <ActionButton
             testID="application-android-id-button"
             title="Get Android ID"
@@ -171,25 +165,25 @@ function handleGetIosReleaseType(): void {
             :onPress="handleGetInstallReferrer"
             :color="lineColor"
           />
-        </View>
-        <View v-if="androidIdResult !== null" class="application-row">
-          <Text class="application-row-label">Android ID</Text>
-          <Text
+        </view>
+        <view v-if="androidIdResult !== null" class="application-row">
+          <text class="application-row-label">Android ID</text>
+          <text
             testID="application-android-id-value"
             class="application-value-text"
-            >{{ androidIdResult }}</Text
+            >{{ androidIdResult }}</text
           >
-        </View>
-        <View v-if="installReferrerResult !== null" class="application-row">
-          <Text class="application-row-label">Install referrer</Text>
-          <Text
+        </view>
+        <view v-if="installReferrerResult !== null" class="application-row">
+          <text class="application-row-label">Install referrer</text>
+          <text
             testID="application-install-referrer-value"
             class="application-value-text"
-            >{{ installReferrerResult }}</Text
+            >{{ installReferrerResult }}</text
           >
-        </View>
+        </view>
 
-        <View v-if="Platform.OS === 'ios'" class="button-row">
+        <view v-if="Platform.OS === 'ios'" class="button-row">
           <ActionButton
             testID="application-ios-vendor-id-button"
             title="Get iOS ID For Vendor"
@@ -202,24 +196,24 @@ function handleGetIosReleaseType(): void {
             :onPress="handleGetIosReleaseType"
             :color="lineColor"
           />
-        </View>
-        <View v-if="iosVendorIdResult !== null" class="application-row">
-          <Text class="application-row-label">iOS vendor ID</Text>
-          <Text
+        </view>
+        <view v-if="iosVendorIdResult !== null" class="application-row">
+          <text class="application-row-label">iOS vendor ID</text>
+          <text
             testID="application-ios-vendor-id-value"
             class="application-value-text"
-            >{{ iosVendorIdResult }}</Text
+            >{{ iosVendorIdResult }}</text
           >
-        </View>
-        <View v-if="iosReleaseTypeResult !== null" class="application-row">
-          <Text class="application-row-label">iOS release type</Text>
-          <Text
+        </view>
+        <view v-if="iosReleaseTypeResult !== null" class="application-row">
+          <text class="application-row-label">iOS release type</text>
+          <text
             testID="application-ios-release-type-value"
             class="application-value-text"
-            >{{ iosReleaseTypeResult }}</Text
+            >{{ iosReleaseTypeResult }}</text
           >
-        </View>
-      </View>
-    </ScrollView>
-  </SafeAreaView>
+        </view>
+      </view>
+    </scroll-view>
+  </safe-area-view>
 </template>

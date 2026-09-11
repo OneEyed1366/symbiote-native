@@ -1,5 +1,4 @@
 import { Activity, lazy, Suspense, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { CaveatNote } from './CaveatNote';
 import { LINE_COLOR } from '../navigation-lines';
@@ -13,8 +12,8 @@ export function SuspenseActivityLazyDemo() {
   );
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">Suspense · lazy · Activity</Text>
+    <view className="section-nested">
+      <text className="section-label">Suspense · lazy · Activity</text>
       <ActionButton
         testID="suspense-toggle"
         title={
@@ -25,7 +24,7 @@ export function SuspenseActivityLazyDemo() {
       />
       {showLazy && (
         <Suspense
-          fallback={<Text className="info-text">loading lazy panel…</Text>}
+          fallback={<text className="info-text">loading lazy panel…</text>}
         >
           <LazyLoadedPanel />
         </Suspense>
@@ -43,15 +42,15 @@ export function SuspenseActivityLazyDemo() {
         color={LINE_COLOR.introspection}
       />
       <Activity mode={activityMode}>
-        <Text testID="activity-content" className="info-text">
+        <text testID="activity-content" className="info-text">
           Activity-wrapped content — state stays alive while hidden
-        </Text>
+        </text>
       </Activity>
       <CaveatNote testID="suspense-activity-caveat">
         host-config.ts's hideInstance/unhideInstance are no-op stubs, so content
         Suspense/Activity mark as hidden likely stays visually painted — only
         React's own bookkeeping treats it as hidden, not the actual view tree.
       </CaveatNote>
-    </View>
+    </view>
   );
 }

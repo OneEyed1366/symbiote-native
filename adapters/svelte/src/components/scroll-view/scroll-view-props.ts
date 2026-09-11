@@ -4,15 +4,16 @@
 // adapters/vue/src/components/scroll-view/shared.ts) with Svelte's own idioms: `class` (not
 // `className`), `children` as a Snippet.
 //
-// KNOWN GAP — read before wiring `stickyHeaderIndices`: this adapter does NOT auto-wrap children
-// by index the way React (Children.toArray) / Vue (slots.default(), a real VNode[]) do. Svelte
-// hands a component only an opaque `Snippet` — a render FUNCTION, not an introspectable/indexable
-// list of elements — so there is no mechanical way to pull "child at index N" out of it and
-// re-wrap it. `stickyHeaderIndices` / `invertStickyHeaders` are still typed here for interface
-// parity (an app porting from React/Vue type-checks against the same surface), but index.svelte
-// dlogs a warning once when they are supplied, since nothing actually goes sticky as a result. Use
-// the exported `ScrollViewStickyHeader` component directly around a section instead — see
-// sticky-header.svelte and index.svelte's header comment for the full reasoning.
+// `stickyHeaderIndices` works here since the wrapper was deleted (2026-09-10) — deleting it is what
+// turned the feature on. It was unhonored while a component saw only an opaque `Snippet`, with no
+// "child at index N" to pull out of a render function; the behavior walks the COMMITTED children
+// instead (`behaviors/scroll-view/sticky-indices.test.ts`), which needs no Snippet at all.
+//
+// The `sticky-header` TAG is the other spelling and still the better one for markup you control: it
+// pins by document order, so no index has to stay in step with the children.
+//
+// `invertStickyHeaders` IS honored: it is an ordinary prop of the scroll node and the behavior
+// reads it off the owner when it builds a pin.
 import type { Snippet } from 'svelte';
 import type {
   IStyleProp,
@@ -35,6 +36,10 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   // IClassNameValue union, since IStyleProp is itself an object/array and that would be
   // ambiguous with a real style (mirrors React's/Vue's own contentContainerStyle typing).
   contentContainerStyle?: IStyleProp<IViewStyle> | string;
+  // Typed for parity with React/Vue, and DELETED from the payload by the behavior's fold: the axis
+  // comes from which tag you wrote. RN derives the native component, the row content style and this
+  // flag from one prop so they cannot disagree; a prop contradicting the tag is dropped, with a
+  // dlog, rather than producing a shape RN cannot make.
   horizontal?: boolean;
   scrollEnabled?: boolean;
   showsVerticalScrollIndicator?: boolean;
@@ -50,9 +55,10 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
     right?: number;
   };
   contentOffset?: { x: number; y: number };
-  // The REAL RefreshControl's own prop bag, minus `children` — ScrollView itself supplies that to
-  // wire the platform-correct sibling (iOS) / wrap (Android) shape; see index.svelte's header
-  // comment for why this is a props object rather than React's/Vue's rendered-element shape.
+  // The REAL RefreshControl's own prop bag, minus `children` — ScrollView instantiates it as an
+  // ordinary child and the ScrollView host behavior claims it, placing it beside the content view
+  // on iOS and inverting the tree on Android. A props object rather than React's/Vue's
+  // rendered-element shape because Svelte has no cloneElement to re-parent one with.
   refreshControl?: Omit<IRefreshControlProps, 'children'>;
   removeClippedSubviews?: boolean;
   // Fired when the content container's size changes. RN synthesizes this in JS by putting an
@@ -64,7 +70,6 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   snapToStart?: boolean;
   snapToEnd?: boolean;
   disableIntervalMomentum?: boolean;
-  // See the KNOWN GAP note above — not auto-honored in this adapter.
   stickyHeaderIndices?: number[];
   invertStickyHeaders?: boolean;
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';

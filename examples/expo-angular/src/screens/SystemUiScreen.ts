@@ -1,5 +1,10 @@
 import { Component, signal } from '@angular/core';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  SafeAreaViewElement,
+  ScrollViewElement,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   getBackgroundColorAsync,
   setBackgroundColorAsync,
@@ -17,40 +22,40 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 @Component({
   selector: 'SystemUiScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="system-ui-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">System UI</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">System UI</text>
+            <text class="hero-body">
               @symbiote-native/system-ui — get/set the root view's background
               color, the color painted behind the RN surface before any content
               mounts.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="system-ui-background-card" class="capability-card">
-          <Text class="capability-card-title">Root background color</Text>
-          <View class="capability-row">
-            <Text class="capability-label">Current color</Text>
-            <Text testID="system-ui-color-result" class="value-text">{{
+        <view testID="system-ui-background-card" class="capability-card">
+          <text class="capability-card-title">Root background color</text>
+          <view class="capability-row">
+            <text class="capability-label">Current color</text>
+            <text testID="system-ui-color-result" class="value-text">{{
               colorLabel()
-            }}</Text>
-          </View>
-          <View class="button-row">
+            }}</text>
+          </view>
+          <view class="button-row">
             <ActionButton
               testID="system-ui-set-red"
               title="Red"
@@ -69,10 +74,10 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
               [color]="lineColor"
               (press)="handleSetColor(null)"
             ></ActionButton>
-          </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          </view>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class SystemUiScreen {

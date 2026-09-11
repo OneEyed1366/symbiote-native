@@ -9,7 +9,7 @@
 -->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, type Ref } from 'vue';
-import { View, Text, Animated } from '@symbiote-native/vue';
+import { Animated } from '@symbiote-native/vue';
 import ActionButton from './ActionButton.vue';
 
 const SLIDE_DISTANCE = 220;
@@ -81,26 +81,26 @@ const freezeJs = (): void => {
 </script>
 
 <template>
-  <View class="section-nested">
-    <Text class="section-label">Animated · JS vs native driver</Text>
+  <view class="section-nested">
+    <text class="section-label">Animated · JS vs native driver</text>
 
     <!-- native-driven perpetual pulse -->
-    <View class="pulse-frame">
+    <view class="pulse-frame">
       <Animated.View
         testID="pulse-dot"
         class="pulse-dot"
         :style="{ opacity: pulseOpacity, transform: [{ scale: pulseScale }] }"
       />
-    </View>
+    </view>
 
     <!-- JS-driven slide: a commit per frame -->
-    <View class="slide-track">
+    <view class="slide-track">
       <Animated.View
         testID="slide-js-dot"
         class="js-slide-dot"
         :style="{ transform: [{ translateX: jsX }] }"
       />
-    </View>
+    </view>
     <ActionButton
       testID="slide-js-btn"
       title="Slide (JS driver)"
@@ -109,13 +109,13 @@ const freezeJs = (): void => {
     />
 
     <!-- native-driven slide: offloaded, zero JS frames -->
-    <View class="slide-track">
+    <view class="slide-track">
       <Animated.View
         testID="slide-native-dot"
         class="native-slide-dot"
         :style="{ transform: [{ translateX: nativeX }] }"
       />
-    </View>
+    </view>
     <ActionButton
       testID="slide-native-btn"
       title="Slide (native driver)"
@@ -125,5 +125,5 @@ const freezeJs = (): void => {
 
     <!-- Freeze the JS thread 1.5s: native (pulse + green) keep moving, JS (orange) stalls -->
     <ActionButton title="Freeze JS 1.5s" :onPress="freezeJs" color="#fc8181" />
-  </View>
+  </view>
 </template>

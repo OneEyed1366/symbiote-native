@@ -3,7 +3,7 @@
 //
 // WHY IT EXISTS. A lowered element inherits NOTHING its wrapper component did — prop defaults,
 // alias renames and bag folds all live in the wrapper, and lowering routes around it. That cost two
-// device-only bugs on 2026-08-31: a lowered `symbiote-text` lost RN's `ellipsizeMode: 'tail'` and
+// device-only bugs on 2026-08-31: a lowered `text` lost RN's `ellipsizeMode: 'tail'` and
 // `allowFontScaling: true` so clamped text truncated with no ellipsis, and Angular never applied
 // `id -> nativeID` at all. Every test was green, `tsc` was happy, and the gap was found only by
 // diffing prop-key NAMES between two adapters by hand.
@@ -218,7 +218,7 @@ function findByTestID(
 /**
  * THE GUARD AGAINST THE MOST LIKELY FALSE GREEN: both arms taking the SAME path.
  *
- * Angular is the live instance — its primitives carry a dual selector (`'symbiote-view, View'`) and
+ * Angular is the live instance — its primitives carry a dual selector (`'view, View'`) and
  * directive matching is resolved per TEMPLATE, so writing the intrinsic inside a template that
  * imports the component resolves straight back to the component, silently. The general form is any
  * adapter where the "lowered" snippet is hand-written intrinsic markup the renderer happens to route
@@ -262,14 +262,14 @@ function findByTestID(
  *     source spelling  only the lowered arm names the BARE intrinsic, since a wrapper renders the
  *                      `-managed` spelling. The strongest of the three — no runtime coincidence
  *                      satisfies it — and available only where the arm can read its own source.
- *     compiled output  `_$createComponent(View, …)` vs `_$createElement("symbiote-view")`. Solid's,
+ *     compiled output  `_$createComponent(View, …)` vs `_$createElement("view")`. Solid's,
  *                      because its arms are JSX compiled by the runner: there is no source to read
  *                      at assertion time, and this is the same claim reachable from where it stands.
  *
  * A DISABLED discriminator can be disabled exactly where its trap lives, and only a break-test
  * says so. Measured on Angular 2026-09-02: the node-count control was switched off for `View` and
  * `Text` because their arms legitimately census equal — and those two are the ONLY primitives
- * carrying the dual selector `'symbiote-view, View'`, i.e. the one construct that makes an
+ * carrying the dual selector `'view, View'`, i.e. the one construct that makes an
  * intrinsic resolve back to its component. Handing the lowered arm its imports, which should have
  * reproduced the trap, left all nine rows GREEN. The five rows where the control WAS active have
  * single-name selectors and could never have shown it.
@@ -292,8 +292,8 @@ function findByTestID(
  * rather than on runtime state, so no coincidence at mount can satisfy it, and assert the component
  * arm does NOT name the intrinsic, or the check passes on two lowered arms.
  *
- * Match the tag with a boundary. `symbiote-text` is a prefix of `symbiote-text-input` and
- * `symbiote-switch` of `symbiote-switch-managed`, so a bare substring test reads a wrapper's
+ * Match the tag with a boundary. `text` is a prefix of `text-input` and
+ * `switch` of `switch-managed`, so a bare substring test reads a wrapper's
  * `-managed` output as the bare intrinsic and certifies two arms that are the same arm.
  *
  * Counts are passed IN rather than computed here: `censusRetainedTree` lives in the engine, and

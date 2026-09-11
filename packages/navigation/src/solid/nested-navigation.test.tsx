@@ -74,7 +74,7 @@ const texts = (): string[] =>
     String(node.props.text),
   );
 
-const DetailsScreen = () => <symbiote-text>details</symbiote-text>;
+const DetailsScreen = () => <text>details</text>;
 
 describe('Solid nested navigators', () => {
   describe('Positive', () => {
@@ -82,8 +82,8 @@ describe('Solid nested navigators', () => {
     // shadowing is what gives that for free; a per-kind key would let an inner marker register with
     // a far-away ancestor of the same kind instead.
     it('a Tab nested in a Stack screen captures its own markers', async () => {
-      const FeedScreen = () => <symbiote-text>feed</symbiote-text>;
-      const InboxScreen = () => <symbiote-text>inbox</symbiote-text>;
+      const FeedScreen = () => <text>feed</text>;
+      const InboxScreen = () => <text>inbox</text>;
       const TabHost = () => (
         <Tab initialRouteName="Feed">
           <Tab.Screen
@@ -124,7 +124,7 @@ describe('Solid nested navigators', () => {
         const navigation = useNavigation();
         const parent = navigation().getParent();
         parentCanPush = parent !== undefined && 'push' in parent;
-        return <symbiote-text>feed</symbiote-text>;
+        return <text>feed</text>;
       };
       const TabHost = () => (
         <Tab initialRouteName="Feed">
@@ -150,7 +150,7 @@ describe('Solid nested navigators', () => {
         const navigation = useNavigation();
         const parent = navigation().getParent();
         if (parent !== undefined && 'push' in parent) parent.push('Details');
-        return <symbiote-text>feed</symbiote-text>;
+        return <text>feed</text>;
       };
       const TabHost = () => (
         <Tab initialRouteName="Feed">
@@ -173,7 +173,7 @@ describe('Solid nested navigators', () => {
     // why: a marker of the WRONG kind is rejected by the collector's `kind` tag rather than silently
     // registering with some ancestor - the failure mode a per-kind context key would have had.
     it('ignores a Tab marker written directly inside a Stack', async () => {
-      const FeedScreen = () => <symbiote-text>feed</symbiote-text>;
+      const FeedScreen = () => <text>feed</text>;
       mount(ROOT_TAG, () => (
         <Stack initialRouteName="Details">
           <Stack.Screen name="Details" component={DetailsScreen} />

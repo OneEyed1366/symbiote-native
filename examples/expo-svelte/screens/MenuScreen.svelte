@@ -9,13 +9,7 @@
   // edge-to-edge: the DOM shim turns a whitespace-only text node under a non-text parent into an
   // anchor instead of an RCTRawText, and Metro's transformer collapses a wrapped sentence back to
   // single spaces (svelte-adapter-dom-shim §16b).
-  import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    Text,
-    View,
-  } from '@symbiote-native/svelte';
+  import { ScrollView } from '@symbiote-native/svelte';
   import { useStackNavigation } from '@symbiote-native/navigation/svelte';
   import { ROUTE_NAME } from '../routes';
   import type { ITourRouteName } from '../navigation-lines';
@@ -146,34 +140,36 @@
   ];
 </script>
 
-<SafeAreaView class="screen">
+<safe-area-view class="screen">
   <ScrollView
     testID="menu-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
-    <View class="menu-hero">
-      <Text class="menu-eyebrow">EXPO MODULES DEMOS</Text>
-      <Text class="menu-hero-title">Expo-SDK ports on a real native stack</Text>
-      <Text class="menu-hero-subtitle">
+    <view class="menu-hero">
+      <text class="menu-eyebrow">EXPO MODULES DEMOS</text>
+      <text class="menu-hero-title">Expo-SDK ports on a real native stack</text>
+      <text class="menu-hero-subtitle">
         Each row below demos a different @symbiote-native package built on
         expo-modules-core.
-      </Text>
-    </View>{#each MENU_ITEMS as item (item.route)}{@const lineInfo =
-        ROUTE_LINE_INFO[item.route]}<Pressable
+      </text>
+    </view>
+    {#each MENU_ITEMS as item (item.route)}{@const lineInfo =
+        ROUTE_LINE_INFO[item.route]}
+      <pressable
         testID={`menu-row-${item.route}`}
         class={`menu-row menu-row-${lineInfo.line}`}
         onPress={() => navigation.current.push(item.route)}
       >
-        <View class={`menu-badge menu-badge-${lineInfo.line}`}>
-          <Text class="menu-badge-text">{lineInfo.code}</Text>
-        </View>
-        <View class="menu-row-copy">
-          <Text class="menu-row-label">{item.label}</Text>
-          <Text class={`menu-row-hint menu-row-hint-${lineInfo.line}`}>
+        <view class={`menu-badge menu-badge-${lineInfo.line}`}>
+          <text class="menu-badge-text">{lineInfo.code}</text>
+        </view>
+        <view class="menu-row-copy">
+          <text class="menu-row-label">{item.label}</text>
+          <text class={`menu-row-hint menu-row-hint-${lineInfo.line}`}>
             {item.hint}
-          </Text>
-        </View>
-      </Pressable>{/each}
+          </text>
+        </view>
+      </pressable>{/each}
   </ScrollView>
-</SafeAreaView>
+</safe-area-view>

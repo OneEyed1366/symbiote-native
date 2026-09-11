@@ -47,7 +47,7 @@ function mountLowPowerMode(): Ref<boolean> {
     defineComponent({
       setup: () => {
         lowPowerMode = useLowPowerMode();
-        return () => h('symbiote-text', {}, 'battery');
+        return () => h('text', {}, 'battery');
       },
     }),
   );

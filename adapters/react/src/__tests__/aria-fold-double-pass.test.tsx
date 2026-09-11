@@ -16,7 +16,7 @@
 // own mapping — so none of them travels the alias path at all. The whole adapter was green
 // throughout the move without exercising the thing that moved.
 import { describe, expect, it } from 'vitest';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 118;
@@ -36,7 +36,7 @@ function committed(testID: string): IFakeNode | undefined {
 
 describe('the aria fold survives running twice through React', () => {
   it('folds role and aria-label, and leaves no alias in the payload', () => {
-    mount(ROOT_TAG, <View testID="folded" role="button" aria-label="close" />);
+    mount(ROOT_TAG, <view testID="folded" role="button" aria-label="close" />);
 
     const props = committed('folded')?.props ?? {};
     expect(props.accessibilityRole).toBe('button');
@@ -54,7 +54,7 @@ describe('the aria fold survives running twice through React', () => {
   it('does not let the second pass blank a composite the first pass built', () => {
     mount(
       ROOT_TAG,
-      <View
+      <view
         testID="composite"
         accessibilityState={{ checked: false, busy: true }}
         aria-checked

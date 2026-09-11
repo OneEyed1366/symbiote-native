@@ -9,7 +9,6 @@
 -->
 <script setup lang="ts">
 import { useAttrs } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 
 defineOptions({ name: 'CounterCapsule', inheritAttrs: false });
@@ -31,21 +30,21 @@ defineExpose({ reset });
 </script>
 
 <template>
-  <View class="a11y-card">
-    <Text class="switch-label"
-      >CounterCapsule — defineModel + defineEmits + defineExpose</Text
+  <view class="a11y-card">
+    <text class="switch-label"
+      >CounterCapsule — defineModel + defineEmits + defineExpose</text
     >
-    <Text class="list-row-text" testID="capsule-count">{{
+    <text class="list-row-text" testID="capsule-count">{{
       `count=${count}`
-    }}</Text>
-    <Text class="note-text">{{
+    }}</text>
+    <text class="note-text">{{
       `useAttrs() fallthrough (inheritAttrs:false) = ${JSON.stringify(attrs)}`
-    }}</Text>
+    }}</text>
     <ActionButton
       testID="capsule-increment"
       title="increment (v-model:count)"
       :onPress="increment"
       color="#f5a623"
     />
-  </View>
+  </view>
 </template>

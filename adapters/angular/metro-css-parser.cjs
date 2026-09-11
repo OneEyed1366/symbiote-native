@@ -10,4 +10,5 @@
 // createCssMetroTransformer is a factory, not a ready transformer — Metro's
 // babelTransformerPath needs the actual {transform, getCacheKey} object it returns,
 // not the css-parser package barrel.
-module.exports = require('@symbiote-native/css-parser').createCssMetroTransformer();
+module.exports =
+  require('@symbiote-native/css-parser').createCssMetroTransformer();

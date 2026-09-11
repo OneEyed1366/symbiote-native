@@ -23,7 +23,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import {
@@ -31,6 +31,9 @@ import {
   waitUntil,
   type IFakeNode,
 } from '@symbiote-native/test-utils';
+// The press machine reaches a `pressable` TAG through the engine's behavior registry, so this
+// suite is pressing nothing without the registration.
+import '../../register';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -50,23 +53,12 @@ const ACTIVE_OPACITY = 0.3;
 const BASE_WIDTH = 10;
 const PRESS_DELAY_MS = 30;
 
-const COMPONENTS_DIR = join(__dirname, '..');
 // Every compiled artifact sits NEXT TO its real source: the compiled output's own relative
-// imports ('../runes/attachments', './pressable-props') resolve from where the FILE lives, not
-// from where it was compiled (svelte-adapter-dom-shim §15). The `-for-opacity` suffix and the
-// `.smoke-compiled-` prefix are both load-bearing: View and Pressable are owned by other suites
-// that run concurrently (.claude/rules/smoke-compiled-artifact-collisions.md), and only
-// `.smoke-compiled-*.mjs` is gitignored.
-const VIEW_OUT = join(COMPONENTS_DIR, '.smoke-compiled-view-for-opacity.mjs');
-const PRESSABLE_OUT = join(
-  COMPONENTS_DIR,
-  'pressable',
-  '.smoke-compiled-pressable-for-opacity.mjs',
-);
-const TOUCHABLE_OUT = join(
-  __dirname,
-  '.smoke-compiled-touchable-opacity-own.mjs',
-);
+// imports ('../../runes/attachments') resolve from where the FILE lives, not from where it was
+// compiled (svelte-adapter-dom-shim §15). The `-own` suffix and the `.smoke-compiled-` prefix are
+// both load-bearing: a name owned by two concurrently-running suites races
+// (.claude/rules/smoke-compiled-artifact-collisions.md), and only `.smoke-compiled-*.mjs` is
+// gitignored.
 const PARENT_OUT = join(
   __dirname,
   '.smoke-compiled-touchable-opacity-parent.mjs',
@@ -143,31 +135,11 @@ interface ILoaded {
 }
 
 async function loadParent(): Promise<ILoaded> {
-  compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'),
-    'View.svelte',
-    VIEW_OUT,
-  );
-  compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'pressable', 'index.svelte'), 'utf8'),
-    'Pressable.svelte',
-    PRESSABLE_OUT,
-  );
-  compileToFile(
-    readFileSync(join(__dirname, 'index.svelte'), 'utf8'),
-    'TouchableOpacity.svelte',
-    TOUCHABLE_OUT,
-    [
-      [
-        "from '../View.svelte'",
-        "from '../.smoke-compiled-view-for-opacity.mjs'",
-      ],
-      [
-        "from '../pressable/index.svelte'",
-        "from '../pressable/.smoke-compiled-pressable-for-opacity.mjs'",
-      ],
-    ],
-  );
+  // The BARE TAG, which is now the only spelling — there is no TouchableOpacity component to
+  // compile beside this any more. Everything the wrapper used to hold (the Animated.Value, the
+  // fade, the press scheduling, the re-settle, the teardown) is on the engine node, reached
+  // through `../../register`, so this file exercises the same surface an app writes.
+  //
   // ONE parent file for every scenario — Node's import() cache would hand back a stale module for
   // a rewritten path anyway (svelte-adapter-dom-shim §15). Props handed to `mount()` are a plain
   // object and are NOT reactive, so the two tests that change a prop AFTER mount drive it through
@@ -177,13 +149,10 @@ async function loadParent(): Promise<ILoaded> {
        export const control = $state({ disabled: undefined, label: undefined });
      </script>
      <script>
-       import TouchableOpacity from './.smoke-compiled-touchable-opacity-own.mjs';
        let props = $props();
      </script>
-     <TouchableOpacity
-       {...props}
-       disabled={control.disabled}
-       accessibilityLabel={control.label}
+     <touchable-opacity
+       p={{ ...props, disabled: control.disabled, accessibilityLabel: control.label }}
      />`,
     'Parent.svelte',
     PARENT_OUT,
@@ -223,9 +192,6 @@ afterEach(() => {
   unmount(ROOT_TAG);
   Reflect.deleteProperty(globalThis, 'requestAnimationFrame');
   Reflect.deleteProperty(globalThis, 'cancelAnimationFrame');
-  rmSync(VIEW_OUT, { force: true });
-  rmSync(PRESSABLE_OUT, { force: true });
-  rmSync(TOUCHABLE_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
 });
 
@@ -258,13 +224,12 @@ function responderHandle(): unknown {
   return node.instanceHandle;
 }
 
-// The feedback node is the AnimatedView's own host view: the single RCTView child of the
-// responder (no android_ripple on this platform, so nothing sits between them).
+// The responder IS the feedback node. It used to be a child: this component built a `pressable`
+// around a faded `view`, where RN builds one `<Animated.View>` carrying both
+// (TouchableOpacity.js:302). The fade now lands on the same node the responder sits on, through the
+// engine's `touchable-opacity` behavior.
 function feedbackProps(): Record<string, unknown> {
-  const feedback = responderNode().children.find(n => n.viewName === 'RCTView');
-  if (feedback === undefined)
-    throw new Error('the responder committed no feedback child');
-  return feedback.props;
+  return responderNode().props;
 }
 
 function asNumber(value: unknown, label: string): number {

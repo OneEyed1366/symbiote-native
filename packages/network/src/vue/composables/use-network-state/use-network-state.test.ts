@@ -64,7 +64,7 @@ function mountNetworkState(): Ref<INetworkState> {
     defineComponent({
       setup: () => {
         networkState = useNetworkState();
-        return () => h('symbiote-text', {}, 'network');
+        return () => h('text', {}, 'network');
       },
     }),
   );

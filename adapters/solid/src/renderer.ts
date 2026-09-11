@@ -35,7 +35,10 @@ import {
   SymbioteSurface,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { descriptorFor } from '@symbiote-native/components';
+import {
+  descriptorFor,
+  TEXT_INPUT_MULTILINE_TAG,
+} from '@symbiote-native/components';
 
 // Solid host nodes are all SymbioteNode (elements, raw text, anchors). The mount container is the
 // surface, and Solid's own `render(code, node)` takes that container as a NodeType, so the surface
@@ -179,16 +182,10 @@ function foldTextValue(
   return fold === undefined ? value : fold(value);
 }
 
-// The alias fold, at the RENDERER and not only in the transform — the defect class Angular paid for
-// twice on 2026-08-31. A lowered element inherits nothing the component wrapper did, and the
-// compile-time rename in `babel-lower-host-primitives.cjs` covers exactly the call sites the
-// transform REWROTE: `<View id={x} />` is fine (the attribute name is renamed before the preset
-// compiles it, dynamic value included), but a hand-written `<symbiote-view id="x">` is not, and it
-// committed `id` — a key Fabric does not know — while the component committed `nativeID`. Measured
-// by mounting both forms and diffing committed key NAMES; totals were identical and said nothing.
-//
-// The transform's rename STAYS. It is not redundant: it means the markup path arrives here already
-// spelled `nativeID`, so the common case never takes the branch below with a key to rewrite.
+// The alias fold, at the RENDERER — the only place it can live now that an app writes the tag
+// itself. A bare `<view id="x">` has no wrapper to inherit the fold from, and `id` is a key Fabric
+// does not know, so it committed nothing while the component committed `nativeID`. Measured by
+// mounting both forms and diffing committed key NAMES; totals were identical and said nothing.
 //
 // One string comparison rather than a Map lookup, because this sits on the per-prop write path —
 // 32 001 prop writes on a benchmark create, where a Map.get is the kind of cost the engine spent
@@ -198,8 +195,48 @@ function foldTextValue(
 const ALIAS_FROM = 'id';
 const ALIAS_TO = 'nativeID';
 
-function foldAliasKey(name: string): string {
-  return name === ALIAS_FROM ? ALIAS_TO : name;
+// `multiline` selects between TWO Fabric views, so the TAG decides and no prop write moves a node
+// between them. Two of the three paths that can build the node resolve it earlier — the wrapper
+// CONSUMES the prop to pick its intrinsic, a lowering transform reads a literal at compile time —
+// and an author writing the tag by hand has neither, which leaves two silent divergences.
+//
+// The shared behavior (`core/components/src/behaviors/text-input.ts`) already makes the PAYLOAD
+// follow the tag. The complaint has to live here instead of there: `foldPayload` runs inside the
+// commit, so a throw from it lands a tick later as an uncaught exception with no frame naming the
+// call site — measured, a test awaiting the mount sees `nothing committed` rather than the error.
+const MULTILINE_PROP = 'multiline';
+
+function assertMultilineMatchesTag(node: ISymbioteNode, value: unknown): void {
+  if ((value === true) === (node.props[MULTILINE_PROP] === true)) return;
+  throw new Error(
+    `multiline={${String(value)}} contradicts the tag: <text-input> and ` +
+      `<text-input-multiline> are different Fabric views and no prop write moves a node ` +
+      `between them. Pick the tag (a runtime choice needs a <Show> around both).`,
+  );
+}
+
+// RN gives `id` UNCONDITIONAL priority when both are set (View.js:77-79,
+// `processedProps.nativeID = id`), and `foldHostBag` reproduces that by deleting the source key out
+// of a whole bag. This renderer never sees a bag — it folds one key at a time — so precedence would
+// otherwise come out as source order, and `<view id nativeID>` would keep the stale legacy value
+// while `<view nativeID id>` would not. The wrapper hid that; a bare tag does not.
+//
+// So the node remembers that its nativeID came from an `id`, and a later raw `nativeID` write loses
+// to it. Off the hot path in every ordinary case: nothing is touched unless the prop being written
+// is one of these two names.
+const aliasedNodes = new WeakSet<ISymbioteNode>();
+
+function foldAliasKey(
+  node: ISymbioteNode,
+  name: string,
+  value: unknown,
+): string {
+  if (name === ALIAS_FROM) {
+    if (value === undefined) aliasedNodes.delete(node);
+    else aliasedNodes.add(node);
+    return ALIAS_TO;
+  }
+  return name;
 }
 
 const nodeOps: RendererOptions<IHostNode> = {
@@ -216,6 +253,10 @@ const nodeOps: RendererOptions<IHostNode> = {
       tag,
     );
     if (descriptor.isText) seedTextDefaults(node);
+    // Only the multiline tag is seeded: writing `multiline: false` on the single-line one would add
+    // a key the wrapper's payload does not carry, i.e. a divergence in the other direction.
+    if (tag === TEXT_INPUT_MULTILINE_TAG)
+      setEngineProp(node, MULTILINE_PROP, true);
     // Graft the imperative public-instance API (measure / setNativeProps / focus / …) onto the raw
     // node so a `ref` to a host element exposes it exactly like React's getPublicInstance.
     // toPublicInstance mutates in place and returns the SAME node identity, so the engine's commit
@@ -254,11 +295,17 @@ const nodeOps: RendererOptions<IHostNode> = {
 
   setProperty(node, name, value) {
     if (isSurface(node)) return;
+    if (name === MULTILINE_PROP) assertMultilineMatchesTag(node, value);
+    if (name === ALIAS_TO && aliasedNodes.has(node)) return;
     // routeProp makes the prop-vs-event decision from the node's ViewConfig (onPress on a View
     // becomes a listener; onTintColor on a Switch stays a prop), and centralizes the class+style
     // merge. Shared with React and Vue — never re-implement an `onX` check here
     // (symbiote-engine-core §2).
-    routeProp(node, foldAliasKey(name), foldTextValue(node, name, value));
+    routeProp(
+      node,
+      foldAliasKey(node, name, value),
+      foldTextValue(node, name, value),
+    );
     requestCommit();
   },
 
@@ -304,8 +351,17 @@ const nodeOps: RendererOptions<IHostNode> = {
   // getFirstChild(parent) to replace text in place). Hiding a node the runtime itself inserted
   // desyncs that record from the real tree. Anchors are invisible to FABRIC — the commit walk skips
   // them — not to tree traversal.
+  //
+  // `childHost` redirected, same as the engine's own `appendChild`/`insertBefore`/`removeChild`
+  // (`hostFor`, core/engine/src/node.ts): a composed primitive's real children live on the slot it
+  // built, not on the owner it was asked to insert into, and `insert()`'s reconciliation reads this
+  // to know what is ALREADY there before deciding what to insert/move/remove. Reading the owner's
+  // own (single-child) array here would have every dynamic child on a bare `<scroll-view>` diffed
+  // against the wrong node — invisible on VirtualizedList, which never calls `insert()` on the
+  // owner directly, and wrong for any app writing `<scroll-view>{dynamicChildren}</scroll-view>`.
   getFirstChild(node) {
-    return node.children[0];
+    if (isSurface(node)) return node.children[0];
+    return (node.childHost ?? node).children[0];
   },
 
   getNextSibling(node) {

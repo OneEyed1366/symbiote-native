@@ -13,7 +13,7 @@
 //
 // The two entries are handed out together because either alone is broken:
 //
-//   lowering only        -> `symbiote-view` compiles to resolveComponent("symbiote-view"), a
+//   lowering only        -> `view` compiles to resolveComponent("view"), a
 //                           component that resolves to nothing, with SLOT children an element path
 //                           never mounts. Blank subtree, no error.
 //   isCustomElement only -> nothing was rewritten, so <View> is still a Vue component and the whole
@@ -26,20 +26,19 @@
 // declares no extra devDependency — same reasoning as ./metro-css-parser.cjs.
 
 const vueJsx = require('@vue/babel-plugin-jsx');
-const lowerHostPrimitives = require('./babel-lower-host-primitives.cjs');
 
-// Every `symbiote-*` tag is an intrinsic the renderer resolves through descriptorFor, never a Vue
-// component — including one an app writes by hand, which is why this is a prefix test rather than a
-// list of the two tags the lowering emits.
-const SYMBIOTE_TAG_PREFIX = 'symbiote-';
+// An intrinsic the renderer resolves through descriptorFor, never a Vue component — including one
+// an app writes by hand. A CLOSED set and not a prefix or shape test: an app's own kebab-case
+// component looks identical to ours since the `symbiote-` marker was dropped, and answering true
+// for it would stop resolving it with nothing red.
+const INTRINSIC_TAGS = require('./intrinsic-tags.cjs');
 
 function isSymbioteIntrinsic(tag) {
-  return tag.startsWith(SYMBIOTE_TAG_PREFIX);
+  return INTRINSIC_TAGS.has(tag);
 }
 
 module.exports = function symbioteVueJsx(options = {}) {
   return [
-    lowerHostPrimitives,
     [
       vueJsx,
       {

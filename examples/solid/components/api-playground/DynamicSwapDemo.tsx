@@ -18,7 +18,6 @@
 
 import { createSignal } from 'solid-js';
 import type { JSX } from '@symbiote-native/solid/jsx-runtime';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -29,25 +28,25 @@ type IVariantProps = { caption: string };
 
 function InfoVariant(props: IVariantProps) {
   return (
-    <View class="ap-panel">
-      <Text class="ap-value">{`info · ${props.caption}`}</Text>
-    </View>
+    <view class="ap-panel">
+      <text class="ap-value">{`info · ${props.caption}`}</text>
+    </view>
   );
 }
 
 function WarnVariant(props: IVariantProps) {
   return (
-    <View class="ap-item">
-      <Text class="ap-note">{`warn · ${props.caption}`}</Text>
-    </View>
+    <view class="ap-item">
+      <text class="ap-note">{`warn · ${props.caption}`}</text>
+    </view>
   );
 }
 
 function DoneVariant(props: IVariantProps) {
   return (
-    <View class="ap-item ap-item-on">
-      <Text class="ap-item-text">{`done · ${props.caption}`}</Text>
-    </View>
+    <view class="ap-item ap-item-on">
+      <text class="ap-item-text">{`done · ${props.caption}`}</text>
+    </view>
   );
 }
 
@@ -63,8 +62,8 @@ export function DynamicSwapDemo() {
   const [kind, setKind] = createSignal<IKind>('info');
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">component swap (Dynamic's replacement)</Text>
+    <view class="section-nested">
+      <text class="section-label">component swap (Dynamic's replacement)</text>
       {(() => {
         const Variant = VARIANTS[kind()];
         return <Variant caption={`swapped to ${kind()}`} />;
@@ -80,12 +79,12 @@ export function DynamicSwapDemo() {
           )
         }
       />
-      <Text class="ap-note" testID="dynamic-gap-note">
+      <text class="ap-note" testID="dynamic-gap-note">
         &lt;Dynamic&gt; is not exported by @symbiote-native/solid —
         solid-js/web's implementation creates a host element from a STRING tag
         through the DOM, which has no equivalent here yet. Its function branch
         is renderer-agnostic, and that is the form above.
-      </Text>
-    </View>
+      </text>
+    </view>
   );
 }

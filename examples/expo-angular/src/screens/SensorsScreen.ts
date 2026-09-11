@@ -8,8 +8,8 @@ import {
 } from '@angular/core';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import {
-  SafeAreaView,
-  ScrollView,
+  SafeAreaViewElement,
+  ScrollViewElement,
   SymbioteHostPropsDirective,
   Text,
   View,
@@ -136,173 +136,179 @@ type IAxisSensorCard = {
 @Component({
   selector: 'SensorsScreen',
   standalone: true,
-  imports: [SafeAreaView, ScrollView, SymbioteHostPropsDirective, Text, View],
+  imports: [
+    SafeAreaViewElement,
+    ScrollViewElement,
+    SymbioteHostPropsDirective,
+    Text,
+    View,
+  ],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="sensors-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">SN</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Sensors</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">SN</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Sensors</text>
+            <text class="hero-body">
               @symbiote-native/sensors — live readings from five
               expo-sensors-backed hooks. A simulator reports every
               CoreMotion/CMPedometer-backed sensor as unavailable; a real device
               is needed to see live readings.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
         @for (card of axisCards; track card.id) {
-          <View [symbioteHostProps]="card.cardHostProps" class="sensor-card">
-            <View class="sensor-card-header">
-              <Text class="sensor-card-title">{{ card.title }}</Text>
-              <View
+          <view [symbioteHostProps]="card.cardHostProps" class="sensor-card">
+            <view class="sensor-card-header">
+              <text class="sensor-card-title">{{ card.title }}</text>
+              <view
                 [symbioteHostProps]="card.statusHostProps"
                 [class]="statusBadgeClass(card.status())"
               >
-                <Text class="sensor-status-text">{{
+                <text class="sensor-status-text">{{
                   statusLabel(card.status())
-                }}</Text>
-              </View>
-            </View>
+                }}</text>
+              </view>
+            </view>
             @switch (card.status()) {
               @case ('checking') {
-                <Text class="info-text">checking availability…</Text>
+                <text class="info-text">checking availability…</text>
               }
               @case ('unavailable') {
-                <Text class="info-text">not available on this device</Text>
+                <text class="info-text">not available on this device</text>
               }
               @case ('waiting') {
-                <Text class="info-text">waiting for first reading…</Text>
+                <text class="info-text">waiting for first reading…</text>
               }
               @case ('live') {
                 @if (card.reading(); as reading) {
-                  <View class="sensor-reading-row">
-                    <View class="sensor-reading-chip">
-                      <Text class="sensor-reading-label">X</Text>
-                      <Text class="sensor-reading-value">{{
+                  <view class="sensor-reading-row">
+                    <view class="sensor-reading-chip">
+                      <text class="sensor-reading-label">X</text>
+                      <text class="sensor-reading-value">{{
                         reading.x.toFixed(3)
-                      }}</Text>
-                    </View>
-                    <View class="sensor-reading-chip">
-                      <Text class="sensor-reading-label">Y</Text>
-                      <Text class="sensor-reading-value">{{
+                      }}</text>
+                    </view>
+                    <view class="sensor-reading-chip">
+                      <text class="sensor-reading-label">Y</text>
+                      <text class="sensor-reading-value">{{
                         reading.y.toFixed(3)
-                      }}</Text>
-                    </View>
-                    <View class="sensor-reading-chip">
-                      <Text class="sensor-reading-label">Z</Text>
-                      <Text class="sensor-reading-value">{{
+                      }}</text>
+                    </view>
+                    <view class="sensor-reading-chip">
+                      <text class="sensor-reading-label">Z</text>
+                      <text class="sensor-reading-value">{{
                         reading.z.toFixed(3)
-                      }}</Text>
-                    </View>
-                  </View>
+                      }}</text>
+                    </view>
+                  </view>
                 }
               }
             }
-          </View>
+          </view>
         }
 
-        <View testID="sensor-card-device-motion" class="sensor-card">
-          <View class="sensor-card-header">
-            <Text class="sensor-card-title">Device motion</Text>
-            <View
+        <view testID="sensor-card-device-motion" class="sensor-card">
+          <view class="sensor-card-header">
+            <text class="sensor-card-title">Device motion</text>
+            <view
               testID="sensor-status-device-motion"
               [class]="statusBadgeClass(deviceMotionStatus())"
             >
-              <Text class="sensor-status-text">{{
+              <text class="sensor-status-text">{{
                 statusLabel(deviceMotionStatus())
-              }}</Text>
-            </View>
-          </View>
+              }}</text>
+            </view>
+          </view>
           @switch (deviceMotionStatus()) {
             @case ('checking') {
-              <Text class="info-text">checking availability…</Text>
+              <text class="info-text">checking availability…</text>
             }
             @case ('unavailable') {
-              <Text class="info-text">not available on this device</Text>
+              <text class="info-text">not available on this device</text>
             }
             @case ('waiting') {
-              <Text class="info-text">waiting for first reading…</Text>
+              <text class="info-text">waiting for first reading…</text>
             }
             @case ('live') {
               @if (deviceMotion(); as motion) {
-                <Text class="info-text">{{
+                <text class="info-text">{{
                   'interval: ' + motion.interval.toFixed(1) + 'ms'
-                }}</Text>
+                }}</text>
                 @if (motion.rotation; as rotation) {
-                  <View class="sensor-reading-row">
-                    <View class="sensor-reading-chip">
-                      <Text class="sensor-reading-label">ALPHA</Text>
-                      <Text class="sensor-reading-value">{{
+                  <view class="sensor-reading-row">
+                    <view class="sensor-reading-chip">
+                      <text class="sensor-reading-label">ALPHA</text>
+                      <text class="sensor-reading-value">{{
                         rotation.alpha.toFixed(3)
-                      }}</Text>
-                    </View>
-                    <View class="sensor-reading-chip">
-                      <Text class="sensor-reading-label">BETA</Text>
-                      <Text class="sensor-reading-value">{{
+                      }}</text>
+                    </view>
+                    <view class="sensor-reading-chip">
+                      <text class="sensor-reading-label">BETA</text>
+                      <text class="sensor-reading-value">{{
                         rotation.beta.toFixed(3)
-                      }}</Text>
-                    </View>
-                    <View class="sensor-reading-chip">
-                      <Text class="sensor-reading-label">GAMMA</Text>
-                      <Text class="sensor-reading-value">{{
+                      }}</text>
+                    </view>
+                    <view class="sensor-reading-chip">
+                      <text class="sensor-reading-label">GAMMA</text>
+                      <text class="sensor-reading-value">{{
                         rotation.gamma.toFixed(3)
-                      }}</Text>
-                    </View>
-                  </View>
+                      }}</text>
+                    </view>
+                  </view>
                 }
               }
             }
           }
-        </View>
+        </view>
 
-        <View testID="sensor-card-pedometer" class="sensor-card">
-          <View class="sensor-card-header">
-            <Text class="sensor-card-title">Pedometer</Text>
-            <View
+        <view testID="sensor-card-pedometer" class="sensor-card">
+          <view class="sensor-card-header">
+            <text class="sensor-card-title">Pedometer</text>
+            <view
               testID="sensor-status-pedometer"
               [class]="statusBadgeClass(pedometerStatus())"
             >
-              <Text class="sensor-status-text">{{
+              <text class="sensor-status-text">{{
                 statusLabel(pedometerStatus())
-              }}</Text>
-            </View>
-          </View>
+              }}</text>
+            </view>
+          </view>
           @switch (pedometerStatus()) {
             @case ('checking') {
-              <Text class="info-text">checking availability…</Text>
+              <text class="info-text">checking availability…</text>
             }
             @case ('unavailable') {
-              <Text class="info-text">not available on this device</Text>
+              <text class="info-text">not available on this device</text>
             }
             @case ('waiting') {
-              <Text class="info-text">waiting for first reading…</Text>
+              <text class="info-text">waiting for first reading…</text>
             }
             @case ('live') {
               @if (pedometer(); as steps) {
-                <Text
+                <text
                   testID="sensors-pedometer-steps"
                   class="sensor-reading-value"
                 >
                   {{ steps.steps + ' steps' }}
-                </Text>
+                </text>
               }
             }
           }
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class SensorsScreen {

@@ -8,8 +8,6 @@ import {
   createPortal,
   mount,
   unmount,
-  View,
-  Text,
   type IHostInstance,
 } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -41,12 +39,12 @@ function App(): React.ReactElement {
   // that resolves the portal target — a ref's `.current` is null for the whole FIRST render.
   const [overlay, setOverlay] = useState<IHostInstance | null>(null);
   return (
-    <View>
-      <Text testID="source">
-        {overlay ? createPortal(<Text>ported in</Text>, overlay) : null}
-      </Text>
-      <View testID="overlay-host" ref={setOverlay} />
-    </View>
+    <view>
+      <text testID="source">
+        {overlay ? createPortal(<text>ported in</text>, overlay) : null}
+      </text>
+      <view testID="overlay-host" ref={setOverlay} />
+    </view>
   );
 }
 
@@ -92,7 +90,7 @@ describe('createPortal', () => {
     ).toBe(true);
     expect(
       isDescendantOf(sourceTextCommitted, ported),
-      'portal did NOT stay under its own JSX <Text> parent',
+      'portal did NOT stay under its own JSX <text> parent',
     ).toBe(false);
   });
 
@@ -101,10 +99,10 @@ describe('createPortal', () => {
     // signature would normally reject — exactly the "a JS consumer / bad ref" case being guarded.
     const plainObject = JSON.parse('{}');
     const selectorString = JSON.parse('"body"');
-    expect(() => createPortal(<Text>x</Text>, plainObject)).toThrow(
+    expect(() => createPortal(<text>x</text>, plainObject)).toThrow(
       /already-mounted host node/,
     );
-    expect(() => createPortal(<Text>x</Text>, selectorString)).toThrow(
+    expect(() => createPortal(<text>x</text>, selectorString)).toThrow(
       /already-mounted host node/,
     );
   });

@@ -1,5 +1,4 @@
 import { createSignal } from 'solid-js';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
 import {
   DeviceType,
   brand,
@@ -54,10 +53,10 @@ function deviceTypeLabel(type: DeviceType | null): string {
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="capability-row">
-      <Text class="capability-label">{props.label}</Text>
-      <Text class="value-text">{props.value}</Text>
-    </View>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -70,7 +69,9 @@ export function DeviceScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Device];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [asyncDeviceType, setAsyncDeviceType] = createSignal<string | null>(null);
+  const [asyncDeviceType, setAsyncDeviceType] = createSignal<string | null>(
+    null,
+  );
   const [uptime, setUptime] = createSignal<number | null>(null);
   const [isRooted, setIsRooted] = createSignal<boolean | null>(null);
 
@@ -89,33 +90,33 @@ export function DeviceScreen() {
   };
 
   return (
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="device-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Device</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Device</text>
+            <text class="hero-body">
               @symbiote-native/device — brand/model/OS constants resolved
               eagerly at import time, plus one-shot async checks for device
               type, uptime, and root/jailbreak detection.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="device-constants-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Constants</Text>
-          </View>
+        <view testID="device-constants-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Constants</text>
+          </view>
           <ValueRow label="Is real device" value={isDevice ? 'Yes' : 'No'} />
           <ValueRow label="Brand" value={brand ?? 'unknown'} />
           <ValueRow label="Manufacturer" value={manufacturer ?? 'unknown'} />
@@ -125,12 +126,12 @@ export function DeviceScreen() {
           <ValueRow label="OS version" value={osVersion ?? 'unknown'} />
           <ValueRow label="Total memory" value={formatBytes(totalMemory)} />
           <ValueRow label="Device name" value={deviceName ?? 'unknown'} />
-        </View>
+        </view>
 
-        <View testID="device-async-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Async checks</Text>
-          </View>
+        <view testID="device-async-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Async checks</text>
+          </view>
           <ActionButton
             testID="device-type-button"
             title="Get device type"
@@ -146,7 +147,9 @@ export function DeviceScreen() {
             onPress={handleGetUptime}
             color={lineColor}
           />
-          {uptime() !== null && <ValueRow label="Uptime" value={`${uptime()}ms`} />}
+          {uptime() !== null && (
+            <ValueRow label="Uptime" value={`${uptime()}ms`} />
+          )}
           <ActionButton
             testID="device-rooted-button"
             title="Check rooted/jailbroken"
@@ -159,8 +162,8 @@ export function DeviceScreen() {
               value={isRooted() ? 'true' : 'false'}
             />
           )}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

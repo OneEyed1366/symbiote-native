@@ -1,15 +1,20 @@
-// Solid twin of adapters/react/src/components/text-input/text-input.test.tsx and the Vue/Svelte
-// ones. Drives REAL compiled Solid JSX (the vitest `solid` project runs the same babel-preset-solid
-// options the app-facing babel-preset.cjs pins) through the universal renderer into the fake Fabric
-// slot: the intrinsic choice, the value/defaultValue -> private `text` fold, the W3C alias folds,
-// the native change -> onValueChange derivation, the controlled setTextAndSelection handshake, the
-// focus/blur pair, and the imperative handle.
+// `text-input` / `text-input-multiline` as TAGS, through Solid's own renderer — the suite that was
+// `components/text-input.test.tsx` while a component ran the lifecycle. Drives REAL compiled Solid
+// JSX through the universal renderer into the fake Fabric slot: the value/defaultValue -> private
+// `text` fold, the W3C alias folds, the native change -> onValueChange derivation, the controlled
+// setTextAndSelection handshake, the focus/blur pair, and the imperative handle.
+//
+// THE SUBJECT IS THE BARE TAG — there is no TextInput component any more. The whole machine lives
+// on the engine node (`core/components/src/behaviors/text-input.ts`); this file proves the SOLID
+// WIRING. The multiline pair is TWO LITERAL TAGS here (`bare-tag-intrinsic-choice.test.tsx` — a
+// `multiline` prop that CONTRADICTS the tag throws rather than resolving one for you), unlike
+// React's single tag + prop resolution; each adapter's own precedent stands.
 //
 // Several cases have no counterpart in the React file and exist because Solid's lifecycle is the
-// one thing NOT shared with it: a component body runs once and there is no reconciler between what
-// we return and the host node, so "a prop updates after mount", "the host node keeps its identity
-// across a keystroke", and "autoFocus waits for the commit that assigns the Fabric tag" are real,
-// silently-breakable claims here rather than tautologies.
+// one thing NOT shared with it: these are bare tags with no body to freeze, but "a prop updates
+// after mount", "the host node keeps its identity across a keystroke", and "autoFocus waits for
+// the commit that assigns the Fabric tag" are real, silently-breakable claims about the SOLID
+// renderer rather than tautologies.
 //
 // Negative group: a native change payload carrying no text.
 
@@ -17,8 +22,15 @@ import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Keyboard, type ISymbioteEvent } from '@symbiote-native/engine';
+import {
+  buildTextInputHandle,
+  type ITextInputHandle,
+} from '@symbiote-native/components';
+import type { IHostInstance } from '../host-instance';
+// SIDE-EFFECT IMPORT: the controlled handshake lives in the tag's behavior, and only this module
+// installs it.
+import '../register';
 import { mount, unmount } from '../render';
-import { TextInput, type ITextInputHandle } from './text-input';
 
 const ROOT_TAG = 913;
 const SINGLELINE_VIEW = 'RCTSinglelineTextInputView';
@@ -75,7 +87,7 @@ describe('Solid TextInput on the engine', () => {
     // prop plus a `mostRecentEventCount` counter. Sending `value` instead would reach a native view
     // that ignores it, and the field would simply never paint.
     it('folds value into the private text prop on the singleline intrinsic', async () => {
-      mount(ROOT_TAG, () => <TextInput value="hello" />);
+      mount(ROOT_TAG, () => <text-input value="hello" />);
       await tick();
 
       const props = committedInput().props;
@@ -87,7 +99,7 @@ describe('Solid TextInput on the engine', () => {
     // why: `multiline` picks a DIFFERENT native view class, not a prop on the same one — getting it
     // wrong gives a single-line field that silently refuses newlines.
     it('renders the multiline intrinsic when multiline is set', async () => {
-      mount(ROOT_TAG, () => <TextInput multiline value="two lines" />);
+      mount(ROOT_TAG, () => <text-input-multiline value="two lines" />);
       await tick();
       expect(committedInput(MULTILINE_VIEW).props.text).toBe('two lines');
     });
@@ -95,7 +107,7 @@ describe('Solid TextInput on the engine', () => {
     // why: defaultValue is the uncontrolled seed — value wins when both are set (RN's foldText), so
     // an input with only a defaultValue must still paint it.
     it('falls back to defaultValue when value is absent', async () => {
-      mount(ROOT_TAG, () => <TextInput defaultValue="seed" />);
+      mount(ROOT_TAG, () => <text-input defaultValue="seed" />);
       await tick();
       expect(committedInput().props.text).toBe('seed');
     });
@@ -105,7 +117,7 @@ describe('Solid TextInput on the engine', () => {
     // their defaults while every JS-level check still passed.
     it('folds the W3C aliases onto their native props', async () => {
       mount(ROOT_TAG, () => (
-        <TextInput
+        <text-input
           inputMode="email"
           enterKeyHint="send"
           readOnly
@@ -132,7 +144,7 @@ describe('Solid TextInput on the engine', () => {
     // swallowed them would drop half the public surface with no error anywhere.
     it('forwards the un-handled native props onto the host node', async () => {
       mount(ROOT_TAG, () => (
-        <TextInput
+        <text-input
           placeholder="email"
           placeholderTextColor="#999"
           secureTextEntry
@@ -159,10 +171,10 @@ describe('Solid TextInput on the engine', () => {
     });
 
     // why: native reads only `accessibility*`; the web aliases must be folded in JS before commit.
-    // TextInput owns its host element rather than rendering through a View, so the fold is this
-    // component's own job — skipping it leaves the field unlabelled for a screen reader.
+    // TextInput owns its host element rather than rendering through a View, so the fold is the
+    // tag's own behavior — skipping it leaves the field unlabelled for a screen reader.
     it('folds aria aliases into the canonical accessibility props', async () => {
-      mount(ROOT_TAG, () => <TextInput aria-label="email" aria-disabled />);
+      mount(ROOT_TAG, () => <text-input aria-label="email" aria-disabled />);
       await tick();
 
       const props = committedInput().props;
@@ -178,12 +190,12 @@ describe('Solid TextInput on the engine', () => {
       let rawCount: unknown;
       const [value, setValue] = createSignal('a');
       mount(ROOT_TAG, () => (
-        <TextInput
+        <text-input
           value={value()}
-          onValueChange={(text, event: ISymbioteEvent) => {
-            seen = text;
+          onValueChange={event => {
+            seen = event.text;
             rawCount = event.nativeEvent.eventCount;
-            setValue(text);
+            setValue(event.text);
           }}
         />
       ));
@@ -198,13 +210,12 @@ describe('Solid TextInput on the engine', () => {
       expect(committedInput().props.mostRecentEventCount).toBe(1);
     });
 
-    // why: Solid runs a component body ONCE, and there is no reconciler between what this component
-    // returns and the host node. Every prop read sits inside an accessor precisely so a later change
-    // still reaches the SAME native view — a destructure would freeze the input at its mount-time
-    // props, and a rebuilt subtree would drop the cursor and the keyboard mid-typing.
+    // why: a bare tag's props are reactive per-key writes, not a bag rebuilt from a component body
+    // — a later change must still reach the SAME native view, never a fresh one that would drop
+    // the cursor and the keyboard mid-typing.
     it('re-commits the same native node when a prop changes after mount', async () => {
       const [placeholder, setPlaceholder] = createSignal('before');
-      mount(ROOT_TAG, () => <TextInput placeholder={placeholder()} />);
+      mount(ROOT_TAG, () => <text-input placeholder={placeholder()} />);
       await tick();
       const createdAtMount = fabric.counts.createNode;
       expect(committedInput().props.placeholder).toBe('before');
@@ -218,14 +229,18 @@ describe('Solid TextInput on the engine', () => {
       );
     });
 
-    // why: the controlled round trip's failure case. Native has ALREADY changed its own text when
-    // the event arrives; a handler that refuses the change leaves `value` untouched, so nothing
-    // re-commits and a prop re-push cannot correct anything. Only setTextAndSelection carrying the
-    // ACKNOWLEDGED count (native's eventLag check drops any other) puts the old text back.
-    it('commands the old text back when a no-op handler refuses the change', async () => {
-      const [value] = createSignal('a');
+    // why: the controlled round trip's forcing case. Native has ALREADY changed its own text when
+    // the event arrives; a handler that rewrites it (here, uppercasing) leaves native holding the
+    // wrong text, so only setTextAndSelection carrying the ACKNOWLEDGED count (native's eventLag
+    // check drops any other) can correct it. Same shape as
+    // `adapters/react/src/components/text-input/text-input.test.tsx`'s forcing case.
+    it('commands a transformed value back when onValueChange rewrites the text', async () => {
+      const [value, setValue] = createSignal('');
       mount(ROOT_TAG, () => (
-        <TextInput value={value()} onValueChange={() => {}} />
+        <text-input
+          value={value()}
+          onValueChange={event => setValue(event.text.toUpperCase())}
+        />
       ));
       await tick();
 
@@ -236,7 +251,7 @@ describe('Solid TextInput on the engine', () => {
       expect(fabric.commands[0]?.commandName).toBe('setTextAndSelection');
       expect(fabric.commands[0]?.args).toEqual([
         1,
-        'a',
+        'AB',
         NO_SELECTION,
         NO_SELECTION,
       ]);
@@ -247,7 +262,10 @@ describe('Solid TextInput on the engine', () => {
     it('issues no command when the handler accepts the change', async () => {
       const [value, setValue] = createSignal('a');
       mount(ROOT_TAG, () => (
-        <TextInput value={value()} onValueChange={setValue} />
+        <text-input
+          value={value()}
+          onValueChange={event => setValue(event.text)}
+        />
       ));
       await tick();
 
@@ -262,7 +280,7 @@ describe('Solid TextInput on the engine', () => {
     // not a divergence — commanding there would fight the very first render, and (worse) would do
     // it before the node has a Fabric tag, i.e. silently.
     it('issues no command on initial mount', async () => {
-      mount(ROOT_TAG, () => <TextInput value="a" />);
+      mount(ROOT_TAG, () => <text-input value="a" />);
       await tick();
       expect(fabric.commands).toHaveLength(0);
     });
@@ -271,7 +289,7 @@ describe('Solid TextInput on the engine', () => {
     // from what native holds and must be commanded down, not just re-propped.
     it('commands a programmatic value change down with the acknowledged count', async () => {
       const [value, setValue] = createSignal('a');
-      mount(ROOT_TAG, () => <TextInput value={value()} />);
+      mount(ROOT_TAG, () => <text-input value={value()} />);
       await tick();
 
       setValue('b');
@@ -292,7 +310,7 @@ describe('Solid TextInput on the engine', () => {
     // is silently dropped — no error, no focus, and every headless prop assertion still green.
     // whenCommitted defers it to the commit that assigns the tag.
     it('fires autoFocus only after the commit that assigns the Fabric tag', async () => {
-      mount(ROOT_TAG, () => <TextInput autoFocus />);
+      mount(ROOT_TAG, () => <text-input autoFocus />);
       // Synchronously after mount the node exists in the retained tree but has never been
       // committed: nothing may have been dispatched yet.
       expect(fabric.commands).toHaveLength(0);
@@ -307,20 +325,20 @@ describe('Solid TextInput on the engine', () => {
     // why: the counterpart — a focus command on every mount would steal the keyboard from whatever
     // the user was actually typing in.
     it('issues no focus command without autoFocus', async () => {
-      mount(ROOT_TAG, () => <TextInput value="a" />);
+      mount(ROOT_TAG, () => <text-input value="a" />);
       await tick();
       expect(fabric.commands).toHaveLength(0);
     });
 
     // why: focus/blur are the only source of truth for isFocused() (native has no synchronous
-    // getter), and they must ALSO reach the caller's own handlers — our wrappers replace them on
-    // the host node, so a wrapper that forgot to call through would swallow them silently.
+    // getter), and they must ALSO reach the caller's own handlers — the behavior replaces them on
+    // the host node, so a fold that forgot to call through would swallow them silently.
     it('tracks focus state and forwards the focus/blur pair to the caller', async () => {
       const seen: string[] = [];
       let handle: ITextInputHandle | undefined;
       mount(ROOT_TAG, () => (
-        <TextInput
-          ref={instance => (handle = instance)}
+        <text-input
+          ref={(node: IHostInstance) => (handle = buildTextInputHandle(node))}
           onFocus={() => seen.push('focus')}
           onBlur={() => seen.push('blur')}
         />
@@ -340,7 +358,7 @@ describe('Solid TextInput on the engine', () => {
     // holds focus WITHOUT a ref (RN's dismissKeyboard). Dropping that registration leaves the
     // keyboard up with no error anywhere.
     it('registers the focused input so Keyboard.dismiss can blur it', async () => {
-      mount(ROOT_TAG, () => <TextInput />);
+      mount(ROOT_TAG, () => <text-input />);
       await tick();
 
       fabric.fireEvent(createdInput().instanceHandle, 'topFocus', {});
@@ -356,7 +374,7 @@ describe('Solid TextInput on the engine', () => {
     it('passes the controlled selection down and reports selection changes', async () => {
       let reported: unknown;
       mount(ROOT_TAG, () => (
-        <TextInput
+        <text-input
           value="hello"
           selection={{ start: 1, end: 3 }}
           onSelectionChange={(event: ISymbioteEvent) => {
@@ -379,7 +397,7 @@ describe('Solid TextInput on the engine', () => {
     it('carries an explicit selection into the controlled write', async () => {
       const [value, setValue] = createSignal('a');
       mount(ROOT_TAG, () => (
-        <TextInput value={value()} selection={{ start: 2, end: 4 }} />
+        <text-input value={value()} selection={{ start: 2, end: 4 }} />
       ));
       await tick();
 
@@ -395,7 +413,10 @@ describe('Solid TextInput on the engine', () => {
     it('drives focus / blur / clear / setSelection through the ref', async () => {
       let handle: ITextInputHandle | undefined;
       mount(ROOT_TAG, () => (
-        <TextInput ref={instance => (handle = instance)} defaultValue="hello" />
+        <text-input
+          ref={(node: IHostInstance) => (handle = buildTextInputHandle(node))}
+          defaultValue="hello"
+        />
       ));
       await tick();
 
@@ -426,7 +447,7 @@ describe('Solid TextInput on the engine', () => {
     // assertion pins a contract two layers hold, not this adapter alone.)
     it('never forwards the JS-only props onto the native prop bag', async () => {
       mount(ROOT_TAG, () => (
-        <TextInput
+        <text-input
           value="a"
           defaultValue="seed"
           inputMode="email"
@@ -441,22 +462,11 @@ describe('Solid TextInput on the engine', () => {
       expect('inputMode' in props).toBe(false);
     });
 
-    // why: single- and multiline are different NATIVE views, so a runtime flip cannot be a prop
-    // update — the host node has to be rebuilt (React remounts, Vue h()s a new type, Svelte swaps
-    // an {#if} branch). Solid's bridge builds a node's shape ONCE, so without the swap this throws
-    // instead of painting.
-    it('rebuilds the host node when multiline flips after mount', async () => {
-      const [multiline, setMultiline] = createSignal(false);
-      mount(ROOT_TAG, () => <TextInput multiline={multiline()} value="a" />);
-      await tick();
-      expect(committedInput(SINGLELINE_VIEW).props.text).toBe('a');
-
-      setMultiline(true);
-      await tick();
-
-      expect(committedInput(MULTILINE_VIEW).props.text).toBe('a');
-      expect(fabric.committed.length).toBeGreaterThan(0);
-    });
+    // A runtime multiline flip is NOT covered: single- and multiline are different native views,
+    // a bare tag's view is fixed at creation (`resolve-intrinsic.ts`'s own header — no prop write
+    // moves a node between view types), and neither this file's reference (React's) nor any other
+    // adapter tests swapping the two tags on one mount. `bare-tag-intrinsic-choice.test.tsx` covers
+    // every FRESH-mount case; a runtime swap would need its own investigation, not a guess here.
   });
 
   describe('Negative', () => {
@@ -466,7 +476,7 @@ describe('Solid TextInput on the engine', () => {
     it('ignores a change event whose nativeEvent.text is missing', async () => {
       let calls = 0;
       mount(ROOT_TAG, () => (
-        <TextInput
+        <text-input
           value="a"
           onValueChange={() => {
             calls++;

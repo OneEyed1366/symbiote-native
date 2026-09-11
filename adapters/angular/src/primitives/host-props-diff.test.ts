@@ -60,7 +60,7 @@ let mounted: DiffHost | undefined;
   selector: 'diff-host',
   standalone: true,
   imports: [View, SymbioteHostPropsDirective],
-  template: `<View [symbioteHostProps]="bag"></View>`,
+  template: `<view [symbioteHostProps]="bag"></view>`,
 })
 class DiffHost {
   readonly accessibilityLabel = signal<string | undefined>(undefined);

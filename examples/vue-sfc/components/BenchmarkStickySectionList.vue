@@ -11,7 +11,7 @@
   re-render this box.
 -->
 <script setup lang="ts">
-import { SectionList, Text, View, type ISection } from '@symbiote-native/vue';
+import { SectionList, type ISection } from '@symbiote-native/vue';
 
 const SECTION_LIST_SECTION_COUNT = 16;
 const SECTION_LIST_ROWS_PER_SECTION = 32;
@@ -94,8 +94,8 @@ const sectionRowStyle = { height: SECTION_LIST_ROW_HEIGHT };
 </script>
 
 <template>
-  <Text class="section-label"
-    >STICKY PATH B · SectionList · stickySectionHeadersEnabled</Text
+  <text class="section-label"
+    >STICKY PATH B · SectionList · stickySectionHeadersEnabled</text
   >
   <SectionList
     testID="benchmark-sticky-section-list"
@@ -107,17 +107,17 @@ const sectionRowStyle = { height: SECTION_LIST_ROW_HEIGHT };
     :get-item-layout="sectionListItemLayout"
   >
     <template #sectionHeader="{ section }">
-      <Text class="section-header" :style="sectionHeaderStyle">{{
+      <text class="section-header" :style="sectionHeaderStyle">{{
         section.title
-      }}</Text>
+      }}</text>
     </template>
     <template #item="{ item }">
-      <View class="parity-row" :style="sectionRowStyle">
-        <Text class="list-row-text">{{ item.label }}</Text>
-      </View>
+      <view class="parity-row" :style="sectionRowStyle">
+        <text class="list-row-text">{{ item.label }}</text>
+      </view>
     </template>
   </SectionList>
-  <Text class="note-text">{{
+  <text class="note-text">{{
     `${SECTION_LIST_SECTION_COUNT} sections x ${SECTION_LIST_ROWS_PER_SECTION} rows — windowed, sticky math inside the list.`
-  }}</Text>
+  }}</text>
 </template>

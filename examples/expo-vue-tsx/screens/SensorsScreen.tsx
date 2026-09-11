@@ -1,6 +1,6 @@
 import { computed, defineComponent, onMounted, ref } from 'vue';
 import type { ComputedRef, Ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   useAccelerometer,
   useDeviceMotion,
@@ -59,30 +59,30 @@ function sensorStatus(
 
 function renderSensorBody(status: ISensorStatus, children: () => unknown) {
   if (status === 'checking')
-    return <Text class="info-text">checking availability…</Text>;
+    return <text class="info-text">checking availability…</text>;
   if (status === 'unavailable')
-    return <Text class="info-text">not available on this device</Text>;
+    return <text class="info-text">not available on this device</text>;
   if (status === 'waiting')
-    return <Text class="info-text">waiting for first reading…</Text>;
+    return <text class="info-text">waiting for first reading…</text>;
   return children();
 }
 
 function renderAxisRow(measurement: { x: number; y: number; z: number }) {
   return (
-    <View class="sensor-reading-row">
-      <View class="sensor-reading-chip">
-        <Text class="sensor-reading-label">X</Text>
-        <Text class="sensor-reading-value">{measurement.x.toFixed(3)}</Text>
-      </View>
-      <View class="sensor-reading-chip">
-        <Text class="sensor-reading-label">Y</Text>
-        <Text class="sensor-reading-value">{measurement.y.toFixed(3)}</Text>
-      </View>
-      <View class="sensor-reading-chip">
-        <Text class="sensor-reading-label">Z</Text>
-        <Text class="sensor-reading-value">{measurement.z.toFixed(3)}</Text>
-      </View>
-    </View>
+    <view class="sensor-reading-row">
+      <view class="sensor-reading-chip">
+        <text class="sensor-reading-label">X</text>
+        <text class="sensor-reading-value">{measurement.x.toFixed(3)}</text>
+      </view>
+      <view class="sensor-reading-chip">
+        <text class="sensor-reading-label">Y</text>
+        <text class="sensor-reading-value">{measurement.y.toFixed(3)}</text>
+      </view>
+      <view class="sensor-reading-chip">
+        <text class="sensor-reading-label">Z</text>
+        <text class="sensor-reading-value">{measurement.z.toFixed(3)}</text>
+      </view>
+    </view>
   );
 }
 
@@ -145,152 +145,152 @@ export const SensorsScreen = defineComponent(
     );
 
     return () => (
-      <SafeAreaView class="screen">
-        <ScrollView
+      <safe-area-view class="screen">
+        <scroll-view
           testID="sensors-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view
               class="hero-badge"
               style={{ backgroundColor: LINE_COLOR.sensors }}
             >
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Sensors</Text>
-              <Text class="hero-body">
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Sensors</text>
+              <text class="hero-body">
                 @symbiote-native/sensors — live readings from five
                 expo-sensors-backed hooks. A simulator reports every
                 CoreMotion/CMPedometer-backed sensor as unavailable; a real
                 device is needed to see live readings.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View class="sensor-card" testID="sensor-card-accelerometer">
-            <View class="sensor-card-header">
-              <Text class="sensor-card-title">Accelerometer</Text>
-              <View
+          <view class="sensor-card" testID="sensor-card-accelerometer">
+            <view class="sensor-card-header">
+              <text class="sensor-card-title">Accelerometer</text>
+              <view
                 class={`sensor-status-badge sensor-status-badge-${accelerometerStatus.value}`}
               >
-                <Text class="sensor-status-text">
+                <text class="sensor-status-text">
                   {SENSOR_STATUS_TEXT[accelerometerStatus.value]}
-                </Text>
-              </View>
-            </View>
+                </text>
+              </view>
+            </view>
             {renderSensorBody(
               accelerometerStatus.value,
               () => accelerometer.value && renderAxisRow(accelerometer.value),
             )}
-          </View>
+          </view>
 
-          <View class="sensor-card" testID="sensor-card-gyroscope">
-            <View class="sensor-card-header">
-              <Text class="sensor-card-title">Gyroscope</Text>
-              <View
+          <view class="sensor-card" testID="sensor-card-gyroscope">
+            <view class="sensor-card-header">
+              <text class="sensor-card-title">Gyroscope</text>
+              <view
                 class={`sensor-status-badge sensor-status-badge-${gyroscopeStatus.value}`}
               >
-                <Text class="sensor-status-text">
+                <text class="sensor-status-text">
                   {SENSOR_STATUS_TEXT[gyroscopeStatus.value]}
-                </Text>
-              </View>
-            </View>
+                </text>
+              </view>
+            </view>
             {renderSensorBody(
               gyroscopeStatus.value,
               () => gyroscope.value && renderAxisRow(gyroscope.value),
             )}
-          </View>
+          </view>
 
-          <View class="sensor-card" testID="sensor-card-magnetometer">
-            <View class="sensor-card-header">
-              <Text class="sensor-card-title">Magnetometer</Text>
-              <View
+          <view class="sensor-card" testID="sensor-card-magnetometer">
+            <view class="sensor-card-header">
+              <text class="sensor-card-title">Magnetometer</text>
+              <view
                 class={`sensor-status-badge sensor-status-badge-${magnetometerStatus.value}`}
               >
-                <Text class="sensor-status-text">
+                <text class="sensor-status-text">
                   {SENSOR_STATUS_TEXT[magnetometerStatus.value]}
-                </Text>
-              </View>
-            </View>
+                </text>
+              </view>
+            </view>
             {renderSensorBody(
               magnetometerStatus.value,
               () => magnetometer.value && renderAxisRow(magnetometer.value),
             )}
-          </View>
+          </view>
 
-          <View class="sensor-card" testID="sensor-card-device-motion">
-            <View class="sensor-card-header">
-              <Text class="sensor-card-title">Device motion</Text>
-              <View
+          <view class="sensor-card" testID="sensor-card-device-motion">
+            <view class="sensor-card-header">
+              <text class="sensor-card-title">Device motion</text>
+              <view
                 class={`sensor-status-badge sensor-status-badge-${deviceMotionStatus.value}`}
               >
-                <Text class="sensor-status-text">
+                <text class="sensor-status-text">
                   {SENSOR_STATUS_TEXT[deviceMotionStatus.value]}
-                </Text>
-              </View>
-            </View>
+                </text>
+              </view>
+            </view>
             {renderSensorBody(deviceMotionStatus.value, () => {
               const motion = deviceMotion.value;
               if (!motion) return null;
               return [
-                <Text class="info-text">{`interval: ${motion.interval.toFixed(1)}ms`}</Text>,
+                <text class="info-text">{`interval: ${motion.interval.toFixed(1)}ms`}</text>,
                 motion.rotation && (
-                  <View class="sensor-reading-row">
-                    <View class="sensor-reading-chip">
-                      <Text class="sensor-reading-label">ALPHA</Text>
-                      <Text class="sensor-reading-value">
+                  <view class="sensor-reading-row">
+                    <view class="sensor-reading-chip">
+                      <text class="sensor-reading-label">ALPHA</text>
+                      <text class="sensor-reading-value">
                         {motion.rotation.alpha.toFixed(3)}
-                      </Text>
-                    </View>
-                    <View class="sensor-reading-chip">
-                      <Text class="sensor-reading-label">BETA</Text>
-                      <Text class="sensor-reading-value">
+                      </text>
+                    </view>
+                    <view class="sensor-reading-chip">
+                      <text class="sensor-reading-label">BETA</text>
+                      <text class="sensor-reading-value">
                         {motion.rotation.beta.toFixed(3)}
-                      </Text>
-                    </View>
-                    <View class="sensor-reading-chip">
-                      <Text class="sensor-reading-label">GAMMA</Text>
-                      <Text class="sensor-reading-value">
+                      </text>
+                    </view>
+                    <view class="sensor-reading-chip">
+                      <text class="sensor-reading-label">GAMMA</text>
+                      <text class="sensor-reading-value">
                         {motion.rotation.gamma.toFixed(3)}
-                      </Text>
-                    </View>
-                  </View>
+                      </text>
+                    </view>
+                  </view>
                 ),
               ];
             })}
-          </View>
+          </view>
 
-          <View class="sensor-card" testID="sensor-card-pedometer">
-            <View class="sensor-card-header">
-              <Text class="sensor-card-title">Pedometer</Text>
-              <View
+          <view class="sensor-card" testID="sensor-card-pedometer">
+            <view class="sensor-card-header">
+              <text class="sensor-card-title">Pedometer</text>
+              <view
                 class={`sensor-status-badge sensor-status-badge-${pedometerStatus.value}`}
               >
-                <Text class="sensor-status-text">
+                <text class="sensor-status-text">
                   {SENSOR_STATUS_TEXT[pedometerStatus.value]}
-                </Text>
-              </View>
-            </View>
+                </text>
+              </view>
+            </view>
             {renderSensorBody(
               pedometerStatus.value,
               () =>
                 pedometer.value && (
-                  <Text
+                  <text
                     testID="sensors-pedometer-steps"
                     class="sensor-reading-value"
                   >
                     {`${pedometer.value.steps} steps`}
-                  </Text>
+                  </text>
                 ),
             )}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+          </view>
+        </scroll-view>
+      </safe-area-view>
     );
   },
   { name: 'SensorsScreen' },

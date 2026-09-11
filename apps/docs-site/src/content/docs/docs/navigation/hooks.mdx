@@ -209,9 +209,9 @@ pair instead of once on mount.
   `useCallback`) — a new function identity on every render re-subscribes the
   effect, same as any other `useEffect` dependency. Vue's `useFocusEffect`,
   Angular's `injectFocusEffect`, Svelte's `useFocusEffect`, and Solid's
-  `createFocusEffect` need no memoization: `setup()`, a component constructor,
-  a Svelte component's script, and a Solid component body each run exactly
-  once, so the callback is captured a single time by value.
+  `createFocusEffect` need no memoization: `setup()`, a component constructor, a
+  Svelte component's script, and a Solid component body each run exactly once,
+  so the callback is captured a single time by value.
 </Aside>
 
 `useIsFocused`/`injectIsFocused` always **starts `false`**. It never guesses focus from stack

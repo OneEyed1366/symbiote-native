@@ -14,7 +14,7 @@
 // reject — every touch sequence resolves to one of "long press", "press", or "neither".
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, Text } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 140;
@@ -42,14 +42,14 @@ function handleFor(testID: string): unknown {
 describe('React long-press wiring (Positive)', () => {
   it('routes a sustained hold to onLongPress and suppresses onPress', () => {
     // why: proves BOTH `onLongPress` and `onPress` reach the engine's routeProp path from a
-    // real React <Text> mount — the timer/delay/suppression mechanics themselves are
+    // real React <text> mount — the timer/delay/suppression mechanics themselves are
     // engine-tested (see file header); a React-side regression here would look like "onLongPress
     // silently never fires" with no engine-level test able to catch it.
     let longPress = 0;
     let press = 0;
     mount(
       ROOT_TAG,
-      <Text
+      <text
         testID="hold"
         onLongPress={() => {
           longPress++;
@@ -59,7 +59,7 @@ describe('React long-press wiring (Positive)', () => {
         }}
       >
         hold me
-      </Text>,
+      </text>,
     );
     const h = handleFor('hold');
     fabric.fireEvent(h, TOUCH_START);
@@ -77,7 +77,7 @@ describe('React long-press wiring (Positive)', () => {
     let press = 0;
     mount(
       ROOT_TAG,
-      <Text
+      <text
         testID="tap"
         onLongPress={() => {
           longPress++;
@@ -87,7 +87,7 @@ describe('React long-press wiring (Positive)', () => {
         }}
       >
         tap me
-      </Text>,
+      </text>,
     );
     const h = handleFor('tap');
     fabric.fireEvent(h, TOUCH_START);

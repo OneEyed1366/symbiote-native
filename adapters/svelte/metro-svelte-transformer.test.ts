@@ -7,6 +7,7 @@
 // identical scoping (that file likewise never drives its transformer's standalone-CSS branch).
 import { describe, expect, it } from 'vitest';
 import metroSvelteTransformer from './metro-svelte-transformer.cjs';
+import { ShimElement } from './src/dom-shim/element';
 
 const {
   compileSvelteFile,
@@ -27,9 +28,9 @@ const COMPONENT_SOURCE = `
   let { label }: { label: string } = $props();
 </script>
 
-<symbiote-view p={{}}>
-  <symbiote-text p={{}}>{label}</symbiote-text>
-</symbiote-view>
+<view p={{}}>
+  <text p={{}}>{label}</text>
+</view>
 `;
 
 const TRANSFORM_OPTIONS = {
@@ -63,13 +64,28 @@ describe('compileSvelteFile', () => {
       expect(code).not.toContain('from_html(');
     });
 
-    it('routes symbiote-* custom-element props through set_custom_element_data', () => {
-      // why: every symbiote-* tag is hyphenated, so Svelte's compiler takes the custom-element
-      // codegen path (skill §3g) instead of plain set_attribute — losing this would stringify
-      // the object prop bag instead of setting it as a real property.
+    it('passes the prop bag as an OBJECT, on the plain set_attribute path', () => {
+      // why: this used to assert `set_custom_element_data`, which Svelte emits for a HYPHENATED
+      // tag. Dropping the `symbiote-` prefix took `view` and `text` off that path — they are
+      // ordinary element names now, while `scroll-view` and friends still hyphenate, so the
+      // compiler emits two different calls depending on the tag. The property that has to survive
+      // either way is that the bag arrives as an object rather than stringified.
       const code = compileSvelteFile(COMPONENT_SOURCE, 'Demo.svelte');
-      expect(code).toContain("set_custom_element_data(symbiote_view, 'p'");
-      expect(code).toContain("set_custom_element_data(symbiote_text, 'p'");
+      expect(code).toContain("set_attribute(view, 'p', {");
+      expect(code).toContain("set_attribute(text, 'p', {");
+
+      // The runtime half, and it is what the custom-element path used to make unnecessary:
+      // `set_attribute` writes `element[attr] = value` for a non-string value ONLY when
+      // `get_setters` finds a setter on the prototype chain. So the object survives because `p` is
+      // a real setter on the shim — assert that here rather than in a distant file, since the two
+      // halves are now one contract.
+      const setter = Object.getOwnPropertyDescriptor(
+        ShimElement.prototype,
+        'p',
+      );
+      expect(typeof setter?.set, '`p` must be a prototype setter').toBe(
+        'function',
+      );
     });
 
     it('strips <script lang="ts"> types with no external file resolution', () => {

@@ -23,7 +23,6 @@
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  View,
   Modal,
   mount,
   unmount,
@@ -53,7 +52,7 @@ function containerNode(): IFakeNode {
 describe('React Modal on the engine', () => {
   describe('Positive — commit shape through the real Descriptor->React->Fabric bridge', () => {
     // why: proves the STRUCTURE renderModal's contract promises — one childSet, the user's
-    // <View/> nested under a single collapsable container, no second root — actually survives
+    // <view/> nested under a single collapsable container, no second root — actually survives
     // a real commit. The individual style/attribute VALUES (position:absolute, animationType,
     // presentationStyle default, white backdrop) are the exhaustive-value concern of
     // renderModal's own core test; spot-checking one of them (visible) here is enough to prove
@@ -62,7 +61,7 @@ describe('React Modal on the engine', () => {
       mount(
         ROOT_TAG,
         <Modal visible>
-          <View />
+          <view />
         </Modal>,
       );
       expect(fabric.serialize(fabric.appRoot().children)).toBe(
@@ -78,7 +77,7 @@ describe('React Modal on the engine', () => {
       mount(
         ROOT_TAG,
         <Modal visible={false}>
-          <View />
+          <view />
         </Modal>,
       );
       expect(fabric.appRoot().children.length).toBe(0);
@@ -95,7 +94,7 @@ describe('React Modal on the engine', () => {
         const [visible, setVisible] = useState(true);
         return (
           <Modal visible={visible} onRequestClose={() => setVisible(false)}>
-            <View />
+            <view />
           </Modal>
         );
       }
@@ -120,7 +119,7 @@ describe('React Modal on the engine', () => {
             closed = true;
           }}
         >
-          <View />
+          <view />
         </Modal>,
       );
       fabric.fireEvent(modalNode().instanceHandle, 'topRequestClose', {});
@@ -142,7 +141,7 @@ describe('React Modal on the engine', () => {
             received = event;
           }}
         >
-          <View />
+          <view />
         </Modal>,
       );
       fabric.fireEvent(modalNode().instanceHandle, 'topOrientationChange', {
@@ -162,7 +161,7 @@ describe('React Modal on the engine', () => {
             shown = true;
           }}
         >
-          <View />
+          <view />
         </Modal>,
       );
       fabric.fireEvent(modalNode().instanceHandle, 'topShow', {});
@@ -185,7 +184,7 @@ describe('React Modal on the engine', () => {
               dismissCount += 1;
             }}
           >
-            <View />
+            <view />
           </Modal>
         );
       }
@@ -214,7 +213,7 @@ describe('React Modal on the engine', () => {
       mount(
         ROOT_TAG,
         <Modal visible transparent style={{ backgroundColor: 'red' }}>
-          <View />
+          <view />
         </Modal>,
       );
       expect(containerNode().props.backgroundColor).toBe('transparent');
@@ -236,7 +235,7 @@ describe('React Modal on the engine', () => {
           accessible
           accessibilityLabel="a dialog"
         >
-          <View />
+          <view />
         </Modal>,
       );
       const props = modalNode().props;
@@ -262,7 +261,7 @@ describe('React Modal on the engine', () => {
           allowSwipeDismissal
           onRequestClose={() => {}}
         >
-          <View />
+          <view />
         </Modal>,
       );
       const props = modalNode().props;

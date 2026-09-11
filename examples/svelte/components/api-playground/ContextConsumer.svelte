@@ -11,7 +11,6 @@
 
 <script lang="ts">
   import { getAllContexts, getContext, hasContext } from 'svelte';
-  import { Text, View } from '@symbiote-native/svelte';
 
   // Context follows the RUNTIME render tree, not this file's lexical location — it reads whatever
   // CompositionDemo.svelte's ancestor instance set, even though this component is defined in a
@@ -21,11 +20,11 @@
   const contextKeyCount = getAllContexts().size;
 </script>
 
-<View class="row-align-center">
-  <View class="hero-badge" style={{ backgroundColor: theme.accent }}>
-    <Text class="hero-badge-text">ctx</Text>
-  </View>
-  <Text class="info-text-flex" testID="context-consumer-readout">
+<view class="row-align-center">
+  <view class="hero-badge" style={{ backgroundColor: theme.accent }}>
+    <text class="hero-badge-text">ctx</text>
+  </view>
+  <text class="info-text-flex" testID="context-consumer-readout">
     {`hasContext: ${hasTheme} · getAllContexts().size: ${contextKeyCount} · accent via getContext: ${theme.accent}`}
-  </Text>
-</View>
+  </text>
+</view>

@@ -90,14 +90,14 @@ describe('Teleport — the Vue adapter portal', () => {
         rootTag,
         defineComponent({
           setup: () => () =>
-            h('symbiote-view', {}, [
-              h('symbiote-view', { ref: overlayRef, testID: 'overlay-host' }, [
-                h('symbiote-view', { testID: 'own-child' }),
+            h('view', {}, [
+              h('view', { ref: overlayRef, testID: 'overlay-host' }, [
+                h('view', { testID: 'own-child' }),
               ]),
-              h('symbiote-view', { testID: 'source' }, [
+              h('view', { testID: 'source' }, [
                 overlayRef.value
                   ? h(Teleport, { to: overlayRef.value }, () =>
-                      h('symbiote-view', { testID: 'ported' }),
+                      h('view', { testID: 'ported' }),
                     )
                   : null,
               ]),
@@ -134,10 +134,10 @@ describe('Teleport — the Vue adapter portal', () => {
         rootTag,
         defineComponent({
           setup: () => () =>
-            h('symbiote-view', { testID: 'source' }, [
+            h('view', { testID: 'source' }, [
               surfaceRef.value
                 ? h(Teleport, { to: surfaceRef.value }, () =>
-                    h('symbiote-view', { testID: 'ported' }),
+                    h('view', { testID: 'ported' }),
                   )
                 : null,
             ]),
@@ -168,11 +168,11 @@ describe('Teleport — the Vue adapter portal', () => {
         rootTag,
         defineComponent({
           setup: () => () =>
-            h('symbiote-view', {}, [
-              h('symbiote-view', { ref: overlayRef, testID: 'overlay-host' }),
+            h('view', {}, [
+              h('view', { ref: overlayRef, testID: 'overlay-host' }),
               overlayRef.value
                 ? h(Teleport, { to: overlayRef.value }, () =>
-                    h('symbiote-view', {
+                    h('view', {
                       testID: 'ported',
                       accessibilityLabel: label.value,
                     }),
@@ -208,14 +208,14 @@ describe('Teleport — the Vue adapter portal', () => {
         rootTag,
         defineComponent({
           setup: () => () =>
-            h('symbiote-view', {}, [
-              h('symbiote-view', { ref: hostARef, testID: 'host-a' }),
-              h('symbiote-view', { ref: hostBRef, testID: 'host-b' }),
+            h('view', {}, [
+              h('view', { ref: hostARef, testID: 'host-a' }),
+              h('view', { ref: hostBRef, testID: 'host-b' }),
               hostARef.value && hostBRef.value
                 ? h(
                     Teleport,
                     { to: targetIsB.value ? hostBRef.value : hostARef.value },
-                    () => h('symbiote-view', { testID: 'ported' }),
+                    () => h('view', { testID: 'ported' }),
                   )
                 : null,
             ]),
@@ -249,11 +249,11 @@ describe('Teleport — the Vue adapter portal', () => {
         rootTag,
         defineComponent({
           setup: () => () =>
-            h('symbiote-view', {}, [
-              h('symbiote-view', { ref: overlayRef, testID: 'overlay-host' }),
+            h('view', {}, [
+              h('view', { ref: overlayRef, testID: 'overlay-host' }),
               overlayRef.value && isShown.value
                 ? h(Teleport, { to: overlayRef.value }, () =>
-                    h('symbiote-view', { testID: 'ported' }),
+                    h('view', { testID: 'ported' }),
                   )
                 : null,
             ]),
@@ -284,12 +284,12 @@ describe('Teleport — the Vue adapter portal', () => {
         rootTag,
         defineComponent({
           setup: () => () =>
-            h('symbiote-view', {}, [
-              h('symbiote-view', { ref: overlayRef, testID: 'overlay-host' }),
-              h('symbiote-view', { testID: 'source' }, [
+            h('view', {}, [
+              h('view', { ref: overlayRef, testID: 'overlay-host' }),
+              h('view', { testID: 'source' }, [
                 overlayRef.value
                   ? h(Teleport, { to: overlayRef.value, disabled: true }, () =>
-                      h('symbiote-view', { testID: 'ported' }),
+                      h('view', { testID: 'ported' }),
                     )
                   : null,
               ]),
@@ -323,7 +323,7 @@ describe('Teleport — the Vue adapter portal', () => {
         setup: () => {
           const origin = inject(ORIGIN_KEY, 'default');
           return () =>
-            h('symbiote-view', {
+            h('view', {
               testID: 'ported',
               accessibilityLabel: origin,
             });
@@ -340,14 +340,14 @@ describe('Teleport — the Vue adapter portal', () => {
         rootTag,
         defineComponent({
           setup: () => () =>
-            h('symbiote-view', {}, [
+            h('view', {}, [
               h(Provider, null, {
                 default: () =>
                   overlayRef.value
                     ? h(Teleport, { to: overlayRef.value }, () => h(Consumer))
                     : null,
               }),
-              h('symbiote-view', { ref: overlayRef, testID: 'overlay-host' }),
+              h('view', { ref: overlayRef, testID: 'overlay-host' }),
             ]),
         }),
       );
@@ -391,8 +391,7 @@ describe('Teleport — the Vue adapter portal', () => {
         mount(
           rootTag,
           defineComponent({
-            setup: () => () =>
-              h(Teleport, { to: 'body' }, () => h('symbiote-view')),
+            setup: () => () => h(Teleport, { to: 'body' }, () => h('view')),
           }),
         ),
       );
@@ -414,8 +413,7 @@ describe('Teleport — the Vue adapter portal', () => {
         mount(
           rootTag,
           defineComponent({
-            setup: () => () =>
-              h(Teleport, { to: garbage }, () => h('symbiote-view')),
+            setup: () => () => h(Teleport, { to: garbage }, () => h('view')),
           }),
         ),
       );

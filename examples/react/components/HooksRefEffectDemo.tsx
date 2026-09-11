@@ -7,12 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import {
-  Text,
-  View,
-  findNodeHandle,
-  type IHostInstance,
-} from '@symbiote-native/react';
+import { findNodeHandle, type IHostInstance } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 
@@ -32,10 +27,10 @@ const Knob = forwardRef<IKnobHandle, IKnobProps>(function KnobImpl(
     [],
   );
   return (
-    <Text
+    <text
       testID="hooks-knob"
       className="info-text"
-    >{`knob value=${value} bumps=${bumps}`}</Text>
+    >{`knob value=${value} bumps=${bumps}`}</text>
   );
 });
 
@@ -81,28 +76,28 @@ export function HooksRefEffectDemo() {
   }, [ticks]);
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         useRef · useImperativeHandle · useEffect · useLayoutEffect ·
         useEffectEvent
-      </Text>
-      <View ref={boxRef} testID="hooks-layout-box" className="ref-box">
-        <Text className="ref-box-text">{syncNote}</Text>
-      </View>
-      <Text testID="hooks-render-count" className="info-text">
+      </text>
+      <view ref={boxRef} testID="hooks-layout-box" className="ref-box">
+        <text className="ref-box-text">{syncNote}</text>
+      </view>
+      <text testID="hooks-render-count" className="info-text">
         {`useRef render count (mutation alone never re-renders): ${renderCount.current}`}
-      </Text>
+      </text>
       <ActionButton
         testID="hooks-force-rerender"
         title="Force a re-render"
         onPress={() => forceRerender(current => current + 1)}
         color={LINE_COLOR.introspection}
       />
-      <Text className="info-text">{`useEffect ticks: ${ticks}`}</Text>
-      <Text
+      <text className="info-text">{`useEffect ticks: ${ticks}`}</text>
+      <text
         testID="hooks-effect-event-log"
         className="info-text"
-      >{`useEffectEvent: ${loggedText}`}</Text>
+      >{`useEffectEvent: ${loggedText}`}</text>
       <ActionButton
         testID="hooks-multiplier"
         title={multiplier === 1 ? 'Multiplier 1 → 3' : 'Multiplier 3 → 1'}
@@ -116,6 +111,6 @@ export function HooksRefEffectDemo() {
         onPress={() => knobRef.current?.bump()}
         color={LINE_COLOR.introspection}
       />
-    </View>
+    </view>
   );
 }

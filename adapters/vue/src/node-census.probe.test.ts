@@ -5,7 +5,7 @@ import { describe, it } from 'vitest';
 import { defineComponent, h, shallowRef } from 'vue';
 import { installFabric } from '@symbiote-native/test-utils';
 import { censusRetainedTree, readCommitProfile } from '@symbiote-native/engine';
-import { mount, unmount, View, Text, Pressable } from './index';
+import { mount, unmount } from './index';
 
 const fabric = installFabric();
 const ROOT_TAG = 4243;
@@ -19,17 +19,13 @@ const noop = (): void => {};
 const Row = defineComponent({
   props: { id: { type: Number, required: true } },
   setup: props => () =>
-    h(View, { class: 'bench-row' }, () => [
-      h(Text, { class: 'bench-row-id' }, () => String(props.id)),
-      h(Pressable, { class: 'flex1', onPress: noop }, () => [
-        h(
-          Text,
-          { class: 'bench-row-label' },
-          () => `row label number ${props.id}`,
-        ),
+    h('view', { class: 'bench-row' }, [
+      h('text', { class: 'bench-row-id' }, String(props.id)),
+      h('pressable', { class: 'flex1', onPress: noop }, [
+        h('text', { class: 'bench-row-label' }, `row label number ${props.id}`),
       ]),
-      h(Pressable, { class: 'bench-row-remove', onPress: noop }, () => [
-        h(Text, { class: 'bench-row-remove-text' }, () => 'x'),
+      h('pressable', { class: 'bench-row-remove', onPress: noop }, [
+        h('text', { class: 'bench-row-remove-text' }, 'x'),
       ]),
     ]),
 });
@@ -38,7 +34,9 @@ const rows = shallowRef<readonly number[]>([]);
 
 const App = defineComponent({
   setup: () => () =>
-    h(View, { class: 'screen' }, () =>
+    h(
+      'view',
+      { class: 'screen' },
       rows.value.map(id => h(Row, { key: id, id })),
     ),
 });

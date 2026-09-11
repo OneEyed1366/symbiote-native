@@ -12,11 +12,11 @@
 //
 // therefore compiles to `from_tree([marker, ' ', marker])`, and each ' ' becomes an RCTRawText
 // engine node parented to whatever host tag holds the `{@render children?.()}` call. Inside a
-// plain `symbiote-view` that is the invalid "text outside a <Text> component" shape; inside
+// plain `view` that is the invalid "text outside a <text> component" shape; inside
 // RNSScreenStack it is worse, since react-native-screens' native side expects only RNSScreen
 // children there.
 //
-// So the markers are rendered inside a zero-size `symbiote-text` instead: raw text inside an
+// So the markers are rendered inside a zero-size `text` instead: raw text inside an
 // RCTText is LEGAL, which turns the hazard from a device crash into a no-op and makes it
 // structurally impossible rather than a rule app authors have to remember. The cost is one
 // collapsed, non-interactive RCTText per navigator.

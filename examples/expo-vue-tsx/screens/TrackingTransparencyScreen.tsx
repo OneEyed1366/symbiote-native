@@ -1,6 +1,6 @@
 import { defineComponent, ref } from 'vue';
 import type { Ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   getAdvertisingId,
   usePermissions,
@@ -11,10 +11,10 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="auth-capability-row">
-      <Text class="auth-capability-label">{props.label}</Text>
-      <Text class="auth-value-text">{props.value}</Text>
-    </View>
+    <view class="auth-capability-row">
+      <text class="auth-capability-label">{props.label}</text>
+      <text class="auth-value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -43,33 +43,33 @@ export const TrackingTransparencyScreen = defineComponent(
     }
 
     return () => (
-      <SafeAreaView class="screen">
-        <ScrollView
+      <safe-area-view class="screen">
+        <scroll-view
           testID="tracking-transparency-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Tracking Transparency</Text>
-              <Text class="hero-body">
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Tracking Transparency</text>
+              <text class="hero-body">
                 @symbiote-native/tracking-transparency — App Tracking
                 Transparency permission status plus the advertising ID it gates.
                 Android/web always report granted.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="tracking-transparency-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Permission</Text>
-            </View>
+          <view testID="tracking-transparency-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Permission</text>
+            </view>
             <ValueRow
               label="Status"
               value={status.value?.status ?? 'checking…'}
@@ -96,19 +96,19 @@ export const TrackingTransparencyScreen = defineComponent(
               onPress={handleRequest}
               color={lineColor}
             />
-          </View>
+          </view>
 
-          <View
+          <view
             testID="tracking-transparency-advertising-id-card"
             class="auth-card"
           >
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Advertising ID</Text>
-            </View>
+            <view class="auth-card-header">
+              <text class="auth-card-title">Advertising ID</text>
+            </view>
             <ValueRow label="ID" value={advertisingId.value ?? 'null'} />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+          </view>
+        </scroll-view>
+      </safe-area-view>
     );
   },
   { name: 'TrackingTransparencyScreen' },

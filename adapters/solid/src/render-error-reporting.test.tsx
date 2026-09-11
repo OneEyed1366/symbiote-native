@@ -127,14 +127,14 @@ describe('Negative — an uncaught error under the Solid root', () => {
 
     function App() {
       return (
-        <symbiote-view>
-          <symbiote-text>
+        <view>
+          <text>
             {(() => {
               if (step() > 0) throw new Error(BOOM);
               return 'ok';
             })()}
-          </symbiote-text>
-        </symbiote-view>
+          </text>
+        </view>
       );
     }
 
@@ -155,22 +155,22 @@ describe('Negative — an uncaught error under the Solid root', () => {
     const [step, setStep] = createSignal(0);
 
     const Leaf = () => (
-      <symbiote-text>
+      <text>
         {(() => {
           if (step() > 0) throw new Error(BOOM);
           return 'ok';
         })()}
-      </symbiote-text>
+      </text>
     );
     const Inner = () => (
-      <symbiote-view>
+      <view>
         <Leaf />
-      </symbiote-view>
+      </view>
     );
     const Outer = () => (
-      <symbiote-view>
+      <view>
         <Inner />
-      </symbiote-view>
+      </view>
     );
 
     mount(ROOT_TAG, Outer);
@@ -189,7 +189,7 @@ describe('Negative — an uncaught error under the Solid root', () => {
       createEffect(() => {
         if (step() > 0) throw new Error(BOOM);
       });
-      return <symbiote-view testID="effect-root" />;
+      return <view testID="effect-root" />;
     }
 
     mount(ROOT_TAG, App);
@@ -211,7 +211,7 @@ describe('An ErrorBoundary claimed the error', () => {
 
     function App() {
       return (
-        <ErrorBoundary fallback={<symbiote-text>recovered</symbiote-text>}>
+        <ErrorBoundary fallback={<text>recovered</text>}>
           <Exploding />
         </ErrorBoundary>
       );
@@ -232,10 +232,10 @@ describe('An ErrorBoundary claimed the error', () => {
   it('lets the boundary paint its fallback all the same', async () => {
     function App() {
       return (
-        <ErrorBoundary fallback={<symbiote-text>recovered</symbiote-text>}>
-          <symbiote-view>
+        <ErrorBoundary fallback={<text>recovered</text>}>
+          <view>
             <Exploding />
-          </symbiote-view>
+          </view>
         </ErrorBoundary>
       );
     }

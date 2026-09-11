@@ -1,17 +1,11 @@
 // Drawer, driven through the REAL compiled index.svelte against a fake Fabric.
 //
-// One thing has to be substituted to run this at all: `drawer/index.svelte` imports `Animated`
-// from `@symbiote-native/svelte`'s main barrel, and that barrel re-exports real `.svelte` sources
-// which Vite's plain (svelte-plugin-free) test transform cannot parse. So the harness aliases
-// that ONE specifier to a module generated below - which itself pulls in the REAL, freshly
-// compiled `View.svelte` and the REAL `createAnimatedComponent` from the adapter, not a
-// stand-in. Everything the drawer uses
-// beyond it (PanResponder, Dimensions, AnimatedValue, timing) already comes straight from
-// @symbiote-native/engine, which needs no substitution.
+// Nothing is substituted: the drawer writes bare `<view>` tags and takes PanResponder,
+// Dimensions, AnimatedValue and timing straight from @symbiote-native/engine. It used to import
+// `Animated` from the adapter's main barrel, which forced an alias module here because that barrel
+// re-exports `.svelte` sources Vite's plain test transform cannot parse.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { join, relative, resolve } from 'node:path';
-import { rmSync, writeFileSync } from 'node:fs';
 import { installFabric } from '@symbiote-native/test-utils';
 import type { IFakeNode } from '@symbiote-native/test-utils';
 import { Dimensions } from '@symbiote-native/engine';
@@ -35,21 +29,6 @@ if (globalThis.navigator === undefined) {
 }
 
 const ROOT_TAG = 91_703;
-// Animated.View is no longer a `.svelte` file of its own: the adapter builds all six from one
-// generic createAnimatedComponent(Base), so this compiles the plain View and wraps it the same
-// way the adapter's own barrel does.
-const VIEW_SOURCE = resolve(
-  __dirname,
-  '../../../../../adapters/svelte/src/components/View.svelte',
-);
-const CREATE_ANIMATED_COMPONENT = resolve(
-  __dirname,
-  '../../../../../adapters/svelte/src/modules/animated/create-animated-component',
-);
-const ANIMATED_ALIAS = join(
-  __dirname,
-  '.smoke-compiled-drawer-animated-alias.mjs',
-);
 
 // rAF is not a Node global; the engine's `timing` (driven by every openDrawer/closeDrawer/
 // toggleDrawer call and by a gesture release) reads it at .start() time. Same shim, same reason,
@@ -89,9 +68,7 @@ const fabric = installFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve_ => setTimeout(resolve_, 0));
 
-let harness = createSvelteHarness('drawer', {
-  '@symbiote-native/svelte': ANIMATED_ALIAS,
-});
+let harness = createSvelteHarness('drawer');
 
 beforeEach(() => {
   fabric.reset();
@@ -99,15 +76,12 @@ beforeEach(() => {
   pendingFrames.clear();
   nextFrameId = 1;
   installRequestAnimationFrame();
-  harness = createSvelteHarness('drawer', {
-    '@symbiote-native/svelte': ANIMATED_ALIAS,
-  });
+  harness = createSvelteHarness('drawer');
 });
 
 afterEach(() => {
   unmount(ROOT_TAG);
   harness.cleanup();
-  rmSync(ANIMATED_ALIAS, { force: true });
   Reflect.deleteProperty(globalThis, 'requestAnimationFrame');
   Reflect.deleteProperty(globalThis, 'cancelAnimationFrame');
 });
@@ -119,7 +93,7 @@ function screenSource(testID: string): string {
      const route = useRoute();
      const focused = useIsFocused();
    </script>
-   <symbiote-view p={{ testID: '${testID}', accessibilityLabel: route.current.name + ':' + String(focused.current) }} />`;
+   <view p={{ testID: '${testID}', accessibilityLabel: route.current.name + ':' + String(focused.current) }} />`;
 }
 
 function appSource(drawerAttributes: string, includeScreens = true): string {
@@ -137,7 +111,7 @@ function appSource(drawerAttributes: string, includeScreens = true): string {
      $effect(() => { if (navigator !== null) onReady?.(navigator); });
    </script>
    <Drawer bind:this={navigator} ${drawerAttributes}>
-     {#snippet drawerContent(slot)}<symbiote-view p={{ testID: 'drawer-panel-content', accessibilityLabel: String(slot.state.routes.length) + ':' + String(slot.state.isOpen) + ':' + String(Object.keys(slot.descriptors).length) + ':' + String(typeof slot.navigation.openDrawer) }} />{/snippet}
+     {#snippet drawerContent(slot)}<view p={{ testID: 'drawer-panel-content', accessibilityLabel: String(slot.state.routes.length) + ':' + String(slot.state.isOpen) + ':' + String(Object.keys(slot.descriptors).length) + ':' + String(typeof slot.navigation.openDrawer) }} />{/snippet}
      ${screens}
    </Drawer>`;
 }
@@ -152,15 +126,6 @@ async function mountDrawer(
   includeScreens = true,
 ): Promise<IDrawerNavigatorHandle> {
   const dir = __dirname;
-  const view = harness.compileFile(VIEW_SOURCE);
-  writeFileSync(
-    ANIMATED_ALIAS,
-    `import View from ${JSON.stringify(relative(dir, view))};\n` +
-      `import { createAnimatedComponent } from ${JSON.stringify(
-        relative(dir, CREATE_ANIMATED_COMPONENT),
-      )};\n` +
-      'export const Animated = { View: createAnimatedComponent(View) };\n',
-  );
   harness.compileSource(dir, 'inbox-fixture', screenSource('inbox'));
   harness.compileSource(dir, 'settings-fixture', screenSource('settings'));
   const app = harness.compileSource(
@@ -182,7 +147,7 @@ async function mountDrawer(
   return handle;
 }
 
-// Drawer's own root view - the `<symbiote-view p={rootProps}>` that carries
+// Drawer's own root view - the `<view p={rootProps}>` that carries
 // `panResponder.panHandlers` - sits two levels under the mount's own AppContainer wrapper (a
 // fixed shape this file's paint-order assertions already rely on): appRoot -> the mount bridge's
 // content view -> Drawer's root.

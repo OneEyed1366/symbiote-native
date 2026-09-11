@@ -8,7 +8,7 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, View, findNodeHandle } from '@symbiote-native/react';
+import { mount, unmount, findNodeHandle } from '@symbiote-native/react';
 import { AccessibilityInfo } from '../../../../../core/engine/src/accessibility-info/index.android';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
@@ -50,7 +50,7 @@ beforeEach(() => {
 
   function App(): ReactElement {
     return (
-      <View
+      <view
         ref={instance => {
           box = instance;
         }}

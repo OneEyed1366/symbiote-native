@@ -1,5 +1,4 @@
 import { createRef } from 'react';
-import { SafeAreaView, Text, View } from '@symbiote-native/react';
 import { useRoute } from '@symbiote-native/navigation/react';
 import type { IScreenOptionsResolver } from '@symbiote-native/navigation/react';
 import type { ISearchBarCommands } from '@symbiote-native/navigation';
@@ -122,47 +121,47 @@ export function HeaderOptionsScreen() {
   const params = isHeaderOptionsParams(route.params) ? route.params : {};
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HeaderOptions];
   return (
-    <SafeAreaView className="screen">
-      <View className="section">
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View
+    <safe-area-view className="screen">
+      <view className="section">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view
             className="hero-badge"
             style={{ backgroundColor: LINE_COLOR.presentation }}
           >
-            <Text className="hero-badge-text">HD</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Header options</Text>
-            <Text className="hero-body">
+            <text className="hero-badge-text">HD</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Header options</text>
+            <text className="hero-body">
               Bar buttons, a right-side menu, a native search bar, and
               headerLargeTitle — every headerSearchBarOptions callback wired to
               a live control below.
-            </Text>
-          </View>
-        </View>
-        <Text className="info-text">
+            </text>
+          </view>
+        </view>
+        <text className="info-text">
           headerLargeTitle · headerTintColor · headerStyle.backgroundColor
-        </Text>
-        <Text testID="header-last-action" className="info-text">
+        </text>
+        <text testID="header-last-action" className="info-text">
           {`last header action: ${params.lastHeaderAction ?? 'none yet — tap a bar button or menu item'}`}
-        </Text>
-        <Text testID="header-search-text" className="info-text">
+        </text>
+        <text testID="header-search-text" className="info-text">
           {`last search text: ${params.lastSearchText ?? 'none yet — pull down and type'}`}
-        </Text>
-        <Text testID="header-search-submitted" className="info-text">
+        </text>
+        <text testID="header-search-submitted" className="info-text">
           {`last search submitted: ${params.lastSearchSubmitted ?? 'none yet — type and press search'}`}
-        </Text>
-        <Text testID="header-search-event" className="info-text">
+        </text>
+        <text testID="header-search-event" className="info-text">
           {`last search bar event: ${params.lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar'}`}
-        </Text>
-        <Text className="note-text">
+        </text>
+        <text className="note-text">
           Pull down to reveal the search bar (headerSearchBarOptions), or use
           the buttons below to drive it imperatively through its
           SearchBarCommands ref.
-        </Text>
+        </text>
         <ActionButton
           testID="search-bar-focus"
           title="Focus search bar"
@@ -187,7 +186,7 @@ export function HeaderOptionsScreen() {
           onPress={() => searchBarRef.current?.cancelSearch()}
           color={LINE_COLOR.presentation}
         />
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   );
 }

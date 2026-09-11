@@ -109,17 +109,17 @@ export type IAngularModalInputs = Omit<
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (shouldRender) {
-      <symbiote-modal
+      <modal
         [symbioteHostProps]="hostProps()"
         (show)="show.emit()"
         (dismiss)="dismiss.emit()"
         (requestClose)="requestClose.emit()"
         (orientationChange)="emit(orientationChange, $event)"
       >
-        <symbiote-view [style]="containerStyle" [collapsable]="false">
+        <view [style]="containerStyle" [symbioteHostProps]="containerProps">
           <ng-content></ng-content>
-        </symbiote-view>
-      </symbiote-modal>
+        </view>
+      </modal>
     }
   `,
 })
@@ -186,8 +186,8 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
 
   private readonly changeDetector = inject(ChangeDetectorRef);
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT the inner `symbiote-view [style]="containerStyle"`
-  // that hosts the user children; the outer `symbiote-modal` node (bound via `hostProps` below) is
+  // onto (see anchorHostStyle's doc comment) — NOT the inner `view [style]="containerStyle"`
+  // that hosts the user children; the outer `modal` node (bound via `hostProps` below) is
   // the real primitive the anchor sits in front of.
   private readonly elementRef = inject(ElementRef);
 
@@ -261,7 +261,7 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
     this.hostPropsRevision.update(revision => revision + 1);
   }
 
-  // renderModal's own MODAL_HOST_STYLE (position:'absolute') is the outer symbiote-modal node's
+  // renderModal's own MODAL_HOST_STYLE (position:'absolute') is the outer modal node's
   // style; the anchor's class-derived style goes FIRST, that resolved style SECOND —
   // flattenStyle's later-wins collapse keeps the modal's own style winning over its ambient class.
   //
@@ -280,6 +280,14 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
       onMagicTap: this.eventEmitterHandler(this.magicTap),
       onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
     };
+  });
+
+  // Through the props bag rather than `[collapsable]="false"`: `view` matches `ViewHost`, a real
+  // component, so a binding it does not declare is NG8002 under `ngc` — and `CUSTOM_ELEMENTS_SCHEMA`
+  // does not rescue a binding on a MATCHED component. Invisible to `tsc` and to vitest; only a real
+  // AOT build says so. Frozen and shared, so the directive's own diff sees one unchanged object.
+  readonly containerProps: Readonly<Record<string, unknown>> = Object.freeze({
+    collapsable: false,
   });
 
   get containerStyle(): unknown {

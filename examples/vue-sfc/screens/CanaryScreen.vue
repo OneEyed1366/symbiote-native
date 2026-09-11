@@ -23,29 +23,21 @@
   what happened before this screen was brought back to parity. Same pattern as
   DrawerHomeScreen.vue / StatePersistenceScreen.vue.
 
-  Non-template constructs handled the SFC way: RefreshControl is element-valued, so it is built in
-  script via a computed h() and bound (:refresh-control); Animated.View / Animated.ScrollView
+  Non-template constructs handled the SFC way: RefreshControl is an ordinary `<refresh-control>`
+  CHILD of the scroll tag, not a prop — the behavior claims it and places it per platform;
+  Animated.View / Animated.ScrollView
   are used as dotted tags, which the SFC compiler resolves off the setup binding; FlatList renders its cell
-  through the #item scoped slot; Pressable's children take the press state through a scoped slot
-  (#default="{ pressed }").
+  through the #item scoped slot; a `pressable` CHILD that needs the press state gets it from a
+  local ref the screen keeps in step with @press-in/@press-out — press state lives on the engine
+  node and never crosses back into Vue's reactivity.
 -->
 <script setup lang="ts">
-import { ref, shallowRef, computed, h, onMounted, onUnmounted } from 'vue';
+import { ref, shallowRef, computed, onMounted, onUnmounted } from 'vue';
 import {
-  View,
-  Text,
   Animated,
-  ScrollView,
-  TextInput,
-  Image,
-  Switch,
-  ActivityIndicator,
-  Pressable,
   Modal,
   FlatList,
   KeyboardAvoidingView,
-  SafeAreaView,
-  RefreshControl,
   StatusBar,
   Keyboard,
   KEYBOARD_EVENT,
@@ -206,16 +198,6 @@ const onRefresh = (): void => {
   }, REFRESH_MS);
 };
 
-// The RefreshControl as an element-valued prop — Vue templates can't inline an element into a
-// prop, so build the VNode in script and bind it; recomputes when `refreshing` flips.
-const refreshControl = computed(() =>
-  h(RefreshControl, {
-    refreshing: refreshing.value,
-    onRefresh,
-    tintColor: LINE_COLOR.primitives,
-  }),
-);
-
 // Tier A runtime modules, read live. A non-empty Version proves PlatformConstants resolved; a
 // fractional hairline (e.g. 0.333 on @3x) proves DeviceInfo's scale resolved.
 const hairlineText = computed(
@@ -318,13 +300,17 @@ const freezeJs3s = (): void => {
   }
 };
 
-// Pressable's `style` prop is a FUNCTION of press state (RN's own idiom, mirrored by
-// @symbiote-native/vue's Pressable) — the static look lives in .pressable-card / .retention-card
-// (App.css's global registry); only the press-state-dependent colors stay a style function.
+// `style` as a FUNCTION of press state is RN's own idiom, and the engine resolves it on the bare
+// tag (routeProp evaluates the callback at both values of `pressed`). The static look lives in
+// .pressable-card / .retention-card (App.css's global registry).
 const pressableStyle = ({ pressed }: { pressed: boolean }) => ({
   backgroundColor: pressed ? '#0b1622' : '#13243a',
   borderColor: LINE_COLOR.primitives,
 });
+// The element resolves its OWN style callback, but a CHILD has no channel to the press state —
+// it lives on the engine node and never re-enters Vue's reactivity. So the screen mirrors it,
+// which is what any app styling a descendant on press has to do.
+const cardPressed = ref(false);
 const retentionStyle = ({ pressed }: { pressed: boolean }) => ({
   backgroundColor: pressed ? LINE_COLOR.primitives : '#13243a',
 });
@@ -344,123 +330,127 @@ const rotationStyle = {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <ScrollView
+  <safe-area-view class="screen">
+    <scroll-view
       testID="canary-scroll"
       class="screen"
       content-container-style="scroll-content"
-      :refresh-control="refreshControl"
     >
+      <refresh-control
+        :refreshing="refreshing"
+        :tint-color="LINE_COLOR.primitives"
+        @refresh="onRefresh"
+      />
       <!-- JS->native: StatusBar renders nothing; it drives the iOS status bar imperatively. -->
       <StatusBar
         :bar-style="darkStatusBar ? 'dark-content' : 'light-content'"
         :hidden="statusBarHidden"
         :animated="true"
       />
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">{{
           `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View
+        }}</text>
+      </view>
+      <view class="hero-card">
+        <view
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.primitives }"
         >
-          <Text class="hero-badge-text">CN</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">All primitives</Text>
-          <Text class="hero-body"
+          <text class="hero-badge-text">CN</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">All primitives</text>
+          <text class="hero-body"
             >Every @symbiote-native/vue primitive, driven straight onto Fabric —
-            no react-native renderer in the path.</Text
+            no react-native renderer in the path.</text
           >
-        </View>
-      </View>
+        </view>
+      </view>
       <!-- native->JS: keyboard height pushed from the device hub, read live -->
-      <Text class="header-note">{{
+      <text class="header-note">{{
         keyboardHeight > 0
           ? `keyboard up · ${keyboardHeight}px`
           : 'keyboard down'
-      }}</Text>
+      }}</text>
       <!-- Tier A runtime modules, live. The border below IS the hairline. -->
-      <Text
+      <text
         class="hairline-note"
         :style="{ borderTopWidth: StyleSheet.hairlineWidth }"
-        >{{ hairlineText }}</Text
+        >{{ hairlineText }}</text
       >
       <!-- Tier B runtime modules, live. -->
-      <Text class="header-note">{{ dimensionsText }}</Text>
+      <text class="header-note">{{ dimensionsText }}</text>
 
       <!-- JS->native StatusBar controls: watch the top strip react -->
-      <View class="row">
-        <View class="flex1">
+      <view class="row">
+        <view class="flex1">
           <ActionButton
             :title="statusBarHidden ? 'Show status bar' : 'Hide status bar'"
             :onPress="() => (statusBarHidden = !statusBarHidden)"
             :color="LINE_COLOR.primitives"
           />
-        </View>
-        <View class="flex1">
+        </view>
+        <view class="flex1">
           <ActionButton
             :title="darkStatusBar ? 'Light text' : 'Dark text'"
             :onPress="() => (darkStatusBar = !darkStatusBar)"
             :color="LINE_COLOR.primitives"
           />
-        </View>
-      </View>
+        </view>
+      </view>
       <!-- #6 Android-only window flags: the blank-risk pair. PASS: the top strip turns
            red / goes translucent and the app STAYS rendered. -->
-      <View v-if="Platform.OS === 'android'" class="row">
-        <View class="flex1">
+      <view v-if="Platform.OS === 'android'" class="row">
+        <view class="flex1">
           <ActionButton
             :title="statusBarRed ? 'BG default' : 'BG red'"
             :onPress="onToggleStatusBarRed"
             :color="LINE_COLOR.primitives"
           />
-        </View>
-        <View class="flex1">
+        </view>
+        <view class="flex1">
           <ActionButton
             :title="statusBarTranslucent ? 'Opaque' : 'Translucent'"
             :onPress="onToggleStatusBarTranslucent"
             :color="LINE_COLOR.primitives"
           />
-        </View>
-      </View>
+        </view>
+      </view>
       <!-- JS->native imperative modules: tap to fire the real native UI / haptics. -->
-      <View class="row">
-        <View class="flex1">
+      <view class="row">
+        <view class="flex1">
           <ActionButton
             title="Alert"
             :onPress="onAlert"
             :color="LINE_COLOR.primitives"
           />
-        </View>
+        </view>
         <!-- ActionSheetIOS is iOS-only by design (no Android native module exists). -->
-        <View v-if="Platform.OS !== 'android'" class="flex1">
+        <view v-if="Platform.OS !== 'android'" class="flex1">
           <ActionButton
             title="Action sheet"
             :onPress="onActionSheet"
             :color="LINE_COLOR.primitives"
           />
-        </View>
-      </View>
-      <View class="row">
-        <View class="flex1">
+        </view>
+      </view>
+      <view class="row">
+        <view class="flex1">
           <ActionButton
             title="Share"
             :onPress="onShare"
             :color="LINE_COLOR.primitives"
           />
-        </View>
-        <View class="flex1">
+        </view>
+        <view class="flex1">
           <ActionButton
             title="Vibrate"
             :onPress="() => Vibration.vibrate()"
             :color="LINE_COLOR.primitives"
           />
-        </View>
-      </View>
+        </view>
+      </view>
       <ActionButton
         title="Open vuejs.org"
         :onPress="onOpenUrl"
@@ -469,43 +459,44 @@ const rotationStyle = {
 
       <!-- The native UIRefreshControl spinner only shows while iOS holds the pull-down; our full
            re-commit snaps the offset back, so we drive our OWN indicator from `refreshing`. -->
-      <View v-if="refreshing" class="refresh-row">
-        <ActivityIndicator :color="LINE_COLOR.primitives" />
-        <Text class="accent-note">Refreshing…</Text>
-      </View>
-      <Text v-else class="muted-center">{{
+      <view v-if="refreshing" class="refresh-row">
+        <activity-indicator :color="LINE_COLOR.primitives" />
+        <text class="accent-note">Refreshing…</text>
+      </view>
+      <text v-else class="muted-center">{{
         `pull to refresh · refreshed ${refreshes}×`
-      }}</Text>
+      }}</text>
 
       <!-- View + press-to-increment -->
-      <View testID="counter-card" @press="count += 1" class="counter-card">
-        <Text testID="counter-value" class="counter-text">{{
+      <view testID="counter-card" @press="count += 1" class="counter-card">
+        <text testID="counter-value" class="counter-text">{{
           `tapped ${count}×`
-        }}</Text>
-      </View>
+        }}</text>
+      </view>
 
-      <!-- TextInput + greeting, via v-model (our resolveModelValue/emitModelUpdate shim) -->
-      <TextInput
+      <!-- text-input + greeting, via v-model — on an element the compiler emits a runtime
+           directive, which the adapter ships (runtime-helpers/vModelText) -->
+      <text-input
         testID="greeting-input"
         v-model="name"
         placeholder="type your name…"
         placeholder-text-color="#41506a"
         class="text-input"
       />
-      <Text testID="greeting-output" class="greeting">{{
+      <text testID="greeting-output" class="greeting">{{
         name ? `Hello, ${name}` : 'Hello, stranger'
-      }}</Text>
+      }}</text>
 
       <!-- Switch drives the ActivityIndicator, via v-model -->
-      <View class="switch-row">
-        <Text class="switch-label">spinner</Text>
-        <Switch
+      <view class="switch-row">
+        <text class="switch-label">spinner</text>
+        <switch
           testID="spinner-switch"
           v-model="spinning"
           :track-color="{ false: '#334155', true: LINE_COLOR.primitives }"
         />
-      </View>
-      <ActivityIndicator
+      </view>
+      <activity-indicator
         testID="spinner-indicator"
         :animating="spinning"
         :color="LINE_COLOR.primitives"
@@ -515,10 +506,10 @@ const rotationStyle = {
       <!-- Slider: the @react-native-community/slider native view via @symbiote-native/slider/vue. The
            engine derives its events + tint processors from the library's ViewConfig; same wrapper
            backs the React canary. -->
-      <View class="section-tight">
-        <Text class="switch-label">{{
+      <view class="section-tight">
+        <text class="switch-label">{{
           `volume · ${Math.round(volume * 100)}%`
-        }}</Text>
+        }}</text>
         <Slider
           v-model="volume"
           :minimum-value="0"
@@ -529,7 +520,7 @@ const rotationStyle = {
           thumb-tint-color="#ffffff"
           class="slider"
         />
-      </View>
+      </view>
 
       <!-- Animated: JS driver vs native driver, side by side -->
       <AnimatedDemo />
@@ -566,24 +557,25 @@ const rotationStyle = {
         :color="LINE_COLOR.primitives"
       />
 
-      <!-- Pressable's static look lives in .pressable-card; only the press-state-dependent
-           colors stay a style function. Children take the press state through a scoped slot. -->
-      <Pressable
+      <!-- The static look lives in .pressable-card; only the press-state-dependent colors stay a
+           style function, which the tag resolves itself at both values of `pressed`. A CHILD has
+           no such channel, so the screen mirrors the state into `cardPressed`. -->
+      <pressable
         @press="count += 1"
+        @press-in="cardPressed = true"
+        @press-out="cardPressed = false"
         class="pressable-card"
         :style="pressableStyle"
       >
-        <template #default="{ pressed }">
-          <Text
-            class="pressable-label"
-            :style="{ color: pressed ? LINE_COLOR.primitives : '#cbd5e1' }"
-            >{{ pressed ? 'holding…' : 'press me (also +1)' }}</Text
-          >
-        </template>
-      </Pressable>
+        <text
+          class="pressable-label"
+          :style="{ color: cardPressed ? LINE_COLOR.primitives : '#cbd5e1' }"
+          >{{ cardPressed ? 'holding…' : 'press me (also +1)' }}</text
+        >
+      </pressable>
 
       <!-- Horizontal FlatList: real windowing. -->
-      <Text class="section-label">FlatList · 24 chips, windowed</Text>
+      <text class="section-label">FlatList · 24 chips, windowed</text>
       <FlatList
         testID="chips-list"
         :data="chips"
@@ -596,7 +588,7 @@ const rotationStyle = {
           <!-- width/marginRight stay dynamic — they reference the CHIP_WIDTH/CHIP_GAP script
                consts (also used by chipsGetItemLayout above), which a CSS selector has no way to
                read; backgroundColor is per-chip (item.color). -->
-          <View
+          <view
             class="chip-card"
             :style="{
               width: CHIP_WIDTH,
@@ -604,8 +596,8 @@ const rotationStyle = {
               backgroundColor: item.color,
             }"
           >
-            <Text class="chip-number">{{ item.index }}</Text>
-          </View>
+            <text class="chip-number">{{ item.index }}</text>
+          </view>
         </template>
       </FlatList>
 
@@ -617,23 +609,23 @@ const rotationStyle = {
            symmetric-radius approximation. The dx/dy readout tracks the move offset. -->
       <!-- Pressable's static look lives in .retention-card; only the press-state-dependent
            background stays a style function. -->
-      <Pressable
+      <pressable
         :hit-slop="{ top: 0, bottom: 40, left: 0, right: 0 }"
         :press-retention-offset="{ top: 0, bottom: 80, left: 0, right: 0 }"
         @press-move="onRetentionMove"
         class="retention-card"
         :style="retentionStyle"
       >
-        <Text class="info-text">{{
+        <text class="info-text">{{
           `drag me · dx ${retentionMove.dx} · dy ${retentionMove.dy}`
-        }}</Text>
-      </Pressable>
+        }}</text>
+      </pressable>
 
       <!-- maintainVisibleContentPosition. PASS: scroll down a bit, tap Prepend: the rows
            you are looking at DO NOT jump; new items appear above without shifting the
            viewport. FAIL: the list jumps to the top. box-list160 is shared with the
            Animated.ScrollView below. -->
-      <Text class="section-label">MVCP · prepend without jump</Text>
+      <text class="section-label">MVCP · prepend without jump</text>
       <FlatList
         :data="mvcpItems"
         :key-extractor="mvcpKeyExtractor"
@@ -641,9 +633,9 @@ const rotationStyle = {
         class="box-list160"
       >
         <template #item="{ item }">
-          <View class="mvcp-row">
-            <Text class="list-row-text">{{ item.label }}</Text>
-          </View>
+          <view class="mvcp-row">
+            <text class="list-row-text">{{ item.label }}</text>
+          </view>
         </template>
         <!-- This list measures its own cells (no getItemLayout), and the divider is CHROME the
              list renders BETWEEN them — so it belongs to the distance from one row to the next,
@@ -653,7 +645,7 @@ const rotationStyle = {
              (core/components buildOffsets). Deliberately on the MVCP list: prepend-without-jump
              is exactly where an offset being off by a few points is visible. -->
         <template #separator>
-          <View class="mvcp-divider" />
+          <view class="mvcp-divider" />
         </template>
       </FlatList>
       <ActionButton
@@ -673,7 +665,7 @@ const rotationStyle = {
           transform: [{ translateY: parityHeaderTranslateY }],
         }"
       >
-        <Text class="parity-header-text">HEADER — fades as you scroll ↓</Text>
+        <text class="parity-header-text">HEADER — fades as you scroll ↓</text>
       </Animated.View>
       <!-- box-list160 is shared with the MVCP FlatList above. -->
       <Animated.ScrollView
@@ -681,12 +673,12 @@ const rotationStyle = {
         :scroll-event-throttle="16"
         @scroll="onParityScroll"
       >
-        <View v-for="i in scrollRows" :key="i" class="scroll-demo-row">
-          <Text class="list-row-text">{{ `scroll me · row ${i}` }}</Text>
-        </View>
+        <view v-for="i in scrollRows" :key="i" class="scroll-demo-row">
+          <text class="list-row-text">{{ `scroll me · row ${i}` }}</text>
+        </view>
       </Animated.ScrollView>
-      <Text class="tiny-center"
-        >↑ drag inside the box — the bar above reacts</Text
+      <text class="tiny-center"
+        >↑ drag inside the box — the bar above reacts</text
       >
       <!-- Native-driver proof for Animated.event: tap to JAM the JS thread 3s, then drag
            the box above DURING the freeze. If the bar keeps fading/lifting while JS is
@@ -697,44 +689,44 @@ const rotationStyle = {
         color="#fc8181"
         :onPress="freezeJs3s"
       />
-      <Text class="tiny-center"
-        >tap Freeze, then immediately drag the box — bar should still move</Text
+      <text class="tiny-center"
+        >tap Freeze, then immediately drag the box — bar should still move</text
       >
 
       <!-- Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect
            is unmistakable on the dark theme. -->
       <!-- boxShadow: a BLUE glow (a black shadow is invisible on the near-black bg).
            PASS: a soft blue halo bleeds out around the panel. -->
-      <View class="shadow-card" :style="shadowCardExtra">
-        <Text class="note-text">boxShadow · glow</Text>
-      </View>
+      <view class="shadow-card" :style="shadowCardExtra">
+        <text class="note-text">boxShadow · glow</text>
+      </view>
       <!-- filter: same base colour both sides; the right one is darkened by
            brightness(0.5). PASS: the right panel is clearly darker than the left. -->
-      <View class="row">
-        <View class="filter-tile">
-          <Text class="tile-text">no filter</Text>
-        </View>
-        <View class="filter-tile" :style="dimStyle">
-          <Text class="tile-text">brightness 0.5</Text>
-        </View>
-      </View>
+      <view class="row">
+        <view class="filter-tile">
+          <text class="tile-text">no filter</text>
+        </view>
+        <view class="filter-tile" :style="dimStyle">
+          <text class="tile-text">brightness 0.5</text>
+        </view>
+      </view>
       <!-- transformOrigin: the panel rotates around its TOP-LEFT corner, not its centre.
            PASS: the left edge stays put while the bottom-right swings down. -->
-      <View class="rotated-card" :style="rotationStyle">
-        <Text class="tile-text">transformOrigin · top-left</Text>
-      </View>
+      <view class="rotated-card" :style="rotationStyle">
+        <text class="tile-text">transformOrigin · top-left</text>
+      </view>
 
       <!-- background-image: a CSS `linear-gradient(...)` authored entirely in App.css
            (.gradient-card), proving @symbiote-native/css-parser's `background-image` → RN's
            `experimental_backgroundImage` raw passthrough works end to end. PASS: the panel
            shows a blue-to-orange gradient sweeping left to right. -->
-      <View class="gradient-card">
-        <Text class="tile-text">background-image · linear-gradient</Text>
-      </View>
+      <view class="gradient-card">
+        <text class="tile-text">background-image · linear-gradient</text>
+      </view>
 
       <!-- Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
            width/height→style); a screen reader reads "Vue logo" (alt→accessibilityLabel). -->
-      <Image
+      <image
         src="https://vuejs.org/images/logo.png"
         alt="Vue logo"
         :width="48"
@@ -745,18 +737,18 @@ const rotationStyle = {
       <!-- KeyboardAvoidingView enabled toggle. PASS: with enabled ON, focusing the field
            lifts it above the keyboard AND the keyboard is the email layout (proves
            autoComplete/inputMode fold); with enabled OFF the keyboard covers the field. -->
-      <View class="switch-row">
-        <Text class="switch-label">avoid keyboard</Text>
-        <Switch
+      <view class="switch-row">
+        <text class="switch-label">avoid keyboard</text>
+        <switch
           v-model="kavEnabled"
           :track-color="{ false: '#334155', true: '#42b883' }"
         />
-      </View>
+      </view>
       <KeyboardAvoidingView
         :behavior="Platform.OS === 'ios' ? 'padding' : 'height'"
         :enabled="kavEnabled"
       >
-        <TextInput
+        <text-input
           auto-complete="email"
           input-mode="email"
           enter-key-hint="done"
@@ -766,14 +758,14 @@ const rotationStyle = {
         />
       </KeyboardAvoidingView>
 
-      <Image
+      <image
         :source="{ uri: 'https://vuejs.org/images/logo.png' }"
         class="logo-image"
       />
 
-      <View class="bottom-card">
-        <Text class="bottom-text">↑ you scrolled to the bottom</Text>
-      </View>
+      <view class="bottom-card">
+        <text class="bottom-text">↑ you scrolled to the bottom</text>
+      </view>
 
       <!-- Modal overlays its own window -->
       <Modal
@@ -783,12 +775,12 @@ const rotationStyle = {
         @request-close="() => (modalVisible = false)"
       >
         <!-- transparent modal => paint our own dim layer (the RN pattern) -->
-        <View class="modal-overlay">
-          <View testID="modal-card" class="modal-card">
-            <Text class="modal-title">It's a Modal</Text>
-            <Text class="modal-body"
+        <view class="modal-overlay">
+          <view testID="modal-card" class="modal-card">
+            <text class="modal-title">It's a Modal</text>
+            <text class="modal-body"
               >Rendered through ModalHostView — its own native window, same
-              Fabric tree.</Text
+              Fabric tree.</text
             >
             <ActionButton
               testID="modal-close"
@@ -796,8 +788,8 @@ const rotationStyle = {
               :onPress="() => (modalVisible = false)"
               :color="LINE_COLOR.primitives"
             />
-          </View>
-        </View>
+          </view>
+        </view>
       </Modal>
 
       <!-- Teleport: moves the toast card OUT of this scroll content and INTO the overlay-host
@@ -811,15 +803,15 @@ const rotationStyle = {
         :color="LINE_COLOR.primitives"
       />
       <Teleport v-if="overlayHost" :to="overlayHost">
-        <View v-if="toastVisible" testID="toast-card" class="modal-card">
-          <Text class="modal-body">Ported via Teleport ✦</Text>
+        <view v-if="toastVisible" testID="toast-card" class="modal-card">
+          <text class="modal-body">Ported via Teleport ✦</text>
           <ActionButton
             testID="toast-dismiss"
             title="Dismiss"
             :onPress="() => (toastVisible = false)"
             :color="LINE_COLOR.primitives"
           />
-        </View>
+        </view>
       </Teleport>
 
       <!-- createTunnel: no ref, no target node — TunnelIn just registers its slot content from
@@ -833,30 +825,30 @@ const rotationStyle = {
         :color="LINE_COLOR.primitives"
       />
       <TunnelIn v-if="tunnelToastVisible">
-        <View testID="tunnel-toast-card" class="modal-card">
-          <Text class="modal-body">Ported via createTunnel ✦</Text>
+        <view testID="tunnel-toast-card" class="modal-card">
+          <text class="modal-body">Ported via createTunnel ✦</text>
           <ActionButton
             testID="tunnel-toast-dismiss"
             title="Dismiss"
             :onPress="() => (tunnelToastVisible = false)"
             :color="LINE_COLOR.primitives"
           />
-        </View>
+        </view>
       </TunnelIn>
-    </ScrollView>
+    </scroll-view>
 
     <!-- The Teleport/tunnel target: a persistent, empty View sitting above the scroll content.
          pointer-events="box-none" lets touches pass through everywhere except an actual ported
          child (the toast card). Rendered here — a sibling of ScrollView, same surface — so
          Teleport above can reach it via the template ref; createTunnel's TunnelOut below works
          identically wherever it's mounted. -->
-    <View
+    <view
       testID="overlay-host"
       ref="overlayHost"
       pointer-events="box-none"
       class="overlay-host"
     >
       <TunnelOut />
-    </View>
-  </SafeAreaView>
+    </view>
+  </safe-area-view>
 </template>

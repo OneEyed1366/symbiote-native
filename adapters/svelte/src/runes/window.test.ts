@@ -99,7 +99,7 @@ const PROBE = `<script lang="ts">
     });
   });
 </script>
-<symbiote-view p={{}} />`;
+<view p={{}} />`;
 
 interface IMetrics {
   innerWidth: number;
@@ -141,7 +141,7 @@ const SECOND_PROBE = `<script lang="ts">
   let { onValue }: { onValue: (width: number) => void } = $props();
   $effect(() => { onValue(innerWidth.current); });
 </script>
-<symbiote-view p={{}} />`;
+<view p={{}} />`;
 
 async function mountSecondProbe(values: number[]): Promise<void> {
   writeFileSync(

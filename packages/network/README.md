@@ -166,6 +166,7 @@ watch(
     );
   });
 </script>
+
 <Text>
   {networkState.current.isConnected
     ? `Connected via ${networkState.current.type}`

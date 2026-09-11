@@ -10,13 +10,15 @@
 //
 // The suspect input is `nextHeaderLayoutY` — the measured y of the NEXT sticky header down the
 // list, the only thing telling a pinned header where it gets pushed off by the one behind it.
-// React/Vue/Angular derive it in ONE shared place: ScrollView's wrapStickyHeaders() walks its own
-// children as an indexable array (scroll-view/shared.ts -> sticky-header.tsx), and VirtualizedList
-// merely forwards recomputed indices down (virtualized-list/index.ts:732). Svelte CANNOT do that —
-// a Svelte component receives an opaque Snippet, not an inspectable child list (see
-// scroll-view-sticky-context.ts's KNOWN GAP note) — so its VirtualizedList wraps each cell itself
-// and hand-rolls the collision channel (a plain Map + a `stickyVersion` counter). That hand-rolled
-// channel exists in no other adapter and is what this test exercises.
+// React derives it from an INDEX MAP: ScrollView's wrapStickyHeaders() walks its own children as an
+// indexable array (scroll-view/shared.ts -> sticky-header.tsx), and VirtualizedList forwards the
+// recomputed indices down (virtualized-list/index.ts:732).
+//
+// Svelte derives it from DOCUMENT ORDER, and that is what this test now exercises. Its cells carry
+// the `sticky-header` TAG, so the pin is the engine's ScrollView host behavior: the owner keeps its
+// registered headers in tree order and each one's collision point is simply the next entry's
+// measured y — no index, and nothing to renumber when a list windows. Two unrelated derivations
+// feeding one shared reducer is exactly the shape a differential test is for.
 //
 // Cross-adapter by design, not by accident: CLAUDE.md's <adapters_reach_full_feature_parity>
 // defines parity as "proven by a parity check (smoke + prop-by-prop diff against the reference
@@ -30,52 +32,70 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
+// Svelte's headers ARE the engine's sticky behavior now, so the registration is what this file
+// measures — without it the tag commits inert and the Svelte arm traces nothing at all. The
+// registry is global, so React's own ScrollView wrapper also picks up a content node here; that is
+// invisible to this test, which reads reducer INPUTS and finds headers by their pin transform.
+import '../../register';
 
 // The trace array must exist before the vi.mock factory below runs (vi.mock is hoisted above every
 // import), which is what vi.hoisted is for.
-const { trace, headerIds } = vi.hoisted(() => ({
+const { trace } = vi.hoisted(() => ({
   trace: [] as {
     adapter: string;
     kind: string;
-    headerId: number;
+    // The header's own MEASURED y, which is `index * ITEM_HEIGHT` in this scenario and therefore
+    // the one identity both adapters can agree on. Entries from an unmeasured header are dropped
+    // rather than keyed, because every header's layoutY starts at 0 and a y-key would merge them.
+    //
+    // NOT the reducer state's object identity, which is what this used to key on. Svelte's headers
+    // are engine nodes driven by the ScrollView host behavior, and the behavior allocates a fresh
+    // runtime per NODE — so windowing churn hands out twice as many state objects as React's
+    // component instances do, and a first-seen-order id numbers the same header differently on the
+    // two sides. The quantity under test is per-HEADER, not per-instance.
+    layoutY: number;
     nextHeaderLayoutY: number | undefined;
   }[],
-  // Identity map, NOT keyed by layoutY: every header's layoutY starts at 0, so a y-based key
-  // silently merges two different headers into one bucket and hides exactly the divergence this
-  // test exists to find.
-  headerIds: new Map<object, number>(),
 }));
-let nextHeaderId = 0;
 
 // Wrap the SHARED reducer so every call from either adapter records the inputs it was handed.
-// Both adapters import `reduceSticky` from this exact specifier, so one mock covers both.
+//
+// The SOURCE module, not the `@symbiote-native/components` barrel, and that is what makes one mock
+// cover both sides now: React's adapter reaches `reduceSticky` through the barrel, while Svelte's
+// headers are driven by the ENGINE's sticky behavior, which imports the reducer by a relative
+// path. Both resolve to this one file, so the barrel's re-export is the mock too.
 let currentAdapter = 'unknown';
-vi.mock('@symbiote-native/components', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@symbiote-native/components')>();
-  return {
-    ...actual,
-    reduceSticky: (
-      state: Parameters<typeof actual.reduceSticky>[0],
-      action: Parameters<typeof actual.reduceSticky>[1],
-      inputs: Parameters<typeof actual.reduceSticky>[2],
-    ) => {
-      let headerId = headerIds.get(state);
-      if (headerId === undefined) {
-        nextHeaderId += 1;
-        headerId = nextHeaderId;
-        headerIds.set(state, headerId);
-      }
-      trace.push({
-        adapter: currentAdapter,
-        kind: action.kind,
-        headerId,
-        nextHeaderLayoutY: inputs.nextHeaderLayoutY,
-      });
-      return actual.reduceSticky(state, action, inputs);
-    },
-  };
-});
+vi.mock(
+  '../../../../../core/components/src/state/sticky-header-reducer',
+  async importOriginal => {
+    const actual =
+      await importOriginal<
+        typeof import('../../../../../core/components/src/state/sticky-header-reducer')
+      >();
+    return {
+      ...actual,
+      reduceSticky: (
+        state: Parameters<typeof actual.reduceSticky>[0],
+        action: Parameters<typeof actual.reduceSticky>[1],
+        inputs: Parameters<typeof actual.reduceSticky>[2],
+      ) => {
+        const result = actual.reduceSticky(state, action, inputs);
+        // Read the y AFTER the call: a 'layout' action is what makes the header measurable at all,
+        // and the reducer records it in place.
+        if (result.state.measured) {
+          trace.push({
+            adapter: currentAdapter,
+            kind: action.kind,
+            layoutY: result.state.layoutY,
+            nextHeaderLayoutY: inputs.nextHeaderLayoutY,
+          });
+        }
+        return result;
+      },
+    };
+  },
+);
 
 if (globalThis.window === undefined)
   Object.assign(globalThis, { window: globalThis });
@@ -107,17 +127,6 @@ const tick = (): Promise<void> =>
 // --- Svelte compile harness (same shape as virtualized-list.smoke.test.ts) --------------------
 // No .svelte-aware loader is wired into this repo's Vitest, so every .svelte component in the
 // tree is pre-compiled to a sibling .mjs, with static import specifiers rewritten to match.
-const COMPONENTS_DIR = join(__dirname, '..');
-const REFRESH_CONTROL_OUT = join(
-  COMPONENTS_DIR,
-  '.parity-compiled-refresh-control.mjs',
-);
-const VIEW_OUT = join(COMPONENTS_DIR, '.parity-compiled-view.mjs');
-const STICKY_HEADER_OUT = join(
-  COMPONENTS_DIR,
-  'scroll-view',
-  '.parity-compiled-sticky-header.mjs',
-);
 const LIST_OUT = join(__dirname, '.parity-compiled-virtualized-list.mjs');
 const ROOT_OUT = join(__dirname, '.parity-compiled-list-root.mjs');
 
@@ -140,41 +149,10 @@ function compileToFile(
 
 function compileSvelteList(): void {
   compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8'),
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
+    readFileSync(join(__dirname, 'index.svelte'), 'utf8'),
+    'VirtualizedList.svelte',
+    LIST_OUT,
   );
-  compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'),
-    'View.svelte',
-    VIEW_OUT,
-  );
-
-  const stickyHeader = compile(
-    readFileSync(
-      join(COMPONENTS_DIR, 'scroll-view', 'sticky-header.svelte'),
-      'utf8',
-    ),
-    { ...COMPILE_OPTIONS, filename: 'sticky-header.svelte' },
-  ).js.code.replace(
-    "from '../View.svelte'",
-    "from '../.parity-compiled-view.mjs'",
-  );
-  writeFileSync(STICKY_HEADER_OUT, stickyHeader);
-
-  const list = compile(readFileSync(join(__dirname, 'index.svelte'), 'utf8'), {
-    ...COMPILE_OPTIONS,
-    filename: 'VirtualizedList.svelte',
-  })
-    .js.code.replace(
-      "from '../RefreshControl.svelte'",
-      "from '../.parity-compiled-refresh-control.mjs'",
-    )
-    .replace(
-      "from '../scroll-view/sticky-header.svelte'",
-      "from '../scroll-view/.parity-compiled-sticky-header.mjs'",
-    );
-  writeFileSync(LIST_OUT, list);
 }
 
 async function loadSvelteRoot(): Promise<Component> {
@@ -187,7 +165,7 @@ async function loadSvelteRoot(): Promise<Component> {
        function getItemCount(source) { return source.length; }
        function keyExtractor(item) { return 'k-' + item.id; }
      </script>
-     {#snippet cell({ item })}<symbiote-text p={{ text: 'row-' + item.id }}></symbiote-text>{/snippet}
+     {#snippet cell({ item })}<text p={{ text: 'row-' + item.id }}></text>{/snippet}
      <VirtualizedList {data} {getItem} {getItemCount} {keyExtractor} {getItemLayout}
        {stickyHeaderIndices} windowSize={1} item={cell} />`,
     'ParityListRoot.svelte',
@@ -209,12 +187,21 @@ function findScrollView(): IFakeNode {
   return node;
 }
 
-// A sticky wrapper is the only node carrying a `transform` (its translateY) — the same tell the
-// React-side forced-cell test uses.
+// A sticky wrapper is the only node carrying `STICKY_HEADER_Z_INDEX`, and both sides write it from
+// the SAME shared constant — React's sticky-header.tsx and the engine's sticky behavior.
+//
+// NOT the `transform`, which is what this used to look for. A translateY appears only once a
+// header has been measured AND pinned, and on the engine path the behavior registers in
+// `attachAfterCommit`, one commit after the node lands. So a transform probe cannot see a
+// freshly-committed engine-driven header at all, and the first measure round found nothing on the
+// Svelte side while finding both headers on React's — a shape oracle reporting an adapter
+// difference that is really the probe's (`.claude/rules/adapter-parity-audit.md`, "Phrase a parity
+// oracle as a CAPABILITY"). On a device every mounted view gets an onLayout whether or not it has
+// been pinned yet, which is what the zIndex tell reproduces.
 function collectStickyWrappers(nodes: IFakeNode[]): IFakeNode[] {
   const wrappers: IFakeNode[] = [];
   for (const node of nodes) {
-    if (Array.isArray(node.props.transform)) wrappers.push(node);
+    if (node.props.zIndex === STICKY_HEADER_Z_INDEX) wrappers.push(node);
     wrappers.push(...collectStickyWrappers(node.children));
   }
   return wrappers;
@@ -273,7 +260,7 @@ function collisionInputsByHeader(
   const latest: Record<string, number | undefined> = {};
   for (const entry of trace) {
     if (entry.adapter === adapter)
-      latest[`header#${entry.headerId}`] = entry.nextHeaderLayoutY;
+      latest[`header@y=${entry.layoutY}`] = entry.nextHeaderLayoutY;
   }
   return latest;
 }
@@ -305,27 +292,13 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  for (const path of [
-    REFRESH_CONTROL_OUT,
-    VIEW_OUT,
-    STICKY_HEADER_OUT,
-    LIST_OUT,
-    ROOT_OUT,
-  ]) {
+  for (const path of [LIST_OUT, ROOT_OUT]) {
     rmSync(path, { force: true });
   }
 });
 
-// Header ids are per-adapter and assigned in first-seen order, so `header#1` means "the first
-// header this adapter drove" on both sides and the snapshots are actually comparable.
-function resetHeaderIds(): void {
-  headerIds.clear();
-  nextHeaderId = 0;
-}
-
 async function reactSnapshots(): Promise<Record<string, number | undefined>[]> {
   currentAdapter = 'react';
-  resetHeaderIds();
   const react = await import('@symbiote-native/react');
   react.mount(
     REACT_ROOT_TAG,
@@ -341,8 +314,7 @@ async function reactSnapshots(): Promise<Record<string, number | undefined>[]> {
       }),
       windowSize: 1,
       stickyHeaderIndices: STICKY_INDICES,
-      renderItem: ({ item }) =>
-        createElement('symbiote-text', {}, `row-${item.id}`),
+      renderItem: ({ item }) => createElement('text', {}, `row-${item.id}`),
     }),
   );
   await tick();
@@ -355,7 +327,6 @@ async function svelteSnapshots(): Promise<
   Record<string, number | undefined>[]
 > {
   currentAdapter = 'svelte';
-  resetHeaderIds();
   const ListRoot = await loadSvelteRoot();
   const { mount, unmount } = await import('../../render');
   mount(SVELTE_ROOT_TAG, ListRoot, {
@@ -397,12 +368,10 @@ describe('sticky collision input parity: Svelte vs the React reference', () => {
     ).toBe(true);
   });
 
-  // why: THE differential assertion. Svelte cannot reuse React's/Vue's shared wrapStickyHeaders()
-  // (it only ever sees an opaque children Snippet, not an indexable child list — see this file's
-  // header comment), so VirtualizedList hand-rolls its own collision channel (a headerLayoutYs Map
-  // + stickyVersion counter). If the per-step inputs diverge from React's here, the defect is
-  // definitively in THAT hand-rolled channel, not in the shared reducer — collapsing what was
-  // previously an ambiguous device-log investigation into a deterministic file diff.
+  // why: THE differential assertion, and what it now proves is that DOCUMENT ORDER answers the
+  // collision question identically to an index map. Svelte's headers are engine nodes carrying the
+  // `sticky-header` tag; React's are components fed a recomputed index list. If the per-step inputs
+  // diverge, the defect is in one of those two derivations and not in the shared reducer.
   it('Svelte feeds the shared reducer the SAME collision inputs at every scroll step', async () => {
     const react = await reactSnapshots();
     fabric.reset();

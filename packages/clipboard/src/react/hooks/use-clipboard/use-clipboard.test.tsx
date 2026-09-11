@@ -5,7 +5,7 @@
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import { useClipboard } from './index';
 import type { IClipboardEvent } from '../../../core';
@@ -32,7 +32,7 @@ const results: Array<IClipboardEvent | null> = [];
 
 function Probe(): ReactElement {
   results.push(useClipboard());
-  return createElement(View);
+  return createElement('view');
 }
 
 const fabric = installFabric();

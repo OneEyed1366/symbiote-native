@@ -2,7 +2,7 @@
 // adapters/vue/src/host-instance/index.ts. RN's "ref/instance -> native reactTag" lookup,
 // the seam imperative-interop libraries reach through.
 //
-// Angular template refs on a primitive host (`<View #myView>`) receive the component instance,
+// Angular template refs on a primitive host (`<view #myView>`) receive the component instance,
 // not the raw engine node. SymbiotePrimitiveHost exposes `nativeElement`, which holds the
 // engine host node that `getNativeTag` is keyed on. This adapter accepts:
 //   - a bare number (idempotent)

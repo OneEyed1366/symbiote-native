@@ -1,5 +1,5 @@
 // Switch: the render half (framework-agnostic). Maps the resolved props onto the single
-// `symbiote-switch` host node: the strict value fold lands as the `value` Fabric prop, the
+// `switch` host node: the strict value fold lands as the `value` Fabric prop, the
 // track colors take platform-specific prop NAMES (iOS onTintColor/tintColor vs Android
 // trackColorFor*/trackTintColor, supplied via `platform`), thumbColor → thumbTintColor, and
 // ios_backgroundColor folds into the style as the pill that shows through the shrunken track.
@@ -17,15 +17,21 @@ import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
 
 export type ISwitchTrackColor = { false?: string; true?: string };
 
+// The event `onValueChange` fires with. Svelte's compiler treats any individual `on*`-prefixed
+// attribute as a native listener attachment and always calls it with exactly one argument, a real
+// object — a two-argument `(value, event)` callback silently drops `event` there and crashes when
+// `value` is passed as that sole argument (Svelte's own bookkeeping mutates it, which throws on a
+// primitive). So the value rides as a field on the event object itself, never as a second argument.
+export type ISwitchChangeEvent = ISymbioteEvent & { value: boolean };
+
 // Author-facing props: the framework-agnostic public surface every adapter exposes (the
 // controlled value/onValueChange contract, track/thumb colors, style). Identical across
 // adapters; each supplies only its hook + bridge.
 export interface ISwitchProps extends IAccessibilityProps, IAriaProps {
   value?: boolean;
-  // Fires once per native toggle, value first (the common case, plain boolean) plus the raw
-  // event as a second argument for callers who need it — there is only ever one underlying
-  // native event, never two (see the adapter's handleChange).
-  onValueChange?: (value: boolean, event: ISymbioteEvent) => void;
+  // Fires once per native toggle with the event, `value` carried on it — one argument, always a
+  // real object; see `ISwitchChangeEvent`.
+  onValueChange?: (event: ISwitchChangeEvent) => void;
   disabled?: boolean;
   trackColor?: ISwitchTrackColor;
   thumbColor?: string;
@@ -64,7 +70,7 @@ const IOS_BACKGROUND_BORDER_RADIUS = 16;
 // (lastNativeReport, the snap-back effect), so it may not share a tag the behavior registry would
 // also attach to; see that behavior's module header and `.claude/rules/host-primitive-tier.md`,
 // "A lowered element and its wrapper must not share an intrinsic tag" (the TextInput precedent).
-const SWITCH_MANAGED_INTRINSIC = 'symbiote-switch-managed';
+const SWITCH_MANAGED_INTRINSIC = 'switch-managed';
 
 // Fold ios_backgroundColor into the style, matching RN's iOS branch: it paints the
 // background that shows through the shrunken track. Untouched when unset, so a caller's own

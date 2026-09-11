@@ -194,7 +194,7 @@ function isAnchorStyleUnchanged(previous: unknown, next: unknown): boolean {
 }
 
 /**
- * Base for all Angular primitive host components (`symbiote-view`, `symbiote-text`, ...).
+ * Base for all Angular primitive host components (`view`, `text`, ...).
  * RN's `StyleProp` can be an object, an array, nested arrays, falsy entries, and Animated
  * values. Angular's raw `[style]` binding on a custom element routes through the CSS style
  * engine (`setStyle` per key), which crashes on numeric array keys. By declaring `style` as

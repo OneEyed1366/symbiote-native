@@ -2,8 +2,8 @@
 // matches on, and the Vue path adds risk the React path lacks: attrs arrive untyped and run through
 // normalizeVueAttrs, and a component's forwardAttrs allow-list could drop testID. This is the Vue
 // twin of the React testid-forwarding guard: render each component with a unique testID and assert
-// some committed Fabric node carries it (a wrapper like Button -> TouchableOpacity passes as long as
-// the id lands on its root).
+// some committed Fabric node carries it (a tag whose behavior clones onto a child, like
+// touchable-native-feedback, passes as long as the id lands somewhere in the committed subtree).
 //
 // `cases` is the closure: it must list every public visual component exported from
 // adapters/vue/src/index.ts. TouchableNativeFeedback / VirtualizedSectionList / RefreshControl were
@@ -16,29 +16,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,
   unmount,
-  View,
-  Text,
-  Image,
-  ImageBackground,
-  ScrollView,
-  TextInput,
-  Switch,
-  ActivityIndicator,
-  Button,
-  Pressable,
-  TouchableOpacity,
-  TouchableHighlight,
-  TouchableWithoutFeedback,
-  TouchableNativeFeedback,
-  SafeAreaView,
   Modal,
   KeyboardAvoidingView,
-  InputAccessoryView,
   FlatList,
   SectionList,
   VirtualizedList,
   VirtualizedSectionList,
-  RefreshControl,
   Animated,
 } from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -71,45 +54,79 @@ function carriesTestId(id: string): IFakeNode | undefined {
   return fabric.find(node => node.props.testID === id);
 }
 
-const textChild = (): VNode[] => [h(Text, null, 'x')];
+// A TAG child. Children reach an element as an ARRAY; only the list components below, which are
+// real Vue components, take this as a slot function.
+const textChild = (): VNode[] => [h('text', null, 'x')];
 
 // name -> a factory building the VNode with `testID` set (+ whatever minimal props it needs).
 const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
-  ['View', id => h(View, { testID: id })],
-  ['Text', id => h(Text, { testID: id }, 'x')],
-  ['Image', id => h(Image, { testID: id, source: { uri: 'x' } })],
+  ['view', id => h('view', { testID: id })],
+  ['text', id => h('text', { testID: id }, 'x')],
+  // The TAG. `registerImageBehavior` folds `source` on the node itself, so the id stays where it
+  // is written.
+  ['image', id => h('image', { testID: id, source: { uri: 'x' } })],
   [
-    'ImageBackground',
-    id => h(ImageBackground, { testID: id, source: { uri: 'x' } }, textChild),
+    // The TAG. RN spreads `...props` onto the inner Image (ImageBackground.js:81), so the id lands
+    // on the IMAGE rather than the box it is written on — which is what "some committed node
+    // carries it" is phrased to allow, and what every wrapper did before the tag.
+    'image-background',
+    id =>
+      h('image-background', { testID: id, source: { uri: 'x' } }, textChild()),
   ],
-  ['ScrollView', id => h(ScrollView, { testID: id }, textChild)],
-  ['TextInput', id => h(TextInput, { testID: id })],
-  ['Switch', id => h(Switch, { testID: id, value: false })],
-  ['ActivityIndicator', id => h(ActivityIndicator, { testID: id })],
-  ['Button', id => h(Button, { testID: id, title: 'x' })],
-  ['Pressable', id => h(Pressable, { testID: id }, textChild)],
-  ['TouchableOpacity', id => h(TouchableOpacity, { testID: id }, textChild)],
+  ['scroll-view', id => h('scroll-view', { testID: id }, textChild())],
+  ['text-input', id => h('text-input', { testID: id })],
+  ['switch', id => h('switch', { testID: id, value: false })],
   [
-    'TouchableHighlight',
-    id => h(TouchableHighlight, { testID: id }, textChild),
+    // The TAG. RN spreads `...restProps` onto the spinner (ActivityIndicator.js:99), so the id
+    // lands on the SPINNER rather than the centering host — which is what "some committed node
+    // carries it" is phrased to allow.
+    'activity-indicator',
+    id => h('activity-indicator', { testID: id }),
   ],
   [
-    'TouchableWithoutFeedback',
-    id => h(TouchableWithoutFeedback, { testID: id }, () => [h(View)]),
+    // The TAG, not a component. RN's Button takes no children, so the behavior builds the whole
+    // subtree and `testID` stays on the root it is written on.
+    'button',
+    id => h('button', { testID: id, title: 'x' }),
+  ],
+  ['pressable', id => h('pressable', { testID: id }, textChild())],
+  [
+    // The TAG — one node, no clone-onto-child, unlike TouchableHighlight below.
+    'touchable-opacity',
+    id => h('touchable-opacity', { testID: id }, textChild()),
   ],
   [
-    'TouchableNativeFeedback',
-    id => h(TouchableNativeFeedback, { testID: id }, textChild),
+    // The TAG. Both style halves fold onto this one node; the child is untouched, so the id stays
+    // where it is written regardless.
+    'touchable-highlight',
+    id => h('touchable-highlight', { testID: id }, textChild()),
   ],
-  ['SafeAreaView', id => h(SafeAreaView, { testID: id }, textChild)],
+  [
+    // The other clone-onto-the-child TAG, and the same route as the row below it
+    // (TouchableWithoutFeedback.js:153, in the passthrough list rather than the unconditional half).
+    'touchable-without-feedback',
+    id => h('touchable-without-feedback', { testID: id }, [h('view')]),
+  ],
+  [
+    // The TAG, not a component — and the id reaches the committed tree by a different route than
+    // every other row here: this tag commits no node, so `testID` lands via the behavior's clone
+    // onto the single child (TouchableNativeFeedback.js:389).
+    'touchable-native-feedback',
+    id => h('touchable-native-feedback', { testID: id }, textChild()),
+  ],
+  // The TAG. Children go to an element as an ARRAY, never a slot function — an element ignores
+  // slot children entirely and renders nothing.
+  ['safe-area-view', id => h('safe-area-view', { testID: id }, textChild())],
   [
     'KeyboardAvoidingView',
     id => h(KeyboardAvoidingView, { testID: id }, textChild),
   ],
   ['Modal', id => h(Modal, { testID: id, visible: true }, textChild)],
   [
-    'InputAccessoryView',
-    id => h(InputAccessoryView, { testID: id, nativeID: 'acc' }, textChild),
+    // The TAG, children as an array — see `safe-area-view` above.
+    'input-accessory-view',
+    id =>
+      h('input-accessory-view', { testID: id, nativeID: 'acc' }, textChild()),
   ],
   [
     // The cell renderer is a Vue scoped slot (#item), not a renderItem prop — passing renderItem
@@ -121,7 +138,9 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
         FlatList,
         { testID: id, data: [1] },
         {
-          item: (info: { item: unknown }) => [h(Text, null, String(info.item))],
+          item: (info: { item: unknown }) => [
+            h('text', null, String(info.item)),
+          ],
         },
       ),
   ],
@@ -132,7 +151,9 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
         SectionList,
         { testID: id, sections: [{ title: 's', data: [1] }] },
         {
-          item: (info: { item: unknown }) => [h(Text, null, String(info.item))],
+          item: (info: { item: unknown }) => [
+            h('text', null, String(info.item)),
+          ],
         },
       ),
   ],
@@ -150,7 +171,9 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
             Array.isArray(data) ? data.length : 0,
         },
         {
-          item: (info: { item: unknown }) => [h(Text, null, String(info.item))],
+          item: (info: { item: unknown }) => [
+            h('text', null, String(info.item)),
+          ],
         },
       ),
   ],
@@ -161,13 +184,16 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
         VirtualizedSectionList,
         { testID: id, sections: [{ title: 's', data: [1] }] },
         {
-          item: (info: { item: unknown }) => [h(Text, null, String(info.item))],
+          item: (info: { item: unknown }) => [
+            h('text', null, String(info.item)),
+          ],
         },
       ),
   ],
   [
-    'RefreshControl',
-    id => h(RefreshControl, { testID: id, refreshing: false }),
+    // The TAG — `registerRefreshControlBehavior` owns the controlled-spinner handshake.
+    'refresh-control',
+    id => h('refresh-control', { testID: id, refreshing: false }),
   ],
   ['Animated.View', id => h(Animated.View, { testID: id })],
   ['Animated.Text', id => h(Animated.Text, { testID: id }, 'x')],

@@ -447,7 +447,7 @@ describe('Svelte style forms — compiled markup vs. registered styles', () => {
     it('scopes a class: directive token on a host element', async () => {
       const code = await driveToRegistry(
         '<script>let on = true;</script>\n' +
-          '<symbiote-view class="card" class:lit={on}></symbiote-view>\n' +
+          '<view class="card" class:lit={on}></view>\n' +
           '<style>\n  .card { padding: 2px; }\n  .lit { opacity: 1; }\n</style>\n',
       );
       const lit = scopedName(scopedNamesOf(code), 'lit');

@@ -1,8 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
 import {
   Platform,
-  SafeAreaView,
-  ScrollView,
+  SafeAreaViewElement,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -58,39 +58,39 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
 @Component({
   selector: 'BrightnessScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="brightness-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Brightness</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Brightness</text>
+            <text class="hero-body">
               @symbiote-native/brightness — screen brightness get/set, Android
               system-brightness mode, and an iOS-only live listener. Requires
               SYSTEM_BRIGHTNESS permission on Android before setting the
               system-wide value.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="brightness-live-card" class="capability-card">
-          <Text class="capability-card-title">Live brightness</Text>
-          <View class="capability-row">
-            <Text class="capability-label">Screen brightness</Text>
-            <Text class="value-text">{{ brightnessLabel() }}</Text>
-          </View>
-          <View class="button-row">
+        <view testID="brightness-live-card" class="capability-card">
+          <text class="capability-card-title">Live brightness</text>
+          <view class="capability-row">
+            <text class="capability-label">Screen brightness</text>
+            <text class="value-text">{{ brightnessLabel() }}</text>
+          </view>
+          <view class="button-row">
             @for (step of brightnessSteps; track step.label) {
               <ActionButton
                 [testID]="'brightness-set-' + step.label"
@@ -99,27 +99,27 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
                 (press)="handleSetBrightness(step.value)"
               ></ActionButton>
             }
-          </View>
-        </View>
+          </view>
+        </view>
 
         @if (Platform.OS === 'android') {
-          <View testID="brightness-system-card" class="capability-card">
-            <Text class="capability-card-title"
-              >System brightness (Android only)</Text
+          <view testID="brightness-system-card" class="capability-card">
+            <text class="capability-card-title"
+              >System brightness (Android only)</text
             >
-            <View class="capability-row">
-              <Text class="capability-label">Mode</Text>
-              <Text class="value-text">{{ systemModeLabel() }}</Text>
-            </View>
-            <View testID="brightness-using-system" class="capability-row">
-              <Text class="capability-label">Using system value</Text>
-              <View [class]="statusBadgeClass(isUsingSystem())">
-                <Text class="status-badge-text">{{
+            <view class="capability-row">
+              <text class="capability-label">Mode</text>
+              <text class="value-text">{{ systemModeLabel() }}</text>
+            </view>
+            <view testID="brightness-using-system" class="capability-row">
+              <text class="capability-label">Using system value</text>
+              <view [class]="statusBadgeClass(isUsingSystem())">
+                <text class="status-badge-text">{{
                   statusLabel(isUsingSystem())
-                }}</Text>
-              </View>
-            </View>
-            <View class="button-row">
+                }}</text>
+              </view>
+            </view>
+            <view class="button-row">
               <ActionButton
                 testID="brightness-mode-automatic"
                 title="Automatic"
@@ -138,25 +138,25 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
                 [color]="lineColor"
                 (press)="handleRestoreSystem()"
               ></ActionButton>
-            </View>
-          </View>
+            </view>
+          </view>
         }
 
-        <View testID="brightness-permission-card" class="capability-card">
-          <Text class="capability-card-title">Permission</Text>
-          <View class="capability-row">
-            <Text class="capability-label">SYSTEM_BRIGHTNESS status</Text>
-            <Text class="value-text">{{ permissionLabel() }}</Text>
-          </View>
+        <view testID="brightness-permission-card" class="capability-card">
+          <text class="capability-card-title">Permission</text>
+          <view class="capability-row">
+            <text class="capability-label">SYSTEM_BRIGHTNESS status</text>
+            <text class="value-text">{{ permissionLabel() }}</text>
+          </view>
           <ActionButton
             testID="brightness-request-permission"
             title="Request permission"
             [color]="lineColor"
             (press)="requestPermission()"
           ></ActionButton>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class BrightnessScreen {

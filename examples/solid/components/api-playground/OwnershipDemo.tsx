@@ -19,7 +19,6 @@ import {
   onCleanup,
   runWithOwner,
 } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -64,14 +63,14 @@ export function OwnershipDemo() {
   };
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">
+    <view class="section-nested">
+      <text class="section-label">
         createRoot · getOwner · runWithOwner · onCleanup
-      </Text>
-      <Text class="ap-value" testID="ownership-owner">
+      </text>
+      <text class="ap-value" testID="ownership-owner">
         {`getOwner() → ${owner === null ? 'null' : 'an owner'} · detached root ticks ${rootTicks()} · adopted interval ticks ${ownedTicks()}`}
-      </Text>
-      <View class="ap-wrap">
+      </text>
+      <view class="ap-wrap">
         <ActionButton
           testID="ownership-root-start"
           title="createRoot (detached)"
@@ -90,12 +89,12 @@ export function OwnershipDemo() {
           color={ACCENT}
           onPress={adoptAsyncWork}
         />
-      </View>
-      <Text class="subtle">
+      </view>
+      <text class="subtle">
         {adopted()
           ? 'the timeout ran under the captured owner — its onCleanup is now wired to this screen'
           : 'not adopted yet'}
-      </Text>
-    </View>
+      </text>
+    </view>
   );
 }

@@ -2,7 +2,7 @@
 //
 // The defect class, found on Angular 2026-08-31 and invisible to every suite: a lowered element
 // inherits nothing the component wrapper did — no prop defaults, no alias renames, no bag folds.
-// Angular's `symbiote-text` lost `ellipsizeMode: 'tail'` and `allowFontScaling: true` (text
+// Angular's `text` lost `ellipsizeMode: 'tail'` and `allowFontScaling: true` (text
 // truncated with no ellipsis) and `id -> nativeID` never applied, so `id` reached Fabric as an
 // unknown key. Totals matched for a day and said nothing — only the KEY NAMES differed.
 //
@@ -11,8 +11,6 @@
 import { describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
-import { View } from './components/view';
-import { Text } from './components/text';
 
 const fabric = installFabric();
 const TARGET = 'fold-parity';
@@ -52,11 +50,9 @@ const keysOf = (props: Record<string, unknown>): string[] =>
 
 describe('lowered vs component: committed prop KEYS', () => {
   it('View — id folds to nativeID on both paths', async () => {
-    const lowered = await committed(() => (
-      <symbiote-view id="anchor" testID={TARGET} />
-    ));
+    const lowered = await committed(() => <view id="anchor" testID={TARGET} />);
     const component = await committed(() => (
-      <View id="anchor" testID={TARGET} />
+      <view id="anchor" testID={TARGET} />
     ));
     expect(keysOf(lowered)).toEqual(keysOf(component));
     expect(lowered.nativeID).toBe('anchor');
@@ -64,17 +60,15 @@ describe('lowered vs component: committed prop KEYS', () => {
   });
 
   it('View — no id on either path leaves no nativeID key', async () => {
-    const lowered = await committed(() => <symbiote-view testID={TARGET} />);
-    const component = await committed(() => <View testID={TARGET} />);
+    const lowered = await committed(() => <view testID={TARGET} />);
+    const component = await committed(() => <view testID={TARGET} />);
     expect(keysOf(lowered)).toEqual(keysOf(component));
     expect(keysOf(lowered)).not.toContain('nativeID');
   });
 
   it('Text — the two defaults land on both paths', async () => {
-    const lowered = await committed(() => (
-      <symbiote-text testID={TARGET}>y</symbiote-text>
-    ));
-    const component = await committed(() => <Text testID={TARGET}>y</Text>);
+    const lowered = await committed(() => <text testID={TARGET}>y</text>);
+    const component = await committed(() => <text testID={TARGET}>y</text>);
     expect(keysOf(lowered)).toEqual(keysOf(component));
     expect(lowered.ellipsizeMode).toBe(component.ellipsizeMode);
     expect(lowered.allowFontScaling).toBe(component.allowFontScaling);
@@ -82,14 +76,14 @@ describe('lowered vs component: committed prop KEYS', () => {
 
   it('Text — an explicit null still resolves to the default on both paths', async () => {
     const lowered = await committed(() => (
-      <symbiote-text testID={TARGET} ellipsizeMode={null}>
+      <text testID={TARGET} ellipsizeMode={null}>
         y
-      </symbiote-text>
+      </text>
     ));
     const component = await committed(() => (
-      <Text testID={TARGET} ellipsizeMode={null}>
+      <text testID={TARGET} ellipsizeMode={null}>
         y
-      </Text>
+      </text>
     ));
     expect(lowered.ellipsizeMode).toBe(component.ellipsizeMode);
   });

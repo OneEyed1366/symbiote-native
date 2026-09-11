@@ -1,5 +1,10 @@
 import { Component } from '@angular/core';
-import { Pressable, SafeAreaView, Text, View } from '@symbiote-native/angular';
+import {
+  PressableElement,
+  SafeAreaViewElement,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   Drawer,
   DrawerScreenDirective,
@@ -18,29 +23,29 @@ const drawerLineTagLabel = `${drawerLineInfo.code} · ${drawerLineInfo.label}`;
 @Component({
   selector: 'DrawerHomeScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">DR</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Drawer</Text>
-            <Text class="hero-body">
+    <safe-area-view class="screen">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">DR</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Drawer</text>
+            <text class="hero-body">
               A swipeable drawer sliding in from the right, driven by the
               navigator's own gesture handler.
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">
+            </text>
+          </view>
+        </view>
+        <text class="info-text">
           drawerPosition: right · drawerType: slide — swipe from the RIGHT edge,
           or use a button
-        </Text>
+        </text>
         <ActionButton
           testID="drawer-open"
           title="Open drawer"
@@ -53,8 +58,8 @@ const drawerLineTagLabel = `${drawerLineInfo.code} · ${drawerLineInfo.label}`;
           (press)="toggleDrawer()"
           [color]="lineColorStructure"
         ></ActionButton>
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   `,
 })
 export class DrawerHomeScreen {
@@ -77,22 +82,22 @@ export class DrawerHomeScreen {
 @Component({
   selector: 'DrawerSettingsScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <Text class="section-label">Drawer demo · Settings</Text>
+    <safe-area-view class="screen">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <text class="section-label">Drawer demo · Settings</text>
         <ActionButton
           testID="drawer-close-from-settings"
           title="Close drawer"
           (press)="closeDrawer()"
           [color]="lineColorStructure"
         ></ActionButton>
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   `,
 })
 export class DrawerSettingsScreen {
@@ -120,7 +125,13 @@ export class DrawerSettingsScreen {
 @Component({
   selector: 'DrawerDemoScreen',
   standalone: true,
-  imports: [Drawer, DrawerScreenDirective, Pressable, SafeAreaView, Text],
+  imports: [
+    Drawer,
+    DrawerScreenDirective,
+    PressableElement,
+    SafeAreaViewElement,
+    Text,
+  ],
   template: `
     <Drawer
       initialRouteName="Home"
@@ -141,20 +152,23 @@ export class DrawerSettingsScreen {
         [options]="settingsOptions"
       ></ng-template>
       <ng-template #drawerContent let-ctx>
-        <SafeAreaView testID="drawer-panel" class="section-tight drawer-panel">
-          <Text class="section-label">Menu</Text>
+        <safe-area-view
+          testID="drawer-panel"
+          class="section-tight drawer-panel"
+        >
+          <text class="section-label">Menu</text>
           @for (route of ctx.state.routes; track route.key) {
-            <Pressable
+            <pressable
               [testID]="'drawer-menu-' + route.name"
               class="menu-row"
               (press)="ctx.navigation.jumpTo(route.name)"
             >
-              <Text class="menu-row-label">{{
+              <text class="menu-row-label">{{
                 drawerLabelFor(ctx.descriptors, route)
-              }}</Text>
-            </Pressable>
+              }}</text>
+            </pressable>
           }
-        </SafeAreaView>
+        </safe-area-view>
       </ng-template>
     </Drawer>
   `,

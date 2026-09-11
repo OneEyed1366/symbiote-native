@@ -55,13 +55,10 @@ describe('createTunnel — genuine cross-surface delivery', () => {
 
     const SourceApp = defineComponent({
       setup: () => () =>
-        h(tunnel.In, {}, () =>
-          h('symbiote-text', {}, 'ported across surfaces'),
-        ),
+        h(tunnel.In, {}, () => h('text', {}, 'ported across surfaces')),
     });
     const TargetApp = defineComponent({
-      setup: () => () =>
-        h('symbiote-view', { testID: 'target' }, [h(tunnel.Out)]),
+      setup: () => () => h('view', { testID: 'target' }, [h(tunnel.Out)]),
     });
 
     // Surface A registers content, fully synchronously, before surface B ever mounts.
@@ -86,12 +83,10 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     const tunnel = createTunnel();
 
     const SourceApp = defineComponent({
-      setup: () => () =>
-        h(tunnel.In, {}, () => h('symbiote-text', {}, 'still here')),
+      setup: () => () => h(tunnel.In, {}, () => h('text', {}, 'still here')),
     });
     const TargetApp = defineComponent({
-      setup: () => () =>
-        h('symbiote-view', { testID: 'target' }, [h(tunnel.Out)]),
+      setup: () => () => h('view', { testID: 'target' }, [h(tunnel.Out)]),
     });
 
     mount(SOURCE_TAG, SourceApp);
@@ -120,12 +115,11 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     const SourceApp = defineComponent({
       setup: () => () =>
         h(tunnel.In, {}, () =>
-          visible.value ? [h('symbiote-text', {}, 'toggle me')] : [],
+          visible.value ? [h('text', {}, 'toggle me')] : [],
         ),
     });
     const TargetApp = defineComponent({
-      setup: () => () =>
-        h('symbiote-view', { testID: 'target' }, [h(tunnel.Out)]),
+      setup: () => () => h('view', { testID: 'target' }, [h(tunnel.Out)]),
     });
 
     mount(SOURCE_TAG, SourceApp);
@@ -149,13 +143,12 @@ describe('createTunnel — genuine cross-surface delivery', () => {
 
     const SourceApp = defineComponent({
       setup: () => () => [
-        h(tunnel.In, {}, () => h('symbiote-text', {}, 'first')),
-        h(tunnel.In, {}, () => h('symbiote-text', {}, 'second')),
+        h(tunnel.In, {}, () => h('text', {}, 'first')),
+        h(tunnel.In, {}, () => h('text', {}, 'second')),
       ],
     });
     const TargetApp = defineComponent({
-      setup: () => () =>
-        h('symbiote-view', { testID: 'target' }, [h(tunnel.Out)]),
+      setup: () => () => h('view', { testID: 'target' }, [h(tunnel.Out)]),
     });
 
     mount(SOURCE_TAG, SourceApp);
@@ -183,8 +176,8 @@ describe('createTunnel — genuine cross-surface delivery', () => {
       SOURCE_TAG,
       defineComponent({
         setup: () => () =>
-          h('symbiote-view', {}, [
-            h(tunnel.In, {}, () => h('symbiote-text', {}, 'same-surface')),
+          h('view', {}, [
+            h(tunnel.In, {}, () => h('text', {}, 'same-surface')),
             h(tunnel.Out),
           ]),
       }),
@@ -209,7 +202,7 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     const Consumer = defineComponent({
       setup: () => {
         const origin = inject(ORIGIN_KEY, 'default');
-        return () => h('symbiote-text', {}, origin);
+        return () => h('text', {}, origin);
       },
     });
     const Provider = defineComponent({
@@ -224,7 +217,7 @@ describe('createTunnel — genuine cross-surface delivery', () => {
       SOURCE_TAG,
       defineComponent({
         setup: () => () =>
-          h('symbiote-view', {}, [
+          h('view', {}, [
             h(
               Provider,
               { origin: 'in site' },
@@ -236,7 +229,7 @@ describe('createTunnel — genuine cross-surface delivery', () => {
               Provider,
               { origin: 'out site' },
               {
-                default: () => h('symbiote-view', {}, [h(tunnel.Out)]),
+                default: () => h('view', {}, [h(tunnel.Out)]),
               },
             ),
           ]),

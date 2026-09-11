@@ -17,6 +17,7 @@ import {
 } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
+import '../../register';
 import { VirtualizedList } from './index';
 
 const ROOT_TAG = 831;
@@ -129,9 +130,9 @@ describe('CONTROL: the cost of a FLING frame on PATH B geometry (Solid)', () => 
           renderItemCalls += 1;
           const label = info().item.id;
           return (
-            <symbiote-view>
-              <symbiote-text>{label}</symbiote-text>
-            </symbiote-view>
+            <view>
+              <text>{label}</text>
+            </view>
           );
         }}
       />

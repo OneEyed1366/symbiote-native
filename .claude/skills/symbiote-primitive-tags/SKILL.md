@@ -11,8 +11,8 @@ description: >-
   (`export const View: 'symbiote-view' = 'symbiote-view'`), when planning or reviewing an adapter's
   lowering transform, or when asking why a primitive is still a wrapper. Holds the measured
   per-adapter feasibility matrix (React/Vue/Angular need no plugin; Solid and Svelte do, for
-  different reasons), why the `symbiote-` hyphen is load-bearing in the internal tag while the
-  public name drops it, the three categories of component (native-backed / composition /
+  different reasons), why the `symbiote-` hyphen WAS believed load-bearing in the internal tag and
+  why that was superseded 2026-09-03 (re-measured on our own compiler configs, not stock ones), the three categories of component (native-backed / composition /
   framework-element-typed) and which can ever be tags, what a wrapper's prop folds must do before
   it can be deleted, and the four open engine and adapter items that block the remaining eight
   primitives. Trigger on: 'primitive as a tag', 'intrinsic element', 'drop the wrapper',
@@ -423,6 +423,9 @@ would read as a promise the next refactor cannot keep.
 
 ## Dropping the `symbiote-` prefix: safe for the PUBLIC name, fatal for the internal tag
 
+> **The "fatal" half is SUPERSEDED — see the subsection at the end of this section (2026-09-03).**
+> Kept in full because the METHOD failure is the reusable part.
+
 Two different names are involved, and conflating them is the trap. The public name is what a
 developer types; the internal tag is what the compiler and the engine see. Only the second is
 constrained — and it is constrained hard, because `view`, `text`, `image` and `switch` are all real
@@ -444,6 +447,8 @@ Two independent failures from one rename. The tag lands in the SVG namespace, an
 the custom-element codegen path — so `set_custom_element_data` is replaced by attribute writes,
 which stringify. The whole flat-bag strategy (`svelte-adapter-dom-shim`: ONE object prop that must
 land as a PROPERTY set) breaks silently. **The hyphen is load-bearing, not cosmetic.**
+**-- SUPERSEDED 2026-09-03: on OUR configs the bag still lands as a property. See the subsection
+at the end of this section before acting on this paragraph.**
 
 **The capital letter is what makes the public name safe**: the SVG collision fires only on the
 lowercase spelling. `<View>` / `<Text>` / `<Image>` / `<Switch>` are a component to Svelte and Solid
@@ -460,7 +465,59 @@ angular            selector, unconstrained
 
 So: drop the prefix from the public API, keep it in the internal alphabet. Anyone "simplifying"
 this by making the tags plain lowercase gets an SVG namespace and stringified props, on device,
-with every test green.
+with every test green. **-- FALSE on our configs; read the subsection immediately below before
+quoting this sentence.**
+
+### SUPERSEDED 2026-09-03 — re-measured on OUR configs, and both failures disappear
+
+The table above is stock-compiler output. Re-run through the pipelines this repo actually ships —
+`adapters/solid/babel-preset.cjs` (`generate: 'universal'`) and
+`adapters/svelte/metro-svelte-transformer.cjs`'s `COMPILER_OPTIONS` (`fragments: 'tree'`) — the
+hyphenless lowercase form is not blocked on either:
+
+```
+solid    <symbiote-view p={{a:1}}/>   _$createElement("symbiote-view"); _$setProp(el,"p",{a:1})
+         <view          p={{a:1}}/>   _$createElement("view");          _$setProp(el,"p",{a:1})
+         <text> <image> <switch>      same, verbatim.   <View/> -> _$createComponent(View, …)
+
+svelte   <symbiote-view p={p}/>       from_tree([['symbiote-view']], 2)  set_custom_element_data
+         <view          p={p}/>       from_tree([['view']],          4)  set_attribute
+         <stacklayout   p={p}/>       from_tree([['stacklayout']],   4)  set_attribute
+```
+
+Solid's `_$template` line in that table (the one wrapping `<svg><view …`) is the DOM generator. Universal mode emits calls into our
+renderer and builds no template string at all, so there is no HTML parser and therefore no
+namespace to switch. The SVG half of the finding does not reach us.
+
+Svelte's codegen genuinely differs — and the COMMITTED tree does not. Mounted through the real
+`mount()` against `installFabric()`:
+
+```
+symbiote-view   RCTView       { testID: "probe", nativeID: "x" }
+view            view          { testID: "probe", nativeID: "x" }
+stacklayout     stacklayout   { testID: "probe", nativeID: "x" }
+```
+
+The bag lands as a PROPERTY on all three. `set_attribute` (svelte `dom/elements/attributes.js:204`)
+routes a NON-STRING value to `element[attr] = value` whenever `get_setters(element)` finds the
+setter; `p` is a getter/setter pair on `ShimElement.prototype` (`element.ts:86,90`); and
+`patch-globals.ts:79` sets `g.Element = ShimElementBase` — an empty class BELOW `ShimElement` —
+exactly so `get_setters`, which stops at `Element.prototype`, still reaches it. The shim's own
+comment says so. **`stacklayout` behaving identically to `view` is what proves the discriminator
+was the HYPHEN and never the SVG word**; the original entry fused two mechanisms into one clause.
+
+**What this does NOT clear.** Svelte swaps `importNode` for `cloneNode` (flag 2 -> 4), and this
+skill elsewhere calls `importNode` the primary clone path that must be watched — one probe is not
+that suite. The engine's tag->component table knows only `symbiote-*`, so a hyphenless tag commits
+`viewName: "view"`. React, Vue and Angular were not in this pass; React additionally augments
+`declare module 'react'`, so a lowercase `view` collides with `@types/react`'s SVG entry (TS2717)
+until React moves to its own `jsxImportSource`, which Solid already has
+(`adapters/solid/src/jsx-runtime.ts`).
+
+**And the method, which outlives the verdict: the superseded numbers were taken on the compilers'
+STOCK configuration, not on ours, and nothing in the record said which.** A single generator flag
+deleted the whole mechanism the finding was named after. When a finding is about a compiler, record
+the options it was compiled with, or the next reader inherits a fact about somebody else's build.
 
 ## The React arm was BUILT, 2026-09-01 — what it cost and what it uncovered
 
@@ -1932,3 +1989,731 @@ therefore reads wrong if taken as lowered-is-worse. The two paths diverge in opp
 and Solid's wrapper does the same thing as Vue's for the same reason (`buildHost(multiline)` inside
 a memo, taking the value as an ARGUMENT). Both were shown by their own sessions rather than
 asserted, and both hold because of how THOSE wrappers are written — not because of the framework.
+
+## ScrollView, and what the two new engine seams changed (2026-09-03)
+
+`.claude/rules/host-primitive-tier.md` closed ScrollView as **structurally** not lowerable on
+2026-09-01. That verdict was correct on its date and its enabling condition is gone: both escapes it
+priced as too expensive now exist, and the supersession is recorded at the section itself.
+
+```
+IHostBehavior.buildStructure(node) -> slot   builds the primitive's own subtree once at attach,
+node.childHost                               returns the node app children belong under;
+                                             appendChild/insertBefore/removeChild redirect there
+IHostBehavior.slotProps                      owner prop name -> slot prop name, applied in routeProp
+```
+
+The wrapper's two style arrays are reproduced by `payloadFold`s on either side, with OPPOSITE
+precedence — base UNDER the app's on the scroll node, `flexDirection:'row'` OVER it on the content
+node. That is why `slotProps` is a pure RENAME: a redirect that also composed would have to pick one
+order for both.
+
+Also landed, both prerequisites rather than ScrollView work: React's host config now passes the
+intrinsic tag to `createElement` (it was the only adapter that did not, so no behavior could attach
+there at all), and `scrollTo`/`scrollToEnd`/`flashScrollIndicators` are node methods beside
+`focus`/`blur`, with `buildScrollViewHandle` delegating so a ref and a tag cannot disagree on what
+`scrollTo()` with no argument means.
+
+### No `-managed` split. It is a two-path artifact and this is tag-only
+
+The split keeps two owners off one node while a wrapper and a lowered element both emit a tag. There
+is no second owner here, and `component-names/shared.ts` says so at the pair's own declaration
+("DELETE THIS PAIR when the wrappers stop owning that state"). Reintroducing it means keeping the
+wrapper, which is the two-path world this initiative is leaving.
+
+The same correction applies to "refuse per call site". **Tag-only has no fallback**: a prop the tag
+does not handle is not a slower path, it is a prop that silently does nothing. Every prop must work
+before the swap.
+
+### Sequencing, and the one thing that is safe to do incrementally
+
+The BEHAVIOR can grow in pieces because nothing registers it yet — `registerScrollViewBehavior()`
+is called only by tests, deliberately, since `symbiote-scroll-view` is still the wrappers' own tag.
+Only the tag swap is atomic.
+
+```
+3a  no child marking needed   DONE 2026-09-03 — decelerationRate, collapsableChildren,
+                              onContentSizeChange synthesis
+4a  claimed children          DONE 2026-09-03 — <RefreshControl> beside the content view (iOS)
+4b  the Android inversion     DONE 2026-09-03 — claim mode `wrap` + ISymbioteNode.wrapper
+4c  <StickyHeader>            DONE 2026-09-03 — a tag with its own behavior; the throttle, the
+                              scroll value and the inverted layout came with it
+5   swap + delete wrappers    one cut, five adapters
+```
+
+**`scrollEventThrottle` and the `onScroll` MODES moved out of 3a and into 4, and the reason is a
+dependency rather than an estimate.** Both are functions of `hasStickyHeaders`, which a lowered
+element cannot answer until a sticky header is a marked CHILD — `stickyHeaderIndices` indexes a
+children array the element does not have. Resolving the throttle alone would set it to 1 or 16 and
+buy a per-frame scroll event with nothing reading it, so it waits for the mechanism it feeds rather
+than landing half-wired. Plain `onScroll` needs nothing at all: `scroll` is a real Fabric event and
+routes on its own.
+
+### 4a landed as `claimedChildren`, keyed by FABRIC name
+
+A child whose Fabric component the owner's behavior claims stays on the OWNER instead of going into
+the slot, and lands before the slot — RN's iOS branch renders `{refreshControl}{contentContainer}`
+in that order (`ScrollView.js:1844`). `hostFor` picks the node, `indexFor` picks the position, and
+`removeChild` reads the same pair so the adapter can remove from the node it named.
+
+Keyed by the child's **Fabric component name**, unlike the registry itself, and the asymmetry is the
+point: a claim is consulted only for children of ONE owner, so `PullToRefreshView` is unambiguous
+there, while keying the registry that way would attach the press machine to every plain `View`. That
+is what lets a claim cost no per-node field carrying an intrinsic tag.
+
+`RefreshControl` needs no behavior of its own. Its wrapper body is `resolveAccessibilityProps` and a
+spread, and the aria fold already runs in the engine (`fabricProps` -> `foldAriaProps`), so the bare
+tag commits the same payload the component does.
+
+### 4b: on Android the refresh control is not a child
+
+An Android ScrollView takes exactly one child, so RN inverts the tree — `AndroidSwipeRefreshLayout`
+WRAPS the scroll view, with `splitLayoutProps` sending the style's layout half to the wrapper and its
+visual half to the inner view (`ScrollView.js:1856`). Read against upstream, not against our wrapper:
+it is a native ViewGroup constraint, not a JSX one, so a host model does not dissolve it.
+
+A claim cannot express it as a placement. The refresh control has to become a node ABOVE the owner,
+and the owner has no parent yet when its children arrive — adapters append children before mounting
+the owner, and the existing tests do exactly that.
+
+**CLOSED 2026-09-03, and the predicted shape was right.** `claimedChildren` carries a MODE per name
+(`beside` / `wrap`), and `ISymbioteNode.wrapper` records the inversion: the owner remembers what
+stands in its place, and `appendChild` / `insertBefore` / `removeChild` move that instead. The swap
+in `wrapsOwner` is skipped entirely in the common case, because the owner is usually still detached.
+
+Everything above the two structural entry points is untouched: the adapter names the scroll view for
+every insert, prop write and command, which is what keeps the ref and the scroll commands pointed at
+the right node.
+
+**The seam it needed that the plan did not predict: `onWrapChange`.** The wrapper is the APP's node,
+so the behavior never got to give it a `payloadFold` the way it does for a node its own
+`buildStructure` built — and it is exactly the node that has to carry the scroll view's layout style.
+The hook fires from the two entry points when a wrap lands or leaves, and Android's behavior uses it
+to install both folds and to restore the plain one on release. Only `wrap` notifies; `beside` changes
+nothing a behavior has to answer for.
+
+Two smaller things fell out and are worth not re-deriving. `slotDerived` now marks the WRAPPER as
+well as the slot, which is what makes an owner style write re-split (Android adds `style` to the
+list). And `insertBefore`'s `beforeChild` was typed non-nullable while Solid's renderer has always
+spelled "append" as `null` — harmless while the code only called `indexOf` on it, fatal the moment it
+read a field. The type now says what the callers do.
+
+### The `baseStyle` divergence, fixed in the same cut
+
+RN composes the axis base onto BOTH boxes (`StyleSheet.compose(baseStyle, outer)` beside
+`compose(baseStyle, inner)`), and all five adapters had dropped it from the wrapper. Consequence: an
+`AndroidSwipeRefreshLayout` with no explicit user layout style loses `flexGrow: 1` and collapses to
+its content height inside a flex parent, where RN's fills it.
+
+It is now one shared function — `splitScrollViewStyle(base, style)` returns the composed pair — and
+that is the point rather than a tidy-up: five call sites composing `[base, outer]` by hand is exactly
+what drifted, and a fold written inline is invisible to `tests/lowered-primitive-fold-parity.test.ts`,
+whose oracle is shared value imports.
+
+**No test moved when the fix landed, which is the finding.** The Android wrap has three dedicated
+suites across three adapters and none of them asserted anything about the wrapper's own base — they
+were written to check the layout/visual SPLIT, and the base is not part of the split. Break-tested
+after the fact: dropping the base from the wrapper reddens exactly the two new rows.
+
+Sticky and refreshControl belong to 4 by nature, not by size: both ARE the marked-child work. The
+prop carrying an element exists in both cases only because the API had no way to MARK an element —
+`stickyHeaderIndices` is an index list precisely because JSX cannot say "this child is sticky".
+
+### 4c: the child form, and the index array turns out to have been the WORKAROUND
+
+`symbiote-sticky-header` is a tag with its own behavior, registered beside the two scroll tags —
+`core/components/src/behaviors/scroll-view/sticky.ts`. It is the FOURTH effect runner for
+`reduceSticky` and the first with no framework above it; the decision half is untouched, which is
+what keeps this a port rather than a second implementation. The runner's shape is Angular's
+projection controller, because that one already drives engine nodes.
+
+**The cross-talk is where the child form stops being a workaround for a missing index and becomes
+the better mechanism.** Each header needs the y of the NEXT one — the point it gets pushed off at —
+and every existing runner reads that out of a map keyed by child index, with a renumbering pass
+when a windowed list moves. The owner here keeps its headers in DOCUMENT ORDER, taken by walking
+the content subtree, so "the next header" is the next entry and a header that moves carries its own
+identity with it. Nothing to renumber, and no `setChildIndex` at all.
+
+The owner half rides along because three of the ScrollView's own props are functions of "does this
+one have sticky headers", which only a registration can answer: the raised `scrollEventThrottle`,
+the `scroll` listener driving the shared AnimatedValue, and — inverted only — the owner's own
+layout. All three are wired on registration and taken back on the last unregister.
+
+**`scroll` and `layout` are OWNED listeners now, and not because the behavior consumes them.**
+`node.listeners` is single-slot, and RN's ScrollView installs `_handleScroll` / `_handleLayout`
+unconditionally and calls the app's handler from inside them. A behavior installing either without
+owning it evicts the app's silently — the same collision `ownedListeners` was built for on the
+press names.
+
+**Two engine seams this needed.** `setBehaviorListener` takes `undefined` to REMOVE, gate flag
+included: the owner's layout is wanted by an inverted pin OR by the app, so one resolver owns the
+slot and a one-way installer would leave `onLayout: true` standing on a ScrollView that reads
+nothing. And `markPropsDirty` is now exported — a behavior whose payload is DERIVED from its own
+runtime (the debounced translateY lives in the runner, not in `node.props`) has no prop to write,
+so it has no other way to say the fold's input moved.
+
+**The passthrough transform is deliberately unwitnessed, and the note in the code says so.** While
+the pin is JS-driven the animated leaf's `setNativeProps` writes the same value and marks the node,
+so removing `markPropsDirty` reddens nothing. It is the NATIVE-driver path it exists for, which a
+headless test cannot reach — recorded rather than deleted, and the fold's transform half IS
+witnessed by a row that re-renders the style out from under a settled pin.
+
+Five arms break-tested, four on disjoint rows: no cross-talk (the two-header row alone), the layout
+resolver ignoring the app (its own row alone), the fold dropping the settled transform (the
+re-render row alone), and a one-way `setBehaviorListener` (the take-back row alone).
+
+### CLOSED — a slot prop DERIVED from owner props is `slotDerived`, read from `setProp`
+
+`collapsableChildren` on the content node is `maintainVisibleContentPosition !== undefined ||
+snapToAlignment !== undefined` — owner props, computed, landing on the slot, which neither existing
+seam covers: `slotProps` renames a value rather than computing one, and a slot fold reading the
+owner never re-runs, because `markPropsDirty` bubbles UP and `reconcile` skips a clean subtree.
+
+Resolved as the predicted `slotDerived` name list, with one correction to the prediction: it is read
+from **`setProp`, past its identity guard**, not from `routeProp`. `setProp` is the single choke
+point every writer passes — a structural adapter's `setProperty` does not go through `routeProp` —
+and sitting past the guard means a re-render writing the same value dirties nothing, which is what
+keeps a per-render ScrollView from cloning its content node. Break-tested in both directions:
+dropping the field reddens the after-mount re-derivation, moving the read ABOVE the guard reddens
+the unchanged-rewrite case.
+
+### The seam 3a needed that the plan did not predict: `onOwnedListenerChange`
+
+`onLayout` is a GATED event, so a lowered ScrollView may install it on its content view only when
+the app passed `onContentSizeChange` — RN and every wrapper do exactly that, and wiring it always
+would put a flag in every ScrollView's payload for an event nobody reads.
+
+`afterCommit` looks like the beat for that and **cannot see it at all**. A listener change writes no
+Fabric prop, so the commit after it is a no-op and `commitContainer` returns above
+`runPostCommitHooks`. Measured: the WIRE worked (the mount commit is a real commit for other
+reasons) and the UNWIRE was silently dead — half a contract, green suite. `markPropsDirty` on the
+flip does not rescue it either: the payload is identical, so `result.changed` stays false.
+
+So the notification happens where the change does — `setEventListener` calls
+`onOwnedListenerChange(node, name, wired)` on a PRESENCE flip, never on the fresh closure a
+framework hands over each render. Synchronous, so the flag lands before the first commit and the
+lowered path has no two-pass mount the wrapper does not have. Full rationale:
+`.claude/rules/engine-mutations-must-mark-dirty.md`.
+
+The general form for whoever wires the next behavior: **before choosing `afterCommit`, ask which
+Fabric prop moves when the thing you are watching changes.** No answer means no commit, and no
+commit means no hook.
+
+### The per-adapter half, unchanged by any of this
+
+Solid and Svelte need a renamer entry (their compilers decide host-vs-component by CASE). Angular
+needs a non-rendering directive with the selector AND removal from `anchor-host-registry` — its
+three blockers on marked children (anchor per composed component, `ng-content` deferral with
+`parent === null`, and the hand-rolled `ScrollViewProjectionController`) are all consequences of
+ScrollView and RefreshControl still being components, so they are expected to dissolve with the
+swap. Expected, not measured.
+
+## DIRECTION RESET 2026-09-07: no lowering transform may remain
+
+Stated by the project owner: *the developer writes declaratively and explicitly, we keep minimum
+component wrappers, and everything that can go through the engine goes through the engine rather
+than through the JS framework.*
+
+That retires the reconciliation recorded under "THE CONSTRAINT that governs all of the above". It
+was not wrong — it was the correct answer to *"the app keeps writing `<View>`, so who routes a
+refusing call site?"* The app does not keep writing `<View>`. It writes `<view>`, which every
+compiler already reads as an element, so there is no call site to route and a refusal has nothing to
+refuse. Everything priced under "what keeping the transforms COSTS" and "can the transform still
+route a refusing call site" answers a closed question.
+
+**Do not read the earlier sections as superseded wholesale.** The measurements stand; only the
+question changed. In particular `half A` (the primitive resolves to a tag, the import stays) is
+still the shape — an app may write `<view>` or `import { View }` where `View === 'view'`, and both
+reach the same commit.
+
+### The one correctness dependency, and it is closed
+
+Four adapters treated the transform as an optimisation and one did not:
+
+```
+react vue solid angular    a bare tag committed correctly; the transform saved a wrapper
+svelte                     a bare tag committed NOTHING, and THREW on style
+```
+
+Svelte's `ShimElement.setAttribute` wrote an inert Map, so only the `p={{…}}` bag the transform
+builds ever reached `routeProp`. Closed 2026-09-07: `setAttribute` merges each key into that same
+folded bag and routes it, `removeAttribute` routes `undefined`, and both share the pre-live buffer
+the bag already had. `dom-shim/bare-tag-props.test.ts` pins the parity row — bare and bagged commit
+byte-equal payloads — and all six rows go red with the routing call removed.
+
+It cost one private method, against a prediction of "a separate and much larger change" written into
+`.claude/rules/svelte-shim-element-global-must-be-an-ancestor.md`. The estimate was made when the
+bag machinery did not exist; by the time the change was made, the fold, the class normalisation, the
+diff and the replay were all already there and only needed a second writer. **A cost recorded before
+its neighbours were built is an estimate about a different tree** — re-price before quoting one.
+
+### Scope of the reset, stated by the owner the same day
+
+*As few components as possible, as many tags as possible.* Only the LIST family
+(`FlatList` / `SectionList` / `VirtualizedList` / `VirtualizedSectionList`) is expected to stay a
+component — it owns windowing state, a cell registry and a render callback per item, none of which a
+tag can carry. Everything else becomes a tag, and the lowering transform is deleted in every form.
+
+## Angular cannot admit a DASHLESS tag by schema — and a directive beats every schema anyway
+
+Measured 2026-09-07 through the real `@angular/compiler-cli` with the repo's own
+`strictTemplates: true` (`adapters/angular/src/bare-intrinsic-tag-aot.test.ts`, 14 cases with a
+control that the compilation ran). JIT is blind to all of it: a bare `<view>` mounts clean under
+JIT with no schema and no warning, so no mounting test in this repo could have found it.
+
+```
+<view [testID]>          no schema                NG8001 'view' is not a known element
+<view [testID]>          CUSTOM_ELEMENTS_SCHEMA   NG8001          <- the finding
+<view [testID]>          NO_ERRORS_SCHEMA         clean
+<text-input [value]>     CUSTOM_ELEMENTS_SCHEMA   clean
+```
+
+`hasElement` / `hasProperty` gate the `CUSTOM_ELEMENTS_SCHEMA` branch behind
+`normalizedTag.includes('-')` (`dom_element_schema_registry.ts:405,427`) — a custom element must
+have a hyphen. Dropping the `symbiote-` prefix split the alphabet: the dashed tags still compile
+with their whole surface, the six dashless ones (`view`, `text`, `pressable`, `image`, `switch`,
+`modal`) compile under no schema at all.
+
+**A CUSTOM schema is not a thing.** `SchemaMetadata` is `{ name: string }` and the name is compared
+against exactly two constants, in one file. A third object is silently ignored. The registry itself
+is a module-level `const` in four places in ngtsc, so it cannot be swapped either — every article
+describing an `ElementSchemaRegistry` replacement is ViewEngine-era.
+
+### The directive route, and why it is better than the schema it replaces
+
+A `@Directive({ selector: 'view' })` makes the element known with NO schema. What made it look like
+a dead end is real and is a repair rather than a wall: matching a directive turns every binding into
+an input lookup, so an undeclared prop is NG8002 — declare it and the lookup succeeds.
+
+```
+<view [testID]="v">    directive declares testID    compiles, no schema anywhere
+<vieww [testID]="v">   same                          NG8001 — the typo is caught
+<view [testID]="42">   same                          type error — the PROP TYPE is caught
+```
+
+The third row is strictly beyond either schema: both return `true` for EVERY property on a tag they
+admit ("we don't know which properties a custom element will get", `:407`), so `<text-input
+[nonsense]>` compiles silently under `CUSTOM_ELEMENTS_SCHEMA`.
+
+**The value still reaches the engine, through ONE generic loop** — an `ngOnChanges` forwarding each
+changed key to `Renderer2.setProperty`, not per-prop code. Measured end to end
+(`element-directive-forward.test.ts`); with the loop removed the node does not commit at all, which
+is the break-test and also the proof that a claimed binding never reaches the renderer on its own.
+
+### The ergonomics answer, because it is the first objection
+
+There is no global-import mechanism for standalone components — per-component `imports` is the
+design (angular/angular#43784), and it was discussed and not built. That is the floor whatever we
+ship, and it costs nothing new here: **every component in `examples/angular` already writes
+`imports: [SafeAreaView, Text, View]`**, 73 of them. The directives take the same line, and Angular
+flattens a nested array, so the whole set collapses to one symbol — `imports: [SYMBIOTE_ELEMENTS]`,
+which stays one symbol as the set grows (pinned as case L).
+
+An app that genuinely wants zero per-component lines still has NgModules: declare its components in
+a module that imports ours and every one of them sees the directives.
+
+**What is NOT priced yet:** a directive instance per node plus `ngOnChanges`. Cheaper than a
+component (no separate LView) and still the per-node tax this whole migration exists to remove.
+Measure on the Angular benchmark screen before committing to it.
+
+### DECIDED 2026-09-07: the NgModule route, like NativeScript-Angular
+
+The app writes it ONCE. A component DECLARED in an NgModule inherits that module's whole import
+scope, so one `imports: [SymbioteElementsModule]` gives every component in it the element
+directives — no `imports` line and no `schemas` line anywhere else. Measured through real ngtsc
+(cases M and N): two components with nothing between them compile clean, and `<vieww>` still fails
+with NG8001, which is the half NativeScript-Angular gives up by needing `NO_ERRORS_SCHEMA` (they
+have no directives to match).
+
+One correction to the obvious spelling: in v20 a `@Directive` is STANDALONE by default, so the
+module `imports` them and `exports` them. `declarations:` fails with "Directive X is standalone,
+and cannot be declared in an NgModule".
+
+The cost is `standalone: false` on every app component that wants the scope — still supported in
+v20, and case M is what proves that rather than assuming it. `examples/angular` has 73 components
+to convert.
+
+#### SUPERSEDED the same day: standalone + explicit imports
+
+The owner reversed it within the hour, and the reversal is the cheaper answer: components stay
+`standalone: true` and list the elements in their own `imports`. The NgModule measurement above is
+kept because it is what makes the reversal informed — the module route is available and costs 73
+components' worth of `standalone: false` in `examples/angular` alone.
+
+**The decisive fact is that this costs NO new boilerplate.** Every component in `examples/angular`
+already writes `imports: [SafeAreaView, Text, View]` — 73 of them. The directives take the same
+line, and Angular flattens a nested array, so the whole set collapses to one symbol
+(`imports: [SYMBIOTE_ELEMENTS]`, case L) and the line gets shorter rather than longer.
+
+### The engine owns a primitive's inner node — decided 2026-09-07, and it kills the `-managed` route
+
+A ScrollView is two nodes (`RCTScrollView` > `RCTScrollContentView`). Exactly one thing may build the
+inner one. Today the ADAPTER builds it, three ways: the `ScrollView` wrapper (Vue, Angular, React),
+and `VirtualizedList` hand-authoring the `scroll-view`/`scroll-content` intrinsics directly (Svelte,
+Solid). Registering `registerScrollViewBehavior()` makes `buildStructure` build it as well, and the
+committed tree grows a second `RCTScrollContentView`.
+
+Three agents reached this independently, and the finding that matters is **why deleting the wrapper
+does not fix it**: `VirtualizedList` is a second owner, the LIST family deliberately stays a
+component, and on two adapters it never imports the wrapper at all — so an import grep reports those
+adapters clean. The plan's "atomic per-adapter cut" does not exist as an operation.
+
+**The owner's decision: the engine builds it.** Every list and wrapper stops. That rules out the
+route `behaviors/scroll-view/shared.ts` proposed in its own header — a `scroll-view-managed` pair on
+the `text-input-managed` precedent — which was already forbidden by
+`.claude/rules/fold-only-primitive-recipe.md` §4 ("a second tag is not an available answer… delete
+the wrapper rather than giving it a private spelling").
+
+**And the two documents contradicted each other in writing, which is the reusable half.** The rule
+forbids a second tag *because* "this migration is removing the wrapper, which removes the second
+owner" — a premise that is simply false for any primitive whose inner node a surviving component
+also builds. The rule's verdict held; its stated reason did not. Same shape as
+`.claude/rules/adapter-parity-audit.md`'s repeated finding, from the other side: **before applying a
+rule, check that the premise it names is true of YOUR primitive** — here, ask who else builds the
+inner node, and grep for the hand-authored intrinsic as well as for the wrapper import.
+
+### A windowed list must NOT forward `stickyHeaderIndices` to the engine
+
+The behavior's index reconciler numbers the owner's PAINT children — the nodes actually committed
+under the content slot. A list's `stickyHeaderIndices` are indices into its DATA stream. On a
+non-windowed list the two coincide, which is what makes this dangerous; on a windowed one they do
+not, and the reconciler wraps whichever child happens to sit at that paint position.
+
+Measured 2026-09-07 on Svelte's `VirtualizedList` with `stickyHeaderIndices=[0,3,6]`: a phantom
+sticky header appeared at `layoutY=900` — data index 9, which is not in the list at all — and fed a
+bogus collision point to the header at 600.
+
+**The rule for every adapter's list: mark the cell with the `sticky-header` TAG, never forward the
+index array.** The index path in the behavior is the COMPATIBILITY path for an app that writes RN's
+prop on a plain `<scroll-view>`, where paint and data order do agree.
+
+Second, smaller, same family: forward the RAW `scrollEventThrottle`, not a folded one. The behavior's
+`syncThrottle` reads a number back as the app's own value and can then never lower it again.
+
+### Declaring the tag alphabet to each framework's type-checker — measured 2026-09-07
+
+Two of five adapters declared nothing, and Svelte's case is not "no types" but WRONG types, because
+four of our 21 tag names are real SVG elements.
+
+```
+react     src/jsx-runtime.ts + jsx-namespace.type-check.tsx    has it
+solid     src/jsx-runtime.ts                                   has it
+angular   20 element directives with typed @Inputs             has it, by a different mechanism
+vue       nothing — GlobalComponents augmentation is the route, no name conflicts to work around
+svelte    nothing, and view/text/image/switch actively mistype
+```
+
+**Svelte, measured with a control arm:**
+
+```
+augment svelte/elements -> SvelteHTMLElements      TS2717 on view/text/image/switch
+                                                   (svelte/elements.d.ts:2035 view: SVGAttributes<SVGViewElement>)
+                                                   a NEW name such as sticky-header augments cleanly
+augment global svelteHTML.IntrinsicElements        WINS. examples/svelte svelte-check 5 errors -> 3
+bind:this element type                             NOT FIXABLE from a library
+```
+
+The `bind:this` half is closed by construction, so do not re-derive it: `svelte2tsx/svelte-jsx-v4.d.ts:25`
+bakes `Key extends keyof ElementTagNameMap ? … : Key extends keyof SVGElementTagNameMap ? … : any` into
+its shim's RETURN type. Both maps come from `lib.dom`, which line 1 of that same file force-includes with
+`/// <reference lib="dom" />` — a triple-slash lib reference inside a dependency cannot be suppressed from
+a consumer's tsconfig, and the example's own `lib` list contains no `dom` at all. Augmenting either map
+hits the same TS2717. Svelte's custom-renderer API (PR sveltejs/svelte#18042) is not in 5.56.8.
+
+**Scope, which is what keeps this a wart and not a blocker:** a hyphenated tag falls through to `any`
+there, so NO adapter tag has ever given a typed ref in Svelte. Dropping the `symbiote-` prefix turned
+`any` into an ERROR, and only on sites that take a ref — three in the whole canary, all of them ref
+demos. The decision was to ship the attribute half and leave the ref typing alone rather than rename a
+tag.
+
+**Method note worth more than the finding.** The first probe used `--skipLibCheck` and reported the
+augmentation as ACCEPTED — that flag skips exactly the `.d.ts` files where a merge conflict lives, so it
+suppressed the error the probe existed to find. Any probe about declaration merging must run without it,
+and needs a second arm using a name that does NOT collide, or "no error" and "nothing was checked" read
+the same.
+
+#### Refinement: an OWN member of a merged interface outranks an INHERITED one
+
+The measurement above (`svelteHTML.IntrinsicElements` augmentation takes the count 5 -> 3) is true for
+the shape the probe used and MISLEADING for the shape the fix needs. The probe wrote `view: …` directly
+into the augmentation — an own member, same rank as svelte2tsx's own `view: HTMLProps<'view', SVGAttributes>`.
+The shipped version derives its tag list (`interface IntrinsicElements extends Record<ISymbioteIntrinsic, …>`),
+which makes every name INHERITED, and inherited loses. Error count stayed at 5 while the declaration
+demonstrably loaded — svelte-check's file count moved 635 -> 636.
+
+So a probe that hardcodes one name cannot predict a fix that derives the list, and the failure is silent
+in the direction that flatters you. When a probe and the real change differ in HOW a member arrives, the
+probe has not tested the change.
+
+What actually closes it is svelte2tsx's own documented extension point: its `SVGAttributes` is an empty
+interface commented "in case someone enhanced the typings", and its entries are
+`Omit<SvelteHTMLElements[tag], keyof SVGAttributes> & SVGAttributes` — so an index signature there makes
+`keyof` become `string | number`, the `Omit` erases the whole SVG surface, and ours is what remains. Blunt
+(it reaches every SVG tag) and free (a React Native app has none).
+
+## TouchableHighlight ported to a tag, Svelte-only (2026-09-10) — the wiring checklist, reusable
+
+Done via TDD (test file first, watched fail, then the implementation). Unlike
+`TouchableNativeFeedback`/`TouchableWithoutFeedback` (anchor tags, commit nothing, clone onto the child)
+and `TouchableOpacity` (one node, an eased `AnimatedValue` fade), `TouchableHighlight` needed a genuinely
+new composition: one committed node carrying a press machine (`touchable-opacity`'s shape) PLUS a
+discrete underlay show/hide state machine with real hold timers pinned to RN's actual three-callback
+Pressability semantics (`TouchableHighlight.js`) — no existing tag had that combination. The underlay
+machine itself was NOT new: `createHighlightUnderlayHandlers`/`createHighlightUnderlayRuntime`/
+`resolveHighlightExtraStyles`/`hasTouchablePressHandler` (`core/components/src/state/touchable.ts`,
+`core/components/src/view/render-touchable-highlight.ts`) were already framework-agnostic, written when
+the Svelte WRAPPER was built — the port only had to consume them.
+
+**Style-change mechanism, and why it is NOT `setAnimatedBehaviorStyle`.** A discrete boolean toggle
+(shown/hidden) with no easing publishes through `markPropsDirty`+`requestCommitFor` — the same pair
+`./pressable`'s `setPressed` composer uses to force a re-fold after an internal state change —
+`foldPayload` re-reads the WeakMap-held `shown` flag on the next fold. `setAnimatedBehaviorStyle` exists
+for a continuously-driven `AnimatedValue`/eased fade (`touchable-opacity`'s shape) and is the wrong tool
+here.
+
+**Kept the wrapper's own simplification rather than "fixing" it.** RN's real TouchableHighlight commits a
+container (backgroundColor, accessibility, the responder) and separately `cloneElement`s an opacity style
+onto its single CHILD — closer to TNF's clone-onto-child shape than to a true single node. Every wrapper
+(Svelte included, per its own "ITEM 7 IS DELIBERATELY NOT FIXED HERE" comment) folds both the underlay
+color AND the child opacity onto the ONE node instead, because a framework component holding an opaque
+children snippet/slot cannot safely reach a child to clone onto. The tag keeps that same
+already-cross-adapter (Solid and Angular made the same call) simplification —
+`render-touchable-highlight.ts`'s own header says the shared layer "takes no position on where they
+land", so this is a legitimate placement choice, not a shortcut being reopened. A tag COULD reach the
+real child (the anchor+`payloadFold` mechanism TNF/TWF use proves the engine can), but doing so here would
+be new, untested composition work with no product ask behind it — noted as a possible future
+correctness improvement, not attempted.
+
+**The bug the tests caught, and it generalizes to every future Touchable-family tag:** the first draft
+forgot `minPressDuration: 0` in the composed Pressability config. RN's real TouchableHighlight explicitly
+overrides Pressability's own 130ms default floor to 0 (`TouchableHighlight.js:203`, verbatim same as
+`TouchableOpacity.js:195`). Without it, `deactivate()`'s `wait > 0` branch
+(`core/components/src/state/pressable.ts`) defers the WHOLE `onPressOut` — and everything composed in
+front of it, here the underlay-hide logic — behind a real 130ms timer nothing in a naive test simulation
+waits for. 4 of 11 first-draft tests failed this way (underlay never hiding, app callbacks never firing).
+Fix was one line in `refine`'s returned config, mirroring `./touchable-opacity`'s own `refine` exactly.
+**Before writing any new `createPressBehavior`-composed tag, grep `minPressDuration: 0` across the
+sibling `touchable-*.ts` files and confirm the new one sets it too.**
+
+**Second, smaller lesson the tests surfaced:** a props diff that CLEARS a previously-set key on THIS
+engine commits as an explicit `null`, never an omitted/`undefined` key
+(`core/engine/src/commit.ts:209`: `if (!(key in next)) out[key] = null;`). A test expecting
+`toBeUndefined()` after a show→hide style transition is wrong; expect `toBeNull()`. Same fact already
+recorded in `.claude/rules/test-harness-false-greens.md` ("a prop REMOVED on a clone reads as `null`, not
+`undefined`") — this is a second confirmation, not a new finding.
+
+**The reusable wiring checklist**, derived from doing this twice now (TNF/TWF, then TouchableHighlight):
+
+1. Add the tag name to `ISymbioteIntrinsic` in `core/components/src/component-names/shared.ts`, with a
+   comment explaining what it resolves to and why.
+2. Add the Fabric view-name mapping to BOTH `index.ios.ts` and `index.android.ts` in the same directory.
+3. Write the host behavior in `core/components/src/behaviors/<name>.ts` — TDD, test file first.
+4. Export `register<Name>Behavior`/`<NAME>_TAG` from `core/components/src/index.ts`.
+5. Call `register<Name>Behavior()` in the adapter's `register.ts`, with a comment stating WHY it's safe
+   now (wrapper deleted in the same commit — no double-registration risk).
+6. Delete the wrapper source + its own test.
+7. Update the adapter's components barrel comment (what the deleted name resolves to now).
+8. Remove the VALUE export (keep the TYPE export) from the adapter's public `index.ts`.
+9. Grep the whole example app for remaining USAGE of the old component name; migrate every call site to
+   the tag.
+10. **Grep for any smoke/integration test elsewhere that hardcoded the OLD wrapper as its "any component
+    that owns a bare tag" test subject.** This has now happened twice on Svelte — the subject moved
+    TouchableWithoutFeedback → TouchableHighlight → RefreshControl across two sessions
+    (`adapters/svelte/src/runes/attachments.smoke.test.ts`). Rehome it to a component likely to REMAIN a
+    wrapper for a while, to reduce future churn.
+
+Svelte's `intrinsic-elements.ts` needs NO manual edit for a new tag — its
+`Record<ISymbioteIntrinsic, …>` is fully derived from the union, so step 1 alone is sufficient.
+
+Scope: Svelte only. TouchableHighlight is still a live wrapper component on react/vue/solid/angular; no
+parity claim is made about them.
+
+## Svelte BenchmarkScreen redesign — DESIGN SETTLED 2026-09-10, NOT YET BUILT
+
+Decided via a grill-me interview; no screen code has been written. Recorded here so the design survives
+a context reset before implementation starts.
+
+**Goal:** measure each primitive in isolation (vs stock, and set up for a later vs-older-published-version
+comparison) and see per-primitive cost, which the existing mixed 10-tag `BenchmarkRow` cannot show.
+
+**Scope: Svelte adapter ONLY.** The other four adapters and `examples/bare-rn` (stock baseline) are
+untouched, deliberately, for now.
+
+**Shape:** one NEW section per primitive, additive — the existing mixed `BenchmarkRow` (10 tags in one
+row, all the historical CLAUDE.md numbers) stays exactly as it is. Each new section is a homogeneous row
+of **N=1000** identical bare tags, run through the SAME 8-step suite the existing screen already uses
+(Create/Replace/Update/Select/Swap/Remove/Append/Clear — all 8, not a reduced subset; the runner is
+already generic and cheap to reuse).
+
+**Final 13-primitive section list** (all already tag-only on Svelte as of 2026-09-10): `view`, `text`,
+`image`, `pressable`, `text-input`, `switch`, `button`, `activity-indicator`, `image-background`,
+`touchable-opacity`, `touchable-without-feedback`, `touchable-native-feedback`, `touchable-highlight`.
+
+**Explicitly excluded, and why:**
+- `scroll-view`, `modal`, `section-list`, `virtualized-list`, `virtualized-section-list`,
+  `keyboard-avoiding-view`, `safe-area-view` — structural/wrapping primitives, not naturally "N repeated
+  instances" the way a row of Pressables is.
+- `refresh-control`, `input-accessory-view` — attach-only; neither renders its own node in a list, so
+  there is nothing to repeat 1000 times.
+
+**Form: TAG ONLY, no dual-arm.** The original ask ("see the tag-vs-component difference") is answered a
+DIFFERENT way than a live dual-render: checkout an older commit / older published npm version (still
+all-components) and re-measure separately, out of band. The redesigned screen itself only ever renders
+today's tag form.
+
+**UI: a Run button on every section, plus one "run all" button at the top** that iterates every section
+sequentially.
+
+**Explicitly skipped, not forgotten:** converting ~4 plain `<ScrollView>` component-form container usages
+in `examples/svelte/screens/*.svelte` to the `<scroll-view>` tag was approved mid-interview as a
+prerequisite cleanup, then dropped once `scroll-view` was excluded from the final section list — its
+only reason to exist evaporated. If a future session adds a ScrollView section after all, do that
+cleanup first.
+
+Next step when resumed: build the 13 new sections in `examples/svelte/screens/BenchmarkScreen.svelte` (or
+a sibling file), reusing the existing suite-runner/profiling code as-is.
+
+## RefreshControl deleted, Svelte-only (2026-09-10) — real consumers were internal, not app-level
+
+Checked before assuming "zero consumers": `examples/svelte` never wrote `<RefreshControl>` directly
+(apps pass a plain `refreshControl={{...}}` OBJECT to `ScrollView`/`FlatList`, RN's own prop shape) —
+but `scroll-view/index.svelte` and `virtualized-list/index.svelte` both imported the real component
+internally to turn that object into a child. Both migrated to `<refresh-control p={refreshControlProps}>`.
+The wrapper itself was already a pure passthrough (`resolveAccessibilityProps` already runs in
+`fabricProps` on every path per the behavior file's own header — "there is nothing left for a
+`foldPayload` here to do"), so no new engine code was needed, unlike TouchableHighlight.
+
+**The real cost was 7 test files carrying a `readFileSync(.../'RefreshControl.svelte')` +
+import-specifier-rewrite dance**, because no `.svelte`-aware loader exists in this repo's Vitest, so
+any suite compiling ScrollView/VirtualizedList/FlatList/SectionList/animated-list-family from source had
+to ALSO pre-compile RefreshControl and rewrite the compiled parent's import to point at it. Deleting the
+wrapper without touching these breaks them with `ENOENT` on the deleted file, not a clean red — grep
+`readFileSync.*RefreshControl\.svelte` across the WHOLE adapter (not just the two real import sites)
+before considering a wrapper deletion done. All 7 simplified to a plain `compileToFile` of the real
+source (no rewrite needed once nothing imports the deleted file), same committed-tree assertions kept
+unchanged since the engine behavior didn't move.
+
+**The smoke test's "any component that owns a bare tag" subject moved a third time**, from
+TouchableHighlight to RefreshControl to `modal/index.svelte` — Modal is now the subject because it is
+documented as PERMANENTLY un-lowerable (`.claude/rules/host-primitive-tier.md`, "a hidden modal
+commits zero nodes, so lowering it would be a regression"), unlike every previous subject.
+
+## ScrollView deleted, Svelte-only (2026-09-10) — a wrapper's header outlived both of its reasons
+
+The file said it survived for two things and both had expired, one of them for months. It was quoted
+back to the user twice as settled before anyone opened the code, which is the reusable half.
+
+```
+"Animated.ScrollView needs a real component"   Animated.View/Text/Image were deleted and NOTHING
+                                               replaced them. Animated.ScrollView was `ScrollView`
+                                               by identity — an alias, not a wrapper. The engine
+                                               resolves an AnimatedNode in any prop, AND binds a
+                                               native `Animated.event` on any node
+                                               (bindAnimatedEvent, node.ts, from setEventListener).
+"bind:this exposes the imperative handle"      scrollTo/scrollToEnd/flashScrollIndicators are on
+                                               ISymbioteNode's PROTOTYPE, and `IHostInstance =
+                                               ISymbioteNode` is a bare type alias — so
+                                               `hostInstance(bind:this)` already types all three.
+                                               node.ts says why in its own comment: "a lowered
+                                               primitive hands the app its engine NODE, so anything
+                                               the wrapper's handle offered has to be reachable
+                                               from here or the surface silently shrinks."
+```
+
+**Deleting the wrapper TURNED A FEATURE ON, which no audit here would have predicted.** The wrapper
+destructured `stickyHeaderIndices` out of its passthrough and dlogged "not honored by this adapter" —
+true when a component's only view of its children was an opaque Snippet, and false since the behavior
+started walking the COMMITTED children (`behaviors/scroll-view/sticky-indices.test.ts`, "the
+COMPATIBILITY half"). So a wrapper was suppressing RN's own API on this adapter. The content-owner
+test's sticky case flipped `0 pins -> 1` on deletion, and that flip is now the assertion.
+
+**Ask what a wrapper SUBTRACTS, not only what it adds.** Every audit in this repo compares what two
+paths produce; a prop a wrapper destructures away never reaches either path and is invisible to all
+of them.
+
+**Cost was far below RefreshControl's**: zero internal `.svelte` consumers (the barrel and the
+`Animated` namespace only), zero test files pre-compiling it as a dependency. Two suites named it as
+their SUBJECT and were retargeted at `<scroll-view>` — both passed unchanged in substance, which is
+the evidence that licensed the deletion: a suite that survives its subject being deleted was testing
+the behavior, not the wrapper. Seven app call sites migrated, five of them a pure rename.
+
+Two markup facts worth not re-deriving, both measured through the real compiler:
+
+- **A valueless attribute on a hyphenated tag arrives RAW, not stringified.**
+  `<scroll-view nestedScrollEnabled scrollEventThrottle={16}>` emits
+  `set_custom_element_data(el, 'nestedScrollEnabled', true)` and `…, 16`. The shim's `setAttribute`
+  takes `value: unknown` and stores it as-is, so `?? true` folds still work. The worry that it would
+  land as `""` and defeat a nullish default was unfounded.
+- `refreshControl={{…}}` as a PROP becomes `<refresh-control p={{…}} />` as an ordinary CHILD — the
+  scroll behavior claims it and places it per platform. That is a markup-shape change, not a rename,
+  and it is the only one of the seven call sites that was.
+
+### The vendor read settled `horizontal` and found a gap nobody was looking for
+
+`horizontal` is one input in RN and drives three outputs — the native component
+(`HScrollViewNativeComponents.js`), the row `contentContainerStyle`, and the payload flag, which
+`...otherProps` forwards (`ScrollView.js:1644-1656`). They cannot disagree. Our input is the TAG, so
+the tag must be the only input too: `ownerFold` now deletes an app-written `horizontal` and dlogs.
+Without that, `<scroll-view horizontal>` produces a shape RN cannot make — on iOS both tags ARE
+RCTScrollView, so the stray flag really does turn the scroller, over a vertical content node with no
+row style.
+
+**And reading the vendor for one prop turned up a second, unrelated defect on every adapter.** RN
+derives the bounce pair from the axis (`ScrollView.js:1753-1761`):
+`alwaysBounceHorizontal ?? horizontal`, `alwaysBounceVertical ?? !horizontal`. In this repo
+`alwaysBounce*` occurred 20 times and **all 20 were prop-type DECLARATIONS** in the five adapters —
+the value was computed nowhere, so a vertical scroll view had never bounced by default on iOS. Same
+finding shape as `focusable` (`adapter-parity-audit.md`): grep where a value is COMPUTED, never where
+the name appears. The pair is ASYMMETRIC on purpose — RN falls back to `this.props.horizontal`, unset
+on a vertical scroll view, so the horizontal key resolves to `undefined` and never reaches the
+payload. Copying that beats tidying it: writing `false` means the same to native and costs a prop key
+on every vertical scroll view.
+
+## Where a primitive's STATICS go once it becomes a tag (2026-09-10)
+
+A tag is a string and a string carries no properties, so an API RN hangs off the component value has
+to land somewhere. Two survive on Svelte — `Image.getSize`/`prefetch`/… and
+`TouchableNativeFeedback.Ripple`/`.SelectableBackground`/… — and both had been left in
+`components/`, which is the only reason they read as components.
+
+**Keep the NAMESPACE, move the BUCKET.** `modules/` is the documented home
+(`<adapter_src_follows_framework_idioms>`: "imperative RN-API namespaces with no view — Alert,
+Share, Animated, StatusBar"). The prop type stays in `components/<name>/`, the runtime does not —
+the same split ScrollView got.
+
+**Do not convert them to bare helpers, and the bundle-size argument for doing so is void here:
+Metro performs NO tree shaking** (facebook/metro#227; the only escape is the experimental
+`@rnx-kit/metro-serializer-esbuild`, not wired in this repo). A namespace object and five named
+exports cost the same. What is left is two reasons to keep the namespace and none to split it:
+`Alert`/`Share`/`Linking`/`Vibration`/`AppState` are all `export const X = {…}`, so bare
+`getImageSize` would be the only export of its shape; and an app porting from RN writes
+`Image.getSize(...)` verbatim, which is P0.
+
+**Check the surface did not move**, since this is a reorganisation and nothing else: resolve the
+barrel through the compiler (`adapter-parity-audit.md`'s tsc audit) and confirm every affected name
+is still present. Here `Image` · `IImageStatics` · `IImageProps` · `TouchableNativeFeedback` ·
+`ITouchableNativeFeedbackProps` all resolved unchanged, 226 exports total.
+
+**And do not "modernise" a comment that is right.** `TouchableNativeFeedback`'s doc said an app
+"would have no way to build a ripple dict at all" without these, and the first plan was to soften it
+because RN points new code at `Pressable android_ripple` — which the pressable behavior really does
+resolve (`behaviors/pressable.ts`, `asRippleConfig`). But the `touchable-native-feedback` TAG folds
+`background`, and nothing else produces that value, so the sentence was accurate for its own subject.
+Both facts got recorded instead of one replacing the other. Same shape as
+`verify-the-deciding-side.md`'s "a refuted rationale is not a refuted verdict", applied to a
+recommendation rather than a refusal.
+
+## After deleting a wrapper, `tsc --build` blames a package that never changed
+
+`pnpm run typecheck` failed with three `TS6305: Output file
+'adapters/svelte/build/native-view-bridge.d.ts' has not been built from source file …` — all three
+raised by `packages/navigation`, which the migration never touched, about a source file the diff
+never touched either.
+
+The cause is `adapters/svelte/build/`, which nothing cleans (its own `.gitignore` entry hides it).
+Deleting wrappers left the directory half-emptied — five entries, no `native-view-bridge.d.ts` — and
+a composite project treats a MISSING output as stale rather than as absent, so it refuses instead of
+re-emitting. `rm -rf adapters/svelte/build adapters/svelte/tsconfig.tsbuildinfo` and re-run.
+
+Read the SOURCE path in a TS6305, never the file it is reported from: the reporting file is only the
+first consumer that reached the stale output.

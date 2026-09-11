@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { ScrollView, Text, View } from '@symbiote-native/angular';
+import { ScrollViewElement, Text, View } from '@symbiote-native/angular';
 import { injectStackNavigation } from '@symbiote-native/navigation/angular';
 import type { IAngularScreenOptions } from '@symbiote-native/navigation/angular';
 import { ROUTE_NAME } from '../routes';
@@ -28,41 +28,41 @@ export const sheetDemoScreenOptions: IAngularScreenOptions = {
 /**
  * Screen is PUSHED with stackPresentation: 'formSheet'; drag the grabber between the three
  * detents. Angular twin of ../../react/screens/SheetDemoScreen.tsx — skips SafeAreaView on
- * purpose: react-native-screens' formSheet content-sizing search only walks ScrollView's direct
+ * purpose: react-native-screens' formSheet content-sizing search only walks scroll-view's direct
  * native subviews.
  */
 @Component({
   selector: 'SheetDemoScreen',
   standalone: true,
-  imports: [ActionButton, ScrollView, Text, View],
+  imports: [ActionButton, ScrollViewElement, Text, View],
   template: `
-    <ScrollView class="screen" contentContainerStyle="section">
-      <View [class]="lineTagClass">
-        <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" [style]="heroBadgeStyle">
-          <Text class="hero-badge-text">SH</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Sheet presentation</Text>
-          <Text class="hero-body">
+    <scroll-view class="screen" contentContainerStyle="section">
+      <view [class]="lineTagClass">
+        <text class="line-tag-text">{{ lineTagLabel }}</text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" [style]="heroBadgeStyle">
+          <text class="hero-badge-text">SH</text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">Sheet presentation</text>
+          <text class="hero-body">
             Pushed with stackPresentation: formSheet and three detents — drag
             the grabber between 30%, 60%, and full height.
-          </Text>
-        </View>
-      </View>
-      <Text class="info-text">
+          </text>
+        </view>
+      </view>
+      <text class="info-text">
         stackPresentation: formSheet · detents 30% / 60% / 100% · drag the
         grabber
-      </Text>
+      </text>
       <ActionButton
         testID="sheet-dismiss"
         title="Dismiss"
         (press)="navigation.pop()"
         [color]="lineColorPresentation"
       ></ActionButton>
-    </ScrollView>
+    </scroll-view>
   `,
 })
 export class SheetDemoScreen {

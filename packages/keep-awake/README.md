@@ -107,6 +107,7 @@ useKeepAwake();
 
   useKeepAwake(); // screen stays on for as long as this component is mounted
 </script>
+
 <Text>Screen will not sleep</Text>
 ```
 

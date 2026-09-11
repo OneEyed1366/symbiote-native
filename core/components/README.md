@@ -30,8 +30,7 @@ supplies only the third:
    bridges the `Descriptor` to `React.createElement`; Vue wires it through `ref`/`watch` and
    bridges to `h()`. This is the ONLY part a new adapter has to write.
 
-`Switch` is the canonical reference for a full three-layer component; `ActivityIndicator` is the
-canonical render-only reference (no state machine needed).
+`Switch` is the canonical reference for a full three-layer component.
 
 ### Install
 
@@ -86,8 +85,8 @@ host node untouched — the render function never names a framework type.
   canonical `accessibility*` transform, shared so every adapter folds identically.
 - **Components with a full state + render split** — `Switch`, `Modal` (its reducer gates the iOS
   keep-alive frame).
-- **Render-only components** (no state machine) — `ActivityIndicator`, `Image`,
-  `ImageBackground`, `InputAccessoryView`.
+- **Render-only components** (no state machine) — `Image`, `ImageBackground`,
+  `InputAccessoryView`.
 - **Pure logic/plumbing without a full `Descriptor`** — `Pressable`'s press state machine
   (`createPressHandlers` / `createPressRuntime` in `state/pressable`) plus its render-decision
   helpers (`buildPressableListeners`, `resolveDisabledAccessibilityState`, `shouldClaimResponder`,

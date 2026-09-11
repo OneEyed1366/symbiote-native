@@ -93,12 +93,12 @@ actually consumes and re-emits them.
 
 Other events are adapter-level conveniences. Examples:
 
-| Concept               | React                          | Vue                                | Angular                       | Svelte                          | Solid                           |
-| --------------------- | ------------------------------- | ------------------------------------ | ------------------------------- | ---------------------------------- | ---------------------------------- |
-| Press                 | `onPress`                      | `@press`                            | `(press)`                      | `onPress`                         | `onPress`                         |
-| Switch value          | `onValueChange(value, event)`  | `@value-change`<br />or `v-model`   | `(valueChange)` (value only)   | `onValueChange(value, event)`     | `onValueChange(value, event)`     |
-| Text input text       | `onValueChange(text, event)`   | `@value-change`<br />or `v-model`   | `(valueChange)` (text only)    | `onValueChange(text, event)`      | `onValueChange(text, event)`      |
-| Text input raw event  | _(same callback, 2nd arg)_      | _(same emit, 2nd arg)_               | `(change)` (separate output)   | _(same callback, 2nd arg)_         | _(same callback, 2nd arg)_         |
+| Concept              | React                         | Vue                               | Angular                      | Svelte                        | Solid                         |
+| -------------------- | ----------------------------- | --------------------------------- | ---------------------------- | ----------------------------- | ----------------------------- |
+| Press                | `onPress`                     | `@press`                          | `(press)`                    | `onPress`                     | `onPress`                     |
+| Switch value         | `onValueChange(value, event)` | `@value-change`<br />or `v-model` | `(valueChange)` (value only) | `onValueChange(value, event)` | `onValueChange(value, event)` |
+| Text input text      | `onValueChange(text, event)`  | `@value-change`<br />or `v-model` | `(valueChange)` (text only)  | `onValueChange(text, event)`  | `onValueChange(text, event)`  |
+| Text input raw event | _(same callback, 2nd arg)_    | _(same emit, 2nd arg)_            | `(change)` (separate output) | _(same callback, 2nd arg)_    | _(same callback, 2nd arg)_    |
 
 React, Vue, Svelte, and Solid merged `TextInput`'s old `onChangeText`/`onChange`
 pair into one `onValueChange(text, event)` callback — there's only ever one

@@ -12,13 +12,6 @@
   .examples/react/screens/MenuScreen.tsx.
 -->
 <script setup lang="ts">
-import {
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/vue';
 import { useStackNavigation } from '@symbiote-native/navigation/vue';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
@@ -104,44 +97,44 @@ function lineInfoFor(route: ITourRouteName) {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <ScrollView
+  <safe-area-view class="screen">
+    <scroll-view
       testID="menu-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View class="menu-hero">
-        <Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
-        <Text class="menu-hero-title">Twelve stops along the stack</Text>
-        <Text class="menu-hero-subtitle"
+      <view class="menu-hero">
+        <text class="menu-eyebrow">NAVIGATION DEMO SUITE</text>
+        <text class="menu-hero-title">Twelve stops along the stack</text>
+        <text class="menu-hero-subtitle"
           >Ten rows drive a different line of @symbiote-native/navigation —
           Primitives, Presentation, Structure, Introspection, Routing — on a
           real native stack, plus a Performance stop timing the engine's own
           commit path and a Styling stop showing the whole CSS compiler surface.
           The remaining stop is Composition: Vue's own template/API surface
-          instead.</Text
+          instead.</text
         >
-      </View>
-      <Pressable
+      </view>
+      <pressable
         v-for="item in MENU_ITEMS"
         :key="item.route"
         :testID="`menu-row-${item.route}`"
         :class="`menu-row menu-row-${lineInfoFor(item.route).line}`"
         @press="() => navigation.push(item.route)"
       >
-        <View :class="`menu-badge menu-badge-${lineInfoFor(item.route).line}`">
-          <Text class="menu-badge-text">{{
+        <view :class="`menu-badge menu-badge-${lineInfoFor(item.route).line}`">
+          <text class="menu-badge-text">{{
             lineInfoFor(item.route).code
-          }}</Text>
-        </View>
-        <View class="menu-row-copy">
-          <Text class="menu-row-label">{{ item.label }}</Text>
-          <Text
+          }}</text>
+        </view>
+        <view class="menu-row-copy">
+          <text class="menu-row-label">{{ item.label }}</text>
+          <text
             :class="`menu-row-hint menu-row-hint-${lineInfoFor(item.route).line}`"
-            >{{ item.hint }}</Text
+            >{{ item.hint }}</text
           >
-        </View>
-      </Pressable>
-    </ScrollView>
-  </SafeAreaView>
+        </view>
+      </pressable>
+    </scroll-view>
+  </safe-area-view>
 </template>

@@ -17,7 +17,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-function withSymbioteAngularMetroConfig(defaultConfig, projectRoot, { outDir = 'build/angular' } = {}) {
+function withSymbioteAngularMetroConfig(
+  defaultConfig,
+  projectRoot,
+  { outDir = 'build/angular' } = {},
+) {
   const buildRoot = path.join(projectRoot, ...outDir.split('/'));
 
   return {
@@ -25,14 +29,28 @@ function withSymbioteAngularMetroConfig(defaultConfig, projectRoot, { outDir = '
       // Teach Metro that a style file is a source file (the transformer above turns it into a
       // module). scss/sass/less/styl are optional preprocessor sources, reduced to plain CSS
       // before the same transformer runs.
-      sourceExts: [...defaultConfig.resolver.sourceExts, 'css', 'scss', 'sass', 'less', 'styl'],
+      sourceExts: [
+        ...defaultConfig.resolver.sourceExts,
+        'css',
+        'scss',
+        'sass',
+        'less',
+        'styl',
+      ],
       resolveRequest: (context, moduleName, platform) => {
         const isRelativeStyleImport =
-          /^\.\.?\//.test(moduleName) && /\.(css|scss|sass|less|styl)$/.test(moduleName);
+          /^\.\.?\//.test(moduleName) &&
+          /\.(css|scss|sass|less|styl)$/.test(moduleName);
         if (isRelativeStyleImport) {
           const originDir = path.dirname(context.originModulePath);
-          if (originDir === buildRoot || originDir.startsWith(buildRoot + path.sep)) {
-            const sourceDir = path.join(projectRoot, path.relative(buildRoot, originDir));
+          if (
+            originDir === buildRoot ||
+            originDir.startsWith(buildRoot + path.sep)
+          ) {
+            const sourceDir = path.join(
+              projectRoot,
+              path.relative(buildRoot, originDir),
+            );
             const sourceFile = path.resolve(sourceDir, moduleName);
             if (fs.existsSync(sourceFile)) {
               return { type: 'sourceFile', filePath: sourceFile };

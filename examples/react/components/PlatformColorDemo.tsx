@@ -1,10 +1,4 @@
-import {
-  View,
-  Text,
-  useColorScheme,
-  PlatformColor,
-  DynamicColorIOS,
-} from '@symbiote-native/react';
+import { useColorScheme, PlatformColor, DynamicColorIOS } from '@symbiote-native/react';
 
 // PlatformColor / DynamicColorIOS resolve on the native side: 'systemBlue' / 'label'
 // become iOS UIColor selectors, and the dynamic tuple flips with the system
@@ -14,18 +8,18 @@ import {
 export function PlatformColorDemo() {
   const scheme = useColorScheme();
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         {`PlatformColor · semantic + DynamicColorIOS (${scheme ?? 'unknown'})`}
-      </Text>
-      <View className="row">
-        <View
+      </text>
+      <view className="row">
+        <view
           className="color-tile"
           style={{ backgroundColor: PlatformColor('systemBlue') }}
         >
-          <Text className="tile-label">systemBlue</Text>
-        </View>
-        <View
+          <text className="tile-label">systemBlue</text>
+        </view>
+        <view
           className="color-tile-bordered"
           style={{
             backgroundColor: DynamicColorIOS({
@@ -35,14 +29,14 @@ export function PlatformColorDemo() {
             borderColor: PlatformColor('separator'),
           }}
         >
-          <Text
+          <text
             className="bold-label"
             style={{ color: PlatformColor('label') }}
           >
             dynamic
-          </Text>
-        </View>
-      </View>
-    </View>
+          </text>
+        </view>
+      </view>
+    </view>
   );
 }
