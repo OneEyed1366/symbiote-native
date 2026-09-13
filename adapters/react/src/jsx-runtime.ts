@@ -25,24 +25,70 @@
 //      and narrowing it wrongly makes every component call site fail. Today's `jsx.ts` merges into
 //      React's table and therefore already accepts `<div>`, so re-exporting keeps that exactly as
 //      it is rather than regressing it. Closing the DOM tags is its own task.
-import type { ISymbioteIntrinsic } from '@symbiote-native/components';
+import type { ICrossTypedIntrinsics } from '@symbiote-native/components';
+import type { Key } from 'react';
 import type { IViewProps, ITextProps } from './components';
+import type { IPressableProps } from './components/pressable/pressable-props';
+import type { IButtonProps } from './components/button-props';
+import type { IImageProps } from './components/image/image-props';
+import type { IImageBackgroundProps } from './components/image-background-props';
+import type { IInputAccessoryViewProps } from './components/input-accessory-view-props';
+import type { IRefreshControlProps } from './components/refresh-control-props';
+import type { ISafeAreaViewProps } from './components/safe-area-view-props';
+import type { ITouchableNativeFeedbackProps } from './components/touchable-native-feedback/touchable-native-feedback-props';
+import type {
+  ITouchableOpacityProps,
+  ITouchableHighlightProps,
+} from './components/touchable/touchable-props';
+import type { ITouchableWithoutFeedbackProps } from './components/touchable-without-feedback/touchable-without-feedback-props';
+import type { IScrollViewProps } from './components/scroll-view/scroll-view-props';
+import type { ISwitchProps } from './components/switch/switch-props';
+import type { ITextInputProps } from './components/text-input/text-input-props';
+import type { IModalProps } from './components/modal';
+import type { IActivityIndicatorProps } from './components/activity-indicator-props';
 
 export { Fragment, jsx, jsxs } from 'react/jsx-runtime';
 
-// The loose host boundary, and the strict pair, exactly as `jsx.ts` derives them — same reasoning,
-// same `Omit`, because an interface may not narrow an inherited member. See that file for why the
-// strictness lives on the crossed primitives only.
+// The loose host boundary for every tag with no dedicated prop type yet (`sticky-header`,
+// `horizontal-scroll-view`, …). Its index signature is what keeps `key`/an arbitrary prop from
+// erroring here — see IWithKey below for why a CROSSED (closed) type needs the field explicitly.
 interface IHostProps {
   style?: unknown;
   children?: import('react').ReactNode;
   [key: string]: unknown;
 }
 
-type ILooseIntrinsics = Omit<
-  Record<ISymbioteIntrinsic, IHostProps>,
-  'view' | 'text'
->;
+// Every tag with a real, non-generic prop type — mirrors Vue's/Solid's/Svelte's
+// `ICrossedPrimitiveProps` (`ICrossTypedIntrinsics`, `@symbiote-native/components`).
+// `FlatList`/`SectionList`/`VirtualizedList`/`KeyboardAvoidingView` are absent: composed from
+// several intrinsics, never a single tag an app writes.
+export interface ICrossedPrimitiveProps {
+  view: IViewProps;
+  text: ITextProps;
+  pressable: IPressableProps;
+  button: IButtonProps;
+  image: IImageProps;
+  'image-background': IImageBackgroundProps;
+  'input-accessory-view': IInputAccessoryViewProps;
+  'refresh-control': IRefreshControlProps;
+  'safe-area-view': ISafeAreaViewProps;
+  'touchable-native-feedback': ITouchableNativeFeedbackProps;
+  'touchable-opacity': ITouchableOpacityProps;
+  'touchable-highlight': ITouchableHighlightProps;
+  'touchable-without-feedback': ITouchableWithoutFeedbackProps;
+  'scroll-view': IScrollViewProps;
+  switch: ISwitchProps;
+  'text-input': ITextInputProps;
+  modal: IModalProps;
+  'activity-indicator': IActivityIndicatorProps;
+}
+
+// TypeScript only auto-merges `JSX.IntrinsicAttributes` (the `key` field) into a VALUE-based
+// element's props — verified directly: a component under this same jsxImportSource accepts `key`
+// with no error, while a crossed intrinsic (a closed type, no index signature) reports "Property
+// 'key' does not exist". The loose bag above never hit this because its index signature already
+// accepts any name; only the closed, crossed types need `key` added back explicitly.
+type IWithKey<Props> = Props & { key?: Key | null };
 
 // The member names are TypeScript's own — the compiler looks each up by exact name — so the repo's
 // `I`-prefix convention cannot apply inside this namespace.
@@ -62,12 +108,12 @@ export namespace JSX {
     import('react').JSX.IntrinsicClassAttributes<T>;
 
   // DERIVED from the intrinsic union rather than retyped, so a new host tag becomes valid JSX in
-  // the commit that registers its Fabric name. The hand-written twin of this list had fallen four
-  // names behind before it was derived (`jsx.ts` records it).
-  export interface IntrinsicElements extends ILooseIntrinsics {
-    view: IViewProps;
-    text: ITextProps;
-  }
+  // the commit that registers its Fabric name.
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  export interface IntrinsicElements extends ICrossTypedIntrinsics<
+    IHostProps,
+    { [K in keyof ICrossedPrimitiveProps]: IWithKey<ICrossedPrimitiveProps[K]> }
+  > {}
 }
 /* eslint-enable @typescript-eslint/no-namespace */
 
