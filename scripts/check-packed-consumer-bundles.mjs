@@ -354,6 +354,18 @@ async function processExample(
   try {
     const exampleRoot = join(matrixRoot, framework);
     copyTrackedExample(example.dir, exampleRoot);
+    // Own cache per framework, never the matrix-wide one: npm's cacache does content-addressable
+    // writes (tmp-then-rename into content-v2/<algo>/<first two hex chars>/...) that are NOT safe
+    // for two `npm install` processes writing into the SAME cache root at once — a concurrent
+    // rmdir/mkdir race on a shared bucket directory throws ENOTEMPTY. Every framework already runs
+    // its own `npm install` concurrently (see the Promise.all in main()); a shared
+    // `npm_config_cache` was the one piece of mutable state that comment didn't account for.
+    const frameworkNpmCache = join(exampleRoot, '.npm-cache');
+    mkdirSync(frameworkNpmCache, { recursive: true });
+    const frameworkNpmEnvironment = {
+      ...npmEnvironment,
+      npm_config_cache: frameworkNpmCache,
+    };
     const directPackages = directInternalDependencies(manifest);
     const rewritten = rewriteInternalDependencies(manifest, tarballs);
     writeFileSync(
@@ -366,7 +378,7 @@ async function processExample(
     await runAsync(
       'npm',
       ['install', '--package-lock=false', '--no-audit', '--no-fund', '--prefer-offline'],
-      { cwd: exampleRoot, env: npmEnvironment },
+      { cwd: exampleRoot, env: frameworkNpmEnvironment },
     );
     verifyInstalledTarballs(exampleRoot, directPackages, tarballs);
 
@@ -374,7 +386,7 @@ async function processExample(
     log.push(`${framework}: running ${verifyCommand} ${verifyArgs.join(' ')} ...`);
     await runAsync(verifyCommand, verifyArgs, {
       cwd: exampleRoot,
-      env: verifyCommand === 'npm' ? npmEnvironment : process.env,
+      env: verifyCommand === 'npm' ? frameworkNpmEnvironment : process.env,
     });
 
     await Promise.all(
@@ -425,10 +437,10 @@ async function main() {
   const platforms = selectedValues('SYMBIOTE_CONSUMER_PLATFORMS', PLATFORMS);
   const matrixRoot = mkdtempSync(join(tmpdir(), 'symbiote-consumer-matrix-'));
   const packDirectory = join(matrixRoot, 'tarballs');
-  const npmCache = join(matrixRoot, 'npm-cache');
   mkdirSync(packDirectory);
-  mkdirSync(npmCache);
-  const npmEnvironment = { ...process.env, npm_config_cache: npmCache };
+  // Base env for every framework's npm calls; each gets its OWN npm_config_cache override inside
+  // processExample, never a shared one — see the comment there.
+  const npmEnvironment = { ...process.env };
   // pnpm injects its own setting into child processes; npm does not recognize it and warns on
   // every install/run. It has no bearing on the standalone consumer, so do not forward it.
   delete npmEnvironment.npm_config_manage_package_manager_versions;
@@ -460,9 +472,9 @@ async function main() {
     const tarballs = packPackages(packageNames, packDirectory);
     const multiFrameworkPackages = discoverMultiFrameworkPackages();
 
-    // Every framework works in its own disposable directory with no shared mutable state, so
-    // there is nothing to serialize here — running them concurrently turns wall time from "sum of
-    // all five" into "roughly the slowest one" instead.
+    // Every framework works in its own disposable directory (npm cache included — see
+    // processExample), so running them concurrently turns wall time from "sum of all five" into
+    // "roughly the slowest one" instead of needing to serialize.
     await Promise.all(
       selectedExamples.map(([framework, example]) =>
         processExample(
