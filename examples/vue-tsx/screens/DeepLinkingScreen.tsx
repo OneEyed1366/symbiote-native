@@ -58,8 +58,8 @@ export const DeepLinkingScreen = defineComponent(
           <text-input
             testID="deep-link-input"
             value={url.value}
-            onValueChange={(text: string) => {
-              url.value = text;
+            onValueChange={event => {
+              url.value = event.text;
             }}
             placeholder="symbiotecanaryvuetsx://details/42"
             placeholderTextColor="#41506a"

@@ -24,7 +24,7 @@ export function ActionButton(props: IActionButtonProps) {
       //
       // `props.color` is read INSIDE the callback, which is what keeps it reactive: the engine
       // calls the body once per state, so a colour captured outside would freeze at first render.
-      style={({ pressed }: { pressed: boolean }) => ({
+      style={({ pressed }) => ({
         borderColor: props.color,
         opacity: pressed ? 0.6 : 1,
       })}

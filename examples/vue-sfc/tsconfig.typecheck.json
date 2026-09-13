@@ -4,5 +4,12 @@
   "compilerOptions": {
     "types": ["node"]
   },
+  // Points vue-tsc/Volar's virtual codegen at OUR package instead of Vue's default `"vue"` — see
+  // adapters/vue/src/index.ts's own comment on the `export * from 'vue'` this depends on. Without
+  // it, `view`/`text`/`image`/`switch` (the 4 tags colliding with real SVG element names) type-check
+  // against Vue's own SVGAttributes in every `.vue` template, not against our real prop types.
+  "vueCompilerOptions": {
+    "lib": "@symbiote-native/vue"
+  },
   "exclude": ["**/node_modules", "**/Pods", "e2e"]
 }

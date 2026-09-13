@@ -1337,8 +1337,8 @@ export const CanaryScreen = defineComponent({
           <text-input
             testID="greeting-input"
             value={name.value}
-            onValueChange={(text: string) => {
-              name.value = text;
+            onValueChange={event => {
+              name.value = event.text;
             }}
             placeholder="type your name…"
             placeholderTextColor="#3b5266"
@@ -1354,8 +1354,8 @@ export const CanaryScreen = defineComponent({
             <switch
               testID="spinner-switch"
               value={spinning.value}
-              onValueChange={(next: boolean) => {
-                spinning.value = next;
+              onValueChange={event => {
+                spinning.value = event.value;
               }}
               trackColor={{ false: '#334155', true: '#369870' }}
             />
@@ -1439,7 +1439,7 @@ export const CanaryScreen = defineComponent({
               cardPressed.value = false;
             }}
             class="pressable-card"
-            style={({ pressed }: { pressed: boolean }) => ({
+            style={({ pressed }) => ({
               backgroundColor: pressed ? '#2c3e50' : '#22323f',
               borderColor: pressed ? '#42b883' : '#369870',
             })}
@@ -1512,7 +1512,7 @@ export const CanaryScreen = defineComponent({
               };
             }}
             class="retention-card"
-            style={({ pressed }: { pressed: boolean }) => ({
+            style={({ pressed }) => ({
               backgroundColor: pressed ? '#369870' : '#2c3e50',
             })}
           >
@@ -1663,8 +1663,8 @@ export const CanaryScreen = defineComponent({
             <text class="switch-label">avoid keyboard</text>
             <switch
               value={kavEnabled.value}
-              onValueChange={(next: boolean) => {
-                kavEnabled.value = next;
+              onValueChange={event => {
+                kavEnabled.value = event.value;
               }}
               trackColor={{ false: '#334155', true: '#369870' }}
             />

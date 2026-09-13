@@ -1,4 +1,5 @@
 import { defineComponent } from 'vue';
+import type { IPressState } from '@symbiote-native/components';
 
 export type IActionButtonProps = {
   title: string;
@@ -20,7 +21,7 @@ export const ActionButton = defineComponent<IActionButtonProps>(
         testID={props.testID}
         onPress={props.onPress}
         class="action-button"
-        style={({ pressed }: { pressed: boolean }) => ({
+        style={({ pressed }: IPressState) => ({
           borderColor: props.color,
           opacity: pressed ? 0.6 : 1,
         })}

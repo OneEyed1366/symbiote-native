@@ -891,7 +891,7 @@ const CustomRefDemo = defineComponent({
           testID="customref-input"
           class="text-input"
           value={draft.value}
-          onValueChange={(text: string) => (draft.value = text)}
+          onValueChange={event => (draft.value = event.text)}
           placeholder="type — commits 400ms after the last keystroke"
           placeholderTextColor="#41506a"
         />
