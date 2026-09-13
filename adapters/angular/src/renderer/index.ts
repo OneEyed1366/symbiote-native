@@ -103,6 +103,7 @@ function textDefaultFor(el: IHostElement, key: string): unknown {
 // same fold as the function prop `onValueChange`. See `listen()`. The two names live in a leaf
 // module so `elements.ts`'s ControlValueAccessor can name them without importing this cyclic file.
 import { VALUE_CHANGE_EVENT, VALUE_CHANGE_PROP } from './value-change';
+import { flushViewFor } from '../change-detection-flush';
 
 const PROP_ALIASES: ReadonlyMap<string, string> = new Map([
   ['id', 'nativeID'],
@@ -111,6 +112,30 @@ const PROP_ALIASES: ReadonlyMap<string, string> = new Map([
 
 function aliasedPropName(name: string): string {
   return PROP_ALIASES.get(name) ?? name;
+}
+
+// The app callbacks an engine behavior READS BACK inside the same microtask turn, as an Angular
+// `(event)` binding — `valueChange` is handled in `listen` on its own, since it also needs the field
+// unwrapped. Zoneless change detection is a macrotask, so without a flush the behavior reads the
+// PRE-event value; `../change-detection-flush` holds the whole mechanism, the three behaviors, and
+// why this is scoped rather than wired to the engine's event-dispatch seam.
+//
+// The other spelling — the `[onRefresh]` flat-bag PROP — is not here: an `on*` function prop is
+// wrapped by `SymbioteElement` itself, which reaches every one of them rather than a named three,
+// and adds the `markForCheck` a prop callback needs and an event binding gets from Angular.
+const READ_BACK_EVENTS: ReadonlySet<string> = new Set(['refresh']);
+
+type IReadBackListener = (event: unknown) => unknown;
+
+function withChangeDetection(
+  node: IHostElement,
+  listener: IReadBackListener,
+): IReadBackListener {
+  return (event: unknown): unknown => {
+    const result = listener(event);
+    flushViewFor(node);
+    return result;
+  };
 }
 
 // Diagnostic-only: tags each anchor with a sequential id so log lines can tell distinct
@@ -501,17 +526,20 @@ export class SymbioteRenderer implements Renderer2 {
     // unwrap that field back to a bare value before handing it to Angular's callback, or `text =
     // $event` would assign the whole event object instead of the typed string/boolean.
     if (eventName === VALUE_CHANGE_EVENT) {
-      const forwardValue = (event: unknown): boolean | void => {
+      const forwardValue = withChangeDetection(target, (event: unknown) => {
         if (isSymbioteEvent(event)) {
           if ('text' in event) return callback(event.text);
           if ('value' in event) return callback(event.value);
         }
         return callback(event);
-      };
+      });
       routeProp(target, VALUE_CHANGE_PROP, forwardValue);
       return () => routeProp(target, VALUE_CHANGE_PROP, undefined);
     }
-    setEventListener(target, eventName, callback);
+    const listener = READ_BACK_EVENTS.has(eventName)
+      ? withChangeDetection(target, callback)
+      : callback;
+    setEventListener(target, eventName, listener);
     return () => setEventListener(target, eventName, undefined);
   }
 }

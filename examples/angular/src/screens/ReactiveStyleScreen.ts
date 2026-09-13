@@ -13,7 +13,6 @@ import {
   Text,
   TextInputElement,
   TouchableHighlightElement,
-  TouchableNativeFeedbackElement,
   TouchableOpacityElement,
   View,
   VirtualizedList,
@@ -44,6 +43,14 @@ import './ReactiveStyleScreen.css';
 // TouchableHighlight and ScrollView are the controls: if they don't flip, the screen is dead and
 // nothing else here means anything. Ordinary inputs are absent deliberately - they propagate
 // correctly everywhere and would only dilute the signal.
+//
+// TouchableNativeFeedback is ABSENT and must not be re-added. It commits no node of its own and
+// clones a CLOSED list onto its single child, which does not include `style` - RN's own shape, and
+// RN's TNF declares no style prop either (core/components/src/behaviors/touchable-native-feedback.ts,
+// note 3). So its tile painted nothing on either axis, permanently, and this screen's whole
+// grammar is "a tile that did not flip names a component to fix" - a component that CANNOT flip is
+// a standing false accusation. Verified headlessly by
+// adapters/angular/src/__tests__/reactive-style-grid.test.ts.
 
 const ANGULAR_LOGO_URI =
   'https://angular.io/assets/images/logos/angular/angular.png';
@@ -94,7 +101,6 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
     Text,
     TextInputElement,
     TouchableHighlightElement,
-    TouchableNativeFeedbackElement,
     TouchableOpacityElement,
     View,
     VirtualizedList,
@@ -169,15 +175,6 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
               <text class="rstyle-tile-text">tile</text>
             </touchable-opacity>
             <text class="rstyle-caption">TouchableOpacity</text>
-          </view>
-          <view class="rstyle-cell">
-            <touchable-native-feedback
-              testID="rstyle-class-plain"
-              [class]="tileClass"
-            >
-              <text class="rstyle-tile-text">tile</text>
-            </touchable-native-feedback>
-            <text class="rstyle-caption">TouchableNativeFeedback</text>
           </view>
           <view class="rstyle-cell">
             <button
@@ -336,16 +333,6 @@ const SECTIONS: ISection<IRow>[] = [{ title: 'sec', data: [ROW] }];
               <text class="rstyle-tile-text">tile</text>
             </touchable-opacity>
             <text class="rstyle-caption">TouchableOpacity</text>
-          </view>
-          <view class="rstyle-cell">
-            <touchable-native-feedback
-              testID="rstyle-style-plain"
-              class="rstyle-tile"
-              [style]="tileStyle"
-            >
-              <text class="rstyle-tile-text">tile</text>
-            </touchable-native-feedback>
-            <text class="rstyle-caption">TouchableNativeFeedback</text>
           </view>
           <view class="rstyle-cell">
             <button

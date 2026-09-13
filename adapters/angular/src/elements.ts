@@ -26,18 +26,36 @@
 //
 // EVENTS ARE NOT DECLARED. `(press)` / `(layout)` on a tag a directive matches still compiles and
 // still reaches `Renderer2.listen` -> the engine; an `@Output` would CONSUME the binding the same
-// way an `@Input` consumes a prop. Measured both halves — see `elements.test.ts`.
+// way an `@Input` consumes a prop. Measured both halves — see `elements.test.ts`. The cost is that
+// `$event` types as the DOM `Event` there, since ngtsc falls back to the DOM schema for an event no
+// directive claims; the typed spelling of the same handler is the flat-bag `@Input` beside it
+// (`[onPressMove]="fn"`, where `fn` keeps its `ISymbioteEvent` parameter).
+//
+// `valueChange` is the ONE exception, and it is forced rather than chosen: see ValueChangeElement.
 import {
+  ChangeDetectorRef,
   Directive,
   ElementRef,
+  EventEmitter,
   Input,
+  Output,
   Renderer2,
   forwardRef,
   inject,
 } from '@angular/core';
-import type { OnChanges, OnDestroy, SimpleChanges } from '@angular/core';
+import type {
+  OnChanges,
+  OnDestroy,
+  OnInit,
+  SimpleChanges,
+} from '@angular/core';
 import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
 import { VALUE_CHANGE_EVENT } from './renderer/value-change';
+import {
+  createCallbackWrapper,
+  registerViewFlush,
+  unregisterViewFlush,
+} from './change-detection-flush';
 import type {
   IActivityIndicatorProps,
   IImageProps,
@@ -76,7 +94,16 @@ import type { IAngularScrollViewProps } from './components/scroll-view-props';
 @Directive()
 export abstract class SymbioteElement implements OnChanges {
   private readonly renderer = inject(Renderer2);
-  private readonly host = inject(ElementRef);
+  protected readonly host = inject(ElementRef);
+  protected readonly detector = inject(ChangeDetectorRef);
+
+  // An `onX` PROP is called by the engine, so Angular is never told it fired. Shared with the
+  // component path's `SymbioteHostPropsDirective`, which has the identical deficit — see
+  // `createCallbackWrapper`.
+  private readonly wrapCallback = createCallbackWrapper(
+    this.detector,
+    this.host.nativeElement,
+  );
 
   @Input() testID?: IElementProps['testID'];
   @Input() nativeID?: IElementProps['nativeID'];
@@ -157,6 +184,26 @@ export abstract class SymbioteElement implements OnChanges {
   @Input()
   needsOffscreenAlphaCompositing?: IElementProps['needsOffscreenAlphaCompositing'];
   @Input() symbioteStyle?: IElementProps['symbioteStyle'];
+  // Declared, and the reason is the one `element-props.ts` used to give for NOT declaring it —
+  // reversed by measurement. `[style]` on an element with no directive input reaches Angular's own
+  // CSS styling engine (`ɵɵstyleMap`), which cannot represent an RN StyleProp: an ARRAY decomposes
+  // into numeric-index keys and a FUNCTION — the press-state callback this ecosystem writes — dies
+  // in `toStylingKeyValueArray` as "ASSERTION ERROR: Unsupported styling type: function", taking
+  // the whole enclosing template update with it. Device-reported 2026-09-11: every `ActionButton`
+  // in examples/angular painted as an empty bordered box, because the throw aborted the update
+  // before its `<text>` child was ever reached.
+  //
+  // A declared input CLAIMS the binding at compile time, so it never reaches the styling engine —
+  // the same mechanism the primitive host COMPONENTS have always relied on
+  // (`primitives/shared.ts`), which is why `<Pressable [style]>` worked and its replacement tag did
+  // not. `[style.borderWidth.px]` is a different instruction (`ɵɵstyleProp`) and is untouched: it
+  // still reaches `Renderer2.setStyle`, which merges per key.
+  //
+  // The press-state callback rides the BASE type rather than `PressableElement` alone: a subclass
+  // cannot widen an inherited property, and only the pressables have a `pressed` to read — so on
+  // any other tag the engine resolves it at `pressed: false` and the looseness is in the type, not
+  // in what commits.
+  @Input() style?: IElementProps['style'];
 
   // The flat-bag spelling of the events below. `(press)` and `[onPress]` are both supported and
   // land in the same place; an app that already holds a handler bag binds the props.
@@ -174,9 +221,35 @@ export abstract class SymbioteElement implements OnChanges {
       this.renderer.setProperty(
         this.host.nativeElement,
         name,
-        changes[name]?.currentValue,
+        this.wrapCallback(name, changes[name]?.currentValue),
       );
     }
+  }
+}
+
+/**
+ * The base for a tag whose app callback an engine behavior READS BACK inside the same microtask
+ * turn — `<text-input>`, `<switch>`, `<refresh-control>`. Zoneless change detection is a macrotask,
+ * so without this the behavior sees the PRE-event value and undoes the user; the full mechanism,
+ * and why this is `detectChanges()` on one view rather than `ApplicationRef.tick()`, is in
+ * `./change-detection-flush`.
+ *
+ * The directive is the only thing in the adapter that owns a `ChangeDetectorRef` for the view
+ * holding the binding, so it hands one to the renderer keyed on its own node.
+ */
+@Directive()
+abstract class ReadBackElement extends SymbioteElement implements OnDestroy {
+  constructor() {
+    super();
+    const node: unknown = this.host.nativeElement;
+    if (typeof node === 'object' && node !== null) {
+      registerViewFlush(node, () => this.detector.detectChanges());
+    }
+  }
+
+  ngOnDestroy(): void {
+    const node: unknown = this.host.nativeElement;
+    if (typeof node === 'object' && node !== null) unregisterViewFlush(node);
   }
 }
 
@@ -262,6 +335,10 @@ export class ButtonElement extends TouchableOpacityElement {
 
 @Directive({ selector: 'text', standalone: true })
 export class TextElement extends SymbioteElement {
+  // Narrows the inherited input to a TEXT style so `fontSize`/`fontWeight` type-check here. The
+  // initializer is what TS2612 asks for to accept a redeclaration as deliberate; `declare` would
+  // be the other answer and cannot carry a decorator.
+  @Input() override style?: ITextElementProps['style'] = undefined;
   @Input() numberOfLines?: ITextElementProps['numberOfLines'];
   @Input() ellipsizeMode?: ITextElementProps['ellipsizeMode'];
   @Input() selectable?: ITextElementProps['selectable'];
@@ -409,8 +486,68 @@ export class ScrollContentElement extends SymbioteElement {}
 @Directive({ selector: 'horizontal-scroll-content', standalone: true })
 export class HorizontalScrollContentElement extends SymbioteElement {}
 
+/**
+ * The `[(value)]` half of a controlled tag — `<switch>` and `<text-input>`.
+ *
+ * The one `@Output` in this file, and it is FORCED rather than chosen. `[(value)]` desugars to
+ * `[value]` + `(valueChange)`, and ngtsc requires both halves to resolve to the SAME target: a
+ * declared `value` input beside an event no directive claims is NG8007, "the property and event
+ * halves are not bound to the same target". So the sugar this adapter documents cannot work without
+ * the output existing, whatever the file header says about events in general.
+ *
+ * The bridge below is NOT what makes the binding work today, and the comment says so because the
+ * obvious reading is wrong: the file header's "an `@Output` CONSUMES the binding" holds for a
+ * COMPONENT, and an element is the other case — Angular attaches the renderer listener for the
+ * event as well, so `Renderer2.listen` still runs and the engine still hears the change. Measured
+ * under JIT by deleting this whole hook: every case in `lowered-two-way-value.test.ts` stayed
+ * green, delivery included, and exactly ONCE (nothing double-fires when both paths exist).
+ *
+ * It is kept because the measurement is JIT-only and this adapter has a recorded case of JIT and
+ * AOT resolving a binding differently (`test-harness-false-greens.md` §21). If AOT routes the event
+ * exclusively to the output, this hook is the only thing keeping `[(value)]` alive; if it routes to
+ * both, it is one extra listener on a control an app explicitly bound. Delete it once something
+ * executes the LINKED artifact and shows the renderer listener is attached there too.
+ *
+ * Opened only when something is SUBSCRIBED: the prop's PRESENCE is what a behavior reads to decide
+ * it is controlled, so a `<switch>` given a handler nobody asked for changes how it snaps back.
+ * `.observed` is readable from `ngOnInit` because Angular subscribes outputs in the creation pass,
+ * before the update pass runs the hook — observed directly (true for the two bound tags, false for
+ * an unbound one), not assumed.
+ */
+@Directive()
+abstract class ValueChangeElement
+  extends ReadBackElement
+  implements OnInit, OnDestroy
+{
+  private readonly valueRenderer = inject(Renderer2);
+  private readonly valueHost = inject(ElementRef);
+  private unlistenValue?: () => void;
+
+  /** `this.valueChange.observed` — the subclass owns the emitter so its payload type stays exact. */
+  protected abstract hasValueSubscriber(): boolean;
+
+  /** Narrows the engine's unwrapped value to the type THIS tag emits, then emits it. */
+  protected abstract emitValue(value: unknown): void;
+
+  ngOnInit(): void {
+    if (!this.hasValueSubscriber()) return;
+    this.unlistenValue = this.valueRenderer.listen(
+      this.valueHost.nativeElement,
+      VALUE_CHANGE_EVENT,
+      (value: unknown) => {
+        this.emitValue(value);
+      },
+    );
+  }
+
+  override ngOnDestroy(): void {
+    super.ngOnDestroy();
+    this.unlistenValue?.();
+  }
+}
+
 @Directive({ selector: 'text-input', standalone: true })
-export class TextInputElement extends SymbioteElement {
+export class TextInputElement extends ValueChangeElement {
   @Input() value?: ITextInputProps['value'];
   @Input() defaultValue?: ITextInputProps['defaultValue'];
   @Input() placeholder?: ITextInputProps['placeholder'];
@@ -448,6 +585,20 @@ export class TextInputElement extends SymbioteElement {
   @Input() onKeyPress?: ITextInputProps['onKeyPress'];
   @Input() onSelectionChange?: ITextInputProps['onSelectionChange'];
   @Input() onSubmitEditing?: ITextInputProps['onSubmitEditing'];
+
+  // NonNullable, not the prop type: `[(value)]="name"` binds a `string`, and an emitter that can
+  // also emit `undefined` fails the two-way assignability check ngtsc runs on the event half.
+  @Output() readonly valueChange = new EventEmitter<
+    NonNullable<ITextInputProps['value']>
+  >();
+
+  protected hasValueSubscriber(): boolean {
+    return this.valueChange.observed;
+  }
+
+  protected emitValue(value: unknown): void {
+    if (typeof value === 'string') this.valueChange.emit(value);
+  }
 }
 
 @Directive({ selector: 'text-input-multiline', standalone: true })
@@ -463,13 +614,25 @@ export class ManagedTextInputElement extends TextInputElement {}
 export class ManagedMultilineTextInputElement extends TextInputElement {}
 
 @Directive({ selector: 'switch', standalone: true })
-export class SwitchElement extends SymbioteElement {
+export class SwitchElement extends ValueChangeElement {
   @Input() value?: ISwitchProps['value'];
   @Input() disabled?: ISwitchProps['disabled'];
   @Input() trackColor?: ISwitchProps['trackColor'];
   @Input() thumbColor?: ISwitchProps['thumbColor'];
   @Input() ios_backgroundColor?: ISwitchProps['ios_backgroundColor'];
   @Input() onValueChange?: ISwitchProps['onValueChange'];
+
+  @Output() readonly valueChange = new EventEmitter<
+    NonNullable<ISwitchProps['value']>
+  >();
+
+  protected hasValueSubscriber(): boolean {
+    return this.valueChange.observed;
+  }
+
+  protected emitValue(value: unknown): void {
+    if (typeof value === 'boolean') this.valueChange.emit(value);
+  }
 }
 
 @Directive({ selector: 'switch-managed', standalone: true })
@@ -606,7 +769,7 @@ export class ModalElement extends SymbioteElement {
 }
 
 @Directive({ selector: 'refresh-control', standalone: true })
-export class RefreshControlElement extends SymbioteElement {
+export class RefreshControlElement extends ReadBackElement {
   @Input() refreshing?: IAngularRefreshControlProps['refreshing'];
   @Input() enabled?: IAngularRefreshControlProps['enabled'];
   @Input() colors?: IAngularRefreshControlProps['colors'];
@@ -685,9 +848,9 @@ export const SYMBIOTE_ELEMENTS = [
 // the directive declares every key of its interface, and otherwise fails with the missing NAMES in
 // the message. It runs under `tsc --build`, which is what makes it a guard rather than a comment.
 //
-// `style` is excluded everywhere on purpose (see `element-props.ts` for why `[style]` stays with
-// Angular's styling engine); `passthrough` and `StickyHeaderComponent` are internal render inputs
-// of a composed component, never props of a native view.
+// `style` used to be excluded from every row; it is checked like any other prop now that the base
+// declares it. `passthrough` and `StickyHeaderComponent` are internal render inputs of a composed
+// component, never props of a native view.
 type IMissingInputs<TProps, TDirective, TIgnored extends PropertyKey = never> =
   Exclude<keyof TProps, keyof TDirective | TIgnored> extends never
     ? true
@@ -695,51 +858,46 @@ type IMissingInputs<TProps, TDirective, TIgnored extends PropertyKey = never> =
 
 const DECLARES_EVERY_PROP: {
   view: IMissingInputs<IElementProps, ViewElement>;
-  pressable: IMissingInputs<IAngularPressableProps, PressableElement, 'style'>;
+  pressable: IMissingInputs<IAngularPressableProps, PressableElement>;
   // The two touchables, added when their wrappers were deleted (2026-09-11). They inherit
   // `PressableElement`, so the rows above would pass whatever these declared — what they pin is the
   // per-touchable surface (`activeOpacity`, `underlayColor`, the three timing knobs), which used to
   // be fenced by a source-text assertion over the wrapper's template in `angular-gaps.test.ts`.
   touchableOpacity: IMissingInputs<
     IAngularTouchableOpacityProps,
-    TouchableOpacityElement,
-    'style'
+    TouchableOpacityElement
   >;
   touchableHighlight: IMissingInputs<
     IAngularTouchableHighlightProps,
-    TouchableHighlightElement,
-    'style'
+    TouchableHighlightElement
   >;
   text: IMissingInputs<ITextElementProps, TextElement>;
-  image: IMissingInputs<IImageProps, ImageElement, 'style'>;
+  image: IMissingInputs<IImageProps, ImageElement>;
   imageBackground: IMissingInputs<
     IAngularImageBackgroundProps,
-    ImageBackgroundElement,
-    'style'
+    ImageBackgroundElement
   >;
   scrollView: IMissingInputs<
     IAngularScrollViewProps,
     ScrollViewElement,
-    'style' | 'StickyHeaderComponent'
+    'StickyHeaderComponent'
   >;
-  textInput: IMissingInputs<ITextInputProps, TextInputElement, 'style'>;
-  switch: IMissingInputs<ISwitchProps, SwitchElement, 'style'>;
+  textInput: IMissingInputs<ITextInputProps, TextInputElement>;
+  switch: IMissingInputs<ISwitchProps, SwitchElement>;
   activityIndicator: IMissingInputs<
     IActivityIndicatorProps,
-    ActivityIndicatorElement,
-    'style'
+    ActivityIndicatorElement
   >;
-  modal: IMissingInputs<IModalViewProps, ModalElement, 'style' | 'passthrough'>;
+  modal: IMissingInputs<IModalViewProps, ModalElement, 'passthrough'>;
   refreshControl: IMissingInputs<
     IAngularRefreshControlProps,
-    RefreshControlElement,
-    'style'
+    RefreshControlElement
   >;
   stickyHeader: IMissingInputs<IStickyHeaderElementProps, StickyHeaderElement>;
   inputAccessoryView: IMissingInputs<
     IInputAccessoryViewViewProps,
     InputAccessoryViewElement,
-    'style' | 'passthrough'
+    'passthrough'
   >;
 } = {
   view: true,

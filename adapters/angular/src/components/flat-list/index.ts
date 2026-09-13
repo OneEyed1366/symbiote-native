@@ -226,6 +226,7 @@ export type IFlatListInputs<ItemT> = Omit<
         [scrollEventThrottle]="scrollEventThrottle"
         [keyboardShouldPersistTaps]="keyboardShouldPersistTaps"
         [keyboardDismissMode]="keyboardDismissMode"
+        [testID]="testID"
         [style]="resolvedStyle"
         [contentContainerStyle]="contentContainerStyle"
       >
@@ -309,6 +310,7 @@ export type IFlatListInputs<ItemT> = Omit<
         [scrollEventThrottle]="scrollEventThrottle"
         [keyboardShouldPersistTaps]="keyboardShouldPersistTaps"
         [keyboardDismissMode]="keyboardDismissMode"
+        [testID]="testID"
         [style]="resolvedStyle"
         [contentContainerStyle]="contentContainerStyle"
       >
@@ -379,6 +381,12 @@ export class FlatList<ItemT = unknown>
     averageItemLength: number;
   }>();
   @Input({ required: true }) data!: readonly ItemT[];
+  // RN's FlatList spreads its props onto the VirtualizedList it renders, so `testID` lands on the
+  // scroll view. Angular has no spread, and this one was simply missing: `<FlatList testID="x">`
+  // compiled (a static attribute on a component tag is never checked), reached the non-painting
+  // anchor host, and committed nowhere — so the list was untargetable by a test or an e2e selector
+  // while looking perfectly healthy on screen. VirtualizedList has always declared it.
+  @Input() testID?: string;
   @Input() numColumns?: number;
   @Input() columnWrapperStyle?: IStyleProp<IViewStyle> | string;
   @Input() keyExtractor?: (item: ItemT, index: number) => string;

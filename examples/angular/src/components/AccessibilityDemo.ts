@@ -23,10 +23,9 @@ import './AccessibilityDemo.css';
   imports: [View, Text, SymbioteHostPropsDirective],
   template: `
     <view class="section-nested">
-      <text class="section-label"
-        >Accessibility · props → native · aria/role transform ·
-        AccessibilityInfo</text
-      >
+      <text class="section-label">
+        Accessibility · props → native · aria/role transform · AccessibilityInfo
+      </text>
       <text testID="a11y-screen-reader" class="info-text">{{
         'screen reader: ' + screenReader
       }}</text>

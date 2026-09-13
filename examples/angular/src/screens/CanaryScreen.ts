@@ -372,7 +372,7 @@ const overlayTunnel = createTunnel();
           testID="angular-retention-pressable"
           [hitSlop]="{ top: 0, bottom: 40, left: 0, right: 0 }"
           [pressRetentionOffset]="{ top: 0, bottom: 80, left: 0, right: 0 }"
-          (pressMove)="onRetentionMove($event)"
+          [onPressMove]="onRetentionMove"
           [style]="retentionStyle"
         >
           <text testID="angular-retention-readout" class="info-text">
@@ -493,7 +493,7 @@ const overlayTunnel = createTunnel();
             autoComplete/inputMode fold); with enabled OFF the keyboard covers the field. -->
         <view class="switch-row">
           <text class="switch-label">avoid keyboard</text>
-          <Switch
+          <switch
             testID="angular-kav-switch"
             [(value)]="kavEnabled"
             [trackColor]="switchTrackColor"
@@ -503,7 +503,7 @@ const overlayTunnel = createTunnel();
           [behavior]="Platform.OS === 'ios' ? 'padding' : 'height'"
           [enabled]="kavEnabled"
         >
-          <TextInput
+          <text-input
             testID="angular-email-input"
             autoComplete="email"
             inputMode="email"
@@ -514,7 +514,7 @@ const overlayTunnel = createTunnel();
           />
         </KeyboardAvoidingView>
 
-        <Image [src]="angularLogoUri" alt="Angular logo" class="logo-image" />
+        <image [src]="angularLogoUri" alt="Angular logo" class="logo-image" />
 
         <view class="bottom-card">
           <text class="bottom-text">↑ you scrolled to the bottom</text>

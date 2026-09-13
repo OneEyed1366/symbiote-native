@@ -78,7 +78,10 @@ const CASES: Record<string, ICase> = {
     source: fixture(
       'Q',
       `<view class="a" [class]="value" [style]="style" [symbioteStyle]="parts" (layout)="hit()" (press)="hit()"></view>`,
-      `style: unknown = { opacity: 1 }; parts = [{ opacity: 1 }];`,
+      // `style` was `unknown` here while `[style]` belonged to Angular's styling engine, which
+      // type-checks nothing. It is a declared input now, so the fixture has to hand it a real
+      // style — which is the point of declaring it.
+      `style = { opacity: 1 }; parts = [{ opacity: 1 }];`,
     ),
     expect: undefined,
   },
@@ -116,9 +119,27 @@ const CASES: Record<string, ICase> = {
     ),
     expect: undefined,
   },
+  // What declaring `style` buys beyond making it reach the engine: a TYPE. Angular's styling
+  // engine accepts any expression on `[style]`, so this was uncheckable until the input existed.
+  Z_wrongly_typed_style: {
+    source: fixture('Z', `<view [style]="42"></view>`),
+    expect: 'not assignable',
+  },
   X_wrongly_typed_primitive_prop: {
     source: fixture('X', `<text-input [maxLength]="value"></text-input>`),
     expect: 'not assignable',
+  },
+  // The `[(value)]` sugar the adapter documents, and the one case that forced an `@Output` into a
+  // file whose header says events are not declared: the sugar desugars to `[value]` + `(valueChange)`
+  // and ngtsc requires both halves on the SAME target, so a declared input beside an unclaimed event
+  // is NG8007. Only a real ngc run reports it — tsc is clean and a JIT mount happily binds it.
+  Y_two_way_value: {
+    source: fixture(
+      'Y',
+      `<text-input [(value)]="value"></text-input><switch [(value)]="flag"></switch>`,
+      `flag = false;`,
+    ),
+    expect: undefined,
   },
 };
 

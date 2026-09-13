@@ -8,21 +8,26 @@
 // differ, since a bare tag takes children from the template and a handle from `#ref`, so neither
 // `children` nor `ref` appears here.
 //
-// `style` is deliberately ABSENT. Angular reserves `[style]` for its styling engine and a matching
-// directive can only reclaim it at runtime, which is provable solely by executing a linked AOT
-// artifact (`.claude/rules/test-harness-false-greens.md` §21/§21a). Declaring it would silently
-// change what `[style]` means on every bare tag, so the supported spellings stay exactly what
-// `bare-intrinsic-tag.test.ts` already pins: a plain object through `[style]`, an RN StyleProp
-// array through `[symbioteStyle]`.
+// `style` IS declared, reversing what this comment said until 2026-09-11. Leaving it to Angular's
+// styling engine was not the conservative choice it reads as: an array decomposes into
+// numeric-index keys there and a press-state CALLBACK throws out of `toStylingKeyValueArray`,
+// aborting the enclosing template update — which is what an app writes, and what every deleted
+// wrapper component accepted. The claim that a directive can reclaim it "solely by executing a
+// linked AOT artifact" was answered rather than assumed: `elements.test.ts` compiles the binding
+// through real ngtsc and runs the LINKED output. See `SymbioteElement.style`.
+//
+// `symbioteStyle` stays as an alias — it is public API and the renderer still folds it.
 import type {
   IAccessibilityProps,
   IAriaProps,
+  IPressState,
   IRectOffset,
   IResponderProps,
 } from '@symbiote-native/components';
 import type {
   ISymbioteEvent,
   IStyleProp,
+  ITextStyle,
   IViewStyle,
 } from '@symbiote-native/engine';
 
@@ -42,6 +47,13 @@ export interface IElementProps
   needsOffscreenAlphaCompositing?: boolean;
   /** The array-capable `[style]`, aliased to `style` in the renderer. */
   symbioteStyle?: IStyleProp<IViewStyle>;
+  /**
+   * RN's own spelling. The press-state callback is in the union because a subclass cannot widen an
+   * inherited property and `<pressable>`/`<touchable-*>` are the tags that take one; on every other
+   * tag the engine resolves it at `pressed: false`.
+   */
+  style?:
+    IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
   onPress?: IEventHandler;
   onPressIn?: IEventHandler;
   onPressOut?: IEventHandler;
@@ -54,6 +66,8 @@ export interface IElementProps
 
 /** Text's own surface on top of the shared one. `onTextLayout` is an event, so it is not here. */
 export interface ITextElementProps {
+  /** Narrows the shared `style` so `fontSize` / `fontWeight` type-check on a `<text>`. */
+  style?: IStyleProp<ITextStyle>;
   numberOfLines?: number;
   ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
   selectable?: boolean;

@@ -74,7 +74,17 @@ const PASSTHROUGH_PROP = 'passthroughAnimatedPropExplicitValues';
 // escape hatch for any OTHER prop that may hold an AnimatedNode or an Animated.event handler,
 // plus static host props to forward (the React/Vue `rest`). Each concrete @Component re-lists
 // these (Angular's inputs-on-base convention, mirroring Switch/Image).
-export const ANIMATED_INPUTS = ['style', 'animatedProps', PASSTHROUGH_PROP];
+// `testID` is listed alongside them rather than left to `animatedProps`, which is the documented
+// escape hatch for everything else. Every other component in this adapter takes it as an ordinary
+// input, and React's `createAnimatedComponent` spreads `...props`, so `<AnimatedView testID="x">`
+// is what an app writes — it compiled (a static attribute on a component tag is never checked),
+// landed on the non-painting anchor host and committed nowhere.
+export const ANIMATED_INPUTS = [
+  'style',
+  'testID',
+  'animatedProps',
+  PASSTHROUGH_PROP,
+];
 export const ANIMATED_IMAGE_INPUTS = [
   ...IMAGE_INPUTS,
   'animatedProps',
@@ -91,6 +101,7 @@ export abstract class AnimatedComponentBase
   implements AfterViewInit, DoCheck, OnChanges, OnDestroy
 {
   style: unknown;
+  testID: string | undefined;
   animatedProps: Record<string, unknown> | undefined;
   passthroughAnimatedPropExplicitValues: unknown;
 
@@ -187,9 +198,11 @@ export abstract class AnimatedComponentBase
   // never disagree.
   private mergedProps(): Record<string, unknown> {
     const base = this.animatedProps ?? {};
-    return this.style === undefined
-      ? { ...base }
-      : { ...base, style: this.style };
+    const merged: Record<string, unknown> =
+      this.style === undefined ? { ...base } : { ...base, style: this.style };
+    // Only when set, so an unset input cannot clear a `testID` the app put in `animatedProps`.
+    if (this.testID !== undefined) merged.testID = this.testID;
+    return merged;
   }
 
   // The committed host node held by IDENTITY. resolveHostNode unwraps an imperative scroll
