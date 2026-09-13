@@ -517,7 +517,16 @@ async function main() {
     // Every framework works in its own disposable directory (npm cache included — see
     // processExample), so running them concurrently turns wall time from "sum of all five" into
     // "roughly the slowest one" instead of needing to serialize.
-    await Promise.all(
+    //
+    // allSettled, not all: Promise.all rejects the instant the FIRST framework fails while the
+    // others keep running in the background (nothing cancels them). The finally block below then
+    // rmSync's the whole matrixRoot immediately on that rejection, which races an in-progress
+    // sibling's own npm/cacache writes under that same root — the real cause of the "ENOTEMPTY on
+    // _cacache" this script kept hitting even after per-framework cache isolation (782d2cdc) and a
+    // wipe-and-retry (3bd62461). Worse, a throw from `finally` replaces whatever the `try` was
+    // rejecting with, so the ENOTEMPTY from that race was masking each framework's real error.
+    // Waiting for every framework to settle before cleanup removes the race outright.
+    const settled = await Promise.allSettled(
       selectedExamples.map(([framework, example]) =>
         processExample(
           framework,
@@ -531,6 +540,15 @@ async function main() {
         ),
       ),
     );
+    const failures = settled
+      .filter(result => result.status === 'rejected')
+      .map(result => result.reason);
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures,
+        `${failures.length} of ${selectedExamples.length} framework(s) failed`,
+      );
+    }
 
     console.log('\nAll packed consumer bundles passed.');
   } finally {
