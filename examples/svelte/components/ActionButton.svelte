@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { IPressState } from '@symbiote-native/components';
+
   // Drop-in replacement for RN's stock <Button> — a bare Button renders as unstyled tinted text
   // on iOS, visually indistinguishable from a body Text line. One consistent bordered pill,
   // tinted in the caller's own `color`, matching examples/react/components/ActionButton.tsx.
@@ -21,7 +23,7 @@
   //
   // A `$derived` rather than a bare arrow so `color` stays live: the transform calls the callback
   // once per state at render, and a stale closure would freeze the border at its first colour.
-  const buttonStyle = $derived(({ pressed }: { pressed: boolean }) => ({
+  const buttonStyle = $derived(({ pressed }: IPressState) => ({
     borderColor: color,
     opacity: pressed ? 0.6 : 1,
   }));

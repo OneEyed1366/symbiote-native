@@ -45,6 +45,7 @@
 
   // $effect.pre — Partial: runs, but there is no synchronous pre-commit layout value to read the
   // way a web `clientHeight` would be (Fabric's clone-on-write commit is async).
+  // eslint-disable-next-line svelte/prefer-writable-derived -- this is the $effect.pre demo itself
   let preEffectLog = $state('not run yet');
   $effect.pre(() => {
     preEffectLog = `ran before this update committed (count=${count})`;
@@ -52,6 +53,7 @@
 
   // $effect.root — a manually-destroyed effect scope, outside the normal component-lifecycle
   // cleanup.
+  // eslint-disable-next-line svelte/prefer-writable-derived -- this is the $effect.root demo itself
   let rootEffectStatus = $state('not started');
   let destroyRoot: (() => void) | undefined;
   function startRootEffect(): void {

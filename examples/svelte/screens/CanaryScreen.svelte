@@ -56,6 +56,7 @@
     type ITextInputChangeEvent,
     type ISwitchChangeEvent,
   } from '@symbiote-native/svelte';
+  import type { IPressState } from '@symbiote-native/components';
   // A third-party native view via symbiote's own wrapper (not the library's React component); the
   // engine derives RNCSlider's events + tint processors from its ViewConfig. Same wrapper as React.
   import { Slider } from '@symbiote-native/slider/svelte';
@@ -549,7 +550,7 @@
         onPressOut: () => (cardPressed = false),
       }}
       class="pressable-card"
-      style={({ pressed }: { pressed: boolean }) => ({
+      style={({ pressed }: IPressState) => ({
         backgroundColor: pressed ? SURFACE_PRESSED : SURFACE,
         borderColor: accent,
       })}
@@ -605,7 +606,7 @@
       pressRetentionOffset={{ top: 0, bottom: 80, left: 0, right: 0 }}
       p={{ onPressMove: onRetentionMove }}
       class="retention-card"
-      style={({ pressed }: { pressed: boolean }) => ({
+      style={({ pressed }: IPressState) => ({
         backgroundColor: pressed ? accent : SURFACE,
       })}
     >
@@ -789,24 +790,22 @@
       animationType="fade"
       onRequestClose={() => (modalVisible = false)}
     >
-      {#snippet children()}<!-- transparent modal => paint our own dim layer (the RN pattern)
-        -->
-        <view class="modal-overlay">
-          <view testID="modal-card" class="modal-card">
-            <text class="modal-title">It's a Modal</text>
-            <text class="modal-body">
-              Rendered through ModalHostView — its own native window, same
-              Fabric tree.
-            </text>
-            <ActionButton
-              testID="modal-close"
-              title="Close"
-              onPress={() => (modalVisible = false)}
-              color={accent}
-            />
-          </view>
+      <!-- transparent modal => paint our own dim layer (the RN pattern) -->
+      <view class="modal-overlay">
+        <view testID="modal-card" class="modal-card">
+          <text class="modal-title">It's a Modal</text>
+          <text class="modal-body">
+            Rendered through ModalHostView — its own native window, same
+            Fabric tree.
+          </text>
+          <ActionButton
+            testID="modal-close"
+            title="Close"
+            onPress={() => (modalVisible = false)}
+            color={accent}
+          />
         </view>
-      {/snippet}
+      </view>
     </Modal>
     <!-- createTunnel: no ref, no target node — TunnelIn just registers its snippet content from
          wherever it's mounted; TunnelOut (rendered in the overlay host below) reads it back
@@ -821,17 +820,15 @@
     />
     {#if tunnelToastVisible}
       <TunnelIn tunnel={overlayTunnel}>
-        {#snippet children()}
-          <view testID="tunnel-toast-card" class="modal-card">
-            <text class="modal-body">Ported via createTunnel ✦</text>
-            <ActionButton
-              testID="tunnel-toast-dismiss"
-              title="Dismiss"
-              onPress={() => (tunnelToastVisible = false)}
-              color={accent}
-            />
-          </view>
-        {/snippet}
+        <view testID="tunnel-toast-card" class="modal-card">
+          <text class="modal-body">Ported via createTunnel ✦</text>
+          <ActionButton
+            testID="tunnel-toast-dismiss"
+            title="Dismiss"
+            onPress={() => (tunnelToastVisible = false)}
+            color={accent}
+          />
+        </view>
       </TunnelIn>
     {/if}
   </scroll-view>
