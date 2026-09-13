@@ -1,15 +1,16 @@
 // Which intrinsics carry a STRICT prop type, and which still accept anything.
 //
-// THE PREMISE THIS TEST USED TO HAVE IS GONE, and the replacement is the finding. It used to derive
-// "is this primitive a tag yet" from `export const View = 'view'` in `components.ts` — a capitalized
-// alias whose value was the tag string — and require a strict entry for each one that had crossed.
-// Every alias was deleted on 2026-09-11: an app writes `<view>` / `<text>` directly, so the set the
-// old oracle measured is empty and nothing is a component any more.
+// SECOND PREMISE SHIFT (2026-09-14, first one dated 2026-09-11 below): `jsx-runtime.ts` no longer
+// hand-rolls `Omit<Record<ISymbioteIntrinsic, IHostProps>, 'view' | 'text'>` plus two explicit
+// fields. It now calls the same `ICrossTypedIntrinsics` generic Vue/Svelte/Solid already use, fed
+// an `ICrossedPrimitiveProps` interface that lists every crossed tag directly — 18 of them now
+// (pressable, button, image, scroll-view, switch, text-input, ... ), not just view/text. The
+// extraction below reads that interface's own keys instead of an Omit clause that no longer exists.
 //
-// What that changes is who owns the app's compile-time surface. While a primitive was a component,
-// `FC<IXProps>` supplied strictness and the loose intrinsic entry was plumbing. Now the ENTRY is the
-// whole surface — and only two of them are strict, so `<image nope={1}/>` is not a TS2322 today.
-// That is open debt, pinned below so it shrinks deliberately rather than being rediscovered.
+// Original premise (2026-09-11): this used to derive "is this primitive a tag yet" from
+// `export const View = 'view'` in `components.ts` — a capitalized alias whose value was the tag
+// string. Every alias was deleted that day: an app writes `<view>` / `<text>` directly, so that
+// oracle went to zero and nothing was a component any more.
 //
 // Read as source rather than checked by the compiler on purpose: NO test file in this repo is
 // type-checked (every package's tsconfig excludes `**/*.test.ts`, and vitest strips types without
@@ -23,13 +24,11 @@ import { describe, expect, it } from 'vitest';
 const SRC = join(__dirname, '..');
 const jsxSource = readFileSync(join(SRC, 'jsx-runtime.ts'), 'utf8');
 
-// The names the table declares strictly: everything omitted from the loose Record and re-declared.
+// The names the table declares strictly: every key of `ICrossedPrimitiveProps`.
 function strictlyDeclared(): string[] {
-  const omit = jsxSource.match(
-    /Record<ISymbioteIntrinsic, IHostProps>,\s*([^>]+)>/s,
-  );
-  if (omit === null) return [];
-  return [...omit[1].matchAll(/'([a-z][a-z-]*)'/g)]
+  const body = jsxSource.match(/interface ICrossedPrimitiveProps \{([^}]+)\}/s);
+  if (body === null) return [];
+  return [...body[1].matchAll(/^\s*'?([a-zA-Z][a-zA-Z-]*)'?:/gm)]
     .map(match => match[1])
     .sort();
 }
@@ -37,7 +36,26 @@ function strictlyDeclared(): string[] {
 // Equality, not a floor: an entry added without a strict type reddens here, and so does one
 // removed. Growing this list is the intended direction — every name still absent is a primitive
 // whose props an app can misspell with nothing red.
-const STRICT = ['text', 'view'];
+const STRICT = [
+  'activity-indicator',
+  'button',
+  'image',
+  'image-background',
+  'input-accessory-view',
+  'modal',
+  'pressable',
+  'refresh-control',
+  'safe-area-view',
+  'scroll-view',
+  'switch',
+  'text',
+  'text-input',
+  'touchable-highlight',
+  'touchable-native-feedback',
+  'touchable-opacity',
+  'touchable-without-feedback',
+  'view',
+];
 
 describe('intrinsic prop strictness', () => {
   // why: the control. The assertion below compares two derived lists, and two EMPTY lists compare
@@ -54,10 +72,12 @@ describe('intrinsic prop strictness', () => {
     expect(strictlyDeclared()).toEqual(STRICT);
   });
 
-  // why: the table must stay DERIVED from the union. It had drifted four names behind while it was
-  // hand-written — `pressable` among them — and a hand-written list cannot report a name that is
-  // absent from it.
+  // why: the table must stay DERIVED from the union, not hand-listed. `ICrossTypedIntrinsics`
+  // (`Omit<Record<ISymbioteIntrinsic, LooseProps>, keyof Crossed> & Crossed`) is what does that
+  // derivation now, shared verbatim with Vue/Svelte/Solid — a tag missing from `Crossed` falls
+  // through to the loose bag instead of vanishing, which the old hand-written interface couldn't
+  // guarantee.
   it('declares the tag set by deriving it, not by listing it', () => {
-    expect(jsxSource).toContain('Record<ISymbioteIntrinsic, IHostProps>');
+    expect(jsxSource).toContain('ICrossTypedIntrinsics<');
   });
 });
