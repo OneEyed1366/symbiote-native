@@ -42,6 +42,7 @@ export { buildDescriptors, makeDescriptorFor } from './component-names/shared';
 export type {
   ISymbioteIntrinsic,
   IComponentDescriptor,
+  ICrossTypedIntrinsics,
 } from './component-names/shared';
 
 export { renderSwitch } from './view/render-switch';

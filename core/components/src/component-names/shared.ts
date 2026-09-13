@@ -103,6 +103,20 @@ export type ISymbioteIntrinsic =
   | 'sticky-header'
   | 'input-accessory-view';
 
+// The one shared shape behind every adapter's intrinsic-element type table (React's and Solid's
+// JSX namespace, Vue's JSX namespace AND its separate GlobalComponents/Volar table for `.vue`
+// SFCs): every tag gets a LOOSE attribute bag by default, except the ones the adapter has a REAL
+// per-tag prop type for, which get that type instead. The MECHANICS (`Omit` the crossed keys out
+// of the loose record, merge the real ones back in) are identical everywhere; only the prop TYPES
+// differ per adapter, and they have to — `<prop_types_split_agnostic_vs_per_adapter>` in root
+// CLAUDE.md: `children`/`ref` are framework values, so `IViewProps` etc. cannot be one shared type.
+// This generic is what lets each adapter's own table stay a one-line instantiation instead of
+// re-deriving the `Omit<Record<...>, keyof Crossed> & Crossed` shape by hand.
+export type ICrossTypedIntrinsics<
+  LooseProps,
+  Crossed extends Partial<Record<ISymbioteIntrinsic, unknown>>,
+> = Omit<Record<ISymbioteIntrinsic, LooseProps>, keyof Crossed> & Crossed;
+
 export interface IComponentDescriptor {
   component: string;
   isText: boolean;

@@ -35,7 +35,9 @@
     "./runtime-helpers": "./src/runtime-helpers/index.ts",
     "./metro-css-parser": "./metro-css-parser.cjs",
     "./metro-vue-transformer": "./metro-vue-transformer.cjs",
-    "./babel-jsx": "./babel-jsx.cjs"
+    "./babel-jsx": "./babel-jsx.cjs",
+    "./jsx-runtime": "./src/jsx-runtime.ts",
+    "./jsx-dev-runtime": "./src/jsx-runtime.ts"
   },
   "files": [
     "babel-jsx.cjs",
@@ -64,7 +66,15 @@
       },
       "./metro-css-parser": "./metro-css-parser.cjs",
       "./metro-vue-transformer": "./metro-vue-transformer.cjs",
-      "./babel-jsx": "./babel-jsx.cjs"
+      "./babel-jsx": "./babel-jsx.cjs",
+      "./jsx-runtime": {
+        "types": "./build/jsx-runtime.d.ts",
+        "default": "./build/jsx-runtime.js"
+      },
+      "./jsx-dev-runtime": {
+        "types": "./build/jsx-runtime.d.ts",
+        "default": "./build/jsx-runtime.js"
+      }
     }
   },
   "scripts": {

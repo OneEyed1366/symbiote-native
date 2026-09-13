@@ -9,6 +9,28 @@
 
 import './register';
 
+// Re-exports Vue's ENTIRE public API (ref, computed, defineComponent, unref, …), which looks like
+// scope creep on an otherwise carefully curated barrel — it is not ergonomics, it is what makes
+// `vueCompilerOptions.lib: "@symbiote-native/vue"` (examples/*/tsconfig.typecheck.json) safe to
+// set. Volar/`@vue/language-core` generates virtual TS referencing `import(lib).unref`,
+// `import(lib).GlobalComponents`, `.GlobalDirectives`, `.ShallowRef`, `.ObjectDirective` — always
+// off `lib`'s ROOT import, never a subpath — so pointing `lib` at us without this line breaks
+// EVERY `.vue` SFC's template check with `Cannot find name` the moment Volar's codegen touches any
+// of them. `lib`'s other consumer, `optionsWrapper`'s `(await import(lib)).defineComponent(...)`,
+// only fires for a plain `<script>` `export default {}` block (`isExportRawObject`,
+// `@vue/language-core/lib/codegen/script/index.js`) — every `.vue` file in this repo uses
+// `<script setup>`, so that branch never runs and defineComponent needing to resolve from here too
+// is moot in practice, not something this wildcard has to get right on its own.
+//
+// WHY `lib` NEEDS TO BE US AT ALL: plain `"vue"` (Volar's default) types `__VLS_IntrinsicElements`
+// and `GlobalComponents` off `vue`'s own `jsx-runtime`/ambient augmentation — the SAME
+// `view`/`text`/`image`/`switch`-collide-with-real-SVG-elements problem documented in
+// `jsx-runtime.ts` and `intrinsic-elements.ts`, but for `.vue` TEMPLATES rather than TSX. Volar's
+// native-vs-component branch (`!isNativeTag(tag)`) reads `IntrinsicElements` from
+// `import('${lib}/jsx-runtime')`, so redirecting `lib` to our own package is what finally reaches
+// OUR jsx-runtime.ts (real `IViewProps`/`ITextProps`/… on all 4 collision tags) for those four.
+export * from 'vue';
+
 export { mount, unmount, setAppConfigurator } from './render';
 export type { IAppConfigurator } from './render';
 // The portal: Vue's own <Teleport>, guarded so `to` must be a node/surface this renderer actually
