@@ -152,8 +152,19 @@ function commandOff(targets) {
 // existing version ("You cannot publish over the previously published versions"), and the dev loop
 // republishes one version many times a day. Verdaccio allows it because this config sets
 // `unpublish: $all`; real npm does not, which is half of why this is not a dist-tag on npmjs.
+//
+// `pnpm pack` ships whatever is already sitting in `build/` — most packages have no `prepack`
+// build step of their own (only svelte and angular do), so without this, publishing after an edit
+// with no manual `pnpm run prepublish-build` first silently republishes STALE or EMPTY bytes: no
+// error, a tarball that installs fine, and an example that measures last week's code. Building
+// here, always, closes that gap instead of documenting it as a step to remember.
 async function commandPublish(dirs) {
   const token = await ensureToken();
+  console.log('building a fresh package tree (pnpm run prepublish-build) ...');
+  execFileSync('pnpm', ['run', 'prepublish-build'], {
+    cwd: REPO_ROOT,
+    stdio: 'inherit',
+  });
   const entries = publishablePackageEntries();
   // No argument means EVERY publishable package. Naming them was the default because publishing is
   // the slow half, but a list you have to remember is a list that goes stale mid-loop — and the
@@ -221,7 +232,7 @@ async function commandPublish(dirs) {
     console.log(`\nFAILED to publish ${failed.length}:`);
     for (const line of failed) console.log(`  ${line}`);
     console.log(
-      '\nMost often a missing build/ — run `pnpm run prepublish-build` and retry.',
+      '\nThe build ran fresh just before this — check the build output above for a type error.',
     );
     process.exitCode = 1;
   }
