@@ -340,9 +340,25 @@ const nodeOps: RendererOptions<IHostNode> = {
 
   removeNode,
 
+  // Reverse of `getFirstChild`'s `childHost` redirect: a child under a composed primitive's slot
+  // has `node.parent` pointing at the SLOT, but `cleanChildren`'s `isParent = getParentNode(el)
+  // === parent` compares against the OWNER — the same reference the JSX-level `insert()` call was
+  // given. Left un-redirected, that comparison is false for every child of a bare `<scroll-view>`
+  // (or any other slotted primitive) with a following sibling, so `isParent` never fires,
+  // `removeNode` is never called on a full array clear, and the old children are orphaned: still
+  // committed to Fabric, still retained, and re-diffed against on the next reconciliation —
+  // reproduced as unbounded RAM growth and an increasingly slow "Clear" on the benchmark screen.
+  // One level up only: `childHost` is always a DIRECT child the owner built (see `buildStructure`),
+  // never a deeper descendant.
   getParentNode(node) {
     if (isSurface(node)) return undefined;
-    return node.parent ?? activeSurface;
+    const parent = node.parent ?? activeSurface;
+    if (parent === undefined || isSurface(parent)) return parent;
+    const grandparent = parent.parent;
+    if (grandparent !== undefined && grandparent.childHost === parent) {
+      return grandparent;
+    }
+    return parent;
   },
 
   // Anchors are NOT filtered out of this or getNextSibling, deliberately. solid-js/universal keeps

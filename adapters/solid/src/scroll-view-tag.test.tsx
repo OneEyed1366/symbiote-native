@@ -10,6 +10,7 @@
 // proves only that SOLID reaches that behavior: compiled JSX, this adapter's own `class`/`style`
 // merge, and the content-node OWNERSHIP guard — nothing here else in this adapter may ALSO build a
 // scroll-content node, or a tree gets a silent second one nested inside the first.
+import { createSignal, For } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -189,5 +190,36 @@ describe('Solid scroll-view / horizontal-scroll-view tags', () => {
         content.children.filter(child => child.viewName === CONTENT_VIEW),
       ).toHaveLength(0);
     }
+  });
+
+  // Reported as an on-device RAM leak + a "Clear" step that never finishes on the benchmark
+  // screen: a <For> whose items live directly under a <scroll-view> (a composed primitive whose
+  // real children mount on `node.childHost`, the content view) has a FOLLOWING SIBLING, which is
+  // what makes solid-js/universal's array reconciler emit a `marker` and take `cleanChildren`'s
+  // multi-child branch. That branch decides whether an old item still lives under `parent` via
+  // `getParentNode(el) === parent` — and `getParentNode` used to return `el.parent` verbatim,
+  // which for a childHost'd child is the CONTENT node, never the `<scroll-view>` owner Solid holds
+  // as `parent`. The comparison was false for every row, so `removeNode` never fired on a full
+  // clear: the old rows stayed committed to Fabric forever, orphaned but still retained — reproduced
+  // headlessly as the committed node count growing by one row-set per cycle instead of returning to
+  // baseline. `getFirstChild` already carried the matching `childHost` redirect; `getParentNode` had
+  // to walk it the other way — see its own comment in `./renderer.ts`.
+  it('clearing a <For> under a <scroll-view> actually removes its rows, not just orphans them', async () => {
+    const [rows, setRows] = createSignal([1, 2, 3]);
+
+    mount(ROOT_TAG, () => (
+      <scroll-view testID="outer">
+        <For each={rows()}>{row => <view testID={`row-${row}`} />}</For>
+        {/* The trailing sibling is load-bearing: without it solid-js/universal has no `marker` and
+          takes cleanChildren's OTHER branch, which does not consult getParentNode at all. */}
+        <view testID="after" />
+      </scroll-view>
+    ));
+    await tick();
+    expect(committed(CONTENT_VIEW).children).toHaveLength(4); // 3 rows + "after"
+
+    setRows([]);
+    await tick();
+    expect(committed(CONTENT_VIEW).children).toHaveLength(1); // "after" only
   });
 });
