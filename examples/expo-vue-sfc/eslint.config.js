@@ -2,10 +2,12 @@ const reactNativeFlatConfig = require('@react-native/eslint-config/flat');
 const vue = require('eslint-plugin-vue');
 const tsParser = require('@typescript-eslint/parser');
 
-// `@react-native/eslint-config/flat` has no `files` pattern covering `.vue` at all, so ESLint's
-// flat-config default (only recognized JS-like extensions unless a config explicitly opts a file
-// in) reports every `.vue` file "ignored because of a matching ignore pattern" — same root cause
-// and fix as examples/svelte's own eslint.config.js.
+// Migrated from the legacy `.eslintrc.js` (`extends: '@react-native'`) specifically to gain flat
+// config's `files`-scoped plugin blocks — the legacy format cannot load eslint-plugin-vue v10's
+// flat-shaped configs. Without a `files` pattern covering `.vue` at all, ESLint's flat-config
+// default (only recognized JS-like extensions unless a config explicitly opts a file in) reported
+// every `.vue` file "ignored because of a matching ignore pattern" — same root cause and fix as
+// the non-expo vue-sfc example.
 module.exports = [
   ...reactNativeFlatConfig,
   ...vue.configs['flat/recommended'],
@@ -24,8 +26,8 @@ module.exports = [
       'react-hooks/rules-of-hooks': 'off',
       // The `**/*.ts`/`**/*.tsx` block in this same config turns `no-undef` off — typescript-eslint's
       // own recommendation, since a plain (non-type-aware) ESLint rule cannot see ambient globals a
-      // `.d.ts` lib declares (`performance`, RN's own globals, …) and false-flags every one of them.
-      // `.vue`'s `<script lang="ts">` isn't matched by that glob, so it needs the same override here.
+      // `.d.ts` lib declares. `.vue`'s `<script lang="ts">` isn't matched by that glob, so it needs
+      // the same override here.
       'no-undef': 'off',
       // Our own primitives take RN's exact camelCase prop names (`testID`, `onPress`, …), never DOM
       // attributes — hyphenating them is not just unwanted, it silently produces a DIFFERENT wrong
