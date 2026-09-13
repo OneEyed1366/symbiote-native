@@ -89,6 +89,34 @@ function run(command, args, options = {}) {
   }
 }
 
+// npm's cacache fans out internally: one `npm install` fetches/hashes many packages in parallel
+// inside a single process, and its tmp-then-rename cache writes race each other on that
+// same-process concurrency, not only across processes. Per-framework cache isolation
+// (`frameworkNpmCache` below) kills the cross-framework race this script used to have; it can't
+// kill this one, since it's entirely inside one `npm install`. Observed 2026-09-13: ENOTEMPTY on
+// `_cacache/content-v2/**` even with isolated caches. Upstream npm/cacache bug, not fixable here -
+// retry with a wiped cache, the documented workaround for this failure shape.
+async function installWithCacheRetry(cwd, env, cacheDir, attempts = 3) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await runAsync(
+        'npm',
+        ['install', '--package-lock=false', '--no-audit', '--no-fund', '--prefer-offline'],
+        { cwd, env },
+      );
+      return;
+    } catch (error) {
+      const isCacheRace =
+        error instanceof Error && /ENOTEMPTY.*_cacache/s.test(error.message);
+      if (!isCacheRace || attempt === attempts) throw error;
+      // A failed rmdir mid-write can leave the cache half-consistent; a bare retry can hit the
+      // same stuck entry, so wipe and let npm repopulate it from scratch.
+      rmSync(cacheDir, { recursive: true, force: true });
+      mkdirSync(cacheDir, { recursive: true });
+    }
+  }
+}
+
 // Non-blocking counterpart of `run`, so independent frameworks can install/verify/bundle
 // concurrently instead of one at a time (execFileSync blocks the whole event loop, so wrapping it
 // in Promise.all buys nothing — only an async child process yields the loop while it waits on I/O).
@@ -375,10 +403,10 @@ async function processExample(
     rmSync(join(exampleRoot, 'package-lock.json'), { force: true });
 
     log.push(`${framework}: installing fresh tarball consumer ...`);
-    await runAsync(
-      'npm',
-      ['install', '--package-lock=false', '--no-audit', '--no-fund', '--prefer-offline'],
-      { cwd: exampleRoot, env: frameworkNpmEnvironment },
+    await installWithCacheRetry(
+      exampleRoot,
+      frameworkNpmEnvironment,
+      frameworkNpmCache,
     );
     verifyInstalledTarballs(exampleRoot, directPackages, tarballs);
 
