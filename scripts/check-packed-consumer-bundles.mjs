@@ -96,12 +96,26 @@ function run(command, args, options = {}) {
 // kill this one, since it's entirely inside one `npm install`. Observed 2026-09-13: ENOTEMPTY on
 // `_cacache/content-v2/**` even with isolated caches. Upstream npm/cacache bug, not fixable here -
 // retry with a wiped cache, the documented workaround for this failure shape.
+//
+// `--legacy-peer-deps`: navigation/slider/splash-screen each list all five adapters as peers, so
+// an example installing just one still makes npm auto-resolve the other four off the registry.
+// That 5-way peer graph triggers arborist's own backtracking crash (`Cannot read properties of
+// null (reading 'edgesOut')`, npm/cli#4828 - non-deterministic, hit react only on 2026-09-14).
+// This check only needs the tarball to install and bundle, not real peer enforcement, so skipping
+// peer resolution removes the trigger instead of hoping a retry dodges it.
 async function installWithCacheRetry(cwd, env, cacheDir, attempts = 3) {
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       await runAsync(
         'npm',
-        ['install', '--package-lock=false', '--no-audit', '--no-fund', '--prefer-offline'],
+        [
+          'install',
+          '--package-lock=false',
+          '--no-audit',
+          '--no-fund',
+          '--prefer-offline',
+          '--legacy-peer-deps',
+        ],
         { cwd, env },
       );
       return;
