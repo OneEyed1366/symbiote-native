@@ -141,21 +141,31 @@ describe('the Vue GlobalComponents tag alphabet', () => {
     ).toContain('Teleport');
   });
 
-  it.each(['view', 'text', 'scroll-view', 'text-input'])(
-    'exposes %s props through $props',
-    tag => {
-      const props = templateProps(checker, components, tag);
-      expect(
-        checker.getIndexInfoOfType(props, ts.IndexKind.String),
-        'the open attribute surface is missing',
-      ).toBeDefined();
-      const names = checker
-        .getPropertiesOfType(props)
-        .map(property => property.getName());
-      expect(
-        names,
-        'PublicProps is not folded in, so `key`/`ref` would error',
-      ).toContain('key');
-    },
-  );
+  // These four are CROSSED (`ICrossedPrimitiveProps`, intrinsic-elements.ts): `$props` is the real
+  // adapter prop type, not the generic `ISymbioteHostAttributes` bag, so a typo'd prop reports
+  // here the same way it does through the JSX namespace (see that file's header). The open index
+  // signature this test used to require is gone by design; checking it's absent, plus a real
+  // tag-specific field, proves the crossing reached Volar instead of passing vacuously.
+  it.each([
+    ['view', 'pointerEvents'],
+    ['text', 'numberOfLines'],
+    ['scroll-view', 'horizontal'],
+    ['text-input', 'multiline'],
+  ])('exposes %s through a real, closed $props', (tag, ownField) => {
+    const props = templateProps(checker, components, tag);
+    expect(
+      checker.getIndexInfoOfType(props, ts.IndexKind.String),
+      `${tag} still carries the open host-attribute bag instead of its real prop type`,
+    ).toBeUndefined();
+    const names = checker
+      .getPropertiesOfType(props)
+      .map(property => property.getName());
+    expect(names, `${tag}'s real prop type did not reach $props`).toContain(
+      ownField,
+    );
+    expect(
+      names,
+      'PublicProps is not folded in, so `key`/`ref` would error',
+    ).toContain('key');
+  });
 });
