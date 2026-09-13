@@ -4,6 +4,15 @@
     "types": [],
     "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
   },
+  // Points vue-tsc/Volar's virtual codegen at OUR package instead of Vue's default "vue" - see
+  // adapters/vue/src/index.ts's comment on the `export * from 'vue'` this depends on. Without it,
+  // view/text/image/switch (the 4 tags colliding with real SVG element names) type-check against
+  // Vue's own SVGAttributes in every .vue template. Lives HERE, not only in tsconfig.typecheck.json:
+  // the editor's Volar resolves the plain tsconfig.json, not the CLI's typecheck config, so a copy
+  // stuck in the latter only fixes `npm run typecheck` and leaves every live hover/error wrong.
+  "vueCompilerOptions": {
+    "lib": "@symbiote-native/vue"
+  },
   "include": ["**/*.ts", "**/*.tsx", "**/*.vue"],
   "exclude": ["**/node_modules", "**/Pods"]
 }
