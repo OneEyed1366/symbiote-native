@@ -30,33 +30,25 @@ const isLoud = ref(false);
 
 <template>
   <view class="section-nested">
-    <text class="section-label">
-      Compound class · scoped style block
-    </text>
+    <text class="section-label">Compound class · scoped style block</text>
     <view class="row">
       <view
         class="badge"
         testID="compound-badge-plain"
       >
-        <text class="badge-text">
-          plain
-        </text>
+        <text class="badge-text">plain</text>
       </view>
       <view
         class="badge loud"
         testID="compound-badge-loud"
       >
-        <text class="badge-text">
-          loud
-        </text>
+        <text class="badge-text">loud</text>
       </view>
       <view
         :class="isLoud ? 'badge loud' : 'badge'"
         testID="compound-badge-dynamic"
       >
-        <text class="badge-text">
-          dynamic
-        </text>
+        <text class="badge-text">dynamic</text>
       </view>
     </view>
     <text
