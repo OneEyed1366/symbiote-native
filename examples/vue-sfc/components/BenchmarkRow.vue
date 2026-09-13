@@ -37,13 +37,28 @@ const props = defineProps<{
   <view
     :class="props.isSelected ? 'bench-row bench-row-selected' : 'bench-row'"
   >
-    <text class="bench-row-id">{{ String(props.row.id) }}</text>
-    <pressable class="flex1" @press="props.onSelect(props.row.id)">
-      <text class="bench-row-label">{{ props.row.label }}</text>
+    <text class="bench-row-id">
+      {{ String(props.row.id) }}
+    </text>
+    <pressable
+      class="flex1"
+      @press="props.onSelect(props.row.id)"
+    >
+      <text class="bench-row-label">
+        {{ props.row.label }}
+      </text>
     </pressable>
-    <pressable class="bench-row-remove" @press="props.onRemove(props.row.id)">
-      <text class="bench-row-remove-text">×</text>
+    <pressable
+      class="bench-row-remove"
+      @press="props.onRemove(props.row.id)"
+    >
+      <text class="bench-row-remove-text">
+        ×
+      </text>
     </pressable>
-    <text-input class="bench-row-input" :value="props.row.label" />
+    <text-input
+      class="bench-row-input"
+      :value="props.row.label"
+    />
   </view>
 </template>

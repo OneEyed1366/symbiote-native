@@ -61,57 +61,84 @@ function handleRequestReview(): void {
       content-container-style="scroll-content"
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: lineColor }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Store Review</text>
-          <text class="hero-body"
-            >@symbiote-native/store-review — prompts the platform's native
-            in-app review flow.</text
-          >
+          <text class="hero-title">
+            Store Review
+          </text>
+          <text class="hero-body">
+            @symbiote-native/store-review — prompts the platform's native
+            in-app review flow.
+          </text>
         </view>
       </view>
 
-      <view testID="store-review-capabilities-card" class="store-review-card">
-        <text class="store-review-card-title">Capabilities</text>
+      <view
+        testID="store-review-capabilities-card"
+        class="store-review-card"
+      >
+        <text class="store-review-card-title">
+          Capabilities
+        </text>
         <view class="store-review-row">
-          <text class="store-review-row-label">Available</text>
+          <text class="store-review-row-label">
+            Available
+          </text>
           <view
             :class="`store-review-status-badge store-review-status-badge-${isAvailable}`"
           >
-            <text class="store-review-status-text">{{
-              isAvailable === 'checking'
-                ? 'CHECKING…'
-                : isAvailable === 'yes'
-                  ? 'YES'
-                  : 'NO'
-            }}</text>
+            <text class="store-review-status-text">
+              {{
+                isAvailable === 'checking'
+                  ? 'CHECKING…'
+                  : isAvailable === 'yes'
+                    ? 'YES'
+                    : 'NO'
+              }}
+            </text>
           </view>
         </view>
         <view class="store-review-row">
-          <text class="store-review-row-label">Has action</text>
+          <text class="store-review-row-label">
+            Has action
+          </text>
           <view
             :class="`store-review-status-badge store-review-status-badge-${hasReviewAction}`"
           >
-            <text class="store-review-status-text">{{
-              hasReviewAction === 'checking'
-                ? 'CHECKING…'
-                : hasReviewAction === 'yes'
-                  ? 'YES'
-                  : 'NO'
-            }}</text>
+            <text class="store-review-status-text">
+              {{
+                hasReviewAction === 'checking'
+                  ? 'CHECKING…'
+                  : hasReviewAction === 'yes'
+                    ? 'YES'
+                    : 'NO'
+              }}
+            </text>
           </view>
         </view>
       </view>
 
-      <view testID="store-review-actions-card" class="store-review-card">
-        <text class="store-review-card-title">Actions</text>
+      <view
+        testID="store-review-actions-card"
+        class="store-review-card"
+      >
+        <text class="store-review-card-title">
+          Actions
+        </text>
         <ActionButton
           testID="store-review-request-button"
           title="Request Review"
@@ -119,18 +146,25 @@ function handleRequestReview(): void {
           :color="lineColor"
         />
         <view class="store-review-row">
-          <text class="store-review-row-label">Last result</text>
-          <text testID="store-review-result" class="store-review-value-text">{{
-            lastResult
-          }}</text>
+          <text class="store-review-row-label">
+            Last result
+          </text>
+          <text
+            testID="store-review-result"
+            class="store-review-value-text"
+          >
+            {{
+              lastResult
+            }}
+          </text>
         </view>
-        <text class="info-text"
-          >resolved means the call completed, not that a prompt appeared. On
+        <text class="info-text">
+          resolved means the call completed, not that a prompt appeared. On
           Android the Play dialog only shows for a build installed from Google
           Play (internal test track, internal app sharing, or production); a
           sideloaded debug build resolves silently. iOS shows it in debug
-          builds. Both stores also enforce a quota.</text
-        >
+          builds. Both stores also enforce a quota.
+        </text>
       </view>
     </scroll-view>
   </safe-area-view>

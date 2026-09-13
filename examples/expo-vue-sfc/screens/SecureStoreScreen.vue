@@ -103,69 +103,121 @@ function handleDelete(): void {
       content-container-style="scroll-content"
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: lineColor }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Secure Store</text>
-          <text class="hero-body"
-            >@symbiote-native/secure-store — encrypted key/value storage in the
+          <text class="hero-title">
+            Secure Store
+          </text>
+          <text class="hero-body">
+            @symbiote-native/secure-store — encrypted key/value storage in the
             iOS Keychain and the Android Keystore. Save a value, kill the app,
-            relaunch, and read it back.</text
-          >
+            relaunch, and read it back.
+          </text>
         </view>
       </view>
 
-      <view testID="secure-store-capability-card" class="secure-store-card">
-        <text class="secure-store-card-title">Capabilities</text>
-        <view testID="secure-store-available" class="secure-store-row">
-          <text class="secure-store-row-label">Available</text>
+      <view
+        testID="secure-store-capability-card"
+        class="secure-store-card"
+      >
+        <text class="secure-store-card-title">
+          Capabilities
+        </text>
+        <view
+          testID="secure-store-available"
+          class="secure-store-row"
+        >
+          <text class="secure-store-row-label">
+            Available
+          </text>
           <view
             :class="`secure-store-status-badge secure-store-status-badge-${isAvailable}`"
           >
-            <text class="secure-store-status-text">{{
-              toBadgeText(isAvailable)
-            }}</text>
+            <text class="secure-store-status-text">
+              {{
+                toBadgeText(isAvailable)
+              }}
+            </text>
           </view>
         </view>
-        <view testID="secure-store-biometrics" class="secure-store-row">
-          <text class="secure-store-row-label">Biometrics usable</text>
+        <view
+          testID="secure-store-biometrics"
+          class="secure-store-row"
+        >
+          <text class="secure-store-row-label">
+            Biometrics usable
+          </text>
           <view
             :class="`secure-store-status-badge secure-store-status-badge-${canUseBiometrics}`"
           >
-            <text class="secure-store-status-text">{{
-              toBadgeText(canUseBiometrics)
-            }}</text>
+            <text class="secure-store-status-text">
+              {{
+                toBadgeText(canUseBiometrics)
+              }}
+            </text>
           </view>
         </view>
       </view>
 
-      <view testID="secure-store-value-card" class="secure-store-card">
-        <text class="secure-store-card-title">Stored value</text>
+      <view
+        testID="secure-store-value-card"
+        class="secure-store-card"
+      >
+        <text class="secure-store-card-title">
+          Stored value
+        </text>
         <view class="secure-store-row">
-          <text class="secure-store-row-label">{{ DEMO_KEY }}</text>
-          <text testID="secure-store-value" class="secure-store-value-text">{{
-            storedValue === null ? '(no entry)' : storedValue
-          }}</text>
+          <text class="secure-store-row-label">
+            {{ DEMO_KEY }}
+          </text>
+          <text
+            testID="secure-store-value"
+            class="secure-store-value-text"
+          >
+            {{
+              storedValue === null ? '(no entry)' : storedValue
+            }}
+          </text>
         </view>
         <view class="secure-store-row">
-          <text class="secure-store-row-label">Last result</text>
-          <text testID="secure-store-result" class="secure-store-value-text">{{
-            lastResult
-          }}</text>
+          <text class="secure-store-row-label">
+            Last result
+          </text>
+          <text
+            testID="secure-store-result"
+            class="secure-store-value-text"
+          >
+            {{
+              lastResult
+            }}
+          </text>
         </view>
       </view>
 
-      <view testID="secure-store-write-card" class="secure-store-card">
-        <text class="secure-store-card-title">Write, read, delete</text>
+      <view
+        testID="secure-store-write-card"
+        class="secure-store-card"
+      >
+        <text class="secure-store-card-title">
+          Write, read, delete
+        </text>
         <text-input
-          testID="secure-store-input"
           v-model="inputText"
+          testID="secure-store-input"
           placeholder="Value to store"
           placeholder-text-color="#41506a"
           class="text-input"

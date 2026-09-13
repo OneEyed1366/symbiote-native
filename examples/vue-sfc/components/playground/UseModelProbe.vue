@@ -19,10 +19,17 @@ function increment(): void {
 
 <template>
   <view class="a11y-card">
-    <text class="switch-label">useModel() — non-macro v-model</text>
-    <text class="list-row-text" testID="usemodel-count">{{
-      `count=${count}`
-    }}</text>
+    <text class="switch-label">
+      useModel() — non-macro v-model
+    </text>
+    <text
+      class="list-row-text"
+      testID="usemodel-count"
+    >
+      {{
+        `count=${count}`
+      }}
+    </text>
     <ActionButton
       testID="usemodel-increment"
       title="increment (v-model:count)"

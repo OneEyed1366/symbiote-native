@@ -79,13 +79,17 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
 
 <template>
   <view class="section-nested">
-    <text ref="titleRef" class="section-label"
-      >Parity checks · longPress · dismiss · animated scroll · sticky · a11y
-      focus</text
+    <text
+      ref="titleRef"
+      class="section-label"
     >
+      Parity checks · longPress · dismiss · animated scroll · sticky · a11y
+      focus
+    </text>
 
     <!-- #10 Text.onLongPress synthesis: hold ~0.5s (suppresses tap) vs quick tap -->
     <text
+      class="long-press-row"
       @long-press="
         () => {
           longPressMsg = 'long press! (tap was suppressed)';
@@ -96,14 +100,15 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
           longPressMsg = 'tap';
         }
       "
-      class="long-press-row"
-      >{{ longPressMsg }}</text
     >
+      {{ longPressMsg }}
+    </text>
 
     <!-- #15 Keyboard.dismiss: blurs whatever input holds focus without needing a ref -->
     <text-input
       placeholder="focus me…"
       placeholder-text-color="#41506a"
+      class="focus-input"
       @focus="
         () => {
           dismissMsg = 'keyboard up — tap Hide keyboard';
@@ -114,9 +119,10 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
           dismissMsg = 'blurred (keyboard down)';
         }
       "
-      class="focus-input"
     />
-    <text class="note-text">{{ dismissMsg }}</text>
+    <text class="note-text">
+      {{ dismissMsg }}
+    </text>
     <ActionButton
       title="Hide keyboard"
       :onPress="() => Keyboard.dismiss()"
@@ -126,7 +132,9 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
     <!-- #12 animated VirtualizedList scroll: smooth (native command) vs instant.
          A fixed height with no wrapper: the vertical ScrollView clips to its own
          frame (overflow:'scroll' base, like RN), so rows stay inside the box on iOS too. -->
-    <text class="section-label">FlatList · animated scrollToOffset</text>
+    <text class="section-label">
+      FlatList · animated scrollToOffset
+    </text>
     <FlatList
       ref="listRef"
       :data="parityRows"
@@ -135,8 +143,13 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
       class="parity-list"
     >
       <template #item="{ item }">
-        <view class="parity-row" :style="parityRowHeightStyle">
-          <text class="info-text">row {{ item.n }}</text>
+        <view
+          class="parity-row"
+          :style="parityRowHeightStyle"
+        >
+          <text class="info-text">
+            row {{ item.n }}
+          </text>
         </view>
       </template>
     </FlatList>
@@ -160,9 +173,9 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
     <!-- #13 sticky section headers. Drag the inner list: each header pins at the top.
          Cross-talk check: as the NEXT header reaches the top it should PUSH the pinned
          one off (nextHeaderLayoutY not yet wired, watch push vs overlap). -->
-    <text class="section-label"
-      >SectionList · sticky (scroll: next header should push prev off)</text
-    >
+    <text class="section-label">
+      SectionList · sticky (scroll: next header should push prev off)
+    </text>
     <SectionList
       testID="sticky-section-list"
       :sections="paritySections"
@@ -171,11 +184,18 @@ const parityRowHeightStyle = { height: PARITY_ROW_H };
       class="section-list"
     >
       <template #sectionHeader="{ section }">
-        <text class="section-header">{{ section.title }}</text>
+        <text class="section-header">
+          {{ section.title }}
+        </text>
       </template>
       <template #item="{ item }">
-        <view class="parity-row" :style="parityRowHeightStyle">
-          <text class="info-text">{{ item.label }}</text>
+        <view
+          class="parity-row"
+          :style="parityRowHeightStyle"
+        >
+          <text class="info-text">
+            {{ item.label }}
+          </text>
         </view>
       </template>
     </SectionList>

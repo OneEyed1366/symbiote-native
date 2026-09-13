@@ -846,25 +846,36 @@ const rowItemLayout = (
       content-container-style="scroll-content"
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: accent }">
-          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: accent }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Benchmark</text>
-          <text class="hero-body"
-            >The js-framework-benchmark operations, run on device against the
+          <text class="hero-title">
+            Benchmark
+          </text>
+          <text class="hero-body">
+            The js-framework-benchmark operations, run on device against the
             engine's commit path — with the JS-thread frame rate beside
-            them.</text
-          >
+            them.
+          </text>
         </view>
       </view>
 
-      <text class="section-label">MEASUREMENTS</text>
+      <text class="section-label">
+        MEASUREMENTS
+      </text>
       <JsFrameRateMeter :accent="accent" />
 
       <!-- Buttons and results sit DIRECTLY under the meter, and everything they stress sits below:
@@ -909,9 +920,11 @@ const rowItemLayout = (
           />
         </view>
       </view>
-      <text class="note-text">{{
-        `Temporary experiment switch. On, the engine hands a parent's children to cloneNodeWithChildren in one call instead of appending them one at a time — about a third fewer JSI calls on Create, paid for with one extra ShadowNode per batched parent. The sign is not predicted, which is why it is a runtime toggle: two builds a day apart drifted 4% on Create and 6x on Clear with no code change, so the only trustworthy comparison is back-to-back on one binary. Flip it, re-run the suite, compare.`
-      }}</text>
+      <text class="note-text">
+        {{
+          `Temporary experiment switch. On, the engine hands a parent's children to cloneNodeWithChildren in one call instead of appending them one at a time — about a third fewer JSI calls on Create, paid for with one extra ShadowNode per batched parent. The sign is not predicted, which is why it is a runtime toggle: two builds a day apart drifted 4% on Create and 6x on Clear with no code change, so the only trustworthy comparison is back-to-back on one binary. Flip it, re-run the suite, compare.`
+        }}
+      </text>
 
       <view
         v-if="progress !== undefined"
@@ -919,19 +932,27 @@ const rowItemLayout = (
         class="bench-progress"
       >
         <activity-indicator :color="accent" />
-        <text class="bench-progress-text">{{
-          `${progress.mode === MOUNT_MODE.All ? 'All mounted' : 'Virtualized'} · ${progress.label}`
-        }}</text>
-        <text class="bench-progress-count">{{
-          `${progress.done}/${SUITE_STEPS.length}`
-        }}</text>
+        <text class="bench-progress-text">
+          {{
+            `${progress.mode === MOUNT_MODE.All ? 'All mounted' : 'Virtualized'} · ${progress.label}`
+          }}
+        </text>
+        <text class="bench-progress-count">
+          {{
+            `${progress.done}/${SUITE_STEPS.length}`
+          }}
+        </text>
       </view>
 
       <template v-if="hasSuiteResults">
         <view class="bench-compare-row">
           <text class="bench-compare-label" />
-          <text class="bench-compare-head-cell">ALL MOUNTED</text>
-          <text class="bench-compare-head-cell">VIRTUALIZED</text>
+          <text class="bench-compare-head-cell">
+            ALL MOUNTED
+          </text>
+          <text class="bench-compare-head-cell">
+            VIRTUALIZED
+          </text>
         </view>
         <view
           v-for="step in SUITE_STEPS"
@@ -939,26 +960,44 @@ const rowItemLayout = (
           :testID="`bench-suite-${step.op}`"
           class="bench-compare-row"
         >
-          <text class="bench-compare-label">{{ step.label }}</text>
-          <text class="bench-compare-cell">{{
-            formatDuration(allDurations.get(step.op))
-          }}</text>
-          <text class="bench-compare-cell">{{
-            formatDuration(virtualizedDurations.get(step.op))
-          }}</text>
+          <text class="bench-compare-label">
+            {{ step.label }}
+          </text>
+          <text class="bench-compare-cell">
+            {{
+              formatDuration(allDurations.get(step.op))
+            }}
+          </text>
+          <text class="bench-compare-cell">
+            {{
+              formatDuration(virtualizedDurations.get(step.op))
+            }}
+          </text>
         </view>
       </template>
-      <text v-else testID="bench-suite-empty" class="note-text"
-        >No suite run yet.</text
+      <text
+        v-else
+        testID="bench-suite-empty"
+        class="note-text"
       >
+        No suite run yet.
+      </text>
 
       <template v-if="hasSuiteResults">
-        <text class="section-label">ENGINE PER STEP · ALL MOUNTED</text>
+        <text class="section-label">
+          ENGINE PER STEP · ALL MOUNTED
+        </text>
         <view class="bench-compare-row">
           <text class="bench-compare-label" />
-          <text class="bench-compare-head-cell">VISITED</text>
-          <text class="bench-compare-head-cell">WRITES/NOOP</text>
-          <text class="bench-compare-head-cell">COMMITS</text>
+          <text class="bench-compare-head-cell">
+            VISITED
+          </text>
+          <text class="bench-compare-head-cell">
+            WRITES/NOOP
+          </text>
+          <text class="bench-compare-head-cell">
+            COMMITS
+          </text>
         </view>
         <view
           v-for="row in engineRows"
@@ -966,22 +1005,38 @@ const rowItemLayout = (
           :testID="`bench-engine-${row.op}`"
           class="bench-compare-row"
         >
-          <text class="bench-compare-label">{{ row.label }}</text>
-          <text class="bench-compare-cell">{{ row.visited }}</text>
-          <text class="bench-compare-cell">{{ row.writes }}</text>
-          <text class="bench-compare-cell">{{ row.commits }}</text>
+          <text class="bench-compare-label">
+            {{ row.label }}
+          </text>
+          <text class="bench-compare-cell">
+            {{ row.visited }}
+          </text>
+          <text class="bench-compare-cell">
+            {{ row.writes }}
+          </text>
+          <text class="bench-compare-cell">
+            {{ row.commits }}
+          </text>
         </view>
-        <text class="note-text">{{
-          `Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a VISITED or WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. The ms is the reconcile window and it CONTAINS the createNode/appendChild JSI calls, so compare it across adapters, never read it as engine JS.`
-        }}</text>
+        <text class="note-text">
+          {{
+            `Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a VISITED or WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. The ms is the reconcile window and it CONTAINS the createNode/appendChild JSI calls, so compare it across adapters, never read it as engine JS.`
+          }}
+        </text>
       </template>
 
       <template v-if="hasSuiteResults">
-        <text class="section-label">FABRIC CALLS · ALL MOUNTED</text>
+        <text class="section-label">
+          FABRIC CALLS · ALL MOUNTED
+        </text>
         <view class="bench-compare-row">
           <text class="bench-compare-label" />
-          <text class="bench-compare-head-cell">CREATE/APPEND/CLONE</text>
-          <text class="bench-compare-head-cell">PROP KEYS</text>
+          <text class="bench-compare-head-cell">
+            CREATE/APPEND/CLONE
+          </text>
+          <text class="bench-compare-head-cell">
+            PROP KEYS
+          </text>
         </view>
         <view
           v-for="row in fabricRows"
@@ -989,32 +1044,44 @@ const rowItemLayout = (
           :testID="`bench-fabric-${row.op}`"
           class="bench-compare-row"
         >
-          <text class="bench-compare-label">{{ row.label }}</text>
-          <text class="bench-compare-cell">{{ row.calls }}</text>
-          <text class="bench-compare-cell">{{ row.propKeys }}</text>
+          <text class="bench-compare-label">
+            {{ row.label }}
+          </text>
+          <text class="bench-compare-cell">
+            {{ row.calls }}
+          </text>
+          <text class="bench-compare-cell">
+            {{ row.propKeys }}
+          </text>
         </view>
-        <text class="note-text">{{
-          `Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no reconcile walk to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`
-        }}</text>
+        <text class="note-text">
+          {{
+            `Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no reconcile walk to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`
+          }}
+        </text>
       </template>
 
-      <text class="note-text">{{
-        `Every operation in a fixed order, each timed step starting from exactly ${SUITE_ROWS} rows, with untimed resets in between. All-mounted is krausest's own shape (${NATIVE_VIEWS_PER_ROW} native views per row) and the column that compares to the published web numbers; virtualized mounts a window instead, so it prices what an app ships rather than the commit path itself. Pressing the operation buttons by hand leaves Remove and Append measuring whatever happened to be on screen.`
-      }}</text>
+      <text class="note-text">
+        {{
+          `Every operation in a fixed order, each timed step starting from exactly ${SUITE_ROWS} rows, with untimed resets in between. All-mounted is krausest's own shape (${NATIVE_VIEWS_PER_ROW} native views per row) and the column that compares to the published web numbers; virtualized mounts a window instead, so it prices what an app ships rather than the commit path itself. Pressing the operation buttons by hand leaves Remove and Append measuring whatever happened to be on screen.`
+        }}
+      </text>
 
       <!-- Both sticky paths and the row list sit under the buttons: the meter above stays on
         screen while either box is being dragged — the concrete case the benchmark exists for. -->
       <BenchmarkStickyScroll />
       <BenchmarkStickySectionList />
-      <text class="note-text"
-        >Drag inside a box (not the page) and watch the counters above — the two
+      <text class="note-text">
+        Drag inside a box (not the page) and watch the counters above — the two
         boxes differ only in which sticky implementation carries the
-        frame.</text
-      >
+        frame.
+      </text>
 
-      <text class="section-label">{{
-        isAllMounted ? 'ROWS · ALL MOUNTED' : 'ROWS · VIRTUALIZED'
-      }}</text>
+      <text class="section-label">
+        {{
+          isAllMounted ? 'ROWS · ALL MOUNTED' : 'ROWS · VIRTUALIZED'
+        }}
+      </text>
       <template v-if="isAllMounted">
         <BenchmarkRow
           v-for="row in rows"
@@ -1046,7 +1113,9 @@ const rowItemLayout = (
       <!-- Below the fold on purpose: the single operations are for poking at one commit shape
         while debugging, not for reporting. Their Remove and Append numbers depend on press order,
         which is exactly what the suite above exists to remove. -->
-      <text class="section-label">OPERATIONS · LAST RUN</text>
+      <text class="section-label">
+        OPERATIONS · LAST RUN
+      </text>
       <view
         v-for="operation in operations"
         :key="operation.id"
@@ -1063,29 +1132,41 @@ const rowItemLayout = (
         <text
           :testID="`bench-result-${operation.id}`"
           class="bench-op-result"
-          >{{ formatDuration(lastDurations.get(operation.id)) }}</text
         >
+          {{ formatDuration(lastDurations.get(operation.id)) }}
+        </text>
       </view>
 
-      <text testID="bench-row-count" class="info-text">{{
-        `rows: ${rows.length} · ${mountedViews} native views mounted · selected: ${selectedId ?? 'none'}`
-      }}</text>
-
-      <text class="section-label">{{
-        `HISTORY · LAST ${HISTORY_LIMIT} MEASUREMENTS`
-      }}</text>
-      <text v-if="history.length === 0" class="note-text"
-        >Run an operation above to record a measurement.</text
+      <text
+        testID="bench-row-count"
+        class="info-text"
       >
+        {{
+          `rows: ${rows.length} · ${mountedViews} native views mounted · selected: ${selectedId ?? 'none'}`
+        }}
+      </text>
+
+      <text class="section-label">
+        {{
+          `HISTORY · LAST ${HISTORY_LIMIT} MEASUREMENTS`
+        }}
+      </text>
+      <text
+        v-if="history.length === 0"
+        class="note-text"
+      >
+        Run an operation above to record a measurement.
+      </text>
       <template v-else>
         <text
           v-for="entry in history"
           :key="entry.seq"
           class="bench-history-row"
-          >{{
-            `${entry.label} — ${formatDuration(entry.durationMs)} · ${entry.rowCount} rows`
-          }}</text
         >
+          {{
+            `${entry.label} — ${formatDuration(entry.durationMs)} · ${entry.rowCount} rows`
+          }}
+        </text>
       </template>
     </scroll-view>
   </safe-area-view>

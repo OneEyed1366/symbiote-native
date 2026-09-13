@@ -65,26 +65,37 @@ function bumpDeep(): void {
 
 <template>
   <view class="a11y-card">
-    <text class="switch-label"
-      >reactive/shallowReactive/readonly/shallowReadonly/toRaw/markRaw +
-      predicates</text
+    <text class="switch-label">
+      reactive/shallowReactive/readonly/shallowReadonly/toRaw/markRaw +
+      predicates
+    </text>
+    <text
+      class="list-row-text"
+      testID="checks-deep-n"
     >
-    <text class="list-row-text" testID="checks-deep-n">{{
-      `reactive({n}).n = ${deep.n} (live)`
-    }}</text>
+      {{
+        `reactive({n}).n = ${deep.n} (live)`
+      }}
+    </text>
     <ActionButton
       testID="checks-bump-deep"
       title="deep.n++"
       :onPress="bumpDeep"
       color="#f5a623"
     />
-    <text class="note-text"
-      >readonly()'s block isn't demoed interactively — mutating it would need
+    <text class="note-text">
+      readonly()'s block isn't demoed interactively — mutating it would need
       TypeScript's DeepReadonly&lt;T&gt; suppressed just for this button, not
-      worth adding to app code.</text
+      worth adding to app code.
+    </text>
+    <text
+      v-for="(entry, index) in checks"
+      :key="index"
+      class="list-row-text"
     >
-    <text v-for="(entry, index) in checks" :key="index" class="list-row-text">{{
-      entry
-    }}</text>
+      {{
+        entry
+      }}
+    </text>
   </view>
 </template>

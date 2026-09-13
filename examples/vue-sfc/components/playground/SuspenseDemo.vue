@@ -19,9 +19,9 @@ const loadKey = ref(0);
 
 <template>
   <view class="section-tight">
-    <text class="section-label"
-      >&lt;Suspense&gt; + an async setup() component</text
-    >
+    <text class="section-label">
+      &lt;Suspense&gt; + an async setup() component
+    </text>
     <ActionButton
       testID="suspense-reload"
       title="Reload async content"
@@ -34,9 +34,12 @@ const loadKey = ref(0);
       </template>
       <template #fallback>
         <view class="a11y-card">
-          <text class="note-text" testID="suspense-fallback"
-            >loading async payload…</text
+          <text
+            class="note-text"
+            testID="suspense-fallback"
           >
+            loading async payload…
+          </text>
         </view>
       </template>
     </Suspense>

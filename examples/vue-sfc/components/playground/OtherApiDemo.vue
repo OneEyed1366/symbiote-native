@@ -123,21 +123,26 @@ const asyncLoadTriggered = ref(false);
 
 <template>
   <view class="section-tight">
-    <text class="section-label"
-      >Other —
-      h()/createVNode/cloneVNode/isVNode/Fragment/withDirectives/mergeProps</text
-    >
+    <text class="section-label">
+      Other —
+      h()/createVNode/cloneVNode/isVNode/Fragment/withDirectives/mergeProps
+    </text>
     <RenderVNode :node="baseVNode" />
     <RenderVNode :node="clonedVNode" />
     <RenderVNode :node="fragmentVNode" />
-    <text class="note-text" testID="other-is-vnode">{{
-      `isVNode(baseVNode)=${isVNodeCheck}`
-    }}</text>
-
-    <text class="note-text"
-      >withDirectives() — the SAME v-highlight directive as the Template
-      Directives demo, applied programmatically</text
+    <text
+      class="note-text"
+      testID="other-is-vnode"
     >
+      {{
+        `isVNode(baseVNode)=${isVNodeCheck}`
+      }}
+    </text>
+
+    <text class="note-text">
+      withDirectives() — the SAME v-highlight directive as the Template
+      Directives demo, applied programmatically
+    </text>
     <ActionButton
       testID="other-toggle-glow"
       :title="glowOn ? 'glow: on' : 'glow: off'"
@@ -146,39 +151,52 @@ const asyncLoadTriggered = ref(false);
     />
     <RenderVNode :node="directedVNode" />
 
-    <text class="note-text"
-      >defineAsyncComponent — loadingComponent → resolved component, with a
-      150ms delay before the loader shows</text
-    >
+    <text class="note-text">
+      defineAsyncComponent — loadingComponent → resolved component, with a
+      150ms delay before the loader shows
+    </text>
     <ActionButton
       testID="other-load-async"
       title="load async component"
       :onPress="() => (asyncLoadTriggered = true)"
       color="#f5a623"
     />
-    <component :is="AsyncWidget" v-if="asyncLoadTriggered" />
+    <component
+      :is="AsyncWidget"
+      v-if="asyncLoadTriggered"
+    />
 
-    <text class="note-text"
-      >withModifiers() — programmatic form, the .stop modifier bound by hand
+    <text class="note-text">
+      withModifiers() — programmatic form, the .stop modifier bound by hand
       instead of via @press.stop (needs the real press event, unlike
-      ActionButton's zero-arg onPress, so this uses a plain Pressable)</text
-    >
+      ActionButton's zero-arg onPress, so this uses a plain Pressable)
+    </text>
     <pressable
       testID="other-modifier-press"
       class="chip"
       :onPress="onModifierPress"
     >
-      <text class="chip-text">press (wrapped in withModifiers)</text>
+      <text class="chip-text">
+        press (wrapped in withModifiers)
+      </text>
     </pressable>
-    <text class="note-text" testID="other-modifier-log">{{
-      modifierLog.join(' · ') || '(not pressed yet)'
-    }}</text>
+    <text
+      class="note-text"
+      testID="other-modifier-log"
+    >
+      {{
+        modifierLog.join(' · ') || '(not pressed yet)'
+      }}
+    </text>
 
-    <text class="note-text" testID="other-css-module-gap"
-      >useCssModule() — real function now, but unreachable here: this project's
+    <text
+      class="note-text"
+      testID="other-css-module-gap"
+    >
+      useCssModule() — real function now, but unreachable here: this project's
       &lt;style module&gt; compiler emits a plain `$style` const, not the
       `__cssModules` instance option this function reads (see the file header
-      comment above).</text
-    >
+      comment above).
+    </text>
   </view>
 </template>

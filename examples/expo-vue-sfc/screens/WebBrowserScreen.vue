@@ -97,29 +97,43 @@ function handleCoolDown(): void {
       content-container-style="scroll-content"
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: lineColor }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Web Browser</text>
-          <text class="hero-body"
-            >@symbiote-native/web-browser — an in-app browser that keeps the
+          <text class="hero-title">
+            Web Browser
+          </text>
+          <text class="hero-body">
+            @symbiote-native/web-browser — an in-app browser that keeps the
             user inside the app, unlike Linking.openURL, plus the OAuth auth
-            session built on it.</text
-          >
+            session built on it.
+          </text>
         </view>
       </view>
 
-      <view testID="web-browser-open-card" class="web-browser-card">
-        <text class="web-browser-card-title">Open a page</text>
+      <view
+        testID="web-browser-open-card"
+        class="web-browser-card"
+      >
+        <text class="web-browser-card-title">
+          Open a page
+        </text>
         <text-input
-          testID="web-browser-url-input"
           v-model="url"
+          testID="web-browser-url-input"
           placeholder="https://example.com"
           placeholder-text-color="#41506a"
           class="text-input"
@@ -139,16 +153,23 @@ function handleCoolDown(): void {
           :color="lineColor"
         />
         <view class="web-browser-row">
-          <text class="web-browser-row-label">Last result</text>
-          <text testID="web-browser-result" class="web-browser-value-text">{{
-            lastResult
-          }}</text>
+          <text class="web-browser-row-label">
+            Last result
+          </text>
+          <text
+            testID="web-browser-result"
+            class="web-browser-value-text"
+          >
+            {{
+              lastResult
+            }}
+          </text>
         </view>
-        <text class="web-browser-note"
-          >iOS resolves once the browser closes (cancel, or dismiss when closed
+        <text class="web-browser-note">
+          iOS resolves once the browser closes (cancel, or dismiss when closed
           from code); Android resolves opened as soon as the Custom Tab launches
-          and never reports the close. Dismiss is iOS-only.</text
-        >
+          and never reports the close. Dismiss is iOS-only.
+        </text>
       </view>
 
       <view
@@ -156,7 +177,9 @@ function handleCoolDown(): void {
         testID="web-browser-custom-tabs-card"
         class="web-browser-card"
       >
-        <text class="web-browser-card-title">Custom Tabs service</text>
+        <text class="web-browser-card-title">
+          Custom Tabs service
+        </text>
         <ActionButton
           testID="web-browser-list-browsers-button"
           title="List supporting browsers"
@@ -164,10 +187,17 @@ function handleCoolDown(): void {
           :color="lineColor"
         />
         <view class="web-browser-row">
-          <text class="web-browser-row-label">Browsers</text>
-          <text testID="web-browser-browsers" class="web-browser-value-text">{{
-            supportingBrowsers ?? '(not queried)'
-          }}</text>
+          <text class="web-browser-row-label">
+            Browsers
+          </text>
+          <text
+            testID="web-browser-browsers"
+            class="web-browser-value-text"
+          >
+            {{
+              supportingBrowsers ?? '(not queried)'
+            }}
+          </text>
         </view>
         <ActionButton
           testID="web-browser-warm-up-button"
@@ -182,17 +212,20 @@ function handleCoolDown(): void {
           :color="lineColor"
         />
         <view class="web-browser-row">
-          <text class="web-browser-row-label">Service package</text>
+          <text class="web-browser-row-label">
+            Service package
+          </text>
           <text
             testID="web-browser-service-package"
             class="web-browser-value-text"
-            >{{ servicePackage ?? '(not warmed up)' }}</text
           >
+            {{ servicePackage ?? '(not warmed up)' }}
+          </text>
         </view>
-        <text class="web-browser-note"
-          >Android only. Listing the browsers throws on iOS, so this whole card
-          is behind a Platform.OS check.</text
-        >
+        <text class="web-browser-note">
+          Android only. Listing the browsers throws on iOS, so this whole card
+          is behind a Platform.OS check.
+        </text>
       </view>
     </scroll-view>
   </safe-area-view>

@@ -23,12 +23,22 @@ const tone = 'scoped-from-child';
 
 <template>
   <view class="a11y-card">
-    <text class="switch-label">SlotsDemoCard</text>
+    <text class="switch-label">
+      SlotsDemoCard
+    </text>
     <slot />
-    <slot name="body" :tone="tone" />
-    <text class="note-text" testID="slots-has-footer">{{
-      `useSlots(): footer slot passed = ${hasFooter}`
-    }}</text>
+    <slot
+      name="body"
+      :tone="tone"
+    />
+    <text
+      class="note-text"
+      testID="slots-has-footer"
+    >
+      {{
+        `useSlots(): footer slot passed = ${hasFooter}`
+      }}
+    </text>
     <slot name="footer" />
   </view>
 </template>

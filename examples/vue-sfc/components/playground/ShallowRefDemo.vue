@@ -25,10 +25,17 @@ function mutateAndTrigger(): void {
 
 <template>
   <view class="a11y-card">
-    <text class="switch-label">shallowRef + triggerRef</text>
-    <text class="list-row-text" testID="shallowref-tick">{{
-      `box.value.tick (as last rendered) = ${box.tick}`
-    }}</text>
+    <text class="switch-label">
+      shallowRef + triggerRef
+    </text>
+    <text
+      class="list-row-text"
+      testID="shallowref-tick"
+    >
+      {{
+        `box.value.tick (as last rendered) = ${box.tick}`
+      }}
+    </text>
     <view class="row-tight">
       <ActionButton
         testID="shallowref-mutate-silent"

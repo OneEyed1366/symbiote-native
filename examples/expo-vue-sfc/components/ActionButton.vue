@@ -9,6 +9,8 @@
   surface byte-for-byte across every screen that uses it.
 -->
 <script setup lang="ts">
+import type { IPressState } from '@symbiote-native/components';
+
 const props = defineProps<{
   title: string;
   onPress: () => void;
@@ -20,7 +22,7 @@ const props = defineProps<{
 // `<pressable>` tag because the ENGINE resolves it: `routeProp`'s `isStyleCallback` evaluates the
 // callback at both values of `pressed` and swaps the pressed one in while the node is held
 // (`core/engine/src/node.ts`). No component has to read press state for this.
-const actionButtonStyle = ({ pressed }: { pressed: boolean }) => ({
+const actionButtonStyle = ({ pressed }: IPressState) => ({
   borderColor: props.color,
   opacity: pressed ? 0.6 : 1,
 });
@@ -29,10 +31,15 @@ const actionButtonStyle = ({ pressed }: { pressed: boolean }) => ({
 <template>
   <pressable
     :testID="testID"
-    @press="onPress"
     class="action-button"
     :style="actionButtonStyle"
+    @press="onPress"
   >
-    <text class="action-button-text" :style="{ color }">{{ title }}</text>
+    <text
+      class="action-button-text"
+      :style="{ color }"
+    >
+      {{ title }}
+    </text>
   </pressable>
 </template>

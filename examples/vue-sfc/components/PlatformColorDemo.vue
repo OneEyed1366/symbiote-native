@@ -17,15 +17,19 @@ const scheme = useColorScheme();
 
 <template>
   <view class="section-nested">
-    <text class="section-label">{{
-      `PlatformColor · semantic + DynamicColorIOS (${scheme ?? 'unknown'})`
-    }}</text>
+    <text class="section-label">
+      {{
+        `PlatformColor · semantic + DynamicColorIOS (${scheme ?? 'unknown'})`
+      }}
+    </text>
     <view class="row">
       <view
         class="color-tile"
         :style="{ backgroundColor: PlatformColor('systemBlue') }"
       >
-        <text class="tile-label">systemBlue</text>
+        <text class="tile-label">
+          systemBlue
+        </text>
       </view>
       <view
         class="color-tile-bordered"
@@ -37,9 +41,12 @@ const scheme = useColorScheme();
           borderColor: PlatformColor('separator'),
         }"
       >
-        <text class="bold-label" :style="{ color: PlatformColor('label') }"
-          >dynamic</text
+        <text
+          class="bold-label"
+          :style="{ color: PlatformColor('label') }"
         >
+          dynamic
+        </text>
       </view>
     </view>
   </view>

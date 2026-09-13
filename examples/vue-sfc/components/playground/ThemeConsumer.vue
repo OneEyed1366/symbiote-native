@@ -21,12 +21,23 @@ const instanceName = getCurrentInstance()?.type.name ?? 'unnamed';
 </script>
 
 <template>
-  <view class="a11y-card" :style="{ borderWidth: 1, borderColor: '#f5a623' }">
-    <text class="note-text" :testID="`theme-consumer-depth-${depth}`">{{
-      theme === undefined
-        ? `depth ${depth}: no theme provided`
-        : `depth ${depth}: injected tone = "${theme.tone}" · hasInjectionContext()=${hadContext} · instance=${instanceName}`
-    }}</text>
-    <ThemeConsumer v-if="depth < 2" :depth="depth + 1" />
+  <view
+    class="a11y-card"
+    :style="{ borderWidth: 1, borderColor: '#f5a623' }"
+  >
+    <text
+      class="note-text"
+      :testID="`theme-consumer-depth-${depth}`"
+    >
+      {{
+        theme === undefined
+          ? `depth ${depth}: no theme provided`
+          : `depth ${depth}: injected tone = "${theme.tone}" · hasInjectionContext()=${hadContext} · instance=${instanceName}`
+      }}
+    </text>
+    <ThemeConsumer
+      v-if="depth < 2"
+      :depth="depth + 1"
+    />
   </view>
 </template>

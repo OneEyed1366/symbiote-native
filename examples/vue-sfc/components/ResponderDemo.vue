@@ -85,43 +85,51 @@ const onChipRelease = (index: number): void => {
 
 <template>
   <view class="section-tight">
-    <text class="section-label"
-      >Responder · drag a chip vs hand-off to the strip</text
-    >
-    <text class="info-text">{{ status }}</text>
+    <text class="section-label">
+      Responder · drag a chip vs hand-off to the strip
+    </text>
+    <text class="info-text">
+      {{ status }}
+    </text>
     <!-- the separate transfer indicator, lit only when the strip steals the gesture -->
     <text
       class="transfer-text"
       :style="{ color: transfer ? '#f6ad55' : '#41506a' }"
-      >{{ transfer || 'transfer: —' }}</text
     >
+      {{ transfer || 'transfer: —' }}
+    </text>
     <view
+      class="strip-box"
       @move-should-set-responder="onStripMoveShouldSet"
       @responder-grant="onStripGrant"
       @responder-move="onStripMove"
       @responder-release="onStripRelease"
       @responder-terminate="onStripTerminate"
-      class="strip-box"
     >
-      <view class="row-tight" :style="{ transform: [{ translateX: rowDx }] }">
+      <view
+        class="row-tight"
+        :style="{ transform: [{ translateX: rowDx }] }"
+      >
         <view
           v-for="index in RESPONDER_CHIPS"
           :key="index"
           :testID="`resp-chip-${index}`"
-          @start-should-set-responder="onChipStartShouldSet"
-          @responder-grant="event => onChipGrant(index, event)"
-          @responder-move="event => onChipMove(index, event)"
-          @responder-termination-request="onChipTerminationRequest"
-          @responder-terminate="onChipTerminate"
-          @responder-release="() => onChipRelease(index)"
           class="chip"
           :style="{
             borderColor:
               activeChip === index ? CHIP_ACTIVE_BORDER : 'transparent',
             transform: [{ translateX: activeChip === index ? chipDx : 0 }],
           }"
+          @start-should-set-responder="onChipStartShouldSet"
+          @responder-grant="event => onChipGrant(index, event)"
+          @responder-move="event => onChipMove(index, event)"
+          @responder-termination-request="onChipTerminationRequest"
+          @responder-terminate="onChipTerminate"
+          @responder-release="() => onChipRelease(index)"
         >
-          <text class="chip-text">{{ index }}</text>
+          <text class="chip-text">
+            {{ index }}
+          </text>
         </view>
       </view>
     </view>

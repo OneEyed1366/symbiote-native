@@ -53,11 +53,21 @@ function throwNow(): void {
 </script>
 
 <template>
-  <view class="a11y-card" :style="{ borderWidth: 1, borderColor: '#f5a623' }">
-    <text class="switch-label">LifecycleLogChild</text>
-    <text class="note-text" testID="lifecycle-seed">{{
-      `seed prop = ${seed} — bump it from the parent to fire onBeforeUpdate/onUpdated`
-    }}</text>
+  <view
+    class="a11y-card"
+    :style="{ borderWidth: 1, borderColor: '#f5a623' }"
+  >
+    <text class="switch-label">
+      LifecycleLogChild
+    </text>
+    <text
+      class="note-text"
+      testID="lifecycle-seed"
+    >
+      {{
+        `seed prop = ${seed} — bump it from the parent to fire onBeforeUpdate/onUpdated`
+      }}
+    </text>
     <ActionButton
       testID="lifecycle-throw"
       title="throw() → onErrorCaptured + errorHandler"

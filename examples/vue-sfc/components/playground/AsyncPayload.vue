@@ -16,9 +16,14 @@ const payload = await loadPayload();
 
 <template>
   <view class="a11y-card">
-    <text class="switch-label" testID="suspense-resolved"
-      >async payload resolved</text
+    <text
+      class="switch-label"
+      testID="suspense-resolved"
     >
-    <text class="note-text">{{ `fetched at ${payload.fetchedAt}` }}</text>
+      async payload resolved
+    </text>
+    <text class="note-text">
+      {{ `fetched at ${payload.fetchedAt}` }}
+    </text>
   </view>
 </template>

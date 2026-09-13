@@ -36,46 +36,72 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HeaderOptions];
   <safe-area-view class="screen">
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
         <view
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.presentation }"
         >
-          <text class="hero-badge-text">HD</text>
+          <text class="hero-badge-text">
+            HD
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Header options</text>
-          <text class="hero-body"
-            >Bar buttons, a right-side menu, a native search bar, and
+          <text class="hero-title">
+            Header options
+          </text>
+          <text class="hero-body">
+            Bar buttons, a right-side menu, a native search bar, and
             headerLargeTitle — every headerSearchBarOptions callback wired to a
-            live control below.</text
-          >
+            live control below.
+          </text>
         </view>
       </view>
-      <text class="info-text"
-        >headerLargeTitle · headerTintColor · headerStyle.backgroundColor</text
+      <text class="info-text">
+        headerLargeTitle · headerTintColor · headerStyle.backgroundColor
+      </text>
+      <text
+        testID="header-last-action"
+        class="info-text"
       >
-      <text testID="header-last-action" class="info-text">{{
-        `last header action: ${params.lastHeaderAction ?? 'none yet — tap a bar button or menu item'}`
-      }}</text>
-      <text testID="header-search-text" class="info-text">{{
-        `last search text: ${params.lastSearchText ?? 'none yet — pull down and type'}`
-      }}</text>
-      <text testID="header-search-submitted" class="info-text">{{
-        `last search submitted: ${params.lastSearchSubmitted ?? 'none yet — type and press search'}`
-      }}</text>
-      <text testID="header-search-event" class="info-text">{{
-        `last search bar event: ${params.lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar'}`
-      }}</text>
-      <text class="note-text"
-        >Pull down to reveal the search bar (headerSearchBarOptions), or use the
+        {{
+          `last header action: ${params.lastHeaderAction ?? 'none yet — tap a bar button or menu item'}`
+        }}
+      </text>
+      <text
+        testID="header-search-text"
+        class="info-text"
+      >
+        {{
+          `last search text: ${params.lastSearchText ?? 'none yet — pull down and type'}`
+        }}
+      </text>
+      <text
+        testID="header-search-submitted"
+        class="info-text"
+      >
+        {{
+          `last search submitted: ${params.lastSearchSubmitted ?? 'none yet — type and press search'}`
+        }}
+      </text>
+      <text
+        testID="header-search-event"
+        class="info-text"
+      >
+        {{
+          `last search bar event: ${params.lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar'}`
+        }}
+      </text>
+      <text class="note-text">
+        Pull down to reveal the search bar (headerSearchBarOptions), or use the
         buttons below to drive it imperatively through its SearchBarCommands
-        ref.</text
-      >
+        ref.
+      </text>
       <ActionButton
         testID="search-bar-focus"
         title="Focus search bar"

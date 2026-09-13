@@ -48,21 +48,30 @@ function handleRequest(): void {
       content-container-style="scroll-content"
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: lineColor }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Tracking Transparency</text>
-          <text class="hero-body"
-            >@symbiote-native/tracking-transparency — App Tracking Transparency
+          <text class="hero-title">
+            Tracking Transparency
+          </text>
+          <text class="hero-body">
+            @symbiote-native/tracking-transparency — App Tracking Transparency
             permission status plus the advertising ID it gates. Android/web
-            always report granted.</text
-          >
+            always report granted.
+          </text>
         </view>
       </view>
 
@@ -70,27 +79,36 @@ function handleRequest(): void {
         testID="tracking-transparency-permission-card"
         class="tracking-transparency-card"
       >
-        <text class="tracking-transparency-card-title">Permission</text>
+        <text class="tracking-transparency-card-title">
+          Permission
+        </text>
         <view class="tracking-transparency-row">
-          <text class="tracking-transparency-row-label">Status</text>
+          <text class="tracking-transparency-row-label">
+            Status
+          </text>
           <text
             testID="tracking-transparency-status-value"
             class="tracking-transparency-value-text"
-            >{{ statusText }}</text
           >
+            {{ statusText }}
+          </text>
         </view>
         <view class="tracking-transparency-row">
-          <text class="tracking-transparency-row-label">Granted</text>
+          <text class="tracking-transparency-row-label">
+            Granted
+          </text>
           <view
             :class="`tracking-transparency-status-badge tracking-transparency-status-badge-${grantedStatus}`"
           >
-            <text class="tracking-transparency-status-text">{{
-              grantedStatus === 'checking'
-                ? 'CHECKING…'
-                : grantedStatus === 'yes'
-                  ? 'YES'
-                  : 'NO'
-            }}</text>
+            <text class="tracking-transparency-status-text">
+              {{
+                grantedStatus === 'checking'
+                  ? 'CHECKING…'
+                  : grantedStatus === 'yes'
+                    ? 'YES'
+                    : 'NO'
+              }}
+            </text>
           </view>
         </view>
         <view class="button-row">
@@ -113,13 +131,16 @@ function handleRequest(): void {
         testID="tracking-transparency-advertising-id-card"
         class="tracking-transparency-card"
       >
-        <text class="tracking-transparency-card-title">Advertising ID</text>
+        <text class="tracking-transparency-card-title">
+          Advertising ID
+        </text>
         <view class="tracking-transparency-result-box">
           <text
             testID="tracking-transparency-advertising-id-value"
             class="tracking-transparency-result-text"
-            >{{ advertisingId ?? 'null' }}</text
           >
+            {{ advertisingId ?? 'null' }}
+          </text>
         </view>
       </view>
     </scroll-view>

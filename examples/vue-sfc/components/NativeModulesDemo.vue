@@ -79,14 +79,16 @@ const prefetchLogo = (): void => {
 
 <template>
   <view class="section-nested">
-    <text class="section-label"
-      >Runtime modules · I18nManager / Settings / Image statics</text
-    >
+    <text class="section-label">
+      Runtime modules · I18nManager / Settings / Image statics
+    </text>
 
     <!-- I18nManager: RTL layout constants, read live -->
-    <text class="info-text">{{
-      `RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`
-    }}</text>
+    <text class="info-text">
+      {{
+        `RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`
+      }}
+    </text>
     <ActionButton
       :title="
         rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'
@@ -96,9 +98,14 @@ const prefetchLogo = (): void => {
     />
 
     <!-- Settings: counter persisted to NSUserDefaults, survives a relaunch -->
-    <text testID="persist-count" class="info-text">{{
-      `persisted taps: ${persisted} · survives relaunch`
-    }}</text>
+    <text
+      testID="persist-count"
+      class="info-text"
+    >
+      {{
+        `persisted taps: ${persisted} · survives relaunch`
+      }}
+    </text>
     <ActionButton
       testID="persist-btn"
       title="Persist a tap"
@@ -108,13 +115,23 @@ const prefetchLogo = (): void => {
 
     <!-- Image statics: the rendered asset + getSize's measurement of it -->
     <view class="row-align-center">
-      <image :source="{ uri: LOGO_URI }" class="logo-thumb" />
-      <text testID="logo-size" class="info-text-flex">{{
-        `logo size: ${imageSize}`
-      }}</text>
+      <image
+        :source="{ uri: LOGO_URI }"
+        class="logo-thumb"
+      />
+      <text
+        testID="logo-size"
+        class="info-text-flex"
+      >
+        {{
+          `logo size: ${imageSize}`
+        }}
+      </text>
     </view>
     <!-- prefetch warms a cold url: not cached → (tap) → cached -->
-    <text class="info-text">{{ `prefetch cache: ${cacheState}` }}</text>
+    <text class="info-text">
+      {{ `prefetch cache: ${cacheState}` }}
+    </text>
     <ActionButton
       title="Prefetch logo"
       :onPress="prefetchLogo"

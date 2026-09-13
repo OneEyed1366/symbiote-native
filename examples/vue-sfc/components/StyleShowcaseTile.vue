@@ -13,8 +13,12 @@ defineProps<{
 
 <template>
   <view class="sc-pair-half">
-    <text class="sc-tile-label">{{ label }}</text>
+    <text class="sc-tile-label">
+      {{ label }}
+    </text>
     <slot />
-    <text class="sc-tile-caption">{{ caption }}</text>
+    <text class="sc-tile-caption">
+      {{ caption }}
+    </text>
   </view>
 </template>

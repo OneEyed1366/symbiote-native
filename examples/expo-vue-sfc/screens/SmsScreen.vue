@@ -60,44 +60,70 @@ function handleSend(): void {
       content-container-style="scroll-content"
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: lineColor }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">SMS</text>
-          <text class="hero-body"
-            >@symbiote-native/sms — opens the system SMS composer prefilled with
+          <text class="hero-title">
+            SMS
+          </text>
+          <text class="hero-body">
+            @symbiote-native/sms — opens the system SMS composer prefilled with
             recipients and a message. The user still has to press send
-            themselves.</text
-          >
+            themselves.
+          </text>
         </view>
       </view>
 
-      <view testID="sms-capability-card" class="sms-card">
-        <text class="sms-card-title">Capabilities</text>
-        <view testID="sms-available" class="sms-row">
-          <text class="sms-row-label">Available</text>
+      <view
+        testID="sms-capability-card"
+        class="sms-card"
+      >
+        <text class="sms-card-title">
+          Capabilities
+        </text>
+        <view
+          testID="sms-available"
+          class="sms-row"
+        >
+          <text class="sms-row-label">
+            Available
+          </text>
           <view :class="`sms-status-badge sms-status-badge-${isAvailable}`">
-            <text class="sms-status-text">{{ toBadgeText(isAvailable) }}</text>
+            <text class="sms-status-text">
+              {{ toBadgeText(isAvailable) }}
+            </text>
           </view>
         </view>
-        <text class="sms-note"
-          >NO on the iOS simulator, which ships no Messages app, and on Android
+        <text class="sms-note">
+          NO on the iOS simulator, which ships no Messages app, and on Android
           devices without telephony hardware. A real iPhone or an Android device
-          with a SIM reports YES.</text
-        >
+          with a SIM reports YES.
+        </text>
       </view>
 
-      <view testID="sms-compose-card" class="sms-card">
-        <text class="sms-card-title">Compose</text>
+      <view
+        testID="sms-compose-card"
+        class="sms-card"
+      >
+        <text class="sms-card-title">
+          Compose
+        </text>
         <text-input
-          testID="sms-recipients-input"
           v-model="recipients"
+          testID="sms-recipients-input"
           placeholder="Recipients, comma-separated"
           placeholder-text-color="#41506a"
           class="text-input"
@@ -105,8 +131,8 @@ function handleSend(): void {
           :auto-correct="false"
         />
         <text-input
-          testID="sms-message-input"
           v-model="message"
+          testID="sms-message-input"
           placeholder="Message"
           placeholder-text-color="#41506a"
           class="text-input"
@@ -118,17 +144,24 @@ function handleSend(): void {
           :color="lineColor"
         />
         <view class="sms-row">
-          <text class="sms-row-label">Last result</text>
-          <text testID="sms-result" class="sms-value-text">{{
-            lastResult
-          }}</text>
+          <text class="sms-row-label">
+            Last result
+          </text>
+          <text
+            testID="sms-result"
+            class="sms-value-text"
+          >
+            {{
+              lastResult
+            }}
+          </text>
         </view>
-        <text class="sms-note"
-          >iOS reports sent or cancelled; Android always reports unknown,
+        <text class="sms-note">
+          iOS reports sent or cancelled; Android always reports unknown,
           because reading the real outcome needs the READ_SMS permission Google
           restricts to default-SMS-app publishers. Treat unknown as "the
-          composer closed".</text
-        >
+          composer closed".
+        </text>
       </view>
     </scroll-view>
   </safe-area-view>

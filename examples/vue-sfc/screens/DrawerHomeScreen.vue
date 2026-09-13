@@ -17,29 +17,35 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DrawerDemo];
   <safe-area-view class="screen">
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
         <view
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.structure }"
         >
-          <text class="hero-badge-text">DR</text>
+          <text class="hero-badge-text">
+            DR
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Drawer</text>
-          <text class="hero-body"
-            >A swipeable drawer sliding in from the right, driven by the
-            navigator's own gesture handler.</text
-          >
+          <text class="hero-title">
+            Drawer
+          </text>
+          <text class="hero-body">
+            A swipeable drawer sliding in from the right, driven by the
+            navigator's own gesture handler.
+          </text>
         </view>
       </view>
-      <text class="info-text"
-        >drawerPosition: right · drawerType: slide — swipe from the RIGHT edge,
-        or use a button</text
-      >
+      <text class="info-text">
+        drawerPosition: right · drawerType: slide — swipe from the RIGHT edge,
+        or use a button
+      </text>
       <ActionButton
         testID="drawer-open"
         title="Open drawer"

@@ -149,14 +149,16 @@ function lineInfoFor(route: ITourRouteName) {
       content-container-style="scroll-content"
     >
       <view class="menu-hero">
-        <text class="menu-eyebrow">EXPO MODULES DEMOS</text>
-        <text class="menu-hero-title"
-          >Expo-SDK ports on a real native stack</text
-        >
-        <text class="menu-hero-subtitle"
-          >Each row below demos a different @symbiote-native package built on
-          expo-modules-core.</text
-        >
+        <text class="menu-eyebrow">
+          EXPO MODULES DEMOS
+        </text>
+        <text class="menu-hero-title">
+          Expo-SDK ports on a real native stack
+        </text>
+        <text class="menu-hero-subtitle">
+          Each row below demos a different @symbiote-native package built on
+          expo-modules-core.
+        </text>
       </view>
       <pressable
         v-for="item in MENU_ITEMS"
@@ -166,16 +168,21 @@ function lineInfoFor(route: ITourRouteName) {
         @press="() => navigation.push(item.route)"
       >
         <view :class="`menu-badge menu-badge-${lineInfoFor(item.route).line}`">
-          <text class="menu-badge-text">{{
-            lineInfoFor(item.route).code
-          }}</text>
+          <text class="menu-badge-text">
+            {{
+              lineInfoFor(item.route).code
+            }}
+          </text>
         </view>
         <view class="menu-row-copy">
-          <text class="menu-row-label">{{ item.label }}</text>
+          <text class="menu-row-label">
+            {{ item.label }}
+          </text>
           <text
             :class="`menu-row-hint menu-row-hint-${lineInfoFor(item.route).line}`"
-            >{{ item.hint }}</text
           >
+            {{ item.hint }}
+          </text>
         </view>
       </pressable>
     </scroll-view>

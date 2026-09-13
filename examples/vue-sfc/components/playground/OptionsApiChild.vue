@@ -65,33 +65,57 @@ export default defineComponent({
     class="a11y-card"
     :style="{ borderWidth: 1, borderColor: '#f5a623' }"
   >
-    <text class="switch-label"
-      >OptionsApiChild — Options API, mixins + extends</text
+    <text class="switch-label">
+      OptionsApiChild — Options API, mixins + extends
+    </text>
+    <text
+      class="note-text"
+      testID="options-mixin-extends"
     >
-    <text class="note-text" testID="options-mixin-extends">{{
-      `props.seed=${seed} · extends → extendedFlag=${extendedFlag} · mixins → mixinHit=${mixinHit}`
-    }}</text>
-    <text class="note-text" testID="options-instance-props">{{
-      `mounted(): $refs.innerBox seen=${hasInnerRef} · $parent=${hasParent} · $root=${hasRoot} · $slots.default=${hasDefaultSlot}`
-    }}</text>
-    <text class="note-text">{{
-      `$attrs (inheritAttrs:false) = ${JSON.stringify($attrs)}`
-    }}</text>
-    <text class="note-text">{{
-      `app.config.globalProperties.$playgroundGreeting = ${$playgroundGreeting ?? 'not installed yet'}`
-    }}</text>
-    <text class="list-row-text" testID="options-count">{{
-      `count=${count}`
-    }}</text>
+      {{
+        `props.seed=${seed} · extends → extendedFlag=${extendedFlag} · mixins → mixinHit=${mixinHit}`
+      }}
+    </text>
+    <text
+      class="note-text"
+      testID="options-instance-props"
+    >
+      {{
+        `mounted(): $refs.innerBox seen=${hasInnerRef} · $parent=${hasParent} · $root=${hasRoot} · $slots.default=${hasDefaultSlot}`
+      }}
+    </text>
+    <text class="note-text">
+      {{
+        `$attrs (inheritAttrs:false) = ${JSON.stringify($attrs)}`
+      }}
+    </text>
+    <text class="note-text">
+      {{
+        `app.config.globalProperties.$playgroundGreeting = ${$playgroundGreeting ?? 'not installed yet'}`
+      }}
+    </text>
+    <text
+      class="list-row-text"
+      testID="options-count"
+    >
+      {{
+        `count=${count}`
+      }}
+    </text>
     <ActionButton
       testID="options-bump"
       title="bump() → $emit('ping')"
       :onPress="bump"
       color="#f5a623"
     />
-    <text class="list-row-text" testID="options-external-ticks">{{
-      `non-reactive external ticks (as last rendered)=${externalTicksSnapshot()}`
-    }}</text>
+    <text
+      class="list-row-text"
+      testID="options-external-ticks"
+    >
+      {{
+        `non-reactive external ticks (as last rendered)=${externalTicksSnapshot()}`
+      }}
+    </text>
     <view class="row-tight">
       <ActionButton
         testID="options-mutate-external"

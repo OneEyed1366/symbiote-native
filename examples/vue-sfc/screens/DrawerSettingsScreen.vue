@@ -13,11 +13,15 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DrawerDemo];
   <safe-area-view class="screen">
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
-      <text class="section-label">Drawer demo · Settings</text>
+      <text class="section-label">
+        Drawer demo · Settings
+      </text>
       <ActionButton
         testID="drawer-close-from-settings"
         title="Close drawer"

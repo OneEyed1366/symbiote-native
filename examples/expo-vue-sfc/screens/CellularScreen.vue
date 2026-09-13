@@ -99,68 +99,113 @@ const permissionLabel = computed(() =>
       content-container-style="scroll-content"
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: lineColor }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Cellular</text>
-          <text class="hero-body"
-            >@symbiote-native/cellular — cellular generation and carrier/SIM
+          <text class="hero-title">
+            Cellular
+          </text>
+          <text class="hero-body">
+            @symbiote-native/cellular — cellular generation and carrier/SIM
             info. Every field except generation is Android-only upstream
             (iOS/web return null); a physical device with an active SIM is
-            needed for real values.</text
-          >
+            needed for real values.
+          </text>
         </view>
       </view>
 
-      <view testID="cellular-info-card" class="cellular-card">
-        <text class="cellular-card-title">Cellular info</text>
+      <view
+        testID="cellular-info-card"
+        class="cellular-card"
+      >
+        <text class="cellular-card-title">
+          Cellular info
+        </text>
         <view class="cellular-row">
-          <text class="cellular-row-label">Generation</text>
+          <text class="cellular-row-label">
+            Generation
+          </text>
           <text
             testID="cellular-generation-value"
             class="cellular-value-text"
-            >{{ generationText }}</text
           >
+            {{ generationText }}
+          </text>
         </view>
         <template v-if="Platform.OS === 'android'">
           <view class="cellular-row">
-            <text class="cellular-row-label">Allows VoIP</text>
-            <text class="cellular-value-text">{{ allowsVoipText }}</text>
+            <text class="cellular-row-label">
+              Allows VoIP
+            </text>
+            <text class="cellular-value-text">
+              {{ allowsVoipText }}
+            </text>
           </view>
           <view class="cellular-row">
-            <text class="cellular-row-label">ISO country code</text>
-            <text class="cellular-value-text">{{ isoCountryCodeText }}</text>
+            <text class="cellular-row-label">
+              ISO country code
+            </text>
+            <text class="cellular-value-text">
+              {{ isoCountryCodeText }}
+            </text>
           </view>
           <view class="cellular-row">
-            <text class="cellular-row-label">Carrier name</text>
-            <text class="cellular-value-text">{{ carrierNameText }}</text>
+            <text class="cellular-row-label">
+              Carrier name
+            </text>
+            <text class="cellular-value-text">
+              {{ carrierNameText }}
+            </text>
           </view>
           <view class="cellular-row">
-            <text class="cellular-row-label">Mobile country code</text>
-            <text class="cellular-value-text">{{ mobileCountryCodeText }}</text>
+            <text class="cellular-row-label">
+              Mobile country code
+            </text>
+            <text class="cellular-value-text">
+              {{ mobileCountryCodeText }}
+            </text>
           </view>
           <view class="cellular-row">
-            <text class="cellular-row-label">Mobile network code</text>
-            <text class="cellular-value-text">{{ mobileNetworkCodeText }}</text>
+            <text class="cellular-row-label">
+              Mobile network code
+            </text>
+            <text class="cellular-value-text">
+              {{ mobileNetworkCodeText }}
+            </text>
           </view>
         </template>
       </view>
 
-      <view testID="cellular-permission-card" class="cellular-card">
-        <text class="cellular-card-title">Permission</text>
+      <view
+        testID="cellular-permission-card"
+        class="cellular-card"
+      >
+        <text class="cellular-card-title">
+          Permission
+        </text>
         <view class="cellular-row">
-          <text class="cellular-row-label">Phone-state permission status</text>
+          <text class="cellular-row-label">
+            Phone-state permission status
+          </text>
           <text
             testID="cellular-permission-value"
             class="cellular-value-text"
-            >{{ permissionLabel }}</text
           >
+            {{ permissionLabel }}
+          </text>
         </view>
         <ActionButton
           testID="cellular-request-permission"

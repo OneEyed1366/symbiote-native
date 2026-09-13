@@ -103,9 +103,9 @@ function runInAppContext(): void {
 
 <template>
   <view class="section-tight">
-    <text class="section-label"
-      >Global / Application API — driving the live `app` instance</text
-    >
+    <text class="section-label">
+      Global / Application API — driving the live `app` instance
+    </text>
     <ActionButton
       testID="global-register-component"
       :title="
@@ -127,7 +127,11 @@ function runInAppContext(): void {
       :onPress="registerRuntimeDirective"
       color="#f5a623"
     />
-    <view v-if="directiveRegistered" v-runtime-glow="true" class="chip" />
+    <view
+      v-if="directiveRegistered"
+      v-runtime-glow="true"
+      class="chip"
+    />
     <ActionButton
       testID="global-install-plugin"
       :title="
@@ -144,9 +148,13 @@ function runInAppContext(): void {
       :onPress="triggerWarnOutsideSetup"
       color="#f5a623"
     />
-    <text v-if="warnTriggered" class="note-text" testID="global-warn-triggered"
-      >inject() outside setup() called — see the warn log below</text
+    <text
+      v-if="warnTriggered"
+      class="note-text"
+      testID="global-warn-triggered"
     >
+      inject() outside setup() called — see the warn log below
+    </text>
     <ActionButton
       testID="global-run-with-context"
       title="app.runWithContext() → inject() outside setup, no warning"
@@ -157,11 +165,12 @@ function runInAppContext(): void {
       v-if="runWithContextResult !== undefined"
       class="list-row-text"
       testID="global-run-with-context-result"
-      >{{ `runWithContext() result: "${runWithContextResult}"` }}</text
     >
-    <text class="note-text"
-      >createApp() / app.mount() / app.unmount() are root-level singletons — see
-      adapters/vue/src/render.ts, not re-demoed on a screen.</text
-    >
+      {{ `runWithContext() result: "${runWithContextResult}"` }}
+    </text>
+    <text class="note-text">
+      createApp() / app.mount() / app.unmount() are root-level singletons — see
+      adapters/vue/src/render.ts, not re-demoed on a screen.
+    </text>
   </view>
 </template>

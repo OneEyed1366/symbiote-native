@@ -76,10 +76,14 @@ const scrollBy = (delta: number): void => {
 
 <template>
   <view class="section-nested">
-    <text class="section-label">Animated · ValueXY / tracking / diffClamp</text>
+    <text class="section-label">
+      Animated · ValueXY / tracking / diffClamp
+    </text>
 
     <!-- ValueXY box you drag with a finger (PanResponder) -->
-    <text class="drag-hint">drag the purple box →</text>
+    <text class="drag-hint">
+      drag the purple box →
+    </text>
     <view class="xy-frame">
       <Animated.View
         v-bind="panResponder.panHandlers"
@@ -115,7 +119,9 @@ const scrollBy = (delta: number): void => {
         class="collapse-header"
         :style="{ transform: [{ translateY: headerOffset }] }"
       >
-        <text class="collapse-header-text">collapsing header</text>
+        <text class="collapse-header-text">
+          collapsing header
+        </text>
       </Animated.View>
     </view>
     <view class="row-tight">

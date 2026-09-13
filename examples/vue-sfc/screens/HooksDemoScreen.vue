@@ -38,46 +38,65 @@ useFocusEffect(() => {
   <safe-area-view class="screen">
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
         <view
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.introspection }"
         >
-          <text class="hero-badge-text">HK</text>
+          <text class="hero-badge-text">
+            HK
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Hooks</text>
-          <text class="hero-body"
-            >useFocusEffect, useIsFocused, and useNavigationState —
+          <text class="hero-title">
+            Hooks
+          </text>
+          <text class="hero-body">
+            useFocusEffect, useIsFocused, and useNavigationState —
             introspecting the navigator's own live state from inside a
-            screen.</text
-          >
+            screen.
+          </text>
         </view>
       </view>
-      <text testID="hooks-is-focused" class="info-text">{{
-        `useIsFocused(): ${isFocused}`
-      }}</text>
-      <text testID="hooks-focus-count" class="info-text">{{
-        `useFocusEffect focus count: ${focusCount}`
-      }}</text>
-      <text class="info-text">{{
-        lastBlurAt === undefined
-          ? 'not blurred yet'
-          : `last blurred at ${lastBlurAt}`
-      }}</text>
-      <text class="section-label"
-        >useNavigationState() · current route stack</text
+      <text
+        testID="hooks-is-focused"
+        class="info-text"
       >
+        {{
+          `useIsFocused(): ${isFocused}`
+        }}
+      </text>
+      <text
+        testID="hooks-focus-count"
+        class="info-text"
+      >
+        {{
+          `useFocusEffect focus count: ${focusCount}`
+        }}
+      </text>
+      <text class="info-text">
+        {{
+          lastBlurAt === undefined
+            ? 'not blurred yet'
+            : `last blurred at ${lastBlurAt}`
+        }}
+      </text>
+      <text class="section-label">
+        useNavigationState() · current route stack
+      </text>
       <text
         v-for="(name, index) in routeNames"
         :key="`${name}-${index}`"
         class="list-row-text"
-        >{{ `${index}. ${name}` }}</text
       >
+        {{ `${index}. ${name}` }}
+      </text>
     </view>
   </safe-area-view>
 </template>

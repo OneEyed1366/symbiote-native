@@ -82,27 +82,41 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
       content-container-style="scroll-content"
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: lineColor }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Haptics</text>
-          <text class="hero-body"
-            >@symbiote-native/haptics — impact/notification/selection feedback
+          <text class="hero-title">
+            Haptics
+          </text>
+          <text class="hero-body">
+            @symbiote-native/haptics — impact/notification/selection feedback
             via iOS's Taptic Engine and Android's Vibrator API, plus a direct
             Android haptics-engine path. The Simulator plays no physical
-            feedback; a real device is needed to feel it.</text
-          >
+            feedback; a real device is needed to feel it.
+          </text>
         </view>
       </view>
 
-      <view testID="haptics-impact-card" class="haptics-card">
-        <text class="haptics-card-title">Impact</text>
+      <view
+        testID="haptics-impact-card"
+        class="haptics-card"
+      >
+        <text class="haptics-card-title">
+          Impact
+        </text>
         <view class="button-row">
           <ActionButton
             v-for="item in IMPACT_STYLES"
@@ -115,8 +129,13 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
         </view>
       </view>
 
-      <view testID="haptics-notification-card" class="haptics-card">
-        <text class="haptics-card-title">Notification</text>
+      <view
+        testID="haptics-notification-card"
+        class="haptics-card"
+      >
+        <text class="haptics-card-title">
+          Notification
+        </text>
         <view class="button-row">
           <ActionButton
             v-for="item in NOTIFICATION_TYPES"
@@ -129,8 +148,13 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
         </view>
       </view>
 
-      <view testID="haptics-selection-card" class="haptics-card">
-        <text class="haptics-card-title">Selection</text>
+      <view
+        testID="haptics-selection-card"
+        class="haptics-card"
+      >
+        <text class="haptics-card-title">
+          Selection
+        </text>
         <view class="button-row">
           <ActionButton
             testID="haptics-selection-button"
@@ -146,7 +170,9 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
         testID="haptics-android-card"
         class="haptics-card"
       >
-        <text class="haptics-card-title">Android haptics</text>
+        <text class="haptics-card-title">
+          Android haptics
+        </text>
         <view class="button-row">
           <ActionButton
             v-for="item in ANDROID_HAPTICS"
@@ -159,13 +185,19 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
         </view>
       </view>
 
-      <view testID="haptics-last-fired-card" class="haptics-last-fired-card">
-        <text class="haptics-last-fired-label">LAST FIRED</text>
+      <view
+        testID="haptics-last-fired-card"
+        class="haptics-last-fired-card"
+      >
+        <text class="haptics-last-fired-label">
+          LAST FIRED
+        </text>
         <text
           testID="haptics-last-fired-value"
           class="haptics-last-fired-value"
-          >{{ lastFired ?? 'nothing yet' }}</text
         >
+          {{ lastFired ?? 'nothing yet' }}
+        </text>
       </view>
     </scroll-view>
   </safe-area-view>

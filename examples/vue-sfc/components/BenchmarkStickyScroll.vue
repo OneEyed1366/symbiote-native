@@ -63,11 +63,13 @@ const StickyScrollBody: FunctionalComponent = () =>
 </script>
 
 <template>
-  <text class="section-label"
-    >STICKY PATH A · ScrollView · stickyHeaderIndices</text
-  >
+  <text class="section-label">
+    STICKY PATH A · ScrollView · stickyHeaderIndices
+  </text>
   <StickyScrollBody />
-  <text class="note-text">{{
-    `${STICKY_SECTION_COUNT} sections, every row mounted — no virtualization in the frame.`
-  }}</text>
+  <text class="note-text">
+    {{
+      `${STICKY_SECTION_COUNT} sections, every row mounted — no virtualization in the frame.`
+    }}
+  </text>
 </template>

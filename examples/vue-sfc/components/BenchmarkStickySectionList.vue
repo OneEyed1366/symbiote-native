@@ -94,9 +94,9 @@ const sectionRowStyle = { height: SECTION_LIST_ROW_HEIGHT };
 </script>
 
 <template>
-  <text class="section-label"
-    >STICKY PATH B · SectionList · stickySectionHeadersEnabled</text
-  >
+  <text class="section-label">
+    STICKY PATH B · SectionList · stickySectionHeadersEnabled
+  </text>
   <SectionList
     testID="benchmark-sticky-section-list"
     :sections="BENCHMARK_SECTIONS"
@@ -107,17 +107,29 @@ const sectionRowStyle = { height: SECTION_LIST_ROW_HEIGHT };
     :get-item-layout="sectionListItemLayout"
   >
     <template #sectionHeader="{ section }">
-      <text class="section-header" :style="sectionHeaderStyle">{{
-        section.title
-      }}</text>
+      <text
+        class="section-header"
+        :style="sectionHeaderStyle"
+      >
+        {{
+          section.title
+        }}
+      </text>
     </template>
     <template #item="{ item }">
-      <view class="parity-row" :style="sectionRowStyle">
-        <text class="list-row-text">{{ item.label }}</text>
+      <view
+        class="parity-row"
+        :style="sectionRowStyle"
+      >
+        <text class="list-row-text">
+          {{ item.label }}
+        </text>
       </view>
     </template>
   </SectionList>
-  <text class="note-text">{{
-    `${SECTION_LIST_SECTION_COUNT} sections x ${SECTION_LIST_ROWS_PER_SECTION} rows — windowed, sticky math inside the list.`
-  }}</text>
+  <text class="note-text">
+    {{
+      `${SECTION_LIST_SECTION_COUNT} sections x ${SECTION_LIST_ROWS_PER_SECTION} rows — windowed, sticky math inside the list.`
+    }}
+  </text>
 </template>

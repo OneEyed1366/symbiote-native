@@ -52,32 +52,49 @@ onMounted(() => {
       content-container-style="scroll-content"
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: lineColor }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">System UI</text>
-          <text class="hero-body"
-            >@symbiote-native/system-ui — sets and reads the root view's
-            background color.</text
-          >
+          <text class="hero-title">
+            System UI
+          </text>
+          <text class="hero-body">
+            @symbiote-native/system-ui — sets and reads the root view's
+            background color.
+          </text>
         </view>
       </view>
 
-      <view testID="system-ui-card" class="system-ui-card">
-        <text class="system-ui-card-title">Background color</text>
+      <view
+        testID="system-ui-card"
+        class="system-ui-card"
+      >
+        <text class="system-ui-card-title">
+          Background color
+        </text>
         <view class="system-ui-row">
-          <text class="system-ui-row-label">Current</text>
+          <text class="system-ui-row-label">
+            Current
+          </text>
           <text
             testID="system-ui-background-color-value"
             class="system-ui-value-text"
-            >{{ backgroundColor ?? 'not set' }}</text
           >
+            {{ backgroundColor ?? 'not set' }}
+          </text>
         </view>
         <view class="button-row">
           <ActionButton

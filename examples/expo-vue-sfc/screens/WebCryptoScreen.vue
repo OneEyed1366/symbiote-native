@@ -50,56 +50,85 @@ function handleInstallPolyfill(): void {
       content-container-style="scroll-content"
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: lineColor }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Web Crypto</text>
-          <text class="hero-body"
-            >@symbiote-native/standard-web-crypto — a Web Crypto API
+          <text class="hero-title">
+            Web Crypto
+          </text>
+          <text class="hero-body">
+            @symbiote-native/standard-web-crypto — a Web Crypto API
             `getRandomValues` polyfill built on @symbiote-native/crypto's native
-            random source.</text
-          >
+            random source.
+          </text>
         </view>
       </view>
 
-      <view testID="web-crypto-random-bytes-card" class="web-crypto-card">
-        <text class="web-crypto-card-title">Random bytes</text>
+      <view
+        testID="web-crypto-random-bytes-card"
+        class="web-crypto-card"
+      >
+        <text class="web-crypto-card-title">
+          Random bytes
+        </text>
         <ActionButton
           testID="web-crypto-generate-random-bytes-button"
           title="Generate 16 random bytes"
           :onPress="handleGenerateRandomBytes"
           :color="lineColor"
         />
-        <view v-if="randomBytesResult !== null" class="web-crypto-result-box">
+        <view
+          v-if="randomBytesResult !== null"
+          class="web-crypto-result-box"
+        >
           <text
             testID="web-crypto-random-bytes-result-value"
             class="web-crypto-result-text"
-            >{{ randomBytesResult }}</text
           >
+            {{ randomBytesResult }}
+          </text>
         </view>
       </view>
 
-      <view testID="web-crypto-polyfill-card" class="web-crypto-card">
-        <text class="web-crypto-card-title">Polyfill</text>
+      <view
+        testID="web-crypto-polyfill-card"
+        class="web-crypto-card"
+      >
+        <text class="web-crypto-card-title">
+          Polyfill
+        </text>
         <ActionButton
           testID="web-crypto-install-polyfill-button"
           title="Install polyfill"
           :onPress="handleInstallPolyfill"
           :color="lineColor"
         />
-        <view v-if="polyfillInstalledResult !== null" class="web-crypto-row">
-          <text class="web-crypto-row-label">globalThis.crypto defined</text>
+        <view
+          v-if="polyfillInstalledResult !== null"
+          class="web-crypto-row"
+        >
+          <text class="web-crypto-row-label">
+            globalThis.crypto defined
+          </text>
           <text
             testID="web-crypto-polyfill-result-value"
             class="web-crypto-value-text"
-            >{{ polyfillInstalledResult ? 'Yes' : 'No' }}</text
           >
+            {{ polyfillInstalledResult ? 'Yes' : 'No' }}
+          </text>
         </view>
       </view>
     </scroll-view>

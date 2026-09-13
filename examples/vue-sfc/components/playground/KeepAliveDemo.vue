@@ -67,10 +67,10 @@ const cacheEnabled = ref(true);
 
 <template>
   <view class="section-tight">
-    <text class="section-label"
-      >&lt;KeepAlive&gt; + onActivated/onDeactivated + &lt;component
-      :is&gt;</text
-    >
+    <text class="section-label">
+      &lt;KeepAlive&gt; + onActivated/onDeactivated + &lt;component
+      :is&gt;
+    </text>
     <view class="row-tight">
       <ActionButton
         v-for="id in TAB_IDS"
@@ -89,9 +89,19 @@ const cacheEnabled = ref(true);
       :onPress="() => (cacheEnabled = !cacheEnabled)"
       :color="TAB_COLOR"
     />
-    <KeepAlive v-if="cacheEnabled" :max="3">
-      <component :is="tabs[activeTab]" :key="activeTab" />
+    <KeepAlive
+      v-if="cacheEnabled"
+      :max="3"
+    >
+      <component
+        :is="tabs[activeTab]"
+        :key="activeTab"
+      />
     </KeepAlive>
-    <component :is="tabs[activeTab]" :key="activeTab" v-else />
+    <component
+      :is="tabs[activeTab]"
+      v-else
+      :key="activeTab"
+    />
   </view>
 </template>

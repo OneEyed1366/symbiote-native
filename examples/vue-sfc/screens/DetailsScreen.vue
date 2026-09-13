@@ -27,11 +27,17 @@ const paramsLabel = computed(() => {
 <template>
   <safe-area-view class="screen">
     <view class="section">
-      <text class="section-label">Navigation demo · Details screen</text>
-      <text class="info-text">{{ `route.params: ${paramsLabel}` }}</text>
-      <text class="info-text">{{
-        `canGoBack: ${navigation.canGoBack()}`
-      }}</text>
+      <text class="section-label">
+        Navigation demo · Details screen
+      </text>
+      <text class="info-text">
+        {{ `route.params: ${paramsLabel}` }}
+      </text>
+      <text class="info-text">
+        {{
+          `canGoBack: ${navigation.canGoBack()}`
+        }}
+      </text>
       <ActionButton
         testID="nav-pop"
         title="← Pop back"

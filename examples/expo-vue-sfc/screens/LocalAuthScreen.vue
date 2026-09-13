@@ -145,72 +145,113 @@ function handleCancel(): void {
       content-container-style="scroll-content"
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
-        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <text class="hero-badge-text">{{ lineInfo.code }}</text>
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: lineColor }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Local auth</text>
-          <text class="hero-body"
-            >@symbiote-native/local-auth — FaceID/TouchID on iOS, the
+          <text class="hero-title">
+            Local auth
+          </text>
+          <text class="hero-body">
+            @symbiote-native/local-auth — FaceID/TouchID on iOS, the
             Fingerprint/Biometric API on Android. A simulator with no enrolled
             biometrics reports "not enrolled"; a real device with
             FaceID/TouchID/fingerprint set up is needed to see a live
-            prompt.</text
-          >
+            prompt.
+          </text>
         </view>
       </view>
 
-      <view testID="local-auth-capabilities-card" class="auth-card">
+      <view
+        testID="local-auth-capabilities-card"
+        class="auth-card"
+      >
         <view class="auth-card-header">
-          <text class="auth-card-title">Capabilities</text>
+          <text class="auth-card-title">
+            Capabilities
+          </text>
         </view>
-        <view testID="local-auth-hardware" class="auth-capability-row">
-          <text class="auth-capability-label">Hardware present</text>
-          <view :class="`auth-status-badge auth-status-badge-${hasHardware}`">
-            <text class="auth-status-text">{{
-              hasHardware === 'checking'
-                ? 'CHECKING…'
-                : hasHardware === 'yes'
-                  ? 'YES'
-                  : 'NO'
-            }}</text>
-          </view>
-        </view>
-        <view testID="local-auth-enrolled" class="auth-capability-row">
-          <text class="auth-capability-label">Enrolled</text>
-          <view :class="`auth-status-badge auth-status-badge-${isEnrolled}`">
-            <text class="auth-status-text">{{
-              isEnrolled === 'checking'
-                ? 'CHECKING…'
-                : isEnrolled === 'yes'
-                  ? 'YES'
-                  : 'NO'
-            }}</text>
-          </view>
-        </view>
-        <view class="auth-capability-row">
-          <text class="auth-capability-label">Enrolled level</text>
-          <text class="auth-value-text">{{ enrolledLevelText }}</text>
-        </view>
-        <view class="auth-capability-row">
-          <text class="auth-capability-label">Supported types</text>
-          <text class="auth-value-text">{{ supportedTypesText }}</text>
-        </view>
-      </view>
-
-      <view testID="local-auth-authenticate-card" class="auth-card">
-        <view class="auth-card-header">
-          <text class="auth-card-title">Authenticate</text>
-        </view>
-        <text class="info-text"
-          >Prompts FaceID/TouchID on iOS, or the Biometric/Fingerprint dialog on
-          Android.</text
+        <view
+          testID="local-auth-hardware"
+          class="auth-capability-row"
         >
+          <text class="auth-capability-label">
+            Hardware present
+          </text>
+          <view :class="`auth-status-badge auth-status-badge-${hasHardware}`">
+            <text class="auth-status-text">
+              {{
+                hasHardware === 'checking'
+                  ? 'CHECKING…'
+                  : hasHardware === 'yes'
+                    ? 'YES'
+                    : 'NO'
+              }}
+            </text>
+          </view>
+        </view>
+        <view
+          testID="local-auth-enrolled"
+          class="auth-capability-row"
+        >
+          <text class="auth-capability-label">
+            Enrolled
+          </text>
+          <view :class="`auth-status-badge auth-status-badge-${isEnrolled}`">
+            <text class="auth-status-text">
+              {{
+                isEnrolled === 'checking'
+                  ? 'CHECKING…'
+                  : isEnrolled === 'yes'
+                    ? 'YES'
+                    : 'NO'
+              }}
+            </text>
+          </view>
+        </view>
+        <view class="auth-capability-row">
+          <text class="auth-capability-label">
+            Enrolled level
+          </text>
+          <text class="auth-value-text">
+            {{ enrolledLevelText }}
+          </text>
+        </view>
+        <view class="auth-capability-row">
+          <text class="auth-capability-label">
+            Supported types
+          </text>
+          <text class="auth-value-text">
+            {{ supportedTypesText }}
+          </text>
+        </view>
+      </view>
+
+      <view
+        testID="local-auth-authenticate-card"
+        class="auth-card"
+      >
+        <view class="auth-card-header">
+          <text class="auth-card-title">
+            Authenticate
+          </text>
+        </view>
+        <text class="info-text">
+          Prompts FaceID/TouchID on iOS, or the Biometric/Fingerprint dialog on
+          Android.
+        </text>
         <ActionButton
           testID="local-auth-authenticate-button"
           :title="authenticateButtonTitle"
@@ -229,7 +270,9 @@ function handleCancel(): void {
           testID="local-auth-result"
           :class="authResultClass"
         >
-          <text class="auth-result-text">{{ authResultText }}</text>
+          <text class="auth-result-text">
+            {{ authResultText }}
+          </text>
         </view>
       </view>
     </scroll-view>

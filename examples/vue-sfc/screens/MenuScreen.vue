@@ -104,16 +104,20 @@ function lineInfoFor(route: ITourRouteName) {
       content-container-style="scroll-content"
     >
       <view class="menu-hero">
-        <text class="menu-eyebrow">NAVIGATION DEMO SUITE</text>
-        <text class="menu-hero-title">Twelve stops along the stack</text>
-        <text class="menu-hero-subtitle"
-          >Ten rows drive a different line of @symbiote-native/navigation —
+        <text class="menu-eyebrow">
+          NAVIGATION DEMO SUITE
+        </text>
+        <text class="menu-hero-title">
+          Twelve stops along the stack
+        </text>
+        <text class="menu-hero-subtitle">
+          Ten rows drive a different line of @symbiote-native/navigation —
           Primitives, Presentation, Structure, Introspection, Routing — on a
           real native stack, plus a Performance stop timing the engine's own
           commit path and a Styling stop showing the whole CSS compiler surface.
           The remaining stop is Composition: Vue's own template/API surface
-          instead.</text
-        >
+          instead.
+        </text>
       </view>
       <pressable
         v-for="item in MENU_ITEMS"
@@ -123,16 +127,21 @@ function lineInfoFor(route: ITourRouteName) {
         @press="() => navigation.push(item.route)"
       >
         <view :class="`menu-badge menu-badge-${lineInfoFor(item.route).line}`">
-          <text class="menu-badge-text">{{
-            lineInfoFor(item.route).code
-          }}</text>
+          <text class="menu-badge-text">
+            {{
+              lineInfoFor(item.route).code
+            }}
+          </text>
         </view>
         <view class="menu-row-copy">
-          <text class="menu-row-label">{{ item.label }}</text>
+          <text class="menu-row-label">
+            {{ item.label }}
+          </text>
           <text
             :class="`menu-row-hint menu-row-hint-${lineInfoFor(item.route).line}`"
-            >{{ item.hint }}</text
           >
+            {{ item.hint }}
+          </text>
         </view>
       </pressable>
     </scroll-view>

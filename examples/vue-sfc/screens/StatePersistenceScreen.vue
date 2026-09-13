@@ -61,28 +61,36 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StatePersistence];
   <safe-area-view class="screen">
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
         <view
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.routing }"
         >
-          <text class="hero-badge-text">SP</text>
+          <text class="hero-badge-text">
+            SP
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">State persistence</text>
-          <text class="hero-body"
-            >The Stack's own state serialized out and deserialized back in —
-            restoring exactly where you left off.</text
-          >
+          <text class="hero-title">
+            State persistence
+          </text>
+          <text class="hero-body">
+            The Stack's own state serialized out and deserialized back in —
+            restoring exactly where you left off.
+          </text>
         </view>
       </view>
-      <text class="info-text">{{
-        `current stack depth: ${state.routes.length}`
-      }}</text>
+      <text class="info-text">
+        {{
+          `current stack depth: ${state.routes.length}`
+        }}
+      </text>
       <ActionButton
         testID="persist-serialize"
         title="Serialize current stack"
@@ -95,13 +103,23 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StatePersistence];
         :onPress="onRestore"
         :color="LINE_COLOR.routing"
       />
-      <text v-if="restoreError !== undefined" class="info-text">{{
-        `error: ${restoreError}`
-      }}</text>
+      <text
+        v-if="restoreError !== undefined"
+        class="info-text"
+      >
+        {{
+          `error: ${restoreError}`
+        }}
+      </text>
       <view class="box-list160">
-        <text testID="persist-snapshot" class="list-row-text">{{
-          snapshot ?? 'tap Serialize to capture the current route stack as JSON'
-        }}</text>
+        <text
+          testID="persist-snapshot"
+          class="list-row-text"
+        >
+          {{
+            snapshot ?? 'tap Serialize to capture the current route stack as JSON'
+          }}
+        </text>
       </view>
     </view>
   </safe-area-view>

@@ -31,15 +31,22 @@ defineExpose({ reset });
 
 <template>
   <view class="a11y-card">
-    <text class="switch-label"
-      >CounterCapsule — defineModel + defineEmits + defineExpose</text
+    <text class="switch-label">
+      CounterCapsule — defineModel + defineEmits + defineExpose
+    </text>
+    <text
+      class="list-row-text"
+      testID="capsule-count"
     >
-    <text class="list-row-text" testID="capsule-count">{{
-      `count=${count}`
-    }}</text>
-    <text class="note-text">{{
-      `useAttrs() fallthrough (inheritAttrs:false) = ${JSON.stringify(attrs)}`
-    }}</text>
+      {{
+        `count=${count}`
+      }}
+    </text>
+    <text class="note-text">
+      {{
+        `useAttrs() fallthrough (inheritAttrs:false) = ${JSON.stringify(attrs)}`
+      }}
+    </text>
     <ActionButton
       testID="capsule-increment"
       title="increment (v-model:count)"

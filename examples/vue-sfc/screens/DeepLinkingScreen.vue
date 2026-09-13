@@ -31,36 +31,42 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
   <safe-area-view class="screen">
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</text>
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
       </view>
       <view class="hero-card">
         <view
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.routing }"
         >
-          <text class="hero-badge-text">DL</text>
+          <text class="hero-badge-text">
+            DL
+          </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">Deep linking</text>
-          <text class="hero-body"
-            >A typed URL resolved to a route through resolveRouteFromUrl, the
-            same path a real deep link or push notification would take.</text
-          >
+          <text class="hero-title">
+            Deep linking
+          </text>
+          <text class="hero-body">
+            A typed URL resolved to a route through resolveRouteFromUrl, the
+            same path a real deep link or push notification would take.
+          </text>
         </view>
       </view>
-      <text class="info-text"
-        >prefixes: symbiotecanaryvuesfc:// ·
-        https://canary.symbiote-native.dev</text
-      >
-      <text class="note-text"
-        >Details → details/:id · HeaderOptions → header-options · TabsDemo →
-        tabs</text
-      >
+      <text class="info-text">
+        prefixes: symbiotecanaryvuesfc:// ·
+        https://canary.symbiote-native.dev
+      </text>
+      <text class="note-text">
+        Details → details/:id · HeaderOptions → header-options · TabsDemo →
+        tabs
+      </text>
       <text-input
-        testID="deep-link-input"
         v-model="url"
+        testID="deep-link-input"
         placeholder="symbiotecanaryvuesfc://details/42"
         placeholder-text-color="#41506a"
         class="text-input"
@@ -72,9 +78,14 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
         :color="LINE_COLOR.routing"
       />
       <view class="parity-list">
-        <text testID="deep-link-result" class="list-row-text">{{
-          resolved ?? 'tap Resolve to see the parsed route'
-        }}</text>
+        <text
+          testID="deep-link-result"
+          class="list-row-text"
+        >
+          {{
+            resolved ?? 'tap Resolve to see the parsed route'
+          }}
+        </text>
       </view>
     </view>
   </safe-area-view>

@@ -28,12 +28,14 @@ onMounted(() => {
 
 <template>
   <view class="section-nested">
-    <text class="section-label"
-      >Accessibility · props → native · aria/role transform ·
-      AccessibilityInfo</text
-    >
+    <text class="section-label">
+      Accessibility · props → native · aria/role transform ·
+      AccessibilityInfo
+    </text>
     <!-- getter readout: 'off' (no screen reader) proves the module resolved -->
-    <text class="info-text">{{ `screen reader: ${screenReader}` }}</text>
+    <text class="info-text">
+      {{ `screen reader: ${screenReader}` }}
+    </text>
     <!-- canonical accessibility*: content-desc 'a11y-canonical-label' + role=header -->
     <view
       :accessible="true"
@@ -41,7 +43,9 @@ onMounted(() => {
       accessibility-label="a11y-canonical-label"
       class="a11y-card"
     >
-      <text class="info-text">canonical label + role=header</text>
+      <text class="info-text">
+        canonical label + role=header
+      </text>
     </view>
     <!-- web aria and role aliases MUST fold: content-desc should be
          'a11y-aria-label', a raw aria-label attribute must not reach the native node -->
@@ -51,7 +55,9 @@ onMounted(() => {
       aria-label="a11y-aria-label"
       class="a11y-card"
     >
-      <text class="info-text">aria-label + role=button</text>
+      <text class="info-text">
+        aria-label + role=button
+      </text>
     </view>
     <!-- accessibilityState: uiautomator shows enabled=false / selected=true -->
     <view
@@ -60,7 +66,9 @@ onMounted(() => {
       :accessibility-state="{ disabled: true, selected: true }"
       class="a11y-card"
     >
-      <text class="info-text">state: disabled + selected</text>
+      <text class="info-text">
+        state: disabled + selected
+      </text>
     </view>
   </view>
 </template>
