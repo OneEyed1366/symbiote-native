@@ -49,16 +49,16 @@ import type { IActivityIndicatorProps } from './components/activity-indicator-pr
 
 export { Fragment, jsx, jsxs } from 'react/jsx-runtime';
 
-// The loose host boundary for every tag with no dedicated prop type yet (`sticky-header`,
-// `horizontal-scroll-view`, …). Its index signature is what keeps `key`/an arbitrary prop from
-// erroring here — see IWithKey below for why a CROSSED (closed) type needs the field explicitly.
+// The loose host boundary for every tag without a dedicated prop type (`sticky-header`,
+// `horizontal-scroll-view`, ...). Its index signature already accepts `key` and any other name;
+// IWithKey below exists because a closed, crossed type doesn't get that for free.
 interface IHostProps {
   style?: unknown;
   children?: import('react').ReactNode;
   [key: string]: unknown;
 }
 
-// Every tag with a real, non-generic prop type — mirrors Vue's/Solid's/Svelte's
+// Every tag with a real, non-generic prop type - mirrors Vue's/Solid's/Svelte's
 // `ICrossedPrimitiveProps` (`ICrossTypedIntrinsics`, `@symbiote-native/components`).
 // `FlatList`/`SectionList`/`VirtualizedList`/`KeyboardAvoidingView` are absent: composed from
 // several intrinsics, never a single tag an app writes.
@@ -83,11 +83,10 @@ export interface ICrossedPrimitiveProps {
   'activity-indicator': IActivityIndicatorProps;
 }
 
-// TypeScript only auto-merges `JSX.IntrinsicAttributes` (the `key` field) into a VALUE-based
-// element's props — verified directly: a component under this same jsxImportSource accepts `key`
-// with no error, while a crossed intrinsic (a closed type, no index signature) reports "Property
-// 'key' does not exist". The loose bag above never hit this because its index signature already
-// accepts any name; only the closed, crossed types need `key` added back explicitly.
+// TypeScript only auto-merges `JSX.IntrinsicAttributes` (the `key` field) into a value-based
+// element's props, not into a crossed intrinsic - verified directly: a component under this same
+// jsxImportSource accepts `key`, but a closed crossed type reports "Property 'key' does not exist".
+// The loose bag above escapes this only because its index signature already accepts any name.
 type IWithKey<Props> = Props & { key?: Key | null };
 
 // The member names are TypeScript's own — the compiler looks each up by exact name — so the repo's
