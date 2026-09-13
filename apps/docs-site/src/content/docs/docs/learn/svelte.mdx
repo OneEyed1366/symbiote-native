@@ -57,16 +57,14 @@ React, Vue, Angular, and Solid canaries, driven through the DOM shim instead._
 ```svelte
 <!-- App.svelte -->
 <script lang="ts">
-  import { Pressable, Text, View } from '@symbiote-native/svelte';
-
   let count = $state(0);
 </script>
 
-<View class="root">
-  <Pressable onPress={() => (count += 1)}>
-    <Text class="label">Count is {count}</Text>
-  </Pressable>
-</View>
+<view class="root">
+  <pressable onPress={() => (count += 1)}>
+    <text class="label">Count is {count}</text>
+  </pressable>
+</view>
 
 <style>
   .root {
@@ -79,6 +77,11 @@ React, Vue, Angular, and Solid canaries, driven through the DOM shim instead._
   }
 </style>
 ```
+
+`view`, `pressable`, and `text` are intrinsic tags — no import needed. Only a
+composed component (`FlatList`, `SectionList`, `VirtualizedList`,
+`VirtualizedSectionList`, `KeyboardAvoidingView`, …) still comes from
+`@symbiote-native/svelte`.
 
 A component's own `<style>` block is scoped by default, the same as real
 Svelte — no CSS-file import needed here, though one still works identically.

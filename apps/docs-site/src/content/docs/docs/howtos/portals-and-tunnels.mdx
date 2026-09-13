@@ -19,29 +19,30 @@ surface as the call site:
     // React
     const [overlay, setOverlay] = useState<IHostInstance | null>(null);
     // ...
-    <View ref={setOverlay} />
-    {overlay ? createPortal(<Text>ported in</Text>, overlay) : null}
+    <view ref={setOverlay} />
+    {overlay ? createPortal(<text>ported in</text>, overlay) : null}
     ```
   </TabItem>
   <TabItem label="Vue">
     ```vue
     <!-- Vue -->
     <Teleport v-if="toastVisible && overlayHost" :to="overlayHost">
-      <Text>Ported via Teleport</Text>
+      <text>Ported via Teleport</text>
     </Teleport>
-    <View ref="overlayHost" />
+    <view ref="overlayHost" />
     ```
   </TabItem>
   <TabItem label="Angular">
     Angular has no runtime component synthesis (no JIT under Metro/AOT), so `createPortal`
     isn't a factory here — `*portal` is a structural directive instead, the same idiom as
-    `*ngIf`, paired with a `portalOutlet` marking the destination:
+    `*ngIf`, paired with a `portalOutlet` marking the destination. The primitive tags need
+    `imports: [SYMBIOTE_ELEMENTS]` on the component, same as any other Angular template:
 
     ```html
     <!-- Angular -->
-    <View portalOutlet #overlayHost="portalOutlet"></View>
+    <view portalOutlet #overlayHost="portalOutlet"></view>
     @if (toastVisible) {
-      <View *portal="overlayHost"><Text>Ported via *portal</Text></View>
+      <view *portal="overlayHost"><text>Ported via *portal</text></view>
     }
     ```
 
@@ -56,8 +57,8 @@ surface as the call site:
     // Solid
     const [overlay, setOverlay] = createSignal<ISymbioteNode | null>(null);
     // ...
-    <View ref={setOverlay} />
-    {overlay() ? <Portal mount={overlay()}><Text>ported in</Text></Portal> : null}
+    <view ref={setOverlay} />
+    {overlay() ? <Portal mount={overlay()}><text>ported in</text></Portal> : null}
     ```
 
   </TabItem>
@@ -106,7 +107,7 @@ surface, use `createTunnel()` instead — a shared store, not a node reference:
     ```vue
     <!-- Vue -->
     <tunnel.Out />
-    <tunnel.In><Text>Ported via createTunnel</Text></tunnel.In>
+    <tunnel.In><text>Ported via createTunnel</text></tunnel.In>
     ```
   </TabItem>
   <TabItem label="Angular">
@@ -121,7 +122,7 @@ surface, use `createTunnel()` instead — a shared store, not a node reference:
 
     ```html
     @if (toastVisible) {
-      <View *tunnelIn="overlayTunnel"><Text>Ported via createTunnel</Text></View>
+      <view *tunnelIn="overlayTunnel"><text>Ported via createTunnel</text></view>
     }
     <tunnel-out [tunnel]="overlayTunnel" />
     ```

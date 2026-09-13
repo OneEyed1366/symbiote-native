@@ -55,7 +55,6 @@ here holds live state or a subscription.
   <TabItem label="React">
     ```tsx
     import { useEffect, useState } from 'react';
-    import { Text, View } from '@symbiote-native/react';
     import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/react';
 
     polyfillWebCrypto(); // no-op if globalThis.crypto already exists
@@ -70,9 +69,9 @@ here holds live state or a subscription.
       }, []);
 
       return (
-        <View>
-          <Text>{hex || 'generating…'}</Text>
-        </View>
+        <view>
+          <text>{hex || 'generating…'}</text>
+        </view>
       );
     }
     ```
@@ -82,7 +81,6 @@ here holds live state or a subscription.
     ```vue
     <script setup lang="ts">
     import { onMounted, ref } from 'vue';
-    import { Text, View } from '@symbiote-native/vue';
     import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/vue';
 
     polyfillWebCrypto(); // no-op if globalThis.crypto already exists
@@ -97,9 +95,9 @@ here holds live state or a subscription.
     </script>
 
     <template>
-      <View>
-        <Text>{{ hex || 'generating…' }}</Text>
-      </View>
+      <view>
+        <text>{{ hex || 'generating…' }}</text>
+      </view>
     </template>
     ```
 
@@ -107,18 +105,18 @@ here holds live state or a subscription.
   <TabItem label="Angular">
     ```ts
     import { Component, signal } from '@angular/core';
-    import { Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/angular';
 
     polyfillWebCrypto(); // no-op if globalThis.crypto already exists
 
     @Component({
       standalone: true,
-      imports: [Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Text>{{ hex() || 'generating…' }}</Text>
-        </View>
+        <view>
+          <text>{{ hex() || 'generating…' }}</text>
+        </view>
       `,
     })
     export class RandomBytes {
@@ -140,7 +138,6 @@ here holds live state or a subscription.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text, View } from '@symbiote-native/svelte';
       import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/svelte';
 
       polyfillWebCrypto(); // no-op if globalThis.crypto already exists
@@ -154,14 +151,13 @@ here holds live state or a subscription.
       });
     </script>
 
-    <View><Text>{hex || 'generating…'}</Text></View>
+    <view><text>{hex || 'generating…'}</text></view>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
     import { createSignal, onMount } from 'solid-js';
-    import { Text, View } from '@symbiote-native/solid';
     import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/solid';
 
     polyfillWebCrypto(); // no-op if globalThis.crypto already exists
@@ -176,9 +172,9 @@ here holds live state or a subscription.
       });
 
       return (
-        <View>
-          <Text>{hex() || 'generating…'}</Text>
-        </View>
+        <view>
+          <text>{hex() || 'generating…'}</text>
+        </view>
       );
     }
     ```

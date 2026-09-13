@@ -3,21 +3,25 @@ title: Angular API
 description: The Angular adapter public contract.
 ---
 
-Import app-facing APIs from `@symbiote-native/angular`:
+Primitives (`view`, `text`, `pressable`, `text-input`, `scroll-view`, ...) are
+lowercase intrinsic tags in the template. Angular's AOT compiler still needs a
+tag declared before it can type-check it, so add `SYMBIOTE_ELEMENTS` — the
+whole primitive surface as one symbol — to the consuming component's
+`imports` array; there is no `NgModule` to register:
 
 ```ts
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS, StyleSheet } from '@symbiote-native/angular';
+
+@Component({
+  standalone: true,
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `<view><text>Hi</text></view>`,
+})
+export class Example {}
 ```
 
-Every SymbioteNative component is a `standalone: true` Angular component — add it to
-the consuming component's `imports` array, there is no `NgModule` to register.
+Anything that is still a genuinely separate component (the list family, ...)
+is `standalone: true` too — add it to `imports` the same way.
 
 ## Installation
 
@@ -38,7 +42,7 @@ wired by hand; `examples/angular` is the reference.
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Event callbacks | Real `@Output()` `EventEmitter`s everywhere (`(press)`, `(longPress)`, `(hoverIn)`, `(valueChange)`, `(accessibilityAction)`, …), except the scroll family (`onScroll`, `onScrollBeginDrag`, `onScrollEndDrag`, `onMomentumScrollBegin`, `onMomentumScrollEnd`), which stays a plain callback **input** (`[onScroll]`) permanently — it must accept an `Animated.event(...)` marker, not just a template listener. `TextInput` alone keeps a second output, `(change)`, for the raw native event alongside text-only `(valueChange)` |
 | Children        | `<ng-content></ng-content>` (projected content)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Selectors       | Dual: PascalCase alias + `symbiote-*`, e.g. `Pressable, symbiote-pressable`                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Selectors       | lowercase intrinsic tag, e.g. `pressable` — declared via `imports: [SYMBIOTE_ELEMENTS]`                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Refs            | `@ViewChild('host', { read: ElementRef })`, `.nativeElement` is the SymbioteNative host node                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Styles          | `[style]="styles.root"` with React Native-style objects                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
@@ -47,12 +51,12 @@ wired by hand; `examples/angular` is the reference.
 ```ts
 @Component({
   standalone: true,
-  imports: [Pressable, Switch, TextInput, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <Pressable (press)="onPress($event)" (longPress)="onLongPress($event)" />
-    <Switch [value]="enabled" (valueChange)="setEnabled($event)" />
-    <TextInput [value]="text" (valueChange)="setText($event)" (change)="onChange($event)" />
-    <View (layout)="onLayout($event)" />
+    <pressable (press)="onPress($event)" (longPress)="onLongPress($event)" />
+    <switch [value]="enabled" (valueChange)="setEnabled($event)" />
+    <text-input [value]="text" (valueChange)="setText($event)" (change)="onChange($event)" />
+    <view (layout)="onLayout($event)" />
   `,
 })
 ```
@@ -88,14 +92,14 @@ you'd already reach for on a native `<input>`:
 ```ts
 import { Component } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Switch, TextInput } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 
 @Component({
   standalone: true,
-  imports: [ReactiveFormsModule, Switch, TextInput],
+  imports: [ReactiveFormsModule, SYMBIOTE_ELEMENTS],
   template: `
-    <TextInput [formControl]="email" placeholder="email" />
-    <Switch [formControl]="notify" />
+    <text-input [formControl]="email" placeholder="email" />
+    <switch [formControl]="notify" />
   `,
 })
 export class Example {
@@ -116,12 +120,12 @@ equivalent (their controlled-value idiom is plain `value`/`onChangeText` and
 
 ```ts
 import { Component, ViewChild, type ElementRef } from '@angular/core';
-import { TextInput, type ITextInputHandle } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS, type ITextInputHandle } from '@symbiote-native/angular';
 
 @Component({
   standalone: true,
-  imports: [TextInput],
-  template: `<TextInput
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `<text-input
     #input
     [value]="''"
     (valueChange)="onChangeText($event)"
@@ -144,19 +148,18 @@ import { Component, signal } from '@angular/core';
 import {
   PortalDirective,
   PortalOutletDirective,
-  Text,
-  View,
+  SYMBIOTE_ELEMENTS,
 } from '@symbiote-native/angular';
 
 @Component({
   standalone: true,
-  imports: [View, Text, PortalDirective, PortalOutletDirective],
+  imports: [SYMBIOTE_ELEMENTS, PortalDirective, PortalOutletDirective],
   template: `
-    <View portalOutlet #overlayHost="portalOutlet" />
+    <view portalOutlet #overlayHost="portalOutlet" />
     @if (toastVisible()) {
-      <View *portal="overlayHost">
-        <Text>Rendered under overlayHost, not here</Text>
-      </View>
+      <view *portal="overlayHost">
+        <text>Rendered under overlayHost, not here</text>
+      </view>
     }
   `,
 })
@@ -185,26 +188,25 @@ target must live in the same surface as the `*portal` call site.
 import { Component, signal } from '@angular/core';
 import {
   createTunnel,
-  Text,
+  SYMBIOTE_ELEMENTS,
   TunnelInDirective,
   TunnelOut,
-  View,
 } from '@symbiote-native/angular';
 
 const overlayTunnel = createTunnel(); // module-level singleton, importable from both surfaces
 
 @Component({
   standalone: true,
-  imports: [View, Text, TunnelInDirective, TunnelOut],
+  imports: [SYMBIOTE_ELEMENTS, TunnelInDirective, TunnelOut],
   template: `
     <!-- inside the surface that should paint the content -->
     <tunnel-out [tunnel]="tunnel" />
 
     <!-- inside any other component, in any surface -->
     @if (toastVisible()) {
-      <View *tunnelIn="tunnel">
-        <Text>Toast</Text>
-      </View>
+      <view *tunnelIn="tunnel">
+        <text>Toast</text>
+      </view>
     }
   `,
 })

@@ -61,13 +61,12 @@ way to use this package.
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Text } from '@symbiote-native/react';
     import { useKeepAwake } from '@symbiote-native/keep-awake/react';
 
     export default function KeepAwakeScreen() {
       useKeepAwake(); // screen stays on for as long as this component is mounted
 
-      return <Text>Screen will not sleep</Text>;
+      return <text>Screen will not sleep</text>;
     }
     ```
 
@@ -81,7 +80,7 @@ way to use this package.
     </script>
 
     <template>
-      <Text>Screen will not sleep</Text>
+      <text>Screen will not sleep</text>
     </template>
     ```
 
@@ -89,13 +88,13 @@ way to use this package.
   <TabItem label="Angular">
     ```ts
     import { Component, inject } from '@angular/core';
-    import { Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { KeepAwakeService } from '@symbiote-native/keep-awake/angular';
 
     @Component({
       standalone: true,
-      imports: [Text],
-      template: `<Text>Screen will not sleep</Text>`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<text>Screen will not sleep</text>`,
     })
     export class KeepAwakeScreen {
       constructor() {
@@ -112,13 +111,12 @@ way to use this package.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text } from '@symbiote-native/svelte';
       import { useKeepAwake } from '@symbiote-native/keep-awake/svelte';
 
       useKeepAwake(); // screen stays on for as long as this component is mounted
     </script>
 
-    <Text>Screen will not sleep</Text>
+    <text>Screen will not sleep</text>
     ```
 
     `useKeepAwake` has no return value here either — it's a pure `$effect` side effect wired to
@@ -127,13 +125,12 @@ way to use this package.
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Text } from '@symbiote-native/solid';
     import { createKeepAwake } from '@symbiote-native/keep-awake/solid';
 
     export default function KeepAwakeScreen() {
       createKeepAwake(); // screen stays on for as long as this owner is alive
 
-      return <Text>Screen will not sleep</Text>;
+      return <text>Screen will not sleep</text>;
     }
     ```
 
@@ -153,14 +150,13 @@ mount/unmount lifecycle above.
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Button } from '@symbiote-native/react';
     import { activateKeepAwakeAsync, deactivateKeepAwake } from '@symbiote-native/keep-awake/react';
 
     export default function ManualKeepAwake() {
       return (
         <>
-          <Button title="Keep awake" onPress={() => activateKeepAwakeAsync('download-tag')} />
-          <Button title="Allow sleep" onPress={() => deactivateKeepAwake('download-tag')} />
+          <button title="Keep awake" onPress={() => activateKeepAwakeAsync('download-tag')} />
+          <button title="Allow sleep" onPress={() => deactivateKeepAwake('download-tag')} />
         </>
       );
     }
@@ -174,8 +170,8 @@ mount/unmount lifecycle above.
     </script>
 
     <template>
-      <Button title="Keep awake" @press="activateKeepAwakeAsync('download-tag')" />
-      <Button title="Allow sleep" @press="deactivateKeepAwake('download-tag')" />
+      <button title="Keep awake" @press="activateKeepAwakeAsync('download-tag')" />
+      <button title="Allow sleep" @press="deactivateKeepAwake('download-tag')" />
     </template>
     ```
 
@@ -183,15 +179,15 @@ mount/unmount lifecycle above.
   <TabItem label="Angular">
     ```ts
     import { Component } from '@angular/core';
-    import { Button } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { activateKeepAwakeAsync, deactivateKeepAwake } from '@symbiote-native/keep-awake/angular';
 
     @Component({
       standalone: true,
-      imports: [Button],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <Button title="Keep awake" (press)="activateKeepAwakeAsync('download-tag')" />
-        <Button title="Allow sleep" (press)="deactivateKeepAwake('download-tag')" />
+        <button title="Keep awake" (press)="activateKeepAwakeAsync('download-tag')" />
+        <button title="Allow sleep" (press)="deactivateKeepAwake('download-tag')" />
       `,
     })
     export class ManualKeepAwake {
@@ -204,25 +200,23 @@ mount/unmount lifecycle above.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Button } from '@symbiote-native/svelte';
       import { activateKeepAwakeAsync, deactivateKeepAwake } from '@symbiote-native/keep-awake/svelte';
     </script>
 
-    <Button title="Keep awake" onPress={() => activateKeepAwakeAsync('download-tag')} />
-    <Button title="Allow sleep" onPress={() => deactivateKeepAwake('download-tag')} />
+    <button title="Keep awake" onPress={() => activateKeepAwakeAsync('download-tag')} />
+    <button title="Allow sleep" onPress={() => deactivateKeepAwake('download-tag')} />
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Button } from '@symbiote-native/solid';
     import { activateKeepAwakeAsync, deactivateKeepAwake } from '@symbiote-native/keep-awake/solid';
 
     export default function ManualKeepAwake() {
       return (
         <>
-          <Button title="Keep awake" onPress={() => activateKeepAwakeAsync('download-tag')} />
-          <Button title="Allow sleep" onPress={() => deactivateKeepAwake('download-tag')} />
+          <button title="Keep awake" onPress={() => activateKeepAwakeAsync('download-tag')} />
+          <button title="Allow sleep" onPress={() => deactivateKeepAwake('download-tag')} />
         </>
       );
     }

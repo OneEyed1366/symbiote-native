@@ -35,21 +35,20 @@ yet, so the Metro config and the `index.js` entry seam below come from
 
 ## Use it
 
-The app is ordinary React — it imports primitives from `@symbiote-native/react`, not `react-native`:
+The app is ordinary React — the native primitives are plain intrinsic tags, no import needed:
 
 ```jsx
 import { useState } from 'react';
-import { View, Text, Pressable } from '@symbiote-native/react';
 
 export default function App() {
   const [count, setCount] = useState(0);
   return (
-    <View style={{ padding: 24 }}>
-      <Text>Taps: {count}</Text>
-      <Pressable onPress={() => setCount(c => c + 1)}>
-        <Text>Tap me</Text>
-      </Pressable>
-    </View>
+    <view style={{ padding: 24 }}>
+      <text>Taps: {count}</text>
+      <pressable onPress={() => setCount(c => c + 1)}>
+        <text>Tap me</text>
+      </pressable>
+    </view>
   );
 }
 ```
@@ -102,9 +101,11 @@ the surface below.
 Every interaction commits through `@symbiote-native/engine` into Fabric, with RN's renderer never in the
 path:
 
-- **Primitives** — `View` · `Text` · `Image` · `ImageBackground` · `ScrollView` · `TextInput` ·
-  `Pressable` · `Touchable*` · `Button` · `Switch` · `Modal` · `ActivityIndicator` ·
-  `SafeAreaView` · `RefreshControl` · `FlatList` · `SectionList` · `VirtualizedList`.
+- **Primitives** — `view` · `text` · `image` · `image-background` · `scroll-view` · `text-input` ·
+  `pressable` · `touchable-opacity` / `touchable-native-feedback` / `touchable-without-feedback` /
+  `touchable-highlight` · `button` · `switch` · `modal` · `activity-indicator` ·
+  `safe-area-view` · `refresh-control` · plus the components `FlatList` · `SectionList` ·
+  `VirtualizedList`.
 - **Runtime modules** — `Platform` · `StyleSheet` (incl. `hairlineWidth`) · `Dimensions` ·
   `Appearance` · `PixelRatio` · `AppState`, plus imperative `Alert` · `ActionSheetIOS` · `Share` ·
   `Linking` · `Vibration` · `Keyboard` · `StatusBar` — each reaching its real native module on the

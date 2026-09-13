@@ -26,9 +26,9 @@ Wrap the part of the tree that might throw during render, and provide a
   <Child />
 
   {#snippet failed(error, reset)}
-    <View testID="failed">
-      <Text>{error.message}</Text>
-    </View>
+    <view testID="failed">
+      <text>{error.message}</text>
+    </view>
   {/snippet}
 </svelte:boundary>
 ```
@@ -114,12 +114,11 @@ event handler (an `onPress`) never reaches it, exactly like Svelte's
 
 ```tsx
 import { ErrorBoundary, Show } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 
 <ErrorBoundary
   fallback={(error, reset) => (
-    <View>
-      <Text testID="failed">{`caught: ${error.message}`}</Text>
+    <view>
+      <text testID="failed">{`caught: ${error.message}`}</text>
       <ActionButton
         title="reset"
         onPress={() => {
@@ -127,10 +126,10 @@ import { Text, View } from '@symbiote-native/solid';
           reset();
         }}
       />
-    </View>
+    </view>
   )}
 >
-  <Show when={exploding()} fallback={<Text>subtree is healthy</Text>}>
+  <Show when={exploding()} fallback={<text>subtree is healthy</text>}>
     <Exploder />
   </Show>
 </ErrorBoundary>;

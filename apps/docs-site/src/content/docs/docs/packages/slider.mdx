@@ -209,7 +209,7 @@ four receive `{ stepMarked, currentValue, index, min, max }`:
   maximumValue={4}
   step={1}
   StepMarker={({ stepMarked }) => (
-    <View
+    <view
       style={{
         width: 8,
         height: 8,
@@ -225,7 +225,7 @@ four receive `{ stepMarked, currentValue, index, min, max }`:
 <template>
   <Slider :value="2" :minimum-value="0" :maximum-value="4" :step="1">
     <template #stepMarker="{ stepMarked }">
-      <View
+      <view
         :style="{
           width: 8,
           height: 8,
@@ -240,7 +240,7 @@ four receive `{ stepMarked, currentValue, index, min, max }`:
 
 ```svelte
 <Slider value={2} minimumValue={0} maximumValue={4} step={1}
-  >{#snippet stepMarker({ stepMarked })}<View
+  >{#snippet stepMarker({ stepMarked })}<view
       style={{
         width: 8,
         height: 8,
@@ -258,7 +258,7 @@ four receive `{ stepMarked, currentValue, index, min, max }`:
   maximumValue={4}
   step={1}
   StepMarker={marker => (
-    <View
+    <view
       style={{
         width: 8,
         height: 8,

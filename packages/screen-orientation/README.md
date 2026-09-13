@@ -86,9 +86,9 @@ function ScreenOrientationScreen() {
 
   return (
     <>
-      <Text>Orientation: {orientation}</Text>
-      <Text>Lock: {orientationLock}</Text>
-      <Button
+      <text>Orientation: {orientation}</text>
+      <text>Lock: {orientationLock}</text>
+      <button
         title="Lock landscape"
         onPress={() => lockAsync(OrientationLock.LANDSCAPE)}
       />
@@ -100,7 +100,6 @@ function ScreenOrientationScreen() {
 ```vue
 <!-- Vue — examples/expo-vue-sfc/screens/ScreenOrientationScreen.vue -->
 <script setup lang="ts">
-import { Text } from '@symbiote-native/vue';
 import {
   lockAsync,
   OrientationLock,
@@ -110,8 +109,8 @@ import { useScreenOrientation } from '@symbiote-native/screen-orientation/vue';
 const screenOrientation = useScreenOrientation(); // Ref<ScreenOrientationState>
 </script>
 <template>
-  <Text>Orientation: {{ screenOrientation.orientation }}</Text>
-  <Text>Lock: {{ screenOrientation.orientationLock }}</Text>
+  <text>Orientation: {{ screenOrientation.orientation }}</text>
+  <text>Lock: {{ screenOrientation.orientationLock }}</text>
 </template>
 ```
 
@@ -129,20 +128,20 @@ const screenOrientation = useScreenOrientation(); // Ref<ScreenOrientationState>
   const screenOrientation = useScreenOrientation();
 </script>
 
-<Text>Orientation: {screenOrientation.current.orientation}</Text>
-<Text>Lock: {screenOrientation.current.orientationLock}</Text>
+<text>Orientation: {screenOrientation.current.orientation}</text>
+<text>Lock: {screenOrientation.current.orientationLock}</text>
 ```
 
 ```ts
 // Angular — examples/expo-angular/src/screens/ScreenOrientationScreen.ts
 import { Component, inject } from '@angular/core';
-import { Text } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { ScreenOrientationService } from '@symbiote-native/screen-orientation/angular';
 
 @Component({
   standalone: true,
-  imports: [Text],
-  template: `<Text>Orientation: {{ screenOrientation().orientation }}</Text>`,
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `<text>Orientation: {{ screenOrientation().orientation }}</text>`,
 })
 export class ScreenOrientationScreen {
   readonly screenOrientation = inject(ScreenOrientationService).connect(); // Signal<ScreenOrientationState>
@@ -151,7 +150,6 @@ export class ScreenOrientationScreen {
 
 ```tsx
 // Solid — the accessor is CALLED; a Solid component body runs once, so a snapshot would freeze.
-import { Text } from '@symbiote-native/solid';
 import {
   lockAsync,
   OrientationLock,
@@ -163,9 +161,9 @@ function ScreenOrientationScreen() {
 
   return (
     <>
-      <Text>Orientation: {screenOrientation().orientation}</Text>
-      <Text>Lock: {screenOrientation().orientationLock}</Text>
-      <Button
+      <text>Orientation: {screenOrientation().orientation}</text>
+      <text>Lock: {screenOrientation().orientationLock}</text>
+      <button
         title="Lock landscape"
         onPress={() => lockAsync(OrientationLock.LANDSCAPE)}
       />

@@ -62,16 +62,15 @@ versions — never install either yourself, and never add the `expo` meta-packag
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Text } from '@symbiote-native/react';
     import { useAccelerometer } from '@symbiote-native/sensors/react';
 
     export default function AccelerometerReading() {
       const accelerometer = useAccelerometer();
 
       return (
-        <Text>
+        <text>
           {accelerometer && `x ${accelerometer.x} · y ${accelerometer.y} · z ${accelerometer.z}`}
-        </Text>
+        </text>
       );
     }
     ```
@@ -86,7 +85,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
     </script>
 
     <template>
-      <Text>{{ accelerometer && `x ${accelerometer.x} · y ${accelerometer.y} · z ${accelerometer.z}` }}</Text>
+      <text>{{ accelerometer && `x ${accelerometer.x} · y ${accelerometer.y} · z ${accelerometer.z}` }}</text>
     </template>
     ```
 
@@ -94,13 +93,13 @@ versions — never install either yourself, and never add the `expo` meta-packag
   <TabItem label="Angular">
     ```ts
     import { Component, inject } from '@angular/core';
-    import { Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { AccelerometerService } from '@symbiote-native/sensors/angular';
 
     @Component({
       standalone: true,
-      imports: [Text],
-      template: `<Text>{{ accelerometer()?.x }} · {{ accelerometer()?.y }} · {{ accelerometer()?.z }}</Text>`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<text>{{ accelerometer()?.x }} · {{ accelerometer()?.y }} · {{ accelerometer()?.z }}</text>`,
     })
     export class AccelerometerReading {
       readonly accelerometer = inject(AccelerometerService).connect();
@@ -111,30 +110,28 @@ versions — never install either yourself, and never add the `expo` meta-packag
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text } from '@symbiote-native/svelte';
       import { useAccelerometer } from '@symbiote-native/sensors/svelte';
 
       const accelerometer = useAccelerometer(); // { readonly current: IAccelerometerMeasurement | null }
     </script>
 
-    <Text>
+    <text>
       {accelerometer.current && `x ${accelerometer.current.x} · y ${accelerometer.current.y} · z ${accelerometer.current.z}`}
-    </Text>
+    </text>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Text } from '@symbiote-native/solid';
     import { createAccelerometer } from '@symbiote-native/sensors/solid';
 
     export function AccelerometerReading() {
       const accelerometer = createAccelerometer();
 
       return (
-        <Text>
+        <text>
           {accelerometer() && `x ${accelerometer()?.x} · y ${accelerometer()?.y} · z ${accelerometer()?.z}`}
-        </Text>
+        </text>
       );
     }
     ```
@@ -158,13 +155,12 @@ Unlike every other sensor, upstream `Pedometer` has no shared instance to hang `
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Text } from '@symbiote-native/react';
     import { usePedometer } from '@symbiote-native/sensors/react';
 
     export default function StepCount() {
       const pedometer = usePedometer(); // { steps: number } | null, live-subscribed
 
-      return <Text>{pedometer && `${pedometer.steps} steps`}</Text>;
+      return <text>{pedometer && `${pedometer.steps} steps`}</text>;
     }
     ```
 
@@ -178,7 +174,7 @@ Unlike every other sensor, upstream `Pedometer` has no shared instance to hang `
     </script>
 
     <template>
-      <Text>{{ pedometer && `${pedometer.steps} steps` }}</Text>
+      <text>{{ pedometer && `${pedometer.steps} steps` }}</text>
     </template>
     ```
 
@@ -186,13 +182,13 @@ Unlike every other sensor, upstream `Pedometer` has no shared instance to hang `
   <TabItem label="Angular">
     ```ts
     import { Component, inject } from '@angular/core';
-    import { Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { PedometerService } from '@symbiote-native/sensors/angular';
 
     @Component({
       standalone: true,
-      imports: [Text],
-      template: `<Text>{{ pedometer()?.steps }} steps</Text>`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<text>{{ pedometer()?.steps }} steps</text>`,
     })
     export class StepCount {
       readonly pedometer = inject(PedometerService).connect();
@@ -203,25 +199,23 @@ Unlike every other sensor, upstream `Pedometer` has no shared instance to hang `
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text } from '@symbiote-native/svelte';
       import { usePedometer } from '@symbiote-native/sensors/svelte';
 
       const pedometer = usePedometer(); // { readonly current: IPedometerResult | null }
     </script>
 
-    <Text>{pedometer.current && `${pedometer.current.steps} steps`}</Text>
+    <text>{pedometer.current && `${pedometer.current.steps} steps`}</text>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Text } from '@symbiote-native/solid';
     import { createPedometer } from '@symbiote-native/sensors/solid';
 
     export function StepCount() {
       const pedometer = createPedometer(); // Accessor<IPedometerResult | null>
 
-      return <Text>{pedometer() && `${pedometer()?.steps} steps`}</Text>;
+      return <text>{pedometer() && `${pedometer()?.steps} steps`}</text>;
     }
     ```
 

@@ -66,7 +66,6 @@ src/angular/  @symbiote-native/device/angular — export * from '../core'
 ```tsx
 // React
 import { useEffect, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import {
   brand,
   deviceName,
@@ -88,20 +87,20 @@ function DeviceScreen() {
   }, []);
 
   return (
-    <View>
-      <Text>{isDevice ? 'Real device' : 'Simulator/emulator'}</Text>
-      <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
-      <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
-      <Text>{deviceName ?? 'unnamed device'}</Text>
-      <Text>
+    <view>
+      <text>{isDevice ? 'Real device' : 'Simulator/emulator'}</text>
+      <text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</text>
+      <text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</text>
+      <text>{deviceName ?? 'unnamed device'}</text>
+      <text>
         {uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}
-      </Text>
-      <Text>
+      </text>
+      <text>
         {maxMemory === null
           ? 'checking memory…'
           : `Max memory: ${maxMemory} bytes`}
-      </Text>
-    </View>
+      </text>
+    </view>
   );
 }
 ```
@@ -110,7 +109,6 @@ function DeviceScreen() {
 <!-- Vue -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { Text, View } from '@symbiote-native/vue';
 import {
   brand,
   deviceName,
@@ -132,25 +130,24 @@ onMounted(() => {
 </script>
 
 <template>
-  <View>
-    <Text>{{ isDevice ? 'Real device' : 'Simulator/emulator' }}</Text>
-    <Text>{{ `${brand ?? 'unknown'} ${modelName ?? ''}` }}</Text>
-    <Text>{{ `${osName ?? 'unknown OS'} ${osVersion ?? ''}` }}</Text>
-    <Text>{{ deviceName ?? 'unnamed device' }}</Text>
-    <Text>{{
+  <view>
+    <text>{{ isDevice ? 'Real device' : 'Simulator/emulator' }}</text>
+    <text>{{ `${brand ?? 'unknown'} ${modelName ?? ''}` }}</text>
+    <text>{{ `${osName ?? 'unknown OS'} ${osVersion ?? ''}` }}</text>
+    <text>{{ deviceName ?? 'unnamed device' }}</text>
+    <text>{{
       uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`
-    }}</Text>
-    <Text>{{
+    }}</text>
+    <text>{{
       maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`
-    }}</Text>
-  </View>
+    }}</text>
+  </view>
 </template>
 ```
 
 ```svelte
 <!-- Svelte -->
 <script lang="ts">
-  import { Text, View } from '@symbiote-native/svelte';
   import {
     brand,
     deviceName,
@@ -171,23 +168,22 @@ onMounted(() => {
   });
 </script>
 
-<View>
-  <Text>{isDevice ? 'Real device' : 'Simulator/emulator'}</Text>
-  <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
-  <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
-  <Text>{deviceName ?? 'unnamed device'}</Text>
-  <Text>{uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}</Text>
-  <Text>
+<view>
+  <text>{isDevice ? 'Real device' : 'Simulator/emulator'}</text>
+  <text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</text>
+  <text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</text>
+  <text>{deviceName ?? 'unnamed device'}</text>
+  <text>{uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}</text>
+  <text>
     {maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`}
-  </Text>
-</View>
+  </text>
+</view>
 ```
 
 ```tsx
 // Solid — a component body runs once, so the two async values need a signal; the eager
 // constants (brand, modelName, ...) are plain reads with nothing to subscribe to.
 import { createSignal, onMount } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 import {
   brand,
   deviceName,
@@ -209,20 +205,20 @@ function DeviceScreen() {
   });
 
   return (
-    <View>
-      <Text>{isDevice ? 'Real device' : 'Simulator/emulator'}</Text>
-      <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
-      <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
-      <Text>{deviceName ?? 'unnamed device'}</Text>
-      <Text>
+    <view>
+      <text>{isDevice ? 'Real device' : 'Simulator/emulator'}</text>
+      <text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</text>
+      <text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</text>
+      <text>{deviceName ?? 'unnamed device'}</text>
+      <text>
         {uptime() === null ? 'checking uptime…' : `Uptime: ${uptime()}ms`}
-      </Text>
-      <Text>
+      </text>
+      <text>
         {maxMemory() === null
           ? 'checking memory…'
           : `Max memory: ${maxMemory()} bytes`}
-      </Text>
-    </View>
+      </text>
+    </view>
   );
 }
 ```
@@ -230,7 +226,7 @@ function DeviceScreen() {
 ```ts
 // Angular
 import { Component, signal } from '@angular/core';
-import { Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   brand,
   deviceName,
@@ -244,22 +240,22 @@ import {
 
 @Component({
   standalone: true,
-  imports: [Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <View>
-      <Text>{{ isDevice ? 'Real device' : 'Simulator/emulator' }}</Text>
-      <Text>{{ brand ?? 'unknown' }} {{ modelName ?? '' }}</Text>
-      <Text>{{ osName ?? 'unknown OS' }} {{ osVersion ?? '' }}</Text>
-      <Text>{{ deviceName ?? 'unnamed device' }}</Text>
-      <Text>{{
+    <view>
+      <text>{{ isDevice ? 'Real device' : 'Simulator/emulator' }}</text>
+      <text>{{ brand ?? 'unknown' }} {{ modelName ?? '' }}</text>
+      <text>{{ osName ?? 'unknown OS' }} {{ osVersion ?? '' }}</text>
+      <text>{{ deviceName ?? 'unnamed device' }}</text>
+      <text>{{
         uptime() === null ? 'checking uptime…' : 'Uptime: ' + uptime() + 'ms'
-      }}</Text>
-      <Text>{{
+      }}</text>
+      <text>{{
         maxMemory() === null
           ? 'checking memory…'
           : 'Max memory: ' + maxMemory() + ' bytes'
-      }}</Text>
-    </View>
+      }}</text>
+    </view>
   `,
 })
 export class DeviceScreen {

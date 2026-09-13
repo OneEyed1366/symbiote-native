@@ -3,17 +3,12 @@ title: React API
 description: The React adapter public contract.
 ---
 
-Import app-facing APIs from `@symbiote-native/react`:
+Primitives (`view`, `text`, `pressable`, `text-input`, `scroll-view`, ...) are
+plain lowercase intrinsic tags — write them directly in JSX, no import needed.
+Import only what's still a real component or module from `@symbiote-native/react`:
 
 ```tsx
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/react';
+import { StyleSheet } from '@symbiote-native/react';
 ```
 
 The React adapter intentionally feels close to React Native. The difference is
@@ -34,19 +29,19 @@ the Metro version anchor, so it has to be pinned at the app root.
 
 | Concern         | React API                                                                                                                                        |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Event callbacks | `onPress`, `onValueChange` (shared by `Switch`/`TextInput`), `onLayout`                                                                          |
+| Event callbacks | `onPress`, `onValueChange` (shared by `switch`/`text-input`), `onLayout`                                                                          |
 | Children        | `children?: ReactNode`                                                                                                                           |
-| Render children | `(state) => ReactNode`, for components such as `Pressable`                                                                                       |
+| Render children | list components only (`FlatList`, `SectionList`, ...) — a primitive tag like `pressable` has no component body to call a child function against; wire `onPressIn`/`onPressOut` into local state instead |
 | Refs            | React refs to host instances or component handles                                                                                                |
 | Styles          | `style={styles.root}` with React Native-style objects, or `className` for a registered CSS class (see the [Styling guide](/docs/learn/styling/)) |
 
 ## Common events
 
 ```tsx
-<Pressable onPress={event => {}} onLongPress={event => {}} />
-<Switch value={enabled} onValueChange={(value, event) => setEnabled(value)} />
-<TextInput value={text} onValueChange={(text, event) => setText(text)} />
-<View onLayout={event => {}} />
+<pressable onPress={event => {}} onLongPress={event => {}} />
+<switch value={enabled} onValueChange={(value, event) => setEnabled(value)} />
+<text-input value={text} onValueChange={(text, event) => setText(text)} />
+<view onLayout={event => {}} />
 ```
 
 ## Refs and handles
@@ -56,11 +51,11 @@ components expose component-specific handles:
 
 ```tsx
 import { useRef } from 'react';
-import { TextInput, type ITextInputHandle } from '@symbiote-native/react';
+import type { ITextInputHandle } from '@symbiote-native/react';
 
 const inputRef = useRef<ITextInputHandle>(null);
 
-<TextInput ref={inputRef} value="" onValueChange={() => {}} />;
+<text-input ref={inputRef} value="" onValueChange={() => {}} />;
 inputRef.current?.focus();
 ```
 
@@ -121,7 +116,7 @@ this works structurally where it never could in real RN.
 
 The target (`containerNodeOrRef`) must be an already-mounted SymbioteNative host
 node or `SymbioteSurface` — typically a ref to a persistent "overlay host"
-`View` near the app root — not a CSS-selector-style string. **v1 scope:** the
+`view` near the app root — not a CSS-selector-style string. **v1 scope:** the
 target must live in the _same_ surface as the portal's call site; portaling
 into a second, independently-mounted surface isn't wired yet.
 
@@ -140,9 +135,9 @@ const overlayTunnel = createTunnel(); // module-level singleton, importable from
 
 function OverlayHost() {
   return (
-    <View style={styles.overlayHost}>
+    <view style={styles.overlayHost}>
       <overlayTunnel.Out />
-    </View>
+    </view>
   );
 }
 

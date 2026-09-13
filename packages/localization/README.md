@@ -82,8 +82,8 @@ function LocalizationScreen() {
 
   return (
     <>
-      <Text>{locales[0].languageTag}</Text>
-      <Text>{calendars[0].timeZone}</Text>
+      <text>{locales[0].languageTag}</text>
+      <text>{calendars[0].timeZone}</text>
     </>
   );
 }
@@ -98,8 +98,8 @@ const locales = useLocales(); // Ref<Locale[]>
 const calendars = useCalendars(); // Ref<Calendar[]>
 </script>
 <template>
-  <Text>{{ locales[0].languageTag }}</Text>
-  <Text>{{ calendars[0].timeZone }}</Text>
+  <text>{{ locales[0].languageTag }}</text>
+  <text>{{ calendars[0].timeZone }}</text>
 </template>
 ```
 
@@ -115,8 +115,8 @@ const calendars = useCalendars(); // Ref<Calendar[]>
   const calendars = useCalendars(); // { readonly current: Calendar[] }
 </script>
 
-<Text>{locales.current[0].languageTag}</Text>
-<Text>{calendars.current[0].timeZone}</Text>
+<text>{locales.current[0].languageTag}</text>
+<text>{calendars.current[0].timeZone}</text>
 ```
 
 ```tsx
@@ -133,8 +133,8 @@ function LocalizationScreen() {
 
   return (
     <>
-      <Text>{locales()[0].languageTag}</Text>
-      <Text>{calendars()[0].timeZone}</Text>
+      <text>{locales()[0].languageTag}</text>
+      <text>{calendars()[0].timeZone}</text>
     </>
   );
 }

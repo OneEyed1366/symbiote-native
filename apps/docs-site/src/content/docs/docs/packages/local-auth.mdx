@@ -63,7 +63,6 @@ press and branch on `result.success`.
   <TabItem label="React">
     ```tsx
     import { useEffect, useState } from 'react';
-    import { Pressable, Text, View } from '@symbiote-native/react';
     import {
       authenticateAsync,
       getEnrolledLevelAsync,
@@ -90,13 +89,13 @@ press and branch on `result.success`.
       };
 
       return (
-        <View>
-          <Text>{hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled'}</Text>
-          <Pressable onPress={handleAuthenticate}>
-            <Text>Authenticate</Text>
-          </Pressable>
-          {result && <Text>{result.success ? 'Success' : `Failed: ${result.error}`}</Text>}
-        </View>
+        <view>
+          <text>{hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled'}</text>
+          <pressable onPress={handleAuthenticate}>
+            <text>Authenticate</text>
+          </pressable>
+          {result && <text>{result.success ? 'Success' : `Failed: ${result.error}`}</text>}
+        </view>
       );
     }
     ```
@@ -106,7 +105,6 @@ press and branch on `result.success`.
     ```vue
     <script setup lang="ts">
     import { onMounted, ref } from 'vue';
-    import { Pressable, Text, View } from '@symbiote-native/vue';
     import {
       authenticateAsync,
       getEnrolledLevelAsync,
@@ -135,13 +133,13 @@ press and branch on `result.success`.
     </script>
 
     <template>
-      <View>
-        <Text>{{ hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled' }}</Text>
-        <Pressable @press="handleAuthenticate">
-          <Text>Authenticate</Text>
-        </Pressable>
-        <Text v-if="result">{{ result.success ? 'Success' : `Failed: ${result.error}` }}</Text>
-      </View>
+      <view>
+        <text>{{ hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled' }}</text>
+        <pressable @press="handleAuthenticate">
+          <text>Authenticate</text>
+        </pressable>
+        <text v-if="result">{{ result.success ? 'Success' : `Failed: ${result.error}` }}</text>
+      </view>
     </template>
     ```
 
@@ -149,7 +147,7 @@ press and branch on `result.success`.
   <TabItem label="Angular">
     ```ts
     import { Component, signal } from '@angular/core';
-    import { Pressable, Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import {
       authenticateAsync,
       getEnrolledLevelAsync,
@@ -161,17 +159,17 @@ press and branch on `result.success`.
 
     @Component({
       standalone: true,
-      imports: [Pressable, Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Text>{{ hasHardware() && isEnrolled() ? 'Ready to authenticate' : 'No biometrics enrolled' }}</Text>
-          <Pressable (press)="handleAuthenticate()">
-            <Text>Authenticate</Text>
-          </Pressable>
+        <view>
+          <text>{{ hasHardware() && isEnrolled() ? 'Ready to authenticate' : 'No biometrics enrolled' }}</text>
+          <pressable (press)="handleAuthenticate()">
+            <text>Authenticate</text>
+          </pressable>
           @if (result(); as value) {
-            <Text>{{ value.success ? 'Success' : 'Failed: ' + value.error }}</Text>
+            <text>{{ value.success ? 'Success' : 'Failed: ' + value.error }}</text>
           }
-        </View>
+        </view>
       `,
     })
     export class LocalAuthGate {
@@ -200,7 +198,6 @@ press and branch on `result.success`.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Pressable, Text, View } from '@symbiote-native/svelte';
       import {
         authenticateAsync,
         getEnrolledLevelAsync,
@@ -226,22 +223,21 @@ press and branch on `result.success`.
       }
     </script>
 
-    <View>
-      <Text>{hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled'}</Text>
-      <Pressable onPress={handleAuthenticate}>
-        <Text>Authenticate</Text>
-      </Pressable>
+    <view>
+      <text>{hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled'}</text>
+      <pressable onPress={handleAuthenticate}>
+        <text>Authenticate</text>
+      </pressable>
       {#if result}
-        <Text>{result.success ? 'Success' : `Failed: ${result.error}`}</Text>
+        <text>{result.success ? 'Success' : `Failed: ${result.error}`}</text>
       {/if}
-    </View>
+    </view>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
     import { createSignal, onMount } from 'solid-js';
-    import { Pressable, Text, View } from '@symbiote-native/solid';
     import {
       authenticateAsync,
       getEnrolledLevelAsync,
@@ -268,13 +264,13 @@ press and branch on `result.success`.
       };
 
       return (
-        <View>
-          <Text>{hasHardware() && isEnrolled() ? 'Ready to authenticate' : 'No biometrics enrolled'}</Text>
-          <Pressable onPress={handleAuthenticate}>
-            <Text>Authenticate</Text>
-          </Pressable>
-          {result() && <Text>{result()!.success ? 'Success' : `Failed: ${result()!.error}`}</Text>}
-        </View>
+        <view>
+          <text>{hasHardware() && isEnrolled() ? 'Ready to authenticate' : 'No biometrics enrolled'}</text>
+          <pressable onPress={handleAuthenticate}>
+            <text>Authenticate</text>
+          </pressable>
+          {result() && <text>{result()!.success ? 'Success' : `Failed: ${result()!.error}`}</text>}
+        </view>
       );
     }
     ```

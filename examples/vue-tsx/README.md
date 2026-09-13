@@ -27,7 +27,7 @@ a babel concern:
   `'vue'`→runtime-core string rewrite), so the app and the adapter share **one** Vue runtime —
   reactivity is a singleton, two copies would silently fail to react.
 
-So `<View onResponderRelease={onTap}>` compiles to `createVNode(View, { onResponderRelease: onTap })`;
+So `<view onResponderRelease={onTap}>` compiles to `createVNode('view', { onResponderRelease: onTap })`;
 that `onX` key lands in `patchProp` → `routeProp` exactly as the SFC's `@responder-release` did.
 
 This exercises the same structural reconciler paths as the SFC: a `? :` ternary mounts/unmounts

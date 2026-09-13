@@ -57,7 +57,6 @@ or a subscription. Call one straight from a press handler.
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Pressable, Text, View } from '@symbiote-native/react';
     import {
       impactAsync,
       notificationAsync,
@@ -70,20 +69,20 @@ or a subscription. Call one straight from a press handler.
 
     export default function HapticButtons() {
       return (
-        <View>
-          <Pressable onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}>
-            <Text>Impact</Text>
-          </Pressable>
-          <Pressable onPress={() => notificationAsync(NotificationFeedbackType.Success)}>
-            <Text>Notify</Text>
-          </Pressable>
-          <Pressable onPress={() => selectionAsync()}>
-            <Text>Select</Text>
-          </Pressable>
-          <Pressable onPress={() => performAndroidHapticsAsync(AndroidHaptics.Confirm)}>
-            <Text>Android confirm</Text>
-          </Pressable>
-        </View>
+        <view>
+          <pressable onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}>
+            <text>Impact</text>
+          </pressable>
+          <pressable onPress={() => notificationAsync(NotificationFeedbackType.Success)}>
+            <text>Notify</text>
+          </pressable>
+          <pressable onPress={() => selectionAsync()}>
+            <text>Select</text>
+          </pressable>
+          <pressable onPress={() => performAndroidHapticsAsync(AndroidHaptics.Confirm)}>
+            <text>Android confirm</text>
+          </pressable>
+        </view>
       );
     }
     ```
@@ -92,7 +91,6 @@ or a subscription. Call one straight from a press handler.
   <TabItem label="Vue">
     ```vue
     <script setup lang="ts">
-    import { Pressable, Text, View } from '@symbiote-native/vue';
     import {
       impactAsync,
       notificationAsync,
@@ -105,20 +103,20 @@ or a subscription. Call one straight from a press handler.
     </script>
 
     <template>
-      <View>
-        <Pressable @press="impactAsync(ImpactFeedbackStyle.Medium)">
-          <Text>Impact</Text>
-        </Pressable>
-        <Pressable @press="notificationAsync(NotificationFeedbackType.Success)">
-          <Text>Notify</Text>
-        </Pressable>
-        <Pressable @press="selectionAsync()">
-          <Text>Select</Text>
-        </Pressable>
-        <Pressable @press="performAndroidHapticsAsync(AndroidHaptics.Confirm)">
-          <Text>Android confirm</Text>
-        </Pressable>
-      </View>
+      <view>
+        <pressable @press="impactAsync(ImpactFeedbackStyle.Medium)">
+          <text>Impact</text>
+        </pressable>
+        <pressable @press="notificationAsync(NotificationFeedbackType.Success)">
+          <text>Notify</text>
+        </pressable>
+        <pressable @press="selectionAsync()">
+          <text>Select</text>
+        </pressable>
+        <pressable @press="performAndroidHapticsAsync(AndroidHaptics.Confirm)">
+          <text>Android confirm</text>
+        </pressable>
+      </view>
     </template>
     ```
 
@@ -126,7 +124,7 @@ or a subscription. Call one straight from a press handler.
   <TabItem label="Angular">
     ```ts
     import { Component } from '@angular/core';
-    import { Pressable, Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import {
       impactAsync,
       notificationAsync,
@@ -139,22 +137,22 @@ or a subscription. Call one straight from a press handler.
 
     @Component({
       standalone: true,
-      imports: [Pressable, Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Pressable (press)="onImpact()">
-            <Text>Impact</Text>
-          </Pressable>
-          <Pressable (press)="onNotify()">
-            <Text>Notify</Text>
-          </Pressable>
-          <Pressable (press)="onSelect()">
-            <Text>Select</Text>
-          </Pressable>
-          <Pressable (press)="onAndroidConfirm()">
-            <Text>Android confirm</Text>
-          </Pressable>
-        </View>
+        <view>
+          <pressable (press)="onImpact()">
+            <text>Impact</text>
+          </pressable>
+          <pressable (press)="onNotify()">
+            <text>Notify</text>
+          </pressable>
+          <pressable (press)="onSelect()">
+            <text>Select</text>
+          </pressable>
+          <pressable (press)="onAndroidConfirm()">
+            <text>Android confirm</text>
+          </pressable>
+        </view>
       `,
     })
     export class HapticButtons {
@@ -184,7 +182,6 @@ or a subscription. Call one straight from a press handler.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Pressable, Text, View } from '@symbiote-native/svelte';
       import {
         impactAsync,
         notificationAsync,
@@ -196,20 +193,20 @@ or a subscription. Call one straight from a press handler.
       } from '@symbiote-native/haptics/svelte';
     </script>
 
-    <View>
-      <Pressable onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}>
-        <Text>Impact</Text>
-      </Pressable>
-      <Pressable onPress={() => notificationAsync(NotificationFeedbackType.Success)}>
-        <Text>Notify</Text>
-      </Pressable>
-      <Pressable onPress={() => selectionAsync()}>
-        <Text>Select</Text>
-      </Pressable>
-      <Pressable onPress={() => performAndroidHapticsAsync(AndroidHaptics.Confirm)}>
-        <Text>Android confirm</Text>
-      </Pressable>
-    </View>
+    <view>
+      <pressable onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}>
+        <text>Impact</text>
+      </pressable>
+      <pressable onPress={() => notificationAsync(NotificationFeedbackType.Success)}>
+        <text>Notify</text>
+      </pressable>
+      <pressable onPress={() => selectionAsync()}>
+        <text>Select</text>
+      </pressable>
+      <pressable onPress={() => performAndroidHapticsAsync(AndroidHaptics.Confirm)}>
+        <text>Android confirm</text>
+      </pressable>
+    </view>
     ```
 
     Same shape as every other adapter here — every function is a plain free function off the core
@@ -218,7 +215,6 @@ or a subscription. Call one straight from a press handler.
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Pressable, Text, View } from '@symbiote-native/solid';
     import {
       impactAsync,
       notificationAsync,
@@ -231,20 +227,20 @@ or a subscription. Call one straight from a press handler.
 
     export default function HapticButtons() {
       return (
-        <View>
-          <Pressable onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}>
-            <Text>Impact</Text>
-          </Pressable>
-          <Pressable onPress={() => notificationAsync(NotificationFeedbackType.Success)}>
-            <Text>Notify</Text>
-          </Pressable>
-          <Pressable onPress={() => selectionAsync()}>
-            <Text>Select</Text>
-          </Pressable>
-          <Pressable onPress={() => performAndroidHapticsAsync(AndroidHaptics.Confirm)}>
-            <Text>Android confirm</Text>
-          </Pressable>
-        </View>
+        <view>
+          <pressable onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}>
+            <text>Impact</text>
+          </pressable>
+          <pressable onPress={() => notificationAsync(NotificationFeedbackType.Success)}>
+            <text>Notify</text>
+          </pressable>
+          <pressable onPress={() => selectionAsync()}>
+            <text>Select</text>
+          </pressable>
+          <pressable onPress={() => performAndroidHapticsAsync(AndroidHaptics.Confirm)}>
+            <text>Android confirm</text>
+          </pressable>
+        </view>
       );
     }
     ```

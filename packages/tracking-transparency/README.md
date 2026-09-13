@@ -82,15 +82,15 @@ function TrackingScreen() {
   const [permissionStatus, requestPermission] = usePermissions();
 
   return (
-    <View>
-      <Text>{permissionStatus?.status ?? 'checking…'}</Text>
-      <Pressable onPress={() => requestPermission()}>
-        <Text>Request tracking permission</Text>
-      </Pressable>
-      <Pressable onPress={() => console.log(getAdvertisingId())}>
-        <Text>Log advertising ID</Text>
-      </Pressable>
-    </View>
+    <view>
+      <text>{permissionStatus?.status ?? 'checking…'}</text>
+      <pressable onPress={() => requestPermission()}>
+        <text>Request tracking permission</text>
+      </pressable>
+      <pressable onPress={() => console.log(getAdvertisingId())}>
+        <text>Log advertising ID</text>
+      </pressable>
+    </view>
   );
 }
 ```
@@ -106,15 +106,15 @@ const { status: permissionStatus, request: requestPermission } =
 </script>
 
 <template>
-  <View>
-    <Text>{{ permissionStatus?.status ?? 'checking…' }}</Text>
-    <Pressable @press="requestPermission()">
-      <Text>Request tracking permission</Text>
-    </Pressable>
-    <Pressable @press="console.log(getAdvertisingId())">
-      <Text>Log advertising ID</Text>
-    </Pressable>
-  </View>
+  <view>
+    <text>{{ permissionStatus?.status ?? 'checking…' }}</text>
+    <pressable @press="requestPermission()">
+      <text>Request tracking permission</text>
+    </pressable>
+    <pressable @press="console.log(getAdvertisingId())">
+      <text>Log advertising ID</text>
+    </pressable>
+  </view>
 </template>
 ```
 
@@ -130,15 +130,15 @@ import {
   selector: 'TrackingScreen',
   standalone: true,
   template: `
-    <View>
-      <Text>{{ permissionStatus()?.status ?? 'checking…' }}</Text>
-      <Pressable (press)="permissionsService.request()">
-        <Text>Request tracking permission</Text>
-      </Pressable>
-      <Pressable (press)="logAdvertisingId()"
-        ><Text>Log advertising ID</Text></Pressable
+    <view>
+      <text>{{ permissionStatus()?.status ?? 'checking…' }}</text>
+      <pressable (press)="permissionsService.request()">
+        <text>Request tracking permission</text>
+      </pressable>
+      <pressable (press)="logAdvertisingId()"
+        ><text>Log advertising ID</text></pressable
       >
-    </View>
+    </view>
   `,
 })
 export class TrackingScreen {
@@ -163,15 +163,15 @@ export class TrackingScreen {
   const permissions = usePermissions();
 </script>
 
-<View>
-  <Text>{permissions.status?.status ?? 'checking…'}</Text>
-  <Pressable onPress={() => permissions.request()}>
-    <Text>Request tracking permission</Text>
-  </Pressable>
-  <Pressable onPress={() => console.log(getAdvertisingId())}>
-    <Text>Log advertising ID</Text>
-  </Pressable>
-</View>
+<view>
+  <text>{permissions.status?.status ?? 'checking…'}</text>
+  <pressable onPress={() => permissions.request()}>
+    <text>Request tracking permission</text>
+  </pressable>
+  <pressable onPress={() => console.log(getAdvertisingId())}>
+    <text>Log advertising ID</text>
+  </pressable>
+</view>
 ```
 
 ```tsx
@@ -184,15 +184,15 @@ function TrackingScreen() {
     createPermissions();
 
   return (
-    <View>
-      <Text>{permissionStatus()?.status ?? 'checking…'}</Text>
-      <Pressable onPress={() => void requestPermission()}>
-        <Text>Request tracking permission</Text>
-      </Pressable>
-      <Pressable onPress={() => console.log(getAdvertisingId())}>
-        <Text>Log advertising ID</Text>
-      </Pressable>
-    </View>
+    <view>
+      <text>{permissionStatus()?.status ?? 'checking…'}</text>
+      <pressable onPress={() => void requestPermission()}>
+        <text>Request tracking permission</text>
+      </pressable>
+      <pressable onPress={() => console.log(getAdvertisingId())}>
+        <text>Log advertising ID</text>
+      </pressable>
+    </view>
   );
 }
 ```

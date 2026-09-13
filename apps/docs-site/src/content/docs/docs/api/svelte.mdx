@@ -3,17 +3,13 @@ title: Svelte API
 description: The Svelte adapter public contract.
 ---
 
-Import app-facing APIs from `@symbiote-native/svelte`:
+Primitives (`view`, `text`, `pressable`, `text-input`, `scroll-view`, ...) are
+plain lowercase intrinsic tags — write them directly in markup, no import
+needed. Import only what's still a real component or module from
+`@symbiote-native/svelte`:
 
 ```ts
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/svelte';
+import { StyleSheet } from '@symbiote-native/svelte';
 ```
 
 Svelte drives the same engine as React/Vue/Angular/Solid, but through a different
@@ -50,13 +46,15 @@ is the reference for the full config.
   props in camelCase, so there's no kebab-case normalization step like Vue's.
 - Children: a `children` prop typed `Snippet`, rendered internally via
   `{@render children?.()}` — not Svelte 4's `<slot />`.
-- Render children: a component that passes state back renders `{@render
-children?.(state)}` internally; the caller matches it with a named
-  `{#snippet children(state)}` block, Svelte's twin of a scoped slot.
-- Refs: Symbiote components forward no `bind:this` of their own — `{@attach fn}`
-  is the default way to reach a host node. A raw `symbiote-view`/`symbiote-text`
-  tag you author yourself still supports real `bind:this`. See [refs and
-  attachments](/docs/howtos/svelte-refs-and-attachments/) for the full picture.
+- Render children: list components only (`FlatList`, `SectionList`, ...) still
+  pass state back via `{#snippet}` (Svelte's twin of a scoped slot); a
+  primitive tag like `pressable` has no component body to render one from —
+  wire `onPressIn`/`onPressOut` into a rune instead, see [Children](#children)
+  below.
+- Refs: every primitive is a plain tag now, so `bind:this` reaches the
+  committed host node directly. See [refs and
+  attachments](/docs/howtos/svelte-refs-and-attachments/) for the full picture,
+  including `hostInstance()`/`findNodeHandle()`.
 - Styles: `style`/`class` props, plus a component's own scoped `<style>`
   block — see [Scoped styles](#scoped-styles-style) below.
 - Two-way binding: `value = $bindable()` on `TextInput`/`Switch`/[`Slider`](/docs/packages/slider/) —
@@ -65,10 +63,10 @@ children?.(state)}` internally; the caller matches it with a named
 ## Common events
 
 ```svelte
-<Pressable {onPress} {onLongPress} />
-<Switch bind:value={enabled} />
-<TextInput bind:value={text} onValueChange={(text, event) => onChange(event)} />
-<View {onLayout} />
+<pressable {onPress} {onLongPress} />
+<switch bind:value={enabled} />
+<text-input bind:value={text} onValueChange={(text, event) => onChange(event)} />
+<view {onLayout} />
 ```
 
 `TextInput`'s `onValueChange` fires `(text, event)` — the same merged shape
@@ -77,44 +75,43 @@ because an `EventEmitter` only carries one value.
 
 ## Children
 
+`pressable` is a plain tag, so pressed state no longer arrives through a
+`{#snippet}` — wire the two press events into a rune instead:
+
 ```svelte
 <script lang="ts">
-  import { Pressable, Text } from '@symbiote-native/svelte';
+  let pressed = $state(false);
 </script>
 
-<Pressable {onPress}>
-  {#snippet children({ pressed })}
-    <Text>{pressed ? 'Release' : 'Press me'}</Text>
-  {/snippet}
-</Pressable>
+<pressable
+  {onPress}
+  onPressIn={() => (pressed = true)}
+  onPressOut={() => (pressed = false)}
+>
+  <text>{pressed ? 'Release' : 'Press me'}</text>
+</pressable>
 ```
 
-List renderers follow the same principle: the data and native list math are
-shared, while the rendered cell is a snippet rather than a React node or a Vue
-slot.
+List renderers still pass state back through a `{#snippet}`, since the
+rendered cell is a real Svelte snippet rather than a React node or a Vue slot.
 
 ## Refs and handles
 
 ```svelte
 <script lang="ts">
-  import { View } from '@symbiote-native/svelte';
-
-  const logMount = (node: unknown) => {
-    console.log('mounted', node);
-    return () => console.log('unmounted', node);
-  };
+  let node: unknown;
 </script>
 
-<View testID="target" {@attach logMount} />
+<view testID="target" bind:this={node} />
 ```
 
-`{@attach}` is the one directive-shaped construct the Svelte compiler accepts
-on a component (`use:`/`class:`/`style:` are rejected there), and it reaches
-the committed native node on any ordinary Symbiote component for free. A
-component with its own exported imperative surface (`ScrollView.scrollTo`,
-…) uses that surface directly instead. Full mechanism, including a raw
-`symbiote-*` host tag's `bind:this` + `hostInstance()`/`findNodeHandle()`
-path: [How to: refs and attachments in
+Every primitive is an ordinary tag, so `bind:this` reaches the committed
+native node directly — no `{@attach}` indirection needed for a plain ref.
+`{@attach fn}` still works as an ordinary Svelte attachment when you want a
+mount/unmount pair rather than a single assignment. Imperative methods like
+`scroll-view`'s `scrollTo`/`scrollToEnd`/`flashScrollIndicators` live on the
+host node itself — reach them through `hostInstance(node)`. Full mechanism,
+including `findNodeHandle()`: [How to: refs and attachments in
 Svelte](/docs/howtos/svelte-refs-and-attachments/).
 
 ## Two-way binding (`bind:value`)
@@ -123,8 +120,8 @@ Svelte](/docs/howtos/svelte-refs-and-attachments/).
 declare `value = $bindable()`:
 
 ```svelte
-<Switch bind:value={enabled} />
-<TextInput bind:value={text} />
+<switch bind:value={enabled} />
+<text-input bind:value={text} />
 <Slider bind:value={volume} minimumValue={0} maximumValue={1} />
 ```
 
@@ -141,9 +138,9 @@ through the same style registry every adapter's `class`/`className`/`:class`
 path shares:
 
 ```svelte
-<View class="card">
-  <Text>Scoped — no other component's .card collides</Text>
-</View>
+<view class="card">
+  <text>Scoped — no other component's .card collides</text>
+</view>
 
 <style>
   .card {
@@ -181,8 +178,8 @@ term, and this adapter's lifecycle-helper bucket is named `runes/` to match:
   const scheme = useColorScheme();
 </script>
 
-<Text
-  >{dimensions.current.width}×{dimensions.current.height} · {scheme.current}</Text
+<text
+  >{dimensions.current.width}×{dimensions.current.height} · {scheme.current}</text
 >
 ```
 
@@ -200,11 +197,12 @@ because RN's `Settings` has no stock Android implementation at all.
 
 ## Animations and gestures
 
-`Animated` (both the JS and native driver, plus the `AnimatedView`/
-`AnimatedText`/`AnimatedImage`/`AnimatedScrollView` components) and
+An animated value dropped straight into a primitive's prop resolves in the
+engine — `<view style={{ opacity: someAnimatedValue }} />` just works, no
+wrapper component needed. `Animated` (both the JS and native driver) and
 `PanResponder` are re-exported from `@symbiote-native/svelte` — see the
-[Animations guide](/docs/learn/animations/) for the full surface. `Animated.FlatList`/
-`Animated.SectionList` have no Svelte wrapper yet.
+[Animations guide](/docs/learn/animations/) for the full surface.
+`Animated.FlatList`/`Animated.SectionList` have no Svelte wrapper yet.
 
 ## Cross-surface content (`createTunnel`)
 
@@ -222,7 +220,7 @@ because RN's `Settings` has no stock Android implementation at all.
 <!-- inside any other component, in any surface -->
 {#if toastVisible}
   <TunnelIn tunnel={overlayTunnel}>
-    <Text>Toast</Text>
+    <text>Toast</text>
   </TunnelIn>
 {/if}
 ```
@@ -268,7 +266,7 @@ five adapters — React's `componentDidCatch` boundary and Vue's
   <Child />
 
   {#snippet failed(error, reset)}
-    <Text>{error.message}</Text>
+    <text>{error.message}</text>
   {/snippet}
 </svelte:boundary>
 ```

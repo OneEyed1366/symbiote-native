@@ -280,7 +280,7 @@ transition, not an instant JS-only mount.
         }, []),
       );
 
-      return <Text>{`focus count: ${focusCount}`}</Text>;
+      return <text>{`focus count: ${focusCount}`}</text>;
     }
     ```
 
@@ -302,7 +302,7 @@ transition, not an instant JS-only mount.
     </script>
 
     <template>
-      <Text>{{ `focus count: ${focusCount}` }}</Text>
+      <text>{{ `focus count: ${focusCount}` }}</text>
     </template>
     ```
 
@@ -310,13 +310,13 @@ transition, not an instant JS-only mount.
   <TabItem label="Angular">
     ```ts
     import { Component, signal } from '@angular/core';
-    import { Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { injectFocusEffect } from '@symbiote-native/navigation/angular';
 
     @Component({
       standalone: true,
-      imports: [Text],
-      template: `<Text>{{ 'focus count: ' + focusCount() }}</Text>`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<text>{{ 'focus count: ' + focusCount() }}</text>`,
     })
     export class HooksDemoScreen {
       readonly focusCount = signal(0);
@@ -348,7 +348,7 @@ transition, not an instant JS-only mount.
       });
     </script>
 
-    <Text>{`focus count: ${focusCount}`}</Text>
+    <text>{`focus count: ${focusCount}`}</text>
     ```
 
   </TabItem>
@@ -367,7 +367,7 @@ transition, not an instant JS-only mount.
         };
       });
 
-      return <Text>{`focus count: ${focusCount()}`}</Text>;
+      return <text>{`focus count: ${focusCount()}`}</text>;
     }
     ```
 
@@ -433,7 +433,7 @@ navigator's state changes.
 
     function RouteStackList() {
       const routeNames = useNavigationState(state => state.routes.map(route => route.name));
-      return routeNames.map((name, index) => <Text key={name}>{`${index}. ${name}`}</Text>);
+      return routeNames.map((name, index) => <text key={name}>{`${index}. ${name}`}</text>);
     }
     ```
 
@@ -447,7 +447,7 @@ navigator's state changes.
     </script>
 
     <template>
-      <Text v-for="(name, index) in routeNames" :key="name">{{ `${index}. ${name}` }}</Text>
+      <text v-for="(name, index) in routeNames" :key="name">{{ `${index}. ${name}` }}</text>
     </template>
     ```
 
@@ -455,15 +455,15 @@ navigator's state changes.
   <TabItem label="Angular">
     ```ts
     import { Component } from '@angular/core';
-    import { Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { injectNavigationState } from '@symbiote-native/navigation/angular';
 
     @Component({
       standalone: true,
-      imports: [Text],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
         @for (name of routeNames(); track name + '-' + $index; let index = $index) {
-          <Text>{{ index + '. ' + name }}</Text>
+          <text>{{ index + '. ' + name }}</text>
         }
       `,
     })
@@ -481,7 +481,7 @@ navigator's state changes.
       const routeNames = useNavigationState(state => state.routes.map(route => route.name));
     </script>
 
-    {#each routeNames.current as name, index (`${name}-${index}`)}<Text>{`${index}. ${name}`}</Text>{/each}
+    {#each routeNames.current as name, index (`${name}-${index}`)}<text>{`${index}. ${name}`}</text>{/each}
     ```
 
   </TabItem>
@@ -494,7 +494,7 @@ navigator's state changes.
       const routeNames = createNavigationState(state => state.routes.map(route => route.name));
       return (
         <For each={routeNames()}>
-          {(name, index) => <Text>{`${index()}. ${name}`}</Text>}
+          {(name, index) => <text>{`${index()}. ${name}`}</text>}
         </For>
       );
     }

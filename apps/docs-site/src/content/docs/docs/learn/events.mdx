@@ -19,18 +19,18 @@ caveat below).
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    <Switch value={enabled} onValueChange={setEnabled} />
-    <TextInput value={name} onValueChange={setName} />
-    <Pressable onPress={() => setCount(count + 1)} />
+    <switch value={enabled} onValueChange={setEnabled} />
+    <text-input value={name} onValueChange={setName} />
+    <pressable onPress={() => setCount(count + 1)} />
     ```
   </TabItem>
   <TabItem label="Vue">
     Vue uses typed emits, or `v-model` on the controlled components that support it:
 
     ```vue
-    <Switch v-model="enabled" />
-    <TextInput v-model="name" />
-    <Pressable @press="count++" />
+    <switch v-model="enabled" />
+    <text-input v-model="name" />
+    <pressable @press="count++" />
     ```
 
   </TabItem>
@@ -40,9 +40,9 @@ caveat below).
 
     ```ts
     template: `
-      <Switch [value]="enabled" (valueChange)="setEnabled($event)" />
-      <TextInput [value]="name" (valueChange)="setName($event)" />
-      <Pressable (press)="count = count + 1" />
+      <switch [value]="enabled" (valueChange)="setEnabled($event)" />
+      <text-input [value]="name" (valueChange)="setName($event)" />
+      <pressable (press)="count = count + 1" />
     `
     ```
 
@@ -52,9 +52,9 @@ caveat below).
     as-is, no framework-specific event wrapper:
 
     ```svelte
-    <Switch value={enabled} onValueChange={next => (enabled = next)} />
-    <TextInput value={name} onValueChange={next => (name = next)} />
-    <Pressable onPress={() => (count += 1)} />
+    <switch value={enabled} onValueChange={next => (enabled = next)} />
+    <text-input value={name} onValueChange={next => (name = next)} />
+    <pressable onPress={() => (count += 1)} />
     ```
 
   </TabItem>
@@ -63,9 +63,9 @@ caveat below).
     props pass through as-is with no framework-specific event wrapper:
 
     ```tsx
-    <Switch value={enabled()} onValueChange={next => setEnabled(next)} />
-    <TextInput value={name()} onValueChange={next => setName(next)} />
-    <Pressable onPress={() => setCount(count() + 1)} />
+    <switch value={enabled()} onValueChange={next => setEnabled(next)} />
+    <text-input value={name()} onValueChange={next => setName(next)} />
+    <pressable onPress={() => setCount(count() + 1)} />
     ```
 
   </TabItem>
