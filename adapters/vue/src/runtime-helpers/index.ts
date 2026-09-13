@@ -29,11 +29,21 @@ import {
 } from '@symbiote-native/engine';
 import { descriptorFor, SWITCH_TAG } from '@symbiote-native/components';
 
-// Shadows runtime-core's own Teleport for every compiled `from 'vue'` import (see the header):
-// same component, plus a runtime guard on `to`. Lives in ../create-portal so the adapter's portal
-// sits where every other adapter's does; re-exported here because THIS is the module Metro
-// rewrites `vue` to, and an `export *` alone would resolve `Teleport` to the unguarded original.
-export { Teleport, type ITeleportTarget } from '../create-portal';
+// Do NOT shadow runtime-core's own Teleport here, however tempting the guarded ../create-portal
+// wrapper looks (same reasoning that shadowed it in the first place, and it is wrong for this
+// file specifically). @vue/compiler-sfc recognises the literal tag name "Teleport" as one of
+// Vue's CORE built-ins at compile time — regardless of which value the name resolves to at
+// runtime — and compiles its children as a raw array with a PROPS-only patchFlag (`dynamicProps:
+// ["to"]`), never the DYNAMIC_SLOTS-flagged shape a real user component gets. Substituting a real
+// `defineComponent` under that name makes it go through Vue's ordinary component update path
+// (shouldUpdateComponent), which — for a PROPS-only patchFlag — checks ONLY the props named in
+// `dynamicProps` and never re-renders on a children/slot change at all. Confirmed by reproducing
+// through the real compiler (compileSfc) + a live mount: the wrapper's render() fires once at
+// mount and never again, so a Teleport whose content is gated by v-if (the ordinary "toast"/
+// "modal" shape) silently stops updating the moment `to` itself stays the same. `export *` above
+// already re-exports the real, unwrapped Teleport for this path — leave it there. The guarded
+// wrapper (../create-portal) is still exported from the adapter's main barrel for anyone who
+// constructs the vnode by hand (`h(Teleport, ...)`, e.g. in TSX), where no such codegen applies.
 
 // Shadows @vue/shared's own `normalizeProps` for every compiled `from 'vue'` import, for ONE
 // divergence: a FUNCTION-valued `style` survives it.

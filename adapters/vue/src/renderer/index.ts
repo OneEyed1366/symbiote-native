@@ -3,7 +3,14 @@
 // drives the exact same retained tree React does: the proof the core is framework-
 // agnostic.
 
-import { createRenderer, type RendererOptions } from '@vue/runtime-core';
+import {
+  callWithErrorHandling,
+  createRenderer,
+  ErrorCodes,
+  markRaw,
+  type ComponentInternalInstance,
+  type RendererOptions,
+} from '@vue/runtime-core';
 import {
   appendChild,
   createAnchor,
@@ -64,6 +71,55 @@ function seedTextDefaults(node: ISymbioteNode): void {
 // test sets both, so the state is not worth carrying.
 const PROP_ALIASES: ReadonlyMap<string, string> = new Map([['id', 'nativeID']]);
 
+// RN-style event prop naming ('onPress', 'onValueChange', ...), the same convention JSX itself
+// uses to separate an event from a plain value prop — good enough to decide whether to wrap,
+// without duplicating routeProp's own ViewConfig-derived event lists here.
+const EVENT_PROP_NAME = /^on[A-Z]/;
+
+// A native event (a Fabric touch, a responder gesture) invokes a Pressable/TextInput/etc.
+// listener straight out of the engine's own event dispatch (core/engine/src/dispatch.ts,
+// core/components/src/behaviors/pressable.ts's `dispatch`), entirely outside anything Vue ever
+// wraps — no render, no watcher, no lifecycle hook sits between the native event and the app's
+// callback. So a throw inside `onPress={throwNow}` was a genuinely UNCAUGHT JS exception: it
+// skipped `onErrorCaptured`, skipped `app.config.errorHandler`, skipped even this adapter's own
+// default reporter (render.ts's `reportToHost`) and reached Hermes's own top-level handler
+// directly — the raw, component-stack-less redbox this was device-reported as, not the "vue
+// render (...)" framed one `reportToHost` produces. Real Vue DOM has the identical seam
+// (`patchEvent`'s `createInvoker`) for the identical reason: a DOM event is native too.
+//
+// Wrapping here, at `patchProp`, needs the OWNING instance — and `getCurrentInstance()` cannot
+// supply it: Vue resets `currentRenderingInstance` at the END of `renderComponentRoot`, BEFORE
+// the subsequent `patch()` call that actually reaches `mountElement`/`patchProp`, so by the time
+// this runs it always reads null (measured via a real thrown press listener — `handleError` never
+// found the `onErrorCaptured` ancestor because `if (instance)` was false). Real Vue DOM does not
+// use `getCurrentInstance()` for this either: `hostPatchProp` is called with an explicit 6th
+// argument, `parentComponent`, threaded down through `patch`/`mountElement` from the component
+// whose render produced the vnode — the same instance the DOM renderer's own `patchEvent` passes
+// to `callWithAsyncErrorHandling`. That parameter, not the global pointer, is the correct capture.
+//
+// `callWithErrorHandling` (the SYNC form, not `callWithAsyncErrorHandling`) is deliberate: a
+// responder-negotiation callback (`onStartShouldSetResponder`, ...) returns a boolean the engine
+// reads synchronously, and the sync form is the one that returns the call's result directly
+// rather than folding it into promise-handling for the multi-hook case.
+function wrapListenerForErrorHandling(
+  listener: (...args: unknown[]) => unknown,
+  instance: ComponentInternalInstance | null,
+): (...args: unknown[]) => unknown {
+  const wrapper = (...args: unknown[]): unknown =>
+    callWithErrorHandling(
+      listener,
+      instance,
+      ErrorCodes.NATIVE_EVENT_HANDLER,
+      args,
+    );
+  // Some listeners are marker-carrying functions, not plain callbacks — Animated.event's
+  // __getHandler() (core/engine/src/animated/event.ts) hands back exactly this shape,
+  // `Object.assign((...) => {...}, { __getEvent: () => this })`, and the engine's native-driver
+  // attach path reads `__getEvent` off the prop value it was given. A fresh closure with none of
+  // the original's own properties silently breaks that — carry them forward.
+  return Object.assign(wrapper, listener);
+}
+
 // An explicit `undefined` must NOT clear one of those defaults: RN treats a missing prop and an
 // explicit undefined alike, and only a literal `false` opts out of allowFontScaling. Reached
 // only when a value is already undefined, so it costs nothing on the hot path.
@@ -97,7 +153,16 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       dlog(
         () => `vue createElement ${descriptor.component} -> public instance`,
       );
-      return toPublicInstance(node);
+      // markRaw is load-bearing, not an optimization: useTemplateRef()'s return value is
+      // `readonly(shallowRef(null))` (runtime-core.cjs.js), and Vue's readonly() wraps ANY
+      // `.value` whose Object.prototype.toString reads "[object Object]" — true of a plain class
+      // instance, unlike a real DOM Element, which fails that check for free. Unmarked, a node
+      // reached through useTemplateRef() (not a plain ref()/shallowRef(), both of which skip the
+      // wrap) came back as a deep-readonly Proxy: reads worked, so `committedOf`/`whenCommitted`
+      // saw a "committed" node, but `setNativeProps`'s `node.props.style = …` silently no-op'd
+      // with a dev-only "Set operation… target is readonly" warning — device-reported 2026-09-11
+      // as "flash the right chip" doing nothing on press.
+      return markRaw(toPublicInstance(node));
     },
 
     createText(text) {
@@ -183,7 +248,7 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       return index >= 0 ? (siblings[index + 1] ?? null) : null;
     },
 
-    patchProp(el, key, _prev, next) {
+    patchProp(el, key, _prev, next, _namespace, parentComponent) {
       if (isSurface(el)) return;
       // Kebab -> camel happens HERE, not only inside a component wrapper: the SFC transformer
       // lowers View/Text to their intrinsic tags (metro-vue-transformer.cjs), so those props
@@ -191,11 +256,16 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       // path, which already normalized.
       const normalized = normalizeVueAttrKey(key);
       const name = PROP_ALIASES.get(normalized) ?? normalized;
+      const value = next === undefined ? textDefaultFor(el, name) : next;
+      const routed =
+        EVENT_PROP_NAME.test(name) && typeof value === 'function'
+          ? wrapListenerForErrorHandling(value, parentComponent ?? null)
+          : value;
       // routeProp makes the prop-vs-event decision from the node's ViewConfig (onPress on a
       // View becomes a listener; onTintColor on a Switch stays a prop), shared with React. The
       // class/style merge (explicit :style always winning, regardless of which of Vue's two
       // independent patchProp calls lands last) is centralized there too (core/engine/src/node.ts).
-      routeProp(el, name, next === undefined ? textDefaultFor(el, name) : next);
+      routeProp(el, name, routed);
       surface.requestCommit();
     },
 

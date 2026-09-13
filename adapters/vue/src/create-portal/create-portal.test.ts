@@ -18,6 +18,10 @@ import {
   shallowRef,
 } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import ts from 'typescript';
+import type { Component } from '@vue/runtime-core';
+import * as engine from '@symbiote-native/engine';
+import * as vueAdapter from '@symbiote-native/vue';
 import { mount, unmount } from '@symbiote-native/vue';
 import {
   isSymbioteNode,
@@ -25,7 +29,13 @@ import {
   type SymbioteSurface,
 } from '@symbiote-native/engine';
 import { Teleport } from './index';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  installFabric,
+  waitUntil,
+  type IFakeNode,
+} from '@symbiote-native/test-utils';
+import * as runtimeHelpers from '../runtime-helpers';
+import metroVueTransformer from '../../metro-vue-transformer.cjs';
 
 const FIRST_ROOT_TAG = 700;
 
@@ -420,6 +430,92 @@ describe('Teleport — the Vue adapter portal', () => {
 
       expect(
         reported.some(message => /not a real host node/.test(message)),
+      ).toBe(true);
+    });
+  });
+
+  // Every case above builds its Teleport vnode with h(Teleport, ...) — a value the test controls
+  // directly. A real .vue SFC never does that: `<Teleport>` is a reserved tag name @vue/compiler-sfc
+  // recognises at COMPILE TIME regardless of what it resolves to at runtime, and compiles its
+  // children as a raw array carrying a PROPS-only patchFlag (dynamicProps: ["to"]) — the shape real
+  // Teleport wants, since it bypasses Vue's component-slot machinery entirely. Substituting our
+  // guarded wrapper under that name (as `../runtime-helpers` used to) makes Vue mount it as an
+  // ordinary STATEFUL component instead, and `shouldUpdateComponent`'s PROPS-only branch checks only
+  // the props named in `dynamicProps` — never children — so the wrapper's render() fires once at
+  // mount and never again. A toast/modal whose content is `v-if`-gated (the ordinary shape; `to`
+  // itself never changes) silently stops updating. Device-reported 2026-09-11: "Show toast
+  // (Teleport)" did nothing on Vue SFC while the h()-only suite above stayed green throughout,
+  // because it never exercises the real compiler. Fixed by no longer shadowing Teleport in
+  // `runtime-helpers` — this proves the fix through the same pipeline the app actually runs.
+  describe('Through the real compiled SFC (not h())', () => {
+    const moduleRequire = (specifier: string): unknown => {
+      if (specifier === '@symbiote-native/engine') return engine;
+      if (specifier === '@symbiote-native/vue/runtime-helpers')
+        return runtimeHelpers;
+      if (specifier === '@symbiote-native/vue') return vueAdapter;
+      throw new Error(
+        `compiled SFC required an unexpected specifier: ${specifier}`,
+      );
+    };
+
+    function isVueComponent(value: unknown): value is Component {
+      return typeof value === 'object' && value !== null && 'setup' in value;
+    }
+
+    function evaluateCompiledSfc(code: string): Component {
+      const { outputText } = ts.transpileModule(code, {
+        compilerOptions: {
+          module: ts.ModuleKind.CommonJS,
+          target: ts.ScriptTarget.ES2020,
+        },
+      });
+      const evaluated: { exports: Record<string, unknown> } = { exports: {} };
+      const factory = new Function('require', 'module', 'exports', outputText);
+      factory(moduleRequire, evaluated, evaluated.exports);
+      const component = evaluated.exports.default;
+      if (!isVueComponent(component)) {
+        throw new Error('the compiled SFC has no default-exported component');
+      }
+      return component;
+    }
+
+    const {
+      compileSfc,
+    }: { compileSfc: (src: string, filename: string) => Promise<string> } =
+      metroVueTransformer;
+
+    it('keeps applying reactive updates to a v-if-gated toast, target unchanged the whole time', async () => {
+      // The toggle fires from onMounted+setTimeout, exactly as a button press would in the app —
+      // the app never hands the test a way to flip `shown` directly, same as a real screen.
+      const source = `
+        <script setup lang="ts">
+        import { ref, shallowRef, onMounted } from 'vue';
+        import type { IHostInstance } from '@symbiote-native/vue';
+        const shown = ref(false);
+        const host = shallowRef<IHostInstance | null>(null);
+        onMounted(() => setTimeout(() => { shown.value = true; }, 0));
+        </script>
+        <template>
+          <view testID="root">
+            <Teleport v-if="host" :to="host">
+              <view v-if="shown" testID="ported" />
+            </Teleport>
+            <view testID="host" ref="host" />
+          </view>
+        </template>
+      `;
+      const code = await compileSfc(source, 'ReproScreen.vue');
+      mount(rootTag, evaluateCompiledSfc(code));
+      await waitUntil(() => fabric.counts.completeRoot > 0, 'first commit');
+
+      await waitUntil(
+        () => findByTestId('ported') !== undefined,
+        'the toggled toast to reach the committed tree',
+      );
+
+      expect(
+        isDescendantOf(committed('host'), committed('ported')),
+        'the ported content landed under the target after a reactive toggle',
       ).toBe(true);
     });
   });
