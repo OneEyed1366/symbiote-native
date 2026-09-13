@@ -114,6 +114,34 @@ function createScopeClassNodeTransform(renames) {
   };
 }
 
+// The parser's own condense() collapses a text node's multi-line whitespace to a single boundary
+// space but never trims it: `<text>\n  plain\n</text>` compiles to " plain " instead of "plain" -
+// a real leading/trailing space on the rendered RN Text. Babel's JSX whitespace cleaner
+// (cleanJSXElementLiteralChild, used by every other adapter) DOES trim this; Vue's does not, so we
+// do it here, once, for every template. Matches Babel's own rule: only a text node whose SOURCE
+// crosses a line break is touched, so a genuinely single-line `<text>Score: {{ x }}</text>` keeps
+// its intentional trailing space untouched (see examples/vue-sfc's CompoundClassDemo.vue for the
+// device-measured bug this closes).
+function trimReflowedTextNodeTransform(node) {
+  if (node.type !== 1 /* NodeTypes.ELEMENT */ || node.children.length === 0)
+    return;
+  const first = node.children[0];
+  if (
+    first.type === 2 /* NodeTypes.TEXT */ &&
+    first.loc.source.includes('\n') &&
+    first.content.startsWith(' ')
+  ) {
+    first.content = first.content.slice(1);
+  }
+  const last = node.children[node.children.length - 1];
+  if (
+    last.type === 2 /* NodeTypes.TEXT */ &&
+    last.loc.source.includes('\n') &&
+    last.content.endsWith(' ')
+  ) {
+    last.content = last.content.slice(0, -1);
+  }
+}
 
 // Shared with ./babel-jsx.cjs: Vue's two compilers must give one answer to element-vs-component.
 const INTRINSIC_TAGS = require('./intrinsic-tags.cjs');
@@ -279,7 +307,7 @@ async function compileSfc(src, filename) {
 
   // Scoped-class rewriting is skipped entirely (not even passed to the compiler) when nothing in
   // this file is scoped, so a .vue with only unscoped/no styles adds no runtime cost.
-  const nodeTransforms = [];
+  const nodeTransforms = [trimReflowedTextNodeTransform];
   if (scopedClassNames.size > 0)
     nodeTransforms.push(createScopeClassNodeTransform(scopedClassNames));
   // UNCONDITIONAL, and covering EVERY intrinsic rather than the ones this file happens to import.
