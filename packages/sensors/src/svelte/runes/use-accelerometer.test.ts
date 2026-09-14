@@ -109,7 +109,7 @@ async function loadProbe(): Promise<Component> {
        const measurement = useAccelerometer(updateIntervalMs);
        $effect(() => { onValue(measurement.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'AccelerometerProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

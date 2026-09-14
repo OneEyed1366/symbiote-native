@@ -1,22 +1,22 @@
-// Real-compiled-source smoke test for Animated.FlatList: proves it WRAPS the real
-// FlatList.svelte (so windowing, the ScrollView shell and the whole imperative handle come along)
-// rather than a reduced duplicate, that an AnimatedValue in `style` is already rasterized on the
-// FIRST paint, and that the leaf binds to the underlying host node — the handle captured by
-// `bind:this` is an imperative surface, so only getScrollNode() (this adapter's resolveHostNode)
-// reaches something setNativeProps can drive.
+// Real-compiled-source smoke test for `Animated.FlatList`, which IS `FlatList` — there is no
+// wrapper. Proves an AnimatedValue in `style` survives the trip down the deepest component chain
+// in this package and reaches the engine, which rasterizes it on the FIRST paint and repaints it
+// per frame on the committed RCTScrollView. A list forwards `style` through four components
+// before it becomes a host prop, so any link that copies or normalizes the bag would drop the
+// node — this is where that would show.
 //
-// The compile chain is the deepest in this package: AnimatedFlatList -> FlatList ->
-// VirtualizedList -> RefreshControl + ScrollViewStickyHeader -> AnimatedView. Every link is
-// pre-compiled to a co-located sibling `.mjs` with its specifier rewritten, the same technique
-// flat-list.smoke.test.ts and animated-scroll-view.smoke.test.ts already use; the output names are
-// unique to this file because Vitest runs suites concurrently.
+// The compile chain: FlatList -> VirtualizedList -> View (refresh-control is a bare tag now, no
+// sibling component to pre-compile). Every remaining link is pre-compiled to a co-located sibling
+// `.mjs` with its specifier rewritten,
+// the same technique flat-list.smoke.test.ts uses; the output names are unique to this file
+// because Vitest runs suites concurrently.
 //
 // Scope note: FlatList's own surface (numColumns, viewability, RefreshControl) is covered by
-// components/flat-list/flat-list.smoke.test.ts, and the value graph by core/engine's own tests.
-// This file's job is the narrower Animated-specific wiring.
+// components/flat-list/flat-list.smoke.test.ts, and the value graph plus `bindAnimatedValue` by
+// core/engine's own tests. This file's job is the Svelte delivery path only.
 //
-// No Negative group: AnimatedFlatList.svelte has no throwing/rejecting path — every prop rides the
-// same open IAnimatedComponentProps bag as every other Animated.* component.
+// No Negative group: no prop on this path rejects — a `style` holding nothing animated is simply
+// published unchanged (`bindAnimatedValue` returns its input by identity).
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -25,6 +25,9 @@ import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { AnimatedValue } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// See scroll-view.smoke.test.ts: mounting through the render entry skips `index.ts`, so the host
+// behaviors have to be named here.
+import '../../register';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -38,19 +41,6 @@ globalThis.nativeModuleProxy = undefined;
 
 const ROOT_TAG = 91_107;
 const COMPONENTS_DIR = join(__dirname, '..', '..', 'components');
-const REFRESH_CONTROL_OUT = join(
-  COMPONENTS_DIR,
-  '.smoke-compiled-refresh-control-for-animated-flat-list.mjs',
-);
-const VIEW_OUT = join(
-  COMPONENTS_DIR,
-  '.smoke-compiled-view-for-animated-flat-list.mjs',
-);
-const STICKY_HEADER_OUT = join(
-  COMPONENTS_DIR,
-  'scroll-view',
-  '.smoke-compiled-sticky-header-for-animated-flat-list.mjs',
-);
 const VIRTUALIZED_LIST_OUT = join(
   COMPONENTS_DIR,
   'virtualized-list',
@@ -73,14 +63,7 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  for (const out of [
-    REFRESH_CONTROL_OUT,
-    VIEW_OUT,
-    STICKY_HEADER_OUT,
-    VIRTUALIZED_LIST_OUT,
-    FLAT_LIST_OUT,
-    PARENT_OUT,
-  ]) {
+  for (const out of [VIRTUALIZED_LIST_OUT, FLAT_LIST_OUT, PARENT_OUT]) {
     rmSync(out, { force: true });
   }
 });
@@ -137,40 +120,12 @@ function liveScrollView(): IFakeNode {
 
 function compileChain(): void {
   compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8'),
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
-  );
-  compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'),
-    'View.svelte',
-    VIEW_OUT,
-  );
-  compileRewritten(
-    join(COMPONENTS_DIR, 'scroll-view', 'sticky-header.svelte'),
-    'sticky-header.svelte',
-    STICKY_HEADER_OUT,
-    [
-      [
-        "from '../View.svelte'",
-        "from '../.smoke-compiled-view-for-animated-flat-list.mjs'",
-      ],
-    ],
-  );
-  compileRewritten(
-    join(COMPONENTS_DIR, 'virtualized-list', 'index.svelte'),
+    readFileSync(
+      join(COMPONENTS_DIR, 'virtualized-list', 'index.svelte'),
+      'utf8',
+    ),
     'VirtualizedList.svelte',
     VIRTUALIZED_LIST_OUT,
-    [
-      [
-        "from '../RefreshControl.svelte'",
-        "from '../.smoke-compiled-refresh-control-for-animated-flat-list.mjs'",
-      ],
-      [
-        "from '../scroll-view/sticky-header.svelte'",
-        "from '../scroll-view/.smoke-compiled-sticky-header-for-animated-flat-list.mjs'",
-      ],
-    ],
   );
   compileRewritten(
     join(COMPONENTS_DIR, 'flat-list', 'index.svelte'),
@@ -193,16 +148,14 @@ async function loadParent(): Promise<Component> {
   compileToFile(
     `<script>
        import FlatList from '../../components/flat-list/.smoke-compiled-flat-list-for-animated.mjs';
-       import { createAnimatedComponent } from './create-animated-component';
-       const AnimatedFlatList = createAnimatedComponent(FlatList);
        let { data, style } = $props();
        let handle = $state();
        $effect(() => {
          window.__animatedFlatHandle = handle;
        });
      </script>
-     {#snippet cell({ item })}<symbiote-text p={{ text: item }}></symbiote-text>{/snippet}
-     <AnimatedFlatList bind:this={handle} {data} {style} item={cell} />`,
+     {#snippet cell({ item })}<text p={{ text: item }}></text>{/snippet}
+     <FlatList bind:this={handle} {data} {style} item={cell} />`,
     'AnimatedFlatParent.svelte',
     PARENT_OUT,
   );
@@ -235,11 +188,11 @@ const data = Array.from(
 );
 
 describe('Animated.FlatList (real compiled source) (Positive)', () => {
-  // why: wrapping the real FlatList (rather than hand-authoring a reduced list) is the whole
-  // design claim — only the real one brings the ScrollView shell AND the windowing, so asserting
-  // both the native shape and that the slice is windowed is what distinguishes a wrap from a
-  // look-alike. <adapters_reach_full_feature_parity>.
-  it('renders the real windowed FlatList shape through the wrapper', async () => {
+  // why: the control for the two animated cases below. They read one prop off one node, which a
+  // list that rendered nothing at all would also satisfy vacuously; this pins the ScrollView shell
+  // and the windowed slice first, so a red animated case means the VALUE is missing rather than
+  // the tree.
+  it('renders the real windowed FlatList shape', async () => {
     const AnimatedFlatParent = await loadParent();
     mount(ROOT_TAG, AnimatedFlatParent, { data });
     await tick();
@@ -269,11 +222,12 @@ describe('Animated.FlatList (real compiled source) (Positive)', () => {
     expect(liveScrollView().props.opacity).toBe(0.35);
   });
 
-  // why: `bind:this` on a list captures its IMPERATIVE handle, never the host node, so the leaf
-  // must be bound through getScrollNode() (this adapter's resolveHostNode). Binding the handle
-  // itself type-checks as far as the wrapper is concerned but leaves setNativeProps with nothing
-  // to drive — the frame silently never lands. Asserting the repaint is what catches that.
-  it('binds the leaf to the host node behind the handle, so setValue repaints', async () => {
+  // why: a per-frame write goes through the engine's own targeted setNativeProps commit, never a
+  // Svelte re-render, so nothing above re-runs to correct a leaf bound to the wrong object. The
+  // repaint is what says the subscription landed on the committed host node. `bind:this` is read
+  // alongside it because a list hands back an IMPERATIVE handle, and an animated style must not
+  // cost the caller that surface.
+  it('repaints on setValue while still exposing the list handle', async () => {
     const AnimatedFlatParent = await loadParent();
     const opacity = new AnimatedValue(0.35);
 
@@ -284,7 +238,7 @@ describe('Animated.FlatList (real compiled source) (Positive)', () => {
     const handle = Reflect.get(globalThis, '__animatedFlatHandle');
     expect(
       isFlatHandle(handle),
-      'AnimatedFlatList forwards the FlatList handle via bind:this',
+      'FlatList still forwards its handle via bind:this under an animated style',
     ).toBe(true);
     if (!isFlatHandle(handle)) return;
 

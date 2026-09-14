@@ -4,5 +4,7 @@
   "compilerOptions": {
     "types": ["node"]
   },
+  // vueCompilerOptions.lib lives in the base tsconfig.json now (the editor's Volar needs it too,
+  // not just this CLI config) - inherited here via "extends", not duplicated.
   "exclude": ["**/node_modules", "**/Pods", "e2e"]
 }

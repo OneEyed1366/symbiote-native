@@ -68,13 +68,12 @@ versions — never install either yourself, and never add the `expo` meta-packag
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Text } from '@symbiote-native/react';
     import { useBatteryLevel } from '@symbiote-native/battery/react';
 
     export default function BatteryLevel() {
       const batteryLevel = useBatteryLevel(); // number, -1 until the first reading arrives
 
-      return <Text>{batteryLevel}</Text>;
+      return <text>{batteryLevel}</text>;
     }
     ```
 
@@ -88,7 +87,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
     </script>
 
     <template>
-      <Text>{{ batteryLevel }}</Text>
+      <text>{{ batteryLevel }}</text>
     </template>
     ```
 
@@ -96,13 +95,13 @@ versions — never install either yourself, and never add the `expo` meta-packag
   <TabItem label="Angular">
     ```ts
     import { Component, inject } from '@angular/core';
-    import { Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { BatteryLevelService } from '@symbiote-native/battery/angular';
 
     @Component({
       standalone: true,
-      imports: [Text],
-      template: `<Text>{{ batteryLevel() }}</Text>`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<text>{{ batteryLevel() }}</text>`,
     })
     export class BatteryLevelDisplay {
       readonly batteryLevel = inject(BatteryLevelService).connect();
@@ -113,25 +112,23 @@ versions — never install either yourself, and never add the `expo` meta-packag
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text } from '@symbiote-native/svelte';
       import { useBatteryLevel } from '@symbiote-native/battery/svelte';
 
       const batteryLevel = useBatteryLevel(); // { readonly current: number }, -1 until the first reading arrives
     </script>
 
-    <Text>{batteryLevel.current}</Text>
+    <text>{batteryLevel.current}</text>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Text } from '@symbiote-native/solid';
     import { createBatteryLevel } from '@symbiote-native/battery/solid';
 
     export function BatteryLevel() {
       const batteryLevel = createBatteryLevel(); // Accessor<number>, -1 until the first reading arrives
 
-      return <Text>{batteryLevel()}</Text>;
+      return <text>{batteryLevel()}</text>;
     }
     ```
 
@@ -143,14 +140,13 @@ versions — never install either yourself, and never add the `expo` meta-packag
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Text } from '@symbiote-native/react';
     import { useBatteryState } from '@symbiote-native/battery/react';
     import { BatteryState } from '@symbiote-native/battery';
 
     export default function ChargingIndicator() {
       const batteryState = useBatteryState();
 
-      return <Text>{batteryState === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</Text>;
+      return <text>{batteryState === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</text>;
     }
     ```
 
@@ -165,7 +161,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
     </script>
 
     <template>
-      <Text>{{ batteryState === BatteryState.CHARGING ? 'Charging' : 'Not charging' }}</Text>
+      <text>{{ batteryState === BatteryState.CHARGING ? 'Charging' : 'Not charging' }}</text>
     </template>
     ```
 
@@ -173,14 +169,14 @@ versions — never install either yourself, and never add the `expo` meta-packag
   <TabItem label="Angular">
     ```ts
     import { Component, inject } from '@angular/core';
-    import { Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { BatteryStateService } from '@symbiote-native/battery/angular';
     import { BatteryState } from '@symbiote-native/battery';
 
     @Component({
       standalone: true,
-      imports: [Text],
-      template: `<Text>{{ batteryState() === BatteryState.CHARGING ? 'Charging' : 'Not charging' }}</Text>`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<text>{{ batteryState() === BatteryState.CHARGING ? 'Charging' : 'Not charging' }}</text>`,
     })
     export class ChargingIndicator {
       // Angular templates can't reach a module-level import directly — expose the enum as a field.
@@ -193,27 +189,25 @@ versions — never install either yourself, and never add the `expo` meta-packag
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text } from '@symbiote-native/svelte';
       import { useBatteryState } from '@symbiote-native/battery/svelte';
       import { BatteryState } from '@symbiote-native/battery';
 
       const batteryState = useBatteryState(); // { readonly current: BatteryState }, seeded UNKNOWN
     </script>
 
-    <Text>{batteryState.current === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</Text>
+    <text>{batteryState.current === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</text>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Text } from '@symbiote-native/solid';
     import { createBatteryState } from '@symbiote-native/battery/solid';
     import { BatteryState } from '@symbiote-native/battery';
 
     export function ChargingIndicator() {
       const batteryState = createBatteryState(); // Accessor<BatteryState>, seeded UNKNOWN
 
-      return <Text>{batteryState() === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</Text>;
+      return <text>{batteryState() === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</text>;
     }
     ```
 
@@ -225,13 +219,12 @@ versions — never install either yourself, and never add the `expo` meta-packag
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Text } from '@symbiote-native/react';
     import { useLowPowerMode } from '@symbiote-native/battery/react';
 
     export default function LowPowerBadge() {
       const lowPowerMode = useLowPowerMode();
 
-      return <Text>{lowPowerMode ? 'Low Power Mode is on' : null}</Text>;
+      return <text>{lowPowerMode ? 'Low Power Mode is on' : null}</text>;
     }
     ```
 
@@ -245,7 +238,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
     </script>
 
     <template>
-      <Text>{{ lowPowerMode ? 'Low Power Mode is on' : null }}</Text>
+      <text>{{ lowPowerMode ? 'Low Power Mode is on' : null }}</text>
     </template>
     ```
 
@@ -253,13 +246,13 @@ versions — never install either yourself, and never add the `expo` meta-packag
   <TabItem label="Angular">
     ```ts
     import { Component, inject } from '@angular/core';
-    import { Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { LowPowerModeService } from '@symbiote-native/battery/angular';
 
     @Component({
       standalone: true,
-      imports: [Text],
-      template: `<Text>{{ lowPowerMode() ? 'Low Power Mode is on' : null }}</Text>`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<text>{{ lowPowerMode() ? 'Low Power Mode is on' : null }}</text>`,
     })
     export class LowPowerBadge {
       readonly lowPowerMode = inject(LowPowerModeService).connect();
@@ -270,25 +263,23 @@ versions — never install either yourself, and never add the `expo` meta-packag
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text } from '@symbiote-native/svelte';
       import { useLowPowerMode } from '@symbiote-native/battery/svelte';
 
       const lowPowerMode = useLowPowerMode(); // { readonly current: boolean }, seeded false
     </script>
 
-    <Text>{lowPowerMode.current ? 'Low Power Mode is on' : null}</Text>
+    <text>{lowPowerMode.current ? 'Low Power Mode is on' : null}</text>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Text } from '@symbiote-native/solid';
     import { createLowPowerMode } from '@symbiote-native/battery/solid';
 
     export function LowPowerBadge() {
       const lowPowerMode = createLowPowerMode(); // Accessor<boolean>, seeded false
 
-      return <Text>{lowPowerMode() ? 'Low Power Mode is on' : null}</Text>;
+      return <text>{lowPowerMode() ? 'Low Power Mode is on' : null}</text>;
     }
     ```
 
@@ -329,11 +320,11 @@ const { batteryLevel, batteryState, lowPowerMode } = await getPowerStateAsync();
 
 ### Hooks / composables / services / primitives
 
-| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Solid (`/solid`)     | Signature | Returns                                                                                                                                          |
-| ----------------- | ----------------- | ------------------------------- | ------------------- | --------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useBatteryLevel` | `useBatteryLevel` | `BatteryLevelService.connect()` | `useBatteryLevel`   | `createBatteryLevel` | `()`      | Live battery level — `number` (React), `Ref<number>` (Vue), `Signal<number>` (Angular), `{ readonly current: number }` (Svelte), `Accessor<number>` (Solid), seeded `-1`           |
-| `useBatteryState` | `useBatteryState` | `BatteryStateService.connect()` | `useBatteryState`   | `createBatteryState` | `()`      | Live `BatteryState` — plain value (React/Vue `Ref`), `Signal<BatteryState>` (Angular), `{ readonly current: BatteryState }` (Svelte), `Accessor<BatteryState>` (Solid), seeded `UNKNOWN` |
-| `useLowPowerMode` | `useLowPowerMode` | `LowPowerModeService.connect()` | `useLowPowerMode`   | `createLowPowerMode` | `()`      | Live `boolean` — plain value (React/Vue `Ref`), `Signal<boolean>` (Angular), `{ readonly current: boolean }` (Svelte), `Accessor<boolean>` (Solid), seeded `false`                  |
+| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Solid (`/solid`)     | Signature | Returns                                                                                                                                                                                  |
+| ----------------- | ----------------- | ------------------------------- | ------------------ | -------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useBatteryLevel` | `useBatteryLevel` | `BatteryLevelService.connect()` | `useBatteryLevel`  | `createBatteryLevel` | `()`      | Live battery level — `number` (React), `Ref<number>` (Vue), `Signal<number>` (Angular), `{ readonly current: number }` (Svelte), `Accessor<number>` (Solid), seeded `-1`                 |
+| `useBatteryState` | `useBatteryState` | `BatteryStateService.connect()` | `useBatteryState`  | `createBatteryState` | `()`      | Live `BatteryState` — plain value (React/Vue `Ref`), `Signal<BatteryState>` (Angular), `{ readonly current: BatteryState }` (Svelte), `Accessor<BatteryState>` (Solid), seeded `UNKNOWN` |
+| `useLowPowerMode` | `useLowPowerMode` | `LowPowerModeService.connect()` | `useLowPowerMode`  | `createLowPowerMode` | `()`      | Live `boolean` — plain value (React/Vue `Ref`), `Signal<boolean>` (Angular), `{ readonly current: boolean }` (Svelte), `Accessor<boolean>` (Solid), seeded `false`                       |
 
 Angular's `connect()` returns a `Signal` — read it as `batteryLevel()` in code or in a template,
 same as every other `connect()`-based service in this project. Solid's `create*` primitives return

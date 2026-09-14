@@ -15,88 +15,96 @@ wiring your own change handler by hand.
     `[(value)]`/`v-model` shorthand to reach for, and none is planned.
   </TabItem>
   <TabItem label="Vue">
-    This is Vue's `v-model` sugar. `Switch`, `TextInput`, and `Slider` all support
-    it. `Switch`/`TextInput` come from `@symbiote-native/vue`; `Slider` ships from
-    the separate [`@symbiote-native/slider`](/docs/packages/slider/)
-    wrapper package (`@symbiote-native/slider/vue`), not the adapter's own barrel:
+    This is Vue's `v-model` sugar, and it works on `switch`/`text-input` even though
+    they're bare tags now, not components: Vue's compiler emits its own runtime
+    `vModelText` directive for any element it doesn't recognize as a DOM input, and the
+    adapter's `runtime-helpers` shim overrides it just enough to write each primitive's
+    real value type (`Switch` needs a real boolean, not `vModelText`'s stringified
+    default). `Slider` is unrelated to this mechanism — it's a real component, from the
+    separate [`@symbiote-native/slider`](/docs/packages/slider/) wrapper package
+    (`@symbiote-native/slider/vue`):
 
     ```vue
     <script setup lang="ts">
-    import { Switch, TextInput } from '@symbiote-native/vue';
     import { Slider } from '@symbiote-native/slider/vue';
     </script>
 
     <template>
-      <Switch v-model="enabled" />
-      <TextInput v-model="name" />
+      <switch v-model="enabled" />
+      <text-input v-model="name" />
       <Slider v-model="volume" :minimum-value="0" :maximum-value="1" />
     </template>
     ```
 
-    Bare `v-model="x"` compiles to prop `modelValue` + emit `update:modelValue`;
-    named `v-model:value="x"` compiles to prop `value` + emit `update:value`. Each
-    component resolves whichever arrived and emits both, so `:value`/`@value-
-    change` and `v-model` are interchangeable, never a choice you have to commit
-    to upfront.
+    Bare `v-model="x"` binds to `onUpdate:modelValue`; named `v-model:value="x"` binds to
+    `onUpdate:value`. Each primitive's behavior resolves whichever arrived and reports
+    both, so `:value`/`@value-change` and `v-model` are interchangeable, never a choice
+    you have to commit to upfront.
 
   </TabItem>
   <TabItem label="Angular">
-    This is Angular's banana-in-a-box `[(value)]` two-way binding. The same three
-    components expose a matching `value` input + `valueChange` output, so
-    Angular's `[(value)]` sugar works unmodified — `Slider` again from the
+    This is Angular's banana-in-a-box `[(value)]` two-way binding. `switch` and
+    `text-input` are element directives now (not components) but still declare a
+    matching `value` `@Input()` + `valueChange` `@Output()`, so `[(value)]` sugar
+    works unmodified on the tag — `Slider` is the one real component here, from the
     separate `@symbiote-native/slider/angular` package:
 
     ```ts
-    import { Switch, TextInput } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { Slider } from '@symbiote-native/slider/angular';
 
+    // component: imports: [SYMBIOTE_ELEMENTS, Slider]
     // template: `
-    //   <Switch [(value)]="enabled" />
-    //   <TextInput [(value)]="name" />
+    //   <switch [(value)]="enabled" />
+    //   <text-input [(value)]="name" />
     //   <Slider [(value)]="volume" [minimumValue]="0" [maximumValue]="1" />
     // `
     ```
 
-    This is not a special case wired per-component — it falls out of the RN prop
+    This is not a special case wired per-primitive — it falls out of the RN prop
     name (`value`) already matching Angular's `@Output()` naming convention
     (`value` + `valueChange`), which is exactly what `[(x)]` expects.
 
   </TabItem>
   <TabItem label="Svelte">
-    This is Svelte 5's own `$bindable()` mechanism — a component opts a prop
-    into `bind:` by declaring it `let { value = $bindable() } = $props()`.
-    `Switch`, `TextInput`, and `Slider` all declare `value` this way, so
-    `bind:value` works with no adapter-side plumbing: Svelte's compiler
-    generates the two-way sync at the call site. `Switch`/`TextInput` come
-    from `@symbiote-native/svelte`; `Slider` ships from the separate
-    [`@symbiote-native/slider`](/docs/packages/slider/) wrapper package
-    (`@symbiote-native/slider/svelte`), not the adapter's own barrel:
+    `switch` and `text-input` are bare tags now, not components — and Svelte's
+    `$bindable()` mechanism only exists inside a component's own `$props()`, so
+    there's nothing left to declare it on. `bind:value` doesn't even compile on a
+    plain tag (Svelte only recognizes `bind:` on a handful of real DOM elements or
+    a component that opts in), so two-way binding on these two is explicit `value` +
+    `onValueChange` — Svelte's own equivalent of React's controlled-component idiom:
 
     ```svelte
     <script lang="ts">
-      import { Switch, TextInput } from '@symbiote-native/svelte';
-      import { Slider } from '@symbiote-native/slider/svelte';
-
       let enabled = $state(false);
       let name = $state('');
+    </script>
+
+    <switch value={enabled} onValueChange={(next) => (enabled = next)} />
+    <text-input value={name} onValueChange={(next) => (name = next)} />
+    ```
+
+    `Slider` is different: it's a real component from the separate
+    [`@symbiote-native/slider`](/docs/packages/slider/) wrapper package
+    (`@symbiote-native/slider/svelte`) and still declares `value = $bindable()`, so
+    `bind:value` keeps working there:
+
+    ```svelte
+    <script lang="ts">
+      import { Slider } from '@symbiote-native/slider/svelte';
+
       let volume = $state(0.5);
     </script>
 
-    <Switch bind:value={enabled} />
-    <TextInput bind:value={name} />
     <Slider bind:value={volume} minimumValue={0} maximumValue={1} />
     ```
 
-    The explicit `value` + `onValueChange` pair — Svelte's own equivalent of
-    React's controlled-component idiom — still works exactly as before and is
-    still the right choice when you need to see or reject a change before it
-    lands (the "rejecting parent" case in [Why this isn't
-    fragile](#why-this-isnt-fragile) below). One caveat specific to
-    `$bindable()`: supplying your own `onValueChange` on the same instance as
-    `bind:value` silently takes over — the component can't tell whether an
-    instance is bound from the inside, so it only echoes the native-reported
-    value back into your bound variable when `onValueChange` is absent. Pass
-    one or the other, not both, on the same control.
+    That caveat is specific to `$bindable()` and so only applies to `Slider` now:
+    supplying your own `onValueChange` on the same instance as `bind:value` silently
+    takes over — the component can't tell whether an instance is bound from the
+    inside, so it only echoes the native-reported value back into your bound
+    variable when `onValueChange` is absent. Pass one or the other, not both, on the
+    same control.
 
   </TabItem>
   <TabItem label="Solid">
@@ -107,15 +115,14 @@ wiring your own change handler by hand.
 
     ```tsx
     import { createSignal } from 'solid-js';
-    import { Switch, TextInput } from '@symbiote-native/solid';
     import { Slider } from '@symbiote-native/slider/solid';
 
     const [enabled, setEnabled] = createSignal(false);
     const [name, setName] = createSignal('');
     const [volume, setVolume] = createSignal(0.5);
 
-    <Switch value={enabled()} onValueChange={setEnabled} />
-    <TextInput value={name()} onValueChange={setName} />
+    <switch value={enabled()} onValueChange={setEnabled} />
+    <text-input value={name()} onValueChange={setName} />
     <Slider value={volume()} onValueChange={setVolume} minimumValue={0} maximumValue={1} />
     ```
 

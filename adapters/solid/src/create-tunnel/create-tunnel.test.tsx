@@ -17,7 +17,6 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
-import { Text, View } from '../components';
 import type { JSX } from '../jsx-runtime';
 import { createTunnel } from './index';
 
@@ -93,18 +92,18 @@ describe('createTunnel', () => {
 
     function SourceApp() {
       return (
-        <View testID="source">
+        <view testID="source">
           <tunnel.In>
-            <Text>across surfaces</Text>
+            <text>across surfaces</text>
           </tunnel.In>
-        </View>
+        </view>
       );
     }
     function TargetApp() {
       return (
-        <View testID="target">
+        <view testID="target">
           <tunnel.Out />
-        </View>
+        </view>
       );
     }
 
@@ -133,15 +132,15 @@ describe('createTunnel', () => {
     function SourceApp() {
       return (
         <tunnel.In>
-          <Text>still here</Text>
+          <text>still here</text>
         </tunnel.In>
       );
     }
     function TargetApp() {
       return (
-        <View testID="target">
+        <view testID="target">
           <tunnel.Out />
-        </View>
+        </view>
       );
     }
 
@@ -170,7 +169,7 @@ describe('createTunnel', () => {
     function SourceApp() {
       return (
         <tunnel.In>
-          <Text>from source</Text>
+          <text>from source</text>
         </tunnel.In>
       );
     }
@@ -178,10 +177,10 @@ describe('createTunnel', () => {
       const [label, setLabelSignal] = createSignal('before');
       setLabel = setLabelSignal;
       return (
-        <View testID="target">
-          <Text>{label()}</Text>
+        <view testID="target">
+          <text>{label()}</text>
           <tunnel.Out />
-        </View>
+        </view>
       );
     }
 
@@ -210,17 +209,17 @@ describe('createTunnel', () => {
 
     function App() {
       return (
-        <View testID="root">
+        <view testID="root">
           <tunnel.In>
-            <Text>first</Text>
+            <text>first</text>
           </tunnel.In>
           <tunnel.In>
-            <Text>second</Text>
+            <text>second</text>
           </tunnel.In>
-          <View testID="host">
+          <view testID="host">
             <tunnel.Out />
-          </View>
-        </View>
+          </view>
+        </view>
       );
     }
 
@@ -249,16 +248,16 @@ describe('createTunnel', () => {
       const [visible, setVisibleSignal] = createSignal(true);
       setVisible = setVisibleSignal;
       return (
-        <View testID="root">
+        <view testID="root">
           <Show when={visible()}>
             <CountingIn>
-              <Text>same tree</Text>
+              <text>same tree</text>
             </CountingIn>
           </Show>
-          <View testID="host">
+          <view testID="host">
             <tunnel.Out />
-          </View>
-        </View>
+          </view>
+        </view>
       );
     }
 
@@ -294,23 +293,23 @@ describe('createTunnel', () => {
     const OriginContext = createContext('default');
 
     function Consumer() {
-      return <Text>{useContext(OriginContext)}</Text>;
+      return <text>{useContext(OriginContext)}</text>;
     }
 
     function App() {
       return (
-        <View testID="root">
+        <view testID="root">
           <OriginContext.Provider value="in site">
             <tunnel.In>
               <Consumer />
             </tunnel.In>
           </OriginContext.Provider>
           <OriginContext.Provider value="out site">
-            <View testID="host">
+            <view testID="host">
               <tunnel.Out />
-            </View>
+            </view>
           </OriginContext.Provider>
-        </View>
+        </view>
       );
     }
 
@@ -335,11 +334,11 @@ describe('createTunnel', () => {
 
     function App() {
       return (
-        <View testID="root">
+        <view testID="root">
           <tunnel.In>
-            <Text>invisible</Text>
+            <text>invisible</text>
           </tunnel.In>
-        </View>
+        </view>
       );
     }
 

@@ -1,20 +1,19 @@
-// Solid twin of adapters/react/src/components/pressable/pressable.test.tsx and the Svelte
-// smoke test. Drives REAL compiled Solid JSX (the vitest `solid` project runs the same
-// babel-preset-solid options the app-facing babel-preset.cjs pins) through the universal renderer
-// into the fake Fabric slot, firing the raw touch primitives the way native would
-// (topTouchStart/Move/End on the responder node's instanceHandle).
+// `pressable` as a TAG, through Solid's own renderer — the suite that was
+// `components/pressable.test.tsx` while a component composed View. Drives REAL compiled Solid JSX
+// through the universal renderer into the fake Fabric slot, firing the raw touch primitives the
+// way native would (topTouchStart/Move/End on the responder node's instanceHandle).
 //
-// The press machine itself (createPressHandlers/createPressRuntime — the long-press timer, the
-// unstable_pressDelay deferral, the drift test, the suppression flags) is shared verbatim with
-// every other adapter, so the parity half below re-walks React's cases only to prove the SOLID
-// wiring reaches them: the responder listeners actually land on the host node, the IPressHost
-// bridge (setPressed / getMeasureFn / schedule) is connected, and the retention measure resolves
-// through a real host ref.
+// THE SUBJECT IS THE BARE TAG — there is no Pressable component any more. The press machine
+// itself (createPressHandlers/createPressRuntime — the long-press timer, the unstable_pressDelay
+// deferral, the drift test, the suppression flags) lives on the engine node
+// (`core/components/src/behaviors/pressable.ts`) and is fully unit-tested there; this file proves
+// the SOLID WIRING: compiled JSX reaches the tag, the responder listeners land on the host node,
+// and the retention measure resolves through a real host ref.
 //
 // The last group has no React counterpart and is the reason this file is not ceremony: Solid runs
-// a component body ONCE and has no reconciler, so "a prop read after mount still reaches the host",
-// "a static child subtree survives a press", and "a render-prop child re-runs on one" are real,
-// silently-breakable claims here rather than tautologies.
+// a component body ONCE elsewhere, but these are bare tags with no body to freeze — "a prop read
+// after mount still reaches the host" and "a static child subtree survives a press" are real,
+// silently-breakable claims about the SOLID renderer rather than tautologies.
 //
 // Pressable measures its responder rect on grant (RN's _measureResponderRegion); the shared
 // recorder has no `measure`, so a configurable one is grafted onto the live slot before any mount.
@@ -26,8 +25,10 @@ import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// SIDE-EFFECT IMPORT: the press machine lives in the tag's behavior, and only this module installs
+// it. An app reaches it through the package barrel; a test importing render does not.
+import '../register';
 import { mount, unmount } from '../render';
-import { Pressable } from './pressable';
 
 const ROOT_TAG = 814;
 const TARGET = 'pressable-target';
@@ -75,8 +76,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-// The responder is Pressable's own RCTView, found by the testID every mount below sets — the tree
-// also carries the engine's synthetic box-none root, and (in the ripple case) an inner View.
+// The responder is the pressable tag's own RCTView, found by the testID every mount below sets —
+// the tree also carries the engine's synthetic box-none root.
 function createdTarget(): IFakeNode {
   const node = fabric.find(n => n.props.testID === TARGET);
   if (node === undefined)
@@ -161,7 +162,7 @@ describe('Solid Pressable on the engine', () => {
       let pressIns = 0;
       let pressOuts = 0;
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           onPress={() => {
             presses++;
@@ -194,7 +195,7 @@ describe('Solid Pressable on the engine', () => {
     it('suppresses the press and folds accessibilityState.disabled when disabled', async () => {
       let presses = 0;
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           disabled
           onPress={() => {
@@ -216,7 +217,7 @@ describe('Solid Pressable on the engine', () => {
     // the native node untouched.
     it('passes a11y props through and leaves an enabled Pressable undisabled', async () => {
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           accessibilityLabel="save"
           aria-hidden={false}
@@ -236,7 +237,7 @@ describe('Solid Pressable on the engine', () => {
       let longPresses = 0;
       let presses = 0;
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           delayLongPress={LONG_PRESS_MS}
           onLongPress={() => {
@@ -268,7 +269,7 @@ describe('Solid Pressable on the engine', () => {
     it('does not long-press on a release before the delay', async () => {
       let longPresses = 0;
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           delayLongPress={LONG_PRESS_MS}
           onLongPress={() => {
@@ -293,7 +294,7 @@ describe('Solid Pressable on the engine', () => {
       let presses = 0;
       let pressOuts = 0;
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           hitSlop={0}
           pressRetentionOffset={30}
@@ -336,7 +337,7 @@ describe('Solid Pressable on the engine', () => {
       let presses = 0;
       let pressOuts = 0;
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           pressRetentionOffset={{ right: 40 }}
           onPress={() => {
@@ -377,7 +378,7 @@ describe('Solid Pressable on the engine', () => {
       let pressIns = 0;
       let presses = 0;
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           unstable_pressDelay={PRESS_DELAY_MS}
           onPressIn={() => {
@@ -410,7 +411,7 @@ describe('Solid Pressable on the engine', () => {
     it('cancels a pending unstable_pressDelay timer on unmount', async () => {
       let pressIns = 0;
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           unstable_pressDelay={PRESS_DELAY_MS}
           onPressIn={() => {
@@ -436,7 +437,7 @@ describe('Solid Pressable on the engine', () => {
     it('fires onPressMove on every responder move while the press is live', async () => {
       let moves = 0;
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           onPressMove={() => {
             moves++;
@@ -461,7 +462,7 @@ describe('Solid Pressable on the engine', () => {
     // it would sit as a dead prop and the Pressable would yield anyway.
     it('registers a termination gate returning false for cancelable={false}', async () => {
       mount(ROOT_TAG, () => (
-        <Pressable testID={TARGET} cancelable={false} onPress={() => {}} />
+        <pressable testID={TARGET} cancelable={false} onPress={() => {}} />
       ));
       await flush();
       const gate = terminationGate(responderHandle());
@@ -473,7 +474,7 @@ describe('Solid Pressable on the engine', () => {
     // omitted, which would defer to RN's own default) and must resolve to true.
     it('registers a termination gate returning true for cancelable', async () => {
       mount(ROOT_TAG, () => (
-        <Pressable testID={TARGET} cancelable onPress={() => {}} />
+        <pressable testID={TARGET} cancelable onPress={() => {}} />
       ));
       await flush();
       const gate = terminationGate(responderHandle());
@@ -481,26 +482,34 @@ describe('Solid Pressable on the engine', () => {
       expect(gate?.({ nativeEvent: {} })).toBe(true);
     });
 
-    // why: leaving `cancelable` unset must leave RN's own native default in charge — attaching a
-    // gate at all (even one resolving to true) would override that default with our own opinion.
-    it('registers no termination gate when cancelable is unset (RN implicit yes)', async () => {
-      mount(ROOT_TAG, () => <Pressable testID={TARGET} onPress={() => {}} />);
+    // why: leaving `cancelable` unset must leave RN's own native default in charge — FORCING an
+    // answer would override that default with our own opinion.
+    //
+    // Asserted on the ANSWER, not on the listener's presence: the behavior installs ONE dispatcher
+    // per owned event at attach (it has to, since the machine needs the slot before any gesture
+    // can start), and that dispatcher returns `undefined` when no inner gate was built — exactly
+    // what an absent listener yields to the engine (`.claude/rules/adapter-parity-audit.md`,
+    // "phrase a parity oracle as a CAPABILITY").
+    it('forces no termination answer when cancelable is unset (RN implicit yes)', async () => {
+      mount(ROOT_TAG, () => <pressable testID={TARGET} onPress={() => {}} />);
       await flush();
-      expect(terminationGate(responderHandle())).toBeUndefined();
+      const gate = terminationGate(responderHandle());
+      expect(gate?.({ nativeEvent: {} })).toBeUndefined();
     });
 
     // why: android_ripple is gated on Platform.OS === 'android' and must be inert elsewhere (RN
-    // Pressable.js). Headless vitest resolves Platform.OS to 'ios', so this exercises the real
-    // "inert" branch: no ripple prop anywhere AND no extra wrapper node around the child.
-    it('does not wrap the child in a ripple View on this (iOS-resolved) host', async () => {
+    // Pressable.js). The fold itself is the engine behavior's (`core/components/src/behaviors/
+    // pressable.ts`, asserted in `lowered-ripple-android.test.ts`); this pins that a bare tag
+    // never wraps its child regardless — headless vitest resolves Platform.OS to 'ios'.
+    it('never wraps the child in a ripple View, even on this iOS-resolved host', async () => {
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           android_ripple={{ color: '#f00' }}
           onPress={() => {}}
         >
-          <symbiote-view testID="ripple-child" />
-        </Pressable>
+          <view testID="ripple-child" />
+        </pressable>
       ));
       await flush();
 
@@ -522,14 +531,14 @@ describe('Solid Pressable on the engine', () => {
     // Android would read an opinion the app never expressed.
     it('forwards android_disableSound under RN’s own key, and omits it when unset', async () => {
       mount(ROOT_TAG, () => (
-        <Pressable testID={TARGET} android_disableSound onPress={() => {}} />
+        <pressable testID={TARGET} android_disableSound onPress={() => {}} />
       ));
       await flush();
       expect(committedTargetProps().android_disableSound).toBe(true);
 
       unmount(ROOT_TAG);
       fabric.reset();
-      mount(ROOT_TAG, () => <Pressable testID={TARGET} onPress={() => {}} />);
+      mount(ROOT_TAG, () => <pressable testID={TARGET} onPress={() => {}} />);
       await flush();
       expect('android_disableSound' in committedTargetProps()).toBe(false);
     });
@@ -541,7 +550,7 @@ describe('Solid Pressable on the engine', () => {
     // props it has no attribute for.
     it('never forwards its own config props onto the native prop bag', async () => {
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           delayLongPress={LONG_PRESS_MS}
           unstable_pressDelay={PRESS_DELAY_MS}
@@ -575,18 +584,14 @@ describe('Solid Pressable on the engine', () => {
   });
 
   describe('Positive — the Solid lifecycle itself', () => {
-    // why: Solid runs a component body ONCE and has no reconciler, so a prop read at setup would
-    // freeze the Pressable at its mount-time config while every parity test above still passed.
-    // Toggling `disabled` after mount also exercises the vanished-key path: buildPressableListeners
-    // returns an EMPTY bag when disabled, and only View's withStableKeys widening turns those gone
-    // keys into an `undefined` routeProp treats as a delete
-    // (.claude/rules/solid-descriptor-bridge.md §1). Without it the old listeners would survive and
-    // the press would keep firing.
+    // why: `disabled` is a reactive per-prop write on a bare tag, not a memo rebuilding a whole
+    // bag — a later flip must still reach the engine node's `disabled` read, which the press
+    // machine consults fresh on every grant.
     it('drops the responder listeners when disabled flips after mount', async () => {
       const [disabled, setDisabled] = createSignal(false);
       let presses = 0;
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           disabled={disabled()}
           onPress={() => {
@@ -610,71 +615,14 @@ describe('Solid Pressable on the engine', () => {
       expect(presses, 'a disabled Pressable stops responding').toBe(1);
     });
 
-    // why: children-as-a-function-of-press-state is RN's contract and Solid's half of it is
-    // hand-wired here (there is no reconciler to re-run it). The child function itself runs ONCE —
-    // what must reach the caller on BOTH edges of the gesture is the accessor it was handed, read
-    // from inside the leaf.
-    it('feeds a render-prop child the live pressed state through its accessor', async () => {
-      mount(ROOT_TAG, () => (
-        <Pressable testID={TARGET} onPress={() => {}}>
-          {state => (
-            <symbiote-view testID={state().pressed ? 'pressed' : 'idle'} />
-          )}
-        </Pressable>
-      ));
-      await flush();
-      expect(findCommitted(n => n.props.testID === 'idle')).toBeDefined();
-
-      const handle = responderHandle();
-      fire(handle, TOUCH_START);
-      await flush();
-      expect(findCommitted(n => n.props.testID === 'pressed')).toBeDefined();
-
-      fire(handle, TOUCH_END);
-      vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
-      await flush();
-      expect(findCommitted(n => n.props.testID === 'idle')).toBeDefined();
-    });
-
-    // why: `typeof children === 'function'` cannot tell RN's render prop from an ordinary Solid
-    // JSX child, because JSX.Element also covers a zero-argument accessor. The render prop is
-    // called once and UNTRACKED, so mistaking a bare accessor for one freezes it at its first
-    // value — a permanently stale subtree with nothing to notice it. Arity is what separates them.
-    // The signal is read at the accessor's TOP LEVEL (it picks which element to return), which is
-    // the only shape untrack can actually freeze — a dynamic attribute inside the returned JSX
-    // gets its own render effect and stays reactive either way.
-    it('keeps a zero-argument accessor child reactive', async () => {
-      const [flipped, setFlipped] = createSignal(false);
-      mount(ROOT_TAG, () => (
-        <Pressable testID={TARGET} onPress={() => {}}>
-          {() =>
-            flipped() ? (
-              <symbiote-view testID="second" />
-            ) : (
-              <symbiote-view testID="first" />
-            )
-          }
-        </Pressable>
-      ));
-      await flush();
-      expect(findCommitted(n => n.props.testID === 'first')).toBeDefined();
-
-      setFlipped(true);
-      await flush();
-      expect(findCommitted(n => n.props.testID === 'second')).toBeDefined();
-      expect(findCommitted(n => n.props.testID === 'first')).toBeUndefined();
-    });
-
-    // why: the counterpart, and the one that pins the `typeof children === 'function'` gate in
-    // place. A STATIC subtree must not be re-created on a press: reading `pressed` unconditionally
-    // in resolveChildren would put the press signal inside the enclosing render effect, and every
-    // touch would tear the whole child subtree down and rebuild it — invisible to every other
-    // test here, and on a device a flash plus a lost native focus/scroll position.
+    // why: a bare tag has no body to re-run — its children are an ordinary Solid subtree, not a
+    // render prop. A press must not disturb it: the responder listeners live on the tag's own
+    // props, entirely separate from whatever the app put inside it.
     it('does not re-create a static child subtree on a press', async () => {
       mount(ROOT_TAG, () => (
-        <Pressable testID={TARGET} onPress={() => {}}>
-          <symbiote-view testID="static-child" />
-        </Pressable>
+        <pressable testID={TARGET} onPress={() => {}}>
+          <view testID="static-child" />
+        </pressable>
       ));
       await flush();
       const createdAtMount = fabric.counts.createNode;
@@ -695,7 +643,7 @@ describe('Solid Pressable on the engine', () => {
     // prop bag, so a press updates props on the live element instead of remounting it.
     it('re-resolves a function style against the live pressed state on the same node', async () => {
       mount(ROOT_TAG, () => (
-        <Pressable
+        <pressable
           testID={TARGET}
           onPress={() => {}}
           style={state => ({ opacity: state.pressed ? 0.5 : 1 })}

@@ -24,7 +24,7 @@ export {
 } from './shared';
 
 @Component({
-  selector: 'symbiote-view, View',
+  selector: 'view',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
@@ -41,7 +41,7 @@ export class ViewHost extends SymbiotePrimitiveHost {}
  * 'tail' would silently overwrite an explicit `ellipsizeMode="clip"`.
  */
 @Component({
-  selector: 'symbiote-text, Text',
+  selector: 'text',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
@@ -73,35 +73,35 @@ export class TextHost extends SymbiotePrimitiveHost implements OnInit {
 }
 
 @Component({
-  selector: 'symbiote-image',
+  selector: 'image',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class ImageHost extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-scroll-view',
+  selector: 'scroll-view',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class ScrollViewHost extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-scroll-content',
+  selector: 'scroll-content',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class ScrollContentView extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-horizontal-scroll-view',
+  selector: 'horizontal-scroll-view',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class HorizontalScrollView extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-horizontal-scroll-content',
+  selector: 'horizontal-scroll-content',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
@@ -111,35 +111,35 @@ export class HorizontalScrollContentView extends SymbiotePrimitiveHost {}
 // Angular template renders them: this adapter has no lowering transform. The `-managed` pair below
 // is what its own TextInput renders.
 @Component({
-  selector: 'symbiote-text-input',
+  selector: 'text-input',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class TextInputHost extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-text-input-multiline',
+  selector: 'text-input-multiline',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class MultilineTextInputHost extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-text-input-managed',
+  selector: 'text-input-managed',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class ManagedTextInputHost extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-text-input-multiline-managed',
+  selector: 'text-input-multiline-managed',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class ManagedMultilineTextInputHost extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-switch',
+  selector: 'switch',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
@@ -149,42 +149,46 @@ export class SwitchHost extends SymbiotePrimitiveHost {}
 // behavior does not carry. See `component-names/shared.ts` for why the wrapper may not share the
 // lowered tag; mirrors `ManagedTextInputHost` above.
 @Component({
-  selector: 'symbiote-switch-managed',
+  selector: 'switch-managed',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class ManagedSwitchHost extends SymbiotePrimitiveHost {}
 
+// The centering RCTView RN wraps the spinner in (ActivityIndicator.js:112), not the spinner —
+// which is what this tag resolved to until 2026-09-09. The native view moved to
+// `activity-indicator-spinner`, built by the engine's ActivityIndicator behavior, so nothing writes
+// it in a template and it needs no host here.
 @Component({
-  selector: 'symbiote-activity-indicator',
+  selector: 'activity-indicator',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class ActivityIndicatorHost extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-safe-area-view',
+  selector: 'safe-area-view',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class SafeAreaViewHost extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-modal',
+  selector: 'modal',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class ModalHost extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-refresh-control',
+  selector: 'refresh-control',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class RefreshControlHost extends SymbiotePrimitiveHost {}
 
 @Component({
-  selector: 'symbiote-input-accessory-view',
+  selector: 'input-accessory-view',
   standalone: true,
   template: '<ng-content></ng-content>',
 })

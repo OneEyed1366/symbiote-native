@@ -1,13 +1,13 @@
 import { Component, ViewChild } from '@angular/core';
 import {
   AccessibilityInfo,
-  Button,
+  ButtonElement,
   FlatList,
   Keyboard,
   SectionList,
   SymbioteHostPropsDirective,
   Text,
-  TextInput,
+  TextInputElement,
   View,
   VListItemDirective,
   VSectionHeaderDirective,
@@ -68,8 +68,8 @@ const paritySections: ISection<ISectionEntry>[] = [
   imports: [
     View,
     Text,
-    Button,
-    TextInput,
+    ButtonElement,
+    TextInputElement,
     FlatList,
     SectionList,
     VListItemDirective,
@@ -78,39 +78,39 @@ const paritySections: ISection<ISectionEntry>[] = [
     SymbioteHostPropsDirective,
   ],
   template: `
-    <View class="section-nested">
-      <Text #titleRef class="section-label"
+    <view class="section-nested">
+      <text #titleRef class="section-label"
         >Parity checks · longPress · dismiss · animated scroll · sticky · a11y
-        focus</Text
+        focus</text
       >
 
       <!-- Text.onLongPress synthesis: hold ~0.5s (suppresses tap) vs quick tap. Text's own
            primitive host only declares 'style' as a real @Input() (adapters/angular/src/primitives/
            shared.ts), so onLongPress/onPress bind through the symbioteHostProps bag (a REAL declared
            @Input), not as [onLongPress]/[onPress] directly — see ResponderDemo.ts for the same fix. -->
-      <Text [symbioteHostProps]="longPressHostProps" class="long-press-row">{{
+      <text [symbioteHostProps]="longPressHostProps" class="long-press-row">{{
         longPressMsg
-      }}</Text>
+      }}</text>
 
       <!-- Keyboard.dismiss: blurs whatever input holds focus without needing a ref -->
-      <TextInput
+      <text-input
         testID="focus-input"
         placeholder="focus me…"
         placeholderTextColor="#41506a"
         (focus)="handleFocus()"
         (blur)="handleBlur()"
         class="focus-input"
-      />
-      <Text testID="dismiss-msg" class="note-text">{{ dismissMsg }}</Text>
-      <Button
+      ></text-input>
+      <text testID="dismiss-msg" class="note-text">{{ dismissMsg }}</text>
+      <button
         testID="hide-keyboard-btn"
         title="Hide keyboard"
         (press)="hideKeyboard()"
         color="#dd0031"
-      ></Button>
+      ></button>
 
       <!-- animated VirtualizedList scroll: smooth vs instant -->
-      <Text class="section-label">FlatList · animated scrollToOffset</Text>
+      <text class="section-label">FlatList · animated scrollToOffset</text>
       <FlatList
         testID="parity-flat-list"
         [data]="parityRows"
@@ -119,33 +119,33 @@ const paritySections: ISection<ISectionEntry>[] = [
         class="parity-list"
       >
         <ng-template vListItem let-item>
-          <View class="parity-row">
-            <Text class="info-text">{{ 'row ' + parityRowNumber(item) }}</Text>
-          </View>
+          <view class="parity-row">
+            <text class="info-text">{{ 'row ' + parityRowNumber(item) }}</text>
+          </view>
         </ng-template>
       </FlatList>
-      <View class="row">
-        <View class="flex-1">
-          <Button
+      <view class="row">
+        <view class="flex-1">
+          <button
             testID="scroll-down-animated-btn"
             title="Scroll ▼ animated"
             (press)="scrollDown()"
             color="#dd0031"
-          ></Button>
-        </View>
-        <View class="flex-1">
-          <Button
+          ></button>
+        </view>
+        <view class="flex-1">
+          <button
             testID="scroll-top-btn"
             title="Top · instant"
             (press)="scrollTop()"
             color="#dd0031"
-          ></Button>
-        </View>
-      </View>
+          ></button>
+        </view>
+      </view>
 
       <!-- sticky section headers: drag the inner list, each header pins at the top -->
-      <Text class="section-label"
-        >SectionList · sticky (scroll: next header should push prev off)</Text
+      <text class="section-label"
+        >SectionList · sticky (scroll: next header should push prev off)</text
       >
       <SectionList
         testID="sticky-section-list"
@@ -155,23 +155,23 @@ const paritySections: ISection<ISectionEntry>[] = [
         class="section-list"
       >
         <ng-template vSectionHeader let-section>
-          <Text class="section-header">{{ section.title }}</Text>
+          <text class="section-header">{{ section.title }}</text>
         </ng-template>
         <ng-template vSectionItem let-item>
-          <View class="parity-row">
-            <Text class="info-text">{{ sectionItemLabel(item) }}</Text>
-          </View>
+          <view class="parity-row">
+            <text class="info-text">{{ sectionItemLabel(item) }}</text>
+          </view>
         </ng-template>
       </SectionList>
 
       <!-- a11y focus: node-based sendAccessibilityEvent routes through the Fabric slot on both platforms -->
-      <Button
+      <button
         testID="focus-title-btn"
         title="Focus the panel title (a11y)"
         (press)="focusTitle()"
         color="#dd0031"
-      ></Button>
-    </View>
+      ></button>
+    </view>
   `,
 })
 export class ParityDemo {

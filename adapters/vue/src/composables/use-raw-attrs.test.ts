@@ -36,7 +36,7 @@ const Probe = defineComponent({
   setup(_props, { attrs }) {
     contextBag = attrs;
     captured = useRawAttrs(attrs);
-    return (): VNode => h('symbiote-view', { testID: 'probe' });
+    return (): VNode => h('view', { testID: 'probe' });
   },
 });
 

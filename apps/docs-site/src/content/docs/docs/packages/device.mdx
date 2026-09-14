@@ -61,7 +61,6 @@ holds live state or a subscription.
   <TabItem label="React">
     ```tsx
     import { useEffect, useState } from 'react';
-    import { Text, View } from '@symbiote-native/react';
     import {
       brand,
       deviceName,
@@ -83,14 +82,14 @@ holds live state or a subscription.
       }, []);
 
       return (
-        <View>
-          <Text>{isDevice ? 'Real device' : 'Simulator/emulator'}</Text>
-          <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
-          <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
-          <Text>{deviceName ?? 'unnamed device'}</Text>
-          <Text>{uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}</Text>
-          <Text>{maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`}</Text>
-        </View>
+        <view>
+          <text>{isDevice ? 'Real device' : 'Simulator/emulator'}</text>
+          <text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</text>
+          <text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</text>
+          <text>{deviceName ?? 'unnamed device'}</text>
+          <text>{uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}</text>
+          <text>{maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`}</text>
+        </view>
       );
     }
     ```
@@ -100,7 +99,6 @@ holds live state or a subscription.
     ```vue
     <script setup lang="ts">
     import { onMounted, ref } from 'vue';
-    import { Text, View } from '@symbiote-native/vue';
     import {
       brand,
       deviceName,
@@ -122,14 +120,14 @@ holds live state or a subscription.
     </script>
 
     <template>
-      <View>
-        <Text>{{ isDevice ? 'Real device' : 'Simulator/emulator' }}</Text>
-        <Text>{{ `${brand ?? 'unknown'} ${modelName ?? ''}` }}</Text>
-        <Text>{{ `${osName ?? 'unknown OS'} ${osVersion ?? ''}` }}</Text>
-        <Text>{{ deviceName ?? 'unnamed device' }}</Text>
-        <Text>{{ uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms` }}</Text>
-        <Text>{{ maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes` }}</Text>
-      </View>
+      <view>
+        <text>{{ isDevice ? 'Real device' : 'Simulator/emulator' }}</text>
+        <text>{{ `${brand ?? 'unknown'} ${modelName ?? ''}` }}</text>
+        <text>{{ `${osName ?? 'unknown OS'} ${osVersion ?? ''}` }}</text>
+        <text>{{ deviceName ?? 'unnamed device' }}</text>
+        <text>{{ uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms` }}</text>
+        <text>{{ maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes` }}</text>
+      </view>
     </template>
     ```
 
@@ -137,7 +135,7 @@ holds live state or a subscription.
   <TabItem label="Angular">
     ```ts
     import { Component, signal } from '@angular/core';
-    import { Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import {
       brand,
       deviceName,
@@ -151,16 +149,16 @@ holds live state or a subscription.
 
     @Component({
       standalone: true,
-      imports: [Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Text>{{ isDevice ? 'Real device' : 'Simulator/emulator' }}</Text>
-          <Text>{{ brand ?? 'unknown' }} {{ modelName ?? '' }}</Text>
-          <Text>{{ osName ?? 'unknown OS' }} {{ osVersion ?? '' }}</Text>
-          <Text>{{ deviceName ?? 'unnamed device' }}</Text>
-          <Text>{{ uptime() === null ? 'checking uptime…' : 'Uptime: ' + uptime() + 'ms' }}</Text>
-          <Text>{{ maxMemory() === null ? 'checking memory…' : 'Max memory: ' + maxMemory() + ' bytes' }}</Text>
-        </View>
+        <view>
+          <text>{{ isDevice ? 'Real device' : 'Simulator/emulator' }}</text>
+          <text>{{ brand ?? 'unknown' }} {{ modelName ?? '' }}</text>
+          <text>{{ osName ?? 'unknown OS' }} {{ osVersion ?? '' }}</text>
+          <text>{{ deviceName ?? 'unnamed device' }}</text>
+          <text>{{ uptime() === null ? 'checking uptime…' : 'Uptime: ' + uptime() + 'ms' }}</text>
+          <text>{{ maxMemory() === null ? 'checking memory…' : 'Max memory: ' + maxMemory() + ' bytes' }}</text>
+        </view>
       `,
     })
     export class DeviceInfo {
@@ -188,7 +186,6 @@ holds live state or a subscription.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text, View } from '@symbiote-native/svelte';
       import {
         brand,
         deviceName,
@@ -209,14 +206,14 @@ holds live state or a subscription.
       });
     </script>
 
-    <View>
-      <Text>{isDevice ? 'Real device' : 'Simulator/emulator'}</Text>
-      <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
-      <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
-      <Text>{deviceName ?? 'unnamed device'}</Text>
-      <Text>{uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}</Text>
-      <Text>{maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`}</Text>
-    </View>
+    <view>
+      <text>{isDevice ? 'Real device' : 'Simulator/emulator'}</text>
+      <text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</text>
+      <text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</text>
+      <text>{deviceName ?? 'unnamed device'}</text>
+      <text>{uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}</text>
+      <text>{maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`}</text>
+    </view>
     ```
 
     There's no per-instance rune to reach for here either — every constant/function is a plain
@@ -226,7 +223,6 @@ holds live state or a subscription.
   <TabItem label="Solid">
     ```tsx
     import { createSignal, onMount } from 'solid-js';
-    import { Text, View } from '@symbiote-native/solid';
     import {
       brand,
       deviceName,
@@ -248,16 +244,16 @@ holds live state or a subscription.
       });
 
       return (
-        <View>
-          <Text>{isDevice ? 'Real device' : 'Simulator/emulator'}</Text>
-          <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
-          <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
-          <Text>{deviceName ?? 'unnamed device'}</Text>
-          <Text>{uptime() === null ? 'checking uptime…' : `Uptime: ${uptime()}ms`}</Text>
-          <Text>
+        <view>
+          <text>{isDevice ? 'Real device' : 'Simulator/emulator'}</text>
+          <text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</text>
+          <text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</text>
+          <text>{deviceName ?? 'unnamed device'}</text>
+          <text>{uptime() === null ? 'checking uptime…' : `Uptime: ${uptime()}ms`}</text>
+          <text>
             {maxMemory() === null ? 'checking memory…' : `Max memory: ${maxMemory()} bytes`}
-          </Text>
-        </View>
+          </text>
+        </view>
       );
     }
     ```

@@ -99,7 +99,7 @@ async function loadProbe(): Promise<Component> {
        const measurement = useMagnetometerUncalibrated(updateIntervalMs);
        $effect(() => { onValue(measurement.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'MagnetometerUncalibratedProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

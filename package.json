@@ -52,6 +52,7 @@
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-plugin-react-hooks": "catalog:",
+    "eslint-plugin-svelte": "catalog:",
     "globals": "catalog:",
     "husky": "catalog:",
     "lint-staged": "catalog:",

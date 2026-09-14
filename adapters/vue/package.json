@@ -36,12 +36,13 @@
     "./metro-css-parser": "./metro-css-parser.cjs",
     "./metro-vue-transformer": "./metro-vue-transformer.cjs",
     "./babel-jsx": "./babel-jsx.cjs",
-    "./state-style": "./src/state-style.ts"
+    "./jsx-runtime": "./src/jsx-runtime.ts",
+    "./jsx-dev-runtime": "./src/jsx-runtime.ts"
   },
   "files": [
     "babel-jsx.cjs",
-    "babel-lower-host-primitives.cjs",
     "build",
+    "intrinsic-tags.cjs",
     "metro-css-parser.cjs",
     "metro-vue-transformer.cjs"
   ],
@@ -66,9 +67,13 @@
       "./metro-css-parser": "./metro-css-parser.cjs",
       "./metro-vue-transformer": "./metro-vue-transformer.cjs",
       "./babel-jsx": "./babel-jsx.cjs",
-      "./state-style": {
-        "types": "./build/state-style.d.ts",
-        "default": "./build/state-style.js"
+      "./jsx-runtime": {
+        "types": "./build/jsx-runtime.d.ts",
+        "default": "./build/jsx-runtime.js"
+      },
+      "./jsx-dev-runtime": {
+        "types": "./build/jsx-runtime.d.ts",
+        "default": "./build/jsx-runtime.js"
       }
     }
   },

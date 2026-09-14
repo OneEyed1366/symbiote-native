@@ -63,13 +63,12 @@ versions — never install either yourself, and never add the `expo` meta-packag
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Text } from '@symbiote-native/react';
     import { useNetworkState } from '@symbiote-native/network/react';
 
     export default function ConnectionStatus() {
       const networkState = useNetworkState(); // NetworkState, {} until the first reading arrives
 
-      return <Text>{networkState.isConnected ? `Connected via ${networkState.type}` : 'Offline'}</Text>;
+      return <text>{networkState.isConnected ? `Connected via ${networkState.type}` : 'Offline'}</text>;
     }
     ```
 
@@ -83,7 +82,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
     </script>
 
     <template>
-      <Text>{{ networkState.isConnected ? `Connected via ${networkState.type}` : 'Offline' }}</Text>
+      <text>{{ networkState.isConnected ? `Connected via ${networkState.type}` : 'Offline' }}</text>
     </template>
     ```
 
@@ -91,13 +90,13 @@ versions — never install either yourself, and never add the `expo` meta-packag
   <TabItem label="Angular">
     ```ts
     import { Component, inject } from '@angular/core';
-    import { Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { NetworkStateService } from '@symbiote-native/network/angular';
 
     @Component({
       standalone: true,
-      imports: [Text],
-      template: `<Text>{{ networkState().isConnected ? 'Connected via ' + networkState().type : 'Offline' }}</Text>`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<text>{{ networkState().isConnected ? 'Connected via ' + networkState().type : 'Offline' }}</text>`,
     })
     export class ConnectionStatus {
       readonly networkState = inject(NetworkStateService).connect();
@@ -108,25 +107,23 @@ versions — never install either yourself, and never add the `expo` meta-packag
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text } from '@symbiote-native/svelte';
       import { useNetworkState } from '@symbiote-native/network/svelte';
 
       const networkState = useNetworkState(); // { readonly current: NetworkState }, {} until the first reading arrives
     </script>
 
-    <Text>{networkState.current.isConnected ? `Connected via ${networkState.current.type}` : 'Offline'}</Text>
+    <text>{networkState.current.isConnected ? `Connected via ${networkState.current.type}` : 'Offline'}</text>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Text } from '@symbiote-native/solid';
     import { createNetworkState } from '@symbiote-native/network/solid';
 
     export default function ConnectionStatus() {
       const networkState = createNetworkState(); // Accessor<NetworkState>, {} until the first reading arrives
 
-      return <Text>{networkState().isConnected ? `Connected via ${networkState().type}` : 'Offline'}</Text>;
+      return <text>{networkState().isConnected ? `Connected via ${networkState().type}` : 'Offline'}</text>;
     }
     ```
 
@@ -161,8 +158,8 @@ const airplaneMode = await isAirplaneModeEnabledAsync();
 
 ### `useNetworkState()` / `NetworkStateService.connect()`
 
-| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Solid (`/solid`)          | Signature | Returns                                                                                                                                                                                |
-| ----------------- | ----------------- | -------------------------------- | ------------------- | --------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Solid (`/solid`)     | Signature | Returns                                                                                                                                                                                                                  |
+| ----------------- | ----------------- | ------------------------------- | ------------------ | -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `useNetworkState` | `useNetworkState` | `NetworkStateService.connect()` | `useNetworkState`  | `createNetworkState` | `()`      | Live `NetworkState` — plain value (React), `Ref<NetworkState>` (Vue), `Signal<NetworkState>` (Angular), `{ readonly current: NetworkState }` (Svelte, read as `.current`), `Accessor<NetworkState>` (Solid), seeded `{}` |
 
 ### `NetworkState` / `NetworkStateEvent`

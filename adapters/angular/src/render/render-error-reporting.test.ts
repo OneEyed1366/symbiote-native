@@ -36,14 +36,14 @@ const drainAngularAndCommit = async (): Promise<void> => {
 
 class TestView {}
 Component({
-  selector: 'symbiote-view',
+  selector: 'view',
   standalone: true,
   template: '<ng-content></ng-content>',
 })(TestView);
 
 class TestText {}
 Component({
-  selector: 'symbiote-text',
+  selector: 'text',
   standalone: true,
   template: '<ng-content></ng-content>',
 })(TestText);
@@ -66,7 +66,7 @@ Component({
   selector: 'symbiote-angular-tick-throwing',
   standalone: true,
   imports: [TestText],
-  template: '<symbiote-text>{{ text() }}</symbiote-text>',
+  template: '<text>{{ text() }}</text>',
 })(TickThrowingComponent);
 
 class ListenerThrowingComponent {
@@ -83,7 +83,7 @@ Component({
   standalone: true,
   imports: [TestView, TestText],
   template:
-    '<symbiote-view testID="trigger" (press)="boom()"><symbiote-text>{{ label() }}</symbiote-text></symbiote-view>',
+    '<view testID="trigger" (press)="boom()"><text>{{ label() }}</text></view>',
 })(ListenerThrowingComponent);
 
 let consoleError: ReturnType<typeof vi.spyOn>;

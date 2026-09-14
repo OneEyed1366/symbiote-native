@@ -57,7 +57,7 @@ function mountAccelerometer(
     defineComponent({
       setup: () => {
         measurement = useAccelerometer(updateIntervalMs);
-        return () => h('symbiote-text', {}, 'sensor');
+        return () => h('text', {}, 'sensor');
       },
     }),
   );

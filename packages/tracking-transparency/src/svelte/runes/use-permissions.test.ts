@@ -106,7 +106,7 @@ async function loadProbe(): Promise<Component> {
        let { onReady }: { onReady: (permissions: unknown) => void } = $props();
        onReady(usePermissions());
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'PermissionsProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

@@ -146,7 +146,7 @@ describe('a lowered Pressable folds disabled into accessibilityState', () => {
   // same prop on an UNLOWERED tag is untouched — which is what makes the folds above attributable
   // to the behavior rather than to something the engine does for every node.
   it('folds nothing on a node with no behavior', () => {
-    const props = commitLowered(PRESSABLE_VIEW, 'symbiote-view', {
+    const props = commitLowered(PRESSABLE_VIEW, 'view', {
       disabled: true,
     });
 

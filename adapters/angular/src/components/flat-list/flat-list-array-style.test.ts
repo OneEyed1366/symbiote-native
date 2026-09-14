@@ -52,7 +52,7 @@ const chips: IChip[] = Array.from({ length: 24 }, (_unused, index) => ({
       [style]="{ height: 84 }"
     >
       <ng-template vListItem let-item>
-        <symbiote-view
+        <view
           [testID]="'chip-' + item.n"
           [style]="
             flattenStyle([
@@ -61,8 +61,8 @@ const chips: IChip[] = Array.from({ length: 24 }, (_unused, index) => ({
             ])
           "
         >
-          <symbiote-text>{{ item.n }}</symbiote-text>
-        </symbiote-view>
+          <text>{{ item.n }}</text>
+        </view>
       </ng-template>
     </FlatList>
   `,

@@ -10,6 +10,7 @@ import { dlog } from '../debug';
 import { runWrapped } from '../dispatch';
 import { getSlot } from '../fabric';
 import {
+  committedOf,
   isAnchor,
   isSymbioteNode,
   type ISymbioteEvent,
@@ -297,6 +298,42 @@ function findWantsResponder(
   return undefined;
 }
 
+// Tell native which node owns the gesture, RN's `injectGlobalResponderHandler`
+// (ReactFabric-dev.js:18862) — the OLD owner first, then the new one, both in one call so no
+// site can do half of it.
+//
+// WITHOUT THIS A JS RESPONDER LOSES TO ANY SCROLL VIEW ABOVE IT, and it is invisible from JS:
+// `onStartShouldSetResponder` returns true, the native UIScrollView never learns the gesture was
+// claimed, and every subsequent move arrives as `topScroll` instead of `topTouchMove` — so the
+// negotiation never even gets a move to grant on. Device-diagnosed 2026-09-08 on a PanResponder
+// drag box inside the canary's ScrollView: `startShouldSet -> true` followed by
+// `topScrollBeginDrag` and twenty `topScroll`, with no grant and no move.
+//
+// `blockNativeResponder` is the taker's own `onResponderGrant` return, exactly as RN reads it.
+function handOverNativeResponder(
+  from: ISymbioteNode | undefined,
+  to: ISymbioteNode | undefined,
+  blockNativeResponder: boolean,
+): void {
+  const slot = getSlot();
+  const fromHandle = from === undefined ? undefined : committedOf(from)?.handle;
+  const toHandle = to === undefined ? undefined : committedOf(to)?.handle;
+  dlog(
+    `setIsJSResponder from=${from === undefined ? 'none' : fromHandle === undefined ? 'UNCOMMITTED' : 'yes'} ` +
+      `to=${to === undefined ? 'none' : toHandle === undefined ? 'UNCOMMITTED' : 'yes'} block=${blockNativeResponder}`,
+  );
+  if (fromHandle !== undefined)
+    slot.setIsJSResponder(fromHandle, false, blockNativeResponder);
+  if (toHandle !== undefined)
+    slot.setIsJSResponder(toHandle, true, blockNativeResponder);
+}
+
+// Whether the taker asked native to stand down. RN reads this off the grant dispatch's return;
+// an absent listener means no claim, which is RN's `blockNativeResponder || false`.
+function blocksNative(result: unknown): boolean {
+  return result === true;
+}
+
 // Negotiate (or re-negotiate) the responder for a touch start/move. If nobody holds
 // it, the winner is granted. If someone does, the incumbent is asked to relinquish
 // via onResponderTerminationRequest (absent listener = implicit yes); on yes it is
@@ -334,12 +371,24 @@ function negotiateResponder(
           nativeEvent,
           skip,
         );
-  if (!wants || wants === currentResponder) return;
+  // Every exit is logged: a negotiation that declines is indistinguishable from one that never
+  // ran, and the two have opposite causes.
+  if (!wants) {
+    dlog(
+      `responder ${phase}: nobody wants it (path=${path.length}${skip === undefined ? '' : ', one skipped'})`,
+    );
+    return;
+  }
+  if (wants === currentResponder) {
+    dlog(`responder ${phase}: ${wants.component} already holds it`);
+    return;
+  }
 
   if (currentResponder === undefined) {
     currentResponder = wants;
     dlog(`responder granted to ${wants.component}`);
-    callOwnListener(wants, RESPONDER_GRANT, nativeEvent);
+    const granted = callOwnListener(wants, RESPONDER_GRANT, nativeEvent);
+    handOverNativeResponder(undefined, wants, blocksNative(granted));
     return;
   }
 
@@ -361,9 +410,10 @@ function negotiateResponder(
     // before terminate on the consent path (matching RN's grant<terminate ordering) and
     // omit it on reject; the consent OUTCOME is unchanged either way.
     dlog(`responder transferred ${incumbent.component} -> ${wants.component}`);
-    callOwnListener(wants, RESPONDER_GRANT, nativeEvent);
+    const granted = callOwnListener(wants, RESPONDER_GRANT, nativeEvent);
     callOwnListener(incumbent, RESPONDER_TERMINATE, nativeEvent);
     currentResponder = wants;
+    handOverNativeResponder(incumbent, wants, blocksNative(granted));
   } else {
     dlog(`responder takeover of ${incumbent.component} rejected`);
     callOwnListener(wants, RESPONDER_REJECT, nativeEvent);
@@ -379,7 +429,9 @@ export function installEventHandler(): void {
       if (!isSymbioteNode(instanceHandle)) return;
 
       if (topLevelType === TOUCH_START) {
-        dlog(`event ${TOUCH_START}`);
+        dlog(
+          `event ${TOUCH_START} on ${isSymbioteNode(instanceHandle) ? instanceHandle.component : 'NON-NODE'}`,
+        );
         // Update the touch bank, then attach it so responder handlers (PanResponder)
         // read each touch's own previous->current delta; RN records before dispatch.
         recordTouchTrack('start', nativeEvent);
@@ -501,9 +553,10 @@ export function installEventHandler(): void {
           // release) only when the last responder touch lifted.
           if (responder) {
             callOwnListener(responder, RESPONDER_END, nativeEvent);
-            if (releases)
+            if (releases) {
               callOwnListener(responder, RESPONDER_RELEASE, nativeEvent);
-            else
+              handOverNativeResponder(responder, undefined, false);
+            } else
               dlog(
                 'responderEnd without release (touches remain inside responder)',
               );
@@ -538,8 +591,10 @@ export function installEventHandler(): void {
             // Like touch-end, every finger leaving emits responderEnd. Termination is final only
             // when no touch remains inside the responder.
             callOwnListener(responder, RESPONDER_END, nativeEvent);
-            if (terminatesResponder)
+            if (terminatesResponder) {
               callOwnListener(responder, RESPONDER_TERMINATE, nativeEvent);
+              handOverNativeResponder(responder, undefined, false);
+            }
           }
         });
         if (touchHistory.numberActiveTouches === 0) resetTouchHistory();

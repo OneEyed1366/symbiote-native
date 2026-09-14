@@ -197,21 +197,20 @@ frameworks on the iOS simulator. React Native's own renderer is never in the pat
 </div>
 
 The smallest slice is a tap→increment counter. The app is ordinary React (or Vue) — it just
-imports primitives from `@symbiote-native/*` instead of `react-native`:
+writes the native primitives as plain intrinsic tags, no import needed:
 
 ```jsx
 import { useState } from 'react';
-import { View, Text, Pressable } from '@symbiote-native/react';
 
 export default function App() {
   const [count, setCount] = useState(0);
   return (
-    <View style={{ padding: 24 }}>
-      <Text>Taps: {count}</Text>
-      <Pressable onPress={() => setCount(c => c + 1)}>
-        <Text>Tap me</Text>
-      </Pressable>
-    </View>
+    <view style={{ padding: 24 }}>
+      <text>Taps: {count}</text>
+      <pressable onPress={() => setCount(c => c + 1)}>
+        <text>Tap me</text>
+      </pressable>
+    </view>
   );
 }
 ```

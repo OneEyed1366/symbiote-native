@@ -28,7 +28,6 @@ import {
   KeyboardAvoidingView,
   type IKeyboardAvoidingViewProps,
 } from './keyboard-avoiding-view';
-import { Text } from './text';
 
 const ROOT_TAG = 817;
 
@@ -123,7 +122,7 @@ afterEach(() => unmount(ROOT_TAG));
 function App(props: IKeyboardAvoidingViewProps): JSX.Element {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} {...props}>
-      <Text>type here</Text>
+      <text>type here</text>
     </KeyboardAvoidingView>
   );
 }

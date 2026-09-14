@@ -71,10 +71,7 @@ function rawTexts(): string[] {
 describe('whitespace-only text nodes (compiled without the preprocessor)', () => {
   it('drops the gap Svelte leaves between siblings of a non-text parent', async () => {
     const Probe = await load(
-      '<symbiote-view>\n' +
-        '  <symbiote-text>a</symbiote-text>\n' +
-        '  <symbiote-text>b</symbiote-text>\n' +
-        '</symbiote-view>',
+      '<view>\n' + '  <text>a</text>\n' + '  <text>b</text>\n' + '</view>',
     );
     mount(ROOT_TAG, Probe, {});
     await tick();
@@ -84,9 +81,7 @@ describe('whitespace-only text nodes (compiled without the preprocessor)', () =>
   });
 
   it('keeps the separator when the parent IS a text container', async () => {
-    const Probe = await load(
-      '<symbiote-text><symbiote-text>a</symbiote-text> <symbiote-text>b</symbiote-text></symbiote-text>',
-    );
+    const Probe = await load('<text><text>a</text> <text>b</text></text>');
     mount(ROOT_TAG, Probe, {});
     await tick();
 
@@ -104,9 +99,7 @@ describe('whitespace-only text nodes (compiled without the preprocessor)', () =>
     ['a form feed', '\f'],
     ['a zero-width space', '​'],
   ])('drops %s between siblings of a non-text parent', async (_label, gap) => {
-    const Probe = await load(
-      `<symbiote-view><symbiote-text>a</symbiote-text>${gap}<symbiote-text>b</symbiote-text></symbiote-view>`,
-    );
+    const Probe = await load(`<view><text>a</text>${gap}<text>b</text></view>`);
     mount(ROOT_TAG, Probe, {});
     await tick();
 
@@ -116,9 +109,7 @@ describe('whitespace-only text nodes (compiled without the preprocessor)', () =>
   // The counter-case for the WIDER class: inside a <Text> an nbsp is a character the author
   // meant, and the parent check is what protects it — not the class.
   it('keeps &nbsp; when the parent IS a text container', async () => {
-    const Probe = await load(
-      '<symbiote-text><symbiote-text>a</symbiote-text>&nbsp;<symbiote-text>b</symbiote-text></symbiote-text>',
-    );
+    const Probe = await load('<text><text>a</text>&nbsp;<text>b</text></text>');
     mount(ROOT_TAG, Probe, {});
     await tick();
 
@@ -127,12 +118,12 @@ describe('whitespace-only text nodes (compiled without the preprocessor)', () =>
 
   it('leaves an {#each} text placeholder alone — same string, text parent', async () => {
     const Probe = await load(
-      '<symbiote-view>{#each ["x", "y"] as v}<symbiote-text>{v}</symbiote-text>{/each}</symbiote-view>',
+      '<view>{#each ["x", "y"] as v}<text>{v}</text>{/each}</view>',
     );
     mount(ROOT_TAG, Probe, {});
     await tick();
 
-    // The placeholder compiles to ['symbiote-text', null, ' '] — identical to a stray gap at
+    // The placeholder compiles to ['text', null, ' '] — identical to a stray gap at
     // the string level. Its parent is a <Text>, so the rule keeps it; and even if the rule did
     // drop it, promoteAnchorToRawText() would restore it when set_text arrives. Belt and
     // braces, so this asserts the OUTCOME (both rows render) rather than which route got there.

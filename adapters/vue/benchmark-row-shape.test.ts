@@ -158,7 +158,7 @@ async function probe(render: () => unknown): Promise<IProbe> {
 // child appearing to REDUCE Fabric calls. Both arms are taken after this, never across it.
 beforeAll(async () => {
   engine.registerRules(ROW_RULES);
-  await probe(() => h('symbiote-view', null, []));
+  await probe(() => h('view', null, []));
 });
 
 describe('a conditional child costs the retained tree what Fabric cannot see', () => {
@@ -169,10 +169,10 @@ describe('a conditional child costs the retained tree what Fabric cannot see', (
     ['a false child', false],
   ])('%s: +1 retained anchor, +0 createNode', async (_what, absent) => {
     const withoutCondition = await probe(() =>
-      h('symbiote-view', null, [h('symbiote-text', null, 'a')]),
+      h('view', null, [h('text', null, 'a')]),
     );
     const withCondition = await probe(() =>
-      h('symbiote-view', null, [h('symbiote-text', null, 'a'), absent]),
+      h('view', null, [h('text', null, 'a'), absent]),
     );
 
     expect(withCondition.createNode, 'Fabric sees nothing').toBe(
@@ -188,13 +188,10 @@ describe('a conditional child costs the retained tree what Fabric cannot see', (
   // retained" reads the same as a harness that miscounts by one.
   it('a child that DOES render costs a real node, not an anchor', async () => {
     const withoutChild = await probe(() =>
-      h('symbiote-view', null, [h('symbiote-text', null, 'a')]),
+      h('view', null, [h('text', null, 'a')]),
     );
     const withChild = await probe(() =>
-      h('symbiote-view', null, [
-        h('symbiote-text', null, 'a'),
-        h('symbiote-text', null, 'b'),
-      ]),
+      h('view', null, [h('text', null, 'a'), h('text', null, 'b')]),
     );
 
     expect(withChild.anchors).toBe(withoutChild.anchors);

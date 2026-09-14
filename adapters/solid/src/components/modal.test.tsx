@@ -28,8 +28,6 @@ import {
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { Modal } from './modal';
-import { Text } from './text';
-import { View } from './view';
 
 const ROOT_TAG = 818;
 const MODAL_VIEW = 'ModalHostView';
@@ -110,7 +108,7 @@ describe('Solid Modal on the engine', () => {
     it('commits a visible modal as ModalHostView(RCTView(RCTView))', async () => {
       mount(ROOT_TAG, () => (
         <Modal visible>
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -126,7 +124,7 @@ describe('Solid Modal on the engine', () => {
     it('commits no modal node when visible starts false', async () => {
       mount(ROOT_TAG, () => (
         <Modal visible={false}>
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -142,7 +140,7 @@ describe('Solid Modal on the engine', () => {
       const [visible, setVisible] = createSignal(false);
       mount(ROOT_TAG, () => (
         <Modal visible={visible()}>
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -163,7 +161,7 @@ describe('Solid Modal on the engine', () => {
       const [visible, setVisible] = createSignal(true);
       mount(ROOT_TAG, () => (
         <Modal visible={visible()} onRequestClose={() => setVisible(false)}>
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -186,7 +184,7 @@ describe('Solid Modal on the engine', () => {
       const [transparent, setTransparent] = createSignal(false);
       mount(ROOT_TAG, () => (
         <Modal visible transparent={transparent()}>
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -214,7 +212,7 @@ describe('Solid Modal on the engine', () => {
       const [visible, setVisible] = createSignal(true);
       mount(ROOT_TAG, () => (
         <Modal visible={visible()}>
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -241,7 +239,7 @@ describe('Solid Modal on the engine', () => {
       const [label, setLabel] = createSignal('first');
       mount(ROOT_TAG, () => (
         <Modal visible>
-          <Text>{label()}</Text>
+          <text>{label()}</text>
         </Modal>
       ));
       await tick();
@@ -269,7 +267,7 @@ describe('Solid Modal on the engine', () => {
       const [label, setLabel] = createSignal<string | undefined>('a dialog');
       mount(ROOT_TAG, () => (
         <Modal visible aria-label={label()}>
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -297,7 +295,7 @@ describe('Solid Modal on the engine', () => {
             shown = true;
           }}
         >
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -320,7 +318,7 @@ describe('Solid Modal on the engine', () => {
             received = event;
           }}
         >
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -347,7 +345,7 @@ describe('Solid Modal on the engine', () => {
             dismissCount += 1;
           }}
         >
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -385,7 +383,7 @@ describe('Solid Modal on the engine', () => {
           animationType="slide"
           onRequestClose={() => {}}
         >
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -405,7 +403,7 @@ describe('Solid Modal on the engine', () => {
     it('passes testID and folds aria aliases through to the host node', async () => {
       mount(ROOT_TAG, () => (
         <Modal visible testID="my-modal" accessible aria-label="a dialog">
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -422,7 +420,7 @@ describe('Solid Modal on the engine', () => {
     it('lets the transparent override beat a user style on the committed container', async () => {
       mount(ROOT_TAG, () => (
         <Modal visible transparent style={{ backgroundColor: 'red' }}>
-          <View />
+          <view />
         </Modal>
       ));
       await tick();
@@ -438,7 +436,7 @@ describe('Solid Modal on the engine', () => {
     it('resolves class onto the container, not onto the host', async () => {
       mount(ROOT_TAG, () => (
         <Modal visible class="sheet">
-          <View />
+          <view />
         </Modal>
       ));
       await tick();

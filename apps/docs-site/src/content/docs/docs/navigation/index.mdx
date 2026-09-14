@@ -43,8 +43,9 @@ npm install @symbiote-native/navigation
   that registers `RNSScreen`, `RNSScreenStack`, `RNSModalScreen`,
   `RNSScreenStackHeaderConfig`, `RNSScreenStackHeaderSubview`, `RNSSearchBar`,
   and `RNSScreenContentWrapper` in Fabric's view-config registry before any
-  navigator is used. You only ever import from `@symbiote-native/navigation/react`,
-  `/vue`, `/angular`, `/svelte`, or `/solid`.
+  navigator is used. You only ever import from
+  `@symbiote-native/navigation/react`, `/vue`, `/angular`, `/svelte`, or
+  `/solid`.
 </Aside>
 
 ## Quick start
@@ -58,16 +59,15 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
   <TabItem label="React">
     ```tsx
     import { Stack, useStackNavigation } from '@symbiote-native/navigation/react';
-    import { Button } from '@symbiote-native/react';
 
     function Home() {
       const navigation = useStackNavigation();
-      return <Button title="Open details" onPress={() => navigation.push('Details')} />;
+      return <button title="Open details" onPress={() => navigation.push('Details')} />;
     }
 
     function Details() {
       const navigation = useStackNavigation();
-      return <Button title="Go back" onPress={() => navigation.pop()} />;
+      return <button title="Go back" onPress={() => navigation.pop()} />;
     }
 
     export default function App() {
@@ -86,16 +86,15 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
     <script setup lang="ts">
     import { defineComponent, h } from 'vue';
     import { Stack, Screen, useStackNavigation } from '@symbiote-native/navigation/vue';
-    import { Button } from '@symbiote-native/vue';
 
     const Home = defineComponent(() => {
       const navigation = useStackNavigation();
-      return () => h(Button, { title: 'Open details', onPress: () => navigation.value.push('Details') });
+      return () => h('button', { title: 'Open details', onPress: () => navigation.value.push('Details') });
     });
 
     const Details = defineComponent(() => {
       const navigation = useStackNavigation();
-      return () => h(Button, { title: 'Go back', onPress: () => navigation.value.pop() });
+      return () => h('button', { title: 'Go back', onPress: () => navigation.value.pop() });
     });
     </script>
 
@@ -112,13 +111,13 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
     ```ts
     import { Component } from '@angular/core';
     import { Stack, ScreenDirective, injectStackNavigation } from '@symbiote-native/navigation/angular';
-    import { Button } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 
     @Component({
       selector: 'Home',
       standalone: true,
-      imports: [Button],
-      template: `<Button title="Open details" (press)="navigation.push('Details')" />`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<button title="Open details" (press)="navigation.push('Details')" />`,
     })
     class Home {
       protected readonly navigation = injectStackNavigation();
@@ -127,8 +126,8 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
     @Component({
       selector: 'Details',
       standalone: true,
-      imports: [Button],
-      template: `<Button title="Go back" (press)="navigation.pop()" />`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<button title="Go back" (press)="navigation.pop()" />`,
     })
     class Details {
       protected readonly navigation = injectStackNavigation();
@@ -156,25 +155,23 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
     ```svelte
     <!-- Home.svelte -->
     <script lang="ts">
-      import { Button } from '@symbiote-native/svelte';
       import { useStackNavigation } from '@symbiote-native/navigation/svelte';
 
       const navigation = useStackNavigation();
     </script>
 
-    <Button title="Open details" onPress={() => navigation.current.push('Details')} />
+    <button title="Open details" onPress={() => navigation.current.push('Details')} />
     ```
 
     ```svelte
     <!-- Details.svelte -->
     <script lang="ts">
-      import { Button } from '@symbiote-native/svelte';
       import { useStackNavigation } from '@symbiote-native/navigation/svelte';
 
       const navigation = useStackNavigation();
     </script>
 
-    <Button title="Go back" onPress={() => navigation.current.pop()} />
+    <button title="Go back" onPress={() => navigation.current.pop()} />
     ```
 
     ```svelte
@@ -196,16 +193,15 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
   <TabItem label="Solid">
     ```tsx
     import { Stack, useStackNavigation } from '@symbiote-native/navigation/solid';
-    import { Button } from '@symbiote-native/solid';
 
     function Home() {
       const navigation = useStackNavigation();
-      return <Button title="Open details" onPress={() => navigation().push('Details')} />;
+      return <button title="Open details" onPress={() => navigation().push('Details')} />;
     }
 
     function Details() {
       const navigation = useStackNavigation();
-      return <Button title="Go back" onPress={() => navigation().pop()} />;
+      return <button title="Go back" onPress={() => navigation().pop()} />;
     }
 
     export default function App() {

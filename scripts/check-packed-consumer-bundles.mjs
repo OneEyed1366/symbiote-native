@@ -89,6 +89,48 @@ function run(command, args, options = {}) {
   }
 }
 
+// npm's cacache fans out internally: one `npm install` fetches/hashes many packages in parallel
+// inside a single process, and its tmp-then-rename cache writes race each other on that
+// same-process concurrency, not only across processes. Per-framework cache isolation
+// (`frameworkNpmCache` below) kills the cross-framework race this script used to have; it can't
+// kill this one, since it's entirely inside one `npm install`. Observed 2026-09-13: ENOTEMPTY on
+// `_cacache/content-v2/**` even with isolated caches. Upstream npm/cacache bug, not fixable here -
+// retry with a wiped cache, the documented workaround for this failure shape.
+//
+// `--legacy-peer-deps`: navigation/slider/splash-screen each list all five adapters as peers, so
+// an example installing just one still makes npm auto-resolve the other four off the registry.
+// That 5-way peer graph triggers arborist's own backtracking crash (`Cannot read properties of
+// null (reading 'edgesOut')`, npm/cli#4828 - non-deterministic, hit react only on 2026-09-14).
+// This check only needs the tarball to install and bundle, not real peer enforcement, so skipping
+// peer resolution removes the trigger instead of hoping a retry dodges it.
+async function installWithCacheRetry(cwd, env, cacheDir, attempts = 3) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await runAsync(
+        'npm',
+        [
+          'install',
+          '--package-lock=false',
+          '--no-audit',
+          '--no-fund',
+          '--prefer-offline',
+          '--legacy-peer-deps',
+        ],
+        { cwd, env },
+      );
+      return;
+    } catch (error) {
+      const isCacheRace =
+        error instanceof Error && /ENOTEMPTY.*_cacache/s.test(error.message);
+      if (!isCacheRace || attempt === attempts) throw error;
+      // A failed rmdir mid-write can leave the cache half-consistent; a bare retry can hit the
+      // same stuck entry, so wipe and let npm repopulate it from scratch.
+      rmSync(cacheDir, { recursive: true, force: true });
+      mkdirSync(cacheDir, { recursive: true });
+    }
+  }
+}
+
 // Non-blocking counterpart of `run`, so independent frameworks can install/verify/bundle
 // concurrently instead of one at a time (execFileSync blocks the whole event loop, so wrapping it
 // in Promise.all buys nothing — only an async child process yields the loop while it waits on I/O).
@@ -221,26 +263,34 @@ function copyTrackedExample(exampleDir, destination) {
   }
 }
 
-function packPackages(names, packDirectory) {
+// Each `pnpm pack` writes its own uniquely-named tarball into the shared packDirectory, so nothing
+// here is mutable shared state - safe to run concurrently. Measured 2026-09-14: 13 packages,
+// 21.4s sequential -> 7.6s in parallel on an 8-core machine (three of these - navigation, slider,
+// splash-screen - run a full Angular AOT compile as a prepack side effect and dominate either way).
+async function packPackages(names, packDirectory) {
   const entries = new Map(
     publishablePackageEntries().map(entry => [entry.name, entry]),
   );
   const tarballs = new Map();
-  for (const name of names) {
-    const entry = entries.get(name);
-    if (entry === undefined)
-      throw new Error(`${name} is not publishable from this checkout`);
-    const output = run('pnpm', ['pack', '--pack-destination', packDirectory], {
-      cwd: join(REPO_ROOT, entry.dir),
-    });
-    const finalLine = output.trim().split('\n').at(-1)?.trim();
-    if (!finalLine)
-      throw new Error(`pnpm pack returned no tarball path for ${name}`);
-    const tarball = resolve(join(REPO_ROOT, entry.dir), finalLine);
-    if (!existsSync(tarball))
-      throw new Error(`pnpm pack did not create ${tarball}`);
-    tarballs.set(name, tarball);
-  }
+  await Promise.all(
+    names.map(async name => {
+      const entry = entries.get(name);
+      if (entry === undefined)
+        throw new Error(`${name} is not publishable from this checkout`);
+      const output = await runAsync(
+        'pnpm',
+        ['pack', '--pack-destination', packDirectory],
+        { cwd: join(REPO_ROOT, entry.dir) },
+      );
+      const finalLine = output.trim().split('\n').at(-1)?.trim();
+      if (!finalLine)
+        throw new Error(`pnpm pack returned no tarball path for ${name}`);
+      const tarball = resolve(join(REPO_ROOT, entry.dir), finalLine);
+      if (!existsSync(tarball))
+        throw new Error(`pnpm pack did not create ${tarball}`);
+      tarballs.set(name, tarball);
+    }),
+  );
   return tarballs;
 }
 
@@ -354,6 +404,18 @@ async function processExample(
   try {
     const exampleRoot = join(matrixRoot, framework);
     copyTrackedExample(example.dir, exampleRoot);
+    // Own cache per framework, never the matrix-wide one: npm's cacache does content-addressable
+    // writes (tmp-then-rename into content-v2/<algo>/<first two hex chars>/...) that are NOT safe
+    // for two `npm install` processes writing into the SAME cache root at once — a concurrent
+    // rmdir/mkdir race on a shared bucket directory throws ENOTEMPTY. Every framework already runs
+    // its own `npm install` concurrently (see the Promise.all in main()); a shared
+    // `npm_config_cache` was the one piece of mutable state that comment didn't account for.
+    const frameworkNpmCache = join(exampleRoot, '.npm-cache');
+    mkdirSync(frameworkNpmCache, { recursive: true });
+    const frameworkNpmEnvironment = {
+      ...npmEnvironment,
+      npm_config_cache: frameworkNpmCache,
+    };
     const directPackages = directInternalDependencies(manifest);
     const rewritten = rewriteInternalDependencies(manifest, tarballs);
     writeFileSync(
@@ -363,10 +425,10 @@ async function processExample(
     rmSync(join(exampleRoot, 'package-lock.json'), { force: true });
 
     log.push(`${framework}: installing fresh tarball consumer ...`);
-    await runAsync(
-      'npm',
-      ['install', '--package-lock=false', '--no-audit', '--no-fund', '--prefer-offline'],
-      { cwd: exampleRoot, env: npmEnvironment },
+    await installWithCacheRetry(
+      exampleRoot,
+      frameworkNpmEnvironment,
+      frameworkNpmCache,
     );
     verifyInstalledTarballs(exampleRoot, directPackages, tarballs);
 
@@ -374,7 +436,7 @@ async function processExample(
     log.push(`${framework}: running ${verifyCommand} ${verifyArgs.join(' ')} ...`);
     await runAsync(verifyCommand, verifyArgs, {
       cwd: exampleRoot,
-      env: verifyCommand === 'npm' ? npmEnvironment : process.env,
+      env: verifyCommand === 'npm' ? frameworkNpmEnvironment : process.env,
     });
 
     await Promise.all(
@@ -425,10 +487,10 @@ async function main() {
   const platforms = selectedValues('SYMBIOTE_CONSUMER_PLATFORMS', PLATFORMS);
   const matrixRoot = mkdtempSync(join(tmpdir(), 'symbiote-consumer-matrix-'));
   const packDirectory = join(matrixRoot, 'tarballs');
-  const npmCache = join(matrixRoot, 'npm-cache');
   mkdirSync(packDirectory);
-  mkdirSync(npmCache);
-  const npmEnvironment = { ...process.env, npm_config_cache: npmCache };
+  // Base env for every framework's npm calls; each gets its OWN npm_config_cache override inside
+  // processExample, never a shared one — see the comment there.
+  const npmEnvironment = { ...process.env };
   // pnpm injects its own setting into child processes; npm does not recognize it and warns on
   // every install/run. It has no bearing on the standalone consumer, so do not forward it.
   delete npmEnvironment.npm_config_manage_package_manager_versions;
@@ -457,13 +519,22 @@ async function main() {
     console.log(
       `Packing ${packageNames.length} direct consumer package(s): ${packageNames.join(', ')}`,
     );
-    const tarballs = packPackages(packageNames, packDirectory);
+    const tarballs = await packPackages(packageNames, packDirectory);
     const multiFrameworkPackages = discoverMultiFrameworkPackages();
 
-    // Every framework works in its own disposable directory with no shared mutable state, so
-    // there is nothing to serialize here — running them concurrently turns wall time from "sum of
-    // all five" into "roughly the slowest one" instead.
-    await Promise.all(
+    // Every framework works in its own disposable directory (npm cache included — see
+    // processExample), so running them concurrently turns wall time from "sum of all five" into
+    // "roughly the slowest one" instead of needing to serialize.
+    //
+    // allSettled, not all: Promise.all rejects the instant the FIRST framework fails while the
+    // others keep running in the background (nothing cancels them). The finally block below then
+    // rmSync's the whole matrixRoot immediately on that rejection, which races an in-progress
+    // sibling's own npm/cacache writes under that same root — the real cause of the "ENOTEMPTY on
+    // _cacache" this script kept hitting even after per-framework cache isolation (782d2cdc) and a
+    // wipe-and-retry (3bd62461). Worse, a throw from `finally` replaces whatever the `try` was
+    // rejecting with, so the ENOTEMPTY from that race was masking each framework's real error.
+    // Waiting for every framework to settle before cleanup removes the race outright.
+    const settled = await Promise.allSettled(
       selectedExamples.map(([framework, example]) =>
         processExample(
           framework,
@@ -477,6 +548,15 @@ async function main() {
         ),
       ),
     );
+    const failures = settled
+      .filter(result => result.status === 'rejected')
+      .map(result => result.reason);
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures,
+        `${failures.length} of ${selectedExamples.length} framework(s) failed`,
+      );
+    }
 
     console.log('\nAll packed consumer bundles passed.');
   } finally {

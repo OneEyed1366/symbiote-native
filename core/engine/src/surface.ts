@@ -7,6 +7,8 @@ import { commitChildren } from './commit';
 import { dlog } from './debug';
 import { installEventHandler } from './events';
 import { markStructureDirty, type ISymbioteNode } from './node';
+import { hasHostBehaviors, markDetachCandidate } from './host-behavior';
+import { hasAnimatedBindings } from './animated/host-binding';
 
 export class SymbioteSurface {
   readonly rootTag: IRootTag;
@@ -30,12 +32,22 @@ export class SymbioteSurface {
     this.children.splice(index < 0 ? this.children.length : index, 0, child);
   }
 
+  // Nominates for teardown exactly as `node.ts`'s `removeChild` does, and for the same reason it
+  // only NOMINATES: a framework may spell a move as remove-then-reinsert, so the commit sweep
+  // decides. Without this the surface is the one removal path that never reaches the sweep, and a
+  // node's behavior — its timers included — outlives the surface with nothing red.
+  //
+  // `detach` above is deliberately NOT nominated: the two inserts call it to reposition a child
+  // that is staying.
   removeChild(child: ISymbioteNode): void {
     const index = this.children.indexOf(child);
     if (index >= 0) this.children.splice(index, 1);
+    if (hasHostBehaviors() || hasAnimatedBindings()) markDetachCandidate(child);
   }
 
   clear(): void {
+    if (hasHostBehaviors() || hasAnimatedBindings())
+      for (const child of this.children) markDetachCandidate(child);
     this.children.length = 0;
   }
 

@@ -59,7 +59,6 @@ stays a physical file/subpath since Angular ships through a separate `ngc`/AOT b
 ```tsx
 // React
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from '@symbiote-native/react';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -81,13 +80,13 @@ function CryptoScreen() {
   };
 
   return (
-    <View>
-      <Text>UUID: {uuid}</Text>
-      <Pressable onPress={handleHash}>
-        <Text>Hash a string</Text>
-      </Pressable>
-      {hash && <Text>SHA-256: {hash}</Text>}
-    </View>
+    <view>
+      <text>UUID: {uuid}</text>
+      <pressable onPress={handleHash}>
+        <text>Hash a string</text>
+      </pressable>
+      {hash && <text>SHA-256: {hash}</text>}
+    </view>
   );
 }
 ```
@@ -96,7 +95,6 @@ function CryptoScreen() {
 <!-- Vue -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { Pressable, Text, View } from '@symbiote-native/vue';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -121,20 +119,19 @@ function handleHash(): void {
 </script>
 
 <template>
-  <View>
-    <Text>UUID: {{ uuid }}</Text>
-    <Pressable @press="handleHash">
-      <Text>Hash a string</Text>
-    </Pressable>
-    <Text v-if="hash">SHA-256: {{ hash }}</Text>
-  </View>
+  <view>
+    <text>UUID: {{ uuid }}</text>
+    <pressable @press="handleHash">
+      <text>Hash a string</text>
+    </pressable>
+    <text v-if="hash">SHA-256: {{ hash }}</text>
+  </view>
 </template>
 ```
 
 ```svelte
 <!-- Svelte -->
 <script lang="ts">
-  import { Pressable, Text, View } from '@symbiote-native/svelte';
   import {
     CryptoDigestAlgorithm,
     digestStringAsync,
@@ -151,19 +148,18 @@ function handleHash(): void {
   }
 </script>
 
-<View>
-  <Text>UUID: {uuid}</Text>
-  <Pressable onPress={handleHash}>
-    <Text>Hash a string</Text>
-  </Pressable>
-  {#if hash}<Text>SHA-256: {hash}</Text>{/if}
-</View>
+<view>
+  <text>UUID: {uuid}</text>
+  <pressable onPress={handleHash}>
+    <text>Hash a string</text>
+  </pressable>
+  {#if hash}<text>SHA-256: {hash}</text>{/if}
+</view>
 ```
 
 ```tsx
 // Solid
 import { createSignal } from 'solid-js';
-import { Pressable, Text, View } from '@symbiote-native/solid';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -181,13 +177,13 @@ function CryptoScreen() {
   };
 
   return (
-    <View>
-      <Text>UUID: {uuid()}</Text>
-      <Pressable onPress={handleHash}>
-        <Text>Hash a string</Text>
-      </Pressable>
-      {hash() && <Text>SHA-256: {hash()}</Text>}
-    </View>
+    <view>
+      <text>UUID: {uuid()}</text>
+      <pressable onPress={handleHash}>
+        <text>Hash a string</text>
+      </pressable>
+      {hash() && <text>SHA-256: {hash()}</text>}
+    </view>
   );
 }
 ```
@@ -195,7 +191,7 @@ function CryptoScreen() {
 ```ts
 // Angular
 import { Component, signal } from '@angular/core';
-import { Pressable, Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -204,17 +200,17 @@ import {
 
 @Component({
   standalone: true,
-  imports: [Pressable, Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <View>
-      <Text>UUID: {{ uuid() }}</Text>
-      <Pressable (press)="handleHash()">
-        <Text>Hash a string</Text>
-      </Pressable>
+    <view>
+      <text>UUID: {{ uuid() }}</text>
+      <pressable (press)="handleHash()">
+        <text>Hash a string</text>
+      </pressable>
       @if (hash()) {
-        <Text>SHA-256: {{ hash() }}</Text>
+        <text>SHA-256: {{ hash() }}</text>
       }
-    </View>
+    </view>
   `,
 })
 export class CryptoScreen {

@@ -3,9 +3,12 @@
 //
 // Angular is the reason the census exists. Its compiler binds a component to a host ELEMENT, so a
 // composed component instance cannot exist without a node — anchor-host-registry.ts only stops that
-// node from painting, it cannot remove it. The row below composes three components (itself and two
-// Pressables), so the expectation is three anchors per row where the other four adapters have zero
-// or a fixed handful.
+// node from painting, it cannot remove it.
+//
+// The row used to compose THREE components — itself and two Pressables — for three anchors per row.
+// `<pressable>` is a tag since 2026-09-11 and commits a real painting node, so the row composes ONE
+// component and the census reads one anchor per row. That is the migration's cost showing up in the
+// only currency this file measures.
 
 import '@angular/compiler';
 import { Component, Input, signal } from '@angular/core';
@@ -20,7 +23,8 @@ import {
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
-import { Pressable, Text, View } from './components';
+import { Text, View } from './components';
+import { PressableElement } from './elements';
 import { registerComposedComponent } from './anchor-host-registry';
 
 // What examples/angular gets for free from the babel-register-composed plugin: an app-authored
@@ -34,7 +38,8 @@ const ROOT_TAG = 8804;
 const ROWS = 1000;
 const NATIVE_VIEWS_PER_ROW = 9;
 const UPDATE_STRIDE = 10;
-const COMPOSED_COMPONENTS_PER_ROW = 3;
+// The row component itself, and nothing else — its two `<pressable>`s are tags now.
+const COMPOSED_COMPONENTS_PER_ROW = 1;
 
 const fabric = installFabric();
 
@@ -56,17 +61,17 @@ function makeRows(from: number, count: number): IRow[] {
 @Component({
   selector: 'BenchmarkRow',
   standalone: true,
-  imports: [Pressable, Text, View],
+  imports: [PressableElement, Text, View],
   template: `
-    <View [style]="rowStyle">
-      <Text>{{ rowId }}</Text>
-      <Pressable>
-        <Text>{{ row.label }}</Text>
-      </Pressable>
-      <Pressable>
-        <Text>x</Text>
-      </Pressable>
-    </View>
+    <view [style]="rowStyle">
+      <text>{{ rowId }}</text>
+      <pressable>
+        <text>{{ row.label }}</text>
+      </pressable>
+      <pressable>
+        <text>x</text>
+      </pressable>
+    </view>
   `,
 })
 class BenchmarkRow {
@@ -89,11 +94,11 @@ let mounted: List | undefined;
   standalone: true,
   imports: [BenchmarkRow, View],
   template: `
-    <View testID="list">
+    <view testID="list">
       @for (row of rows(); track row.id) {
         <BenchmarkRow [row]="row" [isSelected]="row.id === selectedId()" />
       }
-    </View>
+    </view>
   `,
 })
 class List {

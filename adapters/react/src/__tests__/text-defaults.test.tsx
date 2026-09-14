@@ -12,7 +12,7 @@
 // mid-word on device instead of ellipsising, and Svelte shipped exactly that defect from exactly
 // this cause (2026-08-31).
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Text, View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 241;
@@ -32,7 +32,7 @@ describe('Text defaults reach Fabric', () => {
     // why: RN's own default. A Text with no ellipsizeMode must still truncate with an ellipsis,
     // and the prop has to be PRESENT in the payload — Fabric reads the prop, not a JS default.
     it('seeds ellipsizeMode=tail when unauthored', () => {
-      mount(ROOT_TAG, <Text>hi</Text>);
+      mount(ROOT_TAG, <text>hi</text>);
       expect(textNode().ellipsizeMode).toBe('tail');
     });
 
@@ -40,13 +40,13 @@ describe('Text defaults reach Fabric', () => {
     // "scaling on", and only a literal false opts out. A `??` would read undefined as unset and
     // give the same answer here, so the discriminating case is the Negative one below.
     it('seeds allowFontScaling=true when unauthored', () => {
-      mount(ROOT_TAG, <Text>hi</Text>);
+      mount(ROOT_TAG, <text>hi</text>);
       expect(textNode().allowFontScaling).toBe(true);
     });
 
     // why: a default is a default, not an override — an authored value has to survive it.
     it('keeps an authored ellipsizeMode', () => {
-      mount(ROOT_TAG, <Text ellipsizeMode="middle">hi</Text>);
+      mount(ROOT_TAG, <text ellipsizeMode="middle">hi</text>);
       expect(textNode().ellipsizeMode).toBe('middle');
     });
 
@@ -57,7 +57,7 @@ describe('Text defaults reach Fabric', () => {
     // carries no text defaults either — so a viewName match would pass against the container and
     // never look at the View under test (`.claude/rules/test-harness-false-greens.md` §3).
     it('does not seed text defaults onto a View', () => {
-      mount(ROOT_TAG, <View testID="probe" />);
+      mount(ROOT_TAG, <view testID="probe" />);
       const view = fabric.find(n => n.props.testID === 'probe');
       expect(view, 'the probed View was created').toBeDefined();
       expect('ellipsizeMode' in view!.props).toBe(false);
@@ -70,7 +70,7 @@ describe('Text defaults reach Fabric', () => {
     // survive as false; a `?? true` implementation passes every Positive case above and fails
     // this one, which is the only reason the encoding is worth asserting.
     it('keeps an explicit allowFontScaling={false}', () => {
-      mount(ROOT_TAG, <Text allowFontScaling={false}>hi</Text>);
+      mount(ROOT_TAG, <text allowFontScaling={false}>hi</text>);
       expect(textNode().allowFontScaling).toBe(false);
     });
   });

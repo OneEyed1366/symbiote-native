@@ -79,3 +79,23 @@ export function backgroundProps(
   }
   return { nativeBackgroundAndroid: background };
 }
+
+/**
+ * RN's four statics, under RN's own spelling — `TouchableNativeFeedback.Ripple(color, borderless)`.
+ *
+ * A NAMESPACE OBJECT rather than a component value, and that is the whole of what survived the
+ * wrapper: the element is a tag now, and a tag is a string, which cannot carry properties. Shared
+ * rather than copied five times because every member is a pure dict producer with no framework in
+ * it; each adapter re-exports it verbatim, as it does the background types beside it.
+ *
+ * NOT the spelling for NEW code, and not redundant either. RN's docs point at `Pressable`'s
+ * declarative `android_ripple={{ color, borderless }}`, which the pressable behavior resolves
+ * (`behaviors/pressable.ts`, `asRippleConfig`). These four stay because the
+ * `touchable-native-feedback` tag folds `background` and nothing else produces that value.
+ */
+export const TouchableNativeFeedback = {
+  SelectableBackground: selectableBackground,
+  SelectableBackgroundBorderless: selectableBackgroundBorderless,
+  Ripple: rippleBackground,
+  canUseNativeForeground,
+};

@@ -211,17 +211,16 @@ function moduleBindingOf(
 
 const UNSCOPED_SFC = `
 <script setup lang="ts">
-import { View } from '@symbiote-native/vue'
 const isBig = true
 </script>
 <template>
-  <View class="card" testID="single" />
-  <View class="card big" testID="compound" />
-  <View class="reset" testID="globalWhole" />
-  <View class="card legacy" testID="globalPartial" />
-  <View :class="{ card: isBig, big: isBig }" testID="dynamicObject" />
-  <View :class="['card', 'big']" testID="dynamicArray" />
-  <View class="section-label" testID="kebab" />
+  <view class="card" testID="single" />
+  <view class="card big" testID="compound" />
+  <view class="reset" testID="globalWhole" />
+  <view class="card legacy" testID="globalPartial" />
+  <view :class="{ card: isBig, big: isBig }" testID="dynamicObject" />
+  <view :class="['card', 'big']" testID="dynamicArray" />
+  <view class="section-label" testID="kebab" />
 </template>
 <style>
 .card { padding: 10px; background-color: red; }
@@ -237,20 +236,19 @@ const isBig = true
 
 const SCOPED_SFC = `
 <script setup lang="ts">
-import { View } from '@symbiote-native/vue'
 const isBig = true
 const opaqueClass = 'card big'
 </script>
 <template>
-  <View class="card" testID="single" />
-  <View class="card big" testID="compound" />
-  <View class="reset" testID="globalWhole" />
-  <View class="card legacy" testID="globalPartial" />
-  <View :class="{ card: isBig, big: isBig }" testID="dynamicObject" />
-  <View :class="['card', 'big']" testID="dynamicArray" />
-  <View class="card" :class="{ big: isBig }" testID="staticPlusDynamic" />
-  <View :class="opaqueClass" testID="opaque" />
-  <View class="section-label" testID="kebab" />
+  <view class="card" testID="single" />
+  <view class="card big" testID="compound" />
+  <view class="reset" testID="globalWhole" />
+  <view class="card legacy" testID="globalPartial" />
+  <view :class="{ card: isBig, big: isBig }" testID="dynamicObject" />
+  <view :class="['card', 'big']" testID="dynamicArray" />
+  <view class="card" :class="{ big: isBig }" testID="staticPlusDynamic" />
+  <view :class="opaqueClass" testID="opaque" />
+  <view class="section-label" testID="kebab" />
 </template>
 <style scoped>
 .card { padding: 10px; background-color: blue; }
@@ -271,17 +269,16 @@ const opaqueClass = 'card big'
 // declared, and `.card.big` declares two.
 const MODULE_VIA_SETUP_BINDING_SFC = `
 <script setup lang="ts">
-import { View } from '@symbiote-native/vue'
 const singleClass = $style.card
 const compoundClass = $style.card + ' ' + $style.big
 const globalWholeClass = $style.reset
 const globalPartialClass = $style.card + ' ' + $style.legacy
 </script>
 <template>
-  <View :class="singleClass" testID="single" />
-  <View :class="compoundClass" testID="compound" />
-  <View :class="globalWholeClass" testID="globalWhole" />
-  <View :class="globalPartialClass" testID="globalPartial" />
+  <view :class="singleClass" testID="single" />
+  <view :class="compoundClass" testID="compound" />
+  <view :class="globalWholeClass" testID="globalWhole" />
+  <view :class="globalPartialClass" testID="globalPartial" />
 </template>
 <style module>
 .card { padding: 10px; background-color: blue; }
@@ -293,10 +290,10 @@ const globalPartialClass = $style.card + ' ' + $style.legacy
 
 const MODULE_VIA_TEMPLATE_SFC = `
 <script setup lang="ts">
-import { View } from '@symbiote-native/vue'
+const __tagArm = true
 </script>
 <template>
-  <View :class="$style.card" testID="single" />
+  <view :class="$style.card" testID="single" />
 </template>
 <style module>
 .card { padding: 10px; }
@@ -309,11 +306,10 @@ import { View } from '@symbiote-native/vue'
 const MODULE_VIA_USE_CSS_MODULE_SFC = `
 <script setup lang="ts">
 import { useCssModule } from 'vue'
-import { View } from '@symbiote-native/vue'
 const styles = useCssModule()
 </script>
 <template>
-  <View :class="styles.card" testID="single" />
+  <view :class="styles.card" testID="single" />
 </template>
 <style module>
 .card { padding: 10px; }
@@ -322,10 +318,10 @@ const styles = useCssModule()
 
 const NAMED_MODULE_VIA_TEMPLATE_SFC = `
 <script setup lang="ts">
-import { View } from '@symbiote-native/vue'
+const __tagArm = true
 </script>
 <template>
-  <View :class="classes.card" testID="single" />
+  <view :class="classes.card" testID="single" />
 </template>
 <style module="classes">
 .card { padding: 10px; }

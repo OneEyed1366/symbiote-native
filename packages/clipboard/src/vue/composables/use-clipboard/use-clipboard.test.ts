@@ -47,7 +47,7 @@ function mountClipboard(): Ref<IClipboardEvent | null> {
     defineComponent({
       setup: () => {
         event = useClipboard();
-        return () => h('symbiote-text', {}, 'clipboard');
+        return () => h('text', {}, 'clipboard');
       },
     }),
   );

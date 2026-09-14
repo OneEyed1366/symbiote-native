@@ -32,7 +32,7 @@ function appView(): IFakeNode {
 describe('Solid createAnimatedComponent', () => {
   it('reduces an animated prop to a concrete value on first paint', async () => {
     const opacity = new Animated.Value(0.25);
-    mount(ROOT_TAG, () => <Animated.View style={{ opacity }} />);
+    mount(ROOT_TAG, () => <view style={{ opacity }} />);
     await tick();
 
     // A live AnimatedValue reaching Fabric would serialize as an object and paint nothing.
@@ -42,9 +42,9 @@ describe('Solid createAnimatedComponent', () => {
   it('drives a frame through the leaf without rebuilding the subtree', async () => {
     const opacity = new Animated.Value(0);
     mount(ROOT_TAG, () => (
-      <Animated.View style={{ opacity }}>
-        <symbiote-text>label</symbiote-text>
-      </Animated.View>
+      <view style={{ opacity }}>
+        <text>label</text>
+      </view>
     ));
     await tick();
 
@@ -87,7 +87,7 @@ describe('Solid createAnimatedComponent', () => {
   it('gives the caller the base instance and the leaf the resolved host node', async () => {
     let received: unknown = null;
     mount(ROOT_TAG, () => (
-      <Animated.View
+      <view
         ref={(instance: unknown) => {
           received = instance;
         }}
@@ -96,8 +96,9 @@ describe('Solid createAnimatedComponent', () => {
     await tick();
 
     // View hands back the host node itself, so the caller's ref and the leaf's target coincide
-    // here; the ScrollView case (a handle carrying getScrollNode) is covered by the sticky-header
-    // suite, which drives this same wrap through scroll-view/sticky-header.tsx.
+    // here. There is no `Animated.ScrollView` any more (`modules/animated/index.ts`'s own header) —
+    // a native-driven scroll listener is `<scroll-view onScroll={Animated.event(...)}>` like any
+    // other host node's `on*` prop, resolved by `bindAnimatedEvent` with no wrap of this kind at all.
     expect(isSymbioteNode(received)).toBe(true);
     expect(isSymbioteNode(received) ? getNativeTag(received) : undefined).toBe(
       appView().tag,

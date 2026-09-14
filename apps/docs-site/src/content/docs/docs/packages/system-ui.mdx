@@ -60,7 +60,6 @@ or a subscription.
   <TabItem label="React">
     ```tsx
     import { useEffect } from 'react';
-    import { Text, View } from '@symbiote-native/react';
     import { setBackgroundColorAsync } from '@symbiote-native/system-ui/react';
 
     export default function RootScreen() {
@@ -69,9 +68,9 @@ or a subscription.
       }, []);
 
       return (
-        <View>
-          <Text>Root background set to black</Text>
-        </View>
+        <view>
+          <text>Root background set to black</text>
+        </view>
       );
     }
     ```
@@ -81,7 +80,6 @@ or a subscription.
     ```vue
     <script setup lang="ts">
     import { onMounted } from 'vue';
-    import { Text, View } from '@symbiote-native/vue';
     import { setBackgroundColorAsync } from '@symbiote-native/system-ui/vue';
 
     onMounted(() => {
@@ -90,9 +88,9 @@ or a subscription.
     </script>
 
     <template>
-      <View>
-        <Text>Root background set to black</Text>
-      </View>
+      <view>
+        <text>Root background set to black</text>
+      </view>
     </template>
     ```
 
@@ -100,16 +98,16 @@ or a subscription.
   <TabItem label="Angular">
     ```ts
     import { Component } from '@angular/core';
-    import { Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { setBackgroundColorAsync } from '@symbiote-native/system-ui/angular';
 
     @Component({
       standalone: true,
-      imports: [Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Text>Root background set to black</Text>
-        </View>
+        <view>
+          <text>Root background set to black</text>
+        </view>
       `,
     })
     export class RootScreen {
@@ -126,7 +124,6 @@ or a subscription.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text, View } from '@symbiote-native/svelte';
       import { setBackgroundColorAsync } from '@symbiote-native/system-ui/svelte';
 
       $effect(() => {
@@ -134,14 +131,13 @@ or a subscription.
       });
     </script>
 
-    <View><Text>Root background set to black</Text></View>
+    <view><text>Root background set to black</text></view>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
     import { onMount } from 'solid-js';
-    import { Text, View } from '@symbiote-native/solid';
     import { setBackgroundColorAsync } from '@symbiote-native/system-ui/solid';
 
     export function RootScreen() {
@@ -150,9 +146,9 @@ or a subscription.
       });
 
       return (
-        <View>
-          <Text>Root background set to black</Text>
-        </View>
+        <view>
+          <text>Root background set to black</text>
+        </view>
       );
     }
     ```

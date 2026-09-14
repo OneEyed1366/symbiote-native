@@ -1,5 +1,5 @@
 import { defineComponent } from 'vue';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   Orientation,
   OrientationLock,
@@ -34,10 +34,10 @@ const ORIENTATION_LOCK_LABEL: Record<OrientationLock, string> = {
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="auth-capability-row">
-      <Text class="auth-capability-label">{props.label}</Text>
-      <Text class="auth-value-text">{props.value}</Text>
-    </View>
+    <view class="auth-capability-row">
+      <text class="auth-capability-label">{props.label}</text>
+      <text class="auth-value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -67,32 +67,32 @@ export const ScreenOrientationScreen = defineComponent(
     }
 
     return () => (
-      <SafeAreaView class="screen">
-        <ScrollView
+      <safe-area-view class="screen">
+        <scroll-view
           testID="screen-orientation-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Screen Orientation</Text>
-              <Text class="hero-body">
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Screen Orientation</text>
+              <text class="hero-body">
                 @symbiote-native/screen-orientation — live orientation state
                 plus lock/unlock controls.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="screen-orientation-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Current state</Text>
-            </View>
+          <view testID="screen-orientation-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Current state</text>
+            </view>
             <ValueRow
               label="Orientation"
               value={ORIENTATION_LABEL[screenOrientation.value.orientation]}
@@ -103,12 +103,12 @@ export const ScreenOrientationScreen = defineComponent(
                 ORIENTATION_LOCK_LABEL[screenOrientation.value.orientationLock]
               }
             />
-          </View>
+          </view>
 
-          <View testID="screen-orientation-actions-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Lock controls</Text>
-            </View>
+          <view testID="screen-orientation-actions-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Lock controls</text>
+            </view>
             <ActionButton
               testID="screen-orientation-lock-portrait-button"
               title="Lock portrait"
@@ -127,9 +127,9 @@ export const ScreenOrientationScreen = defineComponent(
               onPress={handleUnlock}
               color={lineColor}
             />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+          </view>
+        </scroll-view>
+      </safe-area-view>
     );
   },
   { name: 'ScreenOrientationScreen' },

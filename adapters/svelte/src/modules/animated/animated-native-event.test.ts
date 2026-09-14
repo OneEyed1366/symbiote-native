@@ -1,20 +1,21 @@
 // Co-located, real-compiled-source test, the Svelte twin of
 // adapters/vue/src/modules/animated/animated-native-event.test.ts. Proves a NATIVE
-// Animated.event on an Animated component: when a prop like
-// onScroll={Animated.event([…], {useNativeDriver:true})} rides Animated.View, the wrapper
-// attaches it to the committed view on the UI thread (addAnimatedEventToView). The attach runs
-// inside the reconcile $effect; under Svelte's async-batched commit the view has no Fabric tag
-// yet at the FIRST effect run, so a naive attachNativeEventHandler call would read
-// getNativeTag()===undefined and bind nothing with no retry — attachNativeEventHandler's own
-// whenCommitted defer (core/engine/src/animated/event.ts) is what makes this actually land. The
-// fake NativeAnimatedTurboModule records the bind so we assert it landed against the real tag,
-// no host needed.
+// Animated.event on a plain tag — there is no wrapper: `onScroll={Animated.event([…],
+// {useNativeDriver:true})}` written on an ordinary `<view>` must reach `bindAnimatedEvent` out of
+// routeProp and attach to the committed view on the UI thread (addAnimatedEventToView). Under
+// Svelte's async-batched commit the view has no Fabric tag when the prop is first written, so a
+// naive attach would read getNativeTag()===undefined and bind nothing with no retry —
+// attachNativeEventHandler's own whenCommitted defer (core/engine/src/animated/event.ts) is what
+// makes this land. The fake NativeAnimatedTurboModule records the bind, so it is asserted against
+// the real tag with no host.
+//
+// The attach is asserted by COUNT. The wrapper used to make this same call, so a capability that
+// moved layers could be live in both, and a payload-shaped oracle cannot see a doubled attach.
 //
 // Scope note: the AnimatedEvent/native-event plumbing itself (whenCommitted's post-commit defer,
 // the event-name -> UI-thread bind) is core/engine (core/engine/src/animated/event.ts, already
 // tested there) and is used, not re-verified, here. This file's own job is the Svelte-specific
-// claim: that the attach genuinely waits for a committed Fabric tag rather than firing against
-// undefined on the reconcile $effect's first (pre-commit) run.
+// claim: that a handler written on a bare component is delivered, once, after the commit.
 //
 // No Negative group: attachNativeEventHandler() has no throw path for this shape — an
 // onScroll prop that is NOT a native Animated.event is simply not attached (a different,
@@ -22,7 +23,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { AnimatedValue, event as animatedEvent } from '@symbiote-native/engine';
@@ -83,9 +84,9 @@ const tick = (): Promise<void> =>
 // (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must
 // instead walk the currently COMMITTED tree, same as activity-indicator.smoke.test.ts's
 // findLive. Filtering on viewName==='RCTView' alone is not enough to identify OUR node:
-// root-element.ts's own mount target is ITSELF an unlabeled `symbiote-view` (RCTView, {}
-// props), sitting between the AppContainer and AnimatedView's real host node — so the search
-// must key on a prop only our own AnimatedView carries (testID), not the generic viewName.
+// root-element.ts's own mount target is ITSELF an unlabeled `view` (RCTView, {}
+// props), sitting between the AppContainer and our View's real host node — so the search
+// must key on a prop only our own View carries (testID), not the generic viewName.
 function findLive(
   node: IFakeNode,
   predicate: (n: IFakeNode) => boolean,
@@ -117,38 +118,32 @@ const COMPILE_OPTIONS = {
   fragments: 'tree',
   css: 'external',
 } as const;
-const COMPONENTS_DIR = join(__dirname, '..', '..', 'components');
-// The compiled base sits NEXT TO its real source, so its own relative imports resolve.
-const VIEW_OUT = join(
-  COMPONENTS_DIR,
-  '.smoke-compiled-animated-view-event.mjs',
-);
 const PARENT_OUT = join(__dirname, '.smoke-compiled-event-parent.mjs');
 
-function compileToFile(
-  source: string,
-  filename: string,
-  outPath: string,
-): void {
-  const result = compile(source, { ...COMPILE_OPTIONS, filename });
-  writeFileSync(outPath, result.js.code);
-}
-
+// The bag, and NOT `<view {onScroll}>`, and the difference is a live gap rather than a style
+// choice. Measured 2026-09-08 with a marked handler, reading it back off the engine node:
+//
+//   <view {onScroll}>          $.event('Scroll', node, fn)  WRAPPED — svelte's own closure
+//   <view {...bag}>            set_attributes               WRAPPED — same closure
+//   <view p={{ onScroll }}>    set_attribute('p', obj)      RAW
+//
+// `bindAnimatedEvent` identity-checks for a native `AnimatedEvent` and no-ops on anything else, so
+// a handler svelte has already wrapped can never reach the native module — the closure is built by
+// the compiler before any code of ours runs, and no shim can see through it. The deleted wrapper
+// hid this by taking `onScroll` as an ordinary `$props()` value and spreading it into `p`.
+//
+// So this fixture uses the one authored spelling that still reaches the mechanism under test. What
+// is NOT covered any more, on this adapter alone: `<view onScroll={Animated.event([…],
+// {useNativeDriver: true})}>` runs JS-driven, silently.
 async function loadParent(): Promise<Component> {
-  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
-  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
-
-  compileToFile(
+  const result = compile(
     `<script>
-       import View from '../../components/.smoke-compiled-animated-view-event.mjs';
-       import { createAnimatedComponent } from './create-animated-component';
-       const AnimatedView = createAnimatedComponent(View);
        let { style, onScroll } = $props();
      </script>
-     <AnimatedView {style} {onScroll} testID="animated-event-box" />`,
-    'EventParent.svelte',
-    PARENT_OUT,
+     <view p={{ style, onScroll, testID: 'animated-event-box' }}></view>`,
+    { ...COMPILE_OPTIONS, filename: 'EventParent.svelte' },
   );
+  writeFileSync(PARENT_OUT, result.js.code);
 
   const mod: unknown = await import(`file://${PARENT_OUT}`);
   if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
@@ -164,7 +159,6 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(VIEW_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
 });
 

@@ -67,16 +67,16 @@ describe('a lowered Pressable on its first press', () => {
     let calls = 0;
     const [tint, setTint] = createSignal('#000');
     mount(ROOT_TAG, () => (
-      <symbiote-view>
-        <symbiote-pressable
+      <view>
+        <pressable
           testID={BUTTON}
           onPress={() => {
             calls += 1;
             setTint(calls === 1 ? '#111' : '#222');
           }}
         />
-        <symbiote-view testID={OUTPUT} style={{ backgroundColor: tint() }} />
-      </symbiote-view>
+        <view testID={OUTPUT} style={{ backgroundColor: tint() }} />
+      </view>
     ));
     await flush();
     expect(committed(OUTPUT).props.backgroundColor, 'before any press').toBe(

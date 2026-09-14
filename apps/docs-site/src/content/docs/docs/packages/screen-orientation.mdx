@@ -67,7 +67,6 @@ system state with no runtime permission prompt on either platform.
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Button, Text } from '@symbiote-native/react';
     import { lockAsync, OrientationLock } from '@symbiote-native/screen-orientation';
     import { useScreenOrientation } from '@symbiote-native/screen-orientation/react';
 
@@ -76,9 +75,9 @@ system state with no runtime permission prompt on either platform.
 
       return (
         <>
-          <Text>Orientation: {orientation}</Text>
-          <Text>Lock: {orientationLock}</Text>
-          <Button title="Lock landscape" onPress={() => lockAsync(OrientationLock.LANDSCAPE)} />
+          <text>Orientation: {orientation}</text>
+          <text>Lock: {orientationLock}</text>
+          <button title="Lock landscape" onPress={() => lockAsync(OrientationLock.LANDSCAPE)} />
         </>
       );
     }
@@ -88,7 +87,6 @@ system state with no runtime permission prompt on either platform.
   <TabItem label="Vue">
     ```vue
     <script setup lang="ts">
-    import { Text } from '@symbiote-native/vue';
     import { lockAsync, OrientationLock } from '@symbiote-native/screen-orientation';
     import { useScreenOrientation } from '@symbiote-native/screen-orientation/vue';
 
@@ -100,9 +98,9 @@ system state with no runtime permission prompt on either platform.
     </script>
 
     <template>
-      <Text>Orientation: {{ screenOrientation.orientation }}</Text>
-      <Text>Lock: {{ screenOrientation.orientationLock }}</Text>
-      <Button title="Lock landscape" @press="onLockLandscape" />
+      <text>Orientation: {{ screenOrientation.orientation }}</text>
+      <text>Lock: {{ screenOrientation.orientationLock }}</text>
+      <button title="Lock landscape" @press="onLockLandscape" />
     </template>
     ```
 
@@ -110,17 +108,17 @@ system state with no runtime permission prompt on either platform.
   <TabItem label="Angular">
     ```ts
     import { Component, inject } from '@angular/core';
-    import { Button, Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { lockAsync, OrientationLock } from '@symbiote-native/screen-orientation';
     import { ScreenOrientationService } from '@symbiote-native/screen-orientation/angular';
 
     @Component({
       standalone: true,
-      imports: [Button, Text],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <Text>Orientation: {{ screenOrientation().orientation }}</Text>
-        <Text>Lock: {{ screenOrientation().orientationLock }}</Text>
-        <Button title="Lock landscape" (press)="onLockLandscape()" />
+        <text>Orientation: {{ screenOrientation().orientation }}</text>
+        <text>Lock: {{ screenOrientation().orientationLock }}</text>
+        <button title="Lock landscape" (press)="onLockLandscape()" />
       `,
     })
     export class ScreenOrientationScreen {
@@ -136,7 +134,6 @@ system state with no runtime permission prompt on either platform.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Button, Text } from '@symbiote-native/svelte';
       import { lockAsync, OrientationLock } from '@symbiote-native/screen-orientation';
       import { useScreenOrientation } from '@symbiote-native/screen-orientation/svelte';
 
@@ -147,15 +144,14 @@ system state with no runtime permission prompt on either platform.
       }
     </script>
 
-    <Text>Orientation: {screenOrientation.current.orientation}</Text>
-    <Text>Lock: {screenOrientation.current.orientationLock}</Text>
-    <Button title="Lock landscape" onPress={onLockLandscape} />
+    <text>Orientation: {screenOrientation.current.orientation}</text>
+    <text>Lock: {screenOrientation.current.orientationLock}</text>
+    <button title="Lock landscape" onPress={onLockLandscape} />
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Button, Text } from '@symbiote-native/solid';
     import { lockAsync, OrientationLock } from '@symbiote-native/screen-orientation';
     import { createScreenOrientation } from '@symbiote-native/screen-orientation/solid';
 
@@ -168,9 +164,9 @@ system state with no runtime permission prompt on either platform.
 
       return (
         <>
-          <Text>Orientation: {screenOrientation().orientation}</Text>
-          <Text>Lock: {screenOrientation().orientationLock}</Text>
-          <Button title="Lock landscape" onPress={onLockLandscape} />
+          <text>Orientation: {screenOrientation().orientation}</text>
+          <text>Lock: {screenOrientation().orientationLock}</text>
+          <button title="Lock landscape" onPress={onLockLandscape} />
         </>
       );
     }

@@ -190,7 +190,7 @@ let capturedSettingsInstance: SettingsDrawerScreenComponent | undefined;
   selector: 'home-drawer-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>home</symbiote-text>`,
+  template: `<text>home</text>`,
 })
 class HomeDrawerScreenComponent {
   // Real screens (e.g. examples/angular's DrawerHomeScreen) call injectIsFocused() - see the
@@ -207,7 +207,7 @@ class HomeDrawerScreenComponent {
   selector: 'settings-drawer-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>settings</symbiote-text>`,
+  template: `<text>settings</text>`,
 })
 class SettingsDrawerScreenComponent {
   readonly isFocused: Signal<boolean> = injectIsFocused();
@@ -238,9 +238,9 @@ let capturedHost: DrawerTestHost | undefined;
         [component]="settingsComponent"
       ></ng-template>
       <ng-template #drawerContent let-ctx>
-        <symbiote-text
+        <text
           >{{ ctx.state.routes.length }} routes, focused index
-          {{ ctx.state.index }}</symbiote-text
+          {{ ctx.state.index }}</text
         >
       </ng-template>
     </Drawer>

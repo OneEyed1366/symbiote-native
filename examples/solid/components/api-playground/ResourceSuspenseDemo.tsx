@@ -20,7 +20,6 @@ import {
   startTransition,
   useTransition,
 } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -54,30 +53,30 @@ export function ResourceSuspenseDemo() {
   const [pending] = useTransition();
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">
+    <view class="section-nested">
+      <text class="section-label">
         createResource · Suspense · refetch · mutate · transitions
-      </Text>
+      </text>
 
       <Suspense
         fallback={
-          <Text class="subtle" testID="resource-fallback">
+          <text class="subtle" testID="resource-fallback">
             Suspense fallback — resource pending
-          </Text>
+          </text>
         }
       >
-        <View class="ap-panel">
-          <Text class="ap-value" testID="resource-user">
+        <view class="ap-panel">
+          <text class="ap-value" testID="resource-user">
             {`#${user()?.id ?? '—'} ${user()?.name ?? ''} · ${user()?.role ?? ''}`}
-          </Text>
-        </View>
+          </text>
+        </view>
       </Suspense>
 
-      <Text class="subtle" testID="resource-state">
+      <text class="subtle" testID="resource-state">
         {`state=${user.state} · loading=${String(user.loading)} · transition pending=${String(pending())}`}
-      </Text>
+      </text>
 
-      <View class="ap-wrap">
+      <view class="ap-wrap">
         <ActionButton
           testID="resource-next-plain"
           title="next user (fallback shows)"
@@ -112,7 +111,7 @@ export function ResourceSuspenseDemo() {
             )
           }
         />
-      </View>
-    </View>
+      </view>
+    </view>
   );
 }

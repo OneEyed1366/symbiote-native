@@ -27,22 +27,9 @@
 // and TypeScript has one `jsx` setting per program. descriptor-to-solid.ts drives the renderer the
 // same way for the same reason.
 
-// createComponent comes from solid-js, not the renderer's re-export: the renderer's is typed to
-// return its own host-node union, which cannot hold what a component returns (an Image is
-// JSX.Element). Same function either way.
-import {
-  createComponent,
-  createEffect,
-  createMemo,
-  createSignal,
-  untrack,
-} from 'solid-js';
+import { createEffect, createMemo, createSignal, untrack } from 'solid-js';
 import type { Accessor, Ref } from 'solid-js';
-import {
-  descriptorToSolid,
-  Image,
-  type IHostInstance,
-} from '@symbiote-native/solid';
+import { descriptorToSolid, type IHostInstance } from '@symbiote-native/solid';
 import {
   createElement,
   createTextNode,
@@ -341,7 +328,7 @@ export function createSlider(
     // replacing it — which would drop the thumb the user is dragging.
     const leaf = descriptorToSolid(() => renderSliderNative(view(), platform));
 
-    const wrapper = hostElement('symbiote-view');
+    const wrapper = hostElement('view');
     // A statically-present key set (all three are always emitted), so this needs no withStableKeys
     // widening — `spread` alone has no removal pass for a key that vanishes.
     spread(
@@ -382,7 +369,7 @@ function buildCustomOverlay(params: ICustomOverlayParams): ISymbioteNode {
   const min = params.cells[0];
   const max = params.cells[params.cells.length - 1];
 
-  const container = hostElement('symbiote-view');
+  const container = hostElement('view');
   // pointerEvents none so the overlay never eats the drag. `style` tracks the measured width, hence
   // an accessor rather than a one-shot setProp.
   spread(
@@ -415,10 +402,10 @@ type IStepCellParams = {
 
 function buildStepCell(cell: IStepCellParams): ISymbioteNode {
   const { params } = cell;
-  const element = hostElement('symbiote-view');
+  const element = hostElement('view');
   setProp(element, 'style', STEP_INDICATOR_ELEMENT_STYLE);
 
-  const track = hostElement('symbiote-view');
+  const track = hostElement('view');
   setProp(track, 'style', TRACK_MARK_CONTAINER_STYLE);
   insertNode(element, track);
 
@@ -438,9 +425,9 @@ function buildStepCell(cell: IStepCellParams): ISymbioteNode {
   insert(track, () => [markerElement, buildThumbImage(cell)]);
 
   if (params.withNumbers) {
-    const numberBox = hostElement('symbiote-view');
+    const numberBox = hostElement('view');
     setProp(numberBox, 'style', STEP_NUMBER_CONTAINER_STYLE);
-    const label = hostElement('symbiote-text');
+    const label = hostElement('text');
     setProp(label, 'testID', `${cell.index}th-step`);
     setProp(label, 'style', { fontSize: cell.fontSize });
     insertNode(label, createTextNode(String(cell.value)));
@@ -455,14 +442,14 @@ function buildThumbImage(cell: IStepCellParams): ISymbioteNode | null {
   if (source === undefined || cell.value !== cell.params.currentValue()) {
     return null;
   }
-  const container = hostElement('symbiote-view');
+  const container = hostElement('view');
   setProp(container, 'style', THUMB_IMAGE_CONTAINER_STYLE);
   setProp(container, 'testID', 'sliderTrackMark-thumbImage');
-  // The Image COMPONENT, not a raw symbiote-image: it resolves an asset id through RN's own
-  // resolveAssetSource, exactly as React's and Vue's custom overlays do.
-  insert(
-    container,
-    createComponent(Image, { source, style: THUMB_IMAGE_STYLE }),
-  );
+  const thumb = hostElement('image');
+  // An asset id still resolves: the fold that used to live in the Image wrapper is now
+  // `sourceOf` in the shared image behavior, which every path into the tag crosses.
+  setProp(thumb, 'source', source);
+  setProp(thumb, 'style', THUMB_IMAGE_STYLE);
+  insertNode(container, thumb);
   return container;
 }

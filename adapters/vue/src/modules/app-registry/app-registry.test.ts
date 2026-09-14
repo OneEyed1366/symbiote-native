@@ -24,13 +24,12 @@ import {
   type IRunnable,
 } from '../..';
 import { installFabric } from '@symbiote-native/test-utils';
-import { Text, View } from '../../components';
 
 const APP_KEY = 'canary';
 const ROOT_TAG = 211;
 
-const App = () =>
-  h(View, { style: { flex: 1 } }, () => h(Text, null, () => 'hi'));
+// The TAGS. Children go to an element as an ARRAY, never a slot function.
+const App = () => h('view', { style: { flex: 1 } }, [h('text', null, 'hi')]);
 
 const fabric = installFabric();
 // Vue's mount() requestCommit()s on a microtask (vue-adapter-reactivity Gotcha 2), unlike
@@ -156,8 +155,8 @@ describe('AppRegistry', () => {
       const Wrapper = defineComponent({
         setup(_props: unknown, { slots }: SetupContext) {
           return () =>
-            h(View, { style: { flex: 1 } }, () => [
-              h(Text, null, () => 'wrapped'),
+            h('view', { style: { flex: 1 } }, [
+              h('text', null, 'wrapped'),
               slots.default?.(),
             ]);
         },

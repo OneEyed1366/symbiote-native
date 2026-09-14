@@ -30,7 +30,7 @@ vi.mock('@symbiote-native/engine', async () => {
   };
 });
 
-import { View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import {
   setColorProcessor,
   statusBarImperative,
@@ -95,9 +95,9 @@ function findAll(method: string): IRecordedCall[] {
 
 function App(): ReactElement {
   return (
-    <View>
+    <view>
       <StatusBar barStyle={BAR_STYLE} backgroundColor={RED_HEX} translucent />
-    </View>
+    </view>
   );
 }
 

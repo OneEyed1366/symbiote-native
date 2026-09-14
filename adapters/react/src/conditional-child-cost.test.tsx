@@ -26,7 +26,6 @@ import {
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
-import { Text, View } from './components';
 
 const ROOT_TAG = 8833;
 const ROWS = 50;
@@ -35,20 +34,20 @@ const fabric = installFabric();
 
 function Row({ withChild }: { withChild: boolean }): React.ReactElement {
   return (
-    <View>
-      <Text>{'id'}</Text>
-      {withChild ? <Text>{'extra'}</Text> : null}
-    </View>
+    <view>
+      <text>{'id'}</text>
+      {withChild ? <text>{'extra'}</text> : null}
+    </view>
   );
 }
 
 function List({ withChild }: { withChild: boolean }): React.ReactElement {
   return (
-    <View testID="list">
+    <view testID="list">
       {Array.from({ length: ROWS }, (_value, index) => (
         <Row key={index} withChild={withChild} />
       ))}
-    </View>
+    </view>
   );
 }
 
@@ -113,7 +112,7 @@ describe('a false conditional child costs React nothing to retain', () => {
     const absent = measure(false);
     const present = measure(true);
 
-    // One Text is two native views (symbiote-text + its RCTRawText child).
+    // One Text is two native views (text + its RCTRawText child).
     expect(present.createNode - absent.createNode).toBe(ROWS * 2);
     expect(present.nodes - absent.nodes).toBe(ROWS * 2);
     expect(present.renderable - absent.renderable).toBe(ROWS * 2);

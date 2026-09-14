@@ -133,14 +133,12 @@ function sectionList(
         },
         {
           sectionHeader: ({ section }: { section: ISectionShape }) => [
-            h('symbiote-text', {}, `header:${section.title}`),
+            h('text', {}, `header:${section.title}`),
           ],
           sectionFooter: ({ section }: { section: ISectionShape }) => [
-            h('symbiote-text', {}, `footer:${section.title}`),
+            h('text', {}, `footer:${section.title}`),
           ],
-          item: ({ item }: { item: IRow }) => [
-            h('symbiote-text', {}, item.label),
-          ],
+          item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
         },
       ),
   });

@@ -1,5 +1,4 @@
 import { act, startTransition, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { CaveatNote } from './CaveatNote';
 import { LINE_COLOR } from '../navigation-lines';
@@ -36,12 +35,12 @@ export function OtherApisDemo() {
   };
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">startTransition · act</Text>
-      <Text
+    <view className="section-nested">
+      <text className="section-label">startTransition · act</text>
+      <text
         testID="other-transition-label"
         className="info-text"
-      >{`startTransition: ${label}`}</Text>
+      >{`startTransition: ${label}`}</text>
       <ActionButton
         testID="other-start-transition"
         title="Update via startTransition"
@@ -53,16 +52,16 @@ export function OtherApisDemo() {
         sync lane and flushes immediately, so there's no non-urgent scheduling
         to observe.
       </CaveatNote>
-      <Text
+      <text
         testID="other-act-log"
         className="info-text"
-      >{`act(): ${actLog}`}</Text>
+      >{`act(): ${actLog}`}</text>
       <ActionButton
         testID="other-run-act"
         title="Run a state update inside act()"
         onPress={onRunAct}
         color={LINE_COLOR.introspection}
       />
-    </View>
+    </view>
   );
 }

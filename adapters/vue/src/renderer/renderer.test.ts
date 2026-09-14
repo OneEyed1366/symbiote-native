@@ -22,7 +22,7 @@
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '../render';
-import { View, Text } from '@symbiote-native/vue';
+// No primitive import: `view` and `text` are TAGS written directly below.
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
@@ -82,7 +82,7 @@ describe('patchProp class/style merge', () => {
     mount(
       ROOT_TAG,
       defineComponent({
-        setup: () => () => h('symbiote-view', { class: 'foo' }),
+        setup: () => () => h('view', { class: 'foo' }),
       }),
     );
     await tick();
@@ -102,7 +102,7 @@ describe('patchProp class/style merge', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h('symbiote-view', { class: 'foo', style: { color: 'blue' } }),
+          h('view', { class: 'foo', style: { color: 'blue' } }),
       }),
     );
     await tick();
@@ -113,7 +113,7 @@ describe('patchProp class/style merge', () => {
     mount(
       ROOT_TAG,
       defineComponent({
-        setup: () => () => h('symbiote-view', { style: { color: 'blue' } }),
+        setup: () => () => h('view', { style: { color: 'blue' } }),
       }),
     );
     await tick();
@@ -139,7 +139,7 @@ describe('patchProp class/style merge', () => {
     mount(
       ROOT_TAG,
       defineComponent({
-        setup: () => () => h('symbiote-view', { class: className.value }),
+        setup: () => () => h('view', { class: className.value }),
       }),
     );
     await tick();
@@ -160,7 +160,7 @@ describe('insert', () => {
     expect(() =>
       mount(
         ROOT_TAG,
-        defineComponent({ setup: () => () => h(View, null, 'plain text') }),
+        defineComponent({ setup: () => () => h('view', null, 'plain text') }),
       ),
     ).toThrow('must be rendered inside a <Text>');
   });
@@ -177,7 +177,7 @@ describe("createComment / createText('') — Fragment and v-if placeholder ancho
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          visible.value ? h(View, { nativeID: 'toggle' }) : null,
+          visible.value ? h('view', { nativeID: 'toggle' }) : null,
       }),
     );
     await tick();
@@ -197,8 +197,8 @@ describe("createComment / createText('') — Fragment and v-if placeholder ancho
       ROOT_TAG,
       defineComponent({
         setup: () => () => [
-          h(View, { nativeID: 'a' }),
-          h(View, { nativeID: 'b' }),
+          h('view', { nativeID: 'a' }),
+          h('view', { nativeID: 'b' }),
         ],
       }),
     );
@@ -217,7 +217,7 @@ describe('setElementText — <Text> content updates', () => {
     const label = ref('first');
     mount(
       ROOT_TAG,
-      defineComponent({ setup: () => () => h(Text, null, label.value) }),
+      defineComponent({ setup: () => () => h('text', null, label.value) }),
     );
     await tick();
     expect(
@@ -245,7 +245,7 @@ describe('setElementText — <Text> content updates', () => {
   });
 
   // why: a plain STRING child on the raw HOST INTRINSIC (Vue's TEXT_CHILDREN shape,
-  // `h('symbiote-view', {}, 'stray')`) patches through setElementText, NOT insert(), so the
+  // `h('view', {}, 'stray')`) patches through setElementText, NOT insert(), so the
   // <Text>-only invariant has to be enforced in BOTH or the array path throws while the string
   // path builds the same invalid Fabric tree in silence. Intrinsic-specific: the public `View`
   // wrapper passes children through slots, which lands as ARRAY_CHILDREN and hits insert()'s
@@ -254,7 +254,7 @@ describe('setElementText — <Text> content updates', () => {
     expect(() =>
       mount(
         ROOT_TAG,
-        defineComponent({ setup: () => () => h('symbiote-view', {}, 'stray') }),
+        defineComponent({ setup: () => () => h('view', {}, 'stray') }),
       ),
     ).toThrow('must be rendered inside a <Text>');
   });
@@ -271,9 +271,9 @@ describe('remove and reorder', () => {
       defineComponent({
         setup: () => () =>
           h(
-            View,
+            'view',
             { nativeID: 'parent' },
-            show.value ? [h(View, { nativeID: 'child' })] : [],
+            show.value ? [h('view', { nativeID: 'child' })] : [],
           ),
       }),
     );
@@ -297,9 +297,9 @@ describe('remove and reorder', () => {
       defineComponent({
         setup: () => () =>
           h(
-            View,
+            'view',
             { nativeID: 'list' },
-            order.value.map(key => h(View, { key, nativeID: `item-${key}` })),
+            order.value.map(key => h('view', { key, nativeID: `item-${key}` })),
           ),
       }),
     );
@@ -340,10 +340,8 @@ describe('lowered host primitives (intrinsic tags)', () => {
     await tick();
   };
 
-  it("seeds RN's Text defaults on an intrinsic symbiote-text", async () => {
-    await mountTemplate(() =>
-      h('symbiote-text', { testID: 'plain' }, ['hello']),
-    );
+  it("seeds RN's Text defaults on an intrinsic text", async () => {
+    await mountTemplate(() => h('text', { testID: 'plain' }, ['hello']));
     const props = findByTestId('plain')?.props;
     expect(props?.ellipsizeMode).toBe('tail');
     expect(props?.allowFontScaling).toBe(true);
@@ -352,7 +350,7 @@ describe('lowered host primitives (intrinsic tags)', () => {
   it('lets an explicit value beat the seeded default', async () => {
     await mountTemplate(() =>
       h(
-        'symbiote-text',
+        'text',
         {
           testID: 'explicit',
           ellipsizeMode: 'middle',
@@ -372,7 +370,7 @@ describe('lowered host primitives (intrinsic tags)', () => {
   it('keeps the default when the prop is explicitly undefined', async () => {
     await mountTemplate(() =>
       h(
-        'symbiote-text',
+        'text',
         {
           testID: 'undef',
           ellipsizeMode: undefined,
@@ -388,7 +386,7 @@ describe('lowered host primitives (intrinsic tags)', () => {
 
   it('folds a kebab attr to camelCase on an intrinsic tag', async () => {
     await mountTemplate(() =>
-      h('symbiote-view', {
+      h('view', {
         testID: 'kebab',
         'accessibility-label': 'close',
       }),
@@ -409,7 +407,7 @@ describe('lowered host primitives (intrinsic tags)', () => {
   // hyphenated key arrived intact), and no camelized key is left behind.
   it('leaves the aria- family hyphenated for the engine to fold', async () => {
     await mountTemplate(() =>
-      h('symbiote-view', { testID: 'aria', 'aria-label': 'from-aria' }),
+      h('view', { testID: 'aria', 'aria-label': 'from-aria' }),
     );
     const props = findByTestId('aria')?.props;
     expect(props?.accessibilityLabel).toBe('from-aria');
@@ -417,7 +415,7 @@ describe('lowered host primitives (intrinsic tags)', () => {
   });
 
   it('leaves a non-text node without text defaults', async () => {
-    await mountTemplate(() => h('symbiote-view', { testID: 'view' }));
+    await mountTemplate(() => h('view', { testID: 'view' }));
     const props = findByTestId('view')?.props;
     expect(props?.ellipsizeMode).toBeUndefined();
     expect(props?.allowFontScaling).toBeUndefined();
@@ -429,7 +427,7 @@ describe('lowered host primitives (intrinsic tags)', () => {
   // red anywhere. React, Svelte and Solid all fold it; Vue did not, on any of its four paths.
   it('folds id to nativeID on an intrinsic tag', async () => {
     await mountTemplate(() =>
-      h('symbiote-view', { testID: 'aliased', id: 'accessory-1' }),
+      h('view', { testID: 'aliased', id: 'accessory-1' }),
     );
     const props = findByTestId('aliased')?.props;
     expect(props?.nativeID).toBe('accessory-1');
@@ -438,7 +436,7 @@ describe('lowered host primitives (intrinsic tags)', () => {
 
   it('folds id on a Text node too', async () => {
     await mountTemplate(() =>
-      h('symbiote-text', { testID: 'aliased-text', id: 'label-1' }, 'x'),
+      h('text', { testID: 'aliased-text', id: 'label-1' }, 'x'),
     );
     expect(findByTestId('aliased-text')?.props.nativeID).toBe('label-1');
   });

@@ -9,7 +9,6 @@
   // `<TabScreen>`. Svelte twin of examples/vue-sfc/screens/DrawerDemoScreen.vue.
   import { Drawer, DrawerScreen } from '@symbiote-native/navigation/svelte';
   import type { IDrawerContentSlotProps } from '@symbiote-native/navigation/svelte';
-  import { Pressable, SafeAreaView, Text } from '@symbiote-native/svelte';
   import DrawerHomeScreen from './DrawerHomeScreen.svelte';
   import DrawerSettingsScreen from './DrawerSettingsScreen.svelte';
 
@@ -33,19 +32,19 @@
     options={{ title: 'Settings', drawerLabel: 'Settings' }}
   />
   {#snippet drawerContent(slot: IDrawerContentSlotProps)}
-    <SafeAreaView testID="drawer-panel" class="section-tight drawer-panel">
-      <Text class="section-label">Menu</Text>
+    <safe-area-view testID="drawer-panel" class="section-tight drawer-panel">
+      <text class="section-label">Menu</text>
       {#each slot.state.routes as route (route.key)}
-        <Pressable
+        <pressable
           testID={`drawer-menu-${route.name}`}
           class="menu-row"
-          onPress={() => slot.navigation.jumpTo(route.name)}
+          p={{ onPress: () => slot.navigation.jumpTo(route.name) }}
         >
-          <Text class="menu-row-label">
+          <text class="menu-row-label">
             {slot.descriptors[route.key]?.options.drawerLabel ?? route.name}
-          </Text>
-        </Pressable>
+          </text>
+        </pressable>
       {/each}
-    </SafeAreaView>
+    </safe-area-view>
   {/snippet}
 </Drawer>

@@ -37,12 +37,10 @@ import {
   resolveHostNode,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { selectScrollIntrinsics } from '@symbiote-native/components';
-import { Image, ScrollView, Text, View } from '../../components';
+import { Text, View } from '../../components';
 import {
   anchorHostStyle,
   ImageHost,
-  ScrollViewHost,
   SymbioteHostPropsDirective,
   SymbioteStyleInputDirective,
   TextHost,
@@ -55,10 +53,16 @@ import {
   ImageBase,
   isImageEventCallback,
   resolveImageProps,
-} from '../../components/image/shared';
+} from '../../components/image-shared';
 import type { IGatedAccessibilityEvent } from '../../gate-demand';
 import { SectionList } from '../../components/section-list';
 import { AnimatedLeafBinder } from './animated-leaf-binder';
+
+// The intrinsic `createAnimatedComponent` accepts in place of the deleted `Image` component.
+const IMAGE_TAG = 'image';
+// Same move for the deleted `ScrollView` component — the vertical axis's own tag stands in for
+// the class identity the generic dispatcher used to compare against.
+const SCROLL_VIEW_TAG = 'scroll-view';
 
 // RN's prop carrying explicit (already-rasterized) values that override the animated prop in
 // the COMMITTED props (sticky-header passthrough). Named once so the directive input and the
@@ -70,7 +74,17 @@ const PASSTHROUGH_PROP = 'passthroughAnimatedPropExplicitValues';
 // escape hatch for any OTHER prop that may hold an AnimatedNode or an Animated.event handler,
 // plus static host props to forward (the React/Vue `rest`). Each concrete @Component re-lists
 // these (Angular's inputs-on-base convention, mirroring Switch/Image).
-export const ANIMATED_INPUTS = ['style', 'animatedProps', PASSTHROUGH_PROP];
+// `testID` is listed alongside them rather than left to `animatedProps`, which is the documented
+// escape hatch for everything else. Every other component in this adapter takes it as an ordinary
+// input, and React's `createAnimatedComponent` spreads `...props`, so `<AnimatedView testID="x">`
+// is what an app writes — it compiled (a static attribute on a component tag is never checked),
+// landed on the non-painting anchor host and committed nowhere.
+export const ANIMATED_INPUTS = [
+  'style',
+  'testID',
+  'animatedProps',
+  PASSTHROUGH_PROP,
+];
 export const ANIMATED_IMAGE_INPUTS = [
   ...IMAGE_INPUTS,
   'animatedProps',
@@ -87,6 +101,7 @@ export abstract class AnimatedComponentBase
   implements AfterViewInit, DoCheck, OnChanges, OnDestroy
 {
   style: unknown;
+  testID: string | undefined;
   animatedProps: Record<string, unknown> | undefined;
   passthroughAnimatedPropExplicitValues: unknown;
 
@@ -183,9 +198,11 @@ export abstract class AnimatedComponentBase
   // never disagree.
   private mergedProps(): Record<string, unknown> {
     const base = this.animatedProps ?? {};
-    return this.style === undefined
-      ? { ...base }
-      : { ...base, style: this.style };
+    const merged: Record<string, unknown> =
+      this.style === undefined ? { ...base } : { ...base, style: this.style };
+    // Only when set, so an unset input cannot clear a `testID` the app put in `animatedProps`.
+    if (this.testID !== undefined) merged.testID = this.testID;
+    return merged;
   }
 
   // The committed host node held by IDENTITY. resolveHostNode unwraps an imperative scroll
@@ -207,9 +224,9 @@ export abstract class AnimatedComponentBase
   imports: [SymbioteHostPropsDirective, ViewHost],
   inputs: ANIMATED_INPUTS,
   template: `
-    <symbiote-view [symbioteHostProps]="reducedProps">
+    <view [symbioteHostProps]="reducedProps">
       <ng-content></ng-content>
-    </symbiote-view>
+    </view>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -225,9 +242,9 @@ export class AnimatedView extends AnimatedComponentBase {}
   imports: [SymbioteHostPropsDirective, TextHost],
   inputs: ANIMATED_INPUTS,
   template: `
-    <symbiote-text [symbioteHostProps]="reducedProps">
+    <text [symbioteHostProps]="reducedProps">
       <ng-content></ng-content>
-    </symbiote-text>
+    </text>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -244,7 +261,7 @@ export class AnimatedText extends AnimatedComponentBase {}
   inputs: ANIMATED_IMAGE_INPUTS,
   outputs: IMAGE_OUTPUTS,
   template: `
-    <symbiote-image
+    <image
       [symbioteHostProps]="animatedImageProps"
       (loadStart)="handleLoadStart($event)"
       (load)="handleLoad($event)"
@@ -254,7 +271,7 @@ export class AnimatedText extends AnimatedComponentBase {}
       (partialLoad)="handlePartialLoad($event)"
     >
       <ng-content></ng-content>
-    </symbiote-image>
+    </image>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -382,49 +399,23 @@ export class AnimatedImage
     { directive: SymbioteStyleInputDirective, inputs: ['style'] },
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  imports: [SymbioteHostPropsDirective, ScrollViewHost],
+  imports: [SymbioteHostPropsDirective],
   inputs: ANIMATED_INPUTS,
   template: `
-    <symbiote-scroll-view [symbioteHostProps]="reducedProps">
-      <symbiote-scroll-content [symbioteHostProps]="contentProps">
-        <ng-content></ng-content>
-      </symbiote-scroll-content>
-    </symbiote-scroll-view>
+    <scroll-view [symbioteHostProps]="reducedProps">
+      <ng-content></ng-content>
+    </scroll-view>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AnimatedScrollView extends AnimatedComponentBase {
-  // RN defaults nested scrolling ON (ScrollView.js `nestedScrollEnabled ?? true`) — Android
-  // needs it explicit or a nested ScrollView never receives touch (swallowed by the outer one;
-  // iOS doesn't gate on this). The real ScrollView component already defaults this
-  // (scroll-view/shared.ts), but AnimatedScrollView talks to the raw primitive directly and
-  // must apply it too.
-  //
-  // scrollViewBaseStyle (overflow: 'scroll' + the per-axis flexDirection) is the other thing the
-  // real ScrollView applies that this bespoke template used to skip — without it, iOS Fabric
-  // never clips content to the scroll view's frame (invisible on Android, whose native ViewGroup
-  // clips regardless of style). This wrapper has no `horizontal` input and its template is
-  // hardcoded to the vertical intrinsics, so selectScrollIntrinsics is always called with
-  // isHorizontal=false here, matching what the template can actually render.
-  override get reducedProps(): Record<string, unknown> {
-    const reduced = super.reducedProps;
-    const { scrollViewBaseStyle } = selectScrollIntrinsics(false, undefined);
-    const withScrollBase: Record<string, unknown> = {
-      ...reduced,
-      style: [scrollViewBaseStyle, reduced.style],
-    };
-    return withScrollBase.nestedScrollEnabled === undefined
-      ? { ...withScrollBase, nestedScrollEnabled: true }
-      : withScrollBase;
-  }
-
-  // The content (inner) view's props: contentStyle from the same intrinsics selection, plus
-  // `collapsable: false` (the Android multi-child fix this file's tests already cover) — mirrors
-  // the real ScrollView's own `contentProps` getter (scroll-view/shared.ts).
-  get contentProps(): Record<string, unknown> {
-    const { contentStyle } = selectScrollIntrinsics(false, undefined);
-    return { style: contentStyle, collapsable: false };
-  }
+  // Nothing left to override: `registerScrollViewBehavior()` (`../../register.ts`) now owns the
+  // content node, `scrollViewBaseStyle`/`nestedScrollEnabled` defaults, and the sticky seam for
+  // this SAME `scroll-view` tag. This class used to build its own `<scroll-content>` child by
+  // hand — deleted 2026-09-11, since that made TWO owners of the content node the moment the
+  // behavior registered on this tag: the engine's own `buildStructure` and this template both
+  // creating one. `<ng-content>` now lands directly under the owner and the behavior redirects it
+  // into the content node it builds, same as every other `<scroll-view>` in the app.
 }
 
 // List components are already explicit AOT-compiled Angular components with their own full input
@@ -441,12 +432,16 @@ export const AnimatedSectionList = SectionList;
 export function createAnimatedComponent(base: unknown): Type<unknown> {
   if (base === View) return AnimatedView;
   if (base === Text) return AnimatedText;
-  if (base === Image) return AnimatedImage;
-  if (base === ScrollView) return AnimatedScrollView;
+  // The TAG, not a component identity: `ScrollView`/`Image` are gone as classes now
+  // (`components/scroll-view-props.ts`, `modules/image`), so there is no class to compare
+  // against — the same move React made (`createAnimatedComponent('image')`). A tag string is also
+  // what portable app code can pass on every adapter.
+  if (base === SCROLL_VIEW_TAG) return AnimatedScrollView;
+  if (base === IMAGE_TAG) return AnimatedImage;
   throw new Error(
     'createAnimatedComponent: Angular cannot synthesize a component at runtime (no JIT compiler ' +
       'under AOT/Metro). Author an explicit standalone @Component extending AnimatedComponentBase ' +
-      'instead. The built-in primitives View / Text / Image / ScrollView map to ' +
-      'AnimatedView / AnimatedText / AnimatedImage / AnimatedScrollView.',
+      "instead. The built-in primitives View / Text and the tags 'scroll-view' / 'image' map to " +
+      'AnimatedView / AnimatedText / AnimatedScrollView / AnimatedImage.',
   );
 }

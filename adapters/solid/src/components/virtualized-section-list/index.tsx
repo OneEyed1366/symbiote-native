@@ -34,7 +34,7 @@ import {
   type IVirtualizedListCellInfo,
   type IVirtualizedListHandle,
 } from '../virtualized-list';
-import type { IScrollViewHandle } from '../scroll-view';
+import type { IScrollViewHandle } from '@symbiote-native/components';
 
 export type { ISection, IVirtualizedSectionListHandle };
 

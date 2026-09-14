@@ -7,11 +7,11 @@
 // the thing under test. Svelte's each-block anchors are exactly what is being counted.
 //
 // One deliberate deviation from the other four columns: the row composes a LOCAL Pressable stub
-// over the raw `symbiote-view` host tag instead of importing `@symbiote-native/svelte`'s. That
+// over the raw `view` host tag instead of importing `@symbiote-native/svelte`'s. That
 // package's components are themselves `.svelte` files, and with no svelte plugin in the vitest
 // config Vite cannot parse them. The stub keeps what this file measures identical — one host view
 // per Pressable, three composed components per row, nine host tags in total — and the adapter's
-// real Pressable adds nothing to either count (it is one `symbiote-view` unless android_ripple is
+// real Pressable adds nothing to either count (it is one `view` unless android_ripple is
 // set, which the canary row does not set).
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -108,7 +108,7 @@ const PRESSABLE_SOURCE = `
   let { children } = $props();
 </script>
 
-<symbiote-view p={{}}>{@render children()}</symbiote-view>
+<view p={{}}>{@render children()}</view>
 `;
 
 const ROW_SOURCE = `
@@ -117,13 +117,13 @@ const ROW_SOURCE = `
   let { row, isSelected } = $props();
 </script>
 
-<symbiote-view p={{ style: isSelected ? { backgroundColor: 'blue' } : undefined }}>
-  <symbiote-text p={{}}>{String(row.id)}</symbiote-text><Pressable>
-    <symbiote-text p={{}}>{row.label}</symbiote-text>
+<view p={{ style: isSelected ? { backgroundColor: 'blue' } : undefined }}>
+  <text p={{}}>{String(row.id)}</text><Pressable>
+    <text p={{}}>{row.label}</text>
   </Pressable><Pressable>
-    <symbiote-text p={{}}>x</symbiote-text>
+    <text p={{}}>x</text>
   </Pressable>
-</symbiote-view>
+</view>
 `;
 
 const LIST_SOURCE = `
@@ -139,9 +139,9 @@ const LIST_SOURCE = `
   });
 </script>
 
-<symbiote-view p={{ testID: 'list' }}>
+<view p={{ testID: 'list' }}>
   {#each rows as row (row.id)}<BenchmarkRow {row} isSelected={row.id === selectedId} />{/each}
-</symbiote-view>
+</view>
 `;
 
 function drive(): IDriver {

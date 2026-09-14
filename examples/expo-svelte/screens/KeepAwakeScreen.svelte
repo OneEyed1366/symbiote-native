@@ -4,12 +4,7 @@
   // toggles a one-line holder component in and out of the tree to drive that; Svelte cannot
   // declare a second component inside one file, so the equivalent here is a NESTED effect (see
   // the toggle effect below). Svelte twin of examples/expo-vue-sfc/screens/KeepAwakeScreen.vue.
-  import {
-    SafeAreaView,
-    ScrollView,
-    Text,
-    View,
-  } from '@symbiote-native/svelte';
+  import { ScrollView } from '@symbiote-native/svelte';
   import {
     isAvailableAsync,
     useKeepAwake,
@@ -57,53 +52,53 @@
   }
 </script>
 
-<SafeAreaView class="screen">
+<safe-area-view class="screen">
   <ScrollView
     testID="keep-awake-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-        <Text class="hero-badge-text">{lineInfo.code}</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">Keep Awake</Text>
-        <Text class="hero-body">
+      </text>
+    </view>
+    <view class="hero-card">
+      <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <text class="hero-badge-text">{lineInfo.code}</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">Keep Awake</text>
+        <text class="hero-body">
           @symbiote-native/keep-awake — keeps the screen on for as long as a
           component holding useKeepAwake() stays mounted.
-        </Text>
-      </View>
-    </View>
-    <View testID="keep-awake-card" class="keep-awake-card">
-      <Text class="keep-awake-card-title">Screen lock</Text>
-      <View class="keep-awake-row">
-        <Text class="keep-awake-row-label">Available</Text>
-        <View
+        </text>
+      </view>
+    </view>
+    <view testID="keep-awake-card" class="keep-awake-card">
+      <text class="keep-awake-card-title">Screen lock</text>
+      <view class="keep-awake-row">
+        <text class="keep-awake-row-label">Available</text>
+        <view
           class={`keep-awake-status-badge keep-awake-status-badge-${isAvailable}`}
         >
-          <Text class="keep-awake-status-text">
+          <text class="keep-awake-status-text">
             {CAPABILITY_BADGE_TEXT[isAvailable]}
-          </Text>
-        </View>
-      </View>
-      <View class="keep-awake-row">
-        <Text class="keep-awake-row-label">Held</Text>
-        <Text testID="keep-awake-held-value" class="keep-awake-value-text">
+          </text>
+        </view>
+      </view>
+      <view class="keep-awake-row">
+        <text class="keep-awake-row-label">Held</text>
+        <text testID="keep-awake-held-value" class="keep-awake-value-text">
           {isHeld ? 'true' : 'false'}
-        </Text>
-      </View>
+        </text>
+      </view>
       <ActionButton
         testID="keep-awake-toggle-button"
         title={isHeld ? 'Release keep-awake' : 'Activate keep-awake'}
         onPress={handleToggle}
         color={lineColor}
       />
-    </View>
+    </view>
   </ScrollView>
-</SafeAreaView>
+</safe-area-view>

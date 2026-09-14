@@ -23,8 +23,7 @@ function runWithNoFilename(content: string): { code: string } {
 describe('forbidWebOnlyConstructs — markup', () => {
   describe('Positive (markup that must pass through unchanged)', () => {
     it('passes clean markup through unchanged', () => {
-      const source =
-        '<symbiote-view p={{}}><symbiote-text p={{}}>hi</symbiote-text></symbiote-view>';
+      const source = '<view p={{}}><text p={{}}>hi</text></view>';
       expect(run(source).code).toBe(source);
     });
 
@@ -78,7 +77,7 @@ describe('forbidWebOnlyConstructs — markup', () => {
     // one field the special elements happen to live under.
     it('rejects {@html} nested inside a block', () => {
       const source =
-        '<script>let s = $state("")</script>{#if s}<symbiote-view p={{}}>{@html s}</symbiote-view>{/if}';
+        '<script>let s = $state("")</script>{#if s}<view p={{}}>{@html s}</view>{/if}';
       expect(() => run(source)).toThrow('{@html …}');
     });
 

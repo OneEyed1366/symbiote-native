@@ -3,7 +3,6 @@
   // caption. Svelte twin of the local Tile function in
   // examples/react/screens/StyleShowcaseScreen.tsx — a component rather than a snippet because it
   // wraps arbitrary content, which is what `children` is for.
-  import { Text, View } from '@symbiote-native/svelte';
   import type { Snippet } from 'svelte';
 
   let {
@@ -13,8 +12,8 @@
   }: { label: string; caption: string; children: Snippet } = $props();
 </script>
 
-<View class="sc-pair-half">
-  <Text class="sc-tile-label">{label}</Text>
+<view class="sc-pair-half">
+  <text class="sc-tile-label">{label}</text>
   {@render children()}
-  <Text class="sc-tile-caption">{caption}</Text>
-</View>
+  <text class="sc-tile-caption">{caption}</text>
+</view>

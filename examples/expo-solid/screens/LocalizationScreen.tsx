@@ -1,14 +1,16 @@
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
-import { createCalendars, createLocales } from '@symbiote-native/localization/solid';
+import {
+  createCalendars,
+  createLocales,
+} from '@symbiote-native/localization/solid';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="capability-row">
-      <Text class="capability-label">{props.label}</Text>
-      <Text class="value-text">{props.value}</Text>
-    </View>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -28,32 +30,32 @@ export function LocalizationScreen() {
   const calendar = () => calendars()[0];
 
   return (
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="localization-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Localization</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Localization</text>
+            <text class="hero-body">
               @symbiote-native/localization — locales and calendars, each
               reactive to device settings changes via its own primitive.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="localization-locale-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Locale</Text>
-          </View>
+        <view testID="localization-locale-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Locale</text>
+          </view>
           <ValueRow label="Language tag" value={locale().languageTag} />
           <ValueRow
             label="Currency code"
@@ -64,12 +66,12 @@ export function LocalizationScreen() {
             value={locale().currencySymbol ?? 'unknown'}
           />
           <ValueRow label="Text direction" value={locale().textDirection} />
-        </View>
+        </view>
 
-        <View testID="localization-calendar-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Calendar</Text>
-          </View>
+        <view testID="localization-calendar-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Calendar</text>
+          </view>
           <ValueRow label="Calendar" value={calendar().calendar ?? 'unknown'} />
           <ValueRow
             label="Uses 24-hour clock"
@@ -81,9 +83,12 @@ export function LocalizationScreen() {
                   : 'No'
             }
           />
-          <ValueRow label="Time zone" value={calendar().timeZone ?? 'unknown'} />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          <ValueRow
+            label="Time zone"
+            value={calendar().timeZone ?? 'unknown'}
+          />
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

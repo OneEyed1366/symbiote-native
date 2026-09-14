@@ -2,6 +2,10 @@
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
     "types": ["jest"],
+    // The adapter owns its own JSX namespace now (adapters/react/src/jsx-runtime.ts), so an app
+    // has to point at it — the old `declare module 'react'` augmentation that reached every
+    // consumer for free is gone. Without this line `<view>` is an unknown intrinsic to tsc.
+    "jsxImportSource": "@symbiote-native/react",
     "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
   },
   "include": ["**/*.ts", "**/*.tsx"],

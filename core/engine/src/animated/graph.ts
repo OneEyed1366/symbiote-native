@@ -38,6 +38,19 @@ let nextListenerId = 1;
 // coalescing layer; symbiote has none here, so it coalesces at the source.
 let flushSuspendDepth = 0;
 
+// Has this process ever constructed an Animated node at all?
+//
+// `routeProp` has to answer "does this prop hold an animated value" on EVERY prop write - 32 001
+// of them on one benchmark create - and for an app that animates nothing the only cheap answer is
+// that no AnimatedNode exists to find. One boolean read, the discipline `hasHostBehaviors` and
+// `isDebug` already set. Set in the base constructor so every node type raises it, including the
+// operators and interpolations an app never names directly.
+let anyAnimatedNode = false;
+
+export function hasAnimatedNodes(): boolean {
+  return anyAnimatedNode;
+}
+
 export class AnimatedNode {
   private readonly listeners = new Map<string, IValueListener>();
 
@@ -59,6 +72,10 @@ export class AnimatedNode {
   // native config at creation (__getNativeTag). Optional: undefined when no caller
   // supplied one, matching today's behavior.
   private platformConfig: IPlatformConfig | undefined;
+
+  constructor() {
+    anyAnimatedNode = true;
+  }
 
   __attach(): void {}
 

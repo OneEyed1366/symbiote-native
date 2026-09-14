@@ -5,7 +5,6 @@
 // counter below is the observable proof — it stays put while `noise` climbs.
 
 import { createMemo, createSignal, untrack } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -30,16 +29,16 @@ export function SignalMemoDemo() {
   );
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">createSignal · createMemo · untrack</Text>
-      <Text class="ap-value" testID="signal-doubled">
+    <view class="section-nested">
+      <text class="section-label">createSignal · createMemo · untrack</text>
+      <text class="ap-value" testID="signal-doubled">
         {`doubled = ${doubled()} · memo body ran ${memoRuns}×`}
-      </Text>
-      <Text class="ap-value" testID="signal-summary">
+      </text>
+      <text class="ap-value" testID="signal-summary">
         {summary()}
-      </Text>
-      <Text class="subtle">{`noise = ${noise()}`}</Text>
-      <View class="ap-wrap">
+      </text>
+      <text class="subtle">{`noise = ${noise()}`}</text>
+      <view class="ap-wrap">
         <ActionButton
           testID="signal-count"
           title="count + 1"
@@ -52,7 +51,7 @@ export function SignalMemoDemo() {
           color={ACCENT}
           onPress={() => setNoise(value => value + 1)}
         />
-      </View>
-    </View>
+      </view>
+    </view>
   );
 }

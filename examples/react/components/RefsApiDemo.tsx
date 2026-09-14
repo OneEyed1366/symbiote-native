@@ -1,10 +1,5 @@
 import { Component, createRef, useState } from 'react';
-import {
-  Text,
-  View,
-  findNodeHandle,
-  type IHostInstance,
-} from '@symbiote-native/react';
+import { findNodeHandle, type IHostInstance } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 
@@ -26,9 +21,9 @@ class LegacyRefHolder extends Component<
 
   render() {
     return (
-      <View ref={this.boxRef} testID="refs-createref-box" className="ref-box">
-        <Text className="ref-box-text">{`createRef() target — tag ${this.state.tag ?? '—'}`}</Text>
-      </View>
+      <view ref={this.boxRef} testID="refs-createref-box" className="ref-box">
+        <text className="ref-box-text">{`createRef() target — tag ${this.state.tag ?? '—'}`}</text>
+      </view>
     );
   }
 }
@@ -38,14 +33,14 @@ export function RefsApiDemo() {
   const [showCallbackTarget, setShowCallbackTarget] = useState(true);
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         ref prop · ref callback with cleanup · createRef()
-      </Text>
+      </text>
       {showCallbackTarget && (
         // A ref callback returning a cleanup function (React 19): fires on attach, then the
         // returned function fires on detach — proven by toggling the target below.
-        <View
+        <view
           testID="refs-callback-box"
           className="ref-box"
           ref={node => {
@@ -53,13 +48,13 @@ export function RefsApiDemo() {
             return () => setAttachLog('detached (cleanup ran)');
           }}
         >
-          <Text className="ref-box-text">ref callback target</Text>
-        </View>
+          <text className="ref-box-text">ref callback target</text>
+        </view>
       )}
-      <Text
+      <text
         testID="refs-attach-log"
         className="info-text"
-      >{`ref callback: ${attachLog}`}</Text>
+      >{`ref callback: ${attachLog}`}</text>
       <ActionButton
         testID="refs-toggle-callback-target"
         title={showCallbackTarget ? 'Unmount (triggers cleanup)' : 'Mount'}
@@ -67,6 +62,6 @@ export function RefsApiDemo() {
         color={LINE_COLOR.introspection}
       />
       <LegacyRefHolder />
-    </View>
+    </view>
   );
 }

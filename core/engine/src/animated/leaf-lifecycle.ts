@@ -1,6 +1,6 @@
 // The AnimatedProps leaf lifecycle every Animated.* wrapper needs: build a leaf from the current
-// props, swap it into the value graph, bind it to the committed node, go native when asked, and
-// rebind native event props. Framework-agnostic on purpose - it knows nothing about hooks,
+// props, swap it into the value graph, bind it to the committed node, and go native when asked.
+// Framework-agnostic on purpose - it knows nothing about hooks,
 // effects, change detection or reactivity, only the engine's own Animated primitives.
 //
 // WHY THIS LIVES IN THE ENGINE. It used to live four times, once per adapter (React's
@@ -16,7 +16,6 @@
 // and HOW to find the host node (a ref, a ViewChild, a shim). Everything below is the same for all.
 
 import { AnimatedProps } from './props';
-import { attachNativeEventHandler } from './event';
 import { dlog } from '../debug';
 import type { ISymbioteNode } from '../node';
 
@@ -84,15 +83,15 @@ export type IScheduleNativeBind = (bind: () => void) => (() => void) | void;
 
 export type IAnimatedLeafLifecycle = {
   // Rebuild the leaf from `props`, swap it into the value graph (new before old), then bind it to
-  // `node` (null while the host has no node at all), go native if `wantsNative`, and rebind any
-  // native-attachable event props. Call on every update.
+  // `node` (null while the host has no node at all) and go native if `wantsNative`. An
+  // `Animated.event` prop is NOT bound here — it reaches `routeProp`. Call on every update.
   reconcile(
     props: Record<string, unknown>,
     node: ISymbioteNode | null,
     wantsNative: boolean,
     scheduleNativeBind?: IScheduleNativeBind,
   ): void;
-  // Detach the last-attached leaf and any native event bindings. Call once, on unmount.
+  // Detach the last-attached leaf. Call once, on unmount.
   teardown(): void;
 };
 
@@ -100,7 +99,6 @@ export function createAnimatedLeafLifecycle(
   label: string,
 ): IAnimatedLeafLifecycle {
   let attached: AnimatedProps | null = null;
-  let eventDetachers: Array<() => void> = [];
   // Diagnostic-only: the last node identity, plus a reentrancy flag to catch reconcile() being
   // called AGAIN from inside its own call stack - the smoking-gun shape for a synchronous
   // same-flush loop, as opposed to merely "called often".
@@ -111,11 +109,6 @@ export function createAnimatedLeafLifecycle(
   let lastWantsNative = false;
   // Canceller for a native bind the caller deferred and that has not run yet.
   let cancelPendingBind: (() => void) | undefined;
-
-  function detachEvents(): void {
-    for (const detach of eventDetachers) detach();
-    eventDetachers = [];
-  }
 
   return {
     reconcile(props, node, wantsNative, scheduleNativeBind): void {
@@ -187,20 +180,17 @@ export function createAnimatedLeafLifecycle(
         if (attached !== null && attached !== newLeaf) attached.__detach();
         attached = newLeaf;
 
-        // The native half, which a caller may defer. Rebinds events each reconcile so a new inline
-        // event re-attaches, detaching first so the prior binding does not leak;
-        // attachNativeEventHandler no-ops unless the prop really is a native event handler on a
-        // committed node, so the JS path stays the fallback.
+        // The native half, which a caller may defer.
+        //
+        // It used to native-attach every `Animated.event` prop here as well. It must not any more:
+        // a wrapper hands those same props DOWN to a host element, so they reach `routeProp`,
+        // which binds them itself (`host-binding.ts`, `bindAnimatedEvent`) — that is what makes a
+        // bare `<scroll-view onScroll={…} />` work with no wrapper at all. Doing it here too
+        // registered the SAME mapping twice on one view tag, caught by the Vue and Svelte
+        // wrapper tests the day the engine half landed.
         const bindNative = (): void => {
           if (node !== null) newLeaf.setNativeView(node);
           if (wantsNative) newLeaf.__makeNative();
-          detachEvents();
-          if (node === null) return;
-          for (const key of Object.keys(props)) {
-            const attachment = attachNativeEventHandler(node, key, props[key]);
-            if (attachment !== undefined)
-              eventDetachers.push(attachment.detach);
-          }
         };
 
         cancelPendingBind?.();
@@ -217,7 +207,6 @@ export function createAnimatedLeafLifecycle(
     teardown(): void {
       cancelPendingBind?.();
       cancelPendingBind = undefined;
-      detachEvents();
       if (attached !== null) {
         attached.__detach();
         attached = null;

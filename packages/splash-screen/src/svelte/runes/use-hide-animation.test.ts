@@ -123,7 +123,7 @@ async function loadProbe(): Promise<Component> {
        const animation = useHideAnimation(getConfig);
        $effect(() => { onResult(animation.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'HideAnimationProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);
@@ -159,7 +159,7 @@ async function loadReactiveReadyProbe(): Promise<Component> {
        $effect(() => { onResult(animation.current); });
        onControls({ setReady: (value: boolean) => { ready = value; } });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'HideAnimationReactiveProbe.svelte' },
   );
   writeFileSync(REACTIVE_PROBE_OUT, result.js.code);

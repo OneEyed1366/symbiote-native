@@ -78,12 +78,21 @@ export type {
   ITaskCancelProvider,
 } from './modules/app-registry';
 
-// Animated: the six animated components RN exposes, over the engine's framework-agnostic value
-// graph. Solid's JSX takes the dotted form directly — `<Animated.View/>` compiles to
-// createComponent(Animated.View, …) — so no local alias is needed, unlike Angular, whose AOT
+// Animated: the three list/scroll components that are still components, over the engine's
+// framework-agnostic value graph. There is no `Animated.View` / `Animated.Text` / `Animated.Image`
+// — those primitives are tags, and `<view style={{ opacity: someAnimatedValue }}>` is the whole
+// API (.claude/rules/animated-values-resolve-in-the-engine.md). Solid's JSX takes the dotted form
+// of what remains directly — `<Animated.ScrollView/>` compiles to
+// createComponent(Animated.ScrollView, …) — so no local alias is needed, unlike Angular, whose AOT
 // compiler cannot trace a class through property access (.claude/rules/dotted-component-tags.md).
 export { StatusBar } from './modules/status-bar';
 export type { IStatusBarProps, IStatusBarStyle } from './modules/status-bar';
+
+// What survives of `Image` once the primitive is the `<image>` tag: RN's statics namespace, no
+// view. Grouped with the runtime modules rather than the components for exactly that reason.
+// `IImageStatics` is not re-exported here — `./components` already carries it, straight from the
+// shared package, and a second export of one name is a build error rather than a convenience.
+export { Image } from './modules/image';
 
 // Portal: same-surface content relocation, the twin of React's createPortal and Angular's
 // PortalDirective/PortalOutletDirective. `mount` takes an already-mounted host node in THIS

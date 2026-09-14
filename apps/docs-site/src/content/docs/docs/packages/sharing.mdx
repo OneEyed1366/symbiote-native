@@ -86,7 +86,6 @@ subscription.
   <TabItem label="React">
     ```tsx
     import { useState } from 'react';
-    import { Button, Text, View } from '@symbiote-native/react';
     import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/react';
 
     export default function ShareReport({ fileUri }: { fileUri: string }) {
@@ -101,10 +100,10 @@ subscription.
       }
 
       return (
-        <View>
-          <Button title="Share the report" onPress={onShare} />
-          {error === null ? null : <Text>{error}</Text>}
-        </View>
+        <view>
+          <button title="Share the report" onPress={onShare} />
+          {error === null ? null : <text>{error}</text>}
+        </view>
       );
     }
     ```
@@ -114,7 +113,6 @@ subscription.
     ```vue
     <script setup lang="ts">
     import { ref } from 'vue';
-    import { Button, Text, View } from '@symbiote-native/vue';
     import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/vue';
 
     const props = defineProps<{ fileUri: string }>();
@@ -133,10 +131,10 @@ subscription.
     </script>
 
     <template>
-      <View>
-        <Button title="Share the report" @press="onShare" />
-        <Text v-if="error">{{ error }}</Text>
-      </View>
+      <view>
+        <button title="Share the report" @press="onShare" />
+        <text v-if="error">{{ error }}</text>
+      </view>
     </template>
     ```
 
@@ -144,19 +142,19 @@ subscription.
   <TabItem label="Angular">
     ```ts
     import { Component, input, signal } from '@angular/core';
-    import { Button, Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/angular';
 
     @Component({
       standalone: true,
-      imports: [Button, Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Button title="Share the report" (press)="onShare()" />
+        <view>
+          <button title="Share the report" (press)="onShare()" />
           @if (error(); as message) {
-            <Text>{{ message }}</Text>
+            <text>{{ message }}</text>
           }
-        </View>
+        </view>
       `,
     })
     export class ShareReport {
@@ -183,7 +181,6 @@ subscription.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Button, Text, View } from '@symbiote-native/svelte';
       import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/svelte';
 
       let { fileUri }: { fileUri: string } = $props();
@@ -198,12 +195,12 @@ subscription.
       }
     </script>
 
-    <View>
-      <Button title="Share the report" onPress={onShare} />
+    <view>
+      <button title="Share the report" onPress={onShare} />
       {#if error}
-        <Text>{error}</Text>
+        <text>{error}</text>
       {/if}
-    </View>
+    </view>
     ```
 
     There's no per-instance rune to reach for here either — both functions are plain exports off
@@ -213,7 +210,6 @@ subscription.
   <TabItem label="Solid">
     ```tsx
     import { createSignal } from 'solid-js';
-    import { Button, Text, View } from '@symbiote-native/solid';
     import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/solid';
 
     export function ShareReport(props: { fileUri: string }) {
@@ -228,10 +224,10 @@ subscription.
       }
 
       return (
-        <View>
-          <Button title="Share the report" onPress={onShare} />
-          {error() === null ? null : <Text>{error()}</Text>}
-        </View>
+        <view>
+          <button title="Share the report" onPress={onShare} />
+          {error() === null ? null : <text>{error()}</text>}
+        </view>
       );
     }
     ```

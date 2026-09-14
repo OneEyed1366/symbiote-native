@@ -7,7 +7,7 @@
 //   1. the LOWERED path (a flat prop bag through the behavior) produces the same payload as the
 //      WRAPPER path (a typed view through renderImage's mapping), for the same authored props;
 //   2. the fold is IDEMPOTENT, so running it on a wrapper-built node — which already carries folded
-//      props, since renderImage emits the same `symbiote-image` tag — changes nothing.
+//      props, since renderImage emits the same `image` tag — changes nothing.
 //
 // (2) is asserted rather than reasoned about on purpose. `.claude/rules/adapter-parity-audit.md`
 // records that a double fold "is invisible for a fold that happens to be idempotent"; the whole
@@ -15,7 +15,7 @@
 //
 // AND DO NOT COPY IMAGE'S CONCLUSION — CHECK BOTH PROPERTIES. It is tempting to read TextInput's
 // `-managed` split as evidence that its fold is not idempotent. Measured 2026-09-01, by reaching
-// `node.payloadFold` off a real `symbiote-text-input` node and running it twice: it IS idempotent
+// `node.payloadFold` off a real `text-input` node and running it twice: it IS idempotent
 // (it deletes its alias-only keys and derives the rest, so a second pass finds nothing to do). The
 // split exists for a different reason — that behavior carries a MACHINE (`ownedListeners`
 // change/focus/blur, `attach`, `attachAfterCommit`, `afterCommit`), and attaching it to a

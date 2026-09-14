@@ -7,7 +7,6 @@
   // requirement) — a Svelte component's script runs exactly ONCE, so the rune reads it once by
   // value and closes over it directly (see runes/use-focus-effect.svelte.ts). Svelte twin of
   // examples/vue-sfc/screens/HooksDemoScreen.vue.
-  import { SafeAreaView, Text, View } from '@symbiote-native/svelte';
   import {
     useFocusEffect,
     useIsFocused,
@@ -32,44 +31,44 @@
   });
 </script>
 
-<SafeAreaView class="screen">
-  <View class="section">
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+<safe-area-view class="screen">
+  <view class="section">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View
+      </text>
+    </view>
+    <view class="hero-card">
+      <view
         class="hero-badge"
         style={{ backgroundColor: LINE_COLOR.introspection }}
       >
-        <Text class="hero-badge-text">HK</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">Hooks</Text>
-        <Text class="hero-body">
+        <text class="hero-badge-text">HK</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">Hooks</text>
+        <text class="hero-body">
           useFocusEffect, useIsFocused, and useNavigationState — introspecting
           the navigator's own live state from inside a screen.
-        </Text>
-      </View>
-    </View>
-    <Text testID="hooks-is-focused" class="info-text">
+        </text>
+      </view>
+    </view>
+    <text testID="hooks-is-focused" class="info-text">
       {`useIsFocused(): ${isFocused.current}`}
-    </Text>
-    <Text testID="hooks-focus-count" class="info-text">
+    </text>
+    <text testID="hooks-focus-count" class="info-text">
       {`useFocusEffect focus count: ${focusCount}`}
-    </Text>
-    <Text class="info-text">
+    </text>
+    <text class="info-text">
       {lastBlurAt === undefined
         ? 'not blurred yet'
         : `last blurred at ${lastBlurAt}`}
-    </Text>
-    <Text class="section-label">
+    </text>
+    <text class="section-label">
       useNavigationState() · current route stack
-    </Text>
+    </text>
     {#each routeNames.current as name, index (`${name}-${index}`)}
-      <Text class="list-row-text">{`${index}. ${name}`}</Text>
+      <text class="list-row-text">{`${index}. ${name}`}</text>
     {/each}
-  </View>
-</SafeAreaView>
+  </view>
+</safe-area-view>

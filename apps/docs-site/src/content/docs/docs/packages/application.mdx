@@ -61,7 +61,7 @@ holds live state or a subscription.
   <TabItem label="React">
     ```tsx
     import { useEffect, useState } from 'react';
-    import { Platform, Text, View } from '@symbiote-native/react';
+    import { Platform } from '@symbiote-native/react';
     import {
       applicationId,
       applicationName,
@@ -78,13 +78,13 @@ holds live state or a subscription.
       }, []);
 
       return (
-        <View>
-          <Text>{applicationName} ({applicationId})</Text>
-          <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+        <view>
+          <text>{applicationName} ({applicationId})</text>
+          <text>v{nativeApplicationVersion} (build {nativeBuildVersion})</text>
           {Platform.OS === 'android' && installedAt && (
-            <Text>Installed {installedAt.toLocaleDateString()}</Text>
+            <text>Installed {installedAt.toLocaleDateString()}</text>
           )}
-        </View>
+        </view>
       );
     }
     ```
@@ -94,7 +94,7 @@ holds live state or a subscription.
     ```vue
     <script setup lang="ts">
     import { onMounted, ref } from 'vue';
-    import { Platform, Text, View } from '@symbiote-native/vue';
+    import { Platform } from '@symbiote-native/vue';
     import {
       applicationId,
       applicationName,
@@ -111,13 +111,13 @@ holds live state or a subscription.
     </script>
 
     <template>
-      <View>
-        <Text>{{ applicationName }} ({{ applicationId }})</Text>
-        <Text>v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</Text>
-        <Text v-if="Platform.OS === 'android' && installedAt">
+      <view>
+        <text>{{ applicationName }} ({{ applicationId }})</text>
+        <text>v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</text>
+        <text v-if="Platform.OS === 'android' && installedAt">
           Installed {{ installedAt?.toLocaleDateString() }}
-        </Text>
-      </View>
+        </text>
+      </view>
     </template>
     ```
 
@@ -125,7 +125,7 @@ holds live state or a subscription.
   <TabItem label="Angular">
     ```ts
     import { Component, signal } from '@angular/core';
-    import { Platform, Text, View } from '@symbiote-native/angular';
+    import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import {
       applicationId,
       applicationName,
@@ -136,15 +136,15 @@ holds live state or a subscription.
 
     @Component({
       standalone: true,
-      imports: [Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Text>{{ applicationName }} ({{ applicationId }})</Text>
-          <Text>v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</Text>
+        <view>
+          <text>{{ applicationName }} ({{ applicationId }})</text>
+          <text>v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</text>
           @if (Platform.OS === 'android' && installedAt(); as date) {
-            <Text>Installed {{ date.toLocaleDateString() }}</Text>
+            <text>Installed {{ date.toLocaleDateString() }}</text>
           }
-        </View>
+        </view>
       `,
     })
     export class ApplicationInfo {
@@ -164,7 +164,7 @@ holds live state or a subscription.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Platform, Text, View } from '@symbiote-native/svelte';
+      import { Platform } from '@symbiote-native/svelte';
       import {
         applicationId,
         applicationName,
@@ -180,13 +180,13 @@ holds live state or a subscription.
       });
     </script>
 
-    <View>
-      <Text>{applicationName} ({applicationId})</Text>
-      <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+    <view>
+      <text>{applicationName} ({applicationId})</text>
+      <text>v{nativeApplicationVersion} (build {nativeBuildVersion})</text>
       {#if Platform.OS === 'android' && installedAt}
-        <Text>Installed {installedAt.toLocaleDateString()}</Text>
+        <text>Installed {installedAt.toLocaleDateString()}</text>
       {/if}
-    </View>
+    </view>
     ```
 
     There's no per-instance rune to reach for here either — every function is a plain free
@@ -196,7 +196,7 @@ holds live state or a subscription.
   <TabItem label="Solid">
     ```tsx
     import { createSignal, onMount, Show } from 'solid-js';
-    import { Platform, Text, View } from '@symbiote-native/solid';
+    import { Platform } from '@symbiote-native/solid';
     import {
       applicationId,
       applicationName,
@@ -213,13 +213,13 @@ holds live state or a subscription.
       });
 
       return (
-        <View>
-          <Text>{applicationName} ({applicationId})</Text>
-          <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+        <view>
+          <text>{applicationName} ({applicationId})</text>
+          <text>v{nativeApplicationVersion} (build {nativeBuildVersion})</text>
           <Show when={Platform.OS === 'android' && installedAt()}>
-            {date => <Text>Installed {date().toLocaleDateString()}</Text>}
+            {date => <text>Installed {date().toLocaleDateString()}</text>}
           </Show>
-        </View>
+        </view>
       );
     }
     ```

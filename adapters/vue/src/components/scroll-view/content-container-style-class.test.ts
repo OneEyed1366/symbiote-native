@@ -1,20 +1,19 @@
-// Regression guard: contentContainerStyle previously accepted ONLY a JS style object/array
-// (isStyleProp rejects a bare string), so a class-name string was silently dropped. It now
-// resolves through the shared style registry, same as `class`/`style` (see shared.ts). Mirrors
-// scroll-view-android-class.test.ts's style-for-this-exact-scenario shape.
+// contentContainerStyle accepts a bare class-name string, resolved through the SAME shared
+// style registry as `class` (routeProp's merge), not the full IClassNameValue union. Proves the
+// resolved style lands on the CONTENT node (RCTScrollContentView), not the outer scroll view, and
+// that a plain style object still works unchanged. Vue twin of
+// adapters/react/src/components/scroll-view/scroll-view-content-container-class.test.tsx.
 //
-// Unit under test: the `contentContainerStyle` ternary in adapters/vue/src/components/scroll-view
-// /shared.ts's createScrollView render (string -> resolveClassName | isStyleProp -> passthrough |
-// else -> undefined), landing on the content view, never the outer scroll view.
-//
-// No Negative group: contentContainerStyle has no throwing path — an unresolvable value degrades
-// to `undefined`, it never rejects.
+// SCOPE: class-name resolution itself (registerRules/routeProp merge) is core/engine infra with
+// its own coverage — N/A here, this file only proves the Vue adapter actually routes
+// contentContainerStyle THROUGH that resolution onto the right node. No Negative group: an
+// unregistered class name resolves to no styles, it does not throw.
 
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, ScrollView } from '@symbiote-native/vue';
+import { mount, unmount } from '@symbiote-native/vue';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 513;
 
@@ -28,62 +27,42 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-function committedContentView(): IFakeNode {
-  const node = fabric.find(n => n.viewName === 'RCTScrollContentView');
-  expect(node, 'the scroll content view was committed').toBeDefined();
-  if (node === undefined) throw new Error('unreachable: content view missing');
-  return node;
-}
-
 function mountScrollView(contentContainerStyle: unknown): Promise<void> {
   mount(
     ROOT_TAG,
     defineComponent({
       setup: () => () =>
-        h(
-          ScrollView,
-          { contentContainerStyle },
-          { default: () => [h('symbiote-text')] },
-        ),
+        h('scroll-view', { contentContainerStyle }, [h('text')]),
     }),
   );
   return tick();
 }
 
-describe('Vue ScrollView contentContainerStyle class-name support', () => {
-  describe('Positive (every accepted shape resolves onto the content view without error)', () => {
-    it('resolves a class-name string onto the content view, not the outer scroll view', async () => {
-      // why: the class-name path is the regression this file guards, and it must land on the
-      // content container, not the outer RCTScrollView that pans it.
-      registerRules([
-        {
-          tokens: ['padded'],
-          specificity: [0, 1, 0],
-          order: 0,
-          style: { padding: 20 },
-        },
-      ]);
-      await mountScrollView('padded');
+describe('Vue <scroll-view> contentContainerStyle class-name resolution', () => {
+  it('resolves a class-name string onto the content node, not the outer scroll view', async () => {
+    registerRules([
+      {
+        tokens: ['padded'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 20 },
+      },
+    ]);
+    await mountScrollView('padded');
 
-      expect(committedContentView().props.padding).toBe(20);
-      const scrollView = fabric.find(n => n.viewName === 'RCTScrollView');
-      expect(scrollView?.props.padding).toBeUndefined();
-    });
+    const content = fabric.find(n => n.viewName === 'RCTScrollContentView');
+    expect(content, 'RCTScrollContentView was created').toBeDefined();
+    expect(content!.props.padding).toBe(20);
 
-    it('still accepts an ordinary style object unchanged', async () => {
-      // why: the class-name branch is additive to the pre-existing object/array contract, not a
-      // replacement for it.
-      await mountScrollView({ padding: 12 });
+    const outer = fabric.find(n => n.viewName === 'RCTScrollView');
+    expect(outer, 'RCTScrollView was created').toBeDefined();
+    expect('padding' in outer!.props).toBe(false);
+  });
 
-      expect(committedContentView().props.padding).toBe(12);
-    });
+  it('still accepts a plain style object unchanged', async () => {
+    await mountScrollView({ padding: 12 });
 
-    it('drops an unresolvable contentContainerStyle rather than throwing', async () => {
-      // why: the ternary's else-branch (not a string, not isStyleProp) must degrade to
-      // `undefined` — a malformed prop must never crash the scroll content render.
-      await mountScrollView(42);
-
-      expect(committedContentView().props.padding).toBeUndefined();
-    });
+    const content = fabric.find(n => n.viewName === 'RCTScrollContentView');
+    expect(content!.props.padding).toBe(12);
   });
 });

@@ -123,7 +123,7 @@ function mountKav(props: Record<string, unknown>): void {
     defineComponent({
       setup: () => (): VNode =>
         h(KeyboardAvoidingView, { style: { flex: 1 }, ...props }, () =>
-          h('symbiote-view'),
+          h('view'),
         ),
     }),
   );
@@ -263,7 +263,7 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
             h(
               KeyboardAvoidingView,
               { style: { flex: 1 }, behavior: behavior.value },
-              () => h('symbiote-view'),
+              () => h('view'),
             ),
         }),
       );

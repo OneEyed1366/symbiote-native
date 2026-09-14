@@ -55,7 +55,7 @@ export {
 // getter only exists to defer a RUNTIME createAnimatedComponent(ScrollView) past module init so
 // it cannot read ScrollView inside its own TDZ during an import cycle. AnimatedScrollView here is
 // a statically-declared component that never reads the ScrollView class at init (it targets the
-// `symbiote-scroll-view` host by string), so there is no cycle to defer.
+// `scroll-view` host by string), so there is no cycle to defer.
 //
 // FlatList / SectionList are exposed as explicit AOT-safe list entries now that the Angular list
 // components exist. Angular still cannot synthesize arbitrary animated wrappers at runtime; custom

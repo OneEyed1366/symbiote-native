@@ -89,10 +89,10 @@ afterEach(() => {
 });
 
 function HomeScreen(): ReturnType<typeof createElement> {
-  return createElement('symbiote-text', {}, 'home');
+  return createElement('text', {}, 'home');
 }
 function ProfileScreen(): ReturnType<typeof createElement> {
-  return createElement('symbiote-text', {}, 'profile');
+  return createElement('text', {}, 'profile');
 }
 
 function findAllText(nodes: readonly IFakeNode[]): string[] {
@@ -498,11 +498,11 @@ describe('React Drawer navigator', () => {
         // Merely proving the handle is a real IDrawerNavigatorHandle (openDrawer/jumpTo/...), not
         // the Stack-only shape this Context value was hard-typed to before the widened union.
         expect(typeof navigation.jumpTo).toBe('function');
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
       function TrackedProfileScreen(): ReturnType<typeof createElement> {
         profileIsFocused = useIsFocused();
-        return createElement('symbiote-text', {}, 'profile');
+        return createElement('text', {}, 'profile');
       }
 
       const ref = createRef<IDrawerNavigatorHandle>();
@@ -577,7 +577,7 @@ describe('React Drawer navigator', () => {
             return () => events.push('cleanup');
           }, []),
         );
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
 
       const ref = createRef<IDrawerNavigatorHandle>();

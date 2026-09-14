@@ -79,7 +79,7 @@ describe('createTunnel (Angular) — genuine cross-surface delivery', () => {
         selector: 'symbiote-tunnel-source-app',
         standalone: true,
         imports: [TextHost, TunnelInDirective],
-        template: '<Text *tunnelIn="tunnel">ported across surfaces</Text>',
+        template: '<text *tunnelIn="tunnel">ported across surfaces</text>',
       })
       class SourceApp {
         readonly tunnel = tunnel;
@@ -89,7 +89,7 @@ describe('createTunnel (Angular) — genuine cross-surface delivery', () => {
         selector: 'symbiote-tunnel-target-app',
         standalone: true,
         imports: [ViewHost, TunnelOut],
-        template: '<View><tunnel-out [tunnel]="tunnel" /></View>',
+        template: '<view><tunnel-out [tunnel]="tunnel" /></view>',
       })
       class TargetApp {
         readonly tunnel = tunnel;
@@ -120,7 +120,7 @@ describe('createTunnel (Angular) — genuine cross-surface delivery', () => {
         selector: 'symbiote-tunnel-source-app-2',
         standalone: true,
         imports: [TextHost, TunnelInDirective],
-        template: '<Text *tunnelIn="tunnel">still here</Text>',
+        template: '<text *tunnelIn="tunnel">still here</text>',
       })
       class SourceApp {
         readonly tunnel = tunnel;
@@ -130,7 +130,7 @@ describe('createTunnel (Angular) — genuine cross-surface delivery', () => {
         selector: 'symbiote-tunnel-target-app-2',
         standalone: true,
         imports: [ViewHost, TunnelOut],
-        template: '<View><tunnel-out [tunnel]="tunnel" /></View>',
+        template: '<view><tunnel-out [tunnel]="tunnel" /></view>',
       })
       class TargetApp {
         readonly tunnel = tunnel;
@@ -166,8 +166,8 @@ describe('createTunnel (Angular) — genuine cross-surface delivery', () => {
         standalone: true,
         imports: [TextHost, TunnelInDirective],
         template: `
-          <Text *tunnelIn="tunnel">first</Text>
-          <Text *tunnelIn="tunnel">second</Text>
+          <text *tunnelIn="tunnel">first</text>
+          <text *tunnelIn="tunnel">second</text>
         `,
       })
       class SourceApp {
@@ -178,7 +178,7 @@ describe('createTunnel (Angular) — genuine cross-surface delivery', () => {
         selector: 'symbiote-tunnel-target-app-3',
         standalone: true,
         imports: [ViewHost, TunnelOut],
-        template: '<View><tunnel-out [tunnel]="tunnel" /></View>',
+        template: '<view><tunnel-out [tunnel]="tunnel" /></view>',
       })
       class TargetApp {
         readonly tunnel = tunnel;
@@ -203,7 +203,7 @@ describe('createTunnel (Angular) — genuine cross-surface delivery', () => {
         selector: 'symbiote-tunnel-source-app-4',
         standalone: true,
         imports: [TextHost, TunnelInDirective],
-        template: '<Text *tunnelIn="tunnel">late arrival</Text>',
+        template: '<text *tunnelIn="tunnel">late arrival</text>',
       })
       class SourceApp {
         readonly tunnel = tunnel;
@@ -213,7 +213,7 @@ describe('createTunnel (Angular) — genuine cross-surface delivery', () => {
         selector: 'symbiote-tunnel-target-app-4',
         standalone: true,
         imports: [ViewHost, TunnelOut],
-        template: '<View><tunnel-out [tunnel]="tunnel" /></View>',
+        template: '<view><tunnel-out [tunnel]="tunnel" /></view>',
       })
       class TargetApp {
         readonly tunnel = tunnel;

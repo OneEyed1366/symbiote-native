@@ -152,8 +152,16 @@ export class AppComponent {
 </script>
 
 <Stack bind:this={stackInstance} initialRouteName="Menu">
-  <Screen name="Menu" component={MenuScreen} options={{ title: 'Navigation Demos' }} />
-  <Screen name="Details" component={DetailsScreen} options={{ title: 'Details' }} />
+  <Screen
+    name="Menu"
+    component={MenuScreen}
+    options={{ title: 'Navigation Demos' }}
+  />
+  <Screen
+    name="Details"
+    component={DetailsScreen}
+    options={{ title: 'Details' }}
+  />
 </Stack>
 ```
 

@@ -35,7 +35,7 @@ import {
   type IKeyboardAvoidingBehavior,
   type IMeasuredFrame,
 } from '@symbiote-native/components';
-import { View, type IViewProps } from '../../components';
+import { type IViewProps } from '../../components';
 import type {
   IAccessibilityProps,
   IAriaProps,
@@ -162,13 +162,13 @@ export const KeyboardAvoidingView: FC<IKeyboardAvoidingViewProps> = props => {
   if (layout.kind === 'nested') {
     return renderWrapper(
       layout.wrapperStyle,
-      createElement(View, { style: layout.innerStyle }, children),
+      createElement('view', { style: layout.innerStyle }, children),
     );
   }
   return renderWrapper(layout.wrapperStyle, children);
 
   // The wrapper carries onLayout. The View FC's public props don't surface it, but
-  // `symbiote-view` routes the base layout event at runtime; widen the props through
+  // `view` routes the base layout event at runtime; widen the props through
   // a typed variable (no inline-literal excess-property check, no `as`) so the
   // onLayout reaches the host without editing View's public type.
   function renderWrapper(
@@ -183,6 +183,6 @@ export const KeyboardAvoidingView: FC<IKeyboardAvoidingViewProps> = props => {
       onLayout: handleLayout,
       children: content,
     };
-    return createElement(View, wrapperProps);
+    return createElement('view', wrapperProps);
   }
 };

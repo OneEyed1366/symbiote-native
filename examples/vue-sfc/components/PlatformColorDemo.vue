@@ -7,8 +7,6 @@
 -->
 <script setup lang="ts">
 import {
-  View,
-  Text,
   PlatformColor,
   DynamicColorIOS,
   useColorScheme,
@@ -18,18 +16,22 @@ const scheme = useColorScheme();
 </script>
 
 <template>
-  <View class="section-nested">
-    <Text class="section-label">{{
-      `PlatformColor · semantic + DynamicColorIOS (${scheme ?? 'unknown'})`
-    }}</Text>
-    <View class="row">
-      <View
+  <view class="section-nested">
+    <text class="section-label">
+      {{
+        `PlatformColor · semantic + DynamicColorIOS (${scheme ?? 'unknown'})`
+      }}
+    </text>
+    <view class="row">
+      <view
         class="color-tile"
         :style="{ backgroundColor: PlatformColor('systemBlue') }"
       >
-        <Text class="tile-label">systemBlue</Text>
-      </View>
-      <View
+        <text class="tile-label">
+          systemBlue
+        </text>
+      </view>
+      <view
         class="color-tile-bordered"
         :style="{
           backgroundColor: DynamicColorIOS({
@@ -39,10 +41,13 @@ const scheme = useColorScheme();
           borderColor: PlatformColor('separator'),
         }"
       >
-        <Text class="bold-label" :style="{ color: PlatformColor('label') }"
-          >dynamic</Text
+        <text
+          class="bold-label"
+          :style="{ color: PlatformColor('label') }"
         >
-      </View>
-    </View>
-  </View>
+          dynamic
+        </text>
+      </view>
+    </view>
+  </view>
 </template>

@@ -10,7 +10,7 @@
 
 import { Component, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Text, View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 214;
@@ -31,7 +31,7 @@ class Boundary extends Component<
   }
 
   render(): ReactNode {
-    return this.state.hasFailed ? <Text>recovered</Text> : this.props.children;
+    return this.state.hasFailed ? <text>recovered</text> : this.props.children;
   }
 }
 
@@ -118,9 +118,9 @@ describe('Negative — a component throws during render', () => {
     mount(
       ROOT_TAG,
       <Boundary>
-        <View>
+        <view>
           <Exploding />
-        </View>
+        </view>
       </Boundary>,
     );
 

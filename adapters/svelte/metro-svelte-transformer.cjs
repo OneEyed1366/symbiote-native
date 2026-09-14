@@ -86,17 +86,6 @@ function collapseTextWhitespacePreprocessor() {
   return collapseTextWhitespacePromise;
 }
 
-// Lowers <View>/<Text> to their intrinsic tags so a primitive stops costing a Svelte component
-// boundary — which in Svelte is paid in ANCHOR NODES, 12 per benchmark row (see the file header).
-// Loaded lazily for the same reason as the three above.
-let lowerHostPrimitivesPromise;
-function lowerHostPrimitivesPreprocessor() {
-  lowerHostPrimitivesPromise ??=
-    import('@symbiote-native/svelte/lower-host-primitives').then(mod =>
-      mod.lowerHostPrimitives(),
-    );
-  return lowerHostPrimitivesPromise;
-}
 //
 // Svelte 5's compiler strips <script lang="ts"> types structurally, with no external type
 // resolution needed (unlike @vue/compiler-sfc's compileScript, which needs registerTS + a real
@@ -160,12 +149,7 @@ module.exports.transform = async function transform(params) {
     const preprocessed = await (
       await collapseTextWhitespacePreprocessor()
     ).markup({ content: stylePreprocessed.code, filename: params.filename });
-    // LAST, and after scopedStyles specifically — see svelte.config.js for why the order is
-    // load-bearing rather than stylistic.
-    const lowered = await (
-      await lowerHostPrimitivesPreprocessor()
-    ).markup({ content: preprocessed.code, filename: params.filename });
-    const code = compileSvelteFile(lowered.code, params.filename);
+    const code = compileSvelteFile(preprocessed.code, params.filename);
     // Re-label as .tsx so RN's transformer processes the module exactly like app source; Metro
     // tracks the real path separately. Matches metro-vue-transformer.cjs's identical trick.
     return upstreamTransformer.transform({

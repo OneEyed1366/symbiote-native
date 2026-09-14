@@ -3,10 +3,10 @@
   // handlers on one prop are Yes and are exercised everywhere on this screen already (every
   // ActionButton's onPress); this widget adds one explicit "combine two handlers" example.
   // `on:event` (legacy directive) and its modifiers are No — dead, superseded by the callback-
-  // prop convention. `use:action` / the `Action`/`ActionReturn` types are Partial: legal only on
-  // a raw element, and app code never authors one (only this adapter's own View.svelte etc. do),
-  // so there is nothing to run here — the caveat below IS the demo.
-  import { Text, View } from '@symbiote-native/svelte';
+  // prop convention. `use:action` / the `Action`/`ActionReturn` types are legal on any host tag,
+  // which app code now writes directly — `{@attach}` stays the house convention for the same need
+  // (it re-runs on a dependency change, an action does not), so the caveat below is a preference
+  // rather than a limit.
   import { dlog } from '@symbiote-native/engine';
   import ActionButton from '../ActionButton.svelte';
 
@@ -31,22 +31,21 @@
   }
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">Events & Actions · combining onX handlers</Text>
+<view class="section-nested">
+  <text class="section-label">Events & Actions · combining onX handlers</text>
   <ActionButton
     testID="events-combined-press"
     title={'onPress={() => { a(); b(); }}'}
     color={ACCENT}
     onPress={onCombinedPress}
   />
-  <Text class="info-text" testID="events-readout">
+  <text class="info-text" testID="events-readout">
     {`presses: ${pressCount} · last: ${lastPressLabel}`}
-  </Text>
-  <Text class="section-label">use:action / Action / ActionReturn</Text>
-  <Text class="note-text">
-    Partial — legal only on a raw element, and app code here never authors one
-    (only this adapter's own View.svelte / Text.svelte / … do, over `symbiote-*`
-    tags). {'{@attach}'} is the house convention for the equivalent "run against the
-    raw node" need — see TemplateSyntaxDemo's measuring box above.
-  </Text>
-</View>
+  </text>
+  <text class="section-label">use:action / Action / ActionReturn</text>
+  <text class="note-text">
+    Legal on any host tag, which app code writes directly now. {'{@attach}'} is still
+    the house convention for the same need — it re-runs when its dependencies change,
+    an action does not. See TemplateSyntaxDemo's measuring box above.
+  </text>
+</view>

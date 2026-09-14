@@ -84,7 +84,7 @@ import { useKeepAwake } from '@symbiote-native/keep-awake/react';
 function KeepAwakeScreen() {
   useKeepAwake(); // screen stays on for as long as this component is mounted
 
-  return <Text>Screen will not sleep</Text>;
+  return <text>Screen will not sleep</text>;
 }
 ```
 
@@ -96,7 +96,7 @@ import { useKeepAwake } from '@symbiote-native/keep-awake/vue';
 useKeepAwake();
 </script>
 <template>
-  <Text>Screen will not sleep</Text>
+  <text>Screen will not sleep</text>
 </template>
 ```
 
@@ -107,7 +107,8 @@ useKeepAwake();
 
   useKeepAwake(); // screen stays on for as long as this component is mounted
 </script>
-<Text>Screen will not sleep</Text>
+
+<text>Screen will not sleep</text>
 ```
 
 ```tsx
@@ -117,7 +118,7 @@ import { createKeepAwake } from '@symbiote-native/keep-awake/solid';
 function KeepAwakeScreen() {
   createKeepAwake(); // activates in the primitive body, releases via onCleanup on dispose
 
-  return <Text>Screen will not sleep</Text>;
+  return <text>Screen will not sleep</text>;
 }
 ```
 

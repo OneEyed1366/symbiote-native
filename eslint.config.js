@@ -3,6 +3,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
+import svelte from 'eslint-plugin-svelte';
 import prettier from 'eslint-config-prettier';
 import json from '@eslint/json';
 import requireReadme from './eslint-rules/require-readme.js';
@@ -158,7 +159,19 @@ export default defineConfig(
 
   // Future adapters get their own block here, e.g.:
   // { files: ['adapters/angular/**/*.ts'], plugins: { ... }, rules: { ... } },
-  // { files: ['adapters/svelte/**/*.svelte'], languageOptions: { parser: svelteParser }, rules: { ... } },
+
+  // adapters/svelte + every companion package's Svelte entry (packages/navigation/src/svelte,
+  // packages/slider/src/svelte). Not core/css-parser's golden-corpus fixture — that .svelte file
+  // is deliberately synthetic (invalid markup on purpose, see its own header) and this glob never
+  // reaches core/**. `flat/recommended` brings svelte-eslint-parser; TS inside `<script lang="ts">`
+  // still resolves through typescript-eslint via the parser's own `parser: tseslint.parser` wiring.
+  {
+    files: ['{adapters/svelte,packages/*/src/svelte}/**/*.svelte'],
+    extends: [...svelte.configs['flat/recommended']],
+    languageOptions: {
+      parserOptions: { parser: tseslint.parser },
+    },
+  },
 
   // prettier last: switch off every formatting rule, since prettier owns formatting.
   prettier,

@@ -6,7 +6,7 @@
 // exactly what both Vue compilers emit for `v-model` on an element — measured on the real
 // `compileSfc` and on `babel-jsx.cjs`, byte-for-byte the same two lines:
 //
-//   _withDirectives(_createElementBlock("symbiote-text-input", {
+//   _withDirectives(_createElementBlock("text-input", {
 //     "onUpdate:modelValue": $event => (name.value = $event)
 //   }), [[_vModelText, name.value]])
 //
@@ -82,7 +82,7 @@ function mountModel(options: {
   initial: string;
   withDirective: boolean;
   modifiers?: Record<string, boolean>;
-  onValueChange?: (text: string, event: unknown) => void;
+  onValueChange?: (event: unknown) => void;
 }): IHarness {
   const model = ref(options.initial);
   let host: ISymbioteNode | null = null;
@@ -104,7 +104,7 @@ function mountModel(options: {
         };
         if (options.onValueChange !== undefined)
           props.onValueChange = options.onValueChange;
-        const vnode = h('symbiote-text-input', props);
+        const vnode = h('text-input', props);
         return options.withDirective
           ? withDirectives(vnode, [
               [vModelText, model.value, undefined, options.modifiers ?? {}],
@@ -182,7 +182,8 @@ describe('v-model on a lowered TextInput', () => {
     await harness.type('typed');
 
     expect(onValueChange).toHaveBeenCalledTimes(1);
-    expect(onValueChange.mock.calls[0][0]).toBe('typed');
+    // ONE argument, the event, with `text` carried on it — not `(text, event)`.
+    expect(onValueChange.mock.calls[0][0]).toMatchObject({ text: 'typed' });
     expect(harness.model.value).toBe('typed');
   });
 
@@ -201,7 +202,7 @@ describe('v-model on a lowered TextInput', () => {
 });
 
 // Vue's compiler picks the v-model directive by ELEMENT, and for anything it does not recognise as
-// a DOM input it emits `vModelText` — a lowered `<symbiote-switch>` included. Stringifying the
+// a DOM input it emits `vModelText` — a lowered `<switch>` included. Stringifying the
 // model there is correct upstream (a DOM input's value IS a string) and fatal here: the Switch
 // behavior reads `props.value === true`, so `String(true)` pins the control OFF and no tap moves
 // it. Device-confirmed on `examples/vue-sfc`, both switches on `CanaryScreen`, 2026-09-02.
@@ -225,11 +226,7 @@ describe('vModelText on a lowered switch', () => {
   // The control that keeps the branch honest: a text input must still be stringified, which is
   // what every other row in this file rests on.
   it('still stringifies for a text input', () => {
-    const el = createElement(
-      'RCTSinglelineTextInputView',
-      false,
-      'symbiote-text-input',
-    );
+    const el = createElement('RCTSinglelineTextInputView', false, 'text-input');
     vModelText.created?.(
       el,
       { value: 42, modifiers: {} } as never,

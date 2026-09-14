@@ -52,7 +52,7 @@ describe('descriptorToSolid', () => {
     it('materializes a descriptor tree as committed Fabric nodes', async () => {
       mount(ROOT_TAG, () =>
         descriptorToSolid(() =>
-          el('symbiote-view', { testID: 'bridge' }, [
+          el('view', { testID: 'bridge' }, [
             txt({ testID: 'label' }, ['hello']),
           ]),
         ),
@@ -79,7 +79,7 @@ describe('descriptorToSolid', () => {
       const [opacity, setOpacity] = createSignal(0.5);
       mount(ROOT_TAG, () =>
         descriptorToSolid(() =>
-          el('symbiote-view', { testID: 'live', opacity: opacity() }),
+          el('view', { testID: 'live', opacity: opacity() }),
         ),
       );
       await tick();
@@ -131,7 +131,7 @@ describe('descriptorToSolid', () => {
         descriptorToSolid(() => {
           const current = label();
           return el(
-            'symbiote-view',
+            'view',
             current === undefined
               ? { testID: 'aria' }
               : { testID: 'aria', accessibilityLabel: current },
@@ -166,24 +166,20 @@ describe('descriptorToSolid', () => {
       );
       await tick();
 
-      expect(() => setChild(el('symbiote-text'))).toThrow(
-        'Descriptor shape changed',
-      );
+      expect(() => setChild(el('text'))).toThrow('Descriptor shape changed');
     });
 
     // why: the node's type is read ONCE, at build. A later type change would otherwise be the
     // quietest failure of all — the new descriptor's props land on the OLD host element, so the
     // screen paints a plausible-looking wrong view instead of erroring.
     it('throws when the descriptor type changes between renders', async () => {
-      const [type, setType] = createSignal('symbiote-view');
+      const [type, setType] = createSignal('view');
       mount(ROOT_TAG, () =>
         descriptorToSolid(() => el(type(), { testID: 'type-drift' })),
       );
       await tick();
 
-      expect(() => setType('symbiote-text')).toThrow(
-        'Descriptor shape changed',
-      );
+      expect(() => setType('text')).toThrow('Descriptor shape changed');
     });
 
     // why: children are mounted by position in one pass at build, so an ADDED child is never

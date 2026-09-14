@@ -21,6 +21,7 @@ export const ROUTE_NAME = {
   DeepLinking: 'DeepLinking',
   StatePersistence: 'StatePersistence',
   Benchmark: 'Benchmark',
+  PrimitiveBench: 'PrimitiveBench',
   StyleShowcase: 'StyleShowcase',
 } as const;
 

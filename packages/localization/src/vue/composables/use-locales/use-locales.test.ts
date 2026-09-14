@@ -86,7 +86,7 @@ function mountLocales(): Ref<Locale[]> {
     defineComponent({
       setup: () => {
         locales = useLocales();
-        return () => h('symbiote-text', {}, 'locales');
+        return () => h('text', {}, 'locales');
       },
     }),
   );

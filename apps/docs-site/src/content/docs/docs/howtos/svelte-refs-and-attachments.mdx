@@ -5,16 +5,15 @@ description: bind:this vs {@attach} for imperative access to a Symbiote host nod
 
 import { Aside } from '@astrojs/starlight/components';
 
-Svelte has no React-style `ref` prop and no Vue template ref. Symbiote's own
-components (`View`, `Text`, `Pressable`, …) forward no `bind:this` escape hatch
-of their own either, so reaching the real native node from app code takes one
-of two mechanisms depending on what you're touching.
+Svelte has no React-style `ref` prop and no Vue template ref. Symbiote's
+primitives (`view`, `text`, `pressable`, …) are ordinary lowercase host tags, so
+reaching the real native node from app code takes one of two mechanisms depending
+on what you're touching.
 
-## `bind:this` — a host tag you author yourself
+## `bind:this` — direct, on any primitive tag
 
-When you hand-author the raw `symbiote-view`/`symbiote-text` host tag directly
-(not going through the `<View>`/`<Text>` wrapper), `bind:this` gives you back a
-real `ShimElement`. `hostInstance()` unwraps that into the imperative
+`bind:this` on a primitive tag gives you back a real `ShimElement` directly — no
+wrapper in the way. `hostInstance()` unwraps that into the imperative
 host-instance API (`measure`, `measureInWindow`, `setNativeProps`, `focus`,
 `blur`), and `findNodeHandle()` reads the committed native tag off it — the
 tag only exists after the first commit, so read it from an `$effect`:
@@ -44,7 +43,7 @@ tag only exists after the first commit, so read it from an `$effect`:
   }
 </script>
 
-<symbiote-view p={{ testID: 'ref-box' }} bind:this={box}> ... </symbiote-view>
+<view testID="ref-box" bind:this={box}> ... </view>
 ```
 
 Source: `examples/svelte/components/RefApiDemo.svelte` — the port of React's
@@ -57,21 +56,10 @@ Svelte-5 twin of React's `useImperativeHandle`/Vue's `expose()`. Check the
 [Components API](/docs/api/components/) for a component's own exported
 surface before reaching for the raw host tag.
 
-## `{@attach}` — the route for everything else, and the recommended default
+## `{@attach}` — the route for a component, and it works on a tag too
 
-The Svelte compiler rejects `use:`/`transition:`/`class:`/`style:` on a
-**component** ("This type of directive is not valid on components"), and app
-code here never authors a host element by hand for an ordinary component.
-`{@attach fn}` is the one directive-shaped construct that _does_ compile on a
-component: it lands as a prop keyed by a real JS `Symbol`
-(`createAttachmentKey()`), which rides through `$props()`/`...rest` untouched
-— `routeProp` only ever walks string keys — and every Symbiote component that
-spreads `...rest` onto its own host tag forwards it there for free. From
-there, the adapter's own `createAttachmentsSync()` wires it to the real
-committed node (`adapters/svelte/src/runes/attachments.ts`).
-
-Concretely, that means `{@attach}` reaches the real host node on any ordinary
-Symbiote component with zero extra code in that component:
+On a primitive tag, `{@attach}` is nothing but Svelte's own compiler feature working
+directly against the element — no adapter code involved, same as `bind:this`:
 
 ```svelte
 <script>
@@ -81,8 +69,19 @@ Symbiote component with zero extra code in that component:
   };
 </script>
 
-<View testID="target" {@attach logLifecycle} />
+<view testID="target" {@attach logLifecycle} />
 ```
+
+Where it earns its keep is the handful of primitives that stay real components
+(`Modal`, `KeyboardAvoidingView`, the list family) — the Svelte compiler rejects
+`use:`/`transition:`/`class:`/`style:` on a **component** ("This type of directive is
+not valid on components"), so `{@attach fn}` is the one directive-shaped construct
+that still compiles there: it lands as a prop keyed by a real JS `Symbol`
+(`createAttachmentKey()`), which rides through `$props()`/`...rest` untouched —
+`routeProp` only ever walks string keys — and each of those components spreads
+`...rest` onto its own host tag, forwarding it there for free. From there, the
+adapter's own `createAttachmentsSync()` wires it to the real committed node
+(`adapters/svelte/src/runes/attachments.ts`).
 
 <Aside type="tip">
   `{@attach}` swaps cleanly even when the expression is conditional
@@ -100,12 +99,11 @@ Symbiote component with zero extra code in that component:
 
 `fromAction` from `svelte/attachments` converts an ordinary Svelte action
 (`init`/`update`/`destroy`) into an attachment, so a library's action-based API
-still works against a Symbiote component:
+still works against a Symbiote primitive:
 
 ```svelte
 <script>
   import { fromAction } from 'svelte/attachments';
-  import { View } from '@symbiote-native/svelte';
 
   const action = (node, value) => ({
     update: next => {
@@ -117,7 +115,7 @@ still works against a Symbiote component:
   });
 </script>
 
-<View testID="action-target" {@attach fromAction(action, () => someValue)} />
+<view testID="action-target" {@attach fromAction(action, () => someValue)} />
 ```
 
 Source: `adapters/svelte/src/runes/attachments.smoke.test.ts`, which
@@ -156,17 +154,17 @@ export function hostProps(
 
 | You have…                                                                          | Use                                               |
 | ---------------------------------------------------------------------------------- | ------------------------------------------------- |
-| A raw `symbiote-view`/`symbiote-text` tag you wrote yourself                       | `bind:this` + `hostInstance()`/`findNodeHandle()` |
+| A primitive tag (`view`, `pressable`, …) and you just need the node                | `bind:this` (or `{@attach}` — both are direct)    |
 | A component with its own exported imperative functions (`ScrollView.scrollTo`, …)  | that component's own `bind:this`                  |
-| An ordinary Symbiote component (`View`, `Pressable`, …) and you just need the node | `{@attach}`                                       |
+| A primitive that still stays a component (`Modal`, `KeyboardAvoidingView`, the list family) | `{@attach}`                               |
 | A third-party Svelte action                                                        | `{@attach fromAction(action, () => arg)}`         |
 | A `<svelte:element>` native leaf (a capitalized, un-hyphenated native view name)   | `{@attach}` setting `node.p`                      |
 
 <Aside type="caution" title="Symbol keys don't survive every forwarding shape">
-  `{@attach}` reaches the host node only through components that spread
-  `...rest` (or otherwise forward the attachment's symbol key). That covers
-  the large majority of components for free, but a component that rebuilds
-  its child's props by NAME instead — the list family forwarding ~30 named
+  On one of the primitives that still stays a component, `{@attach}` reaches the host
+  node only because that component spreads `...rest` (or otherwise forwards the
+  attachment's symbol key). That covers the large majority for free, but a component
+  that rebuilds its child's props by NAME instead — the list family forwarding ~30 named
   props, or `Animated`'s `reduceProps`, which returns a plain string-keyed
   `Record` — drops the symbol key silently. Those wrappers explicitly
   re-forward it with `pickAttachmentProps` from the same module; this is

@@ -59,22 +59,20 @@ import { name as appName } from './app.json';
 createApp(App).mount(appName);
 ```
 
-The app is ordinary Svelte 5 — it just imports primitives from `@symbiote-native/svelte` instead of
-`react-native`. A tap→increment counter, using runes:
+The app is ordinary Svelte 5 — the native primitives are plain intrinsic tags, no import needed.
+A tap→increment counter, using runes:
 
 ```svelte
 <script lang="ts">
-  import { View, Text, Pressable } from '@symbiote-native/svelte';
-
   let count = $state(0);
 </script>
 
-<View style={{ padding: 24 }}>
-  <Text>Taps: {count}</Text>
-  <Pressable onPress={() => count++}>
-    <Text>Tap me</Text>
-  </Pressable>
-</View>
+<view style={{ padding: 24 }}>
+  <text>Taps: {count}</text>
+  <pressable onPress={() => count++}>
+    <text>Tap me</text>
+  </pressable>
+</view>
 ```
 
 The full canary is [`examples/svelte`](../../examples/svelte) — a stock RN 0.86 app whose

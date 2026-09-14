@@ -122,7 +122,7 @@ function callsOf(method: string): INativeCall[] {
 describe('Solid Animated native driver', () => {
   it('mirrors the value graph into native and hands the curve over', async () => {
     const opacity = new Animated.Value(0);
-    mount(ROOT_TAG, () => <Animated.View style={{ opacity }} />);
+    mount(ROOT_TAG, () => <view style={{ opacity }} />);
     await tick();
 
     Animated.timing(opacity, {
@@ -140,7 +140,7 @@ describe('Solid Animated native driver', () => {
 
   it('binds the props leaf to the committed view tag', async () => {
     const opacity = new Animated.Value(0);
-    mount(ROOT_TAG, () => <Animated.View style={{ opacity }} />);
+    mount(ROOT_TAG, () => <view style={{ opacity }} />);
     await tick();
 
     Animated.timing(opacity, {
@@ -158,25 +158,22 @@ describe('Solid Animated native driver', () => {
     expect(viewTag).toBe(fabric.appRoot().children[0].tag);
   });
   it('binds a leaf that must go native BEFORE the first commit', async () => {
-    // The sticky-header shape: the passthrough makes wantsNative true on the FIRST reconcile,
-    // which a Solid effect runs while the node still has no Fabric tag (requestCommit() is
-    // microtask-coalesced).
+    // The sticky-header shape: the prop write that binds the leaf happens while the node still has
+    // no Fabric tag, because this adapter commits through `requestCommit()` and that is
+    // microtask-coalesced. Promotion is by CASCADE from `useNativeDriver`, never from a prop —
+    // `passthroughAnimatedPropExplicitValues` used to force it and is a wrapper-ism the engine
+    // ignores on a bare tag (core/engine/src/animated/host-binding.ts says so by name).
     //
-    // HONEST LIMIT — this does NOT pin the wrap's `scheduleNativeBind`. Deleting that argument
-    // leaves all seven tests green, because the engine parks the leaf in pendingViewConnects and
-    // its own registerPostCommit hook (animated/props.ts) reconnects it. The deferral stays anyway:
-    // that hook is a module-load side effect, and the shape it guards was earned on a device, not
-    // inferred from a suite. What this test DOES pin is that a leaf needing native promotion at
-    // mount ends up connected to the real tag by SOME route.
+    // What this pins is that a leaf bound before the commit ends up connected to the REAL tag: the
+    // engine parks it in pendingViewConnects and its own registerPostCommit hook
+    // (animated/props.ts) reconnects it once the tag exists.
     const translateY = new Animated.Value(0);
-    mount(ROOT_TAG, () => (
-      <Animated.View
-        style={{ transform: [{ translateY }] }}
-        passthroughAnimatedPropExplicitValues={{
-          style: { transform: [{ translateY: 0 }] },
-        }}
-      />
-    ));
+    mount(ROOT_TAG, () => <view style={{ transform: [{ translateY }] }} />);
+    Animated.timing(translateY, {
+      toValue: 40,
+      duration: 10,
+      useNativeDriver: true,
+    }).start();
     await tick();
 
     const connects = callsOf('connectAnimatedNodeToView');
@@ -195,7 +192,7 @@ describe('Solid Animated native driver', () => {
 
   it('schedules NO js frame and NO commit while the native driver runs', async () => {
     const opacity = new Animated.Value(0);
-    mount(ROOT_TAG, () => <Animated.View style={{ opacity }} />);
+    mount(ROOT_TAG, () => <view style={{ opacity }} />);
     await tick();
 
     frameQueue.length = 0;
@@ -218,7 +215,7 @@ describe('Solid Animated native driver', () => {
 
   it('control: the SAME animation on the js driver does schedule frames and commit', async () => {
     const opacity = new Animated.Value(0);
-    mount(ROOT_TAG, () => <Animated.View style={{ opacity }} />);
+    mount(ROOT_TAG, () => <view style={{ opacity }} />);
     await tick();
 
     frameQueue.length = 0;

@@ -119,13 +119,13 @@ function renderStepCell(
   if (params.thumbImage !== undefined && value === params.currentValue) {
     trackMarkChildren.push(
       el(
-        'symbiote-view',
+        'view',
         {
           style: THUMB_IMAGE_CONTAINER_STYLE,
           testID: 'sliderTrackMark-thumbImage',
         },
         [
-          el('symbiote-image', {
+          el('image', {
             source: params.thumbImage,
             style: THUMB_IMAGE_STYLE,
           }),
@@ -135,15 +135,11 @@ function renderStepCell(
   }
 
   const cellChildren: IDescriptorChild[] = [
-    el(
-      'symbiote-view',
-      { style: TRACK_MARK_CONTAINER_STYLE },
-      trackMarkChildren,
-    ),
+    el('view', { style: TRACK_MARK_CONTAINER_STYLE }, trackMarkChildren),
   ];
   if (params.renderStepNumber === true) {
     cellChildren.push(
-      el('symbiote-view', { style: STEP_NUMBER_CONTAINER_STYLE }, [
+      el('view', { style: STEP_NUMBER_CONTAINER_STYLE }, [
         txt(
           {
             testID: `${displayIndex}th-step`,
@@ -154,11 +150,7 @@ function renderStepCell(
       ]),
     );
   }
-  return el(
-    'symbiote-view',
-    { style: STEP_INDICATOR_ELEMENT_STYLE },
-    cellChildren,
-  );
+  return el('view', { style: STEP_INDICATOR_ELEMENT_STYLE }, cellChildren);
 }
 
 // The default overlay (no custom StepMarker). pointerEvents none so it never eats the drag.
@@ -171,7 +163,7 @@ export function renderStepsIndicator(
     renderStepCell(value, displayIndex, params, fontSize),
   );
   return el(
-    'symbiote-view',
+    'view',
     {
       pointerEvents: 'none',
       testID: 'StepsIndicator-Container',

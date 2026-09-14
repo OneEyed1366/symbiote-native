@@ -14,7 +14,7 @@
 // So the tree is built ONCE and every node's props are wired through the renderer's own `spread`,
 // which is a render effect that diffs prop-by-prop against the previous values and calls
 // setProperty -> routeProp only for the ones that actually changed. Same mechanism, same node
-// identity, as compiled `<symbiote-switch value={v()} />`.
+// identity, as compiled `<switch value={v()} />`.
 //
 // This relies on `render-*.ts` producing a SHAPE-STABLE Descriptor: same type, same child count,
 // text where text was — only prop VALUES vary between calls. That is already the contract the

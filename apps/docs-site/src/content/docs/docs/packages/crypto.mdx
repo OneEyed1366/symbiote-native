@@ -60,7 +60,6 @@ or a subscription.
   <TabItem label="React">
     ```tsx
     import { useEffect, useState } from 'react';
-    import { Pressable, Text, View } from '@symbiote-native/react';
     import {
       CryptoDigestAlgorithm,
       digestStringAsync,
@@ -80,13 +79,13 @@ or a subscription.
       };
 
       return (
-        <View>
-          <Text>UUID: {uuid}</Text>
-          <Pressable onPress={handleHash}>
-            <Text>Hash a string</Text>
-          </Pressable>
-          {hash && <Text>SHA-256: {hash}</Text>}
-        </View>
+        <view>
+          <text>UUID: {uuid}</text>
+          <pressable onPress={handleHash}>
+            <text>Hash a string</text>
+          </pressable>
+          {hash && <text>SHA-256: {hash}</text>}
+        </view>
       );
     }
     ```
@@ -96,7 +95,6 @@ or a subscription.
     ```vue
     <script setup lang="ts">
     import { onMounted, ref } from 'vue';
-    import { Pressable, Text, View } from '@symbiote-native/vue';
     import {
       CryptoDigestAlgorithm,
       digestStringAsync,
@@ -118,13 +116,13 @@ or a subscription.
     </script>
 
     <template>
-      <View>
-        <Text>UUID: {{ uuid }}</Text>
-        <Pressable @press="handleHash">
-          <Text>Hash a string</Text>
-        </Pressable>
-        <Text v-if="hash">SHA-256: {{ hash }}</Text>
-      </View>
+      <view>
+        <text>UUID: {{ uuid }}</text>
+        <pressable @press="handleHash">
+          <text>Hash a string</text>
+        </pressable>
+        <text v-if="hash">SHA-256: {{ hash }}</text>
+      </view>
     </template>
     ```
 
@@ -132,7 +130,7 @@ or a subscription.
   <TabItem label="Angular">
     ```ts
     import { Component, signal } from '@angular/core';
-    import { Pressable, Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import {
       CryptoDigestAlgorithm,
       digestStringAsync,
@@ -141,17 +139,17 @@ or a subscription.
 
     @Component({
       standalone: true,
-      imports: [Pressable, Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Text>UUID: {{ uuid() }}</Text>
-          <Pressable (press)="handleHash()">
-            <Text>Hash a string</Text>
-          </Pressable>
+        <view>
+          <text>UUID: {{ uuid() }}</text>
+          <pressable (press)="handleHash()">
+            <text>Hash a string</text>
+          </pressable>
           @if (hash()) {
-            <Text>SHA-256: {{ hash() }}</Text>
+            <text>SHA-256: {{ hash() }}</text>
           }
-        </View>
+        </view>
       `,
     })
     export class CryptoDemo {
@@ -173,7 +171,6 @@ or a subscription.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Pressable, Text, View } from '@symbiote-native/svelte';
       import {
         CryptoDigestAlgorithm,
         digestStringAsync,
@@ -194,15 +191,15 @@ or a subscription.
       }
     </script>
 
-    <View>
-      <Text>UUID: {uuid}</Text>
-      <Pressable onPress={handleHash}>
-        <Text>Hash a string</Text>
-      </Pressable>
+    <view>
+      <text>UUID: {uuid}</text>
+      <pressable onPress={handleHash}>
+        <text>Hash a string</text>
+      </pressable>
       {#if hash}
-        <Text>SHA-256: {hash}</Text>
+        <text>SHA-256: {hash}</text>
       {/if}
-    </View>
+    </view>
     ```
 
     There's no per-instance rune to reach for here either — every function is a plain free
@@ -212,7 +209,6 @@ or a subscription.
   <TabItem label="Solid">
     ```tsx
     import { createSignal, onMount } from 'solid-js';
-    import { Pressable, Text, View } from '@symbiote-native/solid';
     import {
       CryptoDigestAlgorithm,
       digestStringAsync,
@@ -232,13 +228,13 @@ or a subscription.
       }
 
       return (
-        <View>
-          <Text>UUID: {uuid()}</Text>
-          <Pressable onPress={handleHash}>
-            <Text>Hash a string</Text>
-          </Pressable>
-          {hash() && <Text>SHA-256: {hash()}</Text>}
-        </View>
+        <view>
+          <text>UUID: {uuid()}</text>
+          <pressable onPress={handleHash}>
+            <text>Hash a string</text>
+          </pressable>
+          {hash() && <text>SHA-256: {hash()}</text>}
+        </view>
       );
     }
     ```

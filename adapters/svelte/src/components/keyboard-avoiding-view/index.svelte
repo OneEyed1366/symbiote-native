@@ -146,13 +146,13 @@
 </script>
 
 {#if layout.kind === 'nested'}
-  <symbiote-view p={wrapperBag} bind:this={hostShim}>
-    <symbiote-view p={innerBag}>
+  <view p={wrapperBag} bind:this={hostShim}>
+    <view p={innerBag}>
       {@render children?.()}
-    </symbiote-view>
-  </symbiote-view>
+    </view>
+  </view>
 {:else}
-  <symbiote-view p={wrapperBag} bind:this={hostShim}>
+  <view p={wrapperBag} bind:this={hostShim}>
     {@render children?.()}
-  </symbiote-view>
+  </view>
 {/if}

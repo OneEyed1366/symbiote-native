@@ -10,7 +10,7 @@
 // hand and says so in its own header, because nothing was exported to call.
 //
 // WHY THIS MAY SHARE THE WRAPPER'S TAG, where TextInput needed `-managed`. A behavior fold is keyed
-// on the tag, and `renderImage` emits `symbiote-image` too — so on a wrapper-built node this fold
+// on the tag, and `renderImage` emits `image` too — so on a wrapper-built node this fold
 // runs on ALREADY-FOLDED props. That is safe here and only here, because the mapping is idempotent:
 // every alias it consumes (`src`, `srcSet`, `alt`, `width`, `height`, …) is absent from its own
 // output, `source` comes back in the array shape `normalizeSource` guarantees, and
@@ -32,7 +32,7 @@ import {
   type IResizeMode,
 } from '../view/render-image';
 
-export const IMAGE_TAG = 'symbiote-image';
+export const IMAGE_TAG = 'image';
 
 const RESIZE_MODES: ReadonlySet<string> = new Set([
   'cover',

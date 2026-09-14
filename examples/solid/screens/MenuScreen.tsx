@@ -11,13 +11,6 @@
 // (.claude/rules/solid-descriptor-bridge.md §3).
 
 import { For } from 'solid-js';
-import {
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/solid';
 import { useStackNavigation } from '@symbiote-native/navigation/solid';
 import { MENU_ROWS } from '../routes';
 import { ROUTE_LINE_INFO } from '../navigation-lines';
@@ -29,23 +22,23 @@ export function MenuScreen() {
   const navigation = useStackNavigation();
 
   return (
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="menu-scroll"
         class="screen"
         contentContainerStyle="menu-content"
       >
-        <View class="menu-hero">
-          <Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
-          <Text class="menu-hero-title">Twelve stops along the stack</Text>
-          <Text class="menu-hero-subtitle">
+        <view class="menu-hero">
+          <text class="menu-eyebrow">NAVIGATION DEMO SUITE</text>
+          <text class="menu-hero-title">Twelve stops along the stack</text>
+          <text class="menu-hero-subtitle">
             Each row below drives a different line of
             @symbiote-native/navigation — Primitives, Presentation, Structure,
             Introspection, Routing — on a real native stack, plus a Performance
             stop timing the engine's own commit path and a Styling stop showing
             the whole CSS compiler surface.
-          </Text>
-        </View>
+          </text>
+        </view>
 
         <For each={MENU_ROWS}>
           {row => {
@@ -53,25 +46,25 @@ export function MenuScreen() {
             // MENU_ROWS is a module constant, so there is nothing here to keep reactive.
             const lineInfo = ROUTE_LINE_INFO[row.route];
             return (
-              <Pressable
+              <pressable
                 testID={`menu-row-${row.route}`}
                 class={`menu-row menu-row-${lineInfo.line}`}
                 onPress={() => navigation().push(row.route)}
               >
-                <View class={`menu-badge menu-badge-${lineInfo.line}`}>
-                  <Text class="menu-badge-text">{lineInfo.code}</Text>
-                </View>
-                <View class="menu-row-copy">
-                  <Text class="menu-row-label">{row.label}</Text>
-                  <Text class={`menu-row-hint menu-row-hint-${lineInfo.line}`}>
+                <view class={`menu-badge menu-badge-${lineInfo.line}`}>
+                  <text class="menu-badge-text">{lineInfo.code}</text>
+                </view>
+                <view class="menu-row-copy">
+                  <text class="menu-row-label">{row.label}</text>
+                  <text class={`menu-row-hint menu-row-hint-${lineInfo.line}`}>
                     {row.blurb}
-                  </Text>
-                </View>
-              </Pressable>
+                  </text>
+                </view>
+              </pressable>
             );
           }}
         </For>
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

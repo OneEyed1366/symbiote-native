@@ -15,12 +15,25 @@
 import { forbidWebOnlyConstructs } from './src/preprocessor/forbid-web-only-constructs.ts';
 import { scopedStyles } from './src/preprocessor/scoped-styles.ts';
 import { collapseTextWhitespace } from './src/preprocessor/collapse-text-whitespace.ts';
-import { lowerHostPrimitives } from './src/preprocessor/lower-host-primitives.ts';
 
 export default {
   compilerOptions: {
     fragments: 'tree',
     css: 'external',
+    // `<pressable class="x" />` is how an app writes a primitive, and Svelte warns on it:
+    // `element_invalid_self_closing_tag`, on every tag it does not know to be void. The warning is
+    // about HTML's PARSING ambiguity, and nothing here is parsed as HTML — `fragments: 'tree'`
+    // above makes the compiler emit `from_tree()`, so every element goes through createElement.
+    // Blanket is safe because a React Native app has no html elements at all, and
+    // forbidWebOnlyConstructs() rejects the web-only ones outright.
+    //
+    // Config rather than a per-file `svelte-ignore`, which has to be remembered on every new file
+    // — forgetting it pushes an author into an explicit closing tag, and prettier reflows that
+    // into `<tag …\n></tag>`. svelte-check and the language server are the whole surface:
+    // metro-svelte-transformer.cjs reads `js.code` and discards `warnings`. Measured on 5.56.8,
+    // where sveltejs/svelte#14654 is long fixed: examples/svelte 15 warnings -> 3.
+    warningFilter: warning =>
+      warning.code !== 'element_invalid_self_closing_tag',
   },
   // Order matters: the guard throws on a construct that cannot work at all, so it runs before
   // anything rewrites the source it would report offsets against. `scopedStyles` then compiles
@@ -28,14 +41,13 @@ export default {
   // `collapseTextWhitespace` only touches Text node content, never the style/attribute/class
   // output the other two rewrite, so its position doesn't affect them.
   //
-  // `lowerHostPrimitives` MUST run LAST, and specifically AFTER `scopedStyles`. It copies each
-  // attribute's value into an object-bag expression, so once it has run there is no plain `class`
-  // attribute left for the style scoper to find — reverse the order and every scoped class in the
-  // file silently stops being scoped.
+  // There is no lowering pass any more. A primitive IS an intrinsic tag the app writes itself, so
+  // nothing rewrites `<View>` into `<view p={…}>` — which also retires the ordering constraint
+  // that pass carried (it had to run after `scopedStyles`, or every scoped class silently lost
+  // its scope).
   preprocess: [
     forbidWebOnlyConstructs(),
     scopedStyles(),
     collapseTextWhitespace(),
-    lowerHostPrimitives(),
   ],
 };

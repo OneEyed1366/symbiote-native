@@ -62,7 +62,7 @@ stays a physical file/subpath since Angular ships through a separate `ngc`/AOT b
 ```tsx
 // React
 import { useEffect, useState } from 'react';
-import { Platform, Text, View } from '@symbiote-native/react';
+import { Platform } from '@symbiote-native/react';
 import {
   applicationId,
   applicationName,
@@ -79,17 +79,17 @@ function ApplicationScreen() {
   }, []);
 
   return (
-    <View>
-      <Text>
+    <view>
+      <text>
         {applicationName} ({applicationId})
-      </Text>
-      <Text>
+      </text>
+      <text>
         v{nativeApplicationVersion} (build {nativeBuildVersion})
-      </Text>
+      </text>
       {Platform.OS === 'android' && installedAt && (
-        <Text>Installed {installedAt.toLocaleDateString()}</Text>
+        <text>Installed {installedAt.toLocaleDateString()}</text>
       )}
-    </View>
+    </view>
   );
 }
 ```
@@ -98,7 +98,7 @@ function ApplicationScreen() {
 <!-- Vue -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { Platform, Text, View } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   applicationId,
   applicationName,
@@ -115,22 +115,22 @@ onMounted(() => {
 </script>
 
 <template>
-  <View>
-    <Text>{{ applicationName }} ({{ applicationId }})</Text>
-    <Text
-      >v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</Text
+  <view>
+    <text>{{ applicationName }} ({{ applicationId }})</text>
+    <text
+      >v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</text
     >
-    <Text v-if="Platform.OS === 'android' && installedAt">
+    <text v-if="Platform.OS === 'android' && installedAt">
       Installed {{ installedAt?.toLocaleDateString() }}
-    </Text>
-  </View>
+    </text>
+  </view>
 </template>
 ```
 
 ```ts
 // Angular
 import { Component, signal } from '@angular/core';
-import { Platform, Text, View } from '@symbiote-native/angular';
+import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   applicationId,
   applicationName,
@@ -141,17 +141,17 @@ import {
 
 @Component({
   standalone: true,
-  imports: [Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <View>
-      <Text>{{ applicationName }} ({{ applicationId }})</Text>
-      <Text
-        >v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</Text
+    <view>
+      <text>{{ applicationName }} ({{ applicationId }})</text>
+      <text
+        >v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</text
       >
       @if (Platform.OS === 'android' && installedAt(); as date) {
-        <Text>Installed {{ date.toLocaleDateString() }}</Text>
+        <text>Installed {{ date.toLocaleDateString() }}</text>
       }
-    </View>
+    </view>
   `,
 })
 export class ApplicationScreen {
@@ -167,7 +167,7 @@ export class ApplicationScreen {
 ```svelte
 <!-- Svelte -->
 <script lang="ts">
-  import { Platform, Text, View } from '@symbiote-native/svelte';
+  import { Platform } from '@symbiote-native/svelte';
   import {
     applicationId,
     applicationName,
@@ -183,19 +183,19 @@ export class ApplicationScreen {
   });
 </script>
 
-<View>
-  <Text>{applicationName} ({applicationId})</Text>
-  <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+<view>
+  <text>{applicationName} ({applicationId})</text>
+  <text>v{nativeApplicationVersion} (build {nativeBuildVersion})</text>
   {#if Platform.OS === 'android' && installedAt !== null}
-    <Text>Installed {installedAt.toLocaleDateString()}</Text>
+    <text>Installed {installedAt.toLocaleDateString()}</text>
   {/if}
-</View>
+</view>
 ```
 
 ```tsx
 // Solid
 import { createSignal } from 'solid-js';
-import { Platform, Text, View } from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   applicationId,
   applicationName,
@@ -210,17 +210,17 @@ function ApplicationScreen() {
   getInstallationTimeAsync().then(setInstalledAt);
 
   return (
-    <View>
-      <Text>
+    <view>
+      <text>
         {applicationName} ({applicationId})
-      </Text>
-      <Text>
+      </text>
+      <text>
         v{nativeApplicationVersion} (build {nativeBuildVersion})
-      </Text>
+      </text>
       {Platform.OS === 'android' && installedAt() !== null && (
-        <Text>Installed {installedAt()!.toLocaleDateString()}</Text>
+        <text>Installed {installedAt()!.toLocaleDateString()}</text>
       )}
-    </View>
+    </view>
   );
 }
 ```

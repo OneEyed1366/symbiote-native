@@ -1,7 +1,6 @@
 <script lang="ts" module>
   import type { Snippet } from 'svelte';
   import { setContext } from 'svelte';
-  import { Text, TouchableOpacity, View } from '@symbiote-native/svelte';
   import { dlog } from '@symbiote-native/engine';
   import ActionButton from '../ActionButton.svelte';
   import TreeNode from './TreeNode.svelte';
@@ -41,10 +40,9 @@
     showSun = !showSun;
   }
 
-  // {@attach} on a COMPONENT, forwarded for free: TouchableOpacity owns no host tag of its own —
-  // it re-spreads `...rest` onto Pressable, and a symbol-keyed attachment prop survives that
-  // spread with zero forwarding code in TouchableOpacity itself (svelte-adapter-dom-shim skill
-  // §22c, category 2).
+  // {@attach} directly on the `<touchable-highlight>` TAG — no forwarding needed, unlike an
+  // attach on a component (svelte-adapter-dom-shim skill §22c, category 2), because there is no
+  // wrapper standing between this markup and the engine node any more.
   // The run counter is a plain closure variable, exactly as in RunesDemo's $effect: an
   // attachment body runs inside an effect, so `touchableAttachCount += 1` would READ the $state
   // it writes, and Svelte re-runs the effect on its own write forever
@@ -53,9 +51,7 @@
   let attachRunsRaw = 0;
   let touchableAttachCount = $state(0);
   function onTouchableAttach(): void {
-    dlog(
-      'api-playground: {@attach} forwarded through TouchableOpacity -> Pressable',
-    );
+    dlog('api-playground: {@attach} on touchable-highlight fired');
     attachRunsRaw += 1;
     touchableAttachCount = attachRunsRaw;
   }
@@ -65,26 +61,26 @@
   setContext(API_PLAYGROUND_THEME_CONTEXT, { accent: ACCENT });
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">
+<view class="section-nested">
+  <text class="section-label">
     Component Composition · children, snippets, context
-  </Text>
+  </text>
   {#if header !== undefined}{@render header()}
   {/if}
-  <View class="box-list160" testID="composition-children-slot">
+  <view class="box-list160" testID="composition-children-slot">
     {@render children?.()}
-  </View>
-  <Text class="note-text">
+  </view>
+  <text class="note-text">
     the box above renders CompositionDemo's own `children` snippet — supplied by
     ApiPlaygroundScreen.svelte
-  </Text>
-  <Text class="section-label">
+  </text>
+  <text class="section-label">
     {'<svelte:self> — recursive tree'}
-  </Text>
+  </text>
   <TreeNode node={TREE} />
-  <Text class="section-label">
+  <text class="section-label">
     {'<svelte:component> (Partial)'}
-  </Text>
+  </text>
   <ActionButton
     testID="composition-toggle-badge"
     title="Swap badge"
@@ -92,27 +88,27 @@
     onPress={toggleBadge}
   />
   <svelte:component this={currentBadge} />
-  <Text class="note-text">
+  <text class="note-text">
     Partial — legal, but superseded by a plain component-value reference in
     runes mode; kept here for completeness, not the house convention.
-  </Text>
-  <Text class="section-label">
-    {'{@attach}'} on a component — forwarded through TouchableOpacity
-  </Text>
-  <TouchableOpacity
+  </text>
+  <text class="section-label">
+    {'{@attach}'} on the touchable-highlight tag
+  </text>
+  <touchable-highlight
     testID="composition-touchable"
-    onPress={() => {}}
+    p={{ onPress: () => {} }}
     {@attach onTouchableAttach}
   >
-    <Text class="pressable-label">
+    <text class="pressable-label">
       press, or just mount, to fire the attach
-    </Text>
-  </TouchableOpacity>
-  <Text class="info-text" testID="composition-attach-readout">
+    </text>
+  </touchable-highlight>
+  <text class="info-text" testID="composition-attach-readout">
     {`attach fired: ${touchableAttachCount} time(s)`}
-  </Text>
-  <Text class="section-label">
+  </text>
+  <text class="section-label">
     setContext / getContext / hasContext / getAllContexts
-  </Text>
+  </text>
   <ContextConsumer />
-</View>
+</view>

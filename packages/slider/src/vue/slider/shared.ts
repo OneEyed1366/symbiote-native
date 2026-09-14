@@ -66,7 +66,7 @@ import {
 
 // ISliderProps lives framework-agnostic in packages/slider/src/core; `class` can't join it
 // there, so it's added locally, exactly like Image's IImageProps. It targets the WRAPPER
-// `symbiote-view` like `style`, not the inner native slider leaf `passthrough` reaches — see
+// `view` like `style`, not the inner native slider leaf `passthrough` reaches — see
 // the class-routing note on HANDLED_ATTRS below.
 export type ISliderProps = Omit<
   ISliderBaseProps,
@@ -126,7 +126,7 @@ function asAccessibilityState(
 // thumbSize, tapToSeek, vertical, accessibility*/testID/aria-*) forwards onto the native node.
 // The four callbacks are JS-only and must NEVER reach Fabric, so they are stripped here and
 // re-supplied as the native event handlers in `passthrough`. `class` is handled too: like
-// `style`, it targets the WRAPPER `symbiote-view` (renderSlider's outer element), never the
+// `style`, it targets the WRAPPER `view` (renderSlider's outer element), never the
 // inner native slider leaf `passthrough` reaches — applied explicitly by each render path below.
 const HANDLED_ATTRS = [
   'value',
@@ -158,7 +158,7 @@ function forwardAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
   return result;
 }
 
-// renderSlider builds the wrapper `symbiote-view` descriptor itself, with no `class` field of
+// renderSlider builds the wrapper `view` descriptor itself, with no `class` field of
 // its own (packages/slider/src/core stays framework-agnostic). `class` is stamped onto that
 // returned descriptor's props here, right before the Vue bridge, so it lands on the SAME
 // element `style` targets rather than the inner native leaf `passthrough` would otherwise
@@ -308,7 +308,7 @@ export function createSlider(platform: ISliderPlatform) {
             stepMarker: slots.stepMarker,
           });
           return h(
-            'symbiote-view',
+            'view',
             {
               style: resolveStepsWrapperStyle(view.style, platform),
               class: attrs.class,
@@ -389,12 +389,11 @@ function renderCustomStepsOverlay(params: ICustomStepsParams): VNode {
       min,
       max,
     });
-    if (marker !== undefined)
-      trackChildren.push(h('symbiote-view', {}, marker));
+    if (marker !== undefined) trackChildren.push(h('view', {}, marker));
     if (isImageSourceProp(params.thumbImage) && value === params.currentValue) {
       trackChildren.push(
         h(
-          'symbiote-view',
+          'view',
           {
             style: THUMB_IMAGE_CONTAINER_STYLE,
             testID: 'sliderTrackMark-thumbImage',
@@ -404,27 +403,23 @@ function renderCustomStepsOverlay(params: ICustomStepsParams): VNode {
       );
     }
     const cellChildren: VNode[] = [
-      h('symbiote-view', { style: TRACK_MARK_CONTAINER_STYLE }, trackChildren),
+      h('view', { style: TRACK_MARK_CONTAINER_STYLE }, trackChildren),
     ];
     if (params.renderStepNumber) {
       cellChildren.push(
-        h('symbiote-view', { style: STEP_NUMBER_CONTAINER_STYLE }, [
+        h('view', { style: STEP_NUMBER_CONTAINER_STYLE }, [
           h(
-            'symbiote-text',
+            'text',
             { testID: `${index}th-step`, style: { fontSize } },
             String(value),
           ),
         ]),
       );
     }
-    return h(
-      'symbiote-view',
-      { style: STEP_INDICATOR_ELEMENT_STYLE },
-      cellChildren,
-    );
+    return h('view', { style: STEP_INDICATOR_ELEMENT_STYLE }, cellChildren);
   });
   return h(
-    'symbiote-view',
+    'view',
     {
       pointerEvents: 'none',
       testID: 'StepsIndicator-Container',

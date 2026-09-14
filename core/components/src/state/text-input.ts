@@ -332,6 +332,13 @@ export function resolveTextInputProps(
   };
 }
 
+// The event `onValueChange` fires with. Svelte's compiler treats any individual `on*`-prefixed
+// attribute as a native listener attachment and always calls it with exactly one argument, a real
+// object — a two-argument `(text, event)` callback silently drops `event` there and crashes when
+// `text` is passed as that sole argument (Svelte's own bookkeeping mutates it, which throws on a
+// primitive). So the value rides as a field on the event object itself, never as a second argument.
+export type ITextInputChangeEvent = ISymbioteEvent & { text: string };
+
 // The app-facing prop contract, shared by every adapter so the surface CANNOT drift. TextInput
 // is its own host element (not a View wrapper), so it carries the accessibility/aria aliases.
 export type ITextInputProps = IAccessibilityProps &
@@ -383,10 +390,10 @@ export type ITextInputProps = IAccessibilityProps &
     inputAccessoryViewID?: string;
     style?: ITextStyle;
 
-    // Fires once per native change, text first (the common case, plain string) plus the raw
-    // event as a second argument for callers who need it (e.g. nativeEvent.eventCount/target) —
-    // there is only ever one underlying native event, never two (see the adapter's handleChange).
-    onValueChange?: (text: string, event: ISymbioteEvent) => void;
+    // Fires once per native change with the event, `text` carried on it (e.g. alongside
+    // `nativeEvent.eventCount`/`target`) — one argument, always a real object; see
+    // `ITextInputChangeEvent`.
+    onValueChange?: (event: ITextInputChangeEvent) => void;
     onFocus?: ITextInputEventHandler;
     onBlur?: ITextInputEventHandler;
     onEndEditing?: ITextInputEventHandler;

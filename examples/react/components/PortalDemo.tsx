@@ -1,10 +1,5 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  createPortal,
-  type IHostInstance,
-} from '@symbiote-native/react';
+import { createPortal, type IHostInstance } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { CaveatNote } from './CaveatNote';
 import { LINE_COLOR } from '../navigation-lines';
@@ -17,8 +12,8 @@ export function PortalDemo() {
   const [visible, setVisible] = useState(false);
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">createPortal</Text>
+    <view className="section-nested">
+      <text className="section-label">createPortal</text>
       <ActionButton
         testID="portal-toggle"
         title={
@@ -27,21 +22,21 @@ export function PortalDemo() {
         onPress={() => setVisible(current => !current)}
         color={LINE_COLOR.introspection}
       />
-      <Text className="note-text">
+      <text className="note-text">
         host box below is a sibling in this same tree — createPortal moves
         content into it without moving it in the JSX tree
-      </Text>
+      </text>
       {/* The portal TARGET: an already-mounted, empty sibling view — createPortal below reaches
           into it from elsewhere in the tree, mirroring CanaryScreen's overlay-host/toast pair. */}
-      <View ref={setPortalHost} testID="portal-host" className="ref-box">
-        <Text className="ref-box-text">portal host</Text>
-      </View>
+      <view ref={setPortalHost} testID="portal-host" className="ref-box">
+        <text className="ref-box-text">portal host</text>
+      </view>
       {visible &&
         portalHost !== null &&
         createPortal(
-          <Text testID="portal-content" className="ref-box-text">
+          <text testID="portal-content" className="ref-box-text">
             ported content
-          </Text>,
+          </text>,
           portalHost,
         )}
       <CaveatNote testID="portal-caveat">
@@ -51,6 +46,6 @@ export function PortalDemo() {
         independently-mounted surface the way react-dom's createPortal reaches
         an arbitrary DOM node.
       </CaveatNote>
-    </View>
+    </view>
   );
 }

@@ -10,7 +10,7 @@
   //     after the DOM update, the same "one keep-alive frame survives" timing as React's
   //     useEffect / Vue's flush:'post' watch)
   //   - the descriptor bridge: renderModal() always paints the SAME fixed shape (one
-  //     symbiote-modal host wrapping one symbiote-view container — only prop VALUES vary,
+  //     modal host wrapping one view container — only prop VALUES vary,
   //     never structure, per svelte-adapter-dom-shim skill §15), so rather than building a
   //     generic Descriptor->Svelte walker (there is none, and none is needed) this hand-authors
   //     the two literal host tags and reads renderModal()'s computed props off the fixed
@@ -63,7 +63,7 @@
     if (!shouldRender) dlog('Modal hidden -> no node committed');
   });
 
-  // Owns its host element (symbiote-modal), so it folds aria/role via `resolved` above; the
+  // Owns its host element (modal), so it folds aria/role via `resolved` above; the
   // resolved fields ride the host node via `...passthrough` — includes onShow/onDismiss/
   // onRequestClose/onOrientationChange (real ViewConfig DirectEvents) and every accessibility*
   // field, untouched, exactly like React's `...passthrough`.
@@ -100,7 +100,7 @@
       passthrough,
     });
 
-    // root = symbiote-modal > [container]; the children snippet nests UNDER the container View,
+    // root = modal > [container]; the children snippet nests UNDER the container View,
     // never as a direct sibling of the host (RN's modal content layout) — see render-modal.ts.
     const [container] = descriptor.children;
     const containerProps = typeof container === 'string' ? {} : container.props;
@@ -121,9 +121,9 @@
 </script>
 
 {#if shouldRender}
-  <symbiote-modal p={root.hostBag} bind:this={hostShim}>
-    <symbiote-view p={root.containerBag}>
+  <modal p={root.hostBag} bind:this={hostShim}>
+    <view p={root.containerBag}>
       {@render rawProps.children?.()}
-    </symbiote-view>
-  </symbiote-modal>
+    </view>
+  </modal>
 {/if}

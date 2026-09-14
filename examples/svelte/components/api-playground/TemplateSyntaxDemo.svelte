@@ -3,8 +3,7 @@
   // {@render}/{@const}/{@debug}/{@attach} — every row is Yes. {@html} is the one No row in this
   // category (dead: no innerHTML equivalent, forbidden at build time by
   // preprocessor/forbid-web-only-constructs.ts), so it is not demoed.
-  import { Pressable, Text, View } from '@symbiote-native/svelte';
-  import { dlog } from '@symbiote-native/engine';
+  import { dlog, whenCommitted } from '@symbiote-native/engine';
   import { hostInstance } from '@symbiote-native/svelte';
   import { isShimElement } from './shim-node-guard';
   import ActionButton from '../ActionButton.svelte';
@@ -66,30 +65,38 @@
     score += delta;
   }
 
-  // {@attach} — measures the box the moment it becomes the live, committed host node.
+  // {@attach} — measures the box once it becomes the live, COMMITTED host node. `{@attach}` fires
+  // the instant the element mounts into Svelte's own tree, which is earlier than the engine's own
+  // commit to Fabric (the same async-commit race `whenCommitted` exists to fix for Vue) — calling
+  // `.measure()` directly here no-ops silently (`measure skipped: node not committed`) and leaves
+  // `measuredWidth` stuck at `undefined` forever, with nothing on screen but "measuring…".
   let measuredWidth = $state<number | undefined>(undefined);
   function measureAttach(node: unknown): void {
     if (!isShimElement(node)) return;
-    dlog(
-      'api-playground: {@attach} received the committed host node, measuring',
-    );
-    hostInstance(node)?.measure((_x, _y, width) => {
-      measuredWidth = width;
+    const host = hostInstance(node);
+    if (host === undefined) return;
+    whenCommitted(host, () => {
+      dlog(
+        'api-playground: {@attach} received the committed host node, measuring',
+      );
+      host.measure((_x, _y, width) => {
+        measuredWidth = width;
+      });
     });
   }
 </script>
 
-<!-- Declared at file top level, not inside <View>: Svelte reads a {#snippet} nested in a
+<!-- Declared at file top level, not inside <view>: Svelte reads a {#snippet} nested in a
      component's children as an implicit named-snippet PROP for that component, and
      `IViewProps` (rightly) has no field for it. -->
 {#snippet rowLabel(text: string)}
-  <Text class="list-row-text">
+  <text class="list-row-text">
     {text}
-  </Text>
+  </text>
 {/snippet}
-<View class="section-nested">
-  <Text class="section-label">Template Syntax · if / each / await / key</Text>
-  <View class="row-align-center">
+<view class="section-nested">
+  <text class="section-label">Template Syntax · if / each / await / key</text>
+  <view class="row-align-center">
     <ActionButton
       testID="template-score-down"
       title="score −10"
@@ -102,19 +109,19 @@
       color={ACCENT}
       onPress={() => bumpScore(10)}
     />
-  </View>
-  <Text class="info-text" testID="template-if-readout">
+  </view>
+  <text class="info-text" testID="template-if-readout">
     {#if score < 40}low ({score}){:else if score < 70}medium ({score}){:else}high
       ({score}){/if}
-  </Text>
+  </text>
   {@debug score}
-  <Text class="note-text">
+  <text class="note-text">
     {'{@debug score} runs alongside the branch above — check the Metro console / an attached debugger.'}
-  </Text>
-  <Text class="section-label">
+  </text>
+  <text class="section-label">
     {'{#each} / {:else} / {@const}'}
-  </Text>
-  <View class="row-align-center">
+  </text>
+  <view class="row-align-center">
     <ActionButton
       testID="template-add-item"
       title="add item"
@@ -127,22 +134,22 @@
       color={ACCENT}
       onPress={clearItems}
     />
-  </View>
+  </view>
   {#if items.length === 0}
-    <Text class="note-text" testID="template-each-empty">
+    <text class="note-text" testID="template-each-empty">
       {'{:else} branch — no items'}
-    </Text>
+    </text>
   {:else}
     {#each items as item, index (item)}{@const upper = item.toUpperCase()}
-      <Text class="list-row-text">
+      <text class="list-row-text">
         {`${index}. ${item} -> ${upper}`}
-      </Text>
+      </text>
     {/each}
   {/if}
-  <Text class="section-label">
+  <text class="section-label">
     {'{#await} / {:then} / {:catch}'}
-  </Text>
-  <View class="row-align-center">
+  </text>
+  <view class="row-align-center">
     <ActionButton
       testID="template-await-ok"
       title="fetch (resolves)"
@@ -155,25 +162,25 @@
       color={ACCENT}
       onPress={runAwaitFail}
     />
-  </View>
+  </view>
   {#if awaitDemo === undefined}
-    <Text class="note-text" testID="template-await-readout">
+    <text class="note-text" testID="template-await-readout">
       idle — tap a button above
-    </Text>
+    </text>
   {:else}
     {#await awaitDemo}
-      <Text class="note-text" testID="template-await-readout">pending…</Text>
+      <text class="note-text" testID="template-await-readout">pending…</text>
     {:then value}
-      <Text class="note-text" testID="template-await-readout">
+      <text class="note-text" testID="template-await-readout">
         {`resolved: ${value}`}
-      </Text>
+      </text>
     {:catch error}
-      <Text class="note-text" testID="template-await-readout">
+      <text class="note-text" testID="template-await-readout">
         {`caught: ${error instanceof Error ? error.message : String(error)}`}
-      </Text>
+      </text>
     {/await}
   {/if}
-  <View class="row-align-center">
+  <view class="row-align-center">
     <ActionButton
       testID="template-then-only"
       title={'{#await p then v}'}
@@ -186,22 +193,22 @@
       color={ACCENT}
       onPress={runCatchOnly}
     />
-  </View>
-  <Text class="note-text" testID="template-then-only-readout">
+  </view>
+  <text class="note-text" testID="template-then-only-readout">
     {#if thenOnly !== undefined}
       {#await thenOnly then value}{`then-shorthand resolved: ${value}`}
       {/await}
     {:else}idle{/if}
-  </Text>
-  <Text class="note-text" testID="template-catch-only-readout">
+  </text>
+  <text class="note-text" testID="template-catch-only-readout">
     {#if catchOnly !== undefined}
       {#await catchOnly catch error}{`catch-shorthand caught: ${error instanceof Error ? error.message : String(error)}`}
       {/await}
     {:else}idle{/if}
-  </Text>
-  <Text class="section-label">
+  </text>
+  <text class="section-label">
     {'{#key} — force remount'}
-  </Text>
+  </text>
   <ActionButton
     testID="template-force-remount"
     title="Force remount"
@@ -215,29 +222,29 @@
       testID="template-key-stepper"
     />
   {/key}
-  <Text class="section-label">
+  <text class="section-label">
     {'{#snippet} / {@render}'}
-  </Text>
+  </text>
   {@render rowLabel('first row via {@render}')}{@render rowLabel(
     'second row, same snippet',
   )}
-  <Text class="section-label">
+  <text class="section-label">
     {'{@attach} — measuring the real committed host node'}
-  </Text>
-  <View
+  </text>
+  <view
     testID="template-attach-target"
     class="box-list160"
     {@attach measureAttach}
   >
-    <Pressable class="pressable-card" style={{ borderColor: ACCENT }}>
-      <Text class="pressable-label">
+    <pressable class="pressable-card" style={{ borderColor: ACCENT }}>
+      <text class="pressable-label">
         measured on mount via {'{@attach}'}
-      </Text>
-    </Pressable>
-  </View>
-  <Text class="info-text" testID="template-attach-readout">
+      </text>
+    </pressable>
+  </view>
+  <text class="info-text" testID="template-attach-readout">
     {measuredWidth === undefined
       ? 'measuring…'
       : `measured width: ${measuredWidth}px`}
-  </Text>
-</View>
+  </text>
+</view>

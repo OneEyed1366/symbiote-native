@@ -116,7 +116,7 @@ const PROBE_SOURCE = `<script lang="ts">
      String(focused.current),
    ].join('|'));
  </script>
- <symbiote-view p={{ testID: 'probe', accessibilityLabel: label }} />`;
+ <view p={{ testID: 'probe', accessibilityLabel: label }} />`;
 
 // Generic "narrowing rune meets the wrong navigator kind" probe: every `use<Kind>Navigation` rune
 // shares the exact same throw-on-access mechanism (use-stack/tab/drawer-navigation.svelte.ts),
@@ -136,7 +136,7 @@ function mismatchProbeSource(hookFile: string, hookName: string): string {
      }
    });
  </script>
- <symbiote-view p={{ testID: 'mismatch', accessibilityLabel: message }} />`;
+ <view p={{ testID: 'mismatch', accessibilityLabel: message }} />`;
 }
 
 async function mountWithScreen(
@@ -302,7 +302,7 @@ describe('navigation runes (real compiled components)', () => {
            message = error instanceof Error ? error.message : 'unknown';
          }
        </script>
-       <symbiote-view p={{ testID: 'orphan', accessibilityLabel: message }} />`,
+       <view p={{ testID: 'orphan', accessibilityLabel: message }} />`,
       );
       mount(ROOT_TAG, await loadComponent(app));
       await tick();

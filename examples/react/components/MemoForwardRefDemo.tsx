@@ -1,5 +1,4 @@
 import { forwardRef, memo, useImperativeHandle, useRef, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 
@@ -12,9 +11,9 @@ let memoChildRenders = 0;
 const MemoChild = memo(function MemoChildImpl({ label }: IMemoChildProps) {
   memoChildRenders += 1;
   return (
-    <Text testID="memo-child-renders" className="info-text">
+    <text testID="memo-child-renders" className="info-text">
       {`MemoChild rendered ${memoChildRenders} time(s), label="${label}"`}
-    </Text>
+    </text>
   );
 });
 
@@ -29,11 +28,11 @@ const FocusHintBox = forwardRef<IFocusHintHandle, IFocusHintBoxProps>(
     const [hinted, setHinted] = useState(false);
     useImperativeHandle(ref, () => ({ focusHint: () => setHinted(true) }), []);
     return (
-      <View className="ref-box">
-        <Text className="ref-box-text">
+      <view className="ref-box">
+        <text className="ref-box-text">
           {hinted ? `${children} (hinted)` : children}
-        </Text>
-      </View>
+        </text>
+      </view>
     );
   },
 );
@@ -44,8 +43,8 @@ export function MemoForwardRefDemo() {
   const focusHintRef = useRef<IFocusHintHandle | null>(null);
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">memo · forwardRef</Text>
+    <view className="section-nested">
+      <text className="section-label">memo · forwardRef</text>
       <MemoChild label={label} />
       <ActionButton
         testID="memo-change-label"
@@ -59,9 +58,9 @@ export function MemoForwardRefDemo() {
         onPress={() => setTicks(current => current + 1)}
         color={LINE_COLOR.introspection}
       />
-      <Text className="note-text">
+      <text className="note-text">
         {`unrelated ticks: ${ticks} — MemoChild's render count above should NOT move`}
-      </Text>
+      </text>
       <FocusHintBox ref={focusHintRef}>forwardRef target</FocusHintBox>
       <ActionButton
         testID="memo-focus-hint"
@@ -69,6 +68,6 @@ export function MemoForwardRefDemo() {
         onPress={() => focusHintRef.current?.focusHint()}
         color={LINE_COLOR.introspection}
       />
-    </View>
+    </view>
   );
 }

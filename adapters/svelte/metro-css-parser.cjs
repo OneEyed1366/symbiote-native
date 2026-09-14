@@ -6,4 +6,5 @@
 // already handles standalone style files itself (its isStyleFile branch), so this subpath exists
 // only for parity with the other adapters and for a future consumer that wants CSS-only handling
 // without the .svelte transform (e.g. importing a plain .css from non-.svelte source).
-module.exports = require('@symbiote-native/css-parser').createCssMetroTransformer();
+module.exports =
+  require('@symbiote-native/css-parser').createCssMetroTransformer();

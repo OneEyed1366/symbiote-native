@@ -52,7 +52,7 @@ export interface IModalProps extends IAccessibilityProps, IAriaProps {
   // event.nativeEvent.orientation (IModalOrientationChangeEvent describes that payload).
   onOrientationChange?: (event: ISymbioteEvent) => void;
   style?: IStyleProp<IViewStyle>;
-  // Targets the CONTAINER View renderModal wraps the children in, not the outer symbiote-modal
+  // Targets the CONTAINER View renderModal wraps the children in, not the outer modal
   // host — same split React's className / Vue's class apply on the container, not the host.
   class?: ISvelteClassValue;
   children?: Snippet;

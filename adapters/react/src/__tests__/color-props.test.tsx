@@ -5,7 +5,7 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { setColorProcessor } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 
@@ -28,7 +28,7 @@ const COLOR_KEYS = [
 function App(): ReactElement {
   const style: Record<string, unknown> = {};
   for (const key of COLOR_KEYS) style[key] = 'red';
-  return <View style={style} />;
+  return <view style={style} />;
 }
 
 const fabric = installFabric();

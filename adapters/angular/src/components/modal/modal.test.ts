@@ -33,7 +33,7 @@ let capturedOrientationHost: ModalOrientationHostFixture | undefined;
   imports: [Modal],
   template: `
     <Modal [visible]="visible()" [testID]="'modal'" class="sheet">
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </Modal>
   `,
 })
@@ -56,7 +56,7 @@ class ModalHostFixture {
       [testID]="'modal'"
       (orientationChange)="received = $event"
     >
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </Modal>
   `,
 })
@@ -73,7 +73,7 @@ class ModalOrientationHostFixture {
   standalone: true,
   imports: [Modal],
   template: `<Modal [visible]="false" [testID]="'modal'"
-    ><symbiote-text>Hi</symbiote-text></Modal
+    ><text>Hi</text></Modal
   >`,
 })
 class ModalHiddenHostFixture {}
