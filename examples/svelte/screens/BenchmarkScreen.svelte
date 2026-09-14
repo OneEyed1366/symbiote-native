@@ -385,6 +385,289 @@
   const clock = createBenchClock(commitProfileGate);
   const runStep = clock.runStep;
 
+  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Benchmark];
+  const accent = LINE_COLOR.performance;
+
+  // `rowCount` is passed in rather than read back from state afterwards: this closes over the list
+  // as it was when the button was pressed, and reading it later would report the post-mutation one.
+  function measure(
+    op: IBenchOpId,
+    label: string,
+    rowCount: number,
+    mutate: () => void,
+  ): void {
+    // A press mid-suite would install its own pending record over the suite's, and the next commit
+    // would stop the wrong stopwatch - attributing one operation's cost to another, silently. One
+    // rune carries the fact for both the guard and the progress block: a rune read here is live,
+    // not a captured snapshot, so a second non-reactive copy would only be a second thing to
+    // desync.
+    if (progress !== undefined) return;
+    runStep(mutate).then(durationMs => {
+      seq += 1;
+      history = [{ seq, op, label, durationMs, rowCount }, ...history].slice(
+        0,
+        HISTORY_LIMIT,
+      );
+    });
+  }
+
+  // Registration lifetime only; why the stopwatch stops in the engine's hook is in ./bench-clock.ts.
+  $effect(() => clock.install());
+
+  // The guards below keep an operation from recording a measurement of nothing - an empty list,
+  // or an index krausest's fixed row numbers put past the end of a short one.
+  function onSelect(id: number): void {
+    measure(BENCH_OP.Select, 'Select row', list.rows.length, () => {
+      list = {
+        ...list,
+        selectedId: list.selectedId === id ? undefined : id,
+      };
+    });
+  }
+
+  function onRemove(id: number): void {
+    measure(BENCH_OP.Remove, 'Remove row', list.rows.length - 1, () => {
+      list = { ...list, rows: list.rows.filter(row => row.id !== id) };
+    });
+  }
+
+  function onCreate(): void {
+    measure(BENCH_OP.Create, 'Create 1,000 rows', ROW_BATCH, () => {
+      list = { rows: buildRows(ROW_BATCH), selectedId: undefined };
+    });
+  }
+
+  // Same call as Create - krausest scores them apart because the starting state differs: this one
+  // swaps a full keyed list for another, the other one mounts into an empty container.
+  function onReplace(): void {
+    measure(BENCH_OP.Replace, 'Replace all 1,000 rows', ROW_BATCH, () => {
+      list = { rows: buildRows(ROW_BATCH), selectedId: undefined };
+    });
+  }
+
+  function onCreateLots(): void {
+    measure(BENCH_OP.CreateLots, 'Create 10,000 rows', ROW_BATCH_LARGE, () => {
+      list = { rows: buildRows(ROW_BATCH_LARGE), selectedId: undefined };
+    });
+  }
+
+  function onAppend(): void {
+    measure(
+      BENCH_OP.Append,
+      'Append 1,000 rows',
+      list.rows.length + ROW_BATCH,
+      () => {
+        list = { ...list, rows: list.rows.concat(buildRows(ROW_BATCH)) };
+      },
+    );
+  }
+
+  function onUpdate(): void {
+    if (list.rows.length === 0) return;
+    measure(
+      BENCH_OP.Update,
+      'Partial update (every 10th)',
+      list.rows.length,
+      () => {
+        list = {
+          ...list,
+          rows: list.rows.map((row, index) =>
+            index % UPDATE_STRIDE === 0
+              ? { ...row, label: row.label + UPDATE_SUFFIX }
+              : row,
+          ),
+        };
+      },
+    );
+  }
+
+  function onSelectSample(): void {
+    if (list.rows.length <= SELECT_INDEX) return;
+    onSelect(list.rows[SELECT_INDEX].id);
+  }
+
+  function onRemoveSample(): void {
+    if (list.rows.length <= REMOVE_INDEX) return;
+    onRemove(list.rows[REMOVE_INDEX].id);
+  }
+
+  function onSwap(): void {
+    if (list.rows.length <= SWAP_HIGH_INDEX) return;
+    measure(BENCH_OP.Swap, 'Swap 2 rows', list.rows.length, () => {
+      const next = list.rows.slice();
+      const low = next[SWAP_LOW_INDEX];
+      next[SWAP_LOW_INDEX] = next[SWAP_HIGH_INDEX];
+      next[SWAP_HIGH_INDEX] = low;
+      list = { ...list, rows: next };
+    });
+  }
+
+  // Clear wipes the recorded measurements too, not just the rows. A duration stays pinned next to
+  // its button until that operation runs again, so a number measured under one set of conditions
+  // reads as current under another - a Create 10,000 timed in virtualized mode sat next to the
+  // button in all-mounted mode and looked like an all-mounted result. Resetting the run alongside
+  // the list keeps a stale figure from ever being read as a fresh one. Clear's OWN measurement
+  // still lands (the post-commit hook runs after this commit and prepends to the emptied history),
+  // so the button that was just pressed does not read as "did nothing".
+  function onClear(): void {
+    if (list.rows.length === 0) return;
+    measure(BENCH_OP.Clear, 'Clear', 0, () => {
+      list = { rows: [], selectedId: undefined };
+      history = [];
+    });
+  }
+
+  const operations: readonly IBenchOperation[] = [
+    { id: BENCH_OP.Create, label: 'Create 1,000 rows', onPress: onCreate },
+    {
+      id: BENCH_OP.Replace,
+      label: 'Replace all 1,000 rows',
+      onPress: onReplace,
+    },
+    {
+      id: BENCH_OP.Update,
+      label: 'Partial update · every 10th row',
+      onPress: onUpdate,
+    },
+    { id: BENCH_OP.Select, label: 'Select row', onPress: onSelectSample },
+    { id: BENCH_OP.Swap, label: 'Swap 2 rows', onPress: onSwap },
+    { id: BENCH_OP.Remove, label: 'Remove row', onPress: onRemoveSample },
+    {
+      id: BENCH_OP.CreateLots,
+      label: 'Create 10,000 rows',
+      onPress: onCreateLots,
+    },
+    { id: BENCH_OP.Append, label: 'Append 1,000 rows', onPress: onAppend },
+    { id: BENCH_OP.Clear, label: 'Clear', onPress: onClear },
+  ];
+
+  const isAllMounted = $derived(mountMode === MOUNT_MODE.All);
+
+  /**
+   * The whole ruler in one press, in a FIXED order, each timed operation starting from exactly
+   * SUITE_ROWS rows.
+   *
+   * Pressing the buttons by hand does not measure what it looks like it measures. `Remove` and
+   * `Append` cost scale with the rows currently on screen (a flat parent re-appends every child
+   * handle on any structural change), so their numbers depend on which buttons were pressed
+   * before them. Measured 2026-08-18, React Debug, same build twice: Remove 87-107 ms against
+   * 418.6 ms, Append 953 against 1678 ms, while Create / Replace / Partial / Select / Swap
+   * reproduced inside 1-3%. Two runs of the SAME adapter disagreed 4x - so a cross-ADAPTER
+   * comparison off those rows was measuring press order, not the adapter.
+   *
+   * Hence: untimed setup steps in between, awaited through the same engine post-commit seam as
+   * the timed ones, so each measurement begins from a state this function chose rather than one
+   * the operator happened to leave behind.
+   *
+   * Runs in EITHER mount mode - the pressed button picks it. No 10,000-row step in either: 10,000
+   * rows is 100,000 native views, which the host does not survive in all-mounted (see
+   * NATIVE_VIEWS_PER_ROW), and a suite that hangs the screen measures nothing.
+   */
+  async function runSuite(mode: IMountMode): Promise<void> {
+    resetRowData();
+
+    const entries: ISuiteEntry[] = [];
+    const clearRows = (): void => {
+      list = { rows: [], selectedId: undefined };
+    };
+    const fillRows = (): void => {
+      list = { rows: buildRows(SUITE_ROWS), selectedId: undefined };
+    };
+
+    // The suite's own UI is committed and PAINTED before any measured step starts. The engine
+    // coalesces commits onto a microtask, so setting a running flag and then immediately mutating
+    // the list puts the spinner and the first (heaviest) step in one commit: the operator presses
+    // the button and gets several hundred milliseconds of frozen screen with the button still
+    // reading "Run". Awaiting a commit that carries only the progress block splits the two.
+    const showProgress = (label: string): Promise<number> =>
+      runStep(() => {
+        progress = { mode, label, done: entries.length };
+      });
+
+    const timed = async (
+      op: IBenchOpId,
+      startRows: number,
+      mutate: () => void,
+    ): Promise<void> => {
+      const label = suiteLabel(op);
+      await showProgress(label);
+      const durationMs = await runStep(mutate);
+      // Read AFTER the measured step, never after showProgress: the holder carries whichever step
+      // committed last, and the progress step commits first by construction.
+      entries.push({
+        op,
+        label,
+        durationMs,
+        startRows,
+        profile: clock.lastStepProfile,
+        fabric: clock.lastFabricProfile,
+      });
+    };
+
+    // One commit for the whole prologue: the mode this run measures, an emptied list, and the
+    // progress block appearing. It always changes the tree (the block goes from absent to present)
+    // - which matters, because `commitContainer` returns early on a commit that produced no native
+    // change (`if (!result.changed) return` sits ABOVE `runPostCommitHooks()` in
+    // core/engine/src/commit.ts), so a no-op mutation never resolves its step and would stall the
+    // suite until the timeout. Every step after this one changes the tree by construction.
+    await runStep(() => {
+      mountMode = mode;
+      suiteResults = { ...suiteResults, [mode]: [] };
+      history = [];
+      progress = { mode, label: 'Preparing', done: 0 };
+      clearRows();
+    });
+
+    await timed(BENCH_OP.Create, 0, fillRows);
+    await timed(BENCH_OP.Replace, SUITE_ROWS, fillRows);
+    await timed(BENCH_OP.Update, SUITE_ROWS, () => {
+      list = {
+        ...list,
+        rows: list.rows.map((row, index) =>
+          index % UPDATE_STRIDE === 0
+            ? { ...row, label: row.label + UPDATE_SUFFIX }
+            : row,
+        ),
+      };
+    });
+    await timed(BENCH_OP.Select, SUITE_ROWS, () => {
+      list = { ...list, selectedId: list.rows[SELECT_INDEX].id };
+    });
+    await timed(BENCH_OP.Swap, SUITE_ROWS, () => {
+      const next = list.rows.slice();
+      const low = next[SWAP_LOW_INDEX];
+      next[SWAP_LOW_INDEX] = next[SWAP_HIGH_INDEX];
+      next[SWAP_HIGH_INDEX] = low;
+      list = { ...list, rows: next };
+    });
+    await timed(BENCH_OP.Remove, SUITE_ROWS, () => {
+      list = {
+        ...list,
+        rows: list.rows.filter((_row, index) => index !== REMOVE_INDEX),
+      };
+    });
+
+    await runStep(clearRows);
+    await runStep(fillRows);
+    await timed(BENCH_OP.Append, SUITE_ROWS, () => {
+      list = { ...list, rows: list.rows.concat(buildRows(SUITE_ROWS)) };
+    });
+
+    await runStep(clearRows);
+    await runStep(fillRows);
+    await timed(BENCH_OP.Clear, SUITE_ROWS, clearRows);
+
+    // AWAITED, so the suite leaves no commit behind it. The two writes change the tree, and an
+    // unawaited commit lands microtasks later — by which time a SECOND run's stopwatch may be
+    // installed, and this one stops it. The table has two columns, so all-mounted and virtualized
+    // do get pressed back to back. Here it shifts a whole run by one step, so every row carries a
+    // plausible number belonging to its neighbour.
+    await runStep(() => {
+      suiteResults = { ...suiteResults, [mode]: entries };
+      progress = undefined;
+    });
+  }
+
   function onRunSuite(mode: IMountMode): void {
     if (progress !== undefined) return;
     runSuite(mode).catch(() => {
