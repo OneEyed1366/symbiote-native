@@ -1,18 +1,14 @@
-// A HAND-WRITTEN intrinsic tag, with no lowering transform in front of it — the shape an app writes
-// once primitives are tags rather than components.
-//
-// Everything else about a bare tag was already covered: props, the `id` -> `nativeID` fold and the
-// behavior folds by `lowering-equivalence.test.tsx` (its `lowered:` arms are literal tags), a
-// spread by `spread-fold-parity.test.tsx`, listeners by
-// `components/pressable-lowered-active-class.test.tsx`. What NOTHING covered is the one prop that
-// picks a NATIVE VIEW rather than a value, and both directions of it were silently wrong:
+// The one prop that picks a NATIVE VIEW rather than a value, and both directions of it were
+// silently wrong:
 //
 //   <text-input-multiline />        the multiline view folded as SINGLE-line — `submitBehavior`
 //                                   'blurAndSubmit', so Return blurs instead of inserting a newline
 //   <text-input multiline />        the SINGLE-line view carrying the multiline fold
 //
-// Neither path that existed before could hit this: the wrapper consumes `multiline` to choose its
-// intrinsic, and the transform resolves a literal at compile time. Device-only, nothing red.
+// The wrapper that used to stand here consumed `multiline` to choose its intrinsic, so it could not
+// reach either case. Device-only, nothing red. Everything else about a tag is covered by its
+// neighbours: props and the `id` -> `nativeID` fold by `tag-folds.test.tsx`, a spread by
+// `spread-fold.test.tsx`, listeners by `components/pressable-active-class.test.tsx`.
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'solid-js';

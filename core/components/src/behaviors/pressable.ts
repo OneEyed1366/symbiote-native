@@ -18,12 +18,14 @@
 import {
   appListenerFor,
   dlog,
+  propOf,
   registerHostBehavior,
   requestCommitFor,
   setBehaviorListener,
   setNodePressed,
   type IHostBehavior,
   type ISymbioteNode,
+  propsOf,
 } from '@symbiote-native/engine';
 import {
   createPressHandlers,
@@ -140,8 +142,8 @@ function isPressHandler(value: unknown): value is IPressHandler {
 
 // The props the MACHINE consumes and the host must never see. The wrapper drops them by
 // destructuring — they go into `createPressHandlers` / `buildPressableListeners` and are simply
-// absent from the object it spreads onto its View. A lowered element has no destructure, so every
-// one of them rode into the payload as a key no ViewConfig declares.
+// absent from the object it spreads onto its View. A tag has no destructure, so every one of them
+// rode into the payload as a key no ViewConfig declares.
 const MACHINE_ONLY_KEYS = [
   // Consumed below and replaced by the resolved `nativeBackgroundAndroid` /
   // `nativeForegroundAndroid`; the raw config is not a native prop.
@@ -156,7 +158,7 @@ const MACHINE_ONLY_KEYS = [
   'delayHoverOut',
 ] as const;
 
-// Narrowed field by field rather than cast: the bag arrives as `unknown` off `node.props`. A local
+// Narrowed field by field rather than cast: the bag arrives as `unknown` off `propOf`. A local
 // twin of the guard each adapter keeps for its own attrs (Vue's `asAccessibilityState`) — exported
 // to the sibling behaviors that fold the same bag, and deliberately NOT to the shared barrel, which
 // every adapter re-exports wholesale: a narrowing helper is not API anyone should be able to import.
@@ -175,7 +177,7 @@ export function asAccessibilityState(
 }
 
 // Narrowed field by field, same reason as the accessibility guard above: the config arrives as
-// `unknown` off `node.props`.
+// `unknown` off `propOf`.
 function asRippleConfig(
   value: unknown,
 ): IPressableAndroidRippleConfig | undefined {
@@ -193,7 +195,7 @@ function asRippleConfig(
 // `disabled` reaches a screen reader ONLY as `accessibilityState.disabled` — it is not a native
 // View prop, so the wrapper folds it (`resolveDisabledAccessibilityState`, called by all five) and
 // forwards the composite. Lowering dropped that fold: press suppression still worked, because the
-// machine reads `node.props.disabled` directly, so the button behaved correctly and announced
+// machine reads the node's own `disabled` directly, so the button behaved correctly and announced
 // itself as enabled. An accessibility regression with no visual tell and no failing test.
 //
 // Found by the wrapper-vs-behavior import audit (`.claude/rules/adapter-parity-audit.md`).
@@ -205,15 +207,15 @@ function foldPayload(
     typeof props.disabled === 'boolean' ? props.disabled : undefined,
   );
 
-  // The Android ripple. Our WRAPPER paints it through a dedicated inner View, mirroring
-  // TouchableNativeFeedback — and that reading is what made this look unfixable for a lowered
-  // element, which has no child to put it on. RN's own `Pressable` does NOT do that: it spreads
+  // The Android ripple. Our old WRAPPER painted it through a dedicated inner View, mirroring
+  // TouchableNativeFeedback — and that reading is what made this look unfixable for a tag, which has
+  // no child to put it on. RN's own `Pressable` does NOT do that: it spreads
   // `useAndroidRippleForView`'s `viewProps` onto its own View (`Pressable.js:251`), so the ripple
   // background is an ordinary prop of the responder itself and a single node carries it fine.
   //
   // `rippleProps` returns undefined off Android, so this whole branch is inert on iOS.
   //
-  // STILL MISSING ON BOTH PATHS, and lowering did not cause it: RN also dispatches
+  // STILL MISSING, and it always was: RN also dispatches
   // `Commands.hotspotUpdate(x, y)` on pressIn/pressMove and `Commands.setPressed` on
   // pressIn/pressOut, which is what makes the ripple originate at the touch point. Neither our
   // wrapper nor this behavior sends them — grep for `hotspotUpdate` returns nothing in the tree.
@@ -225,7 +227,7 @@ function foldPayload(
   for (const key of MACHINE_ONLY_KEYS) delete out[key];
   if (ripple !== undefined) Object.assign(out, ripple);
   // Written only when the fold produced something: an unconditional assignment would put an
-  // `accessibilityState: undefined` key on every lowered Pressable in the tree, and `fabricProps`
+  // `accessibilityState: undefined` key on every pressable in the tree, and `fabricProps`
   // skipping undefined is a coincidence to lean on, not a contract to rely on here.
   if (resolved !== undefined) out.accessibilityState = resolved;
   out.accessible = accessibleUnlessOptedOut(props);
@@ -241,21 +243,18 @@ function foldPayload(
 // (`TouchableOpacity.js:303`, `TouchableHighlight.js:337`). `!== false` rather than `?? true`, so
 // only a literal `false` opts out and an explicit `undefined` still reads as accessible.
 //
-// Nothing in this repo did it until 2026-09-09, on either path, so a Pressable reached a screen
-// reader as a plain view unless the app wrote the prop. Landing it in the fold above alone reddens
-// four equivalence arms — correctly, since those compare the wrapper against the lowered path — so
-// the behavior and every adapter's wrapper have to move in ONE change. Exported for the wrappers
-// that need to say it themselves, and for the tags whose behavior is their only path.
+// Nothing in this repo did it until 2026-09-09, so a Pressable reached a screen reader as a plain
+// view unless the app wrote the prop. Exported so anything composing this tag can say it too.
 export function accessibleUnlessOptedOut(
   props: Readonly<Record<string, unknown>>,
 ): boolean {
   return props.accessible !== false;
 }
 
-// From the STASH, not from `node.props`. Every name below is in `ownedListeners`, so `routeProp`
+// From the STASH, not from the props. Every name below is in `ownedListeners`, so `routeProp`
 // diverts the app's `onPress` away from `node.listeners` (where it would evict the behavior's own
 // dispatcher) and into the stash — which makes the stash the only place it exists. Reading
-// `node.props` here returns undefined for every callback and every press silently does nothing:
+// `propOf` here returns undefined for every callback and every press silently does nothing:
 // the behavior runs, the machine runs, and it calls nobody.
 function callbackAt(
   node: ISymbioteNode,
@@ -265,9 +264,9 @@ function callbackAt(
   return isPressHandler(value) ? value : undefined;
 }
 
-// Callbacks come from `callbackAt` (the stash), scalars from `node.props`. The split is not
+// Callbacks come from `callbackAt` (the stash), scalars from `propOf`. The split is not
 // cosmetic: `delayLongPress` and `hitSlop` are ordinary props that `fabricProps` drops as unknown
-// keys, while `onPress` and friends are OWNED event names that never reach `node.props` at all.
+// keys, while `onPress` and friends are OWNED event names that never reach the props at all.
 function configFor(node: ISymbioteNode): IPressMachineConfig {
   return {
     onPress: callbackAt(node, 'press'),
@@ -276,26 +275,26 @@ function configFor(node: ISymbioteNode): IPressMachineConfig {
     onPressMove: callbackAt(node, 'pressMove'),
     onLongPress: callbackAt(node, 'longPress'),
     delayLongPress: numberOr(
-      node.props.delayLongPress,
+      propOf(node, 'delayLongPress'),
       DEFAULT_DELAY_LONG_PRESS_MS,
     ),
-    unstable_pressDelay: numberOr(node.props.unstable_pressDelay, 0),
+    unstable_pressDelay: numberOr(propOf(node, 'unstable_pressDelay'), 0),
     // RN's Touchables own the deactivation floor in their OWN machine and hand Pressability
     // `minPressDuration: 0` (TouchableOpacity.js:195). While they were wrappers they passed it as
     // an internal input; on the tag there is nowhere else to say it, so the floor has to be a
     // readable prop or every Touchable holds its fade for the machine's 130 ms default.
     minPressDuration: numberOr(
-      node.props.minPressDuration,
+      propOf(node, 'minPressDuration'),
       DEFAULT_MIN_PRESS_DURATION_MS,
     ),
-    hitSlop: asRectOffset(node.props.hitSlop),
-    pressRetentionOffset: asRectOffset(node.props.pressRetentionOffset),
+    hitSlop: asRectOffset(propOf(node, 'hitSlop')),
+    pressRetentionOffset: asRectOffset(propOf(node, 'pressRetentionOffset')),
   };
 }
 
 // Rebuilding at GESTURE START is the whole reason for the dispatcher indirection, and skipping it
 // is a bug that looks like working code. `attach` runs inside `createElement`, before a single
-// prop has been routed — `node.props` is literally `{}` there — so a machine built at attach would
+// prop has been routed — the node holds nothing at all there — so a machine built at attach would
 // capture no `onPress` at all and every press would silently do nothing. `createPressHandlers`
 // destructures its config eagerly, so it cannot be handed a live view either; it has to be re-made
 // once the props exist. A gesture is one interaction, so a handful of closures per press is
@@ -313,15 +312,16 @@ function rebuild(node: ISymbioteNode, state: IBehaviorState): void {
   state.isBuilt = true;
   // Re-read every gesture, so a tag whose resolver looks past `disabled` — `./button`, at
   // `aria-disabled` — re-enables on the next touch instead of latching at its first answer.
+  const sourceProps = propsOf(source);
   const disabled: unknown =
     state.disabledOf === undefined
-      ? source.props.disabled
-      : state.disabledOf(source.props);
+      ? sourceProps.disabled
+      : state.disabledOf(sourceProps);
   state.listeners = buildPressableListeners(handlers, {
     disabled: disabled === true ? true : undefined,
     cancelable:
-      typeof source.props.cancelable === 'boolean'
-        ? source.props.cancelable
+      typeof propOf(source, 'cancelable') === 'boolean'
+        ? propOf(source, 'cancelable') === true
         : undefined,
   });
 }

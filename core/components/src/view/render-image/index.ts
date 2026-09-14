@@ -250,9 +250,9 @@ export const IMAGE_VIEW_PROP_NAMES = [
   'referrerPolicy',
 ] as const;
 
-// The whole of Image's prop mapping, with the `el()` wrap taken off. Split out because a LOWERED
-// `<image>` has no component body to run it in: its behavior's `foldPayload` needs the same
-// bag at commit time, and a second implementation of this is the exact drift this file already paid
+// The whole of Image's prop mapping, with the `el()` wrap taken off. Split out because an `<image>`
+// tag has no component body to run it in: its behavior's `foldPayload` needs the same bag at commit
+// time, and a second implementation of this is the exact drift this file already paid
 // for once (`adapters/svelte/src/components/image/image-logic.ts` reproduces it by hand, with a
 // comment saying it had to because nothing here was exported).
 export function mapImageProps(view: IImageViewProps): Record<string, unknown> {

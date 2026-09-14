@@ -1,4 +1,4 @@
-// `stickyHeaderIndices` on the lowered path — the COMPATIBILITY half of sticky headers, for apps
+// `stickyHeaderIndices` — the COMPATIBILITY half of sticky headers, for apps
 // written against RN's own API rather than against our `<sticky-header>` tag.
 //
 // WHAT IS NEW HERE, and it is only the selection: the pin, the debounce, the cross-talk and the
@@ -21,6 +21,8 @@ import {
   routeProp,
   type ISymbioteEvent,
   type ISymbioteNode,
+  parentOf,
+  propOf,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../../component-names';
@@ -152,9 +154,17 @@ function wrappedTestIds(scrollView: IFakeNode): unknown[] {
   );
 }
 
+// A row's parent, asked of the host. `undefined` for a row that is not in the tree, which is what
+// the assertions comparing against `childHost` want to be able to see.
+function parentOfRow(
+  row: ISymbioteNode | undefined,
+): ISymbioteNode | undefined {
+  return row === undefined ? undefined : parentOf(row);
+}
+
 // The synthesized wrapper standing over an app child, or undefined while it is still unwrapped.
 function wrapperOf(child: ISymbioteNode): ISymbioteNode {
-  const parent = child.parent;
+  const parent = parentOf(child);
   if (parent === undefined) throw new Error('the child is not in the tree');
   return parent;
 }
@@ -210,7 +220,7 @@ describe('an index selects a child the same way a tag marks one', () => {
     commit();
     expect(committedHeaders(commit())).toHaveLength(0);
     // Back under the content view itself, not orphaned inside a wrapper nobody points at.
-    expect(rows[1]?.parent).toBe(owner.childHost);
+    expect(parentOfRow(rows[1])).toBe(owner.childHost);
   });
 
   it('drops the wrapper when the framework takes its child away', () => {
@@ -237,7 +247,7 @@ describe('an index selects a child the same way a tag marks one', () => {
     });
     const committed = commit();
     // The positive control: the app really did write them, and the behavior really does read them.
-    expect(owner.props.stickyHeaderIndices).toEqual([0]);
+    expect(propOf(owner, 'stickyHeaderIndices')).toEqual([0]);
     expect(Object.hasOwn(committed.props, 'stickyHeaderIndices')).toBe(false);
     expect(Object.hasOwn(committed.props, 'invertStickyHeaders')).toBe(false);
   });
@@ -317,7 +327,7 @@ describe('the tag form and the index form share a scroll view', () => {
     // twice, so the first entry reading `undefined` is the assertion, not noise.
     expect(wrappedTestIds(committed)).toEqual([undefined, 'row-2']);
     // Index 2 addresses the third child, so the tag header counted as index 0 like any other.
-    expect(rows[0]?.parent).toBe(owner.childHost);
+    expect(parentOfRow(rows[0])).toBe(owner.childHost);
   });
 
   it('leaves a written sticky-header alone when an index also names it', () => {
@@ -328,6 +338,6 @@ describe('the tag form and the index form share a scroll view', () => {
     // Both forms agreeing on one child must produce ONE header. Nested, the outer pin wins and the
     // inner one translates relative to it, so the child rides at twice the offset.
     expect(committedHeaders(commit())).toHaveLength(1);
-    expect(rows[0]?.parent).toBe(owner.childHost);
+    expect(parentOfRow(rows[0])).toBe(owner.childHost);
   });
 });

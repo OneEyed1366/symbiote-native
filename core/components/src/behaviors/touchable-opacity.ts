@@ -36,6 +36,8 @@ import {
   type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
+  propOf,
+  propsOf,
 } from '@symbiote-native/engine';
 import { resolveTouchableFocusable } from '../view/render-pressable';
 import {
@@ -110,17 +112,17 @@ const refine: IPressConfigRefinement = (node, config) => {
   if (state === undefined) return config;
   const resting = restingOpacityOf(node);
   const activeOpacity = numberOr(
-    node.props.activeOpacity,
+    propOf(node, 'activeOpacity'),
     DEFAULT_ACTIVE_OPACITY,
   );
   const handlers = createTouchableFeedbackHandlers(
     {
-      delayPressIn: numberOr(node.props.delayPressIn, 0),
-      delayPressOut: numberOr(node.props.delayPressOut, 0),
+      delayPressIn: numberOr(propOf(node, 'delayPressIn'), 0),
+      delayPressOut: numberOr(propOf(node, 'delayPressOut'), 0),
       // Read raw rather than off `config`, which has already defaulted the absent case to the press
       // machine's own 130 ms — a floor RN's Touchables never see (TOUCHABLE_MIN_PRESS_DURATION_MS).
       minPressDuration: numberOr(
-        node.props.minPressDuration,
+        propOf(node, 'minPressDuration'),
         TOUCHABLE_MIN_PRESS_DURATION_MS,
       ),
       schedule: (callback, ms) => {
@@ -223,7 +225,8 @@ export function createTouchableOpacityBehavior(
       // (Button.js:331,337), so reading the prop here left an aria-only flip un-settled — the view
       // stayed at its active opacity while the press was already suppressed. RN's Button has no
       // such gap because it passes the resolved value DOWN as its touchable's prop.
-      const disabled = disabledOf?.(node.props) ?? node.props.disabled;
+      const props = propsOf(node);
+      const disabled = disabledOf?.(props) ?? props.disabled;
       const previous = state.settled;
       state.settled = { disabled, resting };
       if (previous === undefined) {

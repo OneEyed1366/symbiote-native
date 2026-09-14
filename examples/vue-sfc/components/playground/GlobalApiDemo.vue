@@ -127,11 +127,7 @@ function runInAppContext(): void {
       :onPress="registerRuntimeDirective"
       color="#f5a623"
     />
-    <view
-      v-if="directiveRegistered"
-      v-runtime-glow="true"
-      class="chip"
-    />
+    <view v-if="directiveRegistered" v-runtime-glow="true" class="chip" />
     <ActionButton
       testID="global-install-plugin"
       :title="
@@ -148,11 +144,7 @@ function runInAppContext(): void {
       :onPress="triggerWarnOutsideSetup"
       color="#f5a623"
     />
-    <text
-      v-if="warnTriggered"
-      class="note-text"
-      testID="global-warn-triggered"
-    >
+    <text v-if="warnTriggered" class="note-text" testID="global-warn-triggered">
       inject() outside setup() called — see the warn log below
     </text>
     <ActionButton

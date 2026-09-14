@@ -119,6 +119,8 @@ import {
   type IHostBehavior,
   type IPayloadFold,
   type ISymbioteNode,
+  propsOf,
+  setProp,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../component-names';
@@ -215,14 +217,14 @@ const buttonDisabled: IDisabledResolver = props => projectionOf(props).disabled;
  */
 function viewFold(owner: ISymbioteNode): IPayloadFold {
   return props => {
-    const { color, disabled } = projectionOf(owner.props);
+    const { color, disabled } = projectionOf(propsOf(owner));
     return { ...props, style: resolveButtonViewStyle(color, disabled) };
   };
 }
 
 function textFold(owner: ISymbioteNode): IPayloadFold {
   return props => {
-    const { color, disabled } = projectionOf(owner.props);
+    const { color, disabled } = projectionOf(propsOf(owner));
     return {
       ...props,
       style: resolveButtonTextStyle(color, disabled),
@@ -335,7 +337,8 @@ function buildStructure(node: ISymbioteNode): ISymbioteNode {
   // host tag inherits nothing a `<Text>` component did — Svelte's Button clipped long labels
   // mid-word for exactly this reason (`.claude/rules/host-primitive-tier.md`, "The THIRD path").
   // Constants, because the app cannot reach this node to override them.
-  text.props = resolveTextProps({});
+  for (const [key, value] of Object.entries(resolveTextProps({})))
+    setProp(text, key, value);
   // Empty until the redirected `title` arrives. The commit walk drops an empty raw text
   // (`isEmptyRawText`, node.ts), so no Fabric node exists for it until it has a label — and that
   // check reads `props.text`, which the redirect writes, not the fold's uppercased output.

@@ -36,6 +36,7 @@ import {
   type ISymbioteEvent,
   type ISymbioteNode,
   type IViewStyle,
+  setProp,
 } from '@symbiote-native/engine';
 
 import type {
@@ -188,7 +189,8 @@ function buildSpinner(platform: IActivityIndicatorPlatform) {
     // Constants of the platform, never a function of a prop, so they are seeded at build time the
     // way ScrollView seeds `collapsable: false` — empty on iOS, AndroidProgressBar's two
     // requirements on Android.
-    spinner.props = { ...platform.nativeExtras };
+    for (const [key, value] of Object.entries(platform.nativeExtras))
+      setProp(spinner, key, value);
     spinner.payloadFold = spinnerFold(platform);
     appendChild(node, spinner);
     return spinner;

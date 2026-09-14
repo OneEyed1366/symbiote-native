@@ -21,6 +21,7 @@ import { describe, expect, it, afterEach, beforeEach } from 'vitest';
 import {
   censusRetainedTree,
   isSymbioteNode,
+  parentOf,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
@@ -58,7 +59,11 @@ function retainedRoot(): ISymbioteNode {
   if (!isSymbioteNode(handle))
     throw new Error('the list node carries no retained handle');
   let current: ISymbioteNode = handle;
-  while (current.parent !== undefined) current = current.parent;
+  let above = parentOf(current);
+  while (above !== undefined) {
+    current = above;
+    above = parentOf(current);
+  }
   return current;
 }
 

@@ -15,6 +15,7 @@ import {
   type IPayloadFold,
   type ISymbioteNode,
   type IViewStyle,
+  propOf,
 } from '@symbiote-native/engine';
 
 import { splitScrollViewStyle } from '../../scroll-view-commands';
@@ -42,7 +43,7 @@ function wrappedOwnerFold(base: IViewStyle, horizontal: boolean): IPayloadFold {
 function wrapperFold(owner: ISymbioteNode, base: IViewStyle): IPayloadFold {
   return props => ({
     ...props,
-    style: splitScrollViewStyle(base, owner.props.style).outer,
+    style: splitScrollViewStyle(base, propOf(owner, 'style')).outer,
   });
 }
 

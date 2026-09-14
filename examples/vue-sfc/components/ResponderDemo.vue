@@ -106,10 +106,7 @@ const onChipRelease = (index: number): void => {
       @responder-release="onStripRelease"
       @responder-terminate="onStripTerminate"
     >
-      <view
-        class="row-tight"
-        :style="{ transform: [{ translateX: rowDx }] }"
-      >
+      <view class="row-tight" :style="{ transform: [{ translateX: rowDx }] }">
         <view
           v-for="index in RESPONDER_CHIPS"
           :key="index"

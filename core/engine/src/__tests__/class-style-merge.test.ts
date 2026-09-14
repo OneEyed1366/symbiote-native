@@ -11,6 +11,7 @@ import {
   createElement,
   flattenStyle,
   getExplicitStyle,
+  getPublishedStyle,
   registerRules,
   routeProp,
 } from '../index';
@@ -37,7 +38,7 @@ describe('routeProp class/className + style merge', () => {
 
     routeProp(node, 'class', 'card');
 
-    expect(flattenStyle(node.props.style)).toEqual({ padding: 10 });
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({ padding: 10 });
   });
 
   // why: Vue templates author `class`, React JSX authors `className` — both must resolve through
@@ -56,7 +57,7 @@ describe('routeProp class/className + style merge', () => {
 
     routeProp(node, 'className', 'card');
 
-    expect(flattenStyle(node.props.style)).toEqual({ padding: 10 });
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({ padding: 10 });
   });
 
   // why: an inline `style` prop is the more specific, more local override — it must always win
@@ -76,7 +77,7 @@ describe('routeProp class/className + style merge', () => {
     routeProp(node, 'class', 'card');
     routeProp(node, 'style', { backgroundColor: 'blue' });
 
-    expect(flattenStyle(node.props.style)).toEqual({
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({
       padding: 10,
       backgroundColor: 'blue',
     });
@@ -96,7 +97,7 @@ describe('routeProp class/className + style merge', () => {
     routeProp(node, 'style', { backgroundColor: 'blue' });
     routeProp(node, 'class', 'card');
 
-    expect(flattenStyle(node.props.style)).toEqual({
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({
       padding: 10,
       backgroundColor: 'blue',
     });
@@ -120,7 +121,9 @@ describe('routeProp class/className + style merge', () => {
     routeProp(node, 'style', { backgroundColor: 'blue' });
     routeProp(node, 'class', undefined);
 
-    expect(flattenStyle(node.props.style)).toEqual({ backgroundColor: 'blue' });
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({
+      backgroundColor: 'blue',
+    });
   });
 
   // why: an adapter building style prop-by-prop (Angular's Ivy ɵɵstyleProp) must merge onto the
@@ -153,6 +156,8 @@ describe('routeProp class/className + style merge', () => {
     routeProp(node, 'class', 42);
     routeProp(node, 'style', { backgroundColor: 'blue' });
 
-    expect(flattenStyle(node.props.style)).toEqual({ backgroundColor: 'blue' });
+    expect(flattenStyle(getPublishedStyle(node))).toEqual({
+      backgroundColor: 'blue',
+    });
   });
 });

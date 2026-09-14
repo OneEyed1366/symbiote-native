@@ -5,7 +5,29 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import { Animated, Modal, FlatList, KeyboardAvoidingView, StatusBar, Keyboard, KEYBOARD_EVENT, Platform, StyleSheet, PixelRatio, useWindowDimensions, useColorScheme, AppState, Alert, ActionSheetIOS, Linking, Vibration, Share, createPortal, createTunnel, type IHostInstance } from '@symbiote-native/react';
+import {
+  Animated,
+  Modal,
+  FlatList,
+  KeyboardAvoidingView,
+  StatusBar,
+  Keyboard,
+  KEYBOARD_EVENT,
+  Platform,
+  StyleSheet,
+  PixelRatio,
+  useWindowDimensions,
+  useColorScheme,
+  AppState,
+  Alert,
+  ActionSheetIOS,
+  Linking,
+  Vibration,
+  Share,
+  createPortal,
+  createTunnel,
+  type IHostInstance,
+} from '@symbiote-native/react';
 // A real third-party native view, driven through symbiote's own wrapper (@symbiote-native/slider)
 // rather than the library's React component: the wrapper registers RNCSlider's ViewConfig and
 // renders the native leaf through the engine, so the SAME slider works on Vue/Angular too. App

@@ -53,7 +53,7 @@ function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
 
 function findText(text: string): IFakeNode | undefined {
   let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
+  walk(fabric.committedAll, node => {
     if (node.viewName === 'RCTRawText' && node.props.text === text)
       found = node;
   });
@@ -62,7 +62,7 @@ function findText(text: string): IFakeNode | undefined {
 
 function allTexts(): string[] {
   const texts: string[] = [];
-  walk(fabric.committed, node => {
+  walk(fabric.committedAll, node => {
     if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string') {
       texts.push(node.props.text);
     }

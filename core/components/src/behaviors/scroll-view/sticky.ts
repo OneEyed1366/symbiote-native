@@ -1,11 +1,11 @@
-// Sticky headers on the lowered path. BOTH forms live here — the CHILD form (`<sticky-header>`, the
-// path our own lists use) and the INDEX form (`stickyHeaderIndices`, RN's public API) — plus the
-// owner-side half that feeds them.
+// Sticky headers. BOTH forms live here — the CHILD form (`<sticky-header>`, the path our own lists
+// use) and the INDEX form (`stickyHeaderIndices`, RN's public API) — plus the owner-side half that
+// feeds them.
 //
 // WHY A CHILD AT ALL. `stickyHeaderIndices` is an index list because JSX has no way to MARK an
-// element — RN walks its own children array and wraps the flagged ones. `<StickyHeader>` says the
-// same thing in the one place a lowered element can read without an index: the tag of a node that
-// is already in the tree.
+// element — RN walks its own children array and wraps the flagged ones. `<sticky-header>` says the
+// same thing in the one place the engine can read without an index: the tag of a node that is
+// already in the tree.
 //
 // THE INDEX FORM IS BUILT (2026-09-07), and this header said it was impossible until then. Both
 // halves of that claim were false, measured against Angular's projection controller, which already
@@ -67,6 +67,9 @@ import {
   type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
+  propOf,
+  childrenOf,
+  parentOf,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../../component-names';
@@ -137,7 +140,9 @@ export function hasStickyHeaders(owner: ISymbioteNode): boolean {
 // otherwise), which is exactly when RN wraps the scroll view's own onLayout — so the gate flag
 // lands on the same ScrollViews the wrapper puts it on and on no others.
 function needsViewportHeight(owner: ISymbioteNode): boolean {
-  return hasStickyHeaders(owner) && owner.props.invertStickyHeaders === true;
+  return (
+    hasStickyHeaders(owner) && propOf(owner, 'invertStickyHeaders') === true
+  );
 }
 
 function ownerSticky(owner: ISymbioteNode): IStickyOwnerState {
@@ -189,7 +194,7 @@ function collectHeaders(
   members: ReadonlySet<ISymbioteNode>,
   out: ISymbioteNode[],
 ): void {
-  for (const child of node.children) {
+  for (const child of childrenOf(node)) {
     if (members.has(child)) out.push(child);
     collectHeaders(child, members, out);
   }
@@ -217,7 +222,7 @@ function orderedHeaders(
 // The attach happens after the header has registered, which is the same ordering React's
 // `useEffect` gives it.
 function syncThrottle(owner: ISymbioteNode, sticky: IStickyOwnerState): void {
-  const current = owner.props.scrollEventThrottle;
+  const current = propOf(owner, 'scrollEventThrottle');
   // Whatever stands in the key is the APP's unless it is byte-for-byte the value written here —
   // which is what makes the take-back on the last unregister safe.
   const ours =
@@ -316,7 +321,7 @@ export function releaseStickyOwner(owner: ISymbioteNode): void {
 
 // ---------------------------------------------------------------- the index form
 
-// `stickyHeaderIndices` on the lowered path, and it is deliberately NOT a second machine: a flagged
+// `stickyHeaderIndices`, and it is deliberately NOT a second machine: a flagged
 // child is MOVED into a synthesized `sticky-header` node, so ordering, cross-talk, the raised
 // throttle, the pin and the teardown are the child form's, unchanged. Indices decide only WHICH
 // children get one.
@@ -369,10 +374,19 @@ function wrapForIndex(slot: ISymbioteNode, child: ISymbioteNode): void {
   // so the wrapper takes the position the child vacates and nothing has to be removed.
   insertBefore(slot, wrapper, child);
   appendChild(wrapper, child);
+  // AFTER both, or the anchor above would resolve to the wrapper itself. `wrapper` is the engine's
+  // own "what stands in this node's place" indirection (`ISymbioteNode.wrapper`), and a sticky
+  // wrapper is exactly that: the framework keeps naming the ScrollView and the row, while the tree
+  // holds the wrapper in the row's place — so a later `removeChild(owner, row)` takes the wrapper
+  // out with it instead of being refused for naming a parent the row no longer has.
+  child.wrapper = wrapper;
 }
 
 function unwrapIndex(slot: ISymbioteNode, wrapper: ISymbioteNode): void {
-  const child = wrapper.children[0];
+  const child = childrenOf(wrapper)[0];
+  // Before the move, for the same reason it is set after one: `insertBefore` would otherwise put
+  // the wrapper back in the child's place.
+  if (child !== undefined) child.wrapper = undefined;
   if (child !== undefined) insertBefore(slot, child, wrapper);
   removeChild(slot, wrapper);
 }
@@ -388,7 +402,7 @@ function unwrapIndex(slot: ISymbioteNode, wrapper: ISymbioteNode): void {
 export function reconcileStickyIndices(owner: ISymbioteNode): void {
   const slot = owner.childHost;
   if (slot === undefined) return;
-  const wanted = stickyIndexSet(owner.props.stickyHeaderIndices);
+  const wanted = stickyIndexSet(propOf(owner, 'stickyHeaderIndices'));
   if (wanted === undefined && !ownersWithIndexWrappers.has(owner)) return;
 
   let paintIndex = 0;
@@ -398,13 +412,14 @@ export function reconcileStickyIndices(owner: ISymbioteNode): void {
   //
   // A claimed `<RefreshControl>` needs no filter here, unlike Angular's walk — `hostFor` keeps a
   // claimed child on the OWNER, so it never reaches the slot at all.
-  for (const child of [...slot.children]) {
+  for (const child of [...childrenOf(slot)]) {
     const wrapper = indexWrappers.has(child) ? child : undefined;
     if (wrapper !== undefined) {
       // The framework removes a child from the SLOT, because that is where it appended it — so the
       // engine's `removeChild` finds nothing to splice and only clears `child.parent`, leaving a
       // committed wrapper around a node nobody owns. This walk is the only thing that can see it.
-      if (wrapper.children[0]?.parent !== wrapper) {
+      const held = childrenOf(wrapper)[0];
+      if (held === undefined || parentOf(held) !== wrapper) {
         removeChild(slot, wrapper);
         changed = true;
         continue;
@@ -441,10 +456,10 @@ export function reconcileStickyIndices(owner: ISymbioteNode): void {
 // ---------------------------------------------------------------- the header half
 
 function findScrollOwner(node: ISymbioteNode): ISymbioteNode | undefined {
-  let current = node.parent;
+  let current = parentOf(node);
   while (current !== undefined) {
     if (scrollOwners.has(current)) return current;
-    current = current.parent;
+    current = parentOf(current);
   }
   return undefined;
 }
@@ -491,7 +506,7 @@ function dispatch(node: ISymbioteNode, action: IStickyAction): void {
   const sticky = stickyOwners.get(runtime.owner);
   const result = reduceSticky(runtime.state, action, {
     os: Platform.OS,
-    inverted: runtime.owner.props.invertStickyHeaders === true,
+    inverted: propOf(runtime.owner, 'invertStickyHeaders') === true,
     scrollViewHeight: sticky?.viewportHeight,
     nextHeaderLayoutY: nextHeaderY(runtime, node),
   });

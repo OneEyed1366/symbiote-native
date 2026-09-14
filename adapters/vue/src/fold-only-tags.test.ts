@@ -1,9 +1,6 @@
-// The four primitives that became TAGS on 2026-09-10 and left `lowering-equivalence.test.ts`'s
-// comparison with them — `safe-area-view`, `input-accessory-view`, `refresh-control`, `image`.
-// That oracle compares a component spelling against a tag spelling, so a primitive with no
-// component left has nothing to be equal TO and its row must be dropped; this file is what the row
-// is replaced BY, and it asks the absolute question the comparison could not: does the tag alone
-// commit the fold?
+// The four primitives that became TAGS on 2026-09-10 — `safe-area-view`, `input-accessory-view`,
+// `refresh-control`, `image`. With no component spelling left there is nothing to compare against,
+// so this asks the absolute question a comparison could not: does the tag alone commit the fold?
 //
 // Each case pins something the DELETED WRAPPER used to do, so a fold that failed to move down goes
 // red here rather than on a device:

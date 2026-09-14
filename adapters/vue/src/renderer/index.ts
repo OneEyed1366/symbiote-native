@@ -16,14 +16,19 @@ import {
   createAnchor,
   createElement,
   createRawText,
+  childrenOf,
   dlog,
   insertBefore,
+  isRawTextNode,
+  isTextContainer,
+  nextSiblingOf,
+  parentOf,
   removeChild,
   routeProp,
   setProp,
   setText,
+  textOf,
   toPublicInstance,
-  RAW_TEXT_COMPONENT,
   SymbioteSurface,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -40,14 +45,14 @@ function isSurface(parent: IHostElement): parent is SymbioteSurface {
 }
 
 function isRawText(node: ISymbioteNode): boolean {
-  return node.component === RAW_TEXT_COMPONENT;
+  return isRawTextNode(node);
 }
 
 // RN's Text.js applies two defaults on the way to native (core/components/src/text-props.ts:
 // ellipsizeMode 'tail', allowFontScaling true unless literally false). The Vue <Text> wrapper
-// folded them with resolveTextProps; a template that the SFC transformer lowered to the
-// intrinsic `text` has no wrapper, so the renderer seeds them instead. Without this a
-// numberOfLines={1} line clips mid-word with no ellipsis — device-observed, and silent.
+// folded them with resolveTextProps; a `<text>` tag has no wrapper, so the renderer seeds them
+// instead. Without this a numberOfLines={1} line clips mid-word with no ellipsis — device-observed,
+// and silent.
 const TEXT_DEFAULTS: ReadonlyMap<string, unknown> = new Map<string, unknown>([
   ['ellipsizeMode', 'tail'],
   ['allowFontScaling', true],
@@ -59,10 +64,9 @@ function seedTextDefaults(node: ISymbioteNode): void {
 
 // RN's `id` is the modern W3C-named alias for `nativeID` — View.js copies it over
 // (`processedProps.nativeID = id`), so the two name ONE native prop. React folds it in its
-// component wrapper and Svelte and Solid in their transforms; Vue had it nowhere, so `<View
-// id="x">` reached Fabric with an unknown `id` and no `nativeID`, silently and on device only.
-// It lives in the renderer rather than in a transform because that covers all four Vue paths at
-// once — lowered SFC, lowered TSX, the component wrapper, and a hand-written
+// component wrapper and Svelte and Solid elsewhere; Vue had it nowhere, so `<view id="x">` reached
+// Fabric with an unknown `id` and no `nativeID`, silently and on device only. It lives in the
+// renderer because that covers every Vue path at once — SFC, TSX, and a hand-written
 // `h('view', { id })` no compiler ever sees.
 //
 // Caveat, and it matches what Solid's compile-time rename already does: with BOTH `id` and
@@ -124,7 +128,7 @@ function wrapListenerForErrorHandling(
 // explicit undefined alike, and only a literal `false` opts out of allowFontScaling. Reached
 // only when a value is already undefined, so it costs nothing on the hot path.
 function textDefaultFor(node: ISymbioteNode, key: string): unknown {
-  return node.isText ? TEXT_DEFAULTS.get(key) : undefined;
+  return isTextContainer(node) ? TEXT_DEFAULTS.get(key) : undefined;
 }
 
 // One renderer per mounted surface: the options close over the surface so every mutation
@@ -137,8 +141,8 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       const descriptor = descriptorFor(type);
       // `type` as the third argument, not just `descriptor.component`: the behavior registry is
       // keyed by the INTRINSIC TAG (`pressable`), while a node only ever carries the
-      // resolved Fabric name (`RCTView`). This is the one place that still holds both, so a
-      // lowered primitive whose machine lives on the engine node can be matched at all.
+      // resolved Fabric name (`RCTView`). This is the one place that holds both, so a primitive
+      // whose machine lives on the engine node can be matched at all.
       const node = createElement(descriptor.component, descriptor.isText, type);
       if (descriptor.isText) seedTextDefaults(node);
       // The imperative public-instance API (measure / setNativeProps / focus / …) is already on
@@ -194,27 +198,28 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       // this instead of insert() when an element's children collapse to a single string, so
       // without the check a raw text lands under a non-Text parent - an invalid Fabric tree
       // built silently, which is worse than the throw insert() would have given.
-      if (!el.isText) {
+      if (!isTextContainer(el)) {
         throw new Error(
           `Text string "${text}" must be rendered inside a <Text>`,
         );
       }
       // An RCTText carries its string as a single raw-text child. Reuse a lone existing
       // one to avoid churn; otherwise replace all children with a fresh raw-text node.
-      const [first] = el.children;
-      if (el.children.length === 1 && first !== undefined && isRawText(first)) {
+      const existing = childrenOf(el);
+      const [first] = existing;
+      if (existing.length === 1 && first !== undefined && isRawText(first)) {
         setText(first, text);
       } else {
-        for (const child of el.children.slice()) removeChild(el, child);
+        for (const child of existing.slice()) removeChild(el, child);
         appendChild(el, createRawText(text));
       }
       surface.requestCommit();
     },
 
     insert(child, parent, anchor) {
-      if (isRawText(child) && (isSurface(parent) || !parent.isText)) {
+      if (isRawText(child) && (isSurface(parent) || !isTextContainer(parent))) {
         throw new Error(
-          `Text string "${String(child.props.text)}" must be rendered inside a <Text>`,
+          `Text string "${textOf(child) ?? ''}" must be rendered inside a <Text>`,
         );
       }
       if (isSurface(parent)) {
@@ -231,21 +236,20 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
     remove(child) {
       // A top-level node has no parent (it lives in surface.children); everything else
       // detaches from its retained parent.
-      const parent = child.parent;
+      const parent = parentOf(child);
       if (parent !== undefined) removeChild(parent, child);
       else surface.removeChild(child);
       surface.requestCommit();
     },
 
     parentNode(node) {
-      return node.parent ?? surface;
+      return parentOf(node) ?? surface;
     },
 
     nextSibling(node) {
-      const siblings =
-        node.parent !== undefined ? node.parent.children : surface.children;
-      const index = siblings.indexOf(node);
-      return index >= 0 ? (siblings[index + 1] ?? null) : null;
+      // `?? null` because Vue's RendererOptions types the miss as null, not undefined; the
+      // engine answers undefined uniformly and the surface fallback lives there now.
+      return nextSiblingOf(node, surface) ?? null;
     },
 
     patchProp(el, key, _prev, next, _namespace, parentComponent) {

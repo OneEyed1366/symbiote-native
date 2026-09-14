@@ -12,6 +12,7 @@ import {
   clearGlobalStyles,
   createElement,
   createSurface,
+  propOf,
   registerRules,
   routeProp,
   setNodePressed,
@@ -28,8 +29,11 @@ function mount(node: ISymbioteNode) {
   return surface;
 }
 
+// The array `pushClassStyle` last published, read back out of the tree HOST — the engine keeps no
+// props of its own, and slot identity is what half these cases assert on, so this must be the
+// stored value rather than a rebuild of it.
 function publishedStyle(node: ISymbioteNode): unknown[] {
-  const style = node.props.style;
+  const style = propOf(node, 'style');
   return Array.isArray(style) ? style : [];
 }
 

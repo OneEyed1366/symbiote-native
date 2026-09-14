@@ -32,7 +32,7 @@ function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
 
 function findText(text: string): IFakeNode | undefined {
   let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
+  walk(fabric.committedAll, node => {
     if (node.viewName === 'RCTRawText' && node.props.text === text)
       found = node;
   });
@@ -41,7 +41,7 @@ function findText(text: string): IFakeNode | undefined {
 
 function findByTestId(testId: string): IFakeNode | undefined {
   let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
+  walk(fabric.committedAll, node => {
     if (node.props.testID === testId) found = node;
   });
   return found;

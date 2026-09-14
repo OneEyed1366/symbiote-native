@@ -1,6 +1,6 @@
 // Image's host behavior, and it carries NOTHING but a prop fold — no listeners, no timers, no
 // commit hook. That is what a "fold-only" primitive means: the wrapper's whole body was prop
-// mapping, so its lowered form owes exactly that and nothing else.
+// mapping, so the tag owes exactly that and nothing else.
 //
 // The fold itself is not written here. `mapImageProps` in `../view/render-image` is the one
 // implementation, and this file only narrows a flat prop bag into the typed view it takes — the
@@ -9,9 +9,8 @@
 // already paid for once: `adapters/svelte/src/components/image/image-logic.ts` reproduces it by
 // hand and says so in its own header, because nothing was exported to call.
 //
-// WHY THIS MAY SHARE THE WRAPPER'S TAG, where TextInput needed `-managed`. A behavior fold is keyed
-// on the tag, and `renderImage` emits `image` too — so on a wrapper-built node this fold
-// runs on ALREADY-FOLDED props. That is safe here and only here, because the mapping is idempotent:
+// THE FOLD MAY MEET ALREADY-FOLDED PROPS — `renderImage` emits `image` too, and a re-render writes
+// the same bag back. That is safe because the mapping is idempotent:
 // every alias it consumes (`src`, `srcSet`, `alt`, `width`, `height`, …) is absent from its own
 // output, `source` comes back in the array shape `normalizeSource` guarantees, and
 // `loadingIndicatorSource` leaves under a DIFFERENT name (`loadingIndicatorSrc`), so a second pass

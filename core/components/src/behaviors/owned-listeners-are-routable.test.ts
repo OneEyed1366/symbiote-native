@@ -2,14 +2,12 @@
 //
 //   ownedListeners  MINUS  (BASE_EVENTS + COMPONENT_EVENTS[component] + RESPONDER_EVENTS)
 //
-// Anything left over is DEAD on a lowered element and fine on the component path, which is why it
-// survives every other check. `routeProp` hands an `on*` prop to `setEventListener` — and so to the
-// behavior's stash — only for a registered event; a name that misses falls through to `setProp` and
-// sits in `node.props`, where a machine that reads the stash never looks. A wrapper passes the same
-// callback to the machine directly and stays correct, so the two paths disagree in silence.
+// Anything left over is DEAD, silently. `routeProp` hands an `on*` prop to `setEventListener` — and
+// so to the behavior's stash — only for a registered event; a name that misses falls through to
+// `setProp` and sits in `node.props`, where a machine that reads the stash never looks.
 //
 // Found by the gap it left: `pressMove` was the one name of the press machine's eight in neither
-// engine list, so a lowered `<Pressable @press-move>` highlighted on press (that is `activeStyle`,
+// engine list, so `<pressable @press-move>` highlighted on press (that is `activeStyle`,
 // engine-side) while its dx/dy readout never moved. Device-reported on `examples/vue-sfc`,
 // 2026-09-02.
 //
@@ -39,7 +37,7 @@ import { registerTouchableNativeFeedbackBehavior } from './touchable-native-feed
 
 const fabric = installFabric();
 
-function everyLoweredTag(): string[] {
+function everySpecTag(): string[] {
   return Object.values(HOST_PRIMITIVES).flatMap(spec =>
     spec.intrinsicWhen === undefined
       ? [spec.intrinsic]
@@ -68,7 +66,7 @@ describe('every name a behavior owns is routable to its stash', () => {
     const dead: string[] = [];
     let checked = 0;
 
-    for (const tag of everyLoweredTag()) {
+    for (const tag of everySpecTag()) {
       const owned = hostBehaviorFor(tag)?.ownedListeners ?? [];
       for (const event of owned) {
         const node = createElement(descriptorFor(tag).component, false, tag);

@@ -1,11 +1,11 @@
 // RN has no `value` Fabric prop. A TextInput's controlled value rides as the private `text` prop,
 // and the fold that produces it — `value ?? defaultValue` — used to live only in the component
-// WRAPPER. A lowered element has no wrapper, so a transform printing the author's `value={x}` would
-// hand Fabric a key no ViewConfig declares: silently dropped, `text` never set, the field renders
-// empty. Every test green, device only.
+// WRAPPER. A tag has none, so the author's `value={x}` would reach Fabric as a key no ViewConfig
+// declares: silently dropped, `text` never set, the field renders empty. Every test green, device
+// only.
 //
 // The fold now runs in `fabricProps`, so this asserts the COMMITTED payload on a node built the way
-// a lowered element is — `routeProp` only, no wrapper, no adapter. Asserting `node.props` would be
+// a tag is — `routeProp` only, no wrapper, no adapter. Asserting `node.props` would be
 // the wrong end of the chain: the authored shape deliberately keeps `value`, and only the payload
 // says what native receives.
 import { describe, expect, it } from 'vitest';

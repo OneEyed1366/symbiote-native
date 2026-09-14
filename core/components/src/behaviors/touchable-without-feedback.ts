@@ -48,6 +48,8 @@ import {
   type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
+  propOf,
+  propsOf,
 } from '@symbiote-native/engine';
 
 import {
@@ -182,9 +184,8 @@ function cloneFold(owner: ISymbioteNode, inner: IPayloadFold | undefined) {
     // The owner's aria props are on the OWNER, so the engine's own fold at `fabricProps` — which
     // reads the node being committed — never sees them. Run it here over the source bag; the fold
     // returns its input by identity when there is nothing to do.
-    const source = owner.hasAriaAlias
-      ? foldAriaProps(owner.props)
-      : owner.props;
+    const ownerProps = propsOf(owner);
+    const source = owner.hasAriaAlias ? foldAriaProps(ownerProps) : ownerProps;
 
     for (const key of CLONED_ALWAYS) next[key] = source[key];
     for (const key of CLONED_WHEN_SET) {
@@ -230,12 +231,12 @@ function refinementFor(
   return (_node, config) => {
     const handlers = createTouchableFeedbackHandlers(
       {
-        delayPressIn: numberOr(owner.props.delayPressIn, 0),
-        delayPressOut: numberOr(owner.props.delayPressOut, 0),
+        delayPressIn: numberOr(propOf(owner, 'delayPressIn'), 0),
+        delayPressOut: numberOr(propOf(owner, 'delayPressOut'), 0),
         // Read raw rather than off `config`, which has already defaulted the absent case to the
         // press machine's own 130 ms — a floor RN's Touchables never see.
         minPressDuration: numberOr(
-          owner.props.minPressDuration,
+          propOf(owner, 'minPressDuration'),
           TOUCHABLE_MIN_PRESS_DURATION_MS,
         ),
         schedule: (callback, ms) => {

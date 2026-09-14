@@ -27,9 +27,13 @@ describe('AnimatedColor — Positive (input forms parse to channels)', () => {
     expect(new AnimatedColor('#f80').__getValue()).toBe('rgba(255, 136, 0, 1)');
   });
 
-  it('parses an rgba() string', () => {
+  // why: alpha comes back QUANTIZED to 8 bits (0.5 -> 128/255), because the decoder packs every
+  // color into one 0xrrggbbaa int the way RN does. The old float-exact 0.5 was fiction: the value
+  // is packed into an int downstream regardless, so nothing ever saw it. Interpolation between
+  // two such endpoints is still float, so a tween is unaffected.
+  it('parses an rgba() string, with alpha quantized the way RN quantizes it', () => {
     expect(new AnimatedColor('rgba(10, 20, 30, 0.5)').__getValue()).toBe(
-      'rgba(10, 20, 30, 0.5)',
+      `rgba(10, 20, 30, ${128 / 255})`,
     );
   });
 
@@ -113,15 +117,40 @@ describe('AnimatedColor — Positive (input forms parse to channels)', () => {
   });
 });
 
-describe('AnimatedColor — Fallback (silent default instead of throwing — see file header)', () => {
-  it('falls back to default black on an unparseable named color', () => {
+describe('AnimatedColor — the CSS color forms RN itself accepts', () => {
+  // why: an animation whose start color silently becomes BLACK is worse than one that throws --
+  // nothing is red, and the tween just runs from the wrong place. RN resolves these through
+  // @react-native/normalize-colors, so an app writing the idiom every RN tutorial writes
+  // (`color: 'red'`) must animate from red.
+  it('parses a named color', () => {
+    expect(new AnimatedColor('red').__getValue()).toBe('rgba(255, 0, 0, 1)');
     expect(new AnimatedColor('rebeccapurple').__getValue()).toBe(
+      'rgba(102, 51, 153, 1)',
+    );
+  });
+
+  it('parses transparent and the hsl() form', () => {
+    expect(new AnimatedColor('transparent').__getValue()).toBe(
+      'rgba(0, 0, 0, 0)',
+    );
+    expect(new AnimatedColor('hsl(0, 100%, 50%)').__getValue()).toBe(
+      'rgba(255, 0, 0, 1)',
+    );
+  });
+});
+
+describe('AnimatedColor — Fallback (silent default instead of throwing — see file header)', () => {
+  // why: the fixture used to be 'rebeccapurple', chosen when the decoder knew hex and rgb() only.
+  // It is a real CSS name and resolves to #663399 now, so it stopped testing the fallback at all.
+  // A string that is not a color in any grammar is what this group needs.
+  it('falls back to default black on a string that names no color', () => {
+    expect(new AnimatedColor('notacolor').__getValue()).toBe(
       'rgba(0, 0, 0, 1)',
     );
   });
 
   it('never throws for an unparseable color: constructing and reading it is safe inside a render', () => {
-    expect(() => new AnimatedColor('rebeccapurple').__getValue()).not.toThrow();
+    expect(() => new AnimatedColor('notacolor').__getValue()).not.toThrow();
   });
 });
 

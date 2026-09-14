@@ -11,7 +11,7 @@
 // WHY IT NEEDED A NEW ENGINE HOOK AND `Pressable` DID NOT. A press machine is driven entirely by
 // events, which arrive long after commit. The controlled handshake is driven by a PROP: `value`
 // changing is what must re-run the divergence check, and in a component the render is what does
-// that. A lowered element has no render, so `IHostBehavior.afterCommit` is the equivalent beat —
+// that. A tag has no render, so `IHostBehavior.afterCommit` is the equivalent beat —
 // see that interface for why it is not a hook on `setProp`.
 //
 // THE ORDER OF THE TWO COMMIT HOOKS IS LOAD-BEARING HERE, which is why the engine pins it with a
@@ -24,6 +24,7 @@ import {
   blurTextInput,
   dispatchViewCommand,
   dlog,
+  propOf,
   registerHostBehavior,
   requestCommitFor,
   setBehaviorListener,
@@ -46,9 +47,8 @@ import {
   type ITextInputHandle,
 } from '../state/text-input';
 
-// Both spellings, because `multiline` picks between two Fabric views and a lowering transform
-// resolves that statically. The behavior is registered for both so it does not care which one the
-// transform emitted.
+// Both spellings, because `multiline` picks between two Fabric views and the TAG is what decides.
+// The behavior is registered for both so it does not care which one the app wrote.
 export const TEXT_INPUT_TAG = 'text-input';
 export const TEXT_INPUT_MULTILINE_TAG = 'text-input-multiline';
 
@@ -72,7 +72,7 @@ function stateOf(node: ISymbioteNode): IBehaviorState | undefined {
 }
 
 function stringProp(node: ISymbioteNode, key: string): string | undefined {
-  const value = node.props[key];
+  const value = propOf(node, key);
   return typeof value === 'string' ? value : undefined;
 }
 
@@ -89,7 +89,7 @@ function selectionOf(value: unknown): { start: number; end: number } {
 }
 
 // The app's own callback for an owned event name, read from the STASH rather than from
-// `node.props`: every name below is in `ownedListeners`, so `routeProp` parks the app's handler
+// the props: every name below is in `ownedListeners`, so `routeProp` parks the app's handler
 // beside the machine's instead of overwriting it.
 function callAppListener(
   node: ISymbioteNode,
@@ -101,16 +101,14 @@ function callAppListener(
 }
 
 // `onValueChange(event)` is NOT a Fabric event — it is a fold the component wrapper used to do
-// over the raw `change` payload, so it lives in `node.props` as a plain function key and
-// `fabricProps` drops it on the way to native. A lowered element has no wrapper to run that fold, so
-// before this the callback was simply never called: the field echoed keystrokes natively (native
-// owns its own text) while every value the app derived from it stayed frozen. Device-found
-// 2026-08-31 in examples/solid's canary — the greeting never left "Hello, stranger".
+// over the raw `change` payload, so it lives on the node as a plain prop key and
+// `fabricProps` drops it on the way to native. A tag has no wrapper to run that fold, so before
+// this the callback was simply never called: the field echoed keystrokes natively (native owns its
+// own text) while every value the app derived from it stayed frozen. Device-found 2026-08-31 in
+// examples/solid's canary — the greeting never left "Hello, stranger".
 //
 // Same class as `value -> text` (`core/engine/src/fabric-props.ts`) and the same repair: below the
-// fork, where all five adapters inherit it. Refusing to lower an element carrying the prop was the
-// other candidate and is strictly worse — it makes the optimisation opt out of the idiom the
-// ecosystem actually writes, to avoid a fold the runtime can do in three lines.
+// fork, where all five adapters inherit it.
 //
 // The listener takes ONE argument, `text` carried on the event itself (`ITextInputChangeEvent`),
 // not `(text, event)` — Svelte's compiler forces every individual `on*` attribute through a native
@@ -121,7 +119,7 @@ function callValueChange(
   text: string,
   event: ISymbioteEvent,
 ): void {
-  const listener = node.props.onValueChange;
+  const listener = propOf(node, 'onValueChange');
   if (typeof listener !== 'function') return;
   const changeEvent: ITextInputChangeEvent = Object.assign(event, { text });
   listener(changeEvent);
@@ -130,7 +128,7 @@ function callValueChange(
 // The W3C/legacy alias fold the WRAPPER runs in its component body — `inputMode` -> `keyboardType`,
 // `enterKeyHint` -> `returnKeyType`, `readOnly` -> inverted `editable`, `blurOnSubmit` ->
 // `submitBehavior`, plus the `underlineColorAndroid: 'transparent'` default that hides the Material
-// bar. A lowered element has no body, so before this every one of them was dropped: the raw alias
+// bar. A tag has no body, so before this every one of them was dropped: the raw alias
 // reached Fabric as a key no ViewConfig declares, which throws nothing and renders nothing, so
 // `inputMode="numeric"` simply produced the default keyboard on a device while the whole headless
 // suite stayed green.
@@ -153,10 +151,9 @@ function booleanOf(value: unknown): boolean | undefined {
 }
 
 // `multiline` picks between TWO Fabric views, so the TAG decides it and no later prop write moves a
-// node between them. Two of the three paths that build the node resolve it before the engine ever
-// sees the prop — the wrapper CONSUMES it to pick its intrinsic, a lowering transform reads a
-// literal at compile time — and the third, an author writing the tag by hand, has neither. That
-// leaves two silent, device-only divergences, measured on the committed payload:
+// node between them. The wrapper that used to stand here CONSUMED the prop to pick its intrinsic;
+// an author writing the tag can spell the two apart, which leaves two silent, device-only
+// divergences, measured on the committed payload:
 //
 //   <text-input-multiline value="a" />   RCTMultilineTextInputView, folded as SINGLE-line:
 //                                        submitBehavior 'blurAndSubmit', so Return blurs instead
@@ -251,11 +248,10 @@ function attach(node: ISymbioteNode): void {
     lastNativeText: undefined,
     isFocused: false,
   });
-  // The mirror's seed has to reach the PAYLOAD too, not just this state object. Every wrapper hands
-  // the count to `renderTextInput` on every render, so a component-path input commits the key at
-  // create; the behavior used to write it only inside the change handshake, so a lowered input
-  // carried no such key until the user typed. Found independently by three adapters' equivalence
-  // arms, 2026-09-01 — a divergence between the two paths of ONE adapter, not between adapters.
+  // The mirror's seed has to reach the PAYLOAD too, not just this state object. The wrappers handed
+  // the count over on every render, so an input committed the key at create; the behavior used to
+  // write it only inside the change handshake, so the tag carried no such key until the user typed.
+  // Found independently by three adapters, 2026-09-01.
   //
   // No `requestCommitFor` here: at create the renderer commits anyway, and on a re-attach the key is
   // already standing at this same value, so `setProp`'s identity guard makes the write a no-op.
@@ -275,7 +271,7 @@ function attachAfterCommit(node: ISymbioteNode): void {
     stringProp(node, 'defaultValue'),
   );
 
-  if (node.props.autoFocus !== true) return;
+  if (propOf(node, 'autoFocus') !== true) return;
   // Driven in JS rather than as a native prop, exactly as RN does it
   // (TextInput.js:538 -> TextInputState.focusInput). The native command is idempotent if the input
   // is already focused.
@@ -296,7 +292,7 @@ function afterCommit(node: ISymbioteNode): void {
   // `selection` is `{ start, end? }` when present. SELECTION_NONE (-1) is RN's "leave the cursor
   // where native put it" sentinel, so an absent selection must not be read as position 0 — that
   // would jump the caret to the front of the field on every controlled write.
-  const { start, end } = selectionOf(node.props.selection);
+  const { start, end } = selectionOf(propOf(node, 'selection'));
 
   dlog(
     `TextInput behavior: setTextAndSelection count=${state.mostRecentEventCount} ` +

@@ -9,9 +9,45 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { processBackgroundImage } from './index';
-import { setColorProcessor } from '../commit';
+import { setColorProcessor } from '../platform-color';
 
 const PROCESSED_COLOR = 0x7f_b5_ff_d9;
+
+// processBackgroundImage now imports RN's own implementation, which calls RN's `processColor`
+// directly - so the injected `setColorProcessor` seam no longer governs a colour STOP, and these
+// assertions read real platform ints. As aarrggbb, opaque red is 0xffff0000 and opaque blue is
+// 0xff0000ff. `installRealisticColorProcessor()` below is left where it stands but no longer
+// decides anything here; the tests that still call it are the ones asserting direction or
+// rejection, where no colour is compared.
+const RED = 0xff_ff_00_00;
+const BLUE = 0xff_00_00_ff;
+
+// Opaque red as rrggbbaa (0xff0000ff) rotates into aarrggbb 0xffff0000 - the same value as RED,
+// which is the whole point: the rotation is what makes a numeric literal land as red not blue.
+const ROTATED = 0xff_ff_00_00;
+
+// why: a numeric color stop is the app author's own literal (rrggbbaa), not an already-resolved
+// platform int - it owes the same processColor hop a string owes. RN's processColor range-checks
+// it and rotates rrggbbaa into aarrggbb; skipping the hop commits opaque RED unrotated, which
+// native reads as aarrggbb, i.e. blue.
+describe('a numeric color stop goes through the platform processor', () => {
+  it('routes a numeric stop color in the array form', () => {
+    setColorProcessor(value =>
+      value === 0xff_00_00_ff ? ROTATED : PROCESSED_COLOR,
+    );
+    const [gradient] = processBackgroundImage([
+      {
+        type: 'linear-gradient',
+        direction: '180deg',
+        colorStops: [{ color: 0xff_00_00_ff }, { color: 0xff_00_00_ff }],
+      },
+    ]);
+    expect(gradient.colorStops).toEqual([
+      { color: ROTATED, position: null },
+      { color: ROTATED, position: null },
+    ]);
+  });
+});
 
 function installRealisticColorProcessor(): void {
   setColorProcessor(value => {
@@ -39,8 +75,8 @@ describe('processBackgroundImage', () => {
         throw new Error('expected linear-gradient');
       expect(gradient.direction).toEqual({ type: 'angle', value: 180 });
       expect(gradient.colorStops).toEqual([
-        { color: PROCESSED_COLOR, position: null },
-        { color: PROCESSED_COLOR, position: null },
+        { color: RED, position: null },
+        { color: BLUE, position: null },
       ]);
     });
 
@@ -108,8 +144,8 @@ describe('processBackgroundImage', () => {
       if (gradient?.type !== 'linear-gradient')
         throw new Error('expected linear-gradient');
       expect(gradient.colorStops).toEqual([
-        { color: PROCESSED_COLOR, position: '0%' },
-        { color: PROCESSED_COLOR, position: '100%' },
+        { color: RED, position: '0%' },
+        { color: BLUE, position: '100%' },
       ]);
     });
 
@@ -121,9 +157,9 @@ describe('processBackgroundImage', () => {
       if (gradient?.type !== 'linear-gradient')
         throw new Error('expected linear-gradient');
       expect(gradient.colorStops).toEqual([
-        { color: PROCESSED_COLOR, position: '0%' },
-        { color: PROCESSED_COLOR, position: '50%' },
-        { color: PROCESSED_COLOR, position: '100%' },
+        { color: RED, position: '0%' },
+        { color: RED, position: '50%' },
+        { color: BLUE, position: '100%' },
       ]);
     });
 
@@ -135,9 +171,9 @@ describe('processBackgroundImage', () => {
       if (gradient?.type !== 'linear-gradient')
         throw new Error('expected linear-gradient');
       expect(gradient.colorStops).toEqual([
-        { color: PROCESSED_COLOR, position: null },
+        { color: RED, position: null },
         { color: null, position: '20%' },
-        { color: PROCESSED_COLOR, position: null },
+        { color: BLUE, position: null },
       ]);
     });
 
@@ -317,8 +353,8 @@ describe('processBackgroundImage', () => {
         throw new Error('expected linear-gradient');
       expect(gradient.direction).toEqual({ type: 'angle', value: 45 });
       expect(gradient.colorStops).toEqual([
-        { color: 'red', position: null },
-        { color: 'blue', position: null },
+        { color: RED, position: null },
+        { color: BLUE, position: null },
       ]);
     });
 
@@ -335,9 +371,9 @@ describe('processBackgroundImage', () => {
       if (gradient?.type !== 'linear-gradient')
         throw new Error('expected linear-gradient');
       expect(gradient.colorStops).toEqual([
-        { color: 'red', position: '0%' },
-        { color: 'red', position: '50%' },
-        { color: 'blue', position: '100%' },
+        { color: RED, position: '0%' },
+        { color: RED, position: '50%' },
+        { color: BLUE, position: '100%' },
       ]);
     });
 

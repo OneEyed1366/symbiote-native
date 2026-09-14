@@ -63,35 +63,12 @@ export type ISymbioteIntrinsic =
   | 'horizontal-scroll-content'
   | 'text-input'
   | 'text-input-multiline'
-  // The COMPONENT path's spelling of the pair above, resolving to the SAME native views. Same
-  // trick as `pressable`, used the other way round: there the LOWERED tag is the new one
-  // because the wrapper always emitted `view`; here the wrapper got the plain name first,
-  // so the lowered path keeps it and the wrapper is the one that qualifies.
-  //
-  // WHY THE SPLIT EXISTS AT ALL. `registerTextInputBehavior()` puts the whole TextInput machine on
-  // the engine node. The adapter wrappers run that same machine in their own lifecycle — the
-  // focus/blur mirror, the event count, the controlled write, autoFocus. Since the registry is
-  // keyed by TAG, one shared tag would attach the machine to wrapper-built nodes too, and the two
-  // copies would both run: `setInputFocused` twice per focus, `mostRecentEventCount` written from
-  // two places. Separate tags keep exactly one owner per node.
-  //
-  // DELETE THIS PAIR when the wrappers stop owning that state and render the plain tag instead —
-  // one machine, one implementation, which is what `<adapters_reach_full_feature_parity>` asks for
-  // and what makes lowered and un-lowered call sites structurally identical.
-  | 'text-input-managed'
-  | 'text-input-multiline-managed'
   | 'switch'
-  // The component path's spelling, resolving to the SAME native Switch/AndroidSwitch. Same trick
-  // as `text-input-managed`: the plain tag belongs to the behavior registry
-  // (`registerSwitchBehavior`), so the wrapper — which still runs its own lastNativeReport mirror
-  // and snap-back effect — renders this one instead, or the registry would attach a second,
-  // redundant machine to a node whose lifecycle already owns it.
-  | 'switch-managed'
-  // The lowered HOST — RN's centering wrapper View (ActivityIndicator.js:112), not the spinner.
-  // The plain name goes to the app-facing tag and the NATIVE view qualifies, the same direction
-  // `pressable` took and the opposite of `text-input-managed`, where the wrapper got there first.
+  // The HOST — RN's centering wrapper View (ActivityIndicator.js:112), not the spinner. The plain
+  // name goes to the app-facing tag and the NATIVE view qualifies, the same direction `pressable`
+  // took.
   | 'activity-indicator'
-  // The native spinner itself, built by the host's `buildStructure` and by the wrapper's render fn.
+  // The native spinner itself, built by the host's `buildStructure`.
   | 'activity-indicator-spinner'
   | 'safe-area-view'
   | 'modal'

@@ -37,6 +37,7 @@ import {
   setBehaviorListener,
   type ISymbioteEvent,
   type ISymbioteNode,
+  propOf,
 } from '@symbiote-native/engine';
 
 export const REFRESH_CONTROL_TAG = 'refresh-control';
@@ -55,7 +56,7 @@ function evaluateSnapBack(node: ISymbioteNode): void {
   const lastNativeReport = reported.get(node);
   if (lastNativeReport === undefined) return; // no report yet, nothing to disagree with
 
-  const refreshing = node.props.refreshing === true;
+  const refreshing = propOf(node, 'refreshing') === true;
   if (lastNativeReport === refreshing) {
     dlog(`RefreshControl behavior snap-back no-op refreshing=${refreshing}`);
     return;

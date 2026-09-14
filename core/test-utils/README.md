@@ -81,19 +81,21 @@ timer). `advanceTicks(count)` is kept for the genuine "let the queue drain N tim
 raise a tick count to fix a flaky test — that trades a fast failure for a slow one and keeps the
 race; reach for `waitUntil`/`waitForQuiet` instead.
 
-## The host-primitive lowering oracle
+## Committed-payload assertions
 
-`normalizeCommitted(nodes)` strips per-mount identity (`tag`, `instanceHandle`,
-`parentFamilyTag`) from a committed Fabric tree, and `compareLoweringEquivalence` /
-`expectCommittedProps` compare two such trees — used by React, Vue, Svelte, and Solid to mount a
-primitive (`Pressable`, `TextInput`, …) as a framework COMPONENT and as a lowered intrinsic tag
-with the same props, and assert the two committed payloads agree. It exists because a lowered
-element inherits nothing its wrapper component did — prop defaults, alias renames, and bag folds
-all live in the wrapper — so a naive lowering silently drops them (a lost `ellipsizeMode`, a
-never-applied `id -> nativeID`) with every other test green. Write BOTH assertions on every case:
-`compareLoweringEquivalence` catches a fold one path lost, `expectCommittedProps` catches a fold
-BOTH paths lost (an equivalence check alone can't tell "both arms agree" from "both arms are
-broken the same way").
+`normalizeCommitted(nodes)` strips per-mount identity (`tag`, `instanceHandle`, `parentFamilyTag`)
+from a committed Fabric tree. `expectCommittedProps(tree, testID, expected)` finds the node carrying
+`testID` and requires `expected`'s keys to be present with those values — the check that a per-
+primitive fold RAN. It exists because a bare tag inherits nothing a wrapper component used to do:
+prop defaults, alias renames and bag folds all lived in the wrapper, so one that failed to move down
+is silently dropped (a lost `ellipsizeMode`, a never-applied `id -> nativeID`) with every other test
+green.
+
+Pass the value a fold PRODUCES, never the one the author wrote — `{ nativeID: 'x' }` for an authored
+`id="x"`. An expectation restating the input passes with the fold deleted.
+
+`assertCommittedSomething(tree, name)` is the control: `committed` is `[]` until `completeRoot`
+runs, so a mount that never flushed satisfies almost anything read off it.
 
 ## What it does NOT do
 

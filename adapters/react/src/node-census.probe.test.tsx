@@ -68,8 +68,8 @@ describe('node census', () => {
     if (outPath !== undefined) {
       writeFileSync(
         outPath,
-        `react ms=${elapsed.toFixed(1)} nodes=${census.nodes} walkMs=${profile.walkMs.toFixed(1)} ` +
-          `visited=${profile.nodesVisited} writes=${profile.propWrites}/${profile.propNoops}\n`,
+        `react ms=${elapsed.toFixed(1)} nodes=${census.nodes} ` +
+          `writes=${profile.propWrites}\n`,
       );
     }
     console.log(
@@ -77,10 +77,7 @@ describe('node census', () => {
         `anchors=${census.anchors} createNode=${fabric.counts.createNode} ` +
         `appendChild=${fabric.counts.appendChild} clone=${fabric.counts.clone} ` +
         `completeRoot=${fabric.counts.completeRoot} | propWrites=${profile.propWrites} ` +
-        `propNoops=${profile.propNoops} nodesVisited=${profile.nodesVisited} ` +
-        `commits=${profile.commits} walkMs=${profile.walkMs.toFixed(1)} ` +
-        `childScans=${profile.childScans} probed=${profile.childScanProbed} ` +
-        `flattens=${profile.childFlattens} widest=${profile.widestFlattenedParent ?? '?'}`,
+        `commits=${profile.commits}`,
     );
     unmount(ROOT_TAG);
   });

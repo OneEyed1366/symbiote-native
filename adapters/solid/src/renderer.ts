@@ -24,16 +24,22 @@ import {
   createElement as createEngineElement,
   createRawText,
   dlog,
+  firstChildOf,
   insertBefore,
+  isRawTextNode,
+  isTextContainer,
+  nextSiblingOf,
+  parentOf,
   removeChild as removeEngineChild,
   routeProp,
   setNodePressed,
   setProp as setEngineProp,
   setText as setEngineText,
+  textOf,
   toPublicInstance,
-  RAW_TEXT_COMPONENT,
   SymbioteSurface,
   type ISymbioteNode,
+  propOf,
 } from '@symbiote-native/engine';
 import {
   descriptorFor,
@@ -51,7 +57,7 @@ function isSurface(node: IHostNode): node is SymbioteSurface {
 }
 
 function isRawText(node: IHostNode): boolean {
-  return !isSurface(node) && node.component === RAW_TEXT_COMPONENT;
+  return !isSurface(node) && isRawTextNode(node);
 }
 
 // One active surface per process. This is FORCED here, not chosen: the compiled-JSX contract above
@@ -80,11 +86,6 @@ function requestCommit(): void {
     return;
   }
   activeSurface.requestCommit();
-}
-
-function siblingsOf(node: ISymbioteNode): readonly ISymbioteNode[] {
-  if (node.parent !== undefined) return node.parent.children;
-  return activeSurface?.children ?? [];
 }
 
 // Hoisted out of nodeOps and exported because descriptor-to-solid.ts needs the same text-update
@@ -117,10 +118,7 @@ function asText(value: unknown): string {
 // has to DETACH its anchor host from the portal target on cleanup. Going through here rather than
 // calling the engine's removeChild directly is what keeps the mutation paired with requestCommit(),
 // and keeps the surface-vs-node branch in one place.
-// The REFUSED path's half of `:active`, and the reason a refusal costs the component instance
-// rather than the pressed styling. A `<Pressable>` the lowering left as a component still owns its
-// own press machine, and one call here puts the node into its pressed state so `.btn:active`
-// applies exactly as it would on a lowered tag.
+// The `:active` half: one call here puts the node into its pressed state so `.btn:active` applies.
 //
 // Exported paired with requestCommit() for the same reason removeNode below is: the press arrives
 // from a NATIVE EVENT, outside any renderer mutation, so nothing else schedules a commit. React's
@@ -142,19 +140,17 @@ export function removeNode(parent: IHostNode, node: IHostNode): void {
 }
 
 // RN's Text.js applies two defaults on the way to native (core/components/src/text-props.ts:
-// ellipsizeMode 'tail', allowFontScaling true unless literally false). The Solid <Text> wrapper
-// folds them with resolveTextProps; a template the Babel lowering rewrote to the intrinsic
-// `symbiote-text` has no wrapper, so the renderer seeds them instead. Without this a
-// numberOfLines={1} line clips mid-word with no ellipsis — device-observed, and silent.
+// ellipsizeMode 'tail', allowFontScaling true unless literally false). A `<text>` tag has no
+// wrapper to fold them, so the renderer seeds them. Without this a numberOfLines={1} line clips
+// mid-word with no ellipsis — device-observed, and silent.
 // Vue's twin: adapters/vue/src/renderer/index.ts.
 //
 // A FOLD per key, not a default VALUE, and the difference is not cosmetic: `resolveTextProps` is
 // the authority and it reads `ellipsizeMode ?? 'tail'` / `allowFontScaling !== false`, so a null
 // (or 0, or '') has to resolve to the default too. Substituting only on `undefined` — which this
-// did until 2026-08-23 — meant `<Text ellipsizeMode={null}>` committed null through a lowered tag
-// and 'tail' through a wrapper: a divergence lowering introduced, device-only and silent. The same
-// two folds are described as data in `@symbiote-native/components/host-primitives` for the
-// COMPILE-time transforms; collapsing all of them onto resolveTextProps is a separate step.
+// did until 2026-08-23 — meant `<text ellipsizeMode={null}>` committed null, device-only and
+// silent. The same two folds are described as data in `@symbiote-native/components/host-primitives`;
+// collapsing all of them onto resolveTextProps is a separate step.
 type ITextFold = (value: unknown) => unknown;
 
 const TEXT_FOLDS: ReadonlyMap<string, ITextFold> = new Map<string, ITextFold>([
@@ -177,7 +173,7 @@ function foldTextValue(
   key: string,
   value: unknown,
 ): unknown {
-  if (!node.isText) return value;
+  if (!isTextContainer(node)) return value;
   const fold = TEXT_FOLDS.get(key);
   return fold === undefined ? value : fold(value);
 }
@@ -196,9 +192,8 @@ const ALIAS_FROM = 'id';
 const ALIAS_TO = 'nativeID';
 
 // `multiline` selects between TWO Fabric views, so the TAG decides and no prop write moves a node
-// between them. Two of the three paths that can build the node resolve it earlier — the wrapper
-// CONSUMES the prop to pick its intrinsic, a lowering transform reads a literal at compile time —
-// and an author writing the tag by hand has neither, which leaves two silent divergences.
+// between them. An author writing `<text-input multiline>` instead of `<text-input-multiline>` gets
+// the single-line view with a prop no ViewConfig on it declares — two silent divergences.
 //
 // The shared behavior (`core/components/src/behaviors/text-input.ts`) already makes the PAYLOAD
 // follow the tag. The complaint has to live here instead of there: `foldPayload` runs inside the
@@ -207,7 +202,7 @@ const ALIAS_TO = 'nativeID';
 const MULTILINE_PROP = 'multiline';
 
 function assertMultilineMatchesTag(node: ISymbioteNode, value: unknown): void {
-  if ((value === true) === (node.props[MULTILINE_PROP] === true)) return;
+  if ((value === true) === (propOf(node, MULTILINE_PROP) === true)) return;
   throw new Error(
     `multiline={${String(value)}} contradicts the tag: <text-input> and ` +
       `<text-input-multiline> are different Fabric views and no prop write moves a node ` +
@@ -317,13 +312,13 @@ const nodeOps: RendererOptions<IHostNode> = {
     const before =
       anchor !== undefined && !isSurface(anchor) ? anchor : undefined;
 
-    if (isRawText(node) && (isSurface(parent) || !parent.isText)) {
+    if (isRawText(node) && (isSurface(parent) || !isTextContainer(parent))) {
       // Fabric has no bare-text host: RCTRawText is only valid as a <Text> child. Reached by a
       // dynamic expression that resolves to a string outside a <Text>, e.g.
       // `<symbiote-view>{label()}</symbiote-view>`. Failing loudly at mount beats building an
       // invalid tree that crashes deeper in native with a far less legible error.
       throw new Error(
-        `Text string "${String(node.props.text)}" must be rendered inside a <Text>`,
+        `Text string "${textOf(node) ?? ''}" must be rendered inside a <Text>`,
       );
     }
 
@@ -352,9 +347,9 @@ const nodeOps: RendererOptions<IHostNode> = {
   // never a deeper descendant.
   getParentNode(node) {
     if (isSurface(node)) return undefined;
-    const parent = node.parent ?? activeSurface;
+    const parent = parentOf(node) ?? activeSurface;
     if (parent === undefined || isSurface(parent)) return parent;
-    const grandparent = parent.parent;
+    const grandparent = parentOf(parent);
     if (grandparent !== undefined && grandparent.childHost === parent) {
       return grandparent;
     }
@@ -377,14 +372,14 @@ const nodeOps: RendererOptions<IHostNode> = {
   // owner directly, and wrong for any app writing `<scroll-view>{dynamicChildren}</scroll-view>`.
   getFirstChild(node) {
     if (isSurface(node)) return node.children[0];
-    return (node.childHost ?? node).children[0];
+    return firstChildOf(node.childHost ?? node);
   },
 
   getNextSibling(node) {
     if (isSurface(node)) return undefined;
-    const siblings = siblingsOf(node);
-    const index = siblings.indexOf(node);
-    return index >= 0 ? siblings[index + 1] : undefined;
+    // The surface is handed over because a TOP-LEVEL node has no parent to read a sibling list
+    // from — the surface owns that list. The engine returns undefined rather than guessing.
+    return nextSiblingOf(node, activeSurface);
   },
 };
 

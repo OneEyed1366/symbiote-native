@@ -7,9 +7,8 @@
 // won. The two orders are opposite on purpose (base under on the owner, row over on the slot), so
 // a test that checked only one would pass with both folds written the same way.
 //
-// Registration happens HERE and nowhere else. `scroll-view` is the tag the wrappers
-// already emit, so a global registration would give every existing ScrollView a second content
-// node; see the behavior's header for the `-managed` split that resolves it.
+// Registration happens HERE and nowhere else — see the behavior's header for why it waited on the
+// engine becoming the single owner of the content node.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   installFabric,
@@ -26,6 +25,9 @@ import {
   routeProp,
   type ISymbioteEvent,
   type ISymbioteNode,
+  childrenOf,
+  propOf,
+  propsOf,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../../component-names';
@@ -40,6 +42,14 @@ import {
 } from './index';
 
 const fabric = installFabric();
+
+// The slot's props, asked of the host — JS holds no tree, and every call site here has already
+// established that the slot exists.
+function slotPropsOf(owner: ISymbioteNode): Readonly<Record<string, unknown>> {
+  const slot = owner.childHost;
+  if (slot === undefined) throw new Error('the owner built no slot');
+  return propsOf(slot);
+}
 let nextRootTag = 9700;
 
 function scrollNode(tag: string): ISymbioteNode {
@@ -55,7 +65,7 @@ afterEach(() => {
   fabric.reset();
 });
 
-describe('the lowered structure reproduces the wrapper', () => {
+describe('the structure the behavior builds', () => {
   // Derived from `selectScrollIntrinsics`, never hardcoded: it is the ONE function every adapter's
   // wrapper calls, so deriving is what makes this a comparison rather than a restatement. It also
   // keeps the test honest across platforms — the vertical content intrinsic resolves to
@@ -74,8 +84,8 @@ describe('the lowered structure reproduces the wrapper', () => {
 
       const owner = scrollNode(tag);
 
-      expect(owner.children).toHaveLength(1);
-      expect(owner.childHost).toBe(owner.children[0]);
+      expect(childrenOf(owner)).toHaveLength(1);
+      expect(owner.childHost).toBe(childrenOf(owner)[0]);
       expect(owner.childHost?.component).toBe(
         descriptorFor(contentIntrinsic).component,
       );
@@ -92,16 +102,16 @@ describe('the lowered structure reproduces the wrapper', () => {
     // Structure time carries only what the wrapper sets unconditionally; the row direction is a
     // FOLD, so it shows up in the committed payload rather than in `props` (see the payload group).
     const owner = scrollNode(HORIZONTAL_SCROLL_VIEW_TAG);
-    expect(owner.childHost?.props).toEqual({ collapsable: false });
+    expect(slotPropsOf(owner)).toEqual({ collapsable: false });
   });
 
   it('sets collapsable:false on the content node, both axes, as the wrapper does', () => {
     // Yoga may collapse a view that only groups children, and a collapsed content node takes the
     // scroll metrics with it. React's `contentProps` sets it unconditionally; so does this.
-    expect(scrollNode(SCROLL_VIEW_TAG).childHost?.props).toEqual({
+    expect(slotPropsOf(scrollNode(SCROLL_VIEW_TAG))).toEqual({
       collapsable: false,
     });
-    expect(scrollNode(HORIZONTAL_SCROLL_VIEW_TAG).childHost?.props).toEqual({
+    expect(slotPropsOf(scrollNode(HORIZONTAL_SCROLL_VIEW_TAG))).toEqual({
       collapsable: false,
     });
   });
@@ -136,9 +146,9 @@ describe('owner props that belong to the slot', () => {
     // writes it. Nothing on this line knows a slot exists.
     routeProp(owner, 'contentContainerStyle', { padding: 12 });
 
-    expect(owner.props.contentContainerStyle).toBeUndefined();
-    expect(owner.props.style).toBeUndefined();
-    expect(owner.childHost?.props.style).toEqual([undefined, { padding: 12 }]);
+    expect(propOf(owner, 'contentContainerStyle')).toBeUndefined();
+    expect(propOf(owner, 'style')).toBeUndefined();
+    expect(slotPropsOf(owner).style).toEqual([undefined, { padding: 12 }]);
   });
 
   // Device-found 2026-09-08: every canary writes `contentContainerStyle="scroll-content"`, a class
@@ -157,20 +167,23 @@ describe('owner props that belong to the slot', () => {
     const owner = scrollNode(SCROLL_VIEW_TAG);
     routeProp(owner, 'contentContainerStyle', 'scroll-content');
 
-    expect(owner.childHost?.props.style).toEqual([
+    expect(slotPropsOf(owner).style).toEqual([
       { padding: 24, gap: 20 },
       undefined,
     ]);
     // The owner keeps its own class slot free: the name belongs to the content view.
-    expect(owner.props.style).toBeUndefined();
+    expect(propOf(owner, 'style')).toBeUndefined();
   });
 
   it('leaves the owner its own style', () => {
     const owner = scrollNode(SCROLL_VIEW_TAG);
     routeProp(owner, 'style', { backgroundColor: 'red' });
 
-    expect(owner.props.style).toEqual([undefined, { backgroundColor: 'red' }]);
-    expect(owner.childHost?.props.style).toBeUndefined();
+    expect(propOf(owner, 'style')).toEqual([
+      undefined,
+      { backgroundColor: 'red' },
+    ]);
+    expect(slotPropsOf(owner).style).toBeUndefined();
   });
 });
 
@@ -231,7 +244,7 @@ describe('style precedence, which is opposite on the two nodes', () => {
   });
 });
 
-// Mounts a lowered ScrollView and hands back a re-commit, so a test can write a prop AFTER the
+// Mounts a scroll-view tag and hands back a re-commit, so a test can write a prop AFTER the
 // first commit and read what the second one published. Reads out of `fabric.committed` rather than
 // `fabric.find`, which searches `created` and so returns a node's own pre-clone self on any update
 // (`.claude/rules/test-harness-false-greens.md`).
@@ -281,7 +294,7 @@ function layoutEvent(
 
 describe('decelerationRate reaches Fabric as a number', () => {
   // RN's two words resolve to DIFFERENT friction constants per platform, and a wrapper is what did
-  // that resolution. A lowered element has none, so the string would reach Fabric unread and the
+  // that resolution. A tag has none, so the string would reach Fabric unread and the
   // scroll would keep the native default with nothing red.
   it.each(['normal', 'fast'] as const)('resolves %s', word => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG, { decelerationRate: word });
@@ -378,7 +391,7 @@ describe('the bounce pair defaults from the axis, as RN derives it', () => {
 
 // Every wrapper writes `nestedScrollEnabled ?? true` on every ScrollView, both platforms — RN
 // itself only defaults it on Android's RefreshControl WRAP path (`ScrollView.js:1862`), and it is
-// the WRAPPER a lowered element replaces. Without it an Android list nested in a scroll view does
+// the WRAPPER this behavior replaced. Without it an Android list nested in a scroll view does
 // not scroll on its own.
 describe('nested scrolling defaults on, as the wrapper leaves it', () => {
   it('defaults to true when the app set nothing', () => {
@@ -435,23 +448,25 @@ describe('collapsableChildren is derived from props that stay on the owner', () 
   // The other half of the same guard: a re-render writing the SAME value must not dirty the slot,
   // or every ScrollView render clones its content node. `setProp`'s identity guard is what stops
   // it, which is why the mark is read past it and not in `routeProp`.
-  it('an unchanged rewrite dirties nothing', () => {
+  // Asserted on the COMMITTED tree rather than on a dirty flag: JS holds neither the tree nor the
+  // mark now, and the flag was never the claim — "the slot re-published nothing" is.
+  it('an unchanged rewrite publishes nothing', () => {
     const anchor = { minIndexForVisible: 0 };
-    const { node, slot, commit } = mountScroll(SCROLL_VIEW_TAG, {
+    const { node, commit } = mountScroll(SCROLL_VIEW_TAG, {
       maintainVisibleContentPosition: anchor,
     });
-    commit();
-    expect(slot.propsDirty).toBe(false);
+    const before = commit().slot;
 
     routeProp(node, 'maintainVisibleContentPosition', anchor);
-    expect(slot.propsDirty).toBe(false);
+    // The same OBJECT the host already holds: a re-published payload would be a different one.
+    expect(commit().slot).toBe(before);
   });
 });
 
 describe('onContentSizeChange is synthesized from the content view layout', () => {
   it('wires nothing when the app passed no handler', () => {
     const { slot, commit } = mountScroll(SCROLL_VIEW_TAG);
-    // `onLayout` is a GATED event: wiring it unconditionally would put the flag in every lowered
+    // `onLayout` is a GATED event: wiring it unconditionally would put the flag in every
     // ScrollView's payload and buy a native event nobody reads.
     expect(Object.hasOwn(commit().slot.props, 'onLayout')).toBe(false);
     expect(slot.listeners?.get('layout')).toBeUndefined();

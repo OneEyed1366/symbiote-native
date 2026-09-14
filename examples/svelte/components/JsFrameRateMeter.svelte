@@ -21,7 +21,10 @@
   // MARKUP FORMATTING IS LOAD-BEARING here as everywhere in this example: sibling tags are packed
   // edge-to-edge with zero whitespace (svelte-adapter-dom-shim skill §16). Verify with
   // `node scripts/audit-svelte-stray-whitespace.mjs`.
-  import { readCommitProfile } from '@symbiote-native/engine';
+  import {
+    readCommitProfile,
+    type ICommitProfile,
+  } from '@symbiote-native/engine';
   import ActionButton from './ActionButton.svelte';
 
   // 60 Hz budget. Frames are timed on the JS thread only: requestAnimationFrame is scheduled by
@@ -43,26 +46,16 @@
   // would itself dominate the very commit path this meter is supposed to observe.
   const SAMPLE_WINDOW_MS = 500;
 
-  // What the engine's reconcile walk cost inside the last window, next to the frame numbers so the
-  // two can be read against each other: the walk is a term in every adapter's frame budget.
+  // How much the engine wrote inside the last window, next to the frame numbers so the two can be
+  // read against each other: writes are what an adapter generates, and a spread between adapters on
+  // the same screen is the adapter's, not the platform's.
   //
-  // Reported as two halves, never as `walkMs / nodesVisited`. Dirty-marking means the denominator
-  // counts only the nodes reconcile did NOT skip, while the numerator still covers everything it
-  // does (the JSI createNode/appendChild calls included), so that ratio inflates by the skip factor:
-  // 13.4 us/node without dirty-marking, 438 us/node with it, on a device that had got ~2x faster. So
-  // `nodesPerCommit` is the skip itself (read against the screen's node count) and `msPerCommit` is
-  // what a commit costs. A true per-node figure needs a full walk - a cold mount, where nothing is
-  // skippable.
-  type IWalkSample = {
-    sharePercent: number;
-    nodesPerCommit: number;
-    msPerCommit: number;
-  };
-
-  const EMPTY_WALK_SAMPLE: IWalkSample = {
-    sharePercent: 0,
-    nodesPerCommit: 0,
-    msPerCommit: 0,
+  // This block used to time the reconcile walk (% of window, nodes/commit, ms/commit). There is no
+  // walk left to time - the shadow tree lives in C++ and JS only fills a command buffer, so the
+  // engine's own cost is no longer readable from JS at all; sizing it means instrumenting the host.
+  const EMPTY_COMMIT_SAMPLE: ICommitProfile = {
+    commits: 0,
+    propWrites: 0,
   };
 
   let { accent }: { accent: string } = $props();
@@ -72,7 +65,7 @@
   let worstFrameMs = $state(0);
   // Replaced wholesale each window, never mutated field-by-field, so a raw cell is enough - and
   // it keeps the per-window write off the deep-proxy path.
-  let walk = $state.raw<IWalkSample>(EMPTY_WALK_SAMPLE);
+  let commitSample = $state.raw<ICommitProfile>(EMPTY_COMMIT_SAMPLE);
 
   // The running per-frame accumulators (React's useRef pair). Deliberately NOT runes: they are
   // written on every single frame and only published once per window, so making them reactive
@@ -101,9 +94,9 @@
 
       const windowMs = now - windowStartedAt;
       // While a benchmark step holds the gate the whole window-close block is skipped, publish and
-      // reset alike: the readCommitProfile() below would eat the step's profile, and the three
-      // rune writes would put an extra commit inside its measured window. The window simply grows
-      // and publishes once, longer, after the step releases.
+      // reset alike: the readCommitProfile() below would eat the step's profile, and the rune
+      // writes would put an extra commit inside its measured window. The window simply grows and
+      // publishes once, longer, after the step releases.
       if (
         windowMs >= SAMPLE_WINDOW_MS &&
         !commitProfileGate.isHeldByBenchmark
@@ -113,18 +106,7 @@
         worstFrameMs = worstSoFar;
         // Read-and-reset, once per window, so each sample covers exactly the window just closed
         // rather than an ever-growing total.
-        const commitProfile = readCommitProfile();
-        walk = {
-          sharePercent: (commitProfile.walkMs / windowMs) * 100,
-          nodesPerCommit:
-            commitProfile.commits === 0
-              ? 0
-              : commitProfile.nodesVisited / commitProfile.commits,
-          msPerCommit:
-            commitProfile.commits === 0
-              ? 0
-              : commitProfile.walkMs / commitProfile.commits,
-        };
+        commitSample = readCommitProfile();
         framesInWindow = 0;
         windowStartedAt = now;
       }
@@ -144,7 +126,7 @@
     worstSoFar = 0;
     droppedFrames = 0;
     worstFrameMs = 0;
-    walk = EMPTY_WALK_SAMPLE;
+    commitSample = EMPTY_COMMIT_SAMPLE;
   }
 </script>
 
@@ -178,37 +160,27 @@
       <text class="bench-metric-label">worst ms</text>
     </view>
   </view>
-  <text class="section-label">ENGINE RECONCILE WALK</text>
+  <text class="section-label">ENGINE PER WINDOW</text>
   <view class="bench-meter-row">
     <view class="bench-metric">
       <text
-        testID="bench-walk-share"
+        testID="bench-commits"
         class="bench-metric-value"
         style={{ color: accent }}
       >
-        {walk.sharePercent.toFixed(1)}
+        {String(commitSample.commits)}
       </text>
-      <text class="bench-metric-label">% of window</text>
+      <text class="bench-metric-label">commits</text>
     </view>
     <view class="bench-metric">
       <text
-        testID="bench-walk-nodes-per-commit"
+        testID="bench-commit-writes"
         class="bench-metric-value"
         style={{ color: accent }}
       >
-        {walk.nodesPerCommit.toFixed(0)}
+        {String(commitSample.propWrites)}
       </text>
-      <text class="bench-metric-label">nodes / commit</text>
-    </view>
-    <view class="bench-metric">
-      <text
-        testID="bench-walk-ms-per-commit"
-        class="bench-metric-value"
-        style={{ color: accent }}
-      >
-        {walk.msPerCommit.toFixed(1)}
-      </text>
-      <text class="bench-metric-label">ms / commit</text>
+      <text class="bench-metric-label">prop writes</text>
     </view>
   </view>
   <ActionButton

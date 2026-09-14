@@ -1,9 +1,8 @@
 // A BARE tag must commit what the `p={{…}}` bag commits.
 //
 // Until 2026-09-07 it committed NOTHING: `setAttribute` wrote an inert Map and no key ever reached
-// `routeProp`, so `<view testID="x">` mounted an empty node with nothing red. That is the single
-// reason Svelte's lowering transform was load-bearing for CORRECTNESS while it is an optimisation
-// on every other adapter — the transform builds the bag, and only the bag was routed.
+// `routeProp`, so `<view testID="x">` mounted an empty node with nothing red — only the bag was
+// routed.
 //
 // The parity row is the point of the file; the rest exist so a failure says WHICH half broke.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -143,7 +142,7 @@ describe('a bare intrinsic tag', () => {
 
 describe('a bare tag and the prop bag', () => {
   // THE row. Everything above narrows a failure; this one states the contract, and it is what makes
-  // the lowering transform an optimisation on this adapter rather than a correctness dependency.
+  // the bag spelling an optimisation rather than the only way to reach the engine.
   it('commit the same payload for the same props', async () => {
     const props: Record<string, unknown> = {
       accessibilityLabel: 'hello',

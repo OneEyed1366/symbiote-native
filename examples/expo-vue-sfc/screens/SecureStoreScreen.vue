@@ -104,24 +104,17 @@ function handleDelete(): void {
     >
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: lineColor }"
-        >
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
           <text class="hero-badge-text">
             {{ lineInfo.code }}
           </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Secure Store
-          </text>
+          <text class="hero-title"> Secure Store </text>
           <text class="hero-body">
             @symbiote-native/secure-store — encrypted key/value storage in the
             iOS Keychain and the Android Keystore. Save a value, kill the app,
@@ -130,91 +123,50 @@ function handleDelete(): void {
         </view>
       </view>
 
-      <view
-        testID="secure-store-capability-card"
-        class="secure-store-card"
-      >
-        <text class="secure-store-card-title">
-          Capabilities
-        </text>
-        <view
-          testID="secure-store-available"
-          class="secure-store-row"
-        >
-          <text class="secure-store-row-label">
-            Available
-          </text>
+      <view testID="secure-store-capability-card" class="secure-store-card">
+        <text class="secure-store-card-title"> Capabilities </text>
+        <view testID="secure-store-available" class="secure-store-row">
+          <text class="secure-store-row-label"> Available </text>
           <view
             :class="`secure-store-status-badge secure-store-status-badge-${isAvailable}`"
           >
             <text class="secure-store-status-text">
-              {{
-                toBadgeText(isAvailable)
-              }}
+              {{ toBadgeText(isAvailable) }}
             </text>
           </view>
         </view>
-        <view
-          testID="secure-store-biometrics"
-          class="secure-store-row"
-        >
-          <text class="secure-store-row-label">
-            Biometrics usable
-          </text>
+        <view testID="secure-store-biometrics" class="secure-store-row">
+          <text class="secure-store-row-label"> Biometrics usable </text>
           <view
             :class="`secure-store-status-badge secure-store-status-badge-${canUseBiometrics}`"
           >
             <text class="secure-store-status-text">
-              {{
-                toBadgeText(canUseBiometrics)
-              }}
+              {{ toBadgeText(canUseBiometrics) }}
             </text>
           </view>
         </view>
       </view>
 
-      <view
-        testID="secure-store-value-card"
-        class="secure-store-card"
-      >
-        <text class="secure-store-card-title">
-          Stored value
-        </text>
+      <view testID="secure-store-value-card" class="secure-store-card">
+        <text class="secure-store-card-title"> Stored value </text>
         <view class="secure-store-row">
           <text class="secure-store-row-label">
             {{ DEMO_KEY }}
           </text>
-          <text
-            testID="secure-store-value"
-            class="secure-store-value-text"
-          >
-            {{
-              storedValue === null ? '(no entry)' : storedValue
-            }}
+          <text testID="secure-store-value" class="secure-store-value-text">
+            {{ storedValue === null ? '(no entry)' : storedValue }}
           </text>
         </view>
         <view class="secure-store-row">
-          <text class="secure-store-row-label">
-            Last result
-          </text>
-          <text
-            testID="secure-store-result"
-            class="secure-store-value-text"
-          >
-            {{
-              lastResult
-            }}
+          <text class="secure-store-row-label"> Last result </text>
+          <text testID="secure-store-result" class="secure-store-value-text">
+            {{ lastResult }}
           </text>
         </view>
       </view>
 
-      <view
-        testID="secure-store-write-card"
-        class="secure-store-card"
-      >
-        <text class="secure-store-card-title">
-          Write, read, delete
-        </text>
+      <view testID="secure-store-write-card" class="secure-store-card">
+        <text class="secure-store-card-title"> Write, read, delete </text>
         <text-input
           v-model="inputText"
           testID="secure-store-input"

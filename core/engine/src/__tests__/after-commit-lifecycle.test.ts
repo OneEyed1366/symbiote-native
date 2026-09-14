@@ -13,6 +13,7 @@ import {
   createElement,
   createSurface,
   disposeRoot,
+  propOf,
   registerHostBehavior,
   routeProp,
   setNativeProps,
@@ -42,7 +43,7 @@ function registerProbe(): { seen: unknown[]; detached: ISymbioteNode[] } {
       return next;
     },
     attach: () => {},
-    afterCommit: node => seen.push(node.props[MACHINE_ONLY]),
+    afterCommit: node => seen.push(propOf(node, MACHINE_ONLY)),
     detach: node => detached.push(node),
   });
   return { seen, detached };

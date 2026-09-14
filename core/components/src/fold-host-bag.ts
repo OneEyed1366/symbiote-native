@@ -1,25 +1,16 @@
 // The RUNTIME half of `HOST_PRIMITIVES` — RN's prop folds applied to a props bag on its way into
 // the engine, keyed by intrinsic tag.
 //
-// Why it exists at all. A primitive's host node is produced by THREE paths, and the compile-time
-// fold in a lowering transform covers exactly one of them:
-//
-//   lowered `<View>`         the transform folded it     covered by the transform
-//   `<View>` it refused      the wrapper folds it        covered by the wrapper
-//   a hand-authored tag      nobody folds it             covered by NOTHING
-//
-// The third path is not hypothetical: Svelte's `components/button.svelte` writes `<text>`
-// directly rather than composing `Text.svelte`, so its title reached Fabric with no
+// Why it exists at all. A tag has no component body to fold its props, and nothing else stands
+// between an app and the engine. The gap is not hypothetical: Svelte's `components/button.svelte`
+// writes `<text>` directly rather than composing a `Text`, so its title reached Fabric with no
 // `ellipsizeMode` and clipped mid-word where every other adapter ellipsised (2026-08-31). Angular
-// shipped the identical defect from the identical cause, and both fixed it the same way — a seed
-// in the layer every path crosses.
+// shipped the identical defect from the identical cause, and both fixed it the same way — a seed in
+// the layer every path crosses.
 //
-// Why it is SHARED rather than one copy per adapter: an adapter that lowers has a transform doing
-// this at compile time, an adapter that does not has only this, and a primitive with no wrapper at
-// all (a bare intrinsic tag) has only this everywhere. Three producers of one answer is the shape
-// `<adapters_stay_thin>` exists to stop. Both halves read the same spec, so they cannot drift into
-// two different answers — only into one answer applied twice, which every operation here is
-// idempotent under (`(x ?? 'tail') ?? 'tail'`, `(x !== false) !== false`).
+// Why it is SHARED rather than one copy per adapter: five copies of one answer is the shape
+// `<adapters_stay_thin>` exists to stop. Applying it twice is harmless — every operation here is
+// idempotent (`(x ?? 'tail') ?? 'tail'`, `(x !== false) !== false`).
 import {
   HOST_PRIMITIVES,
   type IFoldOp,
@@ -45,31 +36,17 @@ const planFor = (primitive: IHostPrimitive): IFoldPlan => ({
   defaults: Object.entries(primitive.defaults),
 });
 
-// The wrapper's spelling of a tag whose behavior must attach to the LOWERED path only
-// (`component-names/shared.ts`). A suffix rather than a spec field because it cannot go stale: the
-// next primitive to grow a `-managed` twin is covered the day it is named, with no edit here.
-// `managed-tags-fold.test.ts` pins the convention against the platform tables, so a twin named some
-// other way fails rather than silently losing its folds.
-const managedSpellingOf = (tag: string): string => `${tag}-managed`;
-
-// EVERY spelling a primitive commits under, and the two axes are independent.
+// EVERY spelling a primitive commits under: `intrinsicWhen` lets one primitive commit two different
+// tags (`TextInput` -> `text-input` / `…-multiline`), and a plan keyed on the base spelling alone
+// silently skips the other.
 //
-// `intrinsicWhen` lets one primitive commit two different tags (`TextInput` ->
-// `text-input` / `…-multiline`). `-managed` is the wrapper's twin of each of those. A map
-// keyed on the lowered spellings alone folds the lowered path and silently skips the component one
-// — which is exactly what shipped: TextInput and Switch committed a raw `id`, a key no ViewConfig
-// declares, so Fabric dropped it and the nativeID was lost on device with nothing red. Found by
-// Svelte's equivalence arm, 2026-09-01, and it is the two paths of ONE adapter disagreeing.
-//
-// Folding a bag the wrapper already folded is a no-op — an alias deletes its source key, so the
-// second pass finds nothing to rename — which is what makes covering both paths from one plan safe.
+// Folding an already-folded bag is a no-op — an alias deletes its source key, so a second pass finds
+// nothing to rename — which is what makes the fold safe to reach twice.
 function tagsOf(primitive: IHostPrimitive): string[] {
   const alternate = primitive.intrinsicWhen?.intrinsic;
-  const lowered =
-    alternate === undefined
-      ? [primitive.intrinsic]
-      : [primitive.intrinsic, alternate];
-  return [...lowered, ...lowered.map(managedSpellingOf)];
+  return alternate === undefined
+    ? [primitive.intrinsic]
+    : [primitive.intrinsic, alternate];
 }
 
 export const FOLD_PLAN_BY_TAG: ReadonlyMap<string, IFoldPlan> = new Map(

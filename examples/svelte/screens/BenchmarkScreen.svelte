@@ -384,7 +384,6 @@
   let seq = 0;
   const clock = createBenchClock(commitProfileGate);
   const runStep = clock.runStep;
-  let isBatchingCreate = $state(false);
 
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Benchmark];
   const accent = LINE_COLOR.performance;
@@ -662,19 +661,11 @@
     // unawaited commit lands microtasks later — by which time a SECOND run's stopwatch may be
     // installed, and this one stops it. The table has two columns, so all-mounted and virtualized
     // do get pressed back to back. Here it shifts a whole run by one step, so every row carries a
-    // plausible number belonging to its neighbour (`.claude/rules/perf-claims-need-numbers.md`).
+    // plausible number belonging to its neighbour.
     await runStep(() => {
       suiteResults = { ...suiteResults, [mode]: entries };
       progress = undefined;
     });
-  }
-
-  // The engine reads `__SYMBIOTE_BATCH_CREATE__` once per commit, not per node, so it has to be
-  // set BEFORE the mutation that starts a step — which a press between runs always is. Deliberately
-  // a global rather than a prop: nothing on the commit path should have to be threaded a flag.
-  function onToggleBatchCreate(): void {
-    isBatchingCreate = !isBatchingCreate;
-    Reflect.set(globalThis, '__SYMBIOTE_BATCH_CREATE__', isBatchingCreate);
   }
 
   function onRunSuite(mode: IMountMode): void {
@@ -788,22 +779,6 @@
       </view>
     </view>
 
-    <view class="bench-run-row">
-      <view class="flex1">
-        <ActionButton
-          testID="bench-toggle-batch-create"
-          title={isBatchingCreate
-            ? 'Batch create · on ✓'
-            : 'Batch create · off'}
-          onPress={onToggleBatchCreate}
-          color={accent}
-        />
-      </view>
-    </view>
-    <text class="note-text">
-      Temporary experiment switch. On, the engine hands a parent's children to cloneNodeWithChildren in one call instead of appending them one at a time — about a third fewer JSI calls on Create, paid for with one extra ShadowNode per batched parent. The sign is not predicted, which is why it is a runtime toggle: two builds a day apart drifted 4% on Create and 6x on Clear with no code change, so the only trustworthy comparison is back-to-back on one binary. Flip it, re-run the suite, compare.
-    </text>
-
     {#if progress !== undefined}
       <view testID="bench-suite-progress" class="bench-progress">
         <activity-indicator color={accent} />
@@ -843,8 +818,7 @@
       <text class="section-label">ENGINE PER STEP · ALL MOUNTED</text>
       <view class="bench-compare-row">
         <text class="bench-compare-label" />
-        <text class="bench-compare-head-cell">VISITED</text>
-        <text class="bench-compare-head-cell">WRITES/NOOP</text>
+        <text class="bench-compare-head-cell">WRITES</text>
         <text class="bench-compare-head-cell">COMMITS</text>
       </view>
       {#each SUITE_STEPS as step (step.op)}
@@ -852,22 +826,15 @@
         <view testID={`bench-engine-${step.op}`} class="bench-compare-row">
           <text class="bench-compare-label">{step.label}</text>
           <text class="bench-compare-cell">
-            {profile === undefined ? '—' : String(profile.nodesVisited)}
+            {profile === undefined ? '—' : String(profile.propWrites)}
           </text>
           <text class="bench-compare-cell">
-            {profile === undefined
-              ? '—'
-              : `${profile.propWrites}/${profile.propNoops}`}
-          </text>
-          <text class="bench-compare-cell">
-            {profile === undefined
-              ? '—'
-              : `${profile.commits} · ${profile.walkMs.toFixed(1)}ms`}
+            {profile === undefined ? '—' : String(profile.commits)}
           </text>
         </view>
       {/each}
       <text class="note-text">
-        {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a VISITED or WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. The ms is the reconcile window and it CONTAINS the createNode/appendChild JSI calls, so compare it across adapters, never read it as engine JS.`}
+        {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. There is no ms here and no node count: the tree lives in C++ and JS only fills a command buffer, so what the host spends applying it is invisible from JS.`}
       </text>
     {/if}
 
@@ -889,7 +856,16 @@
         </view>
       {/each}
       <text class="note-text">
-        Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no reconcile walk to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.
+        Counted by wrapping global.nativeFabricUIManager before the engine binds
+        it — the one surface this canary and the stock-React-Native baseline
+        (examples/bare-rn) genuinely share, and therefore the only like-for-like
+        number between them. The ENGINE table above has no counterpart over
+        there: stock has no reconcile walk to count. Read as two questions.
+        CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP
+        KEYS answers the other half, "or the same number of times with fatter
+        payloads". The wrapper costs one JS call per crossing and is therefore
+        in every timing on this screen — the comparison holds only because the
+        other side carries the identical wrapper.
       </text>
     {/if}
     <text class="note-text">
@@ -965,6 +941,41 @@
       boxes differ only in which sticky implementation carries the frame.
     </text>
 
+    <!-- These sat BELOW the rows until 2026-09-07, deliberately, so nobody would report numbers
+      from them: their Remove and Append act on whatever happened to be on screen, which is the
+      whole reason the suite above exists. That is still true and the note under them still says
+      so — what changed is that "below the fold" became UNREACHABLE once the list holds a thousand
+      rows, which is exactly the state you are in when you want to poke at one commit shape.
+      A caveat keeps working from the top of the screen; a scroll position does not.
+
+      No `{#if}` added here: on this adapter one costs an anchor per instantiation even when its
+      condition is false, and this block sits above the row loop now. -->
+    <text class="section-label">OPERATIONS · LAST RUN</text>
+    {#each operations as operation (operation.id)}
+      <view class="bench-op-row">
+        <view class="flex1">
+          <ActionButton
+            testID={`bench-op-${operation.id}`}
+            title={operation.label}
+            onPress={operation.onPress}
+            color={accent}
+          />
+        </view>
+        <text testID={`bench-result-${operation.id}`} class="bench-op-result">
+          {formatDuration(lastDurations.get(operation.id))}
+        </text>
+      </view>
+    {/each}
+    <text class="note-text">
+      Single operations, for poking at one commit shape while debugging. Do NOT
+      report from them — Remove and Append act on whatever row count is on
+      screen, which is what the suite above removes.
+    </text>
+
+    <text testID="bench-row-count" class="info-text">
+      {`rows: ${rows.length} · ${mountedViews} native views mounted · selected: ${selectedId ?? 'none'}`}
+    </text>
+
     <text class="section-label">
       {isAllMounted ? 'ROWS · ALL MOUNTED' : 'ROWS · VIRTUALIZED'}
     </text>
@@ -1004,30 +1015,6 @@
         {/snippet}
       </FlatList>
     {/if}
-
-    <!-- Below the fold on purpose: the single operations are for poking at one commit shape while
-      debugging, not for reporting. Their Remove and Append numbers depend on press order, which is
-      exactly what the suite above exists to remove. -->
-    <text class="section-label">OPERATIONS · LAST RUN</text>
-    {#each operations as operation (operation.id)}
-      <view class="bench-op-row">
-        <view class="flex1">
-          <ActionButton
-            testID={`bench-op-${operation.id}`}
-            title={operation.label}
-            onPress={operation.onPress}
-            color={accent}
-          />
-        </view>
-        <text testID={`bench-result-${operation.id}`} class="bench-op-result">
-          {formatDuration(lastDurations.get(operation.id))}
-        </text>
-      </view>
-    {/each}
-
-    <text testID="bench-row-count" class="info-text">
-      {`rows: ${rows.length} · ${mountedViews} native views mounted · selected: ${selectedId ?? 'none'}`}
-    </text>
 
     <text class="section-label">
       {`HISTORY · LAST ${HISTORY_LIMIT} MEASUREMENTS`}

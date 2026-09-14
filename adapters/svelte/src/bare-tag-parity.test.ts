@@ -1,7 +1,7 @@
 // What a PUBLIC bare tag would mean on this adapter, measured 2026-09-01 for the primitives-as-tags
 // work. The question was "does a bare tag commit a payload identical to the wrapper's". Here it
-// does not, and the reason is the funnel: our props do not reach the engine as props. Every lowered
-// element takes ONE `p={{…}}` object and the shim's `p` setter fans it out through `routeProp`; an
+// does not, and the reason is the funnel: our props do not reach the engine as props. A
+// bag-carrying element takes ONE `p={{…}}` object and the shim's `p` setter fans it out; an
 // app-authored `<view class="x" id="y">` has no bag, and Svelte's own codegen sends its
 // attributes three different ways, none of which the shim implements.
 //

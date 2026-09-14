@@ -3,14 +3,12 @@
 // The engine's registry is keyed by TAG, and any path that emits a tag gets its machine. While
 // React still shipped wrappers, the hazard was a wrapper running its own lifecycle AND rendering
 // the plain tag: one node, two machines — `setInputFocused` twice per focus,
-// `mostRecentEventCount` written from two places — with every test green, because both spellings
-// resolve to the SAME Fabric view and the committed tree cannot tell them apart. That is what the
-// `-managed` twins were for.
+// `mostRecentEventCount` written from two places — with every test green, because the committed
+// tree cannot tell two spellings of the same Fabric view apart.
 //
-// EVERY ONE OF THOSE WRAPPERS IS GONE, so the collision is unreachable from this adapter and the
-// twins are dead here: nothing in `adapters/react` emits `text-input-managed` or `switch-managed`
-// any more. What survives is the half that was always the positive control and is now the whole
-// subject — a bare tag, which is what an app writes, must attach its behavior EXACTLY ONCE.
+// EVERY ONE OF THOSE WRAPPERS IS GONE, so the collision is unreachable and what survives is the
+// half that was always the positive control and is now the whole subject — a bare tag, which is
+// what an app writes, must attach its behavior EXACTLY ONCE.
 //
 // Keeping it is not ceremony. An attach that stops happening is silent: the tag still commits the
 // right native view, the tree still looks correct, and only the machine is missing — which is

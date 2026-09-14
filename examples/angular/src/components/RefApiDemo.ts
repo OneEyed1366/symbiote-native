@@ -34,7 +34,7 @@ import './RefApiDemo.css';
         }}</text>
       </view>
       <text testID="measure-frame" class="info-text">{{
-        'frame: ' + frame
+        'measure · ' + frame
       }}</text>
       <view class="row">
         <view class="flex-1">
@@ -78,10 +78,14 @@ export class RefApiDemo implements AfterViewInit {
   readonly onMeasure = (): void => {
     const box = this.boxRef?.nativeElement;
     if (box === undefined) return;
+    // The two halves answer different questions and only one of them moves when you scroll, which
+    // reads as a bug until the labels say so. `measure`'s x/y are the node's offset inside its
+    // PARENT (`DOM.cpp`'s `originRelativeToParent`) — scrolling does not change that — while
+    // pageX/pageY are measured from the root and do.
     box.measure((x, y, width, height, pageX, pageY) => {
       this.frame =
-        `x${Math.round(x)} y${Math.round(y)} · ${Math.round(width)}×${Math.round(height)}` +
-        ` · page ${Math.round(pageX)},${Math.round(pageY)}`;
+        `in parent x${Math.round(x)} y${Math.round(y)} · ${Math.round(width)}×${Math.round(height)}` +
+        ` · from root ${Math.round(pageX)},${Math.round(pageY)}`;
     });
   };
 

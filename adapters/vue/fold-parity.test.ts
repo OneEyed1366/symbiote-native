@@ -1,14 +1,12 @@
 // The runtime folds (`id` -> `nativeID`, RN's two Text defaults) asserted on EVERY Vue path that
-// can reach a host node: the component wrapper, the SFC transformer's lowered output, and the
-// JSX/TSX plugin's lowered output.
+// can reach a host node: a hand-written `h()`, the SFC compiler's output, and the JSX/TSX plugin's.
 //
-// WHY THIS FILE EXISTS. A lowered element inherits nothing the wrapper used to do — defaults,
-// aliases, bug folds. Angular lost both Text defaults AND `id` -> `nativeID` exactly that way:
-// silently, on every app, visible only on a device. Vue applies both folds in the RENDERER
-// (`PROP_ALIASES` and `TEXT_DEFAULTS` in src/renderer/index.ts) rather than in a transform,
-// specifically because that layer sits under all four Vue paths at once. This file is the proof of
-// that claim rather than a restatement of it — the placement argument is sound and would stay
-// sound while a fold quietly stopped running.
+// WHY THIS FILE EXISTS. A tag inherits nothing a component wrapper used to do — defaults, aliases,
+// bag folds. Angular lost both Text defaults AND `id` -> `nativeID` exactly that way: silently, on
+// every app, visible only on a device. Vue applies both folds in the RENDERER (`PROP_ALIASES` and
+// `TEXT_DEFAULTS` in src/renderer/index.ts), specifically because that layer sits under all three
+// paths at once. This file is the proof of that claim rather than a restatement of it — the
+// placement argument is sound and would stay sound while a fold quietly stopped running.
 //
 // WHY THE ORACLE IS THE COMMITTED PAYLOAD, KEY BY KEY. A count agrees for the wrong reasons: two
 // payloads of equal size can differ in which keys they carry, and a whole day was lost to a
@@ -22,10 +20,9 @@
 // assertions catch different things and neither is redundant: cross-arm catches a fold that a
 // transform breaks for one path only, absolute catches a fold that stops running for everyone.
 //
-// WHY BOTH TRANSFORMS, RUN SEPARATELY. Vue is the only adapter with two lowering paths, and they
-// cannot share plumbing: `@vue/compiler-sfc` hands a transform an expression as SOURCE TEXT while
-// the JSX path holds a Babel AST. `lowering-parity.test.ts` covers whether they agree on WHAT to
-// lower; this file covers whether a lowered element still carries what the wrapper did.
+// WHY BOTH COMPILERS, RUN SEPARATELY. Vue is the only adapter with two of them, and they cannot
+// share plumbing: `@vue/compiler-sfc` hands an expression over as SOURCE TEXT while the JSX path
+// holds a Babel AST.
 
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
@@ -319,9 +316,9 @@ describe('every Vue path folds id and the Text defaults identically', () => {
     );
   });
 
-  // The update path, not the mount path: `patchProp` is where both folds actually live, and a
-  // transform that folded at compile time would cover the first write and not this one.
-  it('folds a prop written after mount, on both lowered paths', async () => {
+  // The update path, not the mount path: `patchProp` is where both folds actually live, and a fold
+  // applied at compile time would cover the first write and not this one.
+  it('folds a prop written after mount, on every path', async () => {
     const arms: ReadonlyArray<readonly [string, Component]> = [
       [
         'hand-written',

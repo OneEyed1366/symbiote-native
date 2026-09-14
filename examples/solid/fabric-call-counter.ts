@@ -5,8 +5,9 @@
  * dependency) and in every canary. Keep the copies byte-identical; only the `bindRenderer`
  * callback at the index.js call site differs.
  *
- * Why this and not the engine's own readCommitProfile(): that instrument counts OUR reconcile walk,
- * and stock React Native has no such walk to count. `global.nativeFabricUIManager` is the one
+ * Why this and not the engine's own readCommitProfile(): that instrument counts what the adapter
+ * records into OUR command buffer, and stock React Native has no buffer to count.
+ * `global.nativeFabricUIManager` is the one
  * surface both stacks genuinely share, so it is the only place a like-for-like number can be taken.
  * Call counts answer "do we ask Fabric to do more than React does"; the key counts answer the other
  * half, "or the same number of times, with fatter payloads".

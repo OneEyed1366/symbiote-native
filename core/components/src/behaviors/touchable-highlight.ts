@@ -37,6 +37,7 @@ import {
   type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
+  propOf,
 } from '@symbiote-native/engine';
 import { resolveTouchableFocusable } from '../view/render-pressable';
 import {
@@ -90,7 +91,7 @@ const refine: IPressConfigRefinement = (node, config) => {
 
   const underlay = createHighlightUnderlayHandlers(
     {
-      delayPressOut: numberOr(node.props.delayPressOut, 0),
+      delayPressOut: numberOr(propOf(node, 'delayPressOut'), 0),
       hasPressHandler,
       schedule: (callback, ms) => {
         const id = setTimeout(() => {
@@ -113,11 +114,11 @@ const refine: IPressConfigRefinement = (node, config) => {
         requestCommitFor(node);
       },
       onShowUnderlay: () => {
-        const onShowUnderlay = node.props.onShowUnderlay;
+        const onShowUnderlay = propOf(node, 'onShowUnderlay');
         if (typeof onShowUnderlay === 'function') onShowUnderlay();
       },
       onHideUnderlay: () => {
-        const onHideUnderlay = node.props.onHideUnderlay;
+        const onHideUnderlay = propOf(node, 'onHideUnderlay');
         if (typeof onHideUnderlay === 'function') onHideUnderlay();
       },
     },
@@ -143,9 +144,8 @@ const refine: IPressConfigRefinement = (node, config) => {
   };
 };
 
-// `id -> nativeID`, the fold every un-lowered wrapper's `foldHostBag` already applies. Not read off
-// `HOST_PRIMITIVES`, matching `./touchable-opacity`'s own inline check — that spec entry is
-// deliberately withheld until this primitive's wrapper collapses to one node everywhere.
+// `id -> nativeID`, the same fold `foldHostBag` applies from the spec. Inline rather than read off
+// `HOST_PRIMITIVES`, matching `./touchable-opacity` — this primitive has no spec entry.
 const foldPayload: IPayloadFold = props => {
   const next: Record<string, unknown> = { ...props };
   if (Object.hasOwn(next, 'id')) {

@@ -87,7 +87,7 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Animated.event', () => {
-  it('drives a bound translateY from a real scroll event and forwards the raw arg', () => {
+  it('drives a bound translateY from a real scroll event and forwards the raw arg', async () => {
     const scrollY = new Animated.Value(0);
 
     function App(): ReactElement {
@@ -111,6 +111,9 @@ describe('Animated.event', () => {
 
     const scrollEvent = { nativeEvent: { contentOffset: { y: 42 } } };
     handler(scrollEvent);
+    // setNativeProps queues; the frame reaches Fabric at the microtask boundary
+    // (core/engine/src/imperative.ts), same as the setValue path in animated-component.test.tsx.
+    await Promise.resolve();
 
     expect(committedTranslateY(appView())).toBe(42);
     expect(listenerArg).toBe(scrollEvent);

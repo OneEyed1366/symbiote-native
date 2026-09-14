@@ -55,7 +55,9 @@ describe('node census', () => {
     // write here litters the repo root on every full `vitest run` — and the `.gitignore` entry
     // that followed hides the litter rather than stopping it. The census is the point of the
     // probe, so it goes to stdout always and to a file only under SYMBIOTE_CENSUS_OUT.
-    const line = `solid ms=${elapsed.toFixed(1)} nodes=${census.nodes} walkMs=${profile.walkMs.toFixed(1)} visited=${profile.nodesVisited} writes=${profile.propWrites}/${profile.propNoops}\n`;
+    // The walk numbers (walkMs / nodesVisited) and propNoops died with the JS tree: the host owns
+    // the tree, and its own cost is not readable from here. What is left prices the layer ABOVE it.
+    const line = `solid ms=${elapsed.toFixed(1)} nodes=${census.nodes} commits=${profile.commits} writes=${profile.propWrites}\n`;
 
     console.log(line);
     const outPath = process.env.SYMBIOTE_CENSUS_OUT;
@@ -65,8 +67,7 @@ describe('node census', () => {
         `anchors=${census.anchors} createNode=${fabric.counts.createNode} ` +
         `appendChild=${fabric.counts.appendChild} clone=${fabric.counts.clone} ` +
         `completeRoot=${fabric.counts.completeRoot} | propWrites=${profile.propWrites} ` +
-        `propNoops=${profile.propNoops} nodesVisited=${profile.nodesVisited} ` +
-        `commits=${profile.commits} walkMs=${profile.walkMs.toFixed(1)}`,
+        `commits=${profile.commits}`,
     );
     unmount(ROOT_TAG);
   });

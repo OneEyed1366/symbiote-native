@@ -35,6 +35,7 @@ import {
   type IAnimatedLeafLifecycle,
 } from './leaf-lifecycle';
 import { setProp, type ISymbioteNode } from '../node';
+import { childrenOf, propOf } from '../host-access';
 
 type IBinding = {
   // The animated props by name, RAW — each value still holds its AnimatedNode, because that is
@@ -137,7 +138,7 @@ function withBehaviorStyle(node: ISymbioteNode, style: unknown): unknown {
 /**
  * Give a node a behavior-owned animated style layer, or drop it by passing `undefined`.
  *
- * The seam a lowered `TouchableOpacity` needs: RN runs its press fade from an `Animated.View` whose
+ * The seam `<touchable-opacity>` needs: RN runs its press fade from an `Animated.View` whose
  * style is `[props.style, {opacity: anim}]` (TouchableOpacity.js:302), and a tag has no such
  * wrapper. The layer is bound to the leaf, never folded into `node.props.style` — so the behavior
  * can still read the AUTHOR's resting opacity back without seeing its own fade.
@@ -153,7 +154,7 @@ export function setAnimatedBehaviorStyle(
   }
   // Re-register against the style standing right now, so the pair the leaf holds is always
   // (author, layer) whichever of the two moved last.
-  bindAnimatedValue(node, 'style', node.props.style);
+  bindAnimatedValue(node, 'style', propOf(node, 'style'));
 }
 
 /**
@@ -298,5 +299,5 @@ export function reattachAnimatedProps(node: ISymbioteNode): void {
   const binding = bindings.get(node);
   if (binding !== undefined) reconcile(node, binding);
   reattachAnimatedEvents(node);
-  for (const child of node.children) reattachAnimatedProps(child);
+  for (const child of childrenOf(node)) reattachAnimatedProps(child);
 }

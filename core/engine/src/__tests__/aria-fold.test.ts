@@ -1,13 +1,9 @@
 // The aria/role fold, asserted where it MATTERS: the committed Fabric payload, on a node built the
-// way a LOWERED element is built — `routeProp` only, no component wrapper, no adapter.
+// way a tag is built — `routeProp` only, no component wrapper, no adapter.
 //
-// WHY THIS FILE HAD TO EXIST BEFORE THE REFUSAL COULD GO. Four lowering transforms currently refuse
-// any element carrying `role` / `aria-*` (`REFUSAL_CATEGORIES.bagFold` in
-// `core/components/host-primitives.cjs`), because the fold needs the whole bag and a transform sees
-// one attribute at a time. That refusal is the only thing standing between a lowered element and
-// silently-lost accessibility, and it costs lowering coverage on every primitive. Deleting it is
-// safe exactly once the ENGINE folds — so this asserts the engine does, and it is the gate the
-// deletion is allowed to pass.
+// The fold needs the whole bag (`aria-checked` is folded against a sibling `accessibilityState`),
+// which is why it cannot live anywhere that sees one attribute at a time. Nothing else stands
+// between a tag and silently-lost accessibility.
 //
 // `core/components/src/accessibility-props.test.ts` covers the fold's own rules in isolation,
 // including the two OPPOSITE precedence directions. This one covers the wiring: the sticky node

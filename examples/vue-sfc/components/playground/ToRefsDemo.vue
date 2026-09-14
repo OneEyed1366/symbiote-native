@@ -24,13 +24,8 @@ function relabel(): void {
 
 <template>
   <view class="a11y-card">
-    <text class="switch-label">
-      toRef + toRefs
-    </text>
-    <text
-      class="list-row-text"
-      testID="torefs-values"
-    >
+    <text class="switch-label"> toRef + toRefs </text>
+    <text class="list-row-text" testID="torefs-values">
       {{
         `toRef(state,'label')=${label} · toRefs(state).score=${score} · state.score=${state.score}`
       }}

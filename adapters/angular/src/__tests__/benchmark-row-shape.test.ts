@@ -31,11 +31,9 @@ import { readFileSync } from 'node:fs';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  censusRetainedTree,
   clearGlobalStyles,
-  isAnchor,
-  readCommitProfile,
   registerRules,
-  type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
@@ -331,9 +329,8 @@ type ICommittedShape = {
 // `accessible: true` while the flat row's stand-in — a bare `<view (press)>` — correctly does not:
 // RN's View has no such default. It is the first prop on which the flat row's deliberate surrender
 // of Pressable's accessibility fold is VISIBLE, every earlier one being absent-when-unset. That the
-// composed side really does commit it is pinned by pressable.test.ts and lowering-equivalence.test.ts,
-// so subtracting it here loses no coverage. Delete this when the flat row stops standing in for a
-// Pressable.
+// composed side really does commit it is pinned by pressable.test.ts, so subtracting it here loses
+// no coverage. Delete this when the flat row stops standing in for a Pressable.
 // `focusable` joined it 2026-09-09 for the identical reason and it is the sharper case: RN's
 // Touchable* formula (TouchableOpacity.js:336-340) needs a press handler and a non-disabled state,
 // and the composed row supplies both — while a bare `<view (press)>` has no Pressable to compute
@@ -356,23 +353,6 @@ function viewNamesOf(nodes: readonly IFakeNode[]): string[] {
   return nodes.flatMap(node => [node.viewName, ...viewNamesOf(node.children)]);
 }
 
-function countEngineNodes(roots: readonly ISymbioteNode[]): {
-  total: number;
-  anchors: number;
-} {
-  let total = 0;
-  let anchors = 0;
-  const stack: ISymbioteNode[] = [...roots];
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (node === undefined) break;
-    total += 1;
-    if (isAnchor(node)) anchors += 1;
-    for (const child of node.children) stack.push(child);
-  }
-  return { total, anchors };
-}
-
 type IMountProbe = {
   committed: ICommittedShape[];
   viewNames: string[];
@@ -391,19 +371,20 @@ async function mountProbe(
   rowsSignal.set(buildRows(rowCount));
   selectedSignal.set(undefined);
   fabric.reset();
-  readCommitProfile();
 
   const surface = mount(ROOT_TAG, component);
   await flush();
 
-  const profile = readCommitProfile();
-  const census = countEngineNodes(surface.children);
+  // The host's own census, not a walk here: JS holds no tree to walk. `flattenWidths` lists one
+  // entry per parent whose child list contains a node the commit skips, which is the same
+  // population the retired `childFlattens` commit counter priced.
+  const census = censusRetainedTree(surface.children);
   return {
     committed: shapeOf(fabric.committed),
     viewNames: viewNamesOf(fabric.committed),
-    engineNodes: census.total,
+    engineNodes: census.nodes,
     anchors: census.anchors,
-    childFlattens: profile.childFlattens,
+    childFlattens: census.flattenWidths.length,
   };
 }
 

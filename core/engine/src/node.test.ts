@@ -9,6 +9,7 @@
 // DEBUG-gated diagnostic instrumentation with no product-facing contract to assert.
 
 import { describe, expect, it } from 'vitest';
+import { installFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
   createAnchor,
@@ -22,7 +23,26 @@ import {
   setEventListener,
   setText,
   type ISymbioteEvent,
+  type ISymbioteNode,
 } from './node';
+// The seam, not a field: a node's children live in the HOST, which learns of them from the ops
+// recorded against it, and these reads are the only way to ask (`host-access.ts`).
+import { childrenOf, parentOf, propOf, textOf } from './host-access';
+import { createSurface } from './surface';
+
+// Every read below crosses into the tree host, so without one installed this file would assert
+// against an empty world and pass wherever it expects an absence.
+const fabric = installFabric();
+let nextRootTag = 9400;
+
+// The committed payload, which is what native reads — a listener map and a props bag are two
+// different questions and only this one reaches Fabric.
+function committedPropsOf(node: ISymbioteNode): Record<string, unknown> {
+  const surface = createSurface((nextRootTag += 1));
+  surface.appendChild(node);
+  surface.commit();
+  return fabric.appRoot().children[0].props;
+}
 
 describe('isSymbioteEvent', () => {
   it('narrows a real synthetic event object', () => {
@@ -62,8 +82,8 @@ describe('insertBefore / removeChild (no throwing path — outcome-named groups)
 
     insertBefore(parent, c, b);
 
-    expect(parent.children).toEqual([a, c, b]);
-    expect(c.parent).toBe(parent);
+    expect(childrenOf(parent)).toEqual([a, c, b]);
+    expect(parentOf(c)).toBe(parent);
   });
 
   // why: an adapter moving a node between parents (Vue's patch, a Svelte each-block
@@ -79,8 +99,8 @@ describe('insertBefore / removeChild (no throwing path — outcome-named groups)
 
     insertBefore(newParent, moved, anchor);
 
-    expect(oldParent.children).toEqual([]);
-    expect(newParent.children).toEqual([moved, anchor]);
+    expect(childrenOf(oldParent)).toEqual([]);
+    expect(childrenOf(newParent)).toEqual([moved, anchor]);
   });
 
   // why: `beforeChild` is caller-supplied and can be stale (already removed/reparented
@@ -95,7 +115,7 @@ describe('insertBefore / removeChild (no throwing path — outcome-named groups)
 
     insertBefore(parent, c, stray);
 
-    expect(parent.children).toEqual([a, c]);
+    expect(childrenOf(parent)).toEqual([a, c]);
   });
 
   it('removes an existing child and clears its parent link', () => {
@@ -105,7 +125,7 @@ describe('insertBefore / removeChild (no throwing path — outcome-named groups)
 
     removeChild(parent, child);
 
-    expect(parent.children).toEqual([]);
+    expect(childrenOf(parent)).toEqual([]);
     expect(child.parent).toBeUndefined();
   });
 
@@ -118,7 +138,7 @@ describe('insertBefore / removeChild (no throwing path — outcome-named groups)
     appendChild(parent, other);
 
     expect(() => removeChild(parent, notAChild)).not.toThrow();
-    expect(parent.children).toEqual([other]);
+    expect(childrenOf(parent)).toEqual([other]);
   });
 });
 
@@ -141,7 +161,7 @@ describe('setText', () => {
 
     setText(node, 'hello');
 
-    expect(node.props.text).toBe('hello');
+    expect(textOf(node)).toBe('hello');
   });
 });
 
@@ -170,7 +190,7 @@ describe('setEventListener: the listener map', () => {
     setEventListener(node, 'change', () => {});
 
     expect(node.listeners?.has('change')).toBe(true);
-    expect(Object.keys(node.props)).toHaveLength(0);
+    expect(Object.keys(committedPropsOf(node))).toHaveLength(0);
   });
 });
 
@@ -185,7 +205,7 @@ describe('routeProp: event vs plain-prop classification', () => {
 
     routeProp(node, 'onTintColor', handler);
 
-    expect(node.props.onTintColor).toBe(handler);
+    expect(propOf(node, 'onTintColor')).toBe(handler);
     expect(node.listeners?.has('tintColor')).toBeFalsy();
   });
 
@@ -197,7 +217,7 @@ describe('routeProp: event vs plain-prop classification', () => {
     routeProp(node, 'onPress', handler);
 
     expect(node.listeners?.has('press')).toBe(true);
-    expect(node.props.onPress).toBeUndefined();
+    expect(propOf(node, 'onPress')).toBeUndefined();
   });
 
   // why: PanResponder's negotiation callbacks are a JS-side protocol synthesized from raw
@@ -210,6 +230,6 @@ describe('routeProp: event vs plain-prop classification', () => {
     routeProp(node, 'onStartShouldSetResponder', handler);
 
     expect(node.listeners?.has('startShouldSetResponder')).toBe(true);
-    expect(node.props.onStartShouldSetResponder).toBeUndefined();
+    expect(propOf(node, 'onStartShouldSetResponder')).toBeUndefined();
   });
 });

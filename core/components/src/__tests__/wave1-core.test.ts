@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import { flattenStyle } from '@symbiote-native/engine';
 import type { IDescriptor, IDescriptorChild } from '../descriptor';
-import { renderInputAccessoryView } from '../view/render-input-accessory-view';
+import { mapInputAccessoryViewProps } from '../view/render-input-accessory-view';
 import { renderModal } from '../view/render-modal';
 import {
   createInitialModalState,
@@ -27,37 +27,32 @@ function asDescriptor(child: IDescriptorChild | undefined): IDescriptor {
 // to describe is built by the behavior. Its coverage moved to
 // `behaviors/image-background.test.ts`, which asserts the COMMITTED tree rather than a descriptor.
 
-describe('renderInputAccessoryView', () => {
+describe('mapInputAccessoryViewProps', () => {
   const style = { flex: 1 };
-  const host = renderInputAccessoryView({
+  const props = mapInputAccessoryViewProps({
     nativeID: 'kbd-bar',
     backgroundColor: '#eee',
     style,
     passthrough: { testID: 'iav', accessibilityLabel: 'bar' },
   });
 
-  it('hosts a input-accessory-view forwarding its props', () => {
-    expect(host.type).toBe('input-accessory-view');
-    expect(host.props.nativeID).toBe('kbd-bar');
-    expect(host.props.backgroundColor).toBe('#eee');
-    expect(host.props.style).toBe(style);
-  });
-
-  it('merges passthrough and injects no structural children (the adapter adds user children)', () => {
-    expect(host.props.testID).toBe('iav');
-    expect(host.props.accessibilityLabel).toBe('bar');
-    expect(host.children).toHaveLength(0);
+  it('forwards the typed fields and merges passthrough', () => {
+    expect(props.nativeID).toBe('kbd-bar');
+    expect(props.backgroundColor).toBe('#eee');
+    expect(props.style).toBe(style);
+    expect(props.testID).toBe('iav');
+    expect(props.accessibilityLabel).toBe('bar');
   });
 
   // ABSENT, not present-and-undefined, and the difference is load-bearing rather than tidy.
-  // `nativeID` has an alias source: the wrapper leaves `id` in passthrough and the renderer renames
-  // it, so a `nativeID: undefined` emitted here is written AFTER that rename and deletes it. The
-  // keys were briefly made unconditional on the reasoning that `setProp` collapses undefined to
-  // absent — true, and exactly what makes the write destructive instead of inert.
+  // `nativeID` has an alias source: `id` arrives in passthrough and the renderer renames it, so a
+  // `nativeID: undefined` emitted here is written AFTER that rename and deletes it. The keys were
+  // briefly made unconditional on the reasoning that `setProp` collapses undefined to absent —
+  // true, and exactly what makes the write destructive instead of inert.
   it('omits nativeID and backgroundColor when undefined', () => {
-    const bare = renderInputAccessoryView({ passthrough: {} });
-    expect('nativeID' in bare.props).toBe(false);
-    expect('backgroundColor' in bare.props).toBe(false);
+    const bare = mapInputAccessoryViewProps({ passthrough: {} });
+    expect('nativeID' in bare).toBe(false);
+    expect('backgroundColor' in bare).toBe(false);
   });
 });
 

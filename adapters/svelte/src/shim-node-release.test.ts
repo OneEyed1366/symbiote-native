@@ -128,10 +128,12 @@ async function survivorsAfterShrink(
   await tick();
   await tick();
 
-  // `instanceHandle` is the shim node the engine was driven from, so this tracks the shim layer
-  // itself, not merely the fake Fabric's own bookkeeping.
+  // `instanceHandle` is the node the engine was driven from, so this tracks the shim layer itself,
+  // not merely the fake Fabric's own bookkeeping. Sampled on the row's `RCTText` — one per row, and
+  // the innermost node that HAS a handle: a raw-text node is created by an opcode that carries no
+  // instance handle, so it commits with none.
   const handles = fabric.created
-    .filter(node => node.viewName === 'RCTRawText')
+    .filter(node => node.viewName === 'RCTText')
     .map(node => node.instanceHandle)
     .filter(
       (handle): handle is object =>

@@ -4,7 +4,7 @@
 // 1. A key that DISAPPEARS from the prop bag must be routed as `undefined` so the committed node
 //    resets it. Every other test only ever adds or changes a key, so `applyBagDiff`'s second pass
 //    could be deleted outright with nothing red.
-// 2. `attributes` is allocated lazily (a lowered primitive carries everything in the bag and never
+// 2. `attributes` is allocated lazily (a bag-carrying element puts everything in `p` and never
 //    touches it), which makes the attribute API itself worth pinning — `getAttribute` could be
 //    hard-coded to `null` and nothing failed.
 

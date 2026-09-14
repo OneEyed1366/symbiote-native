@@ -91,12 +91,9 @@ describe('Vue Modal on the engine', () => {
       // transition — an initially-invisible modal must never pay for a host node it never shows.
       mountModal({ visible: false });
       await tick();
-      // Unlike React (whose host config commits an empty AppContainer unconditionally every
-      // commit), Vue's renderer only calls surface.requestCommit() from an actual nodeOp — a
-      // root that renders nothing produces no nodeOp at all, so nothing commits yet. That's
-      // fine: the mirror has no entry for the root container, so the NEXT real insert (when the
-      // modal becomes visible) still does a full first-mount commit, AppContainer included.
-      expect(fabric.committed.length).toBe(0);
+      // A surface always commits its own AppContainer root, so the question is what hangs UNDER
+      // it: a modal that never became visible must contribute no child at all.
+      expect(fabric.appRoot().children.length).toBe(0);
       expect(fabric.find(n => n.viewName === 'ModalHostView')).toBeUndefined();
     });
 

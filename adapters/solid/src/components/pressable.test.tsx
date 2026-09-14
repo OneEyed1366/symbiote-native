@@ -499,7 +499,7 @@ describe('Solid Pressable on the engine', () => {
 
     // why: android_ripple is gated on Platform.OS === 'android' and must be inert elsewhere (RN
     // Pressable.js). The fold itself is the engine behavior's (`core/components/src/behaviors/
-    // pressable.ts`, asserted in `lowered-ripple-android.test.ts`); this pins that a bare tag
+    // pressable.ts`, asserted in `ripple-android.test.ts`); this pins that a bare tag
     // never wraps its child regardless — headless vitest resolves Platform.OS to 'ios'.
     it('never wraps the child in a ripple View, even on this iOS-resolved host', async () => {
       mount(ROOT_TAG, () => (

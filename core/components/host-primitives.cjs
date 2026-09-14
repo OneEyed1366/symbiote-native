@@ -49,18 +49,14 @@
 // Same outcome on both tags: `nativeID = id ?? nativeID`, and the raw `id` key must NOT reach
 // Fabric (no ViewConfig declares it, so it is silently dropped). What the adapters actually did:
 // Solid folded it on both tags, Svelte on View only (its `else` branch skips Text), and Vue on
-// neither — not in either transform, not in its renderer, not in `routeProp`. Vue's gap is OLDER
-// than lowering (its `View` wrapper was always a bare pass-through), so it is a standing
-// <adapters_reach_full_feature_parity> miss, not a lowering regression.
+// neither — not in its renderer, not in `routeProp`. Vue's gap is a standing
+// <adapters_reach_full_feature_parity> miss.
 //
-// WHICH LAYER APPLIES IT IS THE ADAPTER'S CHOICE, exactly as for `defaults` below. Solid and
-// Svelte rename at COMPILE time inside the lowering transform; Vue applies it at RUNTIME
-// (`PROP_ALIASES` in `adapters/vue/src/renderer/index.ts`, in `patchProp`) because Vue has FOUR
-// paths to a node — lowered SFC, lowered TSX, the component wrapper, and a hand-written
-// `h('view', {id})` — and compile time only covers two of them. A transform reading this
-// spec must therefore not assume it owns the fold. Applying it at both layers happens to be
-// harmless here (the rename deletes `id`, so the second pass sees nothing), but that is a property
-// of THIS alias, not a licence.
+// WHICH LAYER APPLIES IT IS THE ADAPTER'S CHOICE, exactly as for `defaults` below. Vue applies it
+// at RUNTIME (`PROP_ALIASES` in `adapters/vue/src/renderer/index.ts`, in `patchProp`) because it
+// covers every path to a node — SFC, TSX, and a hand-written `h('view', {id})` — with one
+// implementation. Applying it twice happens to be harmless here (the rename deletes `id`, so a
+// second pass sees nothing), but that is a property of THIS alias, not a licence.
 //
 // KNOWN DIVERGENCE FROM UPSTREAM, present in two adapters and not introduced by this file: when an
 // element carries BOTH `id` and `nativeID`, RN gives `id` unconditional priority, while a per-key
@@ -81,8 +77,8 @@ const HOST_PRIMITIVES = {
   // — the tag exists only so the host-behavior registry, which is keyed by TAG and never by
   // resolved name, can find the press machine.
   //
-  // No defaults, and only the `id` -> `nativeID` alias every primitive carries: a lowered Pressable
-  // forwards its props otherwise untouched, and the machine reads them off `node.props` at event
+  // No defaults, and only the `id` -> `nativeID` alias every primitive carries: the tag forwards
+  // its props otherwise untouched, and the machine reads them off `node.props` at event
   // time. (This read "No aliases and no defaults" while the line below already said `ID_ALIAS`, and
   // a Solid test injected a `Pressable` entry with `aliases: {}` on the strength of it.)
   Pressable: {
@@ -137,14 +133,8 @@ const HOST_PRIMITIVES = {
   // kept because the SEQUENCE is the reusable part — an entry here is a switch for four transforms
   // at once, so it goes in after every side is ready, never to prove the transforms work.
   //
-  // 1. `registerTextInputBehavior()` is now called by `adapters/{vue,svelte,solid}/src/register.ts`,
-  //    the three that lower. React and Angular have no lowering transform, so no lowered node ever
-  //    exists there and neither carries a `register.ts` — the same reason they skip Pressable's.
-  //
-  // 2. The component path no longer shares these tags. It renders `text-input-managed`
-  //    (`component-names/shared.ts`), because the registry is keyed by TAG and the wrappers run the
-  //    same machine in their own lifecycle — one shared tag would have installed both copies on a
-  //    wrapper-built node and fired `setInputFocused` twice per focus.
+  // `registerTextInputBehavior()` is called by every adapter's `src/register.ts`: the tag is the
+  // only path an app has, so the machine has exactly one owner per node.
   TextInput: {
     intrinsic: 'text-input',
     aliases: ID_ALIAS,
@@ -158,25 +148,18 @@ const HOST_PRIMITIVES = {
     },
   },
   // Landed 2026-09-01, same order as TextInput and Image: runtime half built
-  // (`core/components/src/behaviors/switch.ts`), registered by the four lowering adapters, proven
+  // (`core/components/src/behaviors/switch.ts`), registered by every adapter, proven
   // against the wrapper's payload (positive + negative controls, a break-tested async-timing case)
   // before this key existed.
   //
-  // `-managed` twin, same reason as TextInput: the behavior carries a machine (mirrors the last
-  // value native reported, sends a platform snap-back command on disagreement), so a wrapper-built
-  // node — which already runs that same machine in its own lifecycle — must not also get the
-  // engine's copy. `render-switch.ts` emits `switch-managed`; this key's `intrinsic` is
-  // the bare tag the behavior registry attaches to.
+  // The behavior carries a machine: it mirrors the last value native reported and sends a platform
+  // snap-back command on disagreement.
   //
-  // IDEMPOTENCE OF THE FOLD IS MOOT HERE FOR A DIFFERENT REASON THAN IMAGE'S. Image's entry has no
-  // `-managed` twin, so its fold genuinely CAN run twice (component then lowered, same tag), and
-  // idempotence is what makes that safe — asserted, not assumed. Switch's fold is NOT trivial (it
-  // maps `trackColor`/`thumbColor`/`ios_backgroundColor` to native prop names, keyed on
-  // `Platform.OS`) and running it twice would NOT be a no-op — but the question never arises: the
-  // `-managed` split means only the bare `switch` tag ever carries this behavior, and the
-  // wrapper never emits that tag, so no node's payload ever passes through this fold more than
-  // once. Unreachable by construction, not idempotent by property — the same distinction
-  // TextInput's own entry draws for its fold.
+  // ITS FOLD IS NOT IDEMPOTENT, and that is safe for a reason Image's entry does not share. Switch
+  // maps `trackColor`/`thumbColor`/`ios_backgroundColor` onto native prop names keyed on
+  // `Platform.OS`, so running it twice would NOT be a no-op — the question never arises because a
+  // payload reaches this fold once, on the one tag that carries the behavior. Unreachable by
+  // construction, not idempotent by property.
   //
   // No `observesState`: nothing in Switch's public surface is a function-valued style or a
   // render-prop child (`style?: IStyleProp<IViewStyle>`, never a callback), so neither
@@ -208,9 +191,6 @@ const HOST_PRIMITIVES = {
   // The prop is declared on all five in the same change as this alias — half of it in either
   // direction is broken (a fold for a key nobody can pass, or a raw `id` reaching a view whose
   // ViewConfig declares none).
-  //
-  // No `-managed` twin: the behavior carries a machine, so it needs one owner per node, and it has
-  // one — the wrappers forward to this tag and none of them runs a mirror any more.
   RefreshControl: {
     intrinsic: 'refresh-control',
     aliases: ID_ALIAS,
@@ -238,19 +218,13 @@ const HOST_PRIMITIVES = {
     },
   },
   // FOLD-ONLY: the behavior registered for this tag carries a prop fold and nothing else — no
-  // listeners, no commit hook, no per-node runtime (`core/components/src/behaviors/image.ts`). The
-  // whole of the wrapper's body was prop mapping, so the lowered form owes exactly that.
+  // listeners, no commit hook, no per-node runtime (`core/components/src/behaviors/image.ts`).
   //
-  // No `-managed` twin, unlike TextInput, and the reason is a measured PROPERTY rather than a
-  // precedent: `mapImageProps` is idempotent, so registering the fold on the tag `renderImage`
-  // already emits means a wrapper-built node simply folds a second time to no effect. Asserted in
-  // `behaviors/image.test.ts`; break-tested. TextInput's split is NOT about idempotence (its fold
-  // is idempotent too) — it is about one owner per node, because that behavior carries a machine.
+  // `mapImageProps` is idempotent, asserted in `behaviors/image.test.ts` and break-tested, so a bag
+  // that reaches the fold twice folds to no effect.
   //
-  // Entered LAST, after the runtime half was built, registered by all four lowering adapters and
-  // proven against the wrapper's payload. Adding this key is what makes every transform start
-  // lowering `Image` at once, so a fold that had not landed would surface as a raw `src` reaching
-  // Fabric — a key no ViewConfig declares, which throws nothing and paints nothing.
+  // The runtime half has to land before this key does: without the fold a raw `src` reaches Fabric,
+  // a key no ViewConfig declares, which throws nothing and paints nothing.
   // THE ENTRY IS NOT OPTIONAL HERE, and the reason has nothing to do with folds: this table is what
   // `adapters/vue/intrinsic-tags.cjs` derives element-vs-component from, and a hyphenated tag it
   // does not name compiles to `resolveComponent("image-background")` — children become a slot the
@@ -278,15 +252,11 @@ const HOST_PRIMITIVES = {
     // runs at commit — so there is nothing left for a compile-time seed to do.
     defaults: {},
   },
-  // Entered LAST, same order Image used: runtime half built, registered by the four lowering
-  // adapters, and proven against the wrapper's payload before this key existed.
-  //
   // The ONLY primitive so far whose intrinsic resolves to a different Fabric component per
   // platform — `RCTInputAccessoryView` on iOS, a plain `RCTView` on Android. The fold is
-  // platform-invariant on purpose (it reproduces the wrapper's mapping on both, so the lowered and
-  // wrapped paths cannot diverge per platform); what it does NOT do is repair what sits underneath,
-  // where upstream RN renders nothing at all off iOS. That divergence predates the lowering, is
-  // identical on both paths, and is with the owner as its own decision.
+  // platform-invariant on purpose; what it does NOT do is repair what sits underneath, where
+  // upstream RN renders nothing at all off iOS. That divergence is with the owner as its own
+  // decision.
   InputAccessoryView: {
     intrinsic: 'input-accessory-view',
     aliases: ID_ALIAS,
@@ -308,22 +278,13 @@ const HOST_PRIMITIVES = {
   // a Vue slot, a Solid JSX child, Angular's `<ng-content>`, a Svelte snippet). That clears the
   // disqualifier in `.claude/rules/host-primitive-tier.md`.
   //
-  // NO `ID_ALIAS`, and this is the one place SafeAreaView departs from every entry above it. The
-  // alias exists to REPRODUCE a fold the wrapper performs; not one of the five SafeAreaView wrappers
-  // folds `id`, and none declares it. Adding the alias here would make the lowered element fold a
-  // prop its component spelling passes through untouched — a lowering that ADDS a capability, which
-  // `.claude/rules/adapter-parity-audit.md` records as a bug in the same way as one that drops it.
   // That the five entries above all share `ID_ALIAS` is a property of those five primitives, not a
   // house style to copy: the sixth is where "every case so far did X" stops being a rule.
-  //
-  // The `id` surface gap itself is real and PRE-EXISTING — upstream's SafeAreaView takes `ViewProps`,
-  // so RN accepts `id` where our wrappers do not. It predates lowering, is identical on both paths,
-  // and closing it means adding `id` to five wrappers AND this alias together, never one of the two.
   SafeAreaView: {
     intrinsic: 'safe-area-view',
     // ID_ALIAS was deliberately ABSENT here until 2026-09-01, because none of the five wrappers
-    // declared `id` and aliasing on the lowered path alone would have made lowering ADD a fold the
-    // component spelling does not perform. That exposed a real divergence — Solid's renderer folds
+    // declared `id` and aliasing on the tag alone would have ADDED a fold the component spelling
+    // did not perform. That exposed a real divergence — Solid's renderer folds
     // `id` from two string constants on the write path, so it aliased for a primitive whose spec
     // said not to (`adapters/solid/src/renderer-alias-fold.test.ts`, whose header predicted exactly
     // this the day a primitive stopped sharing the pair).

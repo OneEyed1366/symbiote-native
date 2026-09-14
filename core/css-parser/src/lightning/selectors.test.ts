@@ -389,8 +389,8 @@ describe('selectorsToMatches — the five deep spellings agree', () => {
 
 // BRANCHED ON THE FLAG, not rewritten when it moves. `:active` is currently OFF
 // (IS_STATE_TOKEN_ENABLED in selectors.ts): the pressed look is expressed as a functional
-// `style={({pressed}) => …}`, which every lowering transform compiles to `style` + `activeStyle`,
-// and shipping a second route into the same cascade is what this disables.
+// `style={({pressed}) => …}`, which the engine resolves to `style` + `activeStyle`, and shipping a
+// second route into the same cascade is what this disables.
 //
 // The token table above is NOT dead weight — it is the contract the flag restores, and it is
 // asserted the moment the flag flips, with no edit here. A block that had to be hand-rewritten on

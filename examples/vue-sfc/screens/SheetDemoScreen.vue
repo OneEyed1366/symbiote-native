@@ -21,15 +21,10 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
 </script>
 
 <template>
-  <scroll-view
-    class="screen"
-    content-container-style="section"
-  >
+  <scroll-view class="screen" content-container-style="section">
     <view :class="`line-tag line-tag-${lineInfo.line}`">
       <text class="line-tag-text">
-        {{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}
+        {{ `${lineInfo.code} · ${lineInfo.label}` }}
       </text>
     </view>
     <view class="hero-card">
@@ -37,14 +32,10 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
         class="hero-badge"
         :style="{ backgroundColor: LINE_COLOR.presentation }"
       >
-        <text class="hero-badge-text">
-          SH
-        </text>
+        <text class="hero-badge-text"> SH </text>
       </view>
       <view class="hero-copy">
-        <text class="hero-title">
-          Sheet presentation
-        </text>
+        <text class="hero-title"> Sheet presentation </text>
         <text class="hero-body">
           Pushed with stackPresentation: formSheet and three detents — drag the
           grabber between 30%, 60%, and full height.
@@ -52,8 +43,7 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
       </view>
     </view>
     <text class="info-text">
-      stackPresentation: formSheet · detents 30% / 60% / 100% · drag the
-      grabber
+      stackPresentation: formSheet · detents 30% / 60% / 100% · drag the grabber
     </text>
     <ActionButton
       testID="sheet-dismiss"

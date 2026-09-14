@@ -1,5 +1,5 @@
 // `IHostBehavior.buildStructure` + `ISymbioteNode.childHost` — the seam that lets a COMPOSED
-// primitive be a host element. `foldPayload` gave a lowered primitive its wrapper's prop mapping;
+// primitive be a host element. `foldPayload` gives a tag its wrapper's prop mapping;
 // this gives it the wrapper's internal subtree, which is what a ScrollView (scroll view wrapping a
 // content view) or an ImageBackground needs and what nothing before this could express.
 //
@@ -12,16 +12,24 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
+  childrenOf,
   clearHostBehaviors,
   createElement,
   createSurface,
   insertBefore,
+  parentOf,
   registerHostBehavior,
   removeChild,
   type ISymbioteNode,
 } from './index';
 
 const fabric = installFabric();
+
+// JS holds no tree, so a child list is a read. `kidsOf` absorbs the optional slot at the call
+// sites that ask about one — `childrenOf` takes a node, not a maybe-node.
+function kidsOf(node: ISymbioteNode | undefined): readonly ISymbioteNode[] {
+  return node === undefined ? [] : childrenOf(node);
+}
 let nextRootTag = 9500;
 
 // Distinct Fabric names throughout, so an assertion can never pass by matching the wrong node —
@@ -76,8 +84,8 @@ describe('buildStructure', () => {
     const owner = createElement(OWNER, false, OWNER_TAG);
 
     expect(built).toBe(1);
-    expect(owner.children).toHaveLength(1);
-    expect(owner.childHost).toBe(owner.children[0]);
+    expect(childrenOf(owner)).toHaveLength(1);
+    expect(owner.childHost).toBe(childrenOf(owner)[0]);
     expect(owner.childHost?.component).toBe(SLOT);
   });
 
@@ -88,7 +96,7 @@ describe('buildStructure', () => {
     appendChild(flat, child);
 
     expect(flat.childHost).toBeUndefined();
-    expect(flat.children).toEqual([child]);
+    expect(childrenOf(flat)).toEqual([child]);
   });
 
   it('builds through the ordinary mutation API, so the slot is an ordinary node', () => {
@@ -96,7 +104,7 @@ describe('buildStructure', () => {
     const owner = createElement(OWNER, false, OWNER_TAG);
     const slot = owner.childHost as ISymbioteNode;
 
-    expect(slot.parent).toBe(owner);
+    expect(parentOf(slot)).toBe(owner);
     expect(slot.childHost).toBeUndefined();
   });
 });
@@ -110,9 +118,9 @@ describe('the child redirect', () => {
     appendChild(owner, first);
     appendChild(owner, second);
 
-    expect(owner.children).toEqual([owner.childHost]);
-    expect(owner.childHost?.children).toEqual([first, second]);
-    expect(first.parent).toBe(owner.childHost);
+    expect(childrenOf(owner)).toEqual([owner.childHost]);
+    expect(kidsOf(owner.childHost)).toEqual([first, second]);
+    expect(parentOf(first)).toBe(owner.childHost);
   });
 
   it('honours insertBefore ordering inside the slot', () => {
@@ -127,7 +135,7 @@ describe('the child redirect', () => {
     // adapter makes, and the one an un-redirected insertBefore resolves by appending at the end.
     insertBefore(owner, b, c);
 
-    expect(owner.childHost?.children).toEqual([a, b, c]);
+    expect(kidsOf(owner.childHost)).toEqual([a, b, c]);
   });
 
   it('removes through the owner, which an un-redirected splice would silently miss', () => {
@@ -137,10 +145,10 @@ describe('the child redirect', () => {
     appendChild(owner, child);
     removeChild(owner, child);
 
-    expect(owner.childHost?.children).toEqual([]);
-    expect(child.parent).toBeUndefined();
+    expect(kidsOf(owner.childHost)).toEqual([]);
+    expect(parentOf(child)).toBeUndefined();
     // The structure itself is not collateral: a removal aimed at an app child must not reach it.
-    expect(owner.children).toEqual([owner.childHost]);
+    expect(childrenOf(owner)).toEqual([owner.childHost]);
   });
 });
 
@@ -183,7 +191,7 @@ describe('park and unpark', () => {
 
     expect(built).toBe(1);
     expect(owner.childHost).toBe(slotBefore);
-    expect(owner.children).toEqual([slotBefore]);
-    expect(slotBefore?.children).toEqual([child]);
+    expect(childrenOf(owner)).toEqual([slotBefore]);
+    expect(kidsOf(slotBefore)).toEqual([child]);
   });
 });

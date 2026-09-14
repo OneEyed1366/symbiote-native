@@ -44,7 +44,7 @@ more, so:
 
 ```
 floor much below 15 us   the boundary is cheap and our wrapper BODIES cost the difference
-floor near 15 us         the boundary itself is the cost, and lowering was the only fix
+floor near 15 us         the boundary itself is the cost, and removing it was the only fix
 ```
 
 Two caveats that belong with any number taken here. V8 is not Hermes, so an absolute microsecond
@@ -76,11 +76,11 @@ never gets, while this page's `h()` arm gets neither. So 1.7 us is a LOWER bound
 saves per instance.
 
 **The result cross-checks against the adapters, which is what makes it more than a curiosity.**
-React's boundary is too cheap to measure — and React's adapter sits at parity with stock React
-Native without any lowering, and is the one adapter lowering was never expected to help. Vue's
-boundary is real — and Vue gained 25-29% from lowering View/Text. The instrument and the device
-agree about which framework had something to win.
+React's boundary is too cheap to measure — and React's adapter sat at parity with stock React Native
+while its primitives were still components. Vue's boundary is real — and Vue gained 25-29% when
+`View`/`Text` stopped being components. The instrument and the device agree about which framework
+had something to win.
 
 So the answer to "are our wrappers anomalously heavy": no. A component boundary is a genuine cost in
 the framework itself, and 7-10 of them per row times 1000 rows lands exactly where we measured it.
-What lowering removed was not our own inefficiency — it was the boundary.
+What the tags removed was not our own inefficiency — it was the boundary.

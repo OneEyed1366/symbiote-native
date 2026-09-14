@@ -156,10 +156,9 @@ export interface IScrollForwarding {
 // collapsableChildren={false} on the content container (ScrollView.js:1731 `preserveChildren`).
 // No-op on iOS.
 //
-// Named and exported rather than inlined because the LOWERED path needs the same answer from a
-// different place — the host behavior's slot fold, which has the owner's raw props and none of the
-// sticky inputs `resolveScrollForwarding` also takes. A second inline copy would be invisible to
-// `tests/lowered-primitive-fold-parity.test.ts`, whose oracle is shared value IMPORTS.
+// Named and exported rather than inlined because the host behavior's slot fold needs the same
+// answer from a different place — it has the owner's raw props and none of the sticky inputs
+// `resolveScrollForwarding` also takes. One exported function is what keeps the two from drifting.
 export function preservesContentChildren(
   maintainVisibleContentPosition: unknown,
   snapToAlignment: unknown,

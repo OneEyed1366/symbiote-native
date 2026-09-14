@@ -588,11 +588,13 @@ describe('React TouchableHighlight underlay feedback', () => {
 // Pressable, which owns that fold — so this pins the COMPOSITION, not a second implementation:
 // a variant that stopped forwarding `accessible` through its rest spread would go red here.
 describe('React Touchable* accessibility default', () => {
+  // The COMMITTED tree, not `fabric.find`: creation order is leaves-first (a parent is created with
+  // its children already in hand), so "the first RCTView that is not the surface root" is the
+  // touchable's own child, which carries none of the fold's props.
   function responderProps(): Record<string, unknown> {
-    const view = fabric.find(
-      n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
-    );
-    if (!view) throw new Error('no RCTView (Pressable responder) was created');
+    const view = fabric.appRoot().children[0];
+    if (!view)
+      throw new Error('no RCTView (Pressable responder) was committed');
     return view.props;
   }
 
@@ -632,11 +634,13 @@ describe('React Touchable* accessibility default', () => {
 // Nothing computed it anywhere until 2026-09-09 — a disabled touchable stayed focusable, so a
 // keyboard or TV remote could land on a control that cannot be pressed.
 describe('React Touchable* focusable', () => {
+  // The COMMITTED tree, not `fabric.find`: creation order is leaves-first (a parent is created with
+  // its children already in hand), so "the first RCTView that is not the surface root" is the
+  // touchable's own child, which carries none of the fold's props.
   function responderProps(): Record<string, unknown> {
-    const view = fabric.find(
-      n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
-    );
-    if (!view) throw new Error('no RCTView (Pressable responder) was created');
+    const view = fabric.appRoot().children[0];
+    if (!view)
+      throw new Error('no RCTView (Pressable responder) was committed');
     return view.props;
   }
 

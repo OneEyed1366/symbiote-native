@@ -179,8 +179,6 @@ export {
   HorizontalScrollContentView,
   TextInputHost,
   MultilineTextInputHost,
-  ManagedTextInputHost,
-  ManagedMultilineTextInputHost,
   SwitchHost,
   ActivityIndicatorHost,
   SafeAreaViewHost,

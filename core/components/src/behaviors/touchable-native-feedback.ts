@@ -53,8 +53,7 @@
 // bare `import './register';` that the barrel does not re-export. Registered by ALL FIVE adapters
 // since 2026-09-09, in the same commit that deleted the five wrappers, which is what makes it safe:
 // while a wrapper still built its own Pressable + feedback View, registering would have left every
-// TouchableNativeFeedback with two responders. There is no `-managed` twin and none is possible —
-// this tag commits no node, so a second spelling would have nothing to name.
+// TouchableNativeFeedback with two responders.
 
 import {
   ARIA_ALIAS_KEYS,
@@ -70,6 +69,7 @@ import {
   type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
+  propsOf,
 } from '@symbiote-native/engine';
 
 import {
@@ -273,9 +273,8 @@ function cloneFold(owner: ISymbioteNode, inner: IPayloadFold | undefined) {
     // reads the node being committed — never sees them. Run it here over the source bag instead of
     // restating any of `:349-390`'s aria half; `hasAriaAlias` is the same sticky gate `fabricProps`
     // uses, and the fold returns its input by identity when there is nothing to do.
-    const source = owner.hasAriaAlias
-      ? foldAriaProps(owner.props)
-      : owner.props;
+    const ownerProps = propsOf(owner);
+    const source = owner.hasAriaAlias ? foldAriaProps(ownerProps) : ownerProps;
     for (const key of CLONED_PROPS) next[key] = source[key];
 
     // :369-372. `onPress` is an OWNED name, so it lives in the stash and never in `props`.
@@ -308,7 +307,7 @@ function cloneFold(owner: ISymbioteNode, inner: IPayloadFold | undefined) {
   };
 }
 
-// Not RN's own list: RN drops these by never cloning them, and a lowered tag has no clone to omit
+// Not RN's own list: RN drops these by never cloning them, and a tag has no clone to omit
 // them from — they would ride into the child's payload as keys no ViewConfig declares. Same strip
 // `./pressable`'s fold does for the machine-only half, applied to the owner's bag instead.
 //

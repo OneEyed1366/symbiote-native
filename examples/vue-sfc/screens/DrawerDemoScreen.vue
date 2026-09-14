@@ -33,13 +33,8 @@ const drawerStyle = { backgroundColor: '#13243a' };
       :options="{ title: 'Settings', drawerLabel: 'Settings' }"
     />
     <template #drawerContent="{ state, descriptors, navigation }">
-      <safe-area-view
-        testID="drawer-panel"
-        class="section-tight drawer-panel"
-      >
-        <text class="section-label">
-          Menu
-        </text>
+      <safe-area-view testID="drawer-panel" class="section-tight drawer-panel">
+        <text class="section-label"> Menu </text>
         <pressable
           v-for="route in state.routes"
           :key="route.key"
@@ -48,9 +43,7 @@ const drawerStyle = { backgroundColor: '#13243a' };
           @press="() => navigation.jumpTo(route.name)"
         >
           <text class="menu-row-label">
-            {{
-              descriptors[route.key]?.options.drawerLabel ?? route.name
-            }}
+            {{ descriptors[route.key]?.options.drawerLabel ?? route.name }}
           </text>
         </pressable>
       </safe-area-view>

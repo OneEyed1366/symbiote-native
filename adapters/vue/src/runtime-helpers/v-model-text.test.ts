@@ -1,4 +1,4 @@
-// `v-model` on a LOWERED `<TextInput>`, i.e. on an element. Device-found 2026-08-31 in
+// `v-model` on a `<text-input>`, i.e. on an element. Device-found 2026-08-31 in
 // examples/vue-sfc's canary: the field echoed keystrokes and the greeting beside it never left
 // "Hello, stranger".
 //
@@ -11,7 +11,7 @@
 //   }), [[_vModelText, name.value]])
 //
 // A COMPONENT gets a different expansion (`modelValue` + `onUpdate:modelValue` as ordinary props),
-// which is why this only became reachable when TextInput started lowering.
+// which is why this only became reachable once TextInput was a tag.
 //
 // The failure it guards is silent in the worst way: `vModelText` lives in @vue/runtime-dom, so
 // before this shim existed the compiled import resolved to `undefined`, and Vue's `withDirectives`
@@ -28,6 +28,7 @@ import {
   clearHostBehaviors,
   createElement,
   isSymbioteNode,
+  propOf,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -133,7 +134,7 @@ function mountModel(options: {
   };
 }
 
-describe('v-model on a lowered TextInput', () => {
+describe('v-model on a text-input tag', () => {
   // The two halves of a two-way binding, asserted separately because one can work without the
   // other: the value going down is a prop write, the text coming back is the machine's fold.
   it('sends the model value down as the committed text', async () => {
@@ -202,11 +203,11 @@ describe('v-model on a lowered TextInput', () => {
 });
 
 // Vue's compiler picks the v-model directive by ELEMENT, and for anything it does not recognise as
-// a DOM input it emits `vModelText` — a lowered `<switch>` included. Stringifying the
+// a DOM input it emits `vModelText` — `<switch>` included. Stringifying the
 // model there is correct upstream (a DOM input's value IS a string) and fatal here: the Switch
 // behavior reads `props.value === true`, so `String(true)` pins the control OFF and no tap moves
 // it. Device-confirmed on `examples/vue-sfc`, both switches on `CanaryScreen`, 2026-09-02.
-describe('vModelText on a lowered switch', () => {
+describe('vModelText on a switch tag', () => {
   const created = (value: unknown): ISymbioteNode => {
     const el = createElement('Switch', false, SWITCH_TAG);
     vModelText.created?.(
@@ -219,8 +220,8 @@ describe('vModelText on a lowered switch', () => {
   };
 
   it('writes the boolean the behavior actually reads', () => {
-    expect(created(true).props.value).toBe(true);
-    expect(created(false).props.value).toBe(false);
+    expect(propOf(created(true), 'value')).toBe(true);
+    expect(propOf(created(false), 'value')).toBe(false);
   });
 
   // The control that keeps the branch honest: a text input must still be stringified, which is
@@ -233,6 +234,6 @@ describe('vModelText on a lowered switch', () => {
       { props: { 'onUpdate:modelValue': () => {} } } as never,
       null as never,
     );
-    expect(el.props.value).toBe('42');
+    expect(propOf(el, 'value')).toBe('42');
   });
 });

@@ -101,10 +101,10 @@ before a tag is guaranteed to exist.
   `ActionSheetIOS`, `Linking`, `Vibration`, `ToastAndroid`, `Settings`, `I18nManager`.
 - **Host behaviors** (`registerHostBehavior` / `IHostBehavior` / `hasHostBehaviors` /
   `clearHostBehaviors` / `appListenerFor` / `setBehaviorListener` / `requestCommitFor`) — the
-  registry that lets a primitive's state machine live directly on the engine node instead of
-  inside a framework component, so a `Pressable`/`Switch`/`TextInput`/`Image` can compile to a
-  bare intrinsic tag ("host-primitive lowering"). `@symbiote-native/components` registers its
-  behaviors against this seam; the engine never imports them back.
+  registry that lets a primitive's state machine live directly on the engine node instead of inside
+  a framework component, so `pressable`/`switch`/`text-input`/`image` are bare intrinsic tags.
+  `@symbiote-native/components` registers its behaviors against this seam; the engine never imports
+  them back.
 - **`Animated`** — both the JS and native driver (`timing` / `spring` / `decay` / `loop` /
   `ValueXY` / tracking / `diffClamp` / `Easing`), including the native-event attachment path
   (`attachNativeEvent`, `AnimatedEvent`).

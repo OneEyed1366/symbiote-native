@@ -39,9 +39,7 @@ useFocusEffect(() => {
     <view class="section">
       <view :class="`line-tag line-tag-${lineInfo.line}`">
         <text class="line-tag-text">
-          {{
-            `${lineInfo.code} · ${lineInfo.label}`
-          }}
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
         </text>
       </view>
       <view class="hero-card">
@@ -49,36 +47,21 @@ useFocusEffect(() => {
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.introspection }"
         >
-          <text class="hero-badge-text">
-            HK
-          </text>
+          <text class="hero-badge-text"> HK </text>
         </view>
         <view class="hero-copy">
-          <text class="hero-title">
-            Hooks
-          </text>
+          <text class="hero-title"> Hooks </text>
           <text class="hero-body">
-            useFocusEffect, useIsFocused, and useNavigationState —
-            introspecting the navigator's own live state from inside a
-            screen.
+            useFocusEffect, useIsFocused, and useNavigationState — introspecting
+            the navigator's own live state from inside a screen.
           </text>
         </view>
       </view>
-      <text
-        testID="hooks-is-focused"
-        class="info-text"
-      >
-        {{
-          `useIsFocused(): ${isFocused}`
-        }}
+      <text testID="hooks-is-focused" class="info-text">
+        {{ `useIsFocused(): ${isFocused}` }}
       </text>
-      <text
-        testID="hooks-focus-count"
-        class="info-text"
-      >
-        {{
-          `useFocusEffect focus count: ${focusCount}`
-        }}
+      <text testID="hooks-focus-count" class="info-text">
+        {{ `useFocusEffect focus count: ${focusCount}` }}
       </text>
       <text class="info-text">
         {{

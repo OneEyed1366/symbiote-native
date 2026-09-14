@@ -227,20 +227,20 @@ describe('createTunnel (real compiled tunnel-in.svelte/tunnel-out.svelte)', () =
     await tick();
     await tick();
 
-    expect(findText(fabric.committed)).toBe('tunneled');
+    expect(findText(fabric.committedAll)).toBe('tunneled');
 
     expect(toggle).toBeDefined();
     toggle?.();
     await tick();
     await tick();
 
-    expect(findText(fabric.committed)).toBeUndefined();
+    expect(findText(fabric.committedAll)).toBeUndefined();
 
     toggle?.();
     await tick();
     await tick();
 
-    expect(findText(fabric.committed)).toBe('tunneled');
+    expect(findText(fabric.committedAll)).toBe('tunneled');
   });
 
   // why: `{#each tunnel.items as [id, snippet] (id)}` must render EVERY registered entry, not

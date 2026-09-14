@@ -96,8 +96,7 @@ export function splitLayoutProps(style: IStyleProp<IViewStyle> | undefined): {
 // and collapsed to its content height inside a flex parent, where RN's grows.
 //
 // One function rather than five call sites composing `[base, outer]` by hand, because that is what
-// the last one drifted into: a fold written inline is invisible to
-// `tests/lowered-primitive-fold-parity.test.ts`, whose oracle is shared value imports.
+// the last one drifted into.
 // `style` is `unknown` rather than `IStyleProp`, because a `payloadFold` reads it off an untyped
 // props bag and `flattenStyle` — the only thing that touches it here — already takes `unknown`.
 // Narrowing it would buy a guard at every fold call site and no safety.
@@ -131,9 +130,9 @@ export function forwardScrollEvent(
 // platform files back it with their scroll node getter.
 //
 // It DELEGATES to the node's own methods rather than dispatching commands itself. The commands and
-// their defaults live on `ISymbioteNode` because a LOWERED ScrollView hands the app its engine
-// node directly, with no wrapper to build a handle: two implementations would let `scrollTo()` with
-// no argument mean one thing through a ref and another through a tag, and nothing would report it.
+// their defaults live on `ISymbioteNode` because a `<scroll-view>` hands the app its engine node
+// directly, with no wrapper to build a handle: two implementations would let `scrollTo()` with no
+// argument mean one thing through a ref and another through a tag, and nothing would report it.
 //
 // `getNode` is a LAZY getter (React `() => ref.current`, Vue `() => nodeRef.value`), read on
 // every call, NOT the node captured once. The node is null at mount and only set after the

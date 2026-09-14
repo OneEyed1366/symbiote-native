@@ -8,11 +8,11 @@
 // nothing a component did.
 //
 // NO COMPONENT ARM ANY MORE, and its absence is not a coverage loss. The two arms existed while
-// `renderActivityIndicator` painted the same tree for five wrappers, so the comparison answered "did
-// lowering drop a fold". The wrappers and the render fn are gone in the same commit that registered
-// this behavior, so there is no second path to compare against and the ABSOLUTE expectations below
-// — which every case already carried, because a fold BOTH arms lost still compares equal — are the
-// whole oracle.
+// `renderActivityIndicator` painted the same tree for five wrappers, so the comparison answered
+// "did one path drop a fold". The wrappers and the render fn are gone in the same commit that
+// registered this behavior, so there is no second path to compare against and the ABSOLUTE
+// expectations below — which every case already carried, because a fold BOTH arms lost still
+// compares equal — are the whole oracle.
 //
 // PLATFORM ARMS ARE BY FILE, not by a `Platform.OS` mock, because the behavior's platform half is a
 // folder-as-module split. The intrinsic->native-name table still resolves to the iOS build under
@@ -33,6 +33,8 @@ import {
   registerRules,
   routeProp,
   type ISymbioteNode,
+  childrenOf,
+  propsOf,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../../component-names';
@@ -46,6 +48,14 @@ import {
 } from './shared';
 
 const fabric = installFabric();
+
+// The slot's props, asked of the host — JS holds no tree, and each call site has already
+// established that the slot exists.
+function slotPropsOf(owner: ISymbioteNode): Readonly<Record<string, unknown>> {
+  const slot = owner.childHost;
+  if (slot === undefined) throw new Error('the host built no slot');
+  return propsOf(slot);
+}
 let nextRootTag = 9400;
 
 const TEST_ID = 'indicator';
@@ -91,9 +101,9 @@ function mount(build: (root: ISymbioteNode) => void): IFakeNode[] {
   return [host];
 }
 
-// The LOWERED arm: one node, the props written on it exactly as an app writes them on the tag.
-// Nothing here names the spinner — that is the behavior's job, and its absence is the test.
-function mountLowered(props: IActivityIndicatorProps): IFakeNode[] {
+// One node, the props written on it exactly as an app writes them on the tag. Nothing here names
+// the spinner — that is the behavior's job, and its absence is the test.
+function mountTag(props: IActivityIndicatorProps): IFakeNode[] {
   return mount(root => {
     const host = createElement(HOST_VIEW, false, ACTIVITY_INDICATOR_TAG);
     for (const key of Object.keys(props))
@@ -119,13 +129,13 @@ describe('the tag builds RN’s two-node structure', () => {
   it('builds the spinner under the host and hosts the slot on it', () => {
     const host = createElement(HOST_VIEW, false, ACTIVITY_INDICATOR_TAG);
 
-    expect(host.children).toHaveLength(1);
-    expect(host.childHost).toBe(host.children[0]);
+    expect(childrenOf(host)).toHaveLength(1);
+    expect(host.childHost).toBe(childrenOf(host)[0]);
     expect(host.childHost?.component).toBe(SPINNER_VIEW);
   });
 
   it('commits RCTView(spinner), the two nodes RN itself renders', () => {
-    const tree = mountLowered({ testID: TEST_ID });
+    const tree = mountTag({ testID: TEST_ID });
 
     expect(fabric.serialize(tree)).toBe(`${HOST_VIEW}(${SPINNER_VIEW})`);
   });
@@ -142,8 +152,8 @@ describe('the tag builds RN’s two-node structure', () => {
     routeProp(host, 'testID', TEST_ID);
     routeProp(host, 'onLayout', () => {});
 
-    expect(host.props).toEqual({ onLayout: true });
-    expect(host.childHost?.props).toMatchObject({
+    expect(propsOf(host)).toEqual({ onLayout: true });
+    expect(slotPropsOf(host)).toMatchObject({
       animating: false,
       size: 'large',
       color: 'red',
@@ -162,7 +172,7 @@ describe('the size fold, which is the whole reason `size` is not a native prop',
   ])(
     '$size maps to BOTH the native enum and the fixed box',
     ({ size, box }) => {
-      const spinner = spinnerOf(mountLowered({ testID: TEST_ID, size }));
+      const spinner = spinnerOf(mountTag({ testID: TEST_ID, size }));
 
       expect(spinner.props.size).toBe(size);
       expect(spinner.props).toMatchObject(box);
@@ -170,25 +180,25 @@ describe('the size fold, which is the whole reason `size` is not a native prop',
   );
 
   it('a NUMBER sizes through style only and sends no enum at all', () => {
-    const spinner = spinnerOf(mountLowered({ testID: TEST_ID, size: 24 }));
+    const spinner = spinnerOf(mountTag({ testID: TEST_ID, size: 24 }));
 
     expect(spinner.props).toMatchObject({ width: 24, height: 24 });
     expect(Object.hasOwn(spinner.props, 'size')).toBe(false);
   });
 
   it('defaults to small when the app writes no size, as RN does', () => {
-    const spinner = spinnerOf(mountLowered({ testID: TEST_ID }));
+    const spinner = spinnerOf(mountTag({ testID: TEST_ID }));
 
     expect(spinner.props.size).toBe('small');
     expect(spinner.props).toMatchObject(SIZE_SMALL_BOX);
   });
 });
 
-describe('the two defaults a lowered element has no destructure for', () => {
+describe('the two defaults a tag has no destructure for', () => {
   beforeEach(registerIos);
 
   it('animating and hidesWhenStopped are true when unwritten', () => {
-    const spinner = spinnerOf(mountLowered({ testID: TEST_ID }));
+    const spinner = spinnerOf(mountTag({ testID: TEST_ID }));
 
     expect(spinner.props.animating).toBe(true);
     expect(spinner.props.hidesWhenStopped).toBe(true);
@@ -196,7 +206,7 @@ describe('the two defaults a lowered element has no destructure for', () => {
 
   it('an explicit false still wins', () => {
     const spinner = spinnerOf(
-      mountLowered({
+      mountTag({
         testID: TEST_ID,
         animating: false,
         hidesWhenStopped: false,
@@ -212,7 +222,7 @@ describe('the host keeps the centering style, and only that', () => {
   beforeEach(registerIos);
 
   it('composes RN styles.container UNDER the app style, so the app still wins', () => {
-    const tree = mountLowered({
+    const tree = mountTag({
       testID: TEST_ID,
       nativeID: 'native',
       // Collides with the container's own alignItems — the app must win.
@@ -236,7 +246,7 @@ describe('the host keeps the centering style, and only that', () => {
   });
 
   it('centres with no app style at all', () => {
-    expect(mountLowered({ testID: TEST_ID })[0]?.props).toMatchObject(CENTERED);
+    expect(mountTag({ testID: TEST_ID })[0]?.props).toMatchObject(CENTERED);
   });
 
   // A class NAME is the only entry on the host list that is not RN's own: `routeProp`'s class
@@ -254,7 +264,7 @@ describe('the host keeps the centering style, and only that', () => {
           style: { backgroundColor: 'red' },
         },
       ]);
-      const tree = mountLowered({ testID: TEST_ID, [spelling]: CARD_CLASS });
+      const tree = mountTag({ testID: TEST_ID, [spelling]: CARD_CLASS });
 
       expect(tree[0]?.props).toMatchObject({
         backgroundColor: 'red',
@@ -271,20 +281,19 @@ describe('the platform half: iOS', () => {
   beforeEach(registerIos);
 
   it("fills in RN's GRAY when the app names no colour", () => {
-    expect(spinnerOf(mountLowered({ testID: TEST_ID })).props.color).toBe(
+    expect(spinnerOf(mountTag({ testID: TEST_ID })).props.color).toBe(
       '#999999',
     );
   });
 
   it('an explicit colour wins over the default', () => {
     expect(
-      spinnerOf(mountLowered({ testID: TEST_ID, color: '#ff0000' })).props
-        .color,
+      spinnerOf(mountTag({ testID: TEST_ID, color: '#ff0000' })).props.color,
     ).toBe('#ff0000');
   });
 
   it('sends no native extras — those are AndroidProgressBar requirements', () => {
-    const spinner = spinnerOf(mountLowered({ testID: TEST_ID }));
+    const spinner = spinnerOf(mountTag({ testID: TEST_ID }));
 
     expect(Object.hasOwn(spinner.props, 'styleAttr')).toBe(false);
     expect(Object.hasOwn(spinner.props, 'indeterminate')).toBe(false);
@@ -295,20 +304,19 @@ describe('the platform half: Android', () => {
   beforeEach(registerAndroid);
 
   it('OMITS colour entirely on the theme default — a null is rejected by the colour parser', () => {
-    const spinner = spinnerOf(mountLowered({ testID: TEST_ID }));
+    const spinner = spinnerOf(mountTag({ testID: TEST_ID }));
 
     expect(Object.hasOwn(spinner.props, 'color')).toBe(false);
   });
 
   it('an explicit colour still reaches the spinner', () => {
     expect(
-      spinnerOf(mountLowered({ testID: TEST_ID, color: '#00ff00' })).props
-        .color,
+      spinnerOf(mountTag({ testID: TEST_ID, color: '#00ff00' })).props.color,
     ).toBe('#00ff00');
   });
 
   it('sends styleAttr and indeterminate, without which the view throws setStyle()', () => {
-    const spinner = spinnerOf(mountLowered({ testID: TEST_ID }));
+    const spinner = spinnerOf(mountTag({ testID: TEST_ID }));
 
     expect(spinner.props.styleAttr).toBe('Normal');
     expect(spinner.props.indeterminate).toBe(true);
@@ -374,18 +382,18 @@ describe('the tag commits RN’s payload on both of its nodes', () => {
     beforeEach(register);
 
     it.each(CASES)('$name', ({ props, host, spinner }) => {
-      const lowered = mountLowered(props);
+      const tree = mountTag(props);
 
       // The platform half is merged UNDER the case's own keys, so an explicit colour still wins —
       // the same precedence the fold applies.
       expect(
-        expectCommittedProps(lowered, TEST_ID, {
+        expectCommittedProps(tree, TEST_ID, {
           ...platformDefaults(values),
           ...spinner,
         }).differences,
       ).toEqual([]);
-      expect(lowered[0]?.props).toMatchObject(host);
-      expect(Object.hasOwn(lowered[0]?.props ?? {}, 'testID')).toBe(false);
+      expect(tree[0]?.props).toMatchObject(host);
+      expect(Object.hasOwn(tree[0]?.props ?? {}, 'testID')).toBe(false);
     });
   });
 });
