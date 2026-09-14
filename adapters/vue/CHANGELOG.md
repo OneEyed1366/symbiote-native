@@ -1,5 +1,86 @@
 # @symbiote-native/vue
 
+## 2.0.0
+
+### Major Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `ActivityIndicator`, `Button`, `ImageBackground`, `TouchableWithoutFeedback`,
+  `TouchableNativeFeedback`, `Switch`, `TextInput`, `Pressable`, `TouchableOpacity`,
+  `TouchableHighlight` and `ScrollView` are no longer exported as components from
+  `@symbiote-native/vue`.
+
+  Vue's SFC and TSX transforms already lower each of these to its intrinsic tag at build time
+  (`<view>`, `<pressable>`, `<scroll-view>`, …) whenever the primitive spec in
+  `core/components/host-primitives.cjs` allows it — this removes the JS wrapper that only ever ran
+  for the elements the compiler could not statically lower. `TouchableNativeFeedback` survives as RN's
+  static namespace, re-exported from `@symbiote-native/components`. Every prop type stays exported for
+  a component that forwards a bag onward.
+
+  Migration: replace `import { Switch } from '@symbiote-native/vue'` + `<Switch .../>` with
+  `<switch .../>` in a template, or the plain-`h()` call with the lowercase tag name — props are
+  unchanged.
+
+### Minor Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `@symbiote-native/vue` gains its own `jsx-runtime` module (for `jsxImportSource:
+'@symbiote-native/vue'` in Vue-TSX apps), built on the new `ICrossTypedIntrinsics` shape: every
+  intrinsic tag types as a loose attribute bag except the ones with a real prop type
+  (`IPressableProps`, `IRefreshControlProps`, …), which type-check for real instead of accepting
+  anything. `intrinsic-elements.ts` and the `.vue` SFC `GlobalComponents`/Volar table move onto the
+  same generic, so a template and a TSX file no longer disagree on what a tag accepts.
+
+  `@symbiote-native/solid`'s existing `jsx-runtime.ts` (it reached this shape first) extends onto the
+  same shared generic rather than its own hand-rolled version.
+
+### Patch Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A claimed child can now become the owner's PARENT, which is what an Android RefreshControl is.
+
+  An Android ScrollView holds exactly one child, so a sibling refresh control is an `addViewAt`
+  crash — RN inverts the tree there instead of beside-placing like it does on iOS. `claimedChildren`
+  carries a mode per name, `beside` or `wrap`, and `ISymbioteNode.wrapper` records the inversion. The
+  adapter goes on naming the scroll view for every insert, prop write and command; only the two
+  structural entry points know a wrapper is what the tree holds.
+
+  `IHostBehavior.onWrapChange` is where a behavior answers for it. The wrapper is the app's own node,
+  so nothing could have given it a payload fold at creation — this is where the scroll view's layout
+  style moves up to it and its visual style stays below.
+
+  `splitScrollViewStyle` composes the axis base onto BOTH boxes, as RN does. All five adapters had
+  dropped it from the wrapper, so an `AndroidSwipeRefreshLayout` with no explicit user layout style
+  lost `flexGrow: 1` and collapsed to its content height inside a flex parent.
+
+  `insertBefore`'s `beforeChild` is typed nullable, which is what its callers always passed.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Three unrelated Vue fixes landing together:
+
+  - A template ref (`useTemplateRef()`) to a host element came back deep-readonly — Vue's
+    `readonly()` wraps any `.value` whose `Object.prototype.toString` reads `"[object Object]"`,
+    which is true of a plain `SymbioteNode` class instance. Reads worked, so a commit mirror saw a
+    "committed" node, but a write like `setNativeProps` silently no-opped with a dev-only readonly
+    warning. The renderer now `markRaw`s the node before handing it back.
+  - A listener wired through `onPress`/`onValueChange` runs from the engine's native event dispatch,
+    entirely outside anything Vue wraps — a throw inside it skipped `onErrorCaptured` and
+    `app.config.errorHandler` and reached Hermes's own top-level handler directly, an unframed
+    redbox with no component stack. `patchProp` now wraps a native-event listener through
+    `callWithErrorHandling` with the owning component instance, threaded down through `patch`
+    exactly as Vue's own DOM renderer does for a native DOM event.
+  - `<Teleport>` inside a compiled `.vue` SFC silently stopped re-rendering once mounted.
+    `runtime-helpers` used to shadow `vue`'s own `Teleport` with the adapter's guarded
+    `../create-portal` wrapper for every `from 'vue'` import — but `@vue/compiler-sfc` recognizes
+    the literal tag name `Teleport` as one of Vue's own built-ins at compile time regardless of what
+    value it resolves to, and compiles its children with a PROPS-only patch flag. A real
+    `defineComponent` under that name then goes through Vue's ordinary `shouldUpdateComponent` check,
+    which only re-renders on the props named in that flag and never on a children/slot change — a
+    `<Teleport :to="...">` gated by `v-if` rendered once at mount and froze. The real, unwrapped
+    `Teleport` now flows through unshadowed for the compiled-SFC path; the guarded wrapper stays
+    exported from the adapter's main barrel for hand-built `h(Teleport, ...)` calls (TSX), where no
+    such codegen special-case applies.
+
+- Updated dependencies [[`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f)]:
+  - @symbiote-native/engine@0.5.0
+  - @symbiote-native/components@2.0.0
+
 ## 1.0.0
 
 ### Minor Changes

@@ -1,11 +1,5 @@
 import { Component, signal } from '@angular/core';
-import {
-  Platform,
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  View,
-} from '@symbiote-native/angular';
+import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   AuthenticationType,
   SecurityLevel,
@@ -76,7 +70,7 @@ function securityLevelLabel(level: SecurityLevel): string {
 @Component({
   selector: 'LocalAuthScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

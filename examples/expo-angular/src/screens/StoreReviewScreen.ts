@@ -1,10 +1,5 @@
 import { Component, signal } from '@angular/core';
-import {
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  View,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   hasAction,
   isAvailableAsync,
@@ -30,7 +25,7 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 @Component({
   selector: 'StoreReviewScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

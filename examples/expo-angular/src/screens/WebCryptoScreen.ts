@@ -1,10 +1,5 @@
 import { Component, signal } from '@angular/core';
-import {
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  View,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   polyfillWebCrypto,
   webCrypto,
@@ -31,7 +26,7 @@ function toHex(bytes: Uint8Array): string {
 @Component({
   selector: 'WebCryptoScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

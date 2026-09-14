@@ -3,8 +3,7 @@ import {
   ColorSchemeService,
   DynamicColorIOS,
   PlatformColor,
-  Text,
-  View,
+  SYMBIOTE_ELEMENTS,
 } from '@symbiote-native/angular';
 // static look lives in the compiled stylesheet
 import './PlatformColorDemo.css';
@@ -12,7 +11,7 @@ import './PlatformColorDemo.css';
 @Component({
   selector: 'PlatformColorDemo',
   standalone: true,
-  imports: [View, Text],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <view class="section-nested">
       <text class="section-label">{{

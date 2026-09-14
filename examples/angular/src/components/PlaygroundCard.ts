@@ -7,7 +7,7 @@ import {
   contentChild,
   contentChildren,
 } from '@angular/core';
-import { Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { PlaygroundQueryItemDirective } from './PlaygroundDirectives';
 
 // Content projection: a named slot (`select="[card-header]"`) plus the default, unqualified slot
@@ -25,7 +25,7 @@ import { PlaygroundQueryItemDirective } from './PlaygroundDirectives';
   // PlaygroundQueryItemDirective is only a query TARGET TYPE here (@ContentChild's argument),
   // never used as a template tag by THIS component's own template - so it stays a plain TS
   // import above, not a Component `imports` entry (which is for template-tag usage only).
-  imports: [Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <view class="pg-card" testID="pg-card">
       <ng-content select="[card-header]"></ng-content>

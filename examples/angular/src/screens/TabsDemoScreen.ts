@@ -1,5 +1,5 @@
 import { Component, type Signal } from '@angular/core';
-import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   Tab,
   TabScreenDirective,
@@ -15,7 +15,7 @@ const tabLineTagLabel = `${tabsLineInfo.code} · ${tabsLineInfo.label}`;
 @Component({
   selector: 'TabHomeScreen',
   standalone: true,
-  imports: [SafeAreaViewElement, Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">
@@ -53,7 +53,7 @@ export class TabHomeScreen {
 @Component({
   selector: 'TabSearchScreen',
   standalone: true,
-  imports: [SafeAreaViewElement, Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">
@@ -79,7 +79,7 @@ export class TabSearchScreen {
 @Component({
   selector: 'TabProfileScreen',
   standalone: true,
-  imports: [SafeAreaViewElement, Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">

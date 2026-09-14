@@ -1,11 +1,11 @@
 import { Component, Input, OnDestroy, OnInit, signal } from '@angular/core';
-import { Text, View } from '@symbiote-native/angular';
 import {
   readCommitProfile,
   type ICommitProfile,
 } from '@symbiote-native/engine';
 import { ActionButton } from './ActionButton';
 import './JsFrameRateMeter.css';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 
 // 60 Hz budget. Frames are timed on the JS thread only: requestAnimationFrame is scheduled by
 // JS, so a stall here is a stall in the code we actually optimize. The native UI thread keeps
@@ -35,6 +35,23 @@ const SAMPLE_WINDOW_MS = 500;
 const EMPTY_COMMIT_PROFILE: ICommitProfile = {
   commits: 0,
   propWrites: 0,
+  applyMs: 0,
+  buildMs: 0,
+  commitMs: 0,
+  foldProbeMs: 0,
+  payloadMs: 0,
+  createNodeMs: 0,
+  appendChildMs: 0,
+  foldCallMs: 0,
+  foldedNodes: 0,
+  adoptSwaps: 0,
+  propClones: 0,
+  textSwaps: 0,
+  dirtyTexts: 0,
+  layoutMs: 0,
+  textMs: 0,
+  layoutNodes: 0,
+  textMeasures: 0,
 };
 
 // `readCommitProfile()` is read-and-RESET, and this meter calls it once per window off rAF. A
@@ -61,7 +78,7 @@ export const commitProfileGate = { isHeldByBenchmark: false };
 @Component({
   selector: 'JsFrameRateMeter',
   standalone: true,
-  imports: [ActionButton, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <view class="bench-meter">
       <text class="section-label">JS-THREAD FRAME RATE</text>

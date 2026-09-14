@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   injectRoute,
   injectStackNavigation,
@@ -20,7 +20,7 @@ function openedFromLabel(params: unknown): string {
 @Component({
   selector: 'DetailsScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">

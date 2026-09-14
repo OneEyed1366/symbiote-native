@@ -12,10 +12,7 @@ import {
 import {
   Animated,
   AnimatedView,
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  View,
+  SYMBIOTE_ELEMENTS,
 } from '@symbiote-native/angular';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -112,7 +109,7 @@ export class ShowcaseToggle {
   selector: 'ShowcaseTile',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <view class="sc-pair-half">
       <text class="sc-tile-label">{{ label }}</text>
@@ -130,15 +127,7 @@ export class ShowcaseTile {
   selector: 'StyleShowcaseScreen',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    AnimatedView,
-    SafeAreaViewElement,
-    ScrollViewElement,
-    ShowcaseTile,
-    ShowcaseToggle,
-    Text,
-    View,
-  ],
+  imports: [AnimatedView, ShowcaseTile, ShowcaseToggle, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

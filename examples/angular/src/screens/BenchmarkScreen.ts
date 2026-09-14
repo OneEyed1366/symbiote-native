@@ -9,16 +9,10 @@ import {
   signal,
 } from '@angular/core';
 import {
-  ActivityIndicatorElement,
   FlatList,
-  PressableElement,
-  SafeAreaViewElement,
-  ScrollViewElement,
   SectionList,
+  SYMBIOTE_ELEMENTS,
   SymbioteHostPropsDirective,
-  Text,
-  TextInputElement,
-  View,
   VListItemDirective,
   VSectionHeaderDirective,
   VSectionItemDirective,
@@ -531,7 +525,7 @@ function formatDuration(durationMs: number | undefined): string {
 @Component({
   selector: 'BenchmarkRow',
   standalone: true,
-  imports: [PressableElement, Text, TextInputElement, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <view [class]="rowClass">
       <text class="bench-row-id">{{ rowId }}</text>
@@ -570,7 +564,7 @@ export class BenchmarkRow {
 @Component({
   selector: 'StickyScrollViewBlock',
   standalone: true,
-  imports: [ScrollViewElement, Text],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <text class="section-label"
       >STICKY PATH A · ScrollView · stickyHeaderIndices</text
@@ -608,8 +602,7 @@ export class StickyScrollViewBlock {
   standalone: true,
   imports: [
     SectionList,
-    Text,
-    View,
+    SYMBIOTE_ELEMENTS,
     VSectionHeaderDirective,
     VSectionItemDirective,
   ],
@@ -667,17 +660,13 @@ export class StickySectionListBlock {
   standalone: true,
   imports: [
     ActionButton,
-    ActivityIndicatorElement,
     BenchmarkRow,
     FlatList,
     JsFrameRateMeter,
-    SafeAreaViewElement,
-    ScrollViewElement,
     StickyScrollViewBlock,
     StickySectionListBlock,
+    SYMBIOTE_ELEMENTS,
     SymbioteHostPropsDirective,
-    Text,
-    View,
     VListItemDirective,
   ],
   template: `

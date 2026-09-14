@@ -1,11 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import {
-  Platform,
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  View,
-} from '@symbiote-native/angular';
+import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   CellularGeneration,
   PermissionsService,
@@ -52,7 +46,7 @@ function valueLabel(value: string | boolean | null): string {
 @Component({
   selector: 'CellularScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

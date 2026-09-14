@@ -1,5 +1,70 @@
 # @symbiote-native/angular
 
+## 2.0.0
+
+### Major Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `InputAccessoryView`, `Pressable`, `SafeAreaView`, `Switch`, `TextInput`, `TouchableHighlight`,
+  `TouchableOpacity`, `RefreshControl`, `ScrollView` and `ScrollViewStickyHeader` are no longer
+  exported as directive components from `@symbiote-native/angular` — an app's `imports: [...]` array
+  can no longer name them.
+
+  Each is now the intrinsic tag Angular's own AOT lowering pass (`babel-register-composed.cjs`,
+  `ngtsc` → `@angular/compiler-cli/linker/babel`) compiles directly, the same tag every other
+  adapter writes. `Switch` and `TextInput`'s controlled two-way binding moves to two new exports,
+  `SwitchValueAccessor` and `TextInputValueAccessor` — an app using `[(ngModel)]` or `formControl*`
+  on either tag now imports the accessor instead of the deleted component; both ride the shared
+  `SYMBIOTE_ELEMENTS` provider. `IStickyHeaderComponentType` goes with `ScrollViewStickyHeader` — a
+  sticky header is composed by the engine now, not supplied as a component type.
+
+  Migration: `imports: [Pressable]` + `<Pressable (press)="...">` becomes `<pressable (press)="...">`
+  with no import; `[(ngModel)]="value"` on a `<switch>`/`<text-input>` needs
+  `imports: [SwitchValueAccessor]` / `imports: [TextInputValueAccessor]` in its place.
+
+### Patch Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A claimed child can now become the owner's PARENT, which is what an Android RefreshControl is.
+
+  An Android ScrollView holds exactly one child, so a sibling refresh control is an `addViewAt`
+  crash — RN inverts the tree there instead of beside-placing like it does on iOS. `claimedChildren`
+  carries a mode per name, `beside` or `wrap`, and `ISymbioteNode.wrapper` records the inversion. The
+  adapter goes on naming the scroll view for every insert, prop write and command; only the two
+  structural entry points know a wrapper is what the tree holds.
+
+  `IHostBehavior.onWrapChange` is where a behavior answers for it. The wrapper is the app's own node,
+  so nothing could have given it a payload fold at creation — this is where the scroll view's layout
+  style moves up to it and its visual style stays below.
+
+  `splitScrollViewStyle` composes the axis base onto BOTH boxes, as RN does. All five adapters had
+  dropped it from the wrapper, so an `AndroidSwipeRefreshLayout` with no explicit user layout style
+  lost `flexGrow: 1` and collapsed to its content height inside a flex parent.
+
+  `insertBefore`'s `beforeChild` is typed nullable, which is what its callers always passed.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A native-thread callback (a press, a drag readout, a value change dispatched off Fabric's own
+  thread) now flushes Angular's zoneless change detection after writing the flat-bag `onX` property
+  it lands in. Angular has no zone.js hook into that thread, so a callback firing outside an Angular
+  event handler updated the bound state without ever telling `ApplicationRef` a check was due — a
+  drag readout or a live sensor value froze on screen at its first value until something unrelated
+  next triggered a tick. Also consolidates what had drifted into three near-duplicate callback
+  wrapper implementations into one.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A lowered ScrollView can now pin a `<sticky-header>` child, the last piece a composed host
+  primitive needed before its wrapper could be deleted.
+
+  RN's sticky header is JS-built (`ScrollViewStickyHeader`), not a native concept — a plain view
+  carrying `zIndex` and an animated `translateY` computed from scroll offset against the header's own
+  measured layout. `registerScrollViewBehavior`'s owner now tracks sticky-header children through the
+  new `sticky` claim mode, and `core/components/src/behaviors/scroll-view/sticky.ts` runs the
+  offset/pin math that every wrapper used to duplicate. `<sticky-header>` and its Fabric name join the
+  platform-invariant tables in `component-names/{index.ios,index.android,shared}.ts`.
+
+  Angular's `babel-register-composed.cjs` picks up the new tag for its host-primitive lowering pass.
+
+- Updated dependencies [[`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f)]:
+  - @symbiote-native/engine@0.5.0
+  - @symbiote-native/components@2.0.0
+
 ## 1.0.0
 
 ### Minor Changes

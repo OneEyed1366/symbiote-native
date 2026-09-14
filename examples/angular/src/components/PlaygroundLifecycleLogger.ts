@@ -13,7 +13,7 @@ import {
   type OnInit,
   type SimpleChanges,
 } from '@angular/core';
-import { View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 
 // Every lifecycle hook, in the order Angular actually calls them, each emitting one log line the
 // parent renders in an @for list. `tick` is a plain @Input (not `style`/`class`), so it propagates
@@ -23,7 +23,7 @@ import { View } from '@symbiote-native/angular';
 @Component({
   selector: 'PlaygroundLifecycleLogger',
   standalone: true,
-  imports: [View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <view class="pg-lifecycle-box" testID="pg-lifecycle-box">
       <ng-content></ng-content>

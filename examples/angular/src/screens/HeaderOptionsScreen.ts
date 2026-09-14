@@ -1,5 +1,5 @@
 import { Component, type Signal } from '@angular/core';
-import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { injectRoute } from '@symbiote-native/navigation/angular';
 import type { IScreenOptionsResolver } from '@symbiote-native/navigation/angular';
 import type { ISearchBarCommands, IRoute } from '@symbiote-native/navigation';
@@ -110,7 +110,7 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({
 @Component({
   selector: 'HeaderOptionsScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">

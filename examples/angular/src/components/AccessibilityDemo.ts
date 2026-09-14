@@ -1,9 +1,8 @@
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import {
   AccessibilityInfo,
+  SYMBIOTE_ELEMENTS,
   SymbioteHostPropsDirective,
-  Text,
-  View,
 } from '@symbiote-native/angular';
 
 // Static look lives in AccessibilityDemo.css, compiled at build time by @symbiote-native/css-parser.
@@ -20,7 +19,7 @@ import './AccessibilityDemo.css';
 @Component({
   selector: 'AccessibilityDemo',
   standalone: true,
-  imports: [View, Text, SymbioteHostPropsDirective],
+  imports: [SYMBIOTE_ELEMENTS, SymbioteHostPropsDirective],
   template: `
     <view class="section-nested">
       <text class="section-label">

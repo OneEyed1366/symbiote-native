@@ -6,13 +6,10 @@ import {
   inject,
 } from '@angular/core';
 import {
-  ButtonElement,
   I18nManager,
   Image,
-  ImageElement,
+  SYMBIOTE_ELEMENTS,
   Settings,
-  Text,
-  View,
 } from '@symbiote-native/angular';
 // Static look lives in NativeModulesDemo.css — compiled at build time by
 // @symbiote-native/css-parser and resolved at runtime through the shared style registry.
@@ -30,7 +27,7 @@ const TAP_KEY = 'symbiote.tapCount';
 @Component({
   selector: 'NativeModulesDemo',
   standalone: true,
-  imports: [View, Text, ButtonElement, ImageElement],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <view class="section-nested">
       <text class="section-label"

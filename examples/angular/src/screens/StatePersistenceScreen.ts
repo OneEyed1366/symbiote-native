@@ -1,5 +1,5 @@
 import { Component, signal } from '@angular/core';
-import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   deserializeNavigatorState,
   serializeNavigatorState,
@@ -35,7 +35,7 @@ function isResettableHandle(
 @Component({
   selector: 'StatePersistenceScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">

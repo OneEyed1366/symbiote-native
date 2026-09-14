@@ -1,11 +1,5 @@
 import { Component, signal } from '@angular/core';
-import {
-  Platform,
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  View,
-} from '@symbiote-native/angular';
+import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -76,7 +70,7 @@ const ANDROID_HAPTIC_OPTIONS: readonly IAndroidHapticOption[] = [
 @Component({
   selector: 'HapticsScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view
