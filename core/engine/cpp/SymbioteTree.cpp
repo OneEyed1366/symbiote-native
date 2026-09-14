@@ -392,6 +392,56 @@ std::shared_ptr<const react::ShadowNode> materialize(
     react::SurfaceId surfaceId,
     const Node *fabricParent);
 
+// ── THE INSIDE OF `buildMs`, on the CREATE branch only ──────────────────────────────────────────
+//
+// `buildMs` is ~52 ms of a ~235 ms Svelte create row — the largest single item this project owns
+// and, until these counters existed, the least examined: ~87% of it had been ATTRIBUTED to Fabric's
+// own node construction by reasoning and never measured. Measured, that reasoning was wrong by
+// nearly a factor of two.
+//
+//   foldProbeMs   OURS, and the PROBE only — a `WeakObject` lock plus a property read per node. On
+//                 a create every node is new, so `foldProbe` caches nothing and all ~10 000 pay it.
+//   payloadMs     OURS. `fabricProps` in C++, MINUS the fold call, which is broken out below.
+//   foldCallMs    OURS, and a subset of the walk's JS traffic rather than of its C++: one JSI round
+//                 trip per FOLDED node with the whole bag marshalled both ways. Counted beside
+//                 `foldedNodes` so the per-call price is readable rather than inferred from a
+//                 guess at how many nodes carry a behavior.
+//   createNodeMs  FABRIC'S. `UIManager::createNode` — descriptor lookup, `createFamily`,
+//                 `cloneProps` (the RawProps parse), `createInitialState`, `createShadowNode` with
+//                 its Yoga node. Stock pays the same call per node.
+//   appendChildMs FABRIC'S. `YogaLayoutableShadowNode::appendChild` -> `adoptYogaChild` per child.
+//
+// `buildMs` minus their sum is the residual: the walk itself, the reuse checks, the child vectors,
+// and the clone branch — which is why the clone branch is deliberately NOT split here. A create row
+// is the question; splitting the other branch would double the clock reads for a row this cannot
+// answer anyway.
+//
+// Measured on device 2026-09-10, iOS 26.5 Release, Svelte, 1 000 rows (`buildMs` 52.5):
+//
+//   FOLD 1.7 · PAYLOAD 17.0 · CREATE 28.1 · APPEND 0.9 · WALK 4.8
+//
+// The four plus the residual reproduce `buildMs` to 0.1 ms on all three create-shaped rows, which is
+// the control that says the stages bracket what they claim to. Two findings came straight out of it:
+// Fabric's own construction is 55% of BUILD rather than the ~87% that had been assumed, and PAYLOAD
+// came in EIGHT TIMES its prediction — the JS twin of the builder measures 2.1 ms per 10 000 nodes.
+// `foldCallMs` exists to say which half of that 17.0 is the JSI traffic and which is the builder.
+//
+// WHAT IT COSTS TO KNOW, stated because it lands in the number being read: six
+// `steady_clock::now()` per created node, ~25 ns each on arm64, so ~1.5 ms per 10 000-node create,
+// and it falls inside the RESIDUAL rather than inside any stage it brackets.
+double foldProbeMs = 0;
+double payloadMs = 0;
+double foldCallMs = 0;
+double createNodeMs = 0;
+double appendChildMs = 0;
+size_t foldedNodes = 0;
+
+double millisFrom(
+    std::chrono::steady_clock::time_point started,
+    std::chrono::steady_clock::time_point ended) {
+  return std::chrono::duration<double, std::milli>(ended - started).count();
+}
+
 /**
  * The node's own payload fold, reached through the JS handle it is published on.
  *
@@ -427,11 +477,18 @@ IPayloadFold foldFor(jsi::Runtime &runtime, Node &node) {
   // Through a `shared_ptr` because `IPayloadFold` is a `std::function`, which requires a COPYABLE
   // callable, and `jsi::Function` is move-only. Capturing it by value does not compile.
   auto function = std::make_shared<jsi::Function>(fold.getObject(runtime).getFunction(runtime));
+  // Timed HERE rather than at the call site in `fabricProps`, because this is the whole of what a
+  // fold costs the walk — the bag out as a JSI value, the JS call, the result back as a
+  // `folly::dynamic` — and it is the one part of `payloadMs` that is not C++ at all.
   return [&runtime, function](const folly::dynamic &props) {
-    return boundedDynamicFrom(
+    const auto startedAt = std::chrono::steady_clock::now();
+    folly::dynamic out = boundedDynamicFrom(
         runtime,
         function->call(runtime, jsi::valueFromDynamic(runtime, props)),
         "the payloadFold result");
+    foldCallMs += millisFrom(startedAt, std::chrono::steady_clock::now());
+    foldedNodes += 1;
+    return out;
   };
 }
 
@@ -671,14 +728,29 @@ std::shared_ptr<const react::ShadowNode> materialize(
     // AUTHORED component, which a nested `<Text>` never has rewritten to `RCTVirtualText`. Passing
     // the local would silently change which processors run on every nested text node.
     //
-    const folly::dynamic payload = fabricProps(node.viewName, node.props, foldFor(runtime, node));
+    const auto foldStartedAt = std::chrono::steady_clock::now();
+    IPayloadFold fold = foldFor(runtime, node);
+    const auto payloadStartedAt = std::chrono::steady_clock::now();
+    // Snapshotted so the fold's JSI round trip can be SUBTRACTED out below: `fabricProps` calls the
+    // fold from inside itself, so the bracket around it would otherwise report the builder and the
+    // crossing as one number — which is exactly the ambiguity the first run of this table hit.
+    const double foldCallBefore = foldCallMs;
+    const folly::dynamic payload = fabricProps(node.viewName, node.props, fold);
+    const auto createStartedAt = std::chrono::steady_clock::now();
     auto created = uiManager.createNode(
         node.tag,
         viewName,
         surfaceId,
         react::RawProps(folly::dynamic(payload)),
         node.instanceHandle);
+    const auto appendStartedAt = std::chrono::steady_clock::now();
     for (const auto &child : *children) uiManager.appendChild(created, child);
+    const auto appendEndedAt = std::chrono::steady_clock::now();
+    foldProbeMs += millisFrom(foldStartedAt, payloadStartedAt);
+    payloadMs +=
+        millisFrom(payloadStartedAt, createStartedAt) - (foldCallMs - foldCallBefore);
+    createNodeMs += millisFrom(createStartedAt, appendStartedAt);
+    appendChildMs += millisFrom(appendStartedAt, appendEndedAt);
     node.committed = created;
     node.committedProps = payload;
   } else {
@@ -1359,6 +1431,12 @@ jsi::Value Tree::takeCommitSplit(jsi::Runtime &runtime, const jsi::Value *, size
   auto split = jsi::Object(runtime);
   split.setProperty(runtime, "buildMs", jsi::Value(buildMs_));
   split.setProperty(runtime, "commitMs", jsi::Value(commitMs_));
+  split.setProperty(runtime, "foldProbeMs", jsi::Value(foldProbeMs));
+  split.setProperty(runtime, "payloadMs", jsi::Value(payloadMs));
+  split.setProperty(runtime, "foldCallMs", jsi::Value(foldCallMs));
+  split.setProperty(runtime, "foldedNodes", jsi::Value(static_cast<double>(foldedNodes)));
+  split.setProperty(runtime, "createNodeMs", jsi::Value(createNodeMs));
+  split.setProperty(runtime, "appendChildMs", jsi::Value(appendChildMs));
   split.setProperty(runtime, "adoptSwaps", jsi::Value(static_cast<double>(adoptSwaps)));
   split.setProperty(runtime, "propClones", jsi::Value(static_cast<double>(propClones)));
   split.setProperty(runtime, "textSwaps", jsi::Value(static_cast<double>(textSwaps)));
@@ -1372,6 +1450,12 @@ jsi::Value Tree::takeCommitSplit(jsi::Runtime &runtime, const jsi::Value *, size
   // the same contract `readCommitProfile` already carries on the JS side.
   buildMs_ = 0;
   commitMs_ = 0;
+  foldProbeMs = 0;
+  payloadMs = 0;
+  foldCallMs = 0;
+  foldedNodes = 0;
+  createNodeMs = 0;
+  appendChildMs = 0;
   adoptSwaps = 0;
   propClones = 0;
   textSwaps = 0;

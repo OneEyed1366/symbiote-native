@@ -178,6 +178,19 @@ export type INativeEngineBindings = {
   takeCommitSplit?: () => {
     buildMs: number;
     commitMs: number;
+    /**
+     * The create branch of `buildMs`, split four ways. OPTIONAL where the rest are not, and for a
+     * different reason than the function itself: a pod carrying `takeCommitSplit` may simply
+     * predate these four, and then the object comes back without them. `readCommitProfile` merges
+     * over a zeroed default so the profile stays whole — a `undefined` reaching a benchmark screen
+     * is the measurement-that-lies shape, not a missing feature.
+     */
+    foldProbeMs?: number;
+    payloadMs?: number;
+    foldCallMs?: number;
+    foldedNodes?: number;
+    createNodeMs?: number;
+    appendChildMs?: number;
     adoptSwaps: number;
     propClones: number;
     textSwaps: number;

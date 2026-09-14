@@ -282,6 +282,44 @@ export interface ICommitProfile {
   buildMs: number;
   commitMs: number;
   /**
+   * The inside of `buildMs`, on the CREATE branch only — the four things a new node costs, split so
+   * that what is ours and what is Fabric's can be read apart.
+   *
+   * `foldProbeMs` and `payloadMs` are OURS: the per-node probe for a `payloadFold`, and the C++
+   * payload builder with the fold's own call SUBTRACTED out. `createNodeMs` and `appendChildMs` are
+   * FABRIC'S — `UIManager::createNode` with its descriptor lookup, RawProps parse, `ShadowNode`,
+   * family, event emitter and Yoga node, and `adoptYogaChild` per child. Stock React Native pays
+   * those two per node as well, which is what makes them the wrong place to look for a deficit and
+   * the right place to stop looking. Measured on device 2026-09-10 (Svelte, 1 000 rows, `buildMs`
+   * 52.5): 1.7 / 17.0 / 28.1 / 0.9, residual 4.8 — so Fabric's own construction is 55% of BUILD,
+   * against the ~87% that had been assumed without measuring.
+   *
+   * `buildMs - (the four)` is the residual: the walk, the reuse checks, the child vectors, the
+   * clone branch — and the instrument's own ~25 ns × 6 per created node, which lands there rather
+   * than in any stage it brackets.
+   *
+   * Zero on a step that creates nothing, and on every headless run.
+   */
+  foldProbeMs: number;
+  payloadMs: number;
+  createNodeMs: number;
+  appendChildMs: number;
+  /**
+   * What a behavior's `payloadFold` costs the walk, and how many nodes paid it.
+   *
+   * One JSI round trip per folded node with the whole bag marshalled both ways — the only part of
+   * the payload build that is not C++ at all, which is why it is broken out of `payloadMs` rather
+   * than left inside it. `foldedNodes` is beside it so the per-call price is read rather than
+   * inferred from a guess at how many nodes carry a behavior.
+   *
+   * THE ONE COUNTER HERE THAT SPANS BOTH BRANCHES: a dirty node re-folds on the clone path too, so
+   * this is non-zero on a step that creates nothing while the four above read zero. That is not an
+   * inconsistency to reconcile — it is the number that says what the fold costs an UPDATE, which is
+   * the case a real screen hits constantly and a create row never shows.
+   */
+  foldCallMs: number;
+  foldedNodes: number;
+  /**
    * Child pointers Fabric swapped out from under the host this window.
    *
    * Fabric does not always keep the children it is handed: a child still owned by its previous
@@ -337,6 +375,12 @@ export interface ICommitProfile {
 const EMPTY_SPLIT = {
   buildMs: 0,
   commitMs: 0,
+  foldProbeMs: 0,
+  payloadMs: 0,
+  foldCallMs: 0,
+  foldedNodes: 0,
+  createNodeMs: 0,
+  appendChildMs: 0,
   adoptSwaps: 0,
   propClones: 0,
   textSwaps: 0,
@@ -348,7 +392,11 @@ const EMPTY_SPLIT = {
 };
 
 export function readCommitProfile(): ICommitProfile {
-  const split = nativeEngine()?.takeCommitSplit?.() ?? EMPTY_SPLIT;
+  // MERGED over the zeroed default rather than substituted for it: a pod can carry
+  // `takeCommitSplit` and predate a field it grew later, and the spread below would then leave that
+  // field `undefined` on a profile typed as all numbers — which reaches a benchmark screen as a
+  // blank cell reading like a measurement rather than a missing binding.
+  const split = { ...EMPTY_SPLIT, ...nativeEngine()?.takeCommitSplit?.() };
   const snapshot = {
     commits,
     propWrites: takePropStats().writes,

@@ -175,6 +175,10 @@ class Tree {
    * `commitMs` is `completeSurface` — Fabric's own `ShadowTree::commit`, the differ, layout and the
    * mount pass. A step that is slow says nothing about which one owns it.
    *
+   * `buildMs` is itself split, on the create branch: `foldProbeMs` and `payloadMs` are ours (the
+   * per-node `payloadFold` probe, and `fabricProps`), `createNodeMs` and `appendChildMs` are
+   * Fabric's per-node construction, which stock pays identically. What is left over is the walk.
+   *
    * It has to reach JS rather than a log: `dlog` needs `DEBUG=1`, and a Debug build cannot be
    * benchmarked at all — the sign of the headline metric flips (root `CLAUDE.md`).
    */
