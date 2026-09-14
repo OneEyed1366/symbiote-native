@@ -554,10 +554,10 @@ export function CanaryScreen() {
             5 are the ones that were black; they are here so a colour grammar that quietly narrows
             again shows up as a hole in a row rather than as a screen nobody can explain.
             `SymbioteFabricProps.cpp` now uses React Native's own parser. */}
-        <Text class="section-label">probe A · fill sources</Text>
-        <View style={{ flexDirection: 'row', height: 56 }}>
+        <text class="section-label">probe A · fill sources</text>
+        <view style={{ flexDirection: 'row', height: 56 }}>
           {/* 1 inline hex */}
-          <View
+          <view
             style={{
               width: 48,
               height: 48,
@@ -566,7 +566,7 @@ export function CanaryScreen() {
             }}
           />
           {/* 2 inline hsl, the spelling the chips use */}
-          <View
+          <view
             style={{
               width: 48,
               height: 48,
@@ -575,11 +575,11 @@ export function CanaryScreen() {
             }}
           />
           {/* 3 fill from a class, no inline style at all */}
-          <View class="probe-fill" style={{ marginRight: 8 }} />
+          <view class="probe-fill" style={{ marginRight: 8 }} />
           {/* 4 and 5 the same two fills, but produced inside a For */}
           <For each={['#5599ff', 'hsl(280 70% 55%)']}>
             {fill => (
-              <View
+              <view
                 style={{
                   width: 48,
                   height: 48,
@@ -589,7 +589,7 @@ export function CanaryScreen() {
               />
             )}
           </For>
-        </View>
+        </view>
 
         {/* ===== feature-parity device checks ===== */}
 

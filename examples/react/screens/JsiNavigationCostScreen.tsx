@@ -1,11 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-  type IHostInstance,
-} from '@symbiote-native/react';
+import { type IHostInstance } from '@symbiote-native/react';
 import { getNativeNode } from '@symbiote-native/engine';
 // Typed by ./native-dom.d.ts — the module is Flow source at a private RN path. The deep import is
 // deliberate and cannot be avoided: NativeDOM is not re-exported from react-native's top level,
@@ -367,14 +361,14 @@ export function JsiNavigationCostScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="jsi-screen">
-      <ScrollView contentContainerStyle="jsi-content">
-        <Text className="jsi-title">JSI navigation cost</Text>
-        <Text className="jsi-lede">
+    <safe-area-view className="jsi-screen">
+      <scroll-view contentContainerStyle="jsi-content">
+        <text className="jsi-title">JSI navigation cost</text>
+        <text className="jsi-lede">
           One navigation query across the JSI boundary, against the committed
           tree. Decides whether the pending tree can live in C++ (design 2) or
           must stay a JS skeleton (design 1).
-        </Text>
+        </text>
 
         <ActionButton
           title="Measure"
@@ -383,15 +377,15 @@ export function JsiNavigationCostScreen() {
           testID="jsi-cost-measure"
         />
 
-        {note === '' ? null : <Text className="jsi-note">{note}</Text>}
+        {note === '' ? null : <text className="jsi-note">{note}</text>}
 
         {reach === undefined ? null : (
-          <View className="jsi-card">
-            <Text className="jsi-card-title">
+          <view className="jsi-card">
+            <text className="jsi-card-title">
               UIManager reach (item 8c-1 bring-up)
-            </Text>
-            <Text className="jsi-arm">probeUIManager() = {reach}</Text>
-            <Text className="jsi-floor">
+            </text>
+            <text className="jsi-arm">probeUIManager() = {reach}</text>
+            <text className="jsi-floor">
               {reach < 0
                 ? 'REACHED our C++, but global.nativeFabricUIManager was absent when it ran — the ' +
                   'module is created too early and the applier needs a deferred registration.'
@@ -400,74 +394,74 @@ export function JsiNavigationCostScreen() {
                   (reach === 0
                     ? 'Zero surfaces, so it reached a UIManager that is not driving anything yet.'
                     : 'It is holding live shadow trees, so this is the UIManager the app renders through.')}
-            </Text>
-          </View>
+            </text>
+          </view>
         )}
 
         {store === undefined ? null : (
-          <View className="jsi-card">
-            <Text className="jsi-card-title">
+          <view className="jsi-card">
+            <text className="jsi-card-title">
               native store read (item 8b&apos; go/no-go)
-            </Text>
-            <Text className="jsi-arm">
+            </text>
+            <text className="jsi-arm">
               plain Int32Array: {store.plainUs.toFixed(4)} us/read
-            </Text>
-            <Text className="jsi-arm">
+            </text>
+            <text className="jsi-arm">
               MutableBuffer-backed: {store.nativeUs.toFixed(4)} us/read
-            </Text>
-            <Text className="jsi-arm">
+            </text>
+            <text className="jsi-arm">
               ratio {(store.nativeUs / store.plainUs).toFixed(2)}x — ~1.0 means
               Hermes reads native memory as an ordinary load, so the node table
               can move behind it. Anything materially above 1.0 is a per-access
               check, and 8b&apos; would be a regression.
-            </Text>
-            <Text className="jsi-floor">
+            </text>
+            <text className="jsi-floor">
               guard {store.guard} — equal across both arms by construction
-            </Text>
-          </View>
+            </text>
+          </view>
         )}
 
         {results.map(result => (
-          <View key={result.childCount} className="jsi-card">
-            <Text className="jsi-card-title">{result.childCount} children</Text>
-            <Text className="jsi-floor">
+          <view key={result.childCount} className="jsi-card">
+            <text className="jsi-card-title">{result.childCount} children</text>
+            <text className="jsi-floor">
               JS field read (floor): {result.jsFieldUs.toFixed(3)} us
-            </Text>
-            <Text className="jsi-arm">
+            </text>
+            <text className="jsi-arm">
               getParentNode (one edge — THE per-query number):{' '}
               {result.getParentNodeUs.toFixed(3)} us/call
-            </Text>
-            <Text className="jsi-arm">
+            </text>
+            <text className="jsi-arm">
               — a {result.childCount}-child cleanChildren would cost{' '}
               {((result.getParentNodeUs * result.childCount) / 1000).toFixed(2)}{' '}
               ms across the boundary
-            </Text>
-            <Text className="jsi-arm">
+            </text>
+            <text className="jsi-arm">
               getChildNodes (whole list): {result.getChildNodesUs.toFixed(3)}{' '}
               us/call
-            </Text>
-            <Text className="jsi-floor">
+            </text>
+            <text className="jsi-floor">
               guard {result.guard} — carries no meaning
-            </Text>
-          </View>
+            </text>
+          </view>
         ))}
 
         {/* The measured trees. Kept tiny and off-screen-cheap: what is priced is the boundary, not
             layout, so the children carry no styling of their own. */}
         {CHILD_COUNTS.map(childCount => (
-          <View
+          <view
             key={childCount}
-            ref={host => {
+            ref={(host: IHostInstance | null) => {
               hostRefs.current.set(childCount, host);
             }}
             className="jsi-specimen"
           >
             {Array.from({ length: childCount }, (_unused, index) => (
-              <View key={index} className="jsi-specimen-child" />
+              <view key={index} className="jsi-specimen-child" />
             ))}
-          </View>
+          </view>
         ))}
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }
