@@ -2,23 +2,15 @@
 //
 // Written for the benchmark's `with-input` arm (2026-08-31). That arm appends a `<TextInput>` to
 // the row under a `<Show>`, and the plain arm's acceptance criterion is that its Fabric counters
-// stay BYTE-IDENTICAL to every number recorded before the arm existed. `createNode` is what the
-// acceptance check reads, so the retained side has to be asked separately or a placeholder living
-// only in the retained tree would pass it and still cost a C++ node per row.
+// stay BYTE-IDENTICAL to every number recorded before the arm existed. `createNode` is all that
+// check reads, so the retained side is asked here: a placeholder invisible to it still costs a C++
+// node per row. Svelte's retained tree carried 23 006 nodes against every other adapter's 9 001,
+// 14 004 of them block anchors, `{#if}` worth two per site (`svelte-adapter-dom-shim` §32).
 //
-// That is not hypothetical — it is precisely what Svelte pays. Its retained tree carried 23 006
-// nodes against every other adapter's 9 001, of which 14 004 were block anchors, and `{#if}` was
-// worth two of them per site (`svelte-adapter-dom-shim` §32).
-//
-// THE ONE ANCHOR IS STRUCTURAL, not a leak, which is why it is pinned rather than driven to zero:
-// solid-js/universal's `cleanChildren` needs a node holding the position of a dynamic expression
-// or the siblings after it reorder, and `createTextNode('')` maps to an engine anchor because an
-// empty RCTRawText would actually paint (`renderer.ts`). Pinning it at one still fails the way
-// Svelte's `{#if}` would: two anchors, or a renderable node, breaks the assertion.
-//
-// This file read GREEN until 2026-09-14 while asserting zero, because `costOf` censused
-// `fabric.committed` — the COMMITTED tree, which cannot hold an anchor by construction. The
-// retained half was never measured at all.
+// The one anchor is structural, not a leak: solid-js/universal's `cleanChildren` needs a node
+// holding the position of a dynamic expression or the siblings after it reorder, and
+// `createTextNode('')` maps to an engine anchor because an empty RCTRawText would paint
+// (`renderer.ts`).
 import { describe, expect, it } from 'vitest';
 import { Show } from 'solid-js';
 import { installFabric } from '@symbiote-native/test-utils';
@@ -70,10 +62,10 @@ describe('a falsy <Show> in a row', () => {
       </view>
     ));
 
-    // Native is the half the benchmark's acceptance check reads, and it must be untouched.
+    // The half the benchmark's acceptance check reads.
     expect(withFalsyShow.created).toBe(plain.created);
-    // Retained grows by the placeholder and by nothing else — asserted as an ANCHOR, so a renderable
-    // node slipping in reads as a failure rather than as the same count.
+    // Asserted as an ANCHOR too, so a renderable node taking the position reads as a failure
+    // rather than as the same count.
     expect(withFalsyShow.retained).toBe(plain.retained + 1);
     expect(withFalsyShow.anchors).toBe(plain.anchors + 1);
   });
