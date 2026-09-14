@@ -251,6 +251,29 @@ describe('touchable-native-feedback host behavior', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  // TouchableNativeFeedback.js:214-221 resolves `disabled != null ? disabled : (aria-disabled ??
+  // accessibilityState.disabled)` for the OWNER's Pressability config — the press machine lives on
+  // the CHILD and reads the OWNER (`attachPressMachine`'s `source`), so a real touch must be
+  // dispatched THERE (`symbiote-rn-parity-sweep` lesson: clone-onto-child components fire on the
+  // child, not the owner).
+  it.each([
+    ['aria-disabled', 'aria-disabled', true],
+    ['accessibilityState.disabled', 'accessibilityState', { disabled: true }],
+  ])('suppresses the press from %s alone', (_name, prop, value) => {
+    const onPress = vi.fn();
+    const { root, owner, child, surface } = mount({ onPress, [prop]: value });
+    engineAppend(root, owner);
+    engineAppend(owner, child);
+    surface.commit();
+
+    listenerOf(child, 'pressIn')(touchAt(2, 2));
+    listenerOf(child, 'startShouldSetResponder')(touchAt(2, 2));
+    listenerOf(child, 'press')(touchAt(2, 2));
+    listenerOf(child, 'pressOut')(touchAt(2, 2));
+
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
   // TouchableNativeFeedback.js:226 hands Pressability `minPressDuration: 0` UNCONDITIONALLY — not
   // inside an Android branch. Without it the machine's 130 ms deactivation floor defers pressOut,
   // and no timer is advanced here, so the floor shows up as a callback that never ran.

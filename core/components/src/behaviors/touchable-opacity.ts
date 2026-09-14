@@ -38,8 +38,10 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { resolveTouchableFocusable } from '../view/render-pressable';
+import { resolveButtonDisabled } from '../view/render-button';
 import {
   accessibleUnlessOptedOut,
+  asAccessibilityState,
   booleanOr,
   createPressBehavior,
   type IDisabledResolver,
@@ -162,6 +164,17 @@ const refine: IPressConfigRefinement = (node, config) => {
 
 const press = createPressBehavior(refine);
 
+// TouchableOpacity.js:186-189 — `disabled ?? aria-disabled ?? accessibilityState.disabled`, the
+// same three-way answer Button resolves, just never wired to this tag's OWN registration before.
+// Without it, a caller who sets only `accessibilityState={{disabled: true}}` (no `disabled` prop)
+// gets the greyed-out RN look but a press that still fires here — RN suppresses it.
+const touchableOpacityDisabled: IDisabledResolver = props =>
+  resolveButtonDisabled(
+    booleanOr(props.disabled),
+    booleanOr(props['aria-disabled']),
+    asAccessibilityState(props.accessibilityState),
+  );
+
 // The `id -> nativeID` alias every primitive's spec entry declares, applied here because
 // `HOST_PRIMITIVES` deliberately withholds this primitive's entry until the other adapters'
 // wrappers collapse to one node (the note at its Pressable neighbour says why). A raw `id` is a key
@@ -282,7 +295,7 @@ function onOwnedListenerChange(node: ISymbioteNode, name: string): void {
 
 // Idempotent: an adapter entry may be imported more than once in a bundle.
 export function registerTouchableOpacityBehavior(): void {
-  const touchable = createTouchableOpacityBehavior();
+  const touchable = createTouchableOpacityBehavior(touchableOpacityDisabled);
   registerHostBehavior(TOUCHABLE_OPACITY_TAG, {
     ...touchable,
     // `attachHostBehavior` writes `behavior.foldPayload` into the field one line BEFORE it calls

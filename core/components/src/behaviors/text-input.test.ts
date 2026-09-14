@@ -7,10 +7,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // the sibling pressable suite.
 import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
 import {
+  appendChild,
   clearHostBehaviors,
   createElement,
   createSurface,
   currentlyFocusedInput,
+  removeChild,
   routeProp,
   type IListener,
   type ISymbioteEvent,
@@ -343,6 +345,61 @@ describe('text input host behavior', () => {
 
     expect(commandsNamed('blur')).toHaveLength(1);
     expect(currentlyFocusedInput()).toBeNull();
+  });
+
+  // why: RN's TextInputState.focusTextInput ignores `.focus()` on a field with `editable: false`
+  // (TextInput-test.js's "focus() should not do anything if the TextInput is not editable" — an
+  // earlier verification pass mismarked this N/A, reading `TextInputState.focusInput` [the
+  // unguarded tracker] instead of `focusTextInput` [what `ReactNativeElement.focus()`, i.e. the
+  // real `ref.focus()`, actually calls]).
+  it('ignores an imperative focus while editable is false', () => {
+    registerTextInputBehavior();
+    const node = makeTextInput();
+    routeProp(node, 'editable', false);
+    mount(node);
+    const handle = buildTextInputHandle(node);
+
+    handle.focus();
+
+    expect(commandsNamed('focus')).toHaveLength(0);
+    expect(handle.isFocused()).toBe(false);
+  });
+
+  // why: RN unmounts a focused input through the same guarded blur (TextInput.js's
+  // useLayoutEffect cleanup: `if (currentlyFocusedInput() === inputRefValue) blur()`), so native
+  // and the app-wide tracker don't outlive a node that's gone.
+  it('blurs the input on unmount if it was the tracked focus', () => {
+    registerTextInputBehavior();
+    const parent = createElement('RCTView');
+    const node = makeTextInput();
+    const surface = createSurface((nextRootTag += 1));
+    surface.appendChild(parent);
+    appendChild(parent, node);
+    surface.commit();
+
+    listenerOf(node, 'focus')(EMPTY_EVENT);
+    expect(currentlyFocusedInput()).toBe(node);
+
+    removeChild(parent, node);
+    surface.commit();
+
+    expect(commandsNamed('blur')).toHaveLength(1);
+    expect(currentlyFocusedInput()).toBeNull();
+  });
+
+  it('does not blur on unmount if it was never focused', () => {
+    registerTextInputBehavior();
+    const parent = createElement('RCTView');
+    const node = makeTextInput();
+    const surface = createSurface((nextRootTag += 1));
+    surface.appendChild(parent);
+    appendChild(parent, node);
+    surface.commit();
+
+    removeChild(parent, node);
+    surface.commit();
+
+    expect(commandsNamed('blur')).toHaveLength(0);
   });
 
   // `clear` goes down the same stale-safe path a controlled write takes, and it must also move the

@@ -223,6 +223,31 @@ describe('touchable-opacity host behavior', () => {
     expect(committedPropsOf(TEST_ID).focusable).toBe(false);
   });
 
+  // TouchableOpacity.js:186-189 resolves `disabled ?? aria-disabled ?? accessibilityState.disabled`
+  // for its OWN Pressability config — the same three-way answer Button resolves, wired here for the
+  // first time. `pressable.test.ts` pins the bare-Pressable asymmetry this does NOT share.
+  it.each([
+    ['aria-disabled', 'aria-disabled', true],
+    ['accessibilityState.disabled', 'accessibilityState', { disabled: true }],
+  ])('suppresses the press from %s alone', async (_name, prop, value) => {
+    vi.useFakeTimers();
+    registerTouchableOpacityBehavior();
+    const onPress = vi.fn();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'onPress', onPress);
+    routeProp(node, prop, value);
+    mount(node);
+    await settle();
+
+    pressIn(node);
+    listenerOf(node, 'press')(TOUCH);
+    listenerOf(node, 'pressOut')(TOUCH);
+    await settle();
+
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
   // NO CASE FOR LEG 1 ALONE, and that is a finding rather than a gap: `focusable` is an ordinary
   // prop, so an authored `false` commits as `false` whether the fold runs or not. Break-tested —
   // deleting the fold leaves such a case green. The opt-out is witnessed only where it CONTRADICTS
