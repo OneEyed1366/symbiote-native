@@ -50,9 +50,9 @@
   <text class="section-label">
     Imperative ref · measure / setNativeProps / findNodeHandle
   </text>
-  <symbiote-view p={{ testID: 'ref-box', class: 'ref-box' }} bind:this={box}>
+  <view testID="ref-box" class="ref-box" bind:this={box}>
     <text class="ref-box-text">{`native tag ${tag ?? '—'}`}</text>
-  </symbiote-view>
+  </view>
   <text testID="measure-frame" class="info-text">{`measure · ${frame}`}</text>
   <view class="row">
     <view class="flex1">

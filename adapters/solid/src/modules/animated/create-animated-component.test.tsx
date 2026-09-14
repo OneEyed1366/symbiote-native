@@ -65,7 +65,7 @@ describe('Solid createAnimatedComponent', () => {
     // version passed with the wrap's widening removed. A dynamic spread is the real shape, and the
     // base here deliberately does not widen its own bag, so this pins the WRAP.
     const Bare = (props: Record<string, unknown>): JSX.Element => (
-      <symbiote-view {...props} />
+      <view {...props} />
     );
     const AnimatedBare = createAnimatedComponent(Bare);
 
@@ -125,7 +125,7 @@ describe('Solid createAnimatedComponent', () => {
           received = instance;
         }}
       >
-        <symbiote-view testID="tag-child" />
+        <view testID="tag-child" />
       </AnimatedTag>
     ));
     await tick();
