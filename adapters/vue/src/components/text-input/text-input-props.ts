@@ -1,8 +1,7 @@
 // The `<text-input>` tag's prop surface, for Vue — and `multiline` picks `text-input-multiline`
 // underneath. The wrapper is gone: the acknowledged event count, the `setTextAndSelection`
 // controlled write, the focus/blur mirror and mount `autoFocus` all live on the engine node as
-// `core/components/src/behaviors/text-input.ts`, wired by `../../register`. The
-// `text-input-managed` twin that kept the two machines apart is dead with it.
+// `core/components/src/behaviors/text-input.ts`, wired by `../../register`.
 //
 // The imperative API is reached the way every adapter reaches it — `buildTextInputHandle` over the
 // host instance a template `ref` hands back — rather than through an `expose()` the tag has no body

@@ -109,10 +109,9 @@ const DROP_EXPLANATION: Record<IDroppedSelector['reason'], string> = {
 // back on.
 //
 // WHY. The pressed look has a second, better route that did not exist when `:active` landed: a
-// functional `style={({pressed}) => …}`, which every lowering transform specialises into
-// `style` + `activeStyle` at build time (2026-08-23). It reaches the same slot with no pseudo-class
-// machinery, it is what the ecosystem already writes, and it lowers — so the reason `:active`
-// existed, keeping a Pressable lowerable without a state-reading callback, is gone.
+// functional `style={({pressed}) => …}`, which the engine resolves into `style` + `activeStyle`
+// (`routeProp`, 2026-08-23). It reaches the same slot with no pseudo-class machinery and it is what
+// the ecosystem already writes — so the reason `:active` existed is gone.
 //
 // Keeping BOTH live is what argues against it: they occupy different cascade slots (`activeStyle`
 // replaces the authored style, an `:active` class rule replaces the class style), so an adapter has
@@ -587,7 +586,7 @@ export function selectorsToMatches(
       // warning that misdescribes the cause is worse than none: it sends the reader to the engine.
       if (problem.reason === 'state-pseudo-class') {
         console.warn(
-          `[@symbiote-native/css-parser] ${filename}: dropped \`:${problem.detail}\` — pseudo-class state is currently disabled in this parser. Use a functional style instead: style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}, which every lowering transform compiles to style + activeStyle.`,
+          `[@symbiote-native/css-parser] ${filename}: dropped \`:${problem.detail}\` — pseudo-class state is currently disabled in this parser. Use a functional style instead: style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}, which the engine resolves to style + activeStyle.`,
         );
         continue;
       }

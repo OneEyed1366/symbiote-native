@@ -57,9 +57,6 @@ import {
 } from '../state/switch';
 import type { ISwitchChangeEvent } from '../view/render-switch';
 
-// The LOWERED tag — NOT the wrapper's `switch-managed` (`render-switch.ts`). One owner
-// per node: the wrapper already runs this same machine in its own lifecycle, so registering here
-// under the tag it emits would attach a second, redundant copy.
 export const SWITCH_TAG = 'switch';
 
 const states = new WeakMap<ISymbioteNode, ISwitchState>();
@@ -90,13 +87,13 @@ function trackColorOf(
   return { false: falseColor, true: trueColor };
 }
 
-// The wrapper-body prop fold this primitive owes its lowered form: `trackColor` / `thumbColor` /
-// `ios_backgroundColor` are AUTHORED names, none of them a real Fabric prop — RN's Switch view
-// declares `onTintColor`/`tintColor` (iOS) or `trackColorFor*`/`trackTintColor` (Android), plus
-// `thumbTintColor`. `render-switch.ts` folds them for the wrapper path via an adapter-supplied
-// `ISwitchPlatform`; a lowered node has no adapter to supply one, so this reads `Platform.OS`
-// directly — the same fact every adapter's own index.ios.ts/index.android.ts already encodes as a
-// literal, just read once here instead of five times.
+// The prop fold a wrapper body used to run: `trackColor` / `thumbColor` / `ios_backgroundColor` are
+// AUTHORED names, none of them a real Fabric prop — RN's Switch view declares
+// `onTintColor`/`tintColor` (iOS) or `trackColorFor*`/`trackTintColor` (Android), plus
+// `thumbTintColor`. The wrappers took the per-platform prop NAMES from an adapter-supplied table; a
+// node has no adapter to ask, so this reads `Platform.OS` directly — the same fact every adapter's
+// own index.ios.ts/index.android.ts already encodes as a literal, read once here instead of five
+// times.
 function trackColorPropsFor(
   value: boolean,
   trackColor: { false?: string; true?: string } | undefined,

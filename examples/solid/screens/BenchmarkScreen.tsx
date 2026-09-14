@@ -127,8 +127,8 @@ const ROW_BATCH_LARGE = 10000;
 // below exist, so the claim can be measured instead of asserted.
 // ONE row shape, everywhere. The `plain` / `with-input` pair existed to price a single TextInput
 // as a delta inside one column; that number has been taken, so the arm now only splits every
-// future measurement in two. Ten views, not eleven: a lowered `<text-input>` is a single native
-// input, and its `value` is a prop rather than a child, so it adds no RawText.
+// future measurement in two. Ten views, not eleven: `<text-input>` is a single native input, and
+// its `value` is a prop rather than a child, so it adds no RawText.
 const NATIVE_VIEWS_PER_ROW = 10;
 // Fixed so getItemLayout is exact in virtualized mode and both modes lay rows out identically.
 // Must stay equal to BenchmarkScreen.css's `.bench-row` height.
@@ -422,12 +422,10 @@ function BenchmarkRow(props: IBenchmarkRowProps) {
       {/* LAST, so the other nine views keep the positions every earlier payload diff was read at.
 
           No `multiline` — it selects a different native view. No `onChangeText` — a listener would
-          price the event path rather than the node. And no `ref`, which for this adapter is not
-          merely surplus but measurement-cancelling: `text-input` sits in the transform's
-          ref-refusal set, so a ref would keep the component and the row would measure the wrapper.
+          price the event path rather than the node. No `ref` — it prices the handle, not the row.
 
           `value`, not `defaultValue`: controlled is the shape that exercises the behavior's
-          afterCommit handshake, which is the part lowering moved onto the node. */}
+          afterCommit handshake, which is the part that lives on the node. */}
       <text-input class="bench-row-input" value={props.row.label} />
     </view>
   );

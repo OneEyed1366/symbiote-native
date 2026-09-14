@@ -1,11 +1,11 @@
-// Sticky headers on the lowered path. BOTH forms live here — the CHILD form (`<sticky-header>`, the
-// path our own lists use) and the INDEX form (`stickyHeaderIndices`, RN's public API) — plus the
-// owner-side half that feeds them.
+// Sticky headers. BOTH forms live here — the CHILD form (`<sticky-header>`, the path our own lists
+// use) and the INDEX form (`stickyHeaderIndices`, RN's public API) — plus the owner-side half that
+// feeds them.
 //
 // WHY A CHILD AT ALL. `stickyHeaderIndices` is an index list because JSX has no way to MARK an
-// element — RN walks its own children array and wraps the flagged ones. `<StickyHeader>` says the
-// same thing in the one place a lowered element can read without an index: the tag of a node that
-// is already in the tree.
+// element — RN walks its own children array and wraps the flagged ones. `<sticky-header>` says the
+// same thing in the one place the engine can read without an index: the tag of a node that is
+// already in the tree.
 //
 // THE INDEX FORM IS BUILT (2026-09-07), and this header said it was impossible until then. Both
 // halves of that claim were false, measured against Angular's projection controller, which already
@@ -321,7 +321,7 @@ export function releaseStickyOwner(owner: ISymbioteNode): void {
 
 // ---------------------------------------------------------------- the index form
 
-// `stickyHeaderIndices` on the lowered path, and it is deliberately NOT a second machine: a flagged
+// `stickyHeaderIndices`, and it is deliberately NOT a second machine: a flagged
 // child is MOVED into a synthesized `sticky-header` node, so ordering, cross-talk, the raised
 // throttle, the pin and the teardown are the child form's, unchanged. Indices decide only WHICH
 // children get one.

@@ -2,9 +2,9 @@
 // second pass is a no-op.
 //
 // The fold moved into the engine (`core/engine/src/accessibility-props.ts`, called from
-// `fabricProps`) so that a LOWERED element gets it — a lowered element has no component wrapper to
-// run it in. React never lowers, so its wrapper still calls `resolveAccessibilityProps` on the way
-// in, and the engine then folds the same bag again on the way to Fabric.
+// `fabricProps`) so that a bare tag gets it — a tag has no component wrapper to run it in. React's
+// remaining wrappers still call `resolveAccessibilityProps` on the way in, and the engine then
+// folds the same bag again on the way to Fabric.
 //
 // That is safe only because pass 1 BLANKS every alias, so pass 2's gate reports nothing to do and
 // returns its input by identity. `core/components/src/accessibility-props.test.ts` asserts that
@@ -43,7 +43,7 @@ describe('the aria fold survives running twice through React', () => {
     expect(props.accessibilityLabel).toBe('close');
     // Neither alias may survive. `fabricProps` copies unknown keys through verbatim, so a
     // surviving `role` rides to Fabric as a key no ViewConfig knows — which is exactly the defect
-    // three of the four lowering transforms were shipping before the fold moved down.
+    // three adapters were shipping before the fold moved down.
     expect(Object.hasOwn(props, 'role')).toBe(false);
     expect(Object.hasOwn(props, 'aria-label')).toBe(false);
     unmount(ROOT_TAG);

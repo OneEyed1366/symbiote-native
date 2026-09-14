@@ -1,5 +1,5 @@
 // Button's Android half — the look that did not exist here at all until 2026-09-09. Its own file
-// with its own mock, the shape `behaviors/lowered-ripple-android.test.ts` already uses.
+// with its own mock, the shape `behaviors/ripple-android.test.ts` already uses.
 //
 // The mock replaces `select` as well as `OS`, and that is load-bearing rather than thorough:
 // `platform/index.ios.ts:101` hardcodes `if ('ios' in spec) return spec.ios`, so a mock supplying

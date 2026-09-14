@@ -1,5 +1,5 @@
 // The scroll commands on the node, and the one property that makes them worth moving there: a
-// LOWERED ScrollView hands the app its engine node, with no wrapper to build a handle from. If the
+// `<scroll-view>` hands the app its engine node, with no wrapper to build a handle from. If the
 // node and `buildScrollViewHandle` each dispatched their own commands, `scrollTo()` with no
 // argument could mean one thing through a ref and another through a tag, and no test in either
 // package would see it — each would be internally correct.

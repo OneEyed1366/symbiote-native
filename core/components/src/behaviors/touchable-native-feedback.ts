@@ -53,8 +53,7 @@
 // bare `import './register';` that the barrel does not re-export. Registered by ALL FIVE adapters
 // since 2026-09-09, in the same commit that deleted the five wrappers, which is what makes it safe:
 // while a wrapper still built its own Pressable + feedback View, registering would have left every
-// TouchableNativeFeedback with two responders. There is no `-managed` twin and none is possible —
-// this tag commits no node, so a second spelling would have nothing to name.
+// TouchableNativeFeedback with two responders.
 
 import {
   ARIA_ALIAS_KEYS,
@@ -308,7 +307,7 @@ function cloneFold(owner: ISymbioteNode, inner: IPayloadFold | undefined) {
   };
 }
 
-// Not RN's own list: RN drops these by never cloning them, and a lowered tag has no clone to omit
+// Not RN's own list: RN drops these by never cloning them, and a tag has no clone to omit
 // them from — they would ride into the child's payload as keys no ViewConfig declares. Same strip
 // `./pressable`'s fold does for the machine-only half, applied to the owner's bag instead.
 //

@@ -41,10 +41,8 @@ export default {
   // `collapseTextWhitespace` only touches Text node content, never the style/attribute/class
   // output the other two rewrite, so its position doesn't affect them.
   //
-  // There is no lowering pass any more. A primitive IS an intrinsic tag the app writes itself, so
-  // nothing rewrites `<View>` into `<view p={…}>` — which also retires the ordering constraint
-  // that pass carried (it had to run after `scopedStyles`, or every scoped class silently lost
-  // its scope).
+  // Nothing here rewrites a tag: a primitive IS an intrinsic tag the app writes itself. A pass that
+  // did would have to run after `scopedStyles`, or every scoped class silently loses its scope.
   preprocess: [
     forbidWebOnlyConstructs(),
     scopedStyles(),

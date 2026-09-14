@@ -34,12 +34,12 @@ import type { ISymbioteNode } from './node';
 /**
  * A pure props -> props mapping a behavior applies on the way to the Fabric payload.
  *
- * It exists because a lowered element has no component body, and a wrapper's body is where the
- * per-primitive prop FOLDS live — TextInput's W3C aliases (`inputMode` -> `keyboardType`,
- * `readOnly` -> `editable`), Pressable's `disabled` -> `accessibilityState`. Every one of those was
- * silently dropped the moment the primitive lowered: the raw alias reached Fabric as a key no
- * ViewConfig declares, so nothing threw and nothing rendered differently in a headless test —
- * only the device showed a numeric keyboard that never appeared.
+ * It exists because a tag has no component body, and a wrapper's body is where the per-primitive
+ * prop FOLDS live — TextInput's W3C aliases (`inputMode` -> `keyboardType`, `readOnly` ->
+ * `editable`), Pressable's `disabled` -> `accessibilityState`. Every one of those was silently
+ * dropped the moment the wrapper went: the raw alias reached Fabric as a key no ViewConfig
+ * declares, so nothing threw and nothing rendered differently in a headless test — only the device
+ * showed a numeric keyboard that never appeared.
  *
  * NOT a hook on `setProp`, for the same reason `afterCommit` is not: `setProp` is the hottest path
  * in the engine. This runs once per node per payload build, and only for a node whose behavior
@@ -66,14 +66,14 @@ export interface IHostBehavior {
   // `RESPONDER_EVENTS` makes `startShouldSetResponder`/`responderMove` listeners on any node at
   // all — so the app's own `onPress` would evict the machine from the very keys the gesture starts
   // on. The component wrapper used to mediate that pair by destructuring the app's callbacks out
-  // before they reached the node; lowering removes the mediator, and this replaces it.
+  // before they reached the node; a tag has no mediator, and this replaces it.
   readonly ownedListeners?: readonly string[];
   // Props the app writes on the OWNER that belong to the SLOT, as owner name -> slot name.
   //
   // The prop twin of `childHost`, and needed for the same reason: an adapter writes
   // `contentContainerStyle` on the ScrollView because that is where the app wrote it, while the
   // value styles the content view. A wrapper mediated that by rendering the value onto its inner
-  // node; a lowered element has no wrapper, so the engine has to.
+  // node; a tag has none, so the engine has to.
   //
   // A RENAME rather than a plain redirect, because the two names differ by design —
   // `contentContainerStyle` on the owner is `style` on the slot. The redirected write goes through
@@ -167,13 +167,12 @@ export interface IHostBehavior {
   // Builds the primitive's OWN internal subtree, once, and returns the node the app's children
   // belong under — or undefined when they belong directly on the host.
   //
-  // WHY IT EXISTS. `foldPayload` gave a lowered primitive its wrapper's prop mapping; this gives it
-  // the wrapper's COMPOSITION. A ScrollView is a scroll view wrapping a content view, an
+  // WHY IT EXISTS. `foldPayload` gives a tag its wrapper's prop mapping; this gives it the
+  // wrapper's COMPOSITION. A ScrollView is a scroll view wrapping a content view, an
   // ImageBackground is a view holding an absolutely-filled image; in a component that second node
-  // is built by the wrapper's body, and the wrapper's body is exactly the per-instance cost
-  // lowering deletes. Until this seam existed a composed primitive could not be lowered at all,
-  // whatever its props did — which is why the tier audit reads "state the template never reads" and
-  // still leaves the composed primitives out.
+  // is built by the wrapper's body, and that body is exactly the per-instance cost a tag deletes.
+  // Until this seam existed a composed primitive could not become a tag at all, whatever its props
+  // did.
   //
   // RUNS BEFORE `attach`, so a machine can see its own slot. It is the node's shape, not its
   // runtime, and `attach`'s "the node has its component and nothing else" is about PROPS.
@@ -194,12 +193,12 @@ export interface IHostBehavior {
   // Runs after the commit that first gives the node a Fabric tag — the half `attach` CANNOT do.
   //
   // WHY IT IS SEPARATE. `Pressable` never needed it: its machine only reacts to events that arrive
-  // long after commit, so a tagless node at `attach` is enough. Every other lowering candidate needs
-  // a committed tag AT SETUP TIME — TextInput's `autoFocus` dispatches a view command at mount,
+  // long after commit, so a tagless node at `attach` is enough. Every other behavior needs a
+  // committed tag AT SETUP TIME — TextInput's `autoFocus` dispatches a view command at mount,
   // TouchableOpacity's `useNativeDriver: true` connects an Animated node to a view, ScrollView's
   // sticky path calls `attachNativeEvent`. React commits synchronously, so those would work there by
-  // accident; Vue, Solid and Angular commit a tick later, so the same code silently no-ops —
-  // lowered on paper, dead on device, with the headless suite green.
+  // accident; Vue, Solid and Angular commit a tick later, so the same code silently no-ops — dead
+  // on device, with the headless suite green.
   //
   // Optional, and the ENGINE owns its lifecycle: registered by `attachHostBehavior`, dropped by
   // `detachSubtree`, re-armed by `reattachSubtree`. A behavior can equally call `whenCommitted` by
@@ -239,8 +238,8 @@ export interface IHostBehavior {
   // so it never needs to look at a prop it was not handed. A controlled `TextInput` does: RN's
   // contract is that when the app's `value` diverges from what native last reported, JS commands
   // the text back down — and that comparison is triggered by a PROP CHANGE, not by an event. In a
-  // component the render is what re-runs it; a lowered element has no render, so the commit is the
-  // only equivalent beat.
+  // component the render is what re-runs it; a tag has no render, so the commit is the only
+  // equivalent beat.
   //
   // A prop-write hook on `setProp` was the obvious alternative and is the wrong shape: `setProp` is
   // the hottest path in the engine (32 001 writes on one benchmark create) and would need a per-node
@@ -260,7 +259,7 @@ export interface IHostBehavior {
   // Runs once the node is known to have left the tree for good. Must release everything `attach`
   // took — a timer left behind outlives the tree that owned it.
   detach(node: ISymbioteNode): void;
-  // The wrapper-body prop folds this primitive owes its lowered form. See IPayloadFold.
+  // This primitive's own prop folds. See IPayloadFold.
   readonly foldPayload?: IPayloadFold;
 }
 

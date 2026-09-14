@@ -14,7 +14,7 @@ writing an unchanged value still costs nothing.
 on the fresh closure a framework hands over each render. `afterCommit` cannot serve this: a listener
 change moves no Fabric prop, so the commit after it is a no-op and post-commit hooks are skipped.
 
-A lowered ScrollView now resolves `decelerationRate` to the platform friction constant, turns off
+A `<scroll-view>` now resolves `decelerationRate` to the platform friction constant, turns off
 content-cell flattening for `maintainVisibleContentPosition` / `snapToAlignment`, and synthesizes
 `onContentSizeChange` from its content view's layout — installing that gated `onLayout` only when
 the app passed a handler, as RN and every wrapper do.

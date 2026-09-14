@@ -1,15 +1,10 @@
-// The THIRD way a pressed look arrives, and the one that makes a public primitive TAG possible: a
-// FUNCTION `style`, resolved here at runtime instead of by a compiler.
+// The THIRD way a pressed look arrives: a FUNCTION `style`, resolved in `routeProp` at runtime.
 //
-// A lowering transform normally splits `style={({pressed}) => …}` at build time into `style` +
-// `activeStyle` (that is what active-style-variant.test.ts covers). But a primitive exposed as a
-// bare tag has no transform in front of it on three of the five adapters, so the callback arrives
-// in `routeProp` intact. Before this existed the failure was silent and total: a function is not an
+// An explicit `style` + `activeStyle` pair is the same thing written by hand (that is what
+// active-style-variant.test.ts covers). Nothing stands between an app and a tag, so the callback
+// arrives intact — and before this existed the failure was silent and total: a function is not an
 // `on*` name, so it misses `setEventListener`, lands in `setProp` as a function value, and
 // `fabricProps` drops function props — the node committed with NO style at all.
-//
-// So the compile-time split is now an OPTIMIZATION and this is the mechanism, the same relationship
-// `foldHostBag` has with the compile-time prop folds.
 import { afterEach, describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
 import {
@@ -56,8 +51,8 @@ describe('runtime state-style resolution', () => {
       expect(slots(node)[1]).toEqual({ opacity: 1 });
     });
 
-    // why: the pressed half has to be resolved EAGERLY at write time, not looked up on press — the
-    // callback is gone by then in the lowered path, and both paths must behave alike.
+    // why: the pressed half has to be resolved EAGERLY at write time, not looked up on press — an
+    // explicit `activeStyle` pair carries no callback to consult, and the two must behave alike.
     it('swaps to the pressed half and restores on release', () => {
       const node = createElement('RCTView');
       routeProp(node, 'style', ({ pressed }: { pressed: boolean }) => ({
@@ -143,10 +138,9 @@ describe('runtime state-style resolution', () => {
     // contents and cleared a variant the engine never derived. Found by the Solid session against
     // the flag's own contract, 2026-09-01.
     //
-    // Not reachable from a lowering transform — it either specialises into two plain writes or
-    // refuses and keeps the component, so a callback and an explicit `activeStyle` never reach one
-    // node from the same emission. A flat-bag adapter routing a `p={{…}}` bag key by key can carry
-    // both, which is what makes it a latent hole rather than a dead branch.
+    // An author writes one or the other, so a callback and an explicit `activeStyle` do not reach
+    // one node from the same source. A flat-bag adapter routing a `p={{…}}` bag key by key can
+    // carry both, which is what makes it a latent hole rather than a dead branch.
     it('keeps an explicit activeStyle written AFTER a callback style', () => {
       const node = createElement('RCTView');
       routeProp(node, 'style', ({ pressed }: { pressed: boolean }) => ({

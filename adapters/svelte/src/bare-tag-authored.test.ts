@@ -1,10 +1,10 @@
-// An app-authored bare tag, compiled by the REAL Svelte compiler with the lowering preprocessor
-// OUT of the pipeline, mounted, and read off the committed Fabric tree.
+// An app-authored bare tag, compiled by the REAL Svelte compiler, mounted, and read off the
+// committed Fabric tree.
 //
-// `bare-tag-parity.test.ts` compares the wrapper against the `p={{…}}` bag the transform builds,
-// and `dom-shim/bare-tag-props.test.ts` drives `ShimElement` by hand. Neither answers the question
-// that decides whether the transform can be deleted: does ordinary per-attribute markup —
-// `<view testID="x" style={s} class="card" onPress={fn}>` — survive Svelte's own codegen.
+// `bare-tag-parity.test.ts` works on the `p={{…}}` bag and `dom-shim/bare-tag-props.test.ts` drives
+// `ShimElement` by hand. Neither answers the question an app actually asks: does ordinary
+// per-attribute markup — `<view testID="x" style={s} class="card" onPress={fn}>` — survive Svelte's
+// own codegen.
 //
 // It does not take one path. Measured against svelte@5.56.8 with the shipping options
 // (`{fragments:'tree', css:'external', generate:'client'}`), an attribute reaches the shim through
@@ -119,7 +119,7 @@ function engineNodeFor(label: string): ISymbioteNode {
   return handle;
 }
 
-/** Compile a real `.svelte` source with NO lowering preprocessor, mount it, settle. */
+/** Compile a real `.svelte` source, mount it, settle. */
 async function mountSource(source: string, rootTag: number): Promise<void> {
   writeFileSync(
     PROBE_OUT,

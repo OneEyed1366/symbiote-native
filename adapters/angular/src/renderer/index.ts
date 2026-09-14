@@ -65,9 +65,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // resolveTextProps, which the composed `Text` @Component already calls). That component's own
 // host paints directly (Text is not anchor-hosted — see the top-level "View/Text's own component
 // doesn't have this split" reasoning elsewhere in this file), so createElement runs for its INNER
-// text node too; seeding here therefore covers both the composed Text and any bare
-// `text` a future lowering emits, uniformly. Found missing 2026-08-31 (a cross-adapter
-// key-count diff against Vue's real BenchmarkRow.vue) — without this a lowered Text's
+// text node too; seeding here therefore covers both the composed Text and a bare `text` tag,
+// uniformly. Found missing 2026-08-31 (a cross-adapter key-count diff against Vue's real
+// BenchmarkRow.vue) — without this a `text`'s
 // `numberOfLines` clips with no ellipsis, silently, on device only. Vue's renderer already does
 // this (`adapters/vue/src/renderer/index.ts`'s `seedTextDefaults`); Angular's simply never did.
 //
@@ -95,25 +95,17 @@ function textDefaultFor(el: IHostElement, key: string): unknown {
 
 // RN's `id` is the modern W3C-named alias for `nativeID` (core/components/host-primitives.cjs's
 // `ID_ALIAS`) — View.js/Text.js copy it over unconditionally, so the two name ONE native prop.
-// React/Solid/Svelte fold it in a wrapper or transform; Angular had it nowhere, so `<view
-// id="x">`/`[id]="x"` reached Fabric with an unknown `id` key and no `nativeID` — silently, on
-// device only. Lives in the renderer (mirroring Vue's `PROP_ALIASES`) so it covers every path
-// that can set a prop — `setAttribute`, `setProperty`, and (should a future lowering emit one) a
+// Angular had this fold nowhere, so `<view id="x">`/`[id]="x"` reached Fabric with an unknown `id`
+// key and no `nativeID` — silently, on device only. Lives in the renderer (mirroring Vue's
+// `PROP_ALIASES`) so it covers every path that can set a prop — `setAttribute`, `setProperty`, a
 // hand-built call — not just the composed component's own `id` @Input.
-// `symbioteStyle` is what the lowering transform emits in place of `[style]`: Angular routes a
-// `style` binding to its own CSS styling engine, which cannot represent an RN StyleProp (an array
-// throws inside change detection). Under any other name it is an ordinary property binding and
-// arrives here.
 // Angular's two-way sugar `[(value)]` compiles to a `(valueChange)` binding; the engine knows the
 // same fold as the function prop `onValueChange`. See `listen()`. The two names live in a leaf
 // module so `elements.ts`'s ControlValueAccessor can name them without importing this cyclic file.
 import { VALUE_CHANGE_EVENT, VALUE_CHANGE_PROP } from './value-change';
 import { flushViewFor } from '../change-detection-flush';
 
-const PROP_ALIASES: ReadonlyMap<string, string> = new Map([
-  ['id', 'nativeID'],
-  ['symbioteStyle', 'style'],
-]);
+const PROP_ALIASES: ReadonlyMap<string, string> = new Map([['id', 'nativeID']]);
 
 function aliasedPropName(name: string): string {
   return PROP_ALIASES.get(name) ?? name;
@@ -524,11 +516,11 @@ export class SymbioteRenderer implements Renderer2 {
   ): () => void {
     if (!isSymbioteNode(target)) return () => {};
     // `[(value)]` desugars to `(valueChange)`, which is the spelling every Angular template writes
-    // for a Switch or a TextInput. On the COMPONENT path it is an `@Output()` the wrapper derives
-    // from the raw `change` payload; on a LOWERED element there is no component, and registering
-    // `valueChange` as an engine event would wait forever for a Fabric event of that name.
+    // for a Switch or a TextInput. It used to be an `@Output()` a wrapper derived from the raw
+    // `change` payload; a tag has no component, and registering `valueChange` as an engine event
+    // would wait forever for a Fabric event of that name.
     //
-    // The lowered path already carries the same fold under RN's own spelling: both behaviors call
+    // The same fold already exists under RN's own spelling: both behaviors call
     // `node.props.onValueChange(event)` — a plain function PROP, not an event
     // (`behaviors/switch.ts`, `behaviors/text-input.ts`), with `text`/`value` carried as a FIELD on
     // the event object rather than a second argument (Svelte forces every individual `on*` prop

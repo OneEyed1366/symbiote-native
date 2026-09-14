@@ -3,7 +3,7 @@
 //
 // `foldAliasKey` sits on the per-prop write path — 32 001 prop writes on a benchmark create — so it
 // is one string comparison rather than a Map lookup over each primitive's `aliases`. That is only
-// correct while every lowerable primitive declares the SAME single alias pair. The day a second
+// correct while every primitive declares the SAME single alias pair. The day a second
 // pair appears, or a primitive stops sharing, this fails and the renderer has to carry a real map.
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';

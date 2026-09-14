@@ -57,7 +57,13 @@ function collectSourceFiles(dir: string, out: string[]): void {
     } else if (
       full.endsWith('.ts') &&
       !full.endsWith('.d.ts') &&
-      !full.includes('.test.')
+      !full.includes('.test.') &&
+      // A bench is excluded for the same reason a test is, and it needs saying because the reason
+      // is not "it is not source": the hazard this audit exists for is Metro's inlineRequires
+      // moving a `require()` down to a binding's first USE, so a module nothing names as a value
+      // never evaluates. Neither a test nor a bench is ever in a bundle, so neither can be reached
+      // by that mechanism at all. `.bench.ts` postdates the filter, which is why it was missing.
+      !full.includes('.bench.')
     ) {
       out.push(full);
     }

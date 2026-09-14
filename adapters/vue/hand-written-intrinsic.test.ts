@@ -1,8 +1,5 @@
-// A bare intrinsic tag WRITTEN BY HAND, with no lowering transform in the picture. This is the
-// authoring shape the adapter is moving to: the app writes `<view>` / `<pressable>` itself and no
-// build step rewrites anything, so nothing here compiles a wrapper component and nothing imports
-// one. That is also what makes the arms honest — the lowering transform keys on an
-// `@symbiote-native/vue` import, and these sources have none, so it provably cannot fire.
+// A bare intrinsic tag WRITTEN BY HAND. This is the authoring shape: the app writes `<view>` /
+// `<pressable>` itself, so nothing here compiles a wrapper component and nothing imports one.
 //
 // Both Vue paths, separately. `@vue/compiler-sfc` and `@vue/babel-plugin-jsx` decide
 // element-vs-component in two different places, so one rule reaching two mechanisms is the drift
@@ -110,9 +107,9 @@ async function compileJsx(source: string): Promise<string> {
   return result.code;
 }
 
-// Matched WITH ITS QUOTES. `text-input` is a prefix of `text-input-multiline` and of both `-managed`
-// spellings, so a bare `includes(tag)` reads any of the four as this one and a compiler emitting a
-// sibling would report correct.
+// Matched WITH ITS QUOTES. `text-input` is a prefix of `text-input-multiline`, so a bare
+// `includes(tag)` reads the sibling as this one and a compiler emitting the wrong of the two would
+// report correct.
 const namesElement = (code: string, tag: string): boolean =>
   code.includes(`"${tag}"`) && !code.includes(`_resolveComponent("${tag}")`);
 

@@ -118,10 +118,7 @@ function asText(value: unknown): string {
 // has to DETACH its anchor host from the portal target on cleanup. Going through here rather than
 // calling the engine's removeChild directly is what keeps the mutation paired with requestCommit(),
 // and keeps the surface-vs-node branch in one place.
-// The REFUSED path's half of `:active`, and the reason a refusal costs the component instance
-// rather than the pressed styling. A `<Pressable>` the lowering left as a component still owns its
-// own press machine, and one call here puts the node into its pressed state so `.btn:active`
-// applies exactly as it would on a lowered tag.
+// The `:active` half: one call here puts the node into its pressed state so `.btn:active` applies.
 //
 // Exported paired with requestCommit() for the same reason removeNode below is: the press arrives
 // from a NATIVE EVENT, outside any renderer mutation, so nothing else schedules a commit. React's
@@ -143,19 +140,17 @@ export function removeNode(parent: IHostNode, node: IHostNode): void {
 }
 
 // RN's Text.js applies two defaults on the way to native (core/components/src/text-props.ts:
-// ellipsizeMode 'tail', allowFontScaling true unless literally false). The Solid <Text> wrapper
-// folds them with resolveTextProps; a template the Babel lowering rewrote to the intrinsic
-// `symbiote-text` has no wrapper, so the renderer seeds them instead. Without this a
-// numberOfLines={1} line clips mid-word with no ellipsis — device-observed, and silent.
+// ellipsizeMode 'tail', allowFontScaling true unless literally false). A `<text>` tag has no
+// wrapper to fold them, so the renderer seeds them. Without this a numberOfLines={1} line clips
+// mid-word with no ellipsis — device-observed, and silent.
 // Vue's twin: adapters/vue/src/renderer/index.ts.
 //
 // A FOLD per key, not a default VALUE, and the difference is not cosmetic: `resolveTextProps` is
 // the authority and it reads `ellipsizeMode ?? 'tail'` / `allowFontScaling !== false`, so a null
 // (or 0, or '') has to resolve to the default too. Substituting only on `undefined` — which this
-// did until 2026-08-23 — meant `<Text ellipsizeMode={null}>` committed null through a lowered tag
-// and 'tail' through a wrapper: a divergence lowering introduced, device-only and silent. The same
-// two folds are described as data in `@symbiote-native/components/host-primitives` for the
-// COMPILE-time transforms; collapsing all of them onto resolveTextProps is a separate step.
+// did until 2026-08-23 — meant `<text ellipsizeMode={null}>` committed null, device-only and
+// silent. The same two folds are described as data in `@symbiote-native/components/host-primitives`;
+// collapsing all of them onto resolveTextProps is a separate step.
 type ITextFold = (value: unknown) => unknown;
 
 const TEXT_FOLDS: ReadonlyMap<string, ITextFold> = new Map<string, ITextFold>([
@@ -197,9 +192,8 @@ const ALIAS_FROM = 'id';
 const ALIAS_TO = 'nativeID';
 
 // `multiline` selects between TWO Fabric views, so the TAG decides and no prop write moves a node
-// between them. Two of the three paths that can build the node resolve it earlier — the wrapper
-// CONSUMES the prop to pick its intrinsic, a lowering transform reads a literal at compile time —
-// and an author writing the tag by hand has neither, which leaves two silent divergences.
+// between them. An author writing `<text-input multiline>` instead of `<text-input-multiline>` gets
+// the single-line view with a prop no ViewConfig on it declares — two silent divergences.
 //
 // The shared behavior (`core/components/src/behaviors/text-input.ts`) already makes the PAYLOAD
 // follow the tag. The complaint has to live here instead of there: `foldPayload` runs inside the

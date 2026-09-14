@@ -19,10 +19,9 @@
 // nodes: `selectScrollIntrinsics` picks a scroll intrinsic and a content intrinsic, and the
 // wrapper's body nests `<content>{children}</content>` inside `<scroll>`. That body is a framework
 // component instance per ScrollView — a Vue instance, a Solid props Proxy, Svelte anchors, an
-// Angular LView — which is precisely the currency host-primitive lowering exists to delete
-// (`.claude/rules/host-primitive-tier.md`). `foldPayload` gave a lowered primitive its wrapper's
-// PROP MAPPING; nothing gave it the wrapper's COMPOSITION, so a composed primitive could not be
-// lowered at all no matter what its props did. This is that half.
+// Angular LView — which is precisely the currency a tag exists to delete. `foldPayload` gives a tag
+// its wrapper's PROP MAPPING; nothing gave it the wrapper's COMPOSITION, so a composed primitive
+// could not become a tag at all no matter what its props did. This is that half.
 //
 // WHY THE TAG CARRIES THE AXIS. `buildStructure` runs at `createElement`, before a single prop is
 // routed, so it cannot read `horizontal`. It does not need to: horizontal scroll is already a
@@ -39,15 +38,12 @@
 // content node: `RCTScrollView > RCTScrollContentView > RCTScrollContentView`. So the precondition
 // per adapter is that nothing else builds the content node.
 //
-// A SECOND TAG IS NOT THE ANSWER, and this reverses what this header said until 2026-09-07. The
-// `text-input` / `text-input-managed` split is debt with a deletion date, not a technique
-// (`.claude/rules/fold-only-primitive-recipe.md` §4): each pair exists only to keep two owners
-// apart while a wrapper and a lowered element both emit a tag, and minting one here would buy a
-// rename across every call site now and a second rename when the wrapper dies. The owner's decision
-// is that the ENGINE becomes the single owner of the content node — every adapter's list and
-// wrapper stops building one — so registration waits on that cut rather than on a new spelling.
-// That cut LANDED 2026-09-11: no adapter's wrapper or list builds a content node any more, and all
-// five register this behavior through `@symbiote-native/components/register`.
+// A SECOND TAG WAS NOT THE ANSWER, and this reverses what this header said until 2026-09-07: a
+// second spelling only keeps two owners apart while two paths exist, and it buys a rename across
+// every call site now plus another when one path dies. The decision was that the ENGINE becomes the
+// single owner of the content node. That cut LANDED 2026-09-11: nothing else builds a content node
+// any more, and all five adapters register this behavior through
+// `@symbiote-native/components/register`.
 //
 // STYLE, on both nodes, and the precedence is the part that is easy to get silently wrong. The
 // wrapper composes exactly two arrays, and this reproduces both:
@@ -127,8 +123,8 @@ export const REFRESH_CONTROL = descriptorFor('refresh-control').component;
 
 // The OWNER's fold: the per-axis base style UNDER the app's (so an explicit `flexDirection` still
 // wins), `decelerationRate` resolved from RN's two words to the platform's friction constant, and
-// the two props a lowered element has no wrapper to write for it. The resolution has to happen here
-// because 'normal'/'fast' reach Fabric as strings it cannot read.
+// the two props a tag has no wrapper to write for it. The resolution has to happen here because
+// 'normal'/'fast' reach Fabric as strings it cannot read.
 //
 // `horizontal` is a real C++ prop (`BaseScrollViewProps.h:56`) and the separate ViewManager is
 // ANDROID's — on iOS both tags resolve to RCTScrollView, so the PROP is what turns the axis there
@@ -139,7 +135,7 @@ export const REFRESH_CONTROL = descriptorFor('refresh-control').component;
 //
 // `nestedScrollEnabled` defaults ON because every wrapper writes it on every ScrollView, both
 // platforms. RN itself only defaults it on the Android RefreshControl WRAP path
-// (`ScrollView.js:1862`) — parity here is with the wrapper, which is what the lowered path replaces.
+// (`ScrollView.js:1862`) — parity here is with the wrapper this behavior replaced.
 export function ownerFold(base: IViewStyle, horizontal: boolean): IPayloadFold {
   return props => {
     const next: Record<string, unknown> = {
@@ -240,8 +236,8 @@ const lastContentSize = new WeakMap<ISymbioteNode, IContentSize>();
 
 // RN synthesizes onContentSizeChange from the CONTENT view's own onLayout — there is no native
 // content-size event (ScrollView.js:1675 `contentSizeChangeProps`). The wrapper wired that by
-// rendering an `onLayout` onto its inner node; a lowered element has no inner node of its own, so
-// the behavior installs it on the slot it built.
+// rendering an `onLayout` onto its inner node; a tag has no inner node of its own, so the behavior
+// installs it on the slot it built.
 //
 // The app's callback takes `(width, height)`, not an event, which is why `contentSizeChange` is an
 // OWNED listener: `setEventListener` wraps an ordinary listener as `(event) => handler(event)` and
@@ -268,9 +264,9 @@ function contentSizeListener(owner: ISymbioteNode) {
 
 // RN installs the content `onLayout` only when the app passed `onContentSizeChange`, and so does
 // every wrapper — `onLayout` is a gated event, so wiring it unconditionally would put `onLayout:
-// true` in the payload of every lowered ScrollView's content node and buy a native event nobody
-// reads. A lowering that changes the committed surface in EITHER direction is a bug, so the wiring
-// has to follow the prop.
+// true` in the payload of every ScrollView's content node and buy a native event nobody reads. A
+// change to the committed surface in EITHER direction is a bug, so the wiring has to follow the
+// prop.
 //
 // It follows the LISTENER rather than a commit, which is what `onOwnedListenerChange` is for: a
 // listener flip changes no payload by itself, so the commit after it is a no-op and a post-commit

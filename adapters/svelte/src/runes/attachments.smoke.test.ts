@@ -273,11 +273,9 @@ describe('Positive — {@attach} on a Symbiote component', () => {
   // compiled from source, reaching its committed node.
   //
   // Modal is the subject on purpose, not RefreshControl or either Touchable variant that filled
-  // this role before: Modal is structurally UNLOWERABLE (`.claude/rules/host-primitive-tier.md`,
-  // "the disqualifier: a render that SYNTHESIZES a node" — a hidden modal commits zero nodes, so
-  // lowering it would be a regression, not an optimisation). Any component that renders a bare tag
-  // AND calls `createAttachmentsSync` serves, but this one will not need rehoming the next time a
-  // wrapper is deleted.
+  // this role before: a hidden modal commits zero nodes, so it keeps a component body of its own.
+  // Any component that renders a bare tag AND calls `createAttachmentsSync` serves, but this one
+  // will not need rehoming the next time a wrapper is deleted.
   it('reaches the committed host node of a component that owns a bare tag', async () => {
     compileToFile(
       readFileSync(join(COMPONENTS_DIR, 'modal', 'index.svelte'), 'utf8'),

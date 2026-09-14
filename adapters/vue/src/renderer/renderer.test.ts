@@ -326,12 +326,11 @@ describe('remove and reorder', () => {
   });
 });
 
-// The lowered path: the SFC transformer rewrites <View>/<Text> to their intrinsic TAGS
-// (metro-vue-transformer.cjs), so those nodes reach the renderer with no component wrapper in
-// between. Two things the wrapper used to do must therefore happen here — RN's Text.js defaults
-// (resolveTextProps) and the kebab->camel attr fold (normalizeVueAttrs). Both failures are
-// silent: a clipped line with no ellipsis, and a prop that never reaches Fabric.
-describe('lowered host primitives (intrinsic tags)', () => {
+// An intrinsic TAG reaches the renderer with no component wrapper in between, so two things a
+// wrapper used to do must happen here — RN's Text.js defaults (resolveTextProps) and the
+// kebab->camel attr fold (normalizeVueAttrs). Both failures are silent: a clipped line with no
+// ellipsis, and a prop that never reaches Fabric.
+describe('host primitives as intrinsic tags', () => {
   const findByTestId = (id: string): IFakeNode | undefined =>
     findCommitted(node => node.props.testID === id);
 

@@ -1,11 +1,8 @@
-// `[(value)]` on a LOWERED primitive — the spelling every Angular template writes for a Switch or
-// a TextInput, and the one the lowering transform refused for a few hours because `valueChange` is
-// an @Output the component derives rather than a Fabric event.
-//
-// It does not need to be a component: both behaviors already call
-// `node.props.onValueChange(event)`, RN's own spelling of the same fold, with `text`/`value` carried
-// as a field on the event. The renderer routes the binding to that prop and unwraps the field back
-// to a bare value, so the two paths agree.
+// `[(value)]` on a TAG — the spelling every Angular template writes for a Switch or a TextInput.
+// `valueChange` looks like an @Output a component would have to derive, and it needs no component:
+// both behaviors already call `node.props.onValueChange(event)`, RN's own spelling of the same
+// fold, with `text`/`value` carried as a field on the event. The renderer routes the binding to that
+// prop and unwraps the field back to a bare value.
 //
 // The oracle is the PARENT's field after a native event, not a spy on the callback: a handler that
 // fires into nothing would pass a spy and still leave `[(value)]` broken.
@@ -29,7 +26,7 @@ const tick = (): Promise<void> =>
 const model = { text: '', on: false };
 
 @Component({
-  selector: 'lowered-two-way-host',
+  selector: 'two-way-host',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   // Bare intrinsics, no primitive imported: a component in scope would take the tag back through
@@ -114,7 +111,7 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-describe('[(value)] on a lowered element', () => {
+describe('[(value)] on a tag', () => {
   it('writes the typed text back into the parent field', async () => {
     mount(ROOT_TAG, TwoWayHost);
     await tick();

@@ -1,12 +1,9 @@
 // RN's `aria-*` / `role` -> `accessibility*` fold, at the layer every path goes through.
 //
-// WHY IT IS HERE AND NOT IN A WRAPPER. It used to run inside each primitive's COMPONENT, which is
-// exactly the layer host-primitive lowering removes. A per-attribute element path cannot do it —
-// `aria-checked` has to be folded against a sibling `accessibilityState` — so the four lowering
-// transforms REFUSED any element carrying `role` or an `aria-*` attribute
-// (`REFUSAL_CATEGORIES.bagFold`). Accessibility props are ordinary in real code, so that refusal
-// cost lowering coverage on every primitive, including the three already lowered. Moving the fold
-// down deletes the refusal instead of teaching four transforms a bag operation they cannot express.
+// WHY IT IS HERE AND NOT IN A WRAPPER. It used to run inside each primitive's COMPONENT, and a tag
+// has none. It also cannot run per attribute — `aria-checked` has to be folded against a sibling
+// `accessibilityState` — so it belongs at the one point where the whole bag is known, which is the
+// payload build.
 //
 // IT IS A MOVE, NOT A REWRITE, AND THAT IS DELIBERATE. The function carries TWO CONTRADICTORY
 // PRECEDENCE RULES: for the scalars an explicit `accessibility*` WINS and the alias only fills a

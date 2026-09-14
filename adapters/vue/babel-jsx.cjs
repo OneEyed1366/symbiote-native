@@ -11,16 +11,9 @@
 // so it has to stay in the app's plugins array, where the app also controls its position relative
 // to its own plugins. A preset would move it after every plugin and silently change that order.
 //
-// The two entries are handed out together because either alone is broken:
-//
-//   lowering only        -> `view` compiles to resolveComponent("view"), a
-//                           component that resolves to nothing, with SLOT children an element path
-//                           never mounts. Blank subtree, no error.
-//   isCustomElement only -> nothing was rewritten, so <View> is still a Vue component and the whole
-//                           point (one component instance per node on ~73% of the tree) is unpaid.
-//
-// Same "both halves or nothing" invariant the SFC path states in metro-vue-transformer.cjs, and the
-// reason it is expressed as one require() here rather than two lines of documentation.
+// `isCustomElement` is the load-bearing option: without it `<view>` compiles to
+// `resolveComponent("view")`, a component that resolves to nothing, with SLOT children an element
+// path never mounts. Blank subtree, no error.
 //
 // @vue/babel-plugin-jsx is OUR dependency and require() resolves relative to this file, so the app
 // declares no extra devDependency — same reasoning as ./metro-css-parser.cjs.

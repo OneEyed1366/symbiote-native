@@ -138,7 +138,7 @@ function withBehaviorStyle(node: ISymbioteNode, style: unknown): unknown {
 /**
  * Give a node a behavior-owned animated style layer, or drop it by passing `undefined`.
  *
- * The seam a lowered `TouchableOpacity` needs: RN runs its press fade from an `Animated.View` whose
+ * The seam `<touchable-opacity>` needs: RN runs its press fade from an `Animated.View` whose
  * style is `[props.style, {opacity: anim}]` (TouchableOpacity.js:302), and a tag has no such
  * wrapper. The layer is bound to the leaf, never folded into `node.props.style` — so the behavior
  * can still read the AUTHOR's resting opacity back without seeing its own fade.

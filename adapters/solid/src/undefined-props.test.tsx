@@ -1,10 +1,9 @@
-// What a lowered tag does with an UNDEFINED prop value, on both channels.
+// What a tag does with an UNDEFINED prop value, on both channels.
 //
-// Tier-1 lowers components whose bodies build props conditionally — React's SafeAreaView adds
-// `onLayout` only when it is defined, InputAccessoryView does the same for `nativeID` and
-// `backgroundColor`. A transform cannot reproduce a conditional spread, so it emits the key
-// unconditionally and lets the value be `undefined`. That is only safe if `undefined` commits
-// NOTHING, and for `onLayout` it is sharper than the general case: it sits in GATED_EVENT_PROPS,
+// An app writes the key unconditionally and lets the value be `undefined` — `onLayout={maybeFn}`,
+// `nativeID={maybeId}` — where a component body used to add it only when defined. That is only safe
+// if `undefined` commits NOTHING, and for `onLayout` it is sharper than the general case: it sits
+// in GATED_EVENT_PROPS,
 // where the engine writes a boolean flag that Fabric's C++ tests before it will emit the event at
 // all (`.claude/rules/fabric-boolean-event-gates.md`). A flag lit by an absent handler means native
 // emits layout events for the life of the node with nobody listening.
@@ -34,7 +33,7 @@ function find(node: IFakeNode): IFakeNode | undefined {
   return undefined;
 }
 
-describe('an undefined-valued gated event on a lowered tag', () => {
+describe('an undefined-valued gated event on a tag', () => {
   it('reports the committed keys', async () => {
     const absent = undefined;
     mount(ROOT_TAG, () => <view onLayout={absent} testID={TARGET} />);

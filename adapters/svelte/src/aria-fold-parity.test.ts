@@ -7,8 +7,7 @@
 // at a bag it does not recognise, and the failure is silent — accessibility simply stops, on
 // device, with every suite green.
 //
-// It had a THIRD arm until the wrappers were deleted (a lowered `<View>` and the `View.svelte` that
-// refused). Both are gone; the two arms left are the two an app has.
+// It had a THIRD arm until the wrappers were deleted; the two left are the two an app has.
 import { afterAll, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';

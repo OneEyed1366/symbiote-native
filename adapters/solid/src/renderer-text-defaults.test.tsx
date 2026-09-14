@@ -1,4 +1,4 @@
-// RN's two Text defaults on the LOWERED path. The <Text> wrapper folds them with resolveTextProps;
+// RN's two Text defaults on a `<text>` tag. The <Text> wrapper folded them with resolveTextProps;
 // a file compiled through babel-lower-host-primitives.cjs has no wrapper, so the renderer has to
 // seed them. Vue's twin is adapters/vue/src/renderer/renderer.test.ts.
 //
@@ -37,7 +37,7 @@ function committedTextProps(): Record<string, unknown> | undefined {
   return found;
 }
 
-describe('lowered text carries RN’s Text defaults', () => {
+describe('a text tag carries RN’s Text defaults', () => {
   it('seeds ellipsizeMode and allowFontScaling at create', async () => {
     mount(ROOT_TAG, () => (
       <view>
@@ -95,10 +95,10 @@ describe('lowered text carries RN’s Text defaults', () => {
 
   // why: the seed is keyed on the node being a TEXT container, not on the prop name — a View that
   // happens to be handed `ellipsizeMode` must not acquire text semantics.
-  // why: the divergence lowering introduced and a substitute-on-undefined fold could not see.
-  // `resolveTextProps` — the authority every wrapper path calls — reads `ellipsizeMode ?? 'tail'`
-  // and `allowFontScaling !== false`, so a null resolves to the default on BOTH. Until 2026-08-23
-  // the lowered tag committed the null instead, which no test caught and only a device showed.
+  // why: a substitute-on-undefined fold cannot see this. `resolveTextProps` — the authority — reads
+  // `ellipsizeMode ?? 'tail'` and `allowFontScaling !== false`, so a null resolves to the default.
+  // Until 2026-08-23 the tag committed the null instead, which no test caught and only a device
+  // showed.
   it('folds a null the same way resolveTextProps does, not just an undefined', async () => {
     mount(ROOT_TAG, () => (
       <view>

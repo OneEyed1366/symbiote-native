@@ -88,8 +88,8 @@ describe('Positive', () => {
     expect(fold?.(bag)).toBe(bag);
   });
 
-  // why: one component can have both a lowered primitive's behavior fold and its own ViewConfig
-  // processors. The reference ran the behavior first and the processors over what it produced.
+  // why: one component can have both a behavior fold and its own ViewConfig processors. The
+  // reference ran the behavior first and the processors over what it produced.
   it('composes with a behavior fold, behavior first', () => {
     registerHostBehavior(THIRD_PARTY, {
       attach: () => {},

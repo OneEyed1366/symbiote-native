@@ -1,4 +1,4 @@
-// A press on a LOWERED Pressable must not strand an update to one of its DESCENDANTS.
+// A press on a `<pressable>` must not strand an update to one of its DESCENDANTS.
 //
 // The regression this pins (2026-08-24, fixed in `commitTargeted`): `setNodePressed` dirties the
 // pressed node, so a same-tick prop write on a CHILD bubbles one step, meets the already-dirty
@@ -31,7 +31,7 @@ if (globalThis.navigator === undefined) {
 }
 const fabric = installFabric();
 
-const OUT = join(__dirname, '.smoke-compiled-lowered-press-commit.mjs');
+const OUT = join(__dirname, '.smoke-compiled-press-commit.mjs');
 const ROOT_TAG = 9_711;
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -54,8 +54,7 @@ function pressedNode(): Record<string, unknown> {
     );
   });
   const handle = view?.instanceHandle;
-  if (!isRecord(handle))
-    throw new Error('no lowered Pressable responder found');
+  if (!isRecord(handle)) throw new Error('no pressable responder found');
   return handle;
 }
 
@@ -100,7 +99,7 @@ const SOURCE = [
   `</pressable>`,
 ].join('\n');
 
-describe('a lowered Pressable and its descendants', () => {
+describe('a pressable tag and its descendants', () => {
   it('keeps committing a child update made in the same tick as a press', async () => {
     let presses = 0;
     let bump: (() => void) | undefined;
@@ -110,7 +109,7 @@ describe('a lowered Pressable and its descendants', () => {
         generate: 'client',
         fragments: 'tree',
         css: 'external',
-        filename: 'LoweredPressCommit.svelte',
+        filename: 'PressCommit.svelte',
       }).js.code,
     );
     const { default: Probe } = await import(`file://${OUT}`);

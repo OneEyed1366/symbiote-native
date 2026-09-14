@@ -183,16 +183,15 @@ function addStyle(out: Record<string, unknown>, style: unknown): void {
 // props expect: `style` keys are hoisted to the top level, event handlers and
 // undefined values are dropped.
 // RN HAS NO `value` FABRIC PROP. A TextInput's controlled value rides as the private `text` prop,
-// and the fold that produces it — `value ?? defaultValue` — lives in the component wrapper
-// (`core/components/src/view/render-text-input.ts`, whose own comment says "There is no `value`
-// Fabric prop; this is the whole controlled surface"). A LOWERED element has no wrapper, so a
-// transform printing the author's `value={x}` yields a key no ViewConfig declares: silently dropped,
-// `text` never set, and the field renders EMPTY. Nothing red anywhere — found 2026-08-31 by an agent
-// reading what the render function actually emits rather than trusting a header comment.
+// and the fold that produces it — `value ?? defaultValue` — used to live in the component wrapper.
+// A tag has no wrapper, so an author's `value={x}` would reach Fabric as a key no ViewConfig
+// declares: silently dropped, `text` never set, and the field renders EMPTY. Nothing red anywhere —
+// found 2026-08-31 by an agent reading what the render function actually emitted rather than
+// trusting a header comment.
 //
-// So the fold moves to the layer every path goes through, exactly like the aria fold above it. This
-// is the third instance of one rule: a lowered element inherits NOTHING its wrapper did, and the
-// repair belongs below the fork, never in the transform.
+// So the fold lives in the layer every path goes through, exactly like the aria fold above it. This
+// is the third instance of one rule: a tag inherits NOTHING a wrapper did, and the repair belongs
+// below the fork.
 //
 // GATED ON THE COMPONENT, NOT ON THE PROP. `value` is also a prop of `Switch` and `Slider`; a fold
 // keyed on the prop name would write a bogus `text` onto both. Two string comparisons rather than a
@@ -265,17 +264,17 @@ export function fabricProps(
   const out: Record<string, unknown> = {};
   // THE ONE POINT WHERE THE WHOLE BAG IS KNOWN ON EVERY PATH, which is what the aria fold needs:
   // `aria-checked` has to be folded against a sibling `accessibilityState`, and `routeProp` sees
-  // one key at a time. Both commit paths — create and update — reach here, so a lowered element
-  // gets the fold it has no wrapper to run.
+  // one key at a time. Both commit paths — create and update — reach here, so a tag gets the fold
+  // it has no wrapper to run.
   //
   // NOT memoised on the bag's identity. The host mutates it IN PLACE, so an identity-keyed cache
   // (the `processedStyle` pattern below) would be stale forever. The gate is the node's sticky flag
   // instead: one boolean read for a node with no alias, which is nearly all of them, and the fold's
   // own fast path returns by identity for the rest.
   const aliasFolded = node.hasAriaAlias ? foldAriaProps(nodeProps) : nodeProps;
-  // The behavior's own fold, for a LOWERED element only — the two folds above are keyed on the
-  // component name, which a wrapper and its lowered twin share, so neither could carry a
-  // per-primitive fold without running it twice on the wrapper. See IPayloadFold.
+  // The behavior's own fold, keyed on the TAG — the two folds above are keyed on the resolved
+  // component name, which several tags share (`pressable` and a plain `view` are both `RCTView`),
+  // so neither could carry a per-primitive fold. See IPayloadFold.
   const behaviorFolded =
     node.payloadFold !== undefined
       ? node.payloadFold(aliasFolded)

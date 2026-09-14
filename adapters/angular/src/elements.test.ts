@@ -77,11 +77,11 @@ const CASES: Record<string, ICase> = {
   Q_events_style_and_class: {
     source: fixture(
       'Q',
-      `<view class="a" [class]="value" [style]="style" [symbioteStyle]="parts" (layout)="hit()" (press)="hit()"></view>`,
+      `<view class="a" [class]="value" [style]="style" (layout)="hit()" (press)="hit()"></view>`,
       // `style` was `unknown` here while `[style]` belonged to Angular's styling engine, which
       // type-checks nothing. It is a declared input now, so the fixture has to hand it a real
       // style — which is the point of declaring it.
-      `style = { opacity: 1 }; parts = [{ opacity: 1 }];`,
+      `style = { opacity: 1 };`,
     ),
     expect: undefined,
   },

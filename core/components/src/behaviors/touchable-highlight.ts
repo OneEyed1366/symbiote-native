@@ -144,9 +144,8 @@ const refine: IPressConfigRefinement = (node, config) => {
   };
 };
 
-// `id -> nativeID`, the fold every un-lowered wrapper's `foldHostBag` already applies. Not read off
-// `HOST_PRIMITIVES`, matching `./touchable-opacity`'s own inline check — that spec entry is
-// deliberately withheld until this primitive's wrapper collapses to one node everywhere.
+// `id -> nativeID`, the same fold `foldHostBag` applies from the spec. Inline rather than read off
+// `HOST_PRIMITIVES`, matching `./touchable-opacity` — this primitive has no spec entry.
 const foldPayload: IPayloadFold = props => {
   const next: Record<string, unknown> = { ...props };
   if (Object.hasOwn(next, 'id')) {

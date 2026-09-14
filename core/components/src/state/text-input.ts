@@ -404,8 +404,8 @@ export type ITextInputProps = IAccessibilityProps &
   };
 
 // The callback surface AS A VALUE, so a test can enumerate it instead of restating it. A hand-kept
-// second list is exactly the drift that let `onValueChange` go a month without reaching the app on
-// the lowered path, so this one is derived: `Record` over the keys of the prop type above makes it
+// second list is exactly the drift that let `onValueChange` go a month without reaching the app,
+// so this one is derived: `Record` over the keys of the prop type above makes it
 // exhaustive in BOTH directions — a callback declared and not listed fails to compile, and a name
 // listed and not declared fails too.
 //
@@ -440,21 +440,12 @@ export const TEXT_INPUT_CALLBACK_NAMES: readonly string[] =
 // native view commands; isFocused is tracked JS-side from the focus/blur event pair (RN keeps
 // the same state in TextInputState (there is no native getter to query).
 //
-// IT IS A UNION, and that is the whole point of the type. The five TextInput methods below are
-// what the wrappers used to expose, and a wrapper that exposes ONLY those closes the node off —
-// so a component-path ref loses `measure`/`measureInWindow`/`measureLayout`/`setNativeProps`,
-// which every other primitive's ref hands over. A LOWERED element gives the bare node and loses
-// the other direction: no `clear`, `isFocused` or `setSelection`.
-//
-// So the two paths were not "lowering narrows the surface" but TWO DIFFERENT surfaces, and an app
-// crossed between them by writing `:multiline="isLong"` instead of `multiline` — a runtime
-// selector refuses lowering, a literal does not. Measured on Vue 2026-08-31, both paths, and the
-// same shape holds for every adapter: all five hand-rolled their handle and all five listed
-// exactly the same five names.
-//
-// The fix is the union rather than a refusal: refusing to lower a ref'd TextInput would only swap
-// which four methods go missing, and on `View`/`Text` — where a lowered ref is strictly BETTER,
-// handing back the node instead of a component instance — it would be a plain regression.
+// IT IS A UNION, and that is the whole point of the type. The five TextInput methods below are what
+// the wrappers used to expose, and a wrapper that exposed ONLY those closed the node off — its ref
+// lost `measure`/`measureInWindow`/`measureLayout`/`setNativeProps`, which every other primitive's
+// ref hands over. The bare node loses the other direction: no `clear`, `isFocused` or
+// `setSelection`. Measured on Vue 2026-08-31, and the same shape held for every adapter — all five
+// hand-rolled their handle and all five listed exactly the same five names.
 export type ITextInputHandle = {
   focus(): void;
   blur(): void;

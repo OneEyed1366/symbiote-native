@@ -4,10 +4,10 @@
 //
 // Costs React / Vue / Svelte nothing — each diffs props before calling the engine — but Solid has
 // no diff: a fine-grained effect re-runs whenever any signal it reads changes. Measured on device
-// 2026-08-23 (examples/solid, after host-primitive lowering): selecting one row of 1 000 read
+// 2026-08-23 (examples/solid, once its primitives were tags): selecting one row of 1 000 read
 // WRITES 1001 and a 10.3 ms reconcile window against Fabric's unmoved 0/0/10 — a thousand-node
-// dirty walk for two nodes' worth of change. Before lowering, the View component's splitProps/
-// mergeProps memos absorbed it; the wrapper was acting as a memoization barrier.
+// dirty walk for two nodes' worth of change. The View component's splitProps/mergeProps memos had
+// absorbed it until then; the wrapper was acting as a memoization barrier.
 //
 // Asserted TWICE per case, because the two halves fail in opposite directions. `writes` proves the
 // write was turned away; the CLONE count on the following commit proves the node was not MARKED —

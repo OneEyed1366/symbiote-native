@@ -50,9 +50,9 @@ function isRawText(node: ISymbioteNode): boolean {
 
 // RN's Text.js applies two defaults on the way to native (core/components/src/text-props.ts:
 // ellipsizeMode 'tail', allowFontScaling true unless literally false). The Vue <Text> wrapper
-// folded them with resolveTextProps; a template that the SFC transformer lowered to the
-// intrinsic `text` has no wrapper, so the renderer seeds them instead. Without this a
-// numberOfLines={1} line clips mid-word with no ellipsis — device-observed, and silent.
+// folded them with resolveTextProps; a `<text>` tag has no wrapper, so the renderer seeds them
+// instead. Without this a numberOfLines={1} line clips mid-word with no ellipsis — device-observed,
+// and silent.
 const TEXT_DEFAULTS: ReadonlyMap<string, unknown> = new Map<string, unknown>([
   ['ellipsizeMode', 'tail'],
   ['allowFontScaling', true],
@@ -64,10 +64,9 @@ function seedTextDefaults(node: ISymbioteNode): void {
 
 // RN's `id` is the modern W3C-named alias for `nativeID` — View.js copies it over
 // (`processedProps.nativeID = id`), so the two name ONE native prop. React folds it in its
-// component wrapper and Svelte and Solid in their transforms; Vue had it nowhere, so `<View
-// id="x">` reached Fabric with an unknown `id` and no `nativeID`, silently and on device only.
-// It lives in the renderer rather than in a transform because that covers all four Vue paths at
-// once — lowered SFC, lowered TSX, the component wrapper, and a hand-written
+// component wrapper and Svelte and Solid elsewhere; Vue had it nowhere, so `<view id="x">` reached
+// Fabric with an unknown `id` and no `nativeID`, silently and on device only. It lives in the
+// renderer because that covers every Vue path at once — SFC, TSX, and a hand-written
 // `h('view', { id })` no compiler ever sees.
 //
 // Caveat, and it matches what Solid's compile-time rename already does: with BOTH `id` and
@@ -142,8 +141,8 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       const descriptor = descriptorFor(type);
       // `type` as the third argument, not just `descriptor.component`: the behavior registry is
       // keyed by the INTRINSIC TAG (`pressable`), while a node only ever carries the
-      // resolved Fabric name (`RCTView`). This is the one place that still holds both, so a
-      // lowered primitive whose machine lives on the engine node can be matched at all.
+      // resolved Fabric name (`RCTView`). This is the one place that holds both, so a primitive
+      // whose machine lives on the engine node can be matched at all.
       const node = createElement(descriptor.component, descriptor.isText, type);
       if (descriptor.isText) seedTextDefaults(node);
       // The imperative public-instance API (measure / setNativeProps / focus / …) is already on

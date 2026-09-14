@@ -1,14 +1,11 @@
-// A HAND-WRITTEN intrinsic tag, in an ordinary Angular template — the only shape there is now that
-// no lowering transform stands between an app and the engine.
+// A HAND-WRITTEN intrinsic tag, in an ordinary Angular template — the only shape there is.
 //
-// This is deliberately NOT `lowering-equivalence.test.ts`. That file asks whether the two
-// SPELLINGS of a primitive agree, and answers it by mounting both. It cannot see the question
-// here, which is whether the bare spelling is usable AT ALL from app code: it supplies its own
-// fixture, so it never exercises the props, events and defaults an app actually binds, and it
-// compiles through JIT, which does not enforce `schemas` (measured — a bare `<view>` mounts clean
-// under JIT with no schema and no warning, while ngtsc rejects the same template outright). The
-// compile half therefore lives in its own file, `bare-intrinsic-tag-aot.test.ts`, and neither file
-// is sufficient alone: this one would stay green for a template no app could build.
+// The question is whether the tag is usable AT ALL from app code, so the templates below carry the
+// props, events and defaults an app actually binds. It mounts through JIT, which does not enforce
+// `schemas` (measured — a bare `<view>` mounts clean under JIT with no schema and no warning, while
+// ngtsc rejects the same template outright), so the COMPILE half lives in its own file,
+// `bare-intrinsic-tag-aot.test.ts`. Neither is sufficient alone: this one would stay green for a
+// template no app could build.
 //
 // EACH FIXTURE CARRIES THE SCHEMA ITS TAG GENUINELY NEEDS, and the two differ on purpose:
 //   dashless `<view>`          -> NO_ERRORS_SCHEMA      (nothing else compiles it)
@@ -27,6 +24,7 @@ import { createRequire } from 'node:module';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
 import { COMPONENT_DESCRIPTORS } from '@symbiote-native/components';
+import { ViewElement } from './elements';
 // SIDE-EFFECT IMPORT. `register.ts` installs the host behaviors, and a behavior's `foldPayload` is
 // the bare path's ONLY source for the folds a wrapper would otherwise apply — without it
 // `text-input`/`switch`/`image` below commit a payload missing every default. An app reaches this
@@ -55,9 +53,8 @@ const fabric = installFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-// Sampled rather than a fixed count, mirroring `lowering-equivalence.test.ts`: a half-built tree is
-// indistinguishable from a missing prop in the assertions below. The cap is a failure, not a
-// fallback.
+// Sampled rather than a fixed count: a half-built tree is indistinguishable from a missing prop in
+// the assertions below. The cap is a failure, not a fallback.
 const MAX_SETTLE_TICKS = 20;
 
 async function flushUntilSettled(): Promise<void> {
@@ -114,6 +111,10 @@ interface IMounted {
 async function mountTemplate(
   template: string,
   schema: typeof NO_ERRORS_SCHEMA | typeof CUSTOM_ELEMENTS_SCHEMA,
+  // The element directives, when the case is about what MATCHING one changes. An app imports them
+  // from the package barrel; a schema alone leaves the tag unmatched, which is a different shape
+  // and the reason `[style]` behaves differently in the two.
+  imports: readonly Type<unknown>[] = [],
 ): Promise<IMounted> {
   fabric.reset();
   nextRoot += 1;
@@ -125,6 +126,7 @@ async function mountTemplate(
     selector: `bare-tag-fixture-${root}`,
     standalone: true,
     schemas: [schema],
+    imports: [...imports],
     template,
   })
   class BareTagFixture {
@@ -153,7 +155,7 @@ async function mountTemplate(
 
 beforeEach(() => fabric.reset());
 
-describe('a bare intrinsic tag, hand-written, no lowering transform', () => {
+describe('a bare intrinsic tag, hand-written', () => {
   it('commits a real native view and folds id -> nativeID', async () => {
     const { node } = await mountTemplate(
       `<view [id]="'probe-id'" [testID]="'probe'"></view>`,
@@ -332,34 +334,39 @@ describe('the hyphenated spelling an ngtsc-checked template can use', () => {
   });
 });
 
-describe('style on a bare tag: what works and what cannot', () => {
-  it('takes a plain object [style], which Angular decomposes per key', async () => {
+// `[style]` is the ONLY spelling — there is no alias prop, and an app writes what RN writes. Which
+// of the two Angular routes carries it is decided by whether the element directive MATCHES, and
+// that is the whole content of this block.
+describe('[style] on a tag', () => {
+  it('takes a plain object through the schema route, decomposed per key', async () => {
     const { node } = await mountTemplate(
       `<view testID="probe" [style]="{ opacity: 1 }"></view>`,
       NO_ERRORS_SCHEMA,
     );
-    // Angular compiles `[style]` to ɵɵstyleMap -> one setStyle call per key; the renderer merges
-    // them back into the single `style` prop RN wants.
+    // Unmatched, `[style]` compiles to ɵɵstyleMap -> one setStyle call per key; the renderer merges
+    // them back into the single `style` prop RN wants. An object is the one shape that survives it.
     expect(node?.props.opacity).toBe(1);
   });
 
-  it('LIMITATION: an ARRAY [style] throws inside Angular, before the renderer sees it', async () => {
+  it('takes an ARRAY when the element directive matches', async () => {
+    const { node, thrown } = await mountTemplate(
+      `<view testID="probe" [style]="[{ opacity: 1 }, { margin: 2 }]"></view>`,
+      NO_ERRORS_SCHEMA,
+      [ViewElement],
+    );
+    expect(thrown).toBe('');
+    expect(node?.props).toMatchObject({ opacity: 1, margin: 2 });
+  });
+
+  // The control, and the reason `SymbioteElement` declares `style` at all: a declared input CLAIMS
+  // the binding at compile time so it never reaches the styling engine. Without the directive,
+  // ɵɵstyleMap parses its argument as a CSS string and calls `.indexOf` on it. Keeping both arms is
+  // what makes the case above a measurement rather than an assumption.
+  it('and throws inside Angular without it', async () => {
     const { thrown } = await mountTemplate(
       `<view testID="probe" [style]="[{ opacity: 1 }]"></view>`,
       NO_ERRORS_SCHEMA,
     );
-    // ɵɵstyleMap parses its argument as a CSS string and calls `.indexOf` on it. An RN StyleProp
-    // array never survives that, and no directive can reclaim the binding name — same constraint
-    // already recorded for a FUNCTION `[style]`. `[symbioteStyle]` below is the supported spelling;
-    // this case exists so the failure is a documented one rather than a device-only surprise.
     expect(thrown).toContain('indexOf is not a function');
-  });
-
-  it('takes an array through [symbioteStyle], the alias that dodges the styling engine', async () => {
-    const { node } = await mountTemplate(
-      `<view testID="probe" [symbioteStyle]="[{ opacity: 1 }, { margin: 2 }]"></view>`,
-      NO_ERRORS_SCHEMA,
-    );
-    expect(node?.props).toMatchObject({ opacity: 1, margin: 2 });
   });
 });

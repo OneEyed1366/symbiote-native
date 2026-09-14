@@ -65,33 +65,30 @@ class PlainHost {}
 })
 class ExplicitHost {}
 
-// THE LOWERED SPELLING, and the arm this file was missing for as long as it has existed.
+// THE UNMATCHED SPELLING, and the arm this file was missing for as long as it has existed.
 //
-// Everything above mounts `<text>`, the @Component — the path that already folds the defaults. A
-// LOWERED `<text>` has no component behind it: `resolveTextProps` lives in
-// `../primitives`, which is exactly what lowering routes around. So the two tests above were green
-// while the lowered path shipped text that truncates with no ellipsis, device-observed once
-// already on examples/svelte.
+// Everything above mounts `<text>` with the component in `imports` — the path that already folds
+// the defaults. With no component behind it the tag reaches the engine alone, and `resolveTextProps`
+// lives in `../primitives`. So the two tests above were green while a bare `<text>` shipped text
+// that truncates with no ellipsis, device-observed once already on examples/svelte.
 //
 // `schemas: [CUSTOM_ELEMENTS_SCHEMA]` with `TextHost` absent from `imports` is load-bearing and is
 // the whole reason this needs its own component: Angular's primitive host matches the tag itself
 // (`selector: 'text'`) and directive matching is resolved per TEMPLATE, so importing TextHost
-// anywhere in this template would make `<text>` resolve straight back to the component
-// and the test would assert the wrapper path twice under two spellings
-// (`.claude/rules/host-primitive-tier.md`).
+// anywhere in this template would make `<text>` resolve straight back to the component and the test
+// would assert the same path twice under two spellings.
 //
-// The other four adapters satisfy this in three different ways — Svelte folds at compile time from
-// the spec's `defaults`, Vue and Solid seed in the renderer, React never lowers. That is why the
-// assertion is on the COMMITTED PAYLOAD and not on any transform's output: a check on the emitted
-// text would report the two runtime-seeding adapters as broken. Phrase the oracle as the
-// capability — does a lowered Text commit these two keys — and all five become comparable.
+// The other four adapters satisfy this in two different ways — Svelte folds from the spec's
+// `defaults`, Vue and Solid seed in the renderer. That is why the assertion is on the COMMITTED
+// PAYLOAD: phrase the oracle as the capability — does a bare `<text>` commit these two keys — and
+// all five become comparable.
 @Component({
-  selector: 'symbiote-text-defaults-lowered',
+  selector: 'symbiote-text-defaults-bare',
   standalone: true,
-  template: `<text testID="lowered">clamped</text>`,
+  template: `<text testID="bare">clamped</text>`,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
-class LoweredHost {}
+class BareTagHost {}
 
 describe('Angular Text RN defaults', () => {
   it("defaults ellipsizeMode to 'tail' and allowFontScaling to true", async () => {
@@ -123,17 +120,17 @@ describe('Angular Text RN defaults', () => {
     expect(node?.props.allowFontScaling).toBe(false);
   });
 
-  it('applies the same defaults to a LOWERED text', async () => {
-    mount(ROOT_TAG, LoweredHost);
+  it('applies the same defaults to a text tag with no component behind it', async () => {
+    mount(ROOT_TAG, BareTagHost);
     await waitUntil(
-      () => committed('lowered') !== undefined,
-      'lowered text commits',
+      () => committed('bare') !== undefined,
+      'the bare text commits',
     );
 
-    const node = committed('lowered');
+    const node = committed('bare');
     expect(node).toBeDefined();
     // Six of these — two keys on each of a benchmark row's three Text nodes — are the entire
-    // prop-key gap that made Angular's lowered column incomparable to every other adapter's.
+    // prop-key gap that made Angular's column incomparable to every other adapter's.
     expect(node?.props.ellipsizeMode).toBe('tail');
     expect(node?.props.allowFontScaling).toBe(true);
   });

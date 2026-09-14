@@ -11,14 +11,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-// The press machine is keyed by intrinsic tag and installed only by this module. Without it a
-// lowered element has no listeners at all and every assertion below fails as if the engine were
-// broken — a false red that cost one wrong diagnosis today.
+// The press machine is keyed by intrinsic tag and installed only by this module. Without it the tag
+// has no listeners at all and every assertion below fails as if the engine were broken — a false
+// red that cost one wrong diagnosis today.
 import '../register';
 import { mount, unmount } from '../render';
 
 const ROOT_TAG = 617;
-const TARGET = 'lowered-active-target';
+const TARGET = 'active-class-target';
 const TOUCH_START = 'topTouchStart';
 const TOUCH_END = 'topTouchEnd';
 const TOUCH_IDENTIFIER = 7;
@@ -104,7 +104,7 @@ afterEach(() => {
   clearGlobalStyles();
 });
 
-describe('a LOWERED Pressable resolves :active', () => {
+describe('a pressable tag resolves :active', () => {
   it('dims on touch-down and restores on lift, keeping the authored style', async () => {
     mount(ROOT_TAG, () => (
       <pressable
@@ -133,10 +133,9 @@ describe('a LOWERED Pressable resolves :active', () => {
     expect(findCommitted().props.opacity, 'released').toBe(1);
   });
 
-  // The OTHER half of the lowered surface: a functional `style={({pressed}) => …}` is specialised by
-  // the transform into a resting `style` plus an `activeStyle`, which the engine swaps into SLOT 1
-  // while pressed. Nothing else covers it, and it is the idiom the ecosystem writes — the CSS route
-  // above is the one an app has to be migrated to.
+  // The OTHER half of the surface: a functional `style={({pressed}) => …}` resolves to a resting
+  // `style` plus an `activeStyle`, which the engine swaps into SLOT 1 while pressed. Nothing else
+  // covers it, and it is the idiom the ecosystem writes — the CSS route above is the cheaper one.
   it('swaps the specialised activeStyle in while pressed', async () => {
     mount(ROOT_TAG, () => (
       <pressable

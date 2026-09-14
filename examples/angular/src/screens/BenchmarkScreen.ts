@@ -118,10 +118,10 @@ const ROW_BATCH_LARGE = 10000;
 // instead of asserted.
 //
 // The engine-node currency is different and HIGHER, and that gap is the measurement, not noise:
-// Vue/Svelte/Solid lower TextInput to a bare intrinsic and pay zero retained anchors for it;
-// Angular has no TextInput lowering, so its `<TextInput>` costs its own component anchor plus one
-// more per branch of its internal `@if (isMultiline) {…} @else {…}` — +4 engine nodes / +3
-// anchors per row on top of the one Fabric view, measured directly in
+// every other adapter writes `<text-input>` as a bare intrinsic and pays zero retained anchors for
+// it; Angular's `<TextInput>` component costs its own anchor plus one more per branch of its
+// internal `@if (isMultiline) {…} @else {…}` — +4 engine nodes / +3 anchors per row on top of the
+// one Fabric view, measured directly in
 // `adapters/angular/src/__tests__/benchmark-row-shape.test.ts` ('adds exactly one native view per
 // row (the TextInput), nothing else'). `NATIVE_VIEWS_PER_ROW` counts Fabric only.
 const NATIVE_VIEWS_PER_ROW = 10;
@@ -143,7 +143,7 @@ type IMountMode = (typeof MOUNT_MODE)[keyof typeof MOUNT_MODE];
 
 // Angular has exactly one row shape, the same instrument every other adapter's canary is: a row
 // component and two real <Pressable>s, plus the unconditional <TextInput> below. It used to carry
-// four switchable shapes (`composed`/`flat`/`lowered`/`composed-lowered`) built to isolate whether
+// four switchable shapes built to isolate whether
 // Angular's ~3x Create gap against its siblings was composed-component anchors, Angular's own
 // LView/TView/DI machinery, or Pressable instantiation specifically — none of that decomposition
 // ran to a device conclusion, and a benchmark with a shape-changing control is not one ruler across

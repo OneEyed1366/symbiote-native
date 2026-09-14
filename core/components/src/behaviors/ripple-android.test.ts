@@ -1,13 +1,13 @@
-// The Android ripple on a LOWERED Pressable, which needs `Platform.OS === 'android'` to exist at
-// all — `rippleProps` returns undefined anywhere else, so this cannot live in the iOS-default
-// suite next door and is its own file with its own mock. Same shape as
+// The Android ripple on a `<pressable>`, which needs `Platform.OS === 'android'` to exist at all —
+// `rippleProps` returns undefined anywhere else, so this cannot live in the iOS-default suite next
+// door and is its own file with its own mock. Same shape as
 // `adapters/react/src/modules/status-bar/status-bar-android.test.tsx`.
 //
-// WHAT IT IS PINNING. Our Pressable WRAPPER paints the ripple through a dedicated inner View,
+// WHAT IT IS PINNING. Our old Pressable WRAPPER painted the ripple through a dedicated inner View,
 // mirroring TouchableNativeFeedback — and read literally that makes the ripple impossible on a
-// lowered element, which is a single node with no child. RN's own `Pressable` does not do that: it
-// spreads the ripple's `viewProps` onto its own View (`Pressable.js:251`), so the background is an
-// ordinary prop of the responder. This asserts the lowered path takes RN's shape.
+// single node with no child. RN's own `Pressable` does not do that: it spreads the ripple's
+// `viewProps` onto its own View (`Pressable.js:251`), so the background is an ordinary prop of the
+// responder. This asserts the tag takes RN's shape.
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@symbiote-native/engine', async () => {
@@ -31,7 +31,7 @@ registerPressableBehavior();
 let nextRootTag = 9800;
 const TEST_ID = 'subject';
 
-function commitLowered(
+function commitTag(
   props: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {
   const node = createElement('RCTView', false, PRESSABLE_TAG);
@@ -56,7 +56,7 @@ function commitLowered(
   return found;
 }
 
-describe('a lowered Pressable carries its own Android ripple', () => {
+describe('a pressable tag carries its own Android ripple', () => {
   // CONTROL, and it is not decorative: this whole file is a mock of one field, and if the mock
   // failed to apply, `rippleProps` would return undefined and every case below would pass by
   // asserting the absence of something that was never built. Pin that the platform really moved.
@@ -65,7 +65,7 @@ describe('a lowered Pressable carries its own Android ripple', () => {
   });
 
   it('resolves the config onto the element itself, not a child', () => {
-    const props = commitLowered({
+    const props = commitTag({
       android_ripple: { color: '#ff0000', borderless: true, radius: 12 },
     });
 
@@ -78,7 +78,7 @@ describe('a lowered Pressable carries its own Android ripple', () => {
   });
 
   it('honours foreground, which picks the other native prop', () => {
-    const props = commitLowered({
+    const props = commitTag({
       android_ripple: { color: '#00ff00', foreground: true },
     });
 
@@ -87,7 +87,7 @@ describe('a lowered Pressable carries its own Android ripple', () => {
   });
 
   it('does not send the raw config, which is not a native prop', () => {
-    const props = commitLowered({ android_ripple: { color: '#fff' } });
+    const props = commitTag({ android_ripple: { color: '#fff' } });
 
     expect(Object.keys(props)).not.toContain('android_ripple');
   });

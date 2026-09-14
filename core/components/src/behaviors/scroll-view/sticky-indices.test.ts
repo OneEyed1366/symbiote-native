@@ -1,4 +1,4 @@
-// `stickyHeaderIndices` on the lowered path — the COMPATIBILITY half of sticky headers, for apps
+// `stickyHeaderIndices` — the COMPATIBILITY half of sticky headers, for apps
 // written against RN's own API rather than against our `<sticky-header>` tag.
 //
 // WHAT IS NEW HERE, and it is only the selection: the pin, the debounce, the cross-talk and the

@@ -329,9 +329,8 @@ type ICommittedShape = {
 // `accessible: true` while the flat row's stand-in — a bare `<view (press)>` — correctly does not:
 // RN's View has no such default. It is the first prop on which the flat row's deliberate surrender
 // of Pressable's accessibility fold is VISIBLE, every earlier one being absent-when-unset. That the
-// composed side really does commit it is pinned by pressable.test.ts and lowering-equivalence.test.ts,
-// so subtracting it here loses no coverage. Delete this when the flat row stops standing in for a
-// Pressable.
+// composed side really does commit it is pinned by pressable.test.ts, so subtracting it here loses
+// no coverage. Delete this when the flat row stops standing in for a Pressable.
 // `focusable` joined it 2026-09-09 for the identical reason and it is the sharper case: RN's
 // Touchable* formula (TouchableOpacity.js:336-340) needs a press handler and a non-disabled state,
 // and the composed row supplies both — while a bare `<view (press)>` has no Pressable to compute

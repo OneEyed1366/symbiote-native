@@ -136,9 +136,9 @@ export type {
 // across adapters has to hang off this, not off a per-framework lifecycle hook, or it measures a
 // different quantity in each one under the same name.
 export { registerPostCommit, unregisterPostCommit } from './post-commit';
-// The aria/role -> accessibility* fold. Lives here rather than in a component wrapper because a
-// LOWERED element has no wrapper: `fabricProps` runs it on the way to the payload, so every path
-// gets it. `core/components`' typed `resolveAccessibilityProps` delegates to this one.
+// The aria/role -> accessibility* fold. Lives here rather than in a component wrapper because a tag
+// has none: `fabricProps` runs it on the way to the payload, so every path gets it.
+// `core/components`' typed `resolveAccessibilityProps` delegates to this one.
 export { ARIA_ALIAS_KEYS, foldAriaProps } from './accessibility-props';
 // The payload builder, exported for the HOST rather than for an app: the engine holds no tree, so
 // whoever built the bag calls this on the way to `createNode`. Headlessly that is the TypeScript

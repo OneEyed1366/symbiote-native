@@ -142,8 +142,8 @@ function isPressHandler(value: unknown): value is IPressHandler {
 
 // The props the MACHINE consumes and the host must never see. The wrapper drops them by
 // destructuring — they go into `createPressHandlers` / `buildPressableListeners` and are simply
-// absent from the object it spreads onto its View. A lowered element has no destructure, so every
-// one of them rode into the payload as a key no ViewConfig declares.
+// absent from the object it spreads onto its View. A tag has no destructure, so every one of them
+// rode into the payload as a key no ViewConfig declares.
 const MACHINE_ONLY_KEYS = [
   // Consumed below and replaced by the resolved `nativeBackgroundAndroid` /
   // `nativeForegroundAndroid`; the raw config is not a native prop.
@@ -207,15 +207,15 @@ function foldPayload(
     typeof props.disabled === 'boolean' ? props.disabled : undefined,
   );
 
-  // The Android ripple. Our WRAPPER paints it through a dedicated inner View, mirroring
-  // TouchableNativeFeedback — and that reading is what made this look unfixable for a lowered
-  // element, which has no child to put it on. RN's own `Pressable` does NOT do that: it spreads
+  // The Android ripple. Our old WRAPPER painted it through a dedicated inner View, mirroring
+  // TouchableNativeFeedback — and that reading is what made this look unfixable for a tag, which has
+  // no child to put it on. RN's own `Pressable` does NOT do that: it spreads
   // `useAndroidRippleForView`'s `viewProps` onto its own View (`Pressable.js:251`), so the ripple
   // background is an ordinary prop of the responder itself and a single node carries it fine.
   //
   // `rippleProps` returns undefined off Android, so this whole branch is inert on iOS.
   //
-  // STILL MISSING ON BOTH PATHS, and lowering did not cause it: RN also dispatches
+  // STILL MISSING, and it always was: RN also dispatches
   // `Commands.hotspotUpdate(x, y)` on pressIn/pressMove and `Commands.setPressed` on
   // pressIn/pressOut, which is what makes the ripple originate at the touch point. Neither our
   // wrapper nor this behavior sends them — grep for `hotspotUpdate` returns nothing in the tree.
@@ -227,7 +227,7 @@ function foldPayload(
   for (const key of MACHINE_ONLY_KEYS) delete out[key];
   if (ripple !== undefined) Object.assign(out, ripple);
   // Written only when the fold produced something: an unconditional assignment would put an
-  // `accessibilityState: undefined` key on every lowered Pressable in the tree, and `fabricProps`
+  // `accessibilityState: undefined` key on every pressable in the tree, and `fabricProps`
   // skipping undefined is a coincidence to lean on, not a contract to rely on here.
   if (resolved !== undefined) out.accessibilityState = resolved;
   out.accessible = accessibleUnlessOptedOut(props);
@@ -243,11 +243,8 @@ function foldPayload(
 // (`TouchableOpacity.js:303`, `TouchableHighlight.js:337`). `!== false` rather than `?? true`, so
 // only a literal `false` opts out and an explicit `undefined` still reads as accessible.
 //
-// Nothing in this repo did it until 2026-09-09, on either path, so a Pressable reached a screen
-// reader as a plain view unless the app wrote the prop. Landing it in the fold above alone reddens
-// four equivalence arms — correctly, since those compare the wrapper against the lowered path — so
-// the behavior and every adapter's wrapper have to move in ONE change. Exported for the wrappers
-// that need to say it themselves, and for the tags whose behavior is their only path.
+// Nothing in this repo did it until 2026-09-09, so a Pressable reached a screen reader as a plain
+// view unless the app wrote the prop. Exported so anything composing this tag can say it too.
 export function accessibleUnlessOptedOut(
   props: Readonly<Record<string, unknown>>,
 ): boolean {

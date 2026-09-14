@@ -37,15 +37,7 @@ const PRIMITIVE_SELECTORS = new Set([
   'horizontal-scroll-content',
   'text-input',
   'text-input-multiline',
-  // The COMPONENT path's pair. Only a lowering transform may emit the plain tags above — those
-  // carry the engine's TextInput machine, and this adapter's own component runs that state in
-  // its template. See `core/components/src/component-names/shared.ts`.
-  'text-input-managed',
-  'text-input-multiline-managed',
   'switch',
-  // The component path's spelling — same native view, a tag the engine's Switch behavior does
-  // not carry. See `core/components/src/component-names/shared.ts`.
-  'switch-managed',
   // The centering RCTView RN wraps the spinner in — the tag an app writes — plus the native
   // spinner the ActivityIndicator behavior builds under it.
   'activity-indicator',

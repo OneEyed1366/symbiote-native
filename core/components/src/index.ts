@@ -45,11 +45,8 @@ export type {
   ICrossTypedIntrinsics,
 } from './component-names/shared';
 
-export { renderSwitch } from './view/render-switch';
 export type {
   ISwitchProps,
-  ISwitchViewProps,
-  ISwitchPlatform,
   ISwitchTrackColor,
   ISwitchChangeEvent,
 } from './view/render-switch';
@@ -149,8 +146,7 @@ export { imageStatics, setImageSourceResolver } from '@symbiote-native/engine';
 // No render fn: the only composition this primitive had is the two nodes the behavior builds, so
 // `view/render-image-background.ts` went with the wrappers — same as ActivityIndicator's.
 
-// InputAccessoryView: render-only host assembly (nativeID/backgroundColor).
-export { renderInputAccessoryView } from './view/render-input-accessory-view';
+// InputAccessoryView: the nativeID/backgroundColor fold its behavior applies.
 export type { IInputAccessoryViewViewProps } from './view/render-input-accessory-view';
 
 // Modal: full 3-layer split (state machine gates the iOS keep-alive frame).
@@ -330,8 +326,6 @@ export type {
   ITextInputChangeEvent,
 } from './state/text-input';
 export { keyboardTypeForInputMode } from './state/text-input';
-export { renderTextInput } from './view/render-text-input';
-export type { ITextInputViewProps } from './view/render-text-input';
 
 // VirtualizedList family: the framework-agnostic windowing engine + data shapes. Lists
 // have NO view/render-*.ts (the cell content is the framework's own children, so there is

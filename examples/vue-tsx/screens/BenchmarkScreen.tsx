@@ -429,9 +429,9 @@ const BenchmarkRow = defineComponent<IBenchmarkRowProps>(
         </pressable>
         {/* UNCONDITIONAL, and it used to sit behind a row-shape toggle so one TextInput could be
           priced as a delta. That number has been taken; a second arm only splits every later
-          measurement in two. No multiline / onChangeText / ref: each makes the lowering transform
-          refuse, and the lowered element is what is being measured. `value`, not `defaultValue`:
-          a CONTROLLED input runs the behavior's afterCommit handshake on every commit. */}
+          measurement in two. No multiline / onChangeText / ref: each adds work this row is not
+          measuring. `value`, not `defaultValue`: a CONTROLLED input runs the behavior's afterCommit
+          handshake on every commit. */}
         <text-input class="bench-row-input" value={props.row.label} />
       </view>
     );

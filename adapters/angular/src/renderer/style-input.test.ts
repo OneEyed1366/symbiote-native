@@ -1,17 +1,17 @@
-// The receiving half of the lowering transform's `[style]` -> `[symbioteStyle]` rename.
+// `[style]` carrying an RN StyleProp ARRAY, which is the shape Angular's own styling engine cannot
+// represent: it decomposes the value key by key, so `applyStyling` uses each array element as a
+// style KEY and throws inside change detection. Device-diagnosed 2026-09-02 on ImageBackground.
 //
-// Angular routes a `style` binding to its own CSS styling engine, which decomposes the value key
-// by key and cannot represent an RN StyleProp — an ARRAY makes `applyStyling` use each element as
-// a style KEY and throw inside change detection. A component `@Input()` shadows that instruction;
-// a lowered element has none, so the transform emits the binding under a different name and the
-// renderer folds it back here. Device-diagnosed 2026-09-02 on ImageBackground.
-//
-// The array case is the one that used to crash, so it is the one asserted.
+// What makes it work is that `SymbioteElement` DECLARES `style` as an input, so a matched element
+// claims the binding at compile time and it never reaches that engine — it arrives at
+// `Renderer2.setProperty` like any other prop. This file mounts through the real directive and
+// asserts the array survives; `bare-intrinsic-tag.test.ts` holds the unmatched arm that throws.
 import '@angular/compiler';
 import { CUSTOM_ELEMENTS_SCHEMA, Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
 
+import { ViewElement } from '../elements';
 import { mount, unmount } from '../render';
 
 const ROOT_TAG = 934;
@@ -20,12 +20,13 @@ const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 @Component({
-  selector: 'style-alias-host',
+  selector: 'style-input-host',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<view testID="probe" [symbioteStyle]="style"></view>`,
+  imports: [ViewElement],
+  template: `<view testID="probe" [style]="style"></view>`,
 })
-class StyleAliasHost {
+class StyleInputHost {
   readonly style = [{ opacity: 0.5 }, { width: 12 }];
 }
 
@@ -56,9 +57,9 @@ function probeNode(): ICommitted {
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-describe('symbioteStyle on a lowered element', () => {
+describe('[style] on a matched element', () => {
   it('commits as the node style, array and all', async () => {
-    mount(ROOT_TAG, StyleAliasHost);
+    mount(ROOT_TAG, StyleInputHost);
     await tick();
 
     // Style declarations are hoisted into the payload itself, so there is no `style` key to read

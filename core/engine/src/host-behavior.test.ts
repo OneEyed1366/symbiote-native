@@ -294,7 +294,7 @@ describe('attachAfterCommit', () => {
 // The RECURRING beat, for a behavior whose contract is driven by a PROP rather than by an event.
 // A controlled TextInput is the case: RN commands the text back down when the app's `value`
 // diverges from what native last reported, and in a component the render is what re-runs that
-// comparison. A lowered element has no render, so the commit is the only equivalent.
+// comparison. A tag has no render, so the commit is the only equivalent.
 describe('afterCommit', () => {
   interface IRecurringLog extends ILog {
     order: string[];

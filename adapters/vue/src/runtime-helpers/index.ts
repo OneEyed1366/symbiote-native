@@ -6,8 +6,8 @@
 // real HTMLElement - we have no DOM, so this module supplies our OWN implementation under the
 // same export name instead of leaving `v-show` a silent no-op.
 //
-// Scope: Vue's own template directives (v-show, Teleport) and, since host-primitive lowering
-// landed, `v-model` on an ELEMENT — see vModelText below for why that stopped being out of scope.
+// Scope: Vue's own template directives (v-show, Teleport) and `v-model` on an ELEMENT — see
+// vModelText below for why that is in scope.
 
 export * from '@vue/runtime-core';
 
@@ -102,12 +102,10 @@ export function normalizeProps(
 // contract reads it (`Pressable.js`: `ViewStyleProp | ((state) => ViewStyleProp)` — the callback is
 // top-level, never an array element, so `:style="[a, fn]"` is out of contract here exactly as it is
 // there, and is deliberately NOT rescued).
-// The THIRD door, and the one that decides whether the state-style split can leave the transforms
-// at all. A `:style` binding on a lowered element compiles to `_normalizeStyle(expr)` whenever the
-// compiler cannot keep it on the cheap patch-flag path — an inline arrow and a call expression both
-// do, a bare identifier does not. So `<Pressable :style="({pressed}) => …" />` loses its callback
-// here, and today nothing notices because the lowering transform rewrites that attribute into a
-// resting/active pair before Vue ever emits the helper.
+// The THIRD door. A `:style` binding compiles to `_normalizeStyle(expr)` whenever the compiler
+// cannot keep it on the cheap patch-flag path — an inline arrow and a call expression both do, a
+// bare identifier does not. So `<pressable :style="({pressed}) => …">` would lose its callback here
+// without the rescue below.
 //
 // A TOP-LEVEL function is preserved; one nested inside an array is not, and that asymmetry is the
 // contract rather than an omission. React Native types the prop
@@ -154,7 +152,7 @@ export const vShow: ObjectDirective<ISymbioteNode, boolean> = {
   unmounted: el => pendingShowCommits.get(el)?.(),
 };
 
-// `v-model` on an ELEMENT, which is what a lowered `<TextInput>` now is. Device-found 2026-08-31 in
+// `v-model` on an ELEMENT, which is what `<text-input>` is. Device-found 2026-08-31 in
 // examples/vue-sfc's canary: the field echoed keystrokes and the greeting beside it never left
 // "Hello, stranger".
 //
@@ -167,9 +165,8 @@ export const vShow: ObjectDirective<ISymbioteNode, boolean> = {
 //   }), [[_vModelText, name.value]])
 //
 // Measured identical on BOTH Vue paths — `@vue/compiler-sfc` and `babel-jsx.cjs` emit the same two
-// lines — which is why the repair is here and not in the two lowering transforms. One runtime
-// implementation also covers a hand-written `h('text-input', …)`, the fourth path, exactly
-// as `PROP_ALIASES` covers all four for `id` -> `nativeID`.
+// lines — which is why one runtime implementation also covers a hand-written `h('text-input', …)`,
+// exactly as `PROP_ALIASES` covers every path for `id` -> `nativeID`.
 //
 // AND IT FAILED SILENTLY, which is the part worth remembering. `vModelText` lives in
 // @vue/runtime-dom, so the compiled import resolved to `undefined` here — and `withDirectives`
@@ -201,8 +198,7 @@ interface IModelState {
   // render, so a captured one goes stale against the current closure.
   assign: IModelAssign | undefined;
   // Whatever the app itself bound to `onValueChange`. `v-model` and `@value-change` on one element
-  // both work on the component path (the wrapper emits both), so lowering must not make them
-  // exclusive — the wrapper below calls the app's first, then assigns.
+  // must not be exclusive — the wrapper below calls the app's listener first, then assigns.
   appListener: IValueChangeListener | undefined;
   trim: boolean;
   number: boolean;
@@ -287,7 +283,7 @@ function syncModelListener(el: ISymbioteNode, state: IModelState): void {
 }
 
 // Vue's compiler picks the directive by ELEMENT, and for anything it does not recognise as a DOM
-// input it emits `vModelText` — including a lowered `<switch>`. Stringifying there is what
+// input it emits `vModelText` — `<switch>` included. Stringifying there is what
 // upstream must do (a DOM input's value IS a string) and what we must not: the Switch behavior
 // reads `props.value === true`, so `String(true)` pins the control OFF and no tap can move it.
 // Device-confirmed on `examples/vue-sfc` 2026-09-02, both switches on `CanaryScreen`.
@@ -428,7 +424,7 @@ type IEventHandler<TEvent> = ((event: TEvent, ...args: never[]) => unknown) & {
  * (for a compiler-generated call site that could pass a falsy handler) isn't reflected in the
  * type there either.
  *
- * `@press.self` on a LOWERED element reaches this, and both halves were measured 2026-09-11 rather
+ * `@press.self` on an element reaches this, and both halves were measured 2026-09-11 rather
  * than assumed — the question arose because a modifier on a COMPONENT takes Vue's own event path
  * and only an element emits the helper. `<pressable @press.self>` compiles to
  * `_withModifiers(fn, ["self"])` imported `from "@symbiote-native/vue/runtime-helpers"` (the Metro

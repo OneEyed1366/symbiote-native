@@ -138,8 +138,8 @@ export interface ISymbioteNode {
   // is a read through `tree-host.ts`. The buffer is what tells the host; nothing here mirrors it.
 
   // "A `role` or `aria-*` key has been written here at least once." The gate for the aria fold
-  // (`accessibility-props.ts`), which `fabricProps` runs on the way to the payload so a LOWERED
-  // element gets it too - it has no component wrapper to run it in.
+  // (`accessibility-props.ts`), which `fabricProps` runs on the way to the payload because a tag
+  // has no component wrapper to run it in.
   //
   // A FIELD rather than the fold's own 15-property probe, because the probe is per COMPONENT
   // INSTANCE where this is per NODE PER BUILD: ~9 000 nodes on a create, 135 000 property reads to
@@ -155,11 +155,10 @@ export interface ISymbioteNode {
   // point where the whole bag is known.
   //
   // WHY IT HANGS OFF THE BEHAVIOR AND NOT OFF `node.component`, which is how the aria and
-  // value->text folds next to it are keyed. A wrapper and its lowered twin commit the SAME Fabric
-  // view name — `RCTSinglelineTextInputView` for both `text-input` and
-  // `text-input-managed` — so a fold keyed on the component name runs on both, and the
-  // wrapper has already folded in its own body. Double-folding is the hazard. A behavior attaches
-  // to the LOWERED tag alone, so it is the discriminator that already exists.
+  // value->text folds next to it are keyed. Several tags commit the SAME Fabric view name —
+  // `pressable`, `touchable-opacity` and a plain `view` are all `RCTView` — so a fold keyed on the
+  // component name would run on every one of them. A behavior attaches per TAG, which is the
+  // discriminator that already exists.
   payloadFold: IPayloadFold | undefined;
   // The declarative halves of this node's style — see IClassStyleParts and commitClassStyle below.
   // `undefined` until the node's first class/style write, so a node nobody styles carries a slot
@@ -178,8 +177,8 @@ export interface ISymbioteNode {
   //
   // A host primitive that is a COMPOSITION — ScrollView is a scroll view wrapping a content view —
   // has structure the app never wrote and must never see. In a component that structure lives in
-  // the wrapper's body, which is exactly the per-instance cost lowering exists to delete; on the
-  // host path the behavior builds it once at attach (`IHostBehavior.buildStructure`) and points
+  // a wrapper's body, which is exactly the per-instance cost a tag exists to delete; here the
+  // behavior builds it once at attach (`IHostBehavior.buildStructure`) and points
   // this at the node the app's own children belong under. `appendChild` / `insertBefore` /
   // `removeChild` then redirect, so the adapter keeps calling them with the OWNER and never learns
   // that a slot exists. The browser's twin is a UA shadow tree: `<video>`'s controls are real nodes
@@ -220,7 +219,7 @@ export interface ISymbioteNode {
   // They are PROTOTYPE methods on every node rather than closures grafted per node, and that is a
   // measured decision, not a style one. toPublicInstance used to Object.assign six closures onto
   // each node; on a 1 000-row benchmark press that is 54 000 closures plus 9 000 discarded object
-  // literals, each closure pinning its own context alive - and after the Vue lowering landed, GC
+  // literals, each closure pinning its own context alive - and once Vue's primitives became tags, GC
   // was 30% of the create window and the single biggest bucket in the profile. A prototype costs
   // one object for the whole process. Vue, Solid and Svelte all grafted eagerly and all pay this;
   // React grafts lazily in getPublicInstance and never did.
@@ -234,9 +233,9 @@ export interface ISymbioteNode {
   setNativeProps(nativeProps: Record<string, unknown>): void;
   focus(): void;
   blur(): void;
-  // The scroll commands, on every node for the same reason `focus`/`blur` are: a lowered primitive
-  // hands the app its engine NODE, so anything the wrapper's imperative handle offered has to be
-  // reachable from here or the surface silently shrinks when a primitive stops being a component.
+  // The scroll commands, on every node for the same reason `focus`/`blur` are: a tag hands the app
+  // its engine NODE, so anything a wrapper's imperative handle offered has to be reachable from
+  // here or the surface silently shrinks.
   //
   // ON THE SHARED PROTOTYPE, not per-tag, and that is a trade rather than an oversight. The
   // browser's shape is per-tag — `HTMLVideoElement.play` is not on `HTMLElement` — and it is
@@ -336,8 +335,8 @@ class SymbioteNode implements ISymbioteNode {
   }
 
   // The defaults live HERE and nowhere else. `buildScrollViewHandle`
-  // (`@symbiote-native/components`) used to own them and now delegates, so the wrapper's handle and
-  // a lowered element's node cannot drift on what `scrollTo()` with no argument means.
+  // (`@symbiote-native/components`) delegates here, so a built handle and a node cannot drift on
+  // what `scrollTo()` with no argument means.
   scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void {
     const x = options?.x ?? 0;
     const y = options?.y ?? 0;
@@ -380,7 +379,7 @@ export function createElement(
   isText = false,
   // The intrinsic tag this node came from, when it differs from the Fabric view name above. The
   // behavior registry is keyed by tag and the node only ever carries the resolved name, so an
-  // adapter lowering `<Pressable>` has to hand the tag over here or the registration cannot fire
+  // adapter creating a `<pressable>` has to hand the tag over here or the registration cannot fire
   // (host-behavior.ts, `attached`). Nothing is stored — the lookup happens once, right below.
   tag: string = component,
 ): ISymbioteNode {
@@ -760,8 +759,8 @@ export function setEventListener(
   // without this the two evict each other and the last writer wins with no diagnostic; and the
   // keys at stake are the ones a gesture STARTS on, so the loser is silently pressless. The
   // component wrapper used to mediate this by destructuring the app's callbacks out before they
-  // reached the node; lowering removes the mediator. Gated on the boolean first, so an app with no
-  // behavior registered pays one read.
+  // reached the node; a tag has no mediator. Gated on the boolean first, so an app with no behavior
+  // registered pays one read.
   if (hasHostBehaviors() && ownsListener(node, name)) {
     // The PRESENCE only, never the identity: listeners deliberately do not notify (a framework
     // hands a fresh closure nearly every render — see `markDirty`'s note on why that must stay
@@ -864,18 +863,15 @@ export interface IClassStyleParts {
   // WRITE to serve a state almost no node is ever in is the trade this project keeps refusing.
   className: IClassNameValue | undefined;
   isPressed: boolean;
-  // The pressed variant of the EXPLICIT style, supplied by a compiler rather than by the class
-  // registry. A functional `style={({pressed}) => …}` is the shape every framework's community
-  // writes, and it forces the primitive to stay a COMPONENT because the template reads the press
-  // state. Specialising that arrow at both values of `pressed` — a build-time AST substitution,
-  // not an evaluation — turns it into two plain objects, and this is where the second one lives.
-  // So `:active` is one way to deliver a pressed look and this is the other; the engine does the
-  // same thing with both.
+  // The pressed variant of the EXPLICIT style, as opposed to one the class registry resolves from
+  // an `:active` rule. It arrives either as its own prop or from resolving a functional
+  // `style={({pressed}) => …}` at `pressed: true` (`routeProp`'s `style` branch). So `:active` is
+  // one way to deliver a pressed look and this is the other; the engine does the same with both.
   activeStyle: unknown;
   // Whether slot 1's pressed variant came from resolving a FUNCTION `style` here, rather than from
-  // an explicit `activeStyle` write by a lowering transform. Only the first kind may be cleared
-  // when `style` later arrives as a plain value — clearing the second would break the transform's
-  // two-write path, where `style` and `activeStyle` are separate props and either may land first.
+  // an authored `activeStyle` write. Only the first kind may be cleared when `style` later arrives
+  // as a plain value — clearing the second would break the two-write path, where `style` and
+  // `activeStyle` are separate props and either may land first.
   activeStyleFromCallback: boolean;
   // The array `pushClassStyle` last published, or `undefined` when nothing has been published or a
   // bypass invalidated it. It used to be read back out of `node.props.style` — the array IS the
@@ -1007,10 +1003,9 @@ function pushClassStyle(node: ISymbioteNode, parts: IClassStyleParts): void {
   // an UNCHANGED class still lands as a write AND marks the node dirty. Costs React / Vue / Svelte
   // nothing — each diffs props before calling the engine — but Solid has no diff: a fine-grained
   // effect re-runs whenever any signal it reads changes, so a list-wide signal makes every row
-  // re-push its own unchanged class. Measured on device 2026-08-23 (examples/solid, after
-  // host-primitive lowering): selecting one row of 1 000 read WRITES 1001 and a 10.3 ms reconcile
+  // re-push its own unchanged class. Measured on device 2026-08-23 (examples/solid, once its
+  // primitives were tags): selecting one row of 1 000 read WRITES 1001 and a 10.3 ms reconcile
   // window against Fabric's unmoved 0/0/10 — a thousand-node dirty walk for two nodes of change.
-  // Before lowering, the View component's splitProps/mergeProps memos had been absorbing it.
   //
   // This is NOT the naive skip the paragraph above forbids, and the published marker is the
   // difference. Skipping on "the parts are unchanged" alone would break the restore path, because
@@ -1172,11 +1167,9 @@ export function routeProp(
   if (key === 'style') {
     const parts = stylePartsOf(node);
     // A FUNCTION `style` is `style={({pressed}) => …}`, the idiom this ecosystem actually writes.
-    // A lowering transform normally splits it at build time into `style` + `activeStyle`, so the
-    // engine never sees the callback — but a PUBLIC primitive tag has no transform in front of it
-    // on three adapters, and there the callback arrives here intact. Resolving it makes the
-    // compile-time split an OPTIMIZATION rather than the mechanism, the same relationship
-    // `foldHostBag` has with the compile-time prop folds.
+    // Nothing stands between an app and the tag, so the callback arrives here intact and is
+    // resolved at both states — writing `style` + `activeStyle` as an explicit pair is the same
+    // thing said by hand, and cheaper by one call per recompute.
     //
     // Without this the failure is silent and total: a function is not an `on*` name, so it misses
     // `setEventListener`, lands in `setProp` as a function value, and `fabricProps` drops function
@@ -1191,9 +1184,8 @@ export function routeProp(
     } else {
       parts.explicitStyle = resolved;
       // Only a variant WE derived is stale now. `style` switching from a callback to a plain value
-      // must not leave the old pressed look standing, and an `activeStyle` the transform wrote must
-      // survive a `style` write, because the two arrive as independent props in an unspecified
-      // order.
+      // must not leave the old pressed look standing, and an AUTHORED `activeStyle` must survive a
+      // `style` write, because the two arrive as independent props in an unspecified order.
       if (parts.activeStyleFromCallback) {
         parts.activeStyle = undefined;
         parts.activeStyleFromCallback = false;
@@ -1210,9 +1202,8 @@ export function routeProp(
     // Slot 1 is no longer ours, by definition — whatever a callback derived earlier has just been
     // replaced. Without this the flag outlives the value it describes: a callback sets it, this
     // branch overwrites the slot silently, and a later plain `style` then clears a variant the
-    // engine never derived. Not reachable from a lowering transform (it emits either a callback or
-    // an explicit pair, never both for one node), but a flat-bag adapter routes a bag key by key
-    // and can deliver exactly that sequence.
+    // engine never derived. An author writes either a callback or an explicit pair, never both for
+    // one node — but a flat-bag adapter routes a bag key by key and can deliver that sequence.
     parts.activeStyleFromCallback = false;
     pushClassStyle(node, parts);
     return;

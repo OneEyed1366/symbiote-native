@@ -7,9 +7,8 @@
 // won. The two orders are opposite on purpose (base under on the owner, row over on the slot), so
 // a test that checked only one would pass with both folds written the same way.
 //
-// Registration happens HERE and nowhere else. `scroll-view` is the tag the wrappers
-// already emit, so a global registration would give every existing ScrollView a second content
-// node; see the behavior's header for the `-managed` split that resolves it.
+// Registration happens HERE and nowhere else — see the behavior's header for why it waited on the
+// engine becoming the single owner of the content node.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   installFabric,
@@ -66,7 +65,7 @@ afterEach(() => {
   fabric.reset();
 });
 
-describe('the lowered structure reproduces the wrapper', () => {
+describe('the structure the behavior builds', () => {
   // Derived from `selectScrollIntrinsics`, never hardcoded: it is the ONE function every adapter's
   // wrapper calls, so deriving is what makes this a comparison rather than a restatement. It also
   // keeps the test honest across platforms — the vertical content intrinsic resolves to
@@ -245,7 +244,7 @@ describe('style precedence, which is opposite on the two nodes', () => {
   });
 });
 
-// Mounts a lowered ScrollView and hands back a re-commit, so a test can write a prop AFTER the
+// Mounts a scroll-view tag and hands back a re-commit, so a test can write a prop AFTER the
 // first commit and read what the second one published. Reads out of `fabric.committed` rather than
 // `fabric.find`, which searches `created` and so returns a node's own pre-clone self on any update
 // (`.claude/rules/test-harness-false-greens.md`).
@@ -295,7 +294,7 @@ function layoutEvent(
 
 describe('decelerationRate reaches Fabric as a number', () => {
   // RN's two words resolve to DIFFERENT friction constants per platform, and a wrapper is what did
-  // that resolution. A lowered element has none, so the string would reach Fabric unread and the
+  // that resolution. A tag has none, so the string would reach Fabric unread and the
   // scroll would keep the native default with nothing red.
   it.each(['normal', 'fast'] as const)('resolves %s', word => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG, { decelerationRate: word });
@@ -392,7 +391,7 @@ describe('the bounce pair defaults from the axis, as RN derives it', () => {
 
 // Every wrapper writes `nestedScrollEnabled ?? true` on every ScrollView, both platforms — RN
 // itself only defaults it on Android's RefreshControl WRAP path (`ScrollView.js:1862`), and it is
-// the WRAPPER a lowered element replaces. Without it an Android list nested in a scroll view does
+// the WRAPPER this behavior replaced. Without it an Android list nested in a scroll view does
 // not scroll on its own.
 describe('nested scrolling defaults on, as the wrapper leaves it', () => {
   it('defaults to true when the app set nothing', () => {
@@ -467,7 +466,7 @@ describe('collapsableChildren is derived from props that stay on the owner', () 
 describe('onContentSizeChange is synthesized from the content view layout', () => {
   it('wires nothing when the app passed no handler', () => {
     const { slot, commit } = mountScroll(SCROLL_VIEW_TAG);
-    // `onLayout` is a GATED event: wiring it unconditionally would put the flag in every lowered
+    // `onLayout` is a GATED event: wiring it unconditionally would put the flag in every
     // ScrollView's payload and buy a native event nobody reads.
     expect(Object.hasOwn(commit().slot.props, 'onLayout')).toBe(false);
     expect(slot.listeners?.get('layout')).toBeUndefined();

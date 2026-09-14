@@ -62,7 +62,7 @@ function press(): void {
   }
 }
 
-describe('a lowered Pressable on its first press', () => {
+describe('a pressable tag on its first press', () => {
   it('publishes the framework update on press ONE, not only on press two', async () => {
     let calls = 0;
     const [tint, setTint] = createSignal('#000');

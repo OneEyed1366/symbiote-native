@@ -140,10 +140,8 @@ describe('a functional style survives v-bind', () => {
 
   // The THIRD door, and the one that unblocked removing the state-style split from both Vue
   // transforms. A `:style` binding compiles to `_normalizeStyle(expr)` whenever the compiler cannot
-  // keep it on the cheap patch-flag path — an inline arrow does, a bare identifier does not. While
-  // the transforms rewrote that attribute into a resting/active pair the helper never saw a
-  // callback, so this was unreachable; with the split gone it is the only thing standing between a
-  // lowered `<Pressable :style="({pressed}) => …" />` and no style at all.
+  // keep it on the cheap patch-flag path — an inline arrow does, a bare identifier does not. It is
+  // the only thing standing between `<pressable :style="({pressed}) => …">` and no style at all.
   it('an inline callback survives the :style path', async () => {
     const props = await commit(
       'pressable',

@@ -66,10 +66,8 @@ full reload instead: `unstable_forceFullRefreshPatterns: [/\.tsx$/]`.
 An app writes the lowercase tags directly (`view`, `text`, `pressable`, …) — `babel-preset-solid`'s
 own `isComponent` check already treats a lowercase name as an element, so JSX compiles straight to
 `createElement`/`setProp` calls against `symbiote-view` etc., no import and nothing to opt into.
-This retires the compile-time lowering transform that used to rewrite a `<View>`/`<Text>`/
-`<Pressable>` COMPONENT call site into the same intrinsics (`babel-lower-host-primitives.cjs`,
-deleted 2026-09-08) — there is no component call site left to rewrite. See root `CLAUDE.md`,
-"Where we stand against stock React Native", for the measured device numbers.
+Nothing rewrites the source on the way there, so this adapter carries no Babel plugin of its own.
+See root `CLAUDE.md`, "Where we stand against stock React Native", for the measured device numbers.
 
 ## `./renderer` is a compiler target, not a convenience export
 

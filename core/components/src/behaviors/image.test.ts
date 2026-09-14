@@ -1,32 +1,16 @@
 // Proof of the runtime half for Image, ahead of any `HOST_PRIMITIVES` entry — this project's
-// documented order: wire and prove first, add the spec key last, because the key is what makes all
-// four transforms start lowering at once and a missing fold is device-only and silent.
+// documented order: wire and prove first, add the spec key last, because a missing fold is
+// device-only and silent.
 //
-// Two claims, and the second is the one that decides whether Image needs a `-managed` tag split the
-// way TextInput did:
-//   1. the LOWERED path (a flat prop bag through the behavior) produces the same payload as the
-//      WRAPPER path (a typed view through renderImage's mapping), for the same authored props;
-//   2. the fold is IDEMPOTENT, so running it on a wrapper-built node — which already carries folded
-//      props, since renderImage emits the same `image` tag — changes nothing.
+// Two claims:
+//   1. the behavior's fold (a flat prop bag) produces the same payload as `mapImageProps`, for the
+//      same authored props;
+//   2. the fold is IDEMPOTENT, so a bag that reaches it twice is unchanged.
 //
 // (2) is asserted rather than reasoned about on purpose. `.claude/rules/adapter-parity-audit.md`
 // records that a double fold "is invisible for a fold that happens to be idempotent"; the whole
 // difference between an accident and a design is whether something fails when it stops being true.
-//
-// AND DO NOT COPY IMAGE'S CONCLUSION — CHECK BOTH PROPERTIES. It is tempting to read TextInput's
-// `-managed` split as evidence that its fold is not idempotent. Measured 2026-09-01, by reaching
-// `node.payloadFold` off a real `text-input` node and running it twice: it IS idempotent
-// (it deletes its alias-only keys and derives the rest, so a second pass finds nothing to do). The
-// split exists for a different reason — that behavior carries a MACHINE (`ownedListeners`
-// change/focus/blur, `attach`, `attachAfterCommit`, `afterCommit`), and attaching it to a
-// wrapper-built node would give that node two owners while the wrapper's own lifecycle is running.
-// Solid's `register.ts` says exactly that: "One owner per node."
-//
-// So a fold-only primitive owes TWO checks before it may share the wrapper's tag:
-//   is the fold idempotent?  (this file)
-//   does the behavior carry anything BUT a fold?  (if yes, the tag must split, idempotent or not)
-// Image answers yes and no. A primitive whose fold consumes an alias that also appears in its own
-// output fails the first; anything with listeners or a commit hook fails the second.
+// A fold that consumes an alias also appearing in its own output would fail it.
 import { afterEach, describe, expect, it } from 'vitest';
 import { setImageSourceResolver } from '@symbiote-native/engine';
 import { foldImagePayload } from './image';
@@ -54,9 +38,9 @@ const AUTHORED = {
 } as const;
 
 describe('the Image behavior fold', () => {
-  it('gives the lowered path the payload the wrapper path produces', () => {
-    const lowered = foldImagePayload(AUTHORED);
-    const wrapper = mapImageProps({
+  it('produces the payload mapImageProps produces', () => {
+    const folded = foldImagePayload(AUTHORED);
+    const mapped = mapImageProps({
       src: AUTHORED.src,
       alt: AUTHORED.alt,
       width: AUTHORED.width,
@@ -69,8 +53,8 @@ describe('the Image behavior fold', () => {
       passthrough: { testID: AUTHORED.testID, blurRadius: AUTHORED.blurRadius },
     });
 
-    expect(Object.keys(lowered).sort()).toEqual(Object.keys(wrapper).sort());
-    expect(lowered).toEqual(wrapper);
+    expect(Object.keys(folded).sort()).toEqual(Object.keys(mapped).sort());
+    expect(folded).toEqual(mapped);
   });
 
   it('consumes every W3C alias rather than forwarding it', () => {

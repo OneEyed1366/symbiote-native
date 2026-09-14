@@ -410,12 +410,10 @@ const BenchmarkRow = memo(function BenchmarkRowView({
       <pressable className="bench-row-remove" onPress={() => onRemove(row.id)}>
         <text className="bench-row-remove-text">×</text>
       </pressable>
-      {/* LAST child, and deliberately bare: no `multiline` (it would pick the other native view
-        and, being a runtime value, refuse to lower at all), no change handler and no ref (a ref
-        refuses to lower on the adapters that check for one). CONTROLLED rather than
-        `defaultValue`, because the controlled write is the beat the engine-side machine exists
-        for and an uncontrolled input would never run it. React has no lowering transform, so
-        here it stays a component — this column is the control the lowered ones are read against. */}
+      {/* LAST child, and deliberately bare: no `multiline` (it picks the other native view), no
+        change handler and no ref — each adds work this row is not measuring. CONTROLLED rather than
+        `defaultValue`, because the controlled write is the beat the engine-side machine exists for
+        and an uncontrolled input would never run it. */}
       <text-input className="bench-row-input" value={row.label} />
     </view>
   );

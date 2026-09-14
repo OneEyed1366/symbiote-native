@@ -9,10 +9,8 @@
 // arms share, and Vue's folds all live in that layer (`.claude/rules/test-harness-false-greens.md`
 // §16, measured on this adapter). Each `toEqual` below names the payload RN produces.
 //
-// `tests/lowered-primitive-fold-parity.test.ts` guards this repo-wide by diffing each wrapper's
-// shared-layer IMPORTS against the behavior's, which is a proxy: a fold applied inline, or one
-// living in an adapter's own renderer, is invisible to it. Vue's folds are exactly that shape —
-// kebab->camel has no counterpart in any other adapter — so this asserts the PAYLOAD instead.
+// Vue's folds live in its own renderer and one of them — kebab->camel — has no counterpart in any
+// other adapter, so nothing repo-wide can check them. This asserts the PAYLOAD instead.
 
 import { describe, expect, it } from 'vitest';
 import { defineComponent, h, type VNodeProps } from '@vue/runtime-core';

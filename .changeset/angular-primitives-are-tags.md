@@ -7,7 +7,7 @@
 exported as directive components from `@symbiote-native/angular` — an app's `imports: [...]` array
 can no longer name them.
 
-Each is now the intrinsic tag Angular's own AOT lowering pass (`babel-register-composed.cjs`,
+Each is now the intrinsic tag Angular's own AOT pass (`babel-register-composed.cjs`,
 `ngtsc` → `@angular/compiler-cli/linker/babel`) compiles directly, the same tag every other
 adapter writes. `Switch` and `TextInput`'s controlled two-way binding moves to two new exports,
 `SwitchValueAccessor` and `TextInputValueAccessor` — an app using `[(ngModel)]` or `formControl*`

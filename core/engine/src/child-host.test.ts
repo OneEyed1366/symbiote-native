@@ -1,5 +1,5 @@
 // `IHostBehavior.buildStructure` + `ISymbioteNode.childHost` — the seam that lets a COMPOSED
-// primitive be a host element. `foldPayload` gave a lowered primitive its wrapper's prop mapping;
+// primitive be a host element. `foldPayload` gives a tag its wrapper's prop mapping;
 // this gives it the wrapper's internal subtree, which is what a ScrollView (scroll view wrapping a
 // content view) or an ImageBackground needs and what nothing before this could express.
 //

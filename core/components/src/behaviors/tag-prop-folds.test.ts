@@ -1,9 +1,4 @@
-// The wrapper-body prop folds, asserted on the COMMITTED payload for a LOWERED element.
-//
-// `tests/lowered-primitive-fold-parity.test.ts` asks whether the behavior CALLS the shared fold —
-// a file-listing proxy that catches an omission cheaply and can say nothing about the result. This
-// says what the device would see. Both are needed: the proxy notices a fold nobody wired, and this
-// notices a fold wired wrongly.
+// The prop folds a wrapper body used to run, asserted on the COMMITTED payload of a tag.
 //
 // Every assertion is on the payload rather than on `node.props`, because the failure mode is
 // precisely that the raw prop sits on the node looking correct while the folded one never reaches
@@ -32,7 +27,7 @@ const TEXT_INPUT_VIEW = 'RCTSinglelineTextInputView';
 const PRESSABLE_VIEW = 'RCTView';
 const TEST_ID = 'subject';
 
-function commitLowered(
+function commitTag(
   view: string,
   tag: string,
   props: Readonly<Record<string, unknown>>,
@@ -57,9 +52,9 @@ function commitLowered(
   return found.props;
 }
 
-describe('a lowered TextInput folds the W3C aliases', () => {
+describe('a text-input tag folds the W3C aliases', () => {
   it('maps inputMode / readOnly / enterKeyHint onto the native props', () => {
-    const props = commitLowered(TEXT_INPUT_VIEW, TEXT_INPUT_TAG, {
+    const props = commitTag(TEXT_INPUT_VIEW, TEXT_INPUT_TAG, {
       inputMode: 'numeric',
       readOnly: true,
       enterKeyHint: 'search',
@@ -72,7 +67,7 @@ describe('a lowered TextInput folds the W3C aliases', () => {
   });
 
   it('does not send the raw aliases, which no ViewConfig declares', () => {
-    const props = commitLowered(TEXT_INPUT_VIEW, TEXT_INPUT_TAG, {
+    const props = commitTag(TEXT_INPUT_VIEW, TEXT_INPUT_TAG, {
       inputMode: 'numeric',
       readOnly: true,
       enterKeyHint: 'search',
@@ -86,7 +81,7 @@ describe('a lowered TextInput folds the W3C aliases', () => {
   });
 
   it('carries the defaults the wrapper carries', () => {
-    const props = commitLowered(TEXT_INPUT_VIEW, TEXT_INPUT_TAG, {});
+    const props = commitTag(TEXT_INPUT_VIEW, TEXT_INPUT_TAG, {});
 
     // Hides the Material EditText bar; absent, every Android input grows a line under it.
     expect(props.underlineColorAndroid).toBe('transparent');
@@ -94,9 +89,9 @@ describe('a lowered TextInput folds the W3C aliases', () => {
   });
 });
 
-describe('a lowered Pressable folds disabled into accessibilityState', () => {
+describe('a pressable tag folds disabled into accessibilityState', () => {
   it('announces a disabled button as disabled', () => {
-    const props = commitLowered(PRESSABLE_VIEW, PRESSABLE_TAG, {
+    const props = commitTag(PRESSABLE_VIEW, PRESSABLE_TAG, {
       disabled: true,
     });
 
@@ -104,7 +99,7 @@ describe('a lowered Pressable folds disabled into accessibilityState', () => {
   });
 
   it('merges into an accessibilityState the app already set', () => {
-    const props = commitLowered(PRESSABLE_VIEW, PRESSABLE_TAG, {
+    const props = commitTag(PRESSABLE_VIEW, PRESSABLE_TAG, {
       disabled: true,
       accessibilityState: { selected: true },
     });
@@ -116,13 +111,13 @@ describe('a lowered Pressable folds disabled into accessibilityState', () => {
   });
 
   it('leaves accessibilityState alone when nothing is disabled', () => {
-    const props = commitLowered(PRESSABLE_VIEW, PRESSABLE_TAG, {});
+    const props = commitTag(PRESSABLE_VIEW, PRESSABLE_TAG, {});
 
     expect(Object.keys(props)).not.toContain('accessibilityState');
   });
 
   it('does not send the props only the machine reads', () => {
-    const props = commitLowered(PRESSABLE_VIEW, PRESSABLE_TAG, {
+    const props = commitTag(PRESSABLE_VIEW, PRESSABLE_TAG, {
       disabled: true,
       cancelable: false,
       delayLongPress: 700,
@@ -143,10 +138,10 @@ describe('a lowered Pressable folds disabled into accessibilityState', () => {
 
   // CONTROL. Every case above reads a payload built for a tag carrying a behavior, and a payload
   // with no fold at all would satisfy the three `not.toContain` cases by itself. So pin that the
-  // same prop on an UNLOWERED tag is untouched — which is what makes the folds above attributable
+  // same prop on a BEHAVIORLESS tag is untouched — which is what makes the folds above attributable
   // to the behavior rather than to something the engine does for every node.
   it('folds nothing on a node with no behavior', () => {
-    const props = commitLowered(PRESSABLE_VIEW, 'view', {
+    const props = commitTag(PRESSABLE_VIEW, 'view', {
       disabled: true,
     });
 

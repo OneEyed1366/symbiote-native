@@ -6,7 +6,7 @@
 `InputAccessoryView`, `ActivityIndicator`, `ImageBackground`, `Button`, `TouchableWithoutFeedback`
 and `TouchableNativeFeedback` are no longer exported as components from `@symbiote-native/react`.
 
-Each is now the intrinsic tag it already lowered to under `jsxImportSource: '@symbiote-native/react'`
+Each is now the intrinsic tag it already compiled to under `jsxImportSource: '@symbiote-native/react'`
 (`<view>`, `<text>`, `<scroll-view>`, `<switch>`, …) — write the tag directly, there is nothing left
 to import in the wrapper's place. `TouchableNativeFeedback` and `Image` survive as RN's own static
 namespaces (`Image.getSize`, `TouchableNativeFeedback.Ripple`), re-exported from

@@ -3,8 +3,8 @@
 //
 // THE TWO-NODE SHAPE IS RN'S. `ImageBackground.js:74-103` opens a `<View>` carrying the app's
 // `style`, puts an absolutely-filled `<Image>` inside it, and lays the app's `{children}` AFTER
-// that image so they paint on top. The lowered form is the same two nodes — `image-background`
-// (an RCTView, the tag an app writes) with an RCTImageView built under it.
+// that image so they paint on top. The tag commits the same two nodes — `image-background` (an
+// RCTView, the tag an app writes) with an RCTImageView built under it.
 //
 // WHY THE SLOT TAKES NO CHILDREN, which is the one thing this primitive needed that ScrollView,
 // ActivityIndicator and Button did not. `childHost` answers two questions at once — which node an
@@ -19,9 +19,8 @@
 // (`ImageBackground.js:62-81`), so the set that moves is OPEN — every event, every accessibility
 // prop, `testID`, `id`, whatever an app writes next — and only a complement can express it.
 // `IMAGE_BACKGROUND_HOST_PROPS` is the short list that stays behind, and it is shorter than RN's:
-// `importantForAccessibility` rides to the image alone, which is what all five wrappers did, so
-// the tag and the component it replaces commit the same payload. The divergence from RN predates
-// lowering and is unchanged by it.
+// `importantForAccessibility` rides to the image alone, which is what all five wrappers did, so the
+// tag commits what they committed. The divergence from RN predates all of it.
 //
 // WHAT THE IMAGE'S FOLD OWES. Everything on the image arrives as a real prop write, so its payload
 // is built by the shared `foldImagePayload` like any other `image`. Two things cannot arrive that

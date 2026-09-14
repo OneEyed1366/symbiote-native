@@ -1,5 +1,5 @@
 // InputAccessoryView's host behavior — a prop fold and nothing else. No listeners, no timers, no
-// commit hook: the wrapper's whole body was prop mapping, so its lowered form owes exactly that.
+// commit hook: the wrapper's whole body was prop mapping, so the tag owes exactly that.
 //
 // The fold is NOT written here. `mapInputAccessoryViewProps` in
 // `../view/render-input-accessory-view` is the one implementation and this file only narrows a flat
@@ -9,21 +9,18 @@
 // `input-accessory-view-props.ts` is a type declaration rather than a second mapping. So there was
 // one implementation to extract, not three to collapse.
 //
-// SHARES THE WRAPPER'S TAG, no `-managed` twin. The two questions the recipe separates both answer
-// no: the fold is idempotent (there is no aliasing at all — every consumed name leaves under the
-// same name, so a second pass rewrites the same values), and the behavior carries no machine, so
-// nothing can end up with two owners on one node. Idempotence is asserted rather than reasoned.
+// The fold is idempotent — there is no aliasing at all, every consumed name leaves under the same
+// name, so a second pass rewrites the same values — and the behavior carries no machine. Asserted
+// rather than reasoned.
 //
 // PLATFORM. This is the only primitive in its group that is not platform-invariant in what it
 // COMMITS TO: `input-accessory-view` resolves to `RCTInputAccessoryView` on iOS and to a
-// plain `RCTView` on Android. The fold itself is platform-invariant on purpose — it reproduces the
-// wrapper's mapping exactly, on both platforms, so the lowered and wrapped paths cannot diverge
-// per-platform. What it does NOT do is fix the pre-existing Android divergence underneath it:
+// plain `RCTView` on Android. The fold itself is platform-invariant on purpose. What it does NOT do
+// is fix the pre-existing Android divergence underneath it:
 // upstream RN renders NOTHING there (`InputAccessoryView.js` — `console.warn('<InputAccessoryView>
 // is only supported on iOS.'); return null`), while we commit an RCTView, and `backgroundColor` is
-// a declared prop of the iOS view but a style key on RCTView. Both predate this behavior and are
-// identical on both paths; neither is in scope here, and a fold that "fixed" one silently would
-// make the two paths disagree.
+// a declared prop of the iOS view but a style key on RCTView. Both predate this behavior; neither
+// is in scope here.
 import {
   registerHostBehavior,
   type IStyleProp,

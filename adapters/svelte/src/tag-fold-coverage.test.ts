@@ -1,11 +1,10 @@
 // Every primitive in `HOST_PRIMITIVES`, mounted as the BARE TAG an app now writes, must commit the
 // folds its spec declares — the `id -> nativeID` alias and Text's RN defaults.
 //
-// THIS FILE REPLACES `lowering-equivalence.test.ts`, and the reason is that its subject is gone
-// rather than that it was wrong. That oracle mounted each primitive twice — once through its
-// wrapper component, once through the lowering transform — and compared the committed trees. There
-// is no wrapper and no transform: a primitive IS the tag, so there is exactly one path and nothing
-// to compare it against.
+// THIS FILE REPLACES an equivalence oracle whose subject is gone rather than wrong. That oracle
+// mounted each primitive twice — once through its wrapper component, once as the tag — and compared
+// the committed trees. There is no wrapper: a primitive IS the tag, so there is exactly one path and
+// nothing to compare it against.
 //
 // What survives is the half that oracle called ABSOLUTE, and it is the half that mattered. A
 // cross-arm comparison is structurally blind to a fold that stops running for EVERY arm
