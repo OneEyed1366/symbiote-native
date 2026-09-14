@@ -251,6 +251,34 @@ describe('Solid: `button` as a tag', () => {
       expect(presses).toBe(1);
     });
 
+    // why: RN's Button-itest.js — `disabled` must gate the press itself, not just the label colour
+    // (`prevents the button onPress callback from being called`). The `greys the label` test above
+    // proves the fold reached accessibilityState; a real touch is the only thing that proves it
+    // reached the responder.
+    it('suppresses onPress from a real touch while disabled', async () => {
+      let presses = 0;
+      mount(ROOT_TAG, () => (
+        <button
+          testID={TEST_ID}
+          title={TITLE}
+          disabled
+          onPress={() => {
+            presses++;
+          }}
+        />
+      ));
+      await tick();
+
+      const created = fabric.find(node => node.props.testID === TEST_ID);
+      if (created === undefined) throw new Error('no touchable was created');
+      fabric.fireEvent(created.instanceHandle, 'topTouchStart');
+      await tick();
+      fabric.fireEvent(created.instanceHandle, 'topTouchEnd');
+      await tick();
+
+      expect(presses).toBe(0);
+    });
+
     // why: Solid runs a component body ONCE. `color` and `disabled` are read inside a memo the
     // label's style accessor re-runs, so a later change repaints the SAME text node; a destructure
     // at setup would freeze the label while every other test here passed. The identity assertion is

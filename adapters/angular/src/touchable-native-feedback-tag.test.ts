@@ -59,15 +59,26 @@ function subtreeOf(label: string): IFakeNode[] {
   return flatten(root.children);
 }
 
-async function mountTemplate(template: string): Promise<void> {
+let fixtureId = 0;
+
+async function mountTemplate(
+  template: string,
+  bindings: Record<string, unknown> = {},
+): Promise<void> {
+  fixtureId += 1;
   @Component({
-    // Unique per file: a repeated selector makes Angular log an NG0912 component-id collision.
-    selector: 'tnf-tag-fixture',
+    // Unique per mount: a repeated selector makes Angular log an NG0912 component-id collision.
+    selector: `tnf-tag-fixture-${fixtureId}`,
     standalone: true,
     imports: [SYMBIOTE_ELEMENTS],
     template,
   })
-  class Fixture {}
+  class Fixture {
+    [key: string]: unknown;
+    constructor() {
+      Object.assign(this, bindings);
+    }
+  }
 
   mount(ROOT_TAG, Fixture satisfies Type<unknown>);
   await flushUntilSettled();
@@ -112,5 +123,27 @@ describe('touchable-native-feedback as a tag', () => {
       // :389 — `testID` is cloned, so the OWNER's wins over whatever the child declared.
       testID: 'probe',
     });
+  });
+
+  // why: the clone case above proves the PROPS bridge; it does not prove a real touch on the child
+  // actually reaches the owner's `onPress` through Angular's wiring — the press machine runs on the
+  // child (core/components/src/behaviors/touchable-native-feedback.test.ts), so a touch dispatched
+  // anywhere but there would silently prove nothing.
+  it('fires the owner’s onPress from a real touch on the cloned child', async () => {
+    let presses = 0;
+    await mountTemplate(
+      `<view nativeID="root">
+         <touchable-native-feedback nativeID="tnf" [onPress]="onPress">
+           <view></view>
+         </touchable-native-feedback>
+       </view>`,
+      { onPress: () => (presses += 1) },
+    );
+
+    const [child] = subtreeOf('root');
+    fabric.fireEvent(child.instanceHandle, 'topTouchStart', {});
+    fabric.fireEvent(child.instanceHandle, 'topTouchEnd', {});
+
+    expect(presses).toBe(1);
   });
 });

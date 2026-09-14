@@ -90,4 +90,28 @@ describe('React: `button` as a tag', () => {
     expect(host.props.accessibilityState).toMatchObject({ disabled: true });
     expect(host.children[0].children[0].props.color).toBe(DISABLED_GREY);
   });
+
+  // why: RN's Button-itest.js — `disabled` must gate the press itself, not just the label colour
+  // (`prevents the button onPress callback from being called`). Styling proves the fold reached
+  // the accessibilityState; a real touch is the only thing that proves it reached the responder.
+  it('suppresses onPress from a real touch while disabled', () => {
+    let presses = 0;
+    mount(
+      ROOT_TAG,
+      createElement('button', {
+        id: 'btn',
+        title: 'Go',
+        disabled: true,
+        onPress: () => {
+          presses += 1;
+        },
+      }),
+    );
+
+    const host = hostOf('btn');
+    fabric.fireEvent(host.instanceHandle, 'topTouchStart', {});
+    fabric.fireEvent(host.instanceHandle, 'topTouchEnd', {});
+
+    expect(presses).toBe(0);
+  });
 });

@@ -82,4 +82,30 @@ describe('touchable-native-feedback as a tag', () => {
       testID: 'probe',
     });
   });
+
+  // why: the clone case above proves the PROPS bridge; it does not prove a real touch on the child
+  // actually reaches the owner's `onPress` through React's wiring — the press machine runs on the
+  // child (core/components/src/behaviors/touchable-native-feedback.test.ts), so a touch dispatched
+  // anywhere but there would silently prove nothing.
+  it('fires the owner’s onPress from a real touch on the cloned child', () => {
+    let presses = 0;
+    mount(
+      ROOT_TAG,
+      createElement(
+        'view',
+        { nativeID: 'root' },
+        createElement(
+          'touchable-native-feedback',
+          { nativeID: 'tnf', onPress: () => (presses += 1) },
+          createElement('view', {}),
+        ),
+      ),
+    );
+
+    const [child] = subtreeOf('root');
+    fabric.fireEvent(child.instanceHandle, 'topTouchStart', {});
+    fabric.fireEvent(child.instanceHandle, 'topTouchEnd', {});
+
+    expect(presses).toBe(1);
+  });
 });

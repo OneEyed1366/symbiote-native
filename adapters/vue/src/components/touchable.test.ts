@@ -339,14 +339,48 @@ describe('Vue TouchableOpacity', () => {
     await wait(PRESS_DELAY_MS + 20);
     expect(pressIns).toBe(1);
   });
+
+  // why: RN-parity sweep lesson — style/fade coverage doesn't prove `onPress` is actually gated;
+  // RN's own itest fires a real touch for exactly this reason.
+  it('suppresses onPress from a real touch while disabled', async () => {
+    let presses = 0;
+    const App = defineComponent({
+      setup: () => (): VNode =>
+        h('touchable-opacity', {
+          testID: TARGET,
+          disabled: true,
+          onPress: () => {
+            presses++;
+          },
+        }),
+    });
+    mount(ROOT_TAG, App);
+    await flush();
+
+    fabric.fireEvent(responderHandle(), TOUCH_START);
+    fabric.fireEvent(responderHandle(), TOUCH_END);
+    await flushFrames();
+    expect(presses).toBe(0);
+  });
+
+  // why: RN marks every Touchable accessible unless the app opts OUT (TouchableOpacity.js:303) —
+  // Vue had zero coverage of this default before this sweep, on either variant.
+  it('marks itself accessible by default', async () => {
+    const App = defineComponent({
+      setup: () => (): VNode => h('touchable-opacity', { testID: TARGET }),
+    });
+    mount(ROOT_TAG, App);
+    await flush();
+    expect(committedProps(TARGET).accessible).toBe(true);
+  });
 });
 
 describe('Vue TouchableHighlight', () => {
   // why: RN's _createExtraStyles splits the underlay color and the lowered opacity across a
-  // container and its child — a tag has no render to clone a style onto a child with, so both
-  // halves fold onto the ONE node instead (core/components/src/behaviors/touchable-highlight.ts).
-  // The app's own child is an ordinary child, untouched.
-  it('paints the underlay and the pressed opacity on the one node', async () => {
+  // container and its child (TouchableHighlight.js, confirmed against `TouchableHighlight-itest.js`'s
+  // own two-node shape) — fixed at the engine level via `onChildInserted`
+  // (core/components/src/behaviors/touchable-highlight.ts) 2026-09-15, so Vue gets the real split.
+  it('paints the underlay on the container and the pressed opacity on the child', async () => {
     const App = defineComponent({
       setup: () => (): VNode =>
         h(
@@ -371,14 +405,14 @@ describe('Vue TouchableHighlight', () => {
     fabric.fireEvent(handle, TOUCH_START);
     await flush();
     expect(committedProps(TARGET).backgroundColor, 'the underlay').toBe('#abc');
-    expect(committedProps(TARGET).opacity, 'the lowered opacity').toBe(0.5);
+    expect(
+      committedProps(TARGET).opacity,
+      'the container stays clean',
+    ).toBeUndefined();
     expect(committedProps(TARGET).width, 'the base style survived').toBe(
       BASE_WIDTH,
     );
-    expect(
-      committedProps(CHILD).opacity,
-      'the child is untouched',
-    ).toBeUndefined();
+    expect(committedProps(CHILD).opacity, 'the lowered opacity').toBe(0.5);
 
     // The release is ASYNC: onPress arms the hide timer at delayPressOut (0 here), so the underlay
     // outlives the microtask queue by one macrotask.
@@ -387,7 +421,7 @@ describe('Vue TouchableHighlight', () => {
     await flush();
     // `null`, not `undefined` — the fake slot keeps an explicitly-removed prop as null.
     expect(committedProps(TARGET).backgroundColor).toBeNull();
-    expect(committedProps(TARGET).opacity).toBeNull();
+    expect(committedProps(CHILD).opacity).toBeNull();
   });
 
   // why: RN's _hasPressHandler gates the underlay — a decorative TouchableHighlight with no press
@@ -553,6 +587,111 @@ describe('Vue TouchableHighlight', () => {
     fabric.fireEvent(responderHandle(), TOUCH_START);
     await flush();
     expect(committedProps(TARGET).backgroundColor).toBe('#def');
+  });
+
+  // why: same lesson as TouchableOpacity's — underlay coverage does not prove the press itself is
+  // gated.
+  it('suppresses onPress from a real touch while disabled', async () => {
+    let presses = 0;
+    const App = defineComponent({
+      setup: () => (): VNode =>
+        h('touchable-highlight', {
+          testID: TARGET,
+          disabled: true,
+          onPress: () => {
+            presses++;
+          },
+        }),
+    });
+    mount(ROOT_TAG, App);
+    await flush();
+
+    fabric.fireEvent(responderHandle(), TOUCH_START);
+    fabric.fireEvent(responderHandle(), TOUCH_END);
+    await flush();
+    expect(presses).toBe(0);
+  });
+
+  it('marks itself accessible by default', async () => {
+    const App = defineComponent({
+      setup: () => (): VNode => h('touchable-highlight', { testID: TARGET }),
+    });
+    mount(ROOT_TAG, App);
+    await flush();
+    expect(committedProps(TARGET).accessible).toBe(true);
+  });
+});
+
+// RN-parity sweep gap: this block was deliberately left out under the reasoning that
+// `core/components/src/behaviors/touchable-without-feedback.test.ts` already proves the press
+// wiring "against the COMMITTED tree" — but that core test drives the engine directly, never
+// through Vue's actual reconciler -> engine pipeline. This closes that gap.
+//
+// TWF renders NO view of its own — it clones its props onto its single child (`nativeID`
+// unconditionally from the owner, `testID` only when the owner sets it), so every case here
+// needs a real child and reads the CHILD's committed props.
+describe('Vue TouchableWithoutFeedback', () => {
+  it('fires onPress from a real touch', async () => {
+    let presses = 0;
+    const App = defineComponent({
+      setup: () => (): VNode =>
+        h(
+          'touchable-without-feedback',
+          {
+            onPress: () => {
+              presses++;
+            },
+          },
+          [h('view', { testID: TARGET })],
+        ),
+    });
+    mount(ROOT_TAG, App);
+    await flush();
+
+    fabric.fireEvent(responderHandle(), TOUCH_START);
+    fabric.fireEvent(responderHandle(), TOUCH_END);
+    await flush();
+    expect(presses).toBe(1);
+  });
+
+  it('suppresses onPress from a real touch while disabled', async () => {
+    let presses = 0;
+    const App = defineComponent({
+      setup: () => (): VNode =>
+        h(
+          'touchable-without-feedback',
+          {
+            disabled: true,
+            onPress: () => {
+              presses++;
+            },
+          },
+          [h('view', { testID: TARGET })],
+        ),
+    });
+    mount(ROOT_TAG, App);
+    await flush();
+
+    fabric.fireEvent(responderHandle(), TOUCH_START);
+    fabric.fireEvent(responderHandle(), TOUCH_END);
+    await flush();
+    expect(presses).toBe(0);
+  });
+
+  it('computes focusable and accessibilityState from disabled', async () => {
+    const App = defineComponent({
+      setup: () => (): VNode =>
+        h('touchable-without-feedback', { disabled: true, onPress: () => {} }, [
+          h('view', { testID: TARGET }),
+        ]),
+    });
+    mount(ROOT_TAG, App);
+    await flush();
+
+    expect(committedProps(TARGET).focusable).toBe(false);
+    expect(committedProps(TARGET).accessibilityState).toMatchObject({
+      disabled: true,
+    });
   });
 });
 
