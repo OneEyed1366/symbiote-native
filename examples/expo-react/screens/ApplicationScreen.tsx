@@ -1,11 +1,5 @@
 import { useCallback, useState } from 'react';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/react';
+import { Platform } from '@symbiote-native/react';
 import {
   applicationId,
   applicationName,
@@ -23,10 +17,10 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="capability-row">
-      <Text className="capability-label">{label}</Text>
-      <Text className="value-text">{value}</Text>
-    </View>
+    <view className="capability-row">
+      <text className="capability-label">{label}</text>
+      <text className="value-text">{value}</text>
+    </view>
   );
 }
 
@@ -72,33 +66,33 @@ export function ApplicationScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="application-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Application</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Application</text>
+            <text className="hero-body">
               @symbiote-native/application — native app version/build/name/ID
               constants, plus install-time, Android ID/install-referrer, and iOS
               vendor ID/release-type lookups.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="application-constants-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Constants</Text>
-          </View>
+        <view testID="application-constants-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Constants</text>
+          </view>
           <ValueRow
             label="Version"
             value={nativeApplicationVersion ?? 'unknown'}
@@ -106,12 +100,12 @@ export function ApplicationScreen() {
           <ValueRow label="Build" value={nativeBuildVersion ?? 'unknown'} />
           <ValueRow label="Name" value={applicationName ?? 'unknown'} />
           <ValueRow label="ID" value={applicationId ?? 'unknown'} />
-        </View>
+        </view>
 
-        <View testID="application-install-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Install time</Text>
-          </View>
+        <view testID="application-install-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Install time</text>
+          </view>
           <ActionButton
             testID="application-installation-time-button"
             title="Get installation time"
@@ -121,13 +115,13 @@ export function ApplicationScreen() {
           {installedAt !== null && (
             <ValueRow label="Installed at" value={installedAt} />
           )}
-        </View>
+        </view>
 
         {Platform.OS === 'android' && (
-          <View testID="application-android-card" className="feature-card">
-            <View className="feature-card-header">
-              <Text className="feature-card-title">Android</Text>
-            </View>
+          <view testID="application-android-card" className="feature-card">
+            <view className="feature-card-header">
+              <text className="feature-card-title">Android</text>
+            </view>
             <ActionButton
               testID="application-android-id-button"
               title="Get Android ID"
@@ -146,14 +140,14 @@ export function ApplicationScreen() {
             {installReferrer !== null && (
               <ValueRow label="Install referrer" value={installReferrer} />
             )}
-          </View>
+          </view>
         )}
 
         {Platform.OS === 'ios' && (
-          <View testID="application-ios-card" className="feature-card">
-            <View className="feature-card-header">
-              <Text className="feature-card-title">iOS</Text>
-            </View>
+          <view testID="application-ios-card" className="feature-card">
+            <view className="feature-card-header">
+              <text className="feature-card-title">iOS</text>
+            </view>
             <ActionButton
               testID="application-ios-vendor-id-button"
               title="Get vendor ID"
@@ -172,9 +166,9 @@ export function ApplicationScreen() {
             {iosReleaseType !== null && (
               <ValueRow label="Release type" value={iosReleaseType} />
             )}
-          </View>
+          </view>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

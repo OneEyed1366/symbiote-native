@@ -62,17 +62,16 @@ _Vue JSX/TSX (`.tsx`) — the same canary, authored render-function-first at
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Pressable, Text, View } from '@symbiote-native/vue';
 
 const count = ref(0);
 </script>
 
 <template>
-  <View class="root">
-    <Pressable @press="count++" v-slot="{ pressed }">
-      <Text :class="pressed ? 'pressed' : 'label'"> Count is {{ count }} </Text>
-    </Pressable>
-  </View>
+  <view class="root">
+    <pressable @press="count++" v-slot="{ pressed }">
+      <text :class="pressed ? 'pressed' : 'label'"> Count is {{ count }} </text>
+    </pressable>
+  </view>
 </template>
 
 <style scoped>
@@ -90,6 +89,11 @@ const count = ref(0);
 }
 </style>
 ```
+
+`view`, `pressable`, and `text` are intrinsic tags — no import needed. Only a
+composed component (`FlatList`, `SectionList`, `VirtualizedList`,
+`VirtualizedSectionList`, `KeyboardAvoidingView`, …) still comes from
+`@symbiote-native/vue`.
 
 `StyleSheet.create` works identically if you'd rather keep style objects
 inline instead of an SFC `<style>` block — see the
@@ -111,11 +115,11 @@ Vue uses Vue-shaped APIs where the framework semantics differ from React:
   instead of unmounting, same semantics as Vue's DOM `v-show`.
 
 ```vue
-<Switch v-model="enabled" />
-<TextInput v-model="text" />
-<View v-show="visible">
-  <Text>Hidden without unmounting</Text>
-</View>
+<switch v-model="enabled" />
+<text-input v-model="text" />
+<view v-show="visible">
+  <text>Hidden without unmounting</text>
+</view>
 ```
 
 `v-model` is sugar over the same contract that was already there: `Switch`

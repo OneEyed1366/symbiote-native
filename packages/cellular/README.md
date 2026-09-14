@@ -89,12 +89,12 @@ function CellularScreen() {
 
   return (
     <>
-      <Text>
+      <text>
         {generation === null ? 'checking…' : CellularGeneration[generation]}
-      </Text>
-      <Text>{carrierName ?? 'checking…'}</Text>
-      <Text>{status === null ? 'checking…' : status.status}</Text>
-      <Button title="Request permission" onPress={() => requestPermission()} />
+      </text>
+      <text>{carrierName ?? 'checking…'}</text>
+      <text>{status === null ? 'checking…' : status.status}</text>
+      <button title="Request permission" onPress={() => requestPermission()} />
     </>
   );
 }
@@ -125,12 +125,12 @@ onMounted(() => {
 });
 </script>
 <template>
-  <Text>{{
+  <text>{{
     generation === null ? 'checking…' : CellularGeneration[generation]
-  }}</Text>
-  <Text>{{ carrierName ?? 'checking…' }}</Text>
-  <Text>{{ status === null ? 'checking…' : status.status }}</Text>
-  <Button title="Request permission" :onPress="() => requestPermission()" />
+  }}</text>
+  <text>{{ carrierName ?? 'checking…' }}</text>
+  <text>{{ status === null ? 'checking…' : status.status }}</text>
+  <button title="Request permission" :onPress="() => requestPermission()" />
 </template>
 ```
 
@@ -156,10 +156,13 @@ onMounted(() => {
   );
 </script>
 
-<Text>{generation === null ? 'checking…' : CellularGeneration[generation]}</Text>
-<Text>{carrierName ?? 'checking…'}</Text>
-<Text>{permissions.status === null ? 'checking…' : permissions.status.status}</Text>
-<Button title="Request permission" onPress={() => permissions.request()} />
+<text>{generation === null ? 'checking…' : CellularGeneration[generation]}</text
+>
+<text>{carrierName ?? 'checking…'}</text>
+<text
+  >{permissions.status === null ? 'checking…' : permissions.status.status}</text
+>
+<button title="Request permission" onPress={() => permissions.request()} />
 ```
 
 ```tsx
@@ -173,7 +176,9 @@ import {
 import { createPermissions } from '@symbiote-native/cellular/solid';
 
 function CellularScreen() {
-  const [generation, setGeneration] = createSignal<CellularGeneration | null>(null);
+  const [generation, setGeneration] = createSignal<CellularGeneration | null>(
+    null,
+  );
   const [carrierName, setCarrierName] = createSignal<string | null>(null);
   const { status, request: requestPermission } = createPermissions();
 
@@ -186,12 +191,14 @@ function CellularScreen() {
 
   return (
     <>
-      <Text>
-        {generation() === null ? 'checking…' : CellularGeneration[generation()!]}
-      </Text>
-      <Text>{carrierName() ?? 'checking…'}</Text>
-      <Text>{status() === null ? 'checking…' : status()!.status}</Text>
-      <Button title="Request permission" onPress={() => requestPermission()} />
+      <text>
+        {generation() === null
+          ? 'checking…'
+          : CellularGeneration[generation()!]}
+      </text>
+      <text>{carrierName() ?? 'checking…'}</text>
+      <text>{status() === null ? 'checking…' : status()!.status}</text>
+      <button title="Request permission" onPress={() => requestPermission()} />
     </>
   );
 }
@@ -210,15 +217,15 @@ import {
 @Component({
   selector: 'CellularScreen',
   template: `
-    <Text>{{
+    <text>{{
       generation() === null ? 'checking…' : CellularGeneration[generation()!]
-    }}</Text>
-    <Text>{{ carrierName() ?? 'checking…' }}</Text>
-    <Text>{{ permissionStatus()?.status ?? 'checking…' }}</Text>
-    <Button
+    }}</text>
+    <text>{{ carrierName() ?? 'checking…' }}</text>
+    <text>{{ permissionStatus()?.status ?? 'checking…' }}</text>
+    <button
       title="Request permission"
       (press)="permissionsService.request()"
-    ></Button>
+    ></button>
   `,
 })
 export class CellularScreen {

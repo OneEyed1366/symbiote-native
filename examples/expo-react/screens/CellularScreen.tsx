@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/react';
+import { Platform } from '@symbiote-native/react';
 import {
   CellularGeneration,
   allowsVoipAsync,
@@ -92,88 +86,88 @@ export function CellularScreen() {
     permissionStatus === null ? 'checking…' : permissionStatus.status;
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="cellular-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Cellular</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Cellular</text>
+            <text className="hero-body">
               @symbiote-native/cellular — cellular generation and carrier/SIM
               info. Every field except generation is Android-only upstream
               (iOS/web return null); a physical device with an active SIM is
               needed for real values.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="cellular-info-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Cellular info</Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">Generation</Text>
-            <Text className="value-text">
+        <view testID="cellular-info-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Cellular info</text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">Generation</text>
+            <text className="value-text">
               {generation === null ? 'checking…' : generationLabel(generation)}
-            </Text>
-          </View>
+            </text>
+          </view>
           {Platform.OS === 'android' && (
             <>
-              <View className="capability-row">
-                <Text className="capability-label">Allows VoIP</Text>
-                <Text className="value-text">{valueLabel(allowsVoip)}</Text>
-              </View>
-              <View className="capability-row">
-                <Text className="capability-label">ISO country code</Text>
-                <Text className="value-text">{valueLabel(isoCountryCode)}</Text>
-              </View>
-              <View className="capability-row">
-                <Text className="capability-label">Carrier name</Text>
-                <Text className="value-text">{valueLabel(carrierName)}</Text>
-              </View>
-              <View className="capability-row">
-                <Text className="capability-label">Mobile country code</Text>
-                <Text className="value-text">
+              <view className="capability-row">
+                <text className="capability-label">Allows VoIP</text>
+                <text className="value-text">{valueLabel(allowsVoip)}</text>
+              </view>
+              <view className="capability-row">
+                <text className="capability-label">ISO country code</text>
+                <text className="value-text">{valueLabel(isoCountryCode)}</text>
+              </view>
+              <view className="capability-row">
+                <text className="capability-label">Carrier name</text>
+                <text className="value-text">{valueLabel(carrierName)}</text>
+              </view>
+              <view className="capability-row">
+                <text className="capability-label">Mobile country code</text>
+                <text className="value-text">
                   {valueLabel(mobileCountryCode)}
-                </Text>
-              </View>
-              <View className="capability-row">
-                <Text className="capability-label">Mobile network code</Text>
-                <Text className="value-text">
+                </text>
+              </view>
+              <view className="capability-row">
+                <text className="capability-label">Mobile network code</text>
+                <text className="value-text">
                   {valueLabel(mobileNetworkCode)}
-                </Text>
-              </View>
+                </text>
+              </view>
             </>
           )}
-        </View>
+        </view>
 
-        <View testID="cellular-permission-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Permission</Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">
+        <view testID="cellular-permission-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Permission</text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">
               Phone-state permission status
-            </Text>
-            <Text className="value-text">{permissionLabel}</Text>
-          </View>
+            </text>
+            <text className="value-text">{permissionLabel}</text>
+          </view>
           <ActionButton
             testID="cellular-request-permission"
             title="Request permission"
             onPress={() => requestPermission()}
             color={lineColor}
           />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

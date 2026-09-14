@@ -43,8 +43,28 @@
 // alignment is an app that pulls in the DOM lib, giving solid's `Element` a real `Node` — recorded
 // in `.claude/rules/solid-jsx-namespace.md`.
 
-import type { ISymbioteIntrinsic } from '@symbiote-native/components';
+import type { ICrossTypedIntrinsics } from '@symbiote-native/components';
 import type { ISymbioteNode } from '@symbiote-native/engine';
+import type { IViewProps } from './components/view-props';
+import type { ITextProps } from './components/text-props';
+import type { IPressableProps } from './components/pressable-props';
+import type { IButtonProps } from './components/button-props';
+import type { IImageProps } from './components/image-props';
+import type { IImageBackgroundProps } from './components/image-background-props';
+import type { IInputAccessoryViewProps } from './components/input-accessory-view-props';
+import type { IRefreshControlProps } from './components/refresh-control-props';
+import type { ISafeAreaViewProps } from './components/safe-area-view-props';
+import type { ITouchableNativeFeedbackProps } from './components/touchable-native-feedback/touchable-native-feedback-props';
+import type {
+  ITouchableOpacityProps,
+  ITouchableHighlightProps,
+} from './components/touchable-props';
+import type { ITouchableWithoutFeedbackProps } from './components/touchable-without-feedback/touchable-without-feedback-props';
+import type { IScrollViewProps } from './components/scroll-view-props';
+import type { ISwitchProps } from './components/switch-props';
+import type { ITextInputProps } from './components/text-input-props';
+import type { IModalProps } from './components/modal';
+import type { IActivityIndicatorProps } from './components/activity-indicator-props';
 
 // A flat bag, matching what routeProp actually accepts: it decides prop-vs-event per the node's
 // ViewConfig at runtime, so there is no statically-known attribute set to enumerate. Values stay
@@ -68,6 +88,33 @@ type ISymbioteHostAttributes = {
 // `children: {}` has to stay the wide `{}` because it names the property, not its type. So both
 // rules below are disabled by the contract rather than by preference, and only inside it —
 // solid-js's own jsx.d.ts carries the same empty declarations for the same reason.
+// Every tag with a real, non-generic per-adapter prop type today — the same list
+// `adapters/vue/src/jsx-runtime.ts` crosses, mirrored here (mirrors `adapters/react/src/jsx-
+// runtime.ts` too, which crosses `view`/`text` alone; this one goes further, matching Vue's own
+// expansion). `FlatList`/`SectionList`/`VirtualizedList` are deliberately absent: composed
+// components built from several intrinsics, never a single tag an app writes, with generic
+// (`<ItemT>`) prop types a non-generic `Record<ISymbioteIntrinsic, …>` cannot hold anyway.
+interface ICrossedPrimitiveProps {
+  view: IViewProps;
+  text: ITextProps;
+  pressable: IPressableProps;
+  button: IButtonProps;
+  image: IImageProps;
+  'image-background': IImageBackgroundProps;
+  'input-accessory-view': IInputAccessoryViewProps;
+  'refresh-control': IRefreshControlProps;
+  'safe-area-view': ISafeAreaViewProps;
+  'touchable-native-feedback': ITouchableNativeFeedbackProps;
+  'touchable-opacity': ITouchableOpacityProps;
+  'touchable-highlight': ITouchableHighlightProps;
+  'touchable-without-feedback': ITouchableWithoutFeedbackProps;
+  'scroll-view': IScrollViewProps;
+  switch: ISwitchProps;
+  'text-input': ITextInputProps;
+  modal: IModalProps;
+  'activity-indicator': IActivityIndicatorProps;
+}
+
 /* eslint-disable @typescript-eslint/no-namespace, @typescript-eslint/no-empty-object-type */
 export namespace JSX {
   // Mirrors solid-js's own union with the one substitution that matters: our committed host node
@@ -116,10 +163,12 @@ export namespace JSX {
   // The tag union comes from @symbiote-native/components rather than being retyped, so a new host
   // tag becomes valid JSX in the same commit that registers its Fabric name — no second list to
   // forget. Declared FRESH (not merged into solid-js's HTML list), which is what makes `<div>` an
-  // error in a React Native app.
-  export interface IntrinsicElements extends Record<
-    ISymbioteIntrinsic,
-    ISymbioteHostAttributes
+  // error in a React Native app. Crossed to `ICrossedPrimitiveProps` above for the tags that carry
+  // a real prop type — `IntrinsicAttributes` above is empty (no index signature), so this is fully
+  // strict: an unknown prop or a wrong value type on any of them is a real error, not swallowed.
+  export interface IntrinsicElements extends ICrossTypedIntrinsics<
+    ISymbioteHostAttributes,
+    ICrossedPrimitiveProps
   > {}
 }
 /* eslint-enable @typescript-eslint/no-namespace, @typescript-eslint/no-empty-object-type */

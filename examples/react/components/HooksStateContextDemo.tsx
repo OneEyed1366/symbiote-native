@@ -1,5 +1,4 @@
 import { createContext, useContext, useReducer, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 
@@ -18,11 +17,11 @@ function ReducerCounter() {
   const step = useContext(StepContext);
   const [count, dispatch] = useReducer(counterReducer, 0);
   return (
-    <View className="row-tight">
-      <Text
+    <view className="row-tight">
+      <text
         testID="hooks-reducer-count"
         className="info-text"
-      >{`useReducer count: ${count} (step ${step})`}</Text>
+      >{`useReducer count: ${count} (step ${step})`}</text>
       <ActionButton
         testID="hooks-reducer-increment"
         title={`+${step}`}
@@ -37,7 +36,7 @@ function ReducerCounter() {
         onPress={() => dispatch({ type: 'reset' })}
         color={LINE_COLOR.introspection}
       />
-    </View>
+    </view>
   );
 }
 
@@ -46,12 +45,12 @@ export function HooksStateContextDemo() {
   const [step, setStep] = useState(1);
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">useState · useReducer · useContext</Text>
-      <Text
+    <view className="section-nested">
+      <text className="section-label">useState · useReducer · useContext</text>
+      <text
         testID="hooks-state-name"
         className="info-text"
-      >{`useState: hello, ${name}`}</Text>
+      >{`useState: hello, ${name}`}</text>
       <ActionButton
         testID="hooks-state-toggle"
         title="Rename"
@@ -69,6 +68,6 @@ export function HooksStateContextDemo() {
         onPress={() => setStep(current => (current === 1 ? 5 : 1))}
         color={LINE_COLOR.introspection}
       />
-    </View>
+    </view>
   );
 }

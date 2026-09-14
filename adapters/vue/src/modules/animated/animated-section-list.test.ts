@@ -82,11 +82,9 @@ function mountList(extra: Record<string, unknown>): Promise<void> {
           { sections: SECTIONS, ...extra },
           {
             sectionHeader: ({ section }: { section: ISectionShape }) => [
-              h('symbiote-text', {}, `header:${section.title}`),
+              h('text', {}, `header:${section.title}`),
             ],
-            item: ({ item }: { item: IRow }) => [
-              h('symbiote-text', {}, item.label),
-            ],
+            item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
           },
         ),
     }),

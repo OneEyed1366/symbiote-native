@@ -25,9 +25,9 @@ import { View } from '@symbiote-native/angular';
   standalone: true,
   imports: [View],
   template: `
-    <View class="pg-lifecycle-box" testID="pg-lifecycle-box">
+    <view class="pg-lifecycle-box" testID="pg-lifecycle-box">
       <ng-content></ng-content>
-    </View>
+    </view>
   `,
 })
 export class PlaygroundLifecycleLogger

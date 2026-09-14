@@ -48,7 +48,8 @@ import {
   type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { View, type IViewProps } from './view';
+import { withStableKeys } from '../utils/stable-keys';
+import type { IViewProps } from './view-props';
 
 export type { IKeyboardAvoidingBehavior } from '@symbiote-native/components';
 
@@ -215,15 +216,21 @@ export function KeyboardAvoidingView(
     onLayout: handleLayout,
   }));
 
+  // The half `View` used to supply, now that the wrapper is a bare tag: `spread` has no removal
+  // pass, so a key that stops being emitted (`rest` is a splitProps proxy, and `wrapperStyle` is
+  // absent in some behaviors) would keep its last value on the native view forever
+  // (.claude/rules/solid-descriptor-bridge.md §1).
+  const stableWrapperProps = withStableKeys(wrapperProps);
+
   // 'nested' ('position') pushes the children in an inner View by `bottom: inset`; the wrapper modes
   // ('padding' / 'height' / no behavior) adjust the single wrapper directly.
   return (
-    <View {...wrapperProps()}>
+    <view {...stableWrapperProps()}>
       {isNested() ? (
-        <View style={innerStyle()}>{local.children}</View>
+        <view style={innerStyle()}>{local.children}</view>
       ) : (
         local.children
       )}
-    </View>
+    </view>
   );
 }

@@ -6,16 +6,16 @@
 // (connectAnimatedNodeToView), hands the curve to native, and keeps the JS-committed prop frozen
 // while native drives.
 //
-// Compiles the REAL View.svelte (not a hand-written stand-in) through svelte/compiler and wraps
-// same pattern as components/switch/switch.smoke.test.ts: write the compiled output CO-LOCATED
-// with the real source (its own `import ... from './animated-props-runtime'` / `'../../dom-shim'`
-// resolve relative to wherever the compiled file lives), then dynamic-import it.
+// Compiles app-authored markup through svelte/compiler and dynamic-imports the output, the same
+// pattern as bare-tag-authored.test.ts. There is no wrapper left to compile under it: the subject
+// IS the tag, and `style` reaches the shim through svelte's `set_style` exit.
 //
 // Scope note: the value graph / interpolation math / native-tag minting this exercises belongs to
 // core/engine (already covered by core/engine/src/animated/*.test.ts) and is used, not
-// re-verified, here — this file's job is proving the SVELTE side of the wiring: that mounting
-// AnimatedView through the real component tree produces a committed Fabric view whose tag is what
-// gets bound, at the moment `bind:this`/the reconcile $effect actually run.
+// re-verified, here — this file's job is proving the SVELTE side of the wiring: that an animated
+// style written on a plain `<View>` produces a committed Fabric view whose tag is what gets bound.
+// `connectAnimatedNodeToView` is asserted by COUNT, not just presence: the wrapper used to make
+// this attach too, so a leftover second path would double it rather than break it.
 //
 // No Negative group: there is no invalid input this path rejects — `timing(...).start()` on an
 // unmounted-but-committed view is the one supported shape. The counterpart of this scenario (no
@@ -24,7 +24,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { AnimatedValue } from '@symbiote-native/engine';
@@ -124,9 +124,9 @@ const tick = (): Promise<void> =>
 // (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must
 // instead walk the currently COMMITTED tree, same as activity-indicator.smoke.test.ts's
 // findLive. Filtering on viewName==='RCTView' alone is not enough to identify OUR node:
-// root-element.ts's own mount target is ITSELF an unlabeled `symbiote-view` (RCTView, {}
-// props), sitting between the AppContainer and AnimatedView's real host node — so the search
-// must key on a prop only our own AnimatedView carries (testID), not the generic viewName.
+// root-element.ts's own mount target is ITSELF an unlabeled `view` (RCTView, {}
+// props), sitting between the AppContainer and our View's real host node — so the search
+// must key on a prop only our own View carries (testID), not the generic viewName.
 function findLive(
   node: IFakeNode,
   predicate: (n: IFakeNode) => boolean,
@@ -164,35 +164,17 @@ const COMPILE_OPTIONS = {
   fragments: 'tree',
   css: 'external',
 } as const;
-const COMPONENTS_DIR = join(__dirname, '..', '..', 'components');
-// The compiled base sits NEXT TO its real source, so its own relative imports resolve.
-const VIEW_OUT = join(COMPONENTS_DIR, '.smoke-compiled-animated-view.mjs');
 const PARENT_OUT = join(__dirname, '.smoke-compiled-driver-parent.mjs');
 
-function compileToFile(
-  source: string,
-  filename: string,
-  outPath: string,
-): void {
-  const result = compile(source, { ...COMPILE_OPTIONS, filename });
-  writeFileSync(outPath, result.js.code);
-}
-
 async function loadParent(): Promise<Component> {
-  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
-  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
-
-  compileToFile(
+  const result = compile(
     `<script>
-       import View from '../../components/.smoke-compiled-animated-view.mjs';
-       import { createAnimatedComponent } from './create-animated-component';
-       const AnimatedView = createAnimatedComponent(View);
        let { style } = $props();
      </script>
-     <AnimatedView {style} testID="animated-driver-box" />`,
-    'DriverParent.svelte',
-    PARENT_OUT,
+     <view {style} testID="animated-driver-box"></view>`,
+    { ...COMPILE_OPTIONS, filename: 'DriverParent.svelte' },
   );
+  writeFileSync(PARENT_OUT, result.js.code);
 
   const mod: unknown = await import(`file://${PARENT_OUT}`);
   if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
@@ -210,7 +192,6 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(VIEW_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
 });
 

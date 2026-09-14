@@ -79,19 +79,18 @@ subscription.
   <TabItem label="React">
     ```tsx
     import { useState } from 'react';
-    import { Button, Text, View } from '@symbiote-native/react';
     import { deleteItemAsync, getItemAsync, setItemAsync } from '@symbiote-native/secure-store/react';
 
     export default function SessionToken() {
       const [token, setToken] = useState<string | null>(null);
 
       return (
-        <View>
-          <Text>{token ?? 'no token stored'}</Text>
-          <Button title="Save" onPress={() => setItemAsync('session-token', 'abc123')} />
-          <Button title="Read" onPress={() => getItemAsync('session-token').then(setToken)} />
-          <Button title="Forget" onPress={() => deleteItemAsync('session-token').then(() => setToken(null))} />
-        </View>
+        <view>
+          <text>{token ?? 'no token stored'}</text>
+          <button title="Save" onPress={() => setItemAsync('session-token', 'abc123')} />
+          <button title="Read" onPress={() => getItemAsync('session-token').then(setToken)} />
+          <button title="Forget" onPress={() => deleteItemAsync('session-token').then(() => setToken(null))} />
+        </view>
       );
     }
     ```
@@ -101,7 +100,6 @@ subscription.
     ```vue
     <script setup lang="ts">
     import { ref } from 'vue';
-    import { Button, Text, View } from '@symbiote-native/vue';
     import { deleteItemAsync, getItemAsync, setItemAsync } from '@symbiote-native/secure-store/vue';
 
     const token = ref<string | null>(null);
@@ -124,12 +122,12 @@ subscription.
     </script>
 
     <template>
-      <View>
-        <Text>{{ token ?? 'no token stored' }}</Text>
-        <Button title="Save" @press="onSave" />
-        <Button title="Read" @press="onRead" />
-        <Button title="Forget" @press="onForget" />
-      </View>
+      <view>
+        <text>{{ token ?? 'no token stored' }}</text>
+        <button title="Save" @press="onSave" />
+        <button title="Read" @press="onRead" />
+        <button title="Forget" @press="onForget" />
+      </view>
     </template>
     ```
 
@@ -137,19 +135,19 @@ subscription.
   <TabItem label="Angular">
     ```ts
     import { Component, signal } from '@angular/core';
-    import { Button, Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { deleteItemAsync, getItemAsync, setItemAsync } from '@symbiote-native/secure-store/angular';
 
     @Component({
       standalone: true,
-      imports: [Button, Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Text>{{ token() ?? 'no token stored' }}</Text>
-          <Button title="Save" (press)="onSave()" />
-          <Button title="Read" (press)="onRead()" />
-          <Button title="Forget" (press)="onForget()" />
-        </View>
+        <view>
+          <text>{{ token() ?? 'no token stored' }}</text>
+          <button title="Save" (press)="onSave()" />
+          <button title="Read" (press)="onRead()" />
+          <button title="Forget" (press)="onForget()" />
+        </view>
       `,
     })
     export class SessionToken {
@@ -176,7 +174,6 @@ subscription.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Button, Text, View } from '@symbiote-native/svelte';
       import { deleteItemAsync, getItemAsync, setItemAsync } from '@symbiote-native/secure-store/svelte';
 
       let token = $state<string | null>(null);
@@ -194,12 +191,12 @@ subscription.
       }
     </script>
 
-    <View>
-      <Text>{token ?? 'no token stored'}</Text>
-      <Button title="Save" onPress={onSave} />
-      <Button title="Read" onPress={onRead} />
-      <Button title="Forget" onPress={onForget} />
-    </View>
+    <view>
+      <text>{token ?? 'no token stored'}</text>
+      <button title="Save" onPress={onSave} />
+      <button title="Read" onPress={onRead} />
+      <button title="Forget" onPress={onForget} />
+    </view>
     ```
 
     There's no per-instance rune to reach for here either — every function is a plain export off
@@ -209,19 +206,18 @@ subscription.
   <TabItem label="Solid">
     ```tsx
     import { createSignal } from 'solid-js';
-    import { Button, Text, View } from '@symbiote-native/solid';
     import { deleteItemAsync, getItemAsync, setItemAsync } from '@symbiote-native/secure-store/solid';
 
     export function SessionToken() {
       const [token, setToken] = createSignal<string | null>(null);
 
       return (
-        <View>
-          <Text>{token() ?? 'no token stored'}</Text>
-          <Button title="Save" onPress={() => setItemAsync('session-token', 'abc123')} />
-          <Button title="Read" onPress={() => getItemAsync('session-token').then(setToken)} />
-          <Button title="Forget" onPress={() => deleteItemAsync('session-token').then(() => setToken(null))} />
-        </View>
+        <view>
+          <text>{token() ?? 'no token stored'}</text>
+          <button title="Save" onPress={() => setItemAsync('session-token', 'abc123')} />
+          <button title="Read" onPress={() => getItemAsync('session-token').then(setToken)} />
+          <button title="Forget" onPress={() => deleteItemAsync('session-token').then(() => setToken(null))} />
+        </view>
       );
     }
     ```

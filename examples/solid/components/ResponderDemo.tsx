@@ -16,7 +16,7 @@
 // `style` cannot rebuild anything mid-drag. Keep new reads on that side of the line.
 
 import { Index, createSignal } from 'solid-js';
-import { Text, View, type ISymbioteEvent } from '@symbiote-native/solid';
+import type { ISymbioteEvent } from '@symbiote-native/solid';
 import { firstTouchX } from './event-utils';
 import './ResponderDemo.css';
 
@@ -42,20 +42,20 @@ export function ResponderDemo() {
   let grabbed: number | null = null;
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">
+    <view class="section-nested">
+      <text class="section-label">
         Responder · drag a chip vs hand-off to the strip
-      </Text>
-      <Text class="resp-status">{status()}</Text>
+      </text>
+      <text class="resp-status">{status()}</text>
       {/* the separate transfer indicator, lit only when the strip steals the gesture */}
-      <Text
+      <text
         class="resp-transfer"
         style={{ color: transfer() ? '#f6ad55' : '#41506a' }}
       >
         {transfer() || 'transfer: —'}
-      </Text>
+      </text>
 
-      <View
+      <view
         class="resp-strip"
         onMoveShouldSetResponder={(event: ISymbioteEvent) =>
           grabbed !== null &&
@@ -77,14 +77,14 @@ export function ResponderDemo() {
         }}
         onResponderTerminate={() => setRowDx(0)}
       >
-        <View class="resp-row" style={{ transform: [{ translateX: rowDx() }] }}>
+        <view class="resp-row" style={{ transform: [{ translateX: rowDx() }] }}>
           {/* Index, not For: a chip is a fixed positional slot, so keying it by value would
               rebuild the whole column on any array identity change. Imported explicitly — an
               un-imported control-flow name resolves against the renderer module and reads
               `undefined` at RUNTIME, with the bundle building fine (§3). */}
           <Index each={RESPONDER_CHIPS}>
             {(_chip, index) => (
-              <View
+              <view
                 testID={`resp-chip-${index}`}
                 class="resp-chip"
                 style={{
@@ -120,12 +120,12 @@ export function ResponderDemo() {
                   setStatus(`chip ${index} released`);
                 }}
               >
-                <Text class="resp-chip-text">{index}</Text>
-              </View>
+                <text class="resp-chip-text">{index}</text>
+              </view>
             )}
           </Index>
-        </View>
-      </View>
-    </View>
+        </view>
+      </view>
+    </view>
   );
 }

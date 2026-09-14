@@ -1,5 +1,137 @@
 # @symbiote-native/components
 
+## 2.0.0
+
+### Minor Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A claimed child can now become the owner's PARENT, which is what an Android RefreshControl is.
+
+  An Android ScrollView holds exactly one child, so a sibling refresh control is an `addViewAt`
+  crash — RN inverts the tree there instead of beside-placing like it does on iOS. `claimedChildren`
+  carries a mode per name, `beside` or `wrap`, and `ISymbioteNode.wrapper` records the inversion. The
+  adapter goes on naming the scroll view for every insert, prop write and command; only the two
+  structural entry points know a wrapper is what the tree holds.
+
+  `IHostBehavior.onWrapChange` is where a behavior answers for it. The wrapper is the app's own node,
+  so nothing could have given it a payload fold at creation — this is where the scroll view's layout
+  style moves up to it and its visual style stays below.
+
+  `splitScrollViewStyle` composes the axis base onto BOTH boxes, as RN does. All five adapters had
+  dropped it from the wrapper, so an `AndroidSwipeRefreshLayout` with no explicit user layout style
+  lost `flexGrow: 1` and collapsed to its content height inside a flex parent.
+
+  `insertBefore`'s `beforeChild` is typed nullable, which is what its callers always passed.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `IHostBehavior.claimedChildren` keeps a named child on the owner instead of redirecting it into the
+  internal slot, and places it before that slot.
+
+  A ScrollView's RefreshControl is a sibling of the content view rather than one of its children, and
+  RN renders `{refreshControl}{contentContainer}` in that order. Claims are keyed by the child's
+  Fabric component name: a claim is only consulted for children of one owner, so the name is
+  unambiguous there and no node has to carry its intrinsic tag.
+
+  `insertBefore` and `removeChild` read the same rule, so an adapter that names the owner both places
+  a claimed child correctly and can take it away again.
+
+  Android is not this shape and is not covered: there the refresh control wraps the scroll view, which
+  needs a node above the owner rather than beside its slot.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `@symbiote-native/components/register`: every host behavior (`registerScrollViewBehavior`,
+  `registerSwitchBehavior`, `registerTextInputBehavior`, the sticky-header and image behaviors, …)
+  now registers from one shared module instead of five adapters each re-declaring the same call
+  list in their own `register.ts`.
+
+  The list had already drifted once between adapters before this landed — a behavior added for one
+  framework and forgotten in another is now structurally impossible, since there is only one list to
+  edit. `registerScrollViewBehavior()` itself is finally called for real (it existed since the
+  structure-seam work but nothing invoked it while the wrappers still built their own content node);
+  every adapter pulls it in through this entrypoint now that the wrappers are gone.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add the structure seam a COMPOSED host primitive needs: `IHostBehavior.buildStructure` and
+  `ISymbioteNode.childHost`.
+
+  `foldPayload` gave a lowered primitive its wrapper's prop mapping. Nothing gave it the wrapper's
+  composition, so a primitive built from more than one node — ScrollView is a scroll view wrapping a
+  content view — could not be lowered at all, whatever its props did.
+
+  A behavior may now build its own internal subtree once at attach and return the node the app's
+  children belong under. `appendChild` / `insertBefore` / `removeChild` redirect there, so an adapter
+  keeps naming the owner and never learns a slot exists — the same relationship a browser's `<video>`
+  has with its UA shadow tree.
+
+  `IHostBehavior.slotProps` is the prop twin: owner prop name -> slot prop name, applied in
+  `routeProp` and gated on the same field, so an app writes `contentContainerStyle` on the ScrollView
+  and it lands as the content node's `style`. A pure rename — precedence belongs to a `payloadFold`,
+  because the two orders are opposite (the scroll node's base style goes UNDER the app's, the
+  content node's `flexDirection: 'row'` goes OVER it).
+
+  Also lands `registerScrollViewBehavior()` in `@symbiote-native/components`, the first consumer: it
+  builds the same two nodes and composes the same two style arrays every adapter's wrapper does. It
+  is exported but called by nothing — `symbiote-scroll-view` is the tag the wrappers already emit and
+  they build their own content node, so a global registration would double-nest every existing
+  ScrollView. Splitting the wrapper and lowered tags — the `symbiote-text-input` /
+  `symbiote-text-input-managed` precedent — is the next step.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Declare `scroll-view`, `touchable-opacity` and `touchable-highlight` in
+  `core/components/host-primitives.cjs`, the build-time spec Vue's and Solid's lowering transforms
+  read to decide which JSX elements compile straight to the engine's mutation API instead of a
+  framework component instance. Without an entry a primitive stays a component forever, however
+  completely its runtime behavior already lives on the engine node — this is what let Vue's and
+  Solid's own wrapper-retirement commits actually lower those three tags at build time rather than
+  just delete the JS wrapper and leave the element uncompiled.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Two engine seams a composed host primitive needs, and ScrollView's prop half wired onto them.
+
+  `IHostBehavior.slotDerived` names owner props the internal slot's payload is computed from, so a
+  write to one marks the slot dirty. `markPropsDirty` bubbles up, so without it a derived slot value
+  is correct at mount and frozen forever after. Read past `setProp`'s identity guard, so a re-render
+  writing an unchanged value still costs nothing.
+
+  `IHostBehavior.onOwnedListenerChange` fires when the app wires or unwires an owned listener — never
+  on the fresh closure a framework hands over each render. `afterCommit` cannot serve this: a listener
+  change moves no Fabric prop, so the commit after it is a no-op and post-commit hooks are skipped.
+
+  A lowered ScrollView now resolves `decelerationRate` to the platform friction constant, turns off
+  content-cell flattening for `maintainVisibleContentPosition` / `snapToAlignment`, and synthesizes
+  `onContentSizeChange` from its content view's layout — installing that gated `onLayout` only when
+  the app passed a handler, as RN and every wrapper do.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A lowered ScrollView can now pin a `<sticky-header>` child, the last piece a composed host
+  primitive needed before its wrapper could be deleted.
+
+  RN's sticky header is JS-built (`ScrollViewStickyHeader`), not a native concept — a plain view
+  carrying `zIndex` and an animated `translateY` computed from scroll offset against the header's own
+  measured layout. `registerScrollViewBehavior`'s owner now tracks sticky-header children through the
+  new `sticky` claim mode, and `core/components/src/behaviors/scroll-view/sticky.ts` runs the
+  offset/pin math that every wrapper used to duplicate. `<sticky-header>` and its Fabric name join the
+  platform-invariant tables in `component-names/{index.ios,index.android,shared}.ts`.
+
+  Angular's `babel-register-composed.cjs` picks up the new tag for its host-primitive lowering pass.
+
+### Patch Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Add `ICrossTypedIntrinsics<LooseProps, Crossed>`, the one shared shape behind every adapter's
+  intrinsic-element type table: every tag gets a loose attribute bag by default except the ones the
+  adapter has a real per-tag prop type for, which get that type instead (`Omit` the crossed keys out
+  of the loose record, merge the real ones back in). The mechanics were duplicated per adapter before
+  this; only the prop types genuinely differ (`children`/`ref` are framework values, so a type like
+  `IViewProps` can't be fully shared) — this generic lets an adapter's own table stay a one-line
+  instantiation instead of re-deriving the `Omit<Record<...>, keyof Crossed> & Crossed` shape by hand.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `scrollTo`, `scrollToEnd` and `flashScrollIndicators` are now methods on `ISymbioteNode`, beside
+  `focus` / `blur` / `measure`.
+
+  A lowered ScrollView hands the app its engine node, with no wrapper to build an imperative handle
+  from — so anything the wrapper's handle offered has to be reachable from the node, or the public
+  surface silently shrinks the day the primitive stops being a component.
+
+  `buildScrollViewHandle` keeps its signature and now delegates to those methods instead of
+  dispatching its own commands. The defaults (`x`/`y` 0, `animated` true) live in one place, so a ref
+  and a tag cannot disagree about what `scrollTo()` with no argument means.
+
+- Updated dependencies [[`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f)]:
+  - @symbiote-native/engine@0.5.0
+
 ## 1.0.0
 
 ### Minor Changes

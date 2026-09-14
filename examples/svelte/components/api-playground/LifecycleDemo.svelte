@@ -6,7 +6,6 @@
   // (useFocusEffect/useIsFocused/useNavigationState), never Svelte's onMount/onDestroy/tick/
   // settled directly; this is the first screen to do that.
   import { onMount, settled, tick } from 'svelte';
-  import { Text, View } from '@symbiote-native/svelte';
   import { dlog } from '@symbiote-native/engine';
   import ActionButton from '../ActionButton.svelte';
   import DestroyableChild from './DestroyableChild.svelte';
@@ -46,15 +45,15 @@
   }
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">
+<view class="section-nested">
+  <text class="section-label">
     Lifecycle · onMount, onDestroy, tick, settled
-  </Text>
-  <Text class="info-text" testID="lifecycle-mount-readout">
+  </text>
+  <text class="info-text" testID="lifecycle-mount-readout">
     {mountedAt === undefined
       ? 'not mounted yet'
       : `onMount fired at ${mountedAt}`}
-  </Text>
+  </text>
   <ActionButton
     testID="lifecycle-toggle-child"
     title={childMounted ? 'Unmount child (fires onDestroy)' : 'Mount child'}
@@ -64,27 +63,27 @@
   {#if childMounted}
     <DestroyableChild onGone={onChildGone} />
   {/if}
-  <Text class="info-text" testID="lifecycle-destroy-readout">
+  <text class="info-text" testID="lifecycle-destroy-readout">
     {destroyedAt === undefined
       ? 'child not destroyed yet'
       : `onDestroy fired at ${destroyedAt}`}
-  </Text>
+  </text>
   <ActionButton
     testID="lifecycle-run-tick"
     title="await tick()"
     color={ACCENT}
     onPress={runTick}
   />
-  <Text class="note-text" testID="lifecycle-tick-readout">
+  <text class="note-text" testID="lifecycle-tick-readout">
     {tickReadout}
-  </Text>
+  </text>
   <ActionButton
     testID="lifecycle-run-settled"
     title="await settled()"
     color={ACCENT}
     onPress={runSettled}
   />
-  <Text class="note-text" testID="lifecycle-settled-readout">
+  <text class="note-text" testID="lifecycle-settled-readout">
     {settledReadout}
-  </Text>
-</View>
+  </text>
+</view>

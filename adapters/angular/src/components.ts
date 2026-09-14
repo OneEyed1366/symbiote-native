@@ -4,11 +4,21 @@
 // real Angular input so RN `StyleProp` arrays/objects are flattened and forwarded through the
 // custom renderer, instead of being misinterpreted by Angular's CSS style engine.
 
-export { ActivityIndicator } from './components/activity-indicator';
-export type { IActivityIndicatorProps } from './components/activity-indicator';
-export { Image, setImageSourceResolver } from './components/image';
-export { InputAccessoryView } from './components/input-accessory-view';
-export type { IAngularInputAccessoryViewProps } from './components/input-accessory-view';
+// `ActivityIndicator` is a TAG — `<activity-indicator>`, matched by `ActivityIndicatorElement` — and there is nothing to import in its
+// place. RN's ActivityIndicator has no statics, so the name exports nothing at all now; the prop
+// type stays, for a component forwarding a bag.
+export type { IActivityIndicatorProps } from './components/activity-indicator-props';
+// `Image` is a TAG — `<image>`, matched by `ImageElement` — and the name now exports RN's Image
+// STATICS namespace (`Image.getSize` / `.prefetch` / `.queryCache`), which is what an app still
+// calls it for. `Animated.Image` keeps the component spelling; it is not a primitive.
+export { Image } from './modules/image';
+export type { IImageStatics } from './modules/image';
+export { setImageSourceResolver } from '@symbiote-native/components';
+// `InputAccessoryView` is a TAG — `<input-accessory-view>`, matched by
+// `InputAccessoryViewElement` — and there is nothing to import in its place. RN gives it no
+// statics, so the name exports nothing at all now; an app's `imports: [InputAccessoryView]` becomes
+// `imports: [InputAccessoryViewElement]`. Only the prop type stays.
+export type { IAngularInputAccessoryViewProps } from './components/input-accessory-view-props';
 export { Modal } from './components/modal';
 export type {
   IAngularModalProps,
@@ -24,56 +34,95 @@ export type {
   IResizeMode,
   IImageSize,
   IImageCacheStatus,
-} from './components/image';
-export { Pressable } from './components/pressable';
-export type { IAngularPressableProps } from './components/pressable';
-export { SafeAreaView } from './components/safe-area-view';
-export type { IAngularSafeAreaViewProps } from './components/safe-area-view';
-export { Switch } from './components/switch';
-export type { ISwitchProps, ISwitchTrackColor } from './components/switch';
-export { ImageBackground } from './components/image-background';
-export type { IAngularImageBackgroundProps } from './components/image-background';
+} from '@symbiote-native/components';
+// `Pressable` is a TAG — `<pressable>`, matched by `PressableElement` — and there is nothing to
+// import in its place. RN gives it no statics, so the name exports nothing at all now; the press
+// machine is an engine behavior on the node (`registerPressableBehavior`). An app's
+// `imports: [Pressable]` becomes `imports: [PressableElement]`. Only the prop types stay.
+export type {
+  IAngularPressableProps,
+  IAngularPressableInputs,
+} from './components/pressable-props';
+// `SafeAreaView` is a TAG — `<safe-area-view>`, matched by `SafeAreaViewElement` — and there is
+// nothing to import in its place. RN gives it no statics, so the name exports nothing at all now;
+// an app's `imports: [SafeAreaView]` becomes `imports: [SafeAreaViewElement]`. Only the prop type
+// stays.
+export type { IAngularSafeAreaViewProps } from './components/safe-area-view-props';
+// `Switch` is a TAG — `<switch>`, matched by `SwitchElement` — and there is nothing to import in
+// its place. RN gives it no statics, so the name exports nothing at all now; `[(value)]` is handled
+// by the renderer and `[(ngModel)]` by `SwitchValueAccessor` (`../elements`), which is where the
+// wrapper's `NG_VALUE_ACCESSOR` went. Only the prop types stay.
+export type {
+  ISwitchProps,
+  ISwitchTrackColor,
+  ISwitchChangeEvent,
+} from '@symbiote-native/components';
+// `ImageBackground` is a TAG — `<image-background>`, matched by `ImageBackgroundElement` in
+// `elements.ts` — and there is nothing to import in its place. The prop type stays, for a
+// component forwarding a bag and for that directive's own input types.
+export type { IAngularImageBackgroundProps } from './components/image-background-props';
 export { KeyboardAvoidingView } from './components/keyboard-avoiding-view';
 export type {
   IAngularKeyboardAvoidingViewProps,
   IKeyboardAvoidingBehavior,
 } from './components/keyboard-avoiding-view';
-export { RefreshControl } from './components/refresh-control';
-export type { IAngularRefreshControlProps } from './components/refresh-control';
-export { TextInput } from './components/text-input';
+// `RefreshControl` is a TAG — `<refresh-control>`, matched by `RefreshControlElement` — and there
+// is nothing to import in its place. The controlled-spinner handshake is
+// `registerRefreshControlBehavior` (`../register.ts`); only the prop type stays.
+export type { IAngularRefreshControlProps } from './components/refresh-control-props';
+// `TextInput` is a TAG — `<text-input>` / `<text-input-multiline>`, matched by `TextInputElement`
+// and `MultilineTextInputElement` — and there is nothing to import in its place. RN gives it no
+// statics, so the name exports nothing at all now; `[(value)]` is handled by the renderer,
+// `[(ngModel)]` by `TextInputValueAccessor` (`../elements`), and the imperative handle by
+// `buildTextInputHandle` from `@symbiote-native/components` over the node a template ref hands back.
+export type { IAngularTextInputProps } from './components/text-input-props';
 export type {
-  IAngularTextInputProps,
   IEnterKeyHint,
   IInputMode,
   ISubmitBehavior,
   ITextInputHandle,
   ITextInputSelection,
-} from './components/text-input';
-export { TouchableNativeFeedback } from './components/touchable-native-feedback';
+  ITextInputChangeEvent,
+} from '@symbiote-native/components';
+// `TouchableNativeFeedback` is now RN's STATIC NAMESPACE, not a component: the element is the tag
+// `<touchable-native-feedback>`, matched by `TouchableNativeFeedbackElement` (../elements), which
+// commits no node of its own and clones onto its single child. `.Ripple(…)` /
+// `.SelectableBackground(…)` are unchanged; an app's `imports: [TouchableNativeFeedback]` becomes
+// `imports: [TouchableNativeFeedbackElement]`.
+export { TouchableNativeFeedback } from '@symbiote-native/components';
 export type {
-  IAngularTouchableNativeFeedbackProps,
   INativeFeedbackBackground,
   IRippleBackground,
   IThemeAttrBackground,
-} from './components/touchable-native-feedback';
-export {
-  TouchableHighlight,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-} from './components/touchable';
+} from '@symbiote-native/components';
+export type { IAngularTouchableNativeFeedbackProps } from './components/touchable-native-feedback/touchable-native-feedback-props';
+// `TouchableOpacity` and `TouchableHighlight` are TAGS — `<touchable-opacity>` and
+// `<touchable-highlight>`, matched by their element directives — and RN gives neither any statics,
+// so the names export nothing at all now. Both machines run on the engine node
+// (`registerTouchableOpacityBehavior` / `registerTouchableHighlightBehavior`). Only the prop types
+// stay.
 export type {
   IAngularTouchableHighlightProps,
   IAngularTouchableOpacityProps,
-  IAngularTouchableWithoutFeedbackProps,
-} from './components/touchable';
-export { ScrollView, ScrollViewStickyHeader } from './components/scroll-view';
+} from './components/touchable-props';
+// `TouchableWithoutFeedback` is a TAG — `<touchable-without-feedback>`, matched by
+// `TouchableWithoutFeedbackElement` (../elements) — and RN gives it no statics, so like `Button` the
+// name exports nothing now; an app's `imports: [TouchableWithoutFeedback]` becomes
+// `imports: [TouchableWithoutFeedbackElement]`. Only the prop type stays.
+export type { IAngularTouchableWithoutFeedbackProps } from './components/touchable-without-feedback/touchable-without-feedback-props';
+// `ScrollView` is a TAG — `<scroll-view>` / `<horizontal-scroll-view>`, matched by
+// `ScrollViewElement` / `HorizontalScrollViewElement` — and there is nothing to import in its
+// place. The engine owns the content node, sticky headers and the refresh-control claim
+// (`registerScrollViewBehavior`, `../register.ts`); the imperative handle comes from
+// `buildScrollViewHandle` over the node a template ref hands back. Only the prop types stay.
 export type {
   IAngularScrollViewProps,
   IScrollViewHandle,
-  IStickyHeaderComponentType,
-} from './components/scroll-view';
-export { Button } from './components/button';
-export type { IButtonProps } from './components/button';
+} from './components/scroll-view-props';
+// `Button` is a TAG — `<button>`, matched by `ButtonElement` — and there is nothing to import in
+// its place. RN's Button has no statics, so the name exports nothing at all now; the prop type
+// stays, for a component forwarding a bag.
+export type { IButtonProps } from './components/button-props';
 export {
   VirtualizedList,
   VListEmptyDirective,
@@ -154,6 +203,6 @@ export {
   stableAnchorStyle,
 } from './primitives/index';
 
-// Public ergonomic aliases: <View> and <Text> resolve directly to the primitive hosts
+// Public ergonomic aliases: <view> and <text> resolve directly to the primitive hosts
 // (no extra Angular bookkeeping anchor), while the internal symbiote-* selectors remain
 // available for composed adapter templates.

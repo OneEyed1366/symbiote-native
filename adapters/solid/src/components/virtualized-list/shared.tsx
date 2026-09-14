@@ -1,25 +1,43 @@
-// VirtualizedList — real windowing over a hand-authored scroll host. Only the cells whose computed
-// offset falls inside the visible window (plus a leading/trailing buffer) exist as native views;
-// everything above and below collapses into spacers whose sizes sum to the off-screen extent, so the
-// scroll thumb and total content size stay right without mounting all N rows.
+// VirtualizedList — real windowing over the `<scroll-view>` tag's own engine-owned scroll host.
+// Only the cells whose computed offset falls inside the visible window (plus a leading/trailing
+// buffer) exist as native views; everything above and below collapses into spacers whose sizes sum
+// to the off-screen extent, so the scroll thumb and total content size stay right without mounting
+// all N rows.
 //
 // The orchestration — window recompute, edge-reached, viewability, batch fill, MVCP, the imperative
 // scrolls — is the framework-agnostic `reduceList` state machine in @symbiote-native/components,
 // shared verbatim with React, Vue, Svelte and Angular. So is every geometry leaf (`buildListPlan`,
 // `computeWindow`, `resolveItemKey`, …) and every scroll-host helper ScrollView also uses
-// (`selectScrollIntrinsics`, `resolveScrollForwarding`, `splitLayoutProps`, `buildScrollViewHandle`,
+// (`selectScrollIntrinsics`, `resolveScrollForwarding`, `buildScrollViewHandle`,
 // `attachStickyScroll`, `forwardScrollEvent`). Solid supplies ONLY its lifecycle: it turns native
 // events into ACTIONS, holds ONE plain state cell, runs the returned EFFECTS with Solid primitives,
 // and assembles the host elements. Lists have no Descriptor render fn — the cell content is the
 // user's own subtree (`symbiote-add-component` §0, category 2).
 //
-// WHY THIS FILE HAND-AUTHORS THE SCROLL INTRINSICS INSTEAD OF RENDERING <ScrollView>, which is what
-// adapters/react and adapters/vue do. ScrollView takes an OPAQUE children slot, so its sticky path
-// has to resolve those children through solid's `children()` helper and re-wrap the whole list every
-// time any of them changes — and here "any of them changes" is every scroll event, which would tear
-// down and rebuild every sticky header mid-scroll (losing its measured layout each time). Walking
-// `plan.cells` instead lets this file wrap the flagged CELL itself, once, inside the keyed <For> row
-// that owns it. Same conclusion, same reason, as adapters/svelte's index.svelte.
+// SINCE 2026-09-11 THIS FILE NO LONGER BUILDS THE CONTENT NODE ITSELF. `registerScrollViewBehavior()`
+// makes the tag's own `buildStructure` do that (the same content node ScrollView's bare tag gets
+// anywhere else), and this file reads it back off `scroll.childHost` rather than constructing a
+// second one — building one here too would nest a content view inside the behavior's own
+// (`core/components/src/behaviors/scroll-view/shared.ts`'s header names this precondition). The
+// RefreshControl placement (a sibling on iOS, an inverting wrap on Android) moved the same way: it is
+// an ordinary child now, and the behavior's `claimedChildren` decides where it lands.
+//
+// WHY THIS FILE STILL HAND-AUTHORS THE SCROLL TAG VIA `createElement` INSTEAD OF PLAIN JSX
+// (`<scroll-view>{listBody}</scroll-view>`), unlike a component with no dynamic children. Solid's
+// own `insert()` reconciles a parent's children by walking that SAME node's `getFirstChild`/
+// `getNextSibling` — which read `node.children` directly and know nothing about `childHost`
+// redirection. Calling `insert` on the SCROLL node itself would have it diff against the scroll
+// node's own (single) child rather than the content node's list items. So this file keeps an
+// explicit reference to the content node and calls `insert(content, listBody)` on THAT, exactly the
+// node Solid's own diffing needs to see.
+//
+// WHY THE SCROLL CELLS ARE WALKED FOR STICKY HEADERS RATHER THAN LEFT TO THE ENGINE'S GENERIC
+// `stickyHeaderIndices` WALK OF COMMITTED CHILDREN (what a bare `<scroll-view>` gets for free
+// elsewhere): the flagged CELL here needs wrapping ONCE, inside the keyed <For> row that owns it, or
+// every scroll event would tear the wrapper down and rebuild it (losing its measured layout each
+// time) the moment a naive re-render tried to resolve which child is sticky. Same conclusion, same
+// reason, as adapters/svelte's index.svelte. This is independent of the content-node question above
+// — it is about the LIST's own cells, not about how the scroll host itself is built.
 //
 // THREE SOLID FACTS DRIVE THE REST, and none of them is cosmetic (.claude/rules/
 // solid-descriptor-bridge.md):
@@ -35,18 +53,12 @@
 // 3. The scroll AXIS picks a different host TAG and Solid cannot swap a tag under a live node — so
 //    the flip is an explicit rebuild boundary (trap 5), with the build untracked so every other prop
 //    re-props the SAME nodes through `spread`.
-//
-// The ONE thing that differs per platform is where the RefreshControl sits: a childless SIBLING
-// before the content on iOS, WRAPPING the whole scroll host on Android (an Android ScrollView takes
-// exactly one child). That is `IScrollViewHostPlatform.refreshControlMode`, the same fact this
-// adapter's ScrollView encodes, so the two platform barrels feed it in.
 
 import {
   For,
   Show,
   createEffect,
   createMemo,
-  createRenderEffect,
   createSignal,
   on,
   onCleanup,
@@ -78,7 +90,6 @@ import {
   forwardScrollEvent,
   resolveAccessibilityProps,
   resolveScrollForwarding,
-  splitLayoutProps,
   selectScrollIntrinsics,
   createInitialListState,
   readLayoutLength,
@@ -121,19 +132,9 @@ import {
   type ISymbioteNode,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import {
-  createElement,
-  insert,
-  insertNode,
-  setProp,
-  spread,
-} from '../../renderer';
+import { createElement, insert, insertNode, spread } from '../../renderer';
 import { withStableKeys } from '../../utils/stable-keys';
-import { RefreshControl } from '../refresh-control';
-import { ScrollViewStickyHeader } from '../scroll-view/sticky-header';
-import type { IScrollViewHostPlatform } from '../scroll-view/shared';
-
-export type { IScrollViewHostPlatform };
+import { ScrollViewStickyHeader } from './sticky-header';
 
 // Re-exported so app code (and the package barrel) keeps ONE import path for the shared list types,
 // exactly as React's virtualized-list/index.ts re-exports them.
@@ -304,9 +305,11 @@ export type IVirtualizedListComponent = <ItemT>(
   props: IVirtualizedListProps<ItemT>,
 ) => JSX.Element;
 
-export function createVirtualizedList(
-  platform: IScrollViewHostPlatform,
-): IVirtualizedListComponent {
+// No platform parameter any more: the RefreshControl placement per platform (a sibling on iOS, an
+// inverting wrap on Android) is entirely the tag's own engine behavior's concern now
+// (`core/components/src/behaviors/scroll-view/index.{ios,android}.ts`) — this factory used to take
+// an `IScrollViewHostPlatform` only to re-decide the same thing by hand.
+export function createVirtualizedList(): IVirtualizedListComponent {
   return function VirtualizedList<ItemT>(
     props: IVirtualizedListProps<ItemT>,
   ): JSX.Element {
@@ -831,18 +834,15 @@ export function createVirtualizedList(
       // gap); see .claude/rules/list-geometry-feedback-loop.md.
       const separator = (
         <Show when={hasSeparatorAfter(index())}>
-          <symbiote-view>{separatorElement(index())}</symbiote-view>
+          <view>{separatorElement(index())}</view>
         </Show>
       );
       if (!sticky) {
         return (
-          <symbiote-view
-            onLayout={makeCellMeasure(index)}
-            style={invertedStyle()}
-          >
+          <view onLayout={makeCellMeasure(index)} style={invertedStyle()}>
             {content}
             {separator}
-          </symbiote-view>
+          </view>
         );
       }
       // The sticky wrapper measures the cell itself, so it REPLACES the plain measuring view rather
@@ -885,7 +885,7 @@ export function createVirtualizedList(
         <Show
           when={forcedStickyIndex() === index() && gapExtent() > EMPTY_OFFSET}
         >
-          <symbiote-view style={spacerStyle(gapExtent())} />
+          <view style={spacerStyle(gapExtent())} />
         </Show>,
       ];
     }
@@ -903,37 +903,33 @@ export function createVirtualizedList(
       selectScrollIntrinsics(isHorizontal(), contentContainerStyleInput()),
     );
 
-    const wrapsRefreshControl = (): boolean =>
-      platform.refreshControlMode === 'wrap' && props.onRefresh !== undefined;
-    // Under the Android wrap the class has to be resolved BEFORE the layout/visual split, or a
-    // class-only layout prop (flex, height, gap, …) never reaches the wrapper and it collapses to
-    // nothing. Same reasoning as ScrollView's.
-    const splitStyles = createMemo(() =>
-      splitLayoutProps([
-        resolveClassName(props.class),
-        props.style,
-        invertedStyle(),
-      ]),
-    );
+    // The composed content style RN's ScrollView carries: the app's contentContainerStyle plus the
+    // one thing only THIS list knows — the total content extent along the scroll axis, which pins
+    // the content to its measured width so a horizontal row has something to scroll (RN's own
+    // ScrollView never needs this; it never virtualizes). The behavior's own `contentFold` appends
+    // the row-direction style on top of whatever this resolves to (`core/components/src/behaviors/
+    // scroll-view/shared.ts`), same composition `intrinsics().contentStyle` used to build by hand.
+    const contentContainerStyleForContent = ():
+      IStyleProp<IViewStyle> | undefined =>
+      isHorizontal()
+        ? [contentContainerStyleInput(), { width: metrics().total }]
+        : contentContainerStyleInput();
 
     // withStableKeys because several keys below are conditional and Solid's `spread` walks only the
     // CURRENT key set with no removal pass — a key that vanished would keep its last value on the
     // native view forever (.claude/rules/solid-descriptor-bridge.md §1).
+    //
+    // No `wrapsRefreshControl`/`splitStyles`/base-style composition here any more: the tag's own
+    // engine behavior owns the content node, the base-style-under-the-app's-style composition, the
+    // Android-wrap style split (`splitScrollViewStyle`, read off exactly the `style` written below),
+    // `nestedScrollEnabled`'s default and the `horizontal` axis fold — this file only supplies what
+    // the behavior cannot know (the windowing metrics).
     const outerBag = withStableKeys(() => {
       const bag: Record<string, unknown> = {
         ...resolveAccessibilityProps(accessibilityRest),
-        // Base style UNDER the user style, so an explicit height / flexDirection still wins. Under
-        // the Android wrap only the VISUAL half stays here; the LAYOUT half moved to the wrapper.
-        style: wrapsRefreshControl()
-          ? [intrinsics().scrollViewBaseStyle, splitStyles().inner]
-          : [intrinsics().scrollViewBaseStyle, props.style, invertedStyle()],
-        // Load-bearing on iOS (it flips RCTScrollView's own axis); ignored by Android's dedicated
-        // horizontal manager.
-        horizontal: isHorizontal(),
-        // RN's ScrollView default (`nestedScrollEnabled ?? true`): Android needs it for a list nested
-        // inside another scrollable to scroll at all, and the Android RefreshControl wrap needs the
-        // inner scroll to take the gesture before the refresh parent.
-        nestedScrollEnabled: true,
+        style: [props.style, invertedStyle()],
+        class: props.class,
+        contentContainerStyle: contentContainerStyleForContent(),
         onLayout: onViewportLayout,
         onScroll: scrollHandler(),
       };
@@ -941,9 +937,6 @@ export function createVirtualizedList(
       // JS-fallback), without which a header rebuilt off too-sparse scroll events pins late.
       if (forwarding().scrollEventThrottle !== undefined)
         bag.scrollEventThrottle = forwarding().scrollEventThrottle;
-      // Stripped under the wrap: splitStyles already folded the resolved class into outer/inner, so
-      // forwarding it raw too would re-apply its LAYOUT half a second time.
-      if (!wrapsRefreshControl()) bag.class = props.class;
       if (props.onScrollBeginDrag !== undefined)
         bag.onScrollBeginDrag = props.onScrollBeginDrag;
       if (props.onScrollEndDrag !== undefined)
@@ -973,25 +966,6 @@ export function createVirtualizedList(
       return bag;
     });
 
-    // `collapsable: false` keeps the content container a real Yoga node: Android Fabric would otherwise
-    // flatten it away and hoist the cells up as DIRECT children of the scroll view, which hosts exactly
-    // one. A horizontal list also pins the container to the full content WIDTH, or the row is stretched
-    // to the viewport and there is nothing to scroll.
-    const contentBag = withStableKeys(() => {
-      const bag: Record<string, unknown> = {
-        style: isHorizontal()
-          ? [intrinsics().contentStyle, { width: metrics().total }]
-          : intrinsics().contentStyle,
-        collapsable: false,
-      };
-      // maintainVisibleContentPosition anchors against the metrics of MOUNTED cell views, and Android
-      // Fabric flattens layout-only cells away — so the native helper would have nothing to anchor to
-      // and the list jumps on prepend. RN keeps the cells real the same way. iOS never flattens.
-      if (props.maintainVisibleContentPosition !== undefined)
-        bag.collapsableChildren = false;
-      return bag;
-    });
-
     // Every reactive read below sits inside a <Show>/<For> prop getter, so this accessor itself has no
     // dependencies and the content view's `insert` effect runs exactly ONCE. Moving one of those
     // conditions into a plain helper called from here would put it in that effect's dependency set and
@@ -999,28 +973,28 @@ export function createVirtualizedList(
     function listBody(): JSX.Element {
       return [
         <Show when={headerElement !== undefined}>
-          <symbiote-view>{headerElement}</symbiote-view>
+          <view>{headerElement}</view>
         </Show>,
         <Show
           when={isEmpty()}
           fallback={
             <>
               <Show when={leadingExtent() > EMPTY_OFFSET}>
-                <symbiote-view style={spacerStyle(leadingExtent())} />
+                <view style={spacerStyle(leadingExtent())} />
               </Show>
               <For each={cellKeys()}>{buildRow}</For>
               <Show when={trailingExtent() > EMPTY_OFFSET}>
-                <symbiote-view style={spacerStyle(trailingExtent())} />
+                <view style={spacerStyle(trailingExtent())} />
               </Show>
             </>
           }
         >
           <Show when={emptyElement !== undefined}>
-            <symbiote-view>{emptyElement}</symbiote-view>
+            <view>{emptyElement}</view>
           </Show>
         </Show>,
         <Show when={footerElement !== undefined}>
-          <symbiote-view>{footerElement}</symbiote-view>
+          <view>{footerElement}</view>
         </Show>,
       ];
     }
@@ -1041,7 +1015,7 @@ export function createVirtualizedList(
       if (onRefresh === undefined) return undefined;
       dlog('VirtualizedList wiring RefreshControl (onRefresh provided)');
       const element = (
-        <RefreshControl
+        <refresh-control
           refreshing={props.refreshing ?? false}
           onRefresh={onRefresh}
           progressViewOffset={props.progressViewOffset}
@@ -1050,38 +1024,38 @@ export function createVirtualizedList(
       return isSymbioteNode(element) ? element : undefined;
     }
 
-    // The nested scroll-view / content-view pair RN's ScrollView commits.
+    // The scroll host, wired to the ENGINE-OWNED content node rather than a hand-built one. Once
+    // `registerScrollViewBehavior()` is live, `createElement(scrollViewIntrinsic)` already ran the
+    // behavior's `buildStructure` and appended its own content child as `childHost` — building a
+    // second one here would nest `RCTScrollContentView > RCTScrollContentView`
+    // (`core/components/src/behaviors/scroll-view/shared.ts`'s own header names this precondition).
     function buildTree(): ISymbioteNode {
-      const { scrollViewIntrinsic, contentIntrinsic } = intrinsics();
+      const { scrollViewIntrinsic } = intrinsics();
       dlog(`VirtualizedList -> ${scrollViewIntrinsic}`);
-
-      const content = hostElement(contentIntrinsic);
-      spread(content, contentBag, true);
-      insert(content, listBody);
 
       const scroll = hostElement(scrollViewIntrinsic);
       hostNode = scroll;
       spread(scroll, outerBag, true);
 
-      // iOS: the RefreshControl is a childless SIBLING placed BEFORE the content container (RN
-      // ScrollView.js: {refreshControl}{contentContainer}).
-      const refresh = buildRefreshControl();
-      if (refresh !== undefined && platform.refreshControlMode === 'sibling') {
-        insertNode(scroll, refresh);
-      }
-      insertNode(scroll, content);
-      if (refresh === undefined || !wrapsRefreshControl()) return scroll;
+      const content = scroll.childHost;
+      if (content === undefined)
+        throw new Error(
+          `VirtualizedList: ${scrollViewIntrinsic} built no content node — is ` +
+            'registerScrollViewBehavior() wired?',
+        );
+      insert(content, listBody);
 
-      // Android: the RefreshControl WRAPS the scroll host. React does this with cloneElement and Vue
-      // by re-invoking the VNode's type; Solid has neither, because the element arrived already
-      // built — so the scroll host is nested into the existing node and the outer (layout) half of
-      // the style is written onto it. A render effect, not a one-shot set, so a later style change
-      // still moves.
-      createRenderEffect(() => {
-        setProp(refresh, 'style', splitStyles().outer);
-      });
-      insertNode(refresh, scroll);
-      return refresh;
+      // An ordinary child on both platforms now, not a hand-branched sibling/wrap: the behavior's
+      // own `claimedChildren` places it (a sibling of the content view on iOS, an inverting wrap on
+      // Android) and puts it BEFORE the content view regardless of insertion order.
+      const refresh = buildRefreshControl();
+      if (refresh !== undefined) insertNode(scroll, refresh);
+
+      // A wrap claim re-parents `scroll` under the RefreshControl and records it as `scroll.wrapper`
+      // (`core/engine/src/node.ts`'s `placedNode`) — the wrapper, not `scroll`, is what actually
+      // occupies this subtree's place once claimed, so returning `scroll` on Android would hand back
+      // a node that is no longer the tree's root.
+      return scroll.wrapper ?? scroll;
     }
 
     // Drive the sticky scroll value on the native UI thread (RN's attachNativeEvent) so the header

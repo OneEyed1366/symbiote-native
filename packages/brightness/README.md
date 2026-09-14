@@ -72,7 +72,6 @@ verbatim by every adapter.
 ```tsx
 // React — trimmed from examples/expo-react/screens/BrightnessScreen.tsx
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from '@symbiote-native/react';
 import {
   addBrightnessListener,
   getBrightnessAsync,
@@ -94,18 +93,18 @@ function BrightnessScreen() {
   }, []);
 
   return (
-    <View>
-      <Text>
+    <view>
+      <text>
         {brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`}
-      </Text>
-      <Pressable onPress={() => setBrightnessAsync(0.5)}>
-        <Text>Set to 50%</Text>
-      </Pressable>
-      <Text>{permissionStatus?.status ?? 'checking…'}</Text>
-      <Pressable onPress={() => requestPermission()}>
-        <Text>Request permission</Text>
-      </Pressable>
-    </View>
+      </text>
+      <pressable onPress={() => setBrightnessAsync(0.5)}>
+        <text>Set to 50%</text>
+      </pressable>
+      <text>{permissionStatus?.status ?? 'checking…'}</text>
+      <pressable onPress={() => requestPermission()}>
+        <text>Request permission</text>
+      </pressable>
+    </view>
   );
 }
 ```
@@ -114,7 +113,6 @@ function BrightnessScreen() {
 <!-- Vue — trimmed from examples/expo-vue-sfc/screens/BrightnessScreen.vue -->
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
-import { Pressable, Text, View } from '@symbiote-native/vue';
 import {
   addBrightnessListener,
   getBrightnessAsync,
@@ -139,25 +137,24 @@ onUnmounted(() => subscription?.remove());
 </script>
 
 <template>
-  <View>
-    <Text>{{
+  <view>
+    <text>{{
       brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`
-    }}</Text>
-    <Pressable @press="setBrightnessAsync(0.5)">
-      <Text>Set to 50%</Text>
-    </Pressable>
-    <Text>{{ permissionStatus?.status ?? 'checking…' }}</Text>
-    <Pressable @press="requestPermission()">
-      <Text>Request permission</Text>
-    </Pressable>
-  </View>
+    }}</text>
+    <pressable @press="setBrightnessAsync(0.5)">
+      <text>Set to 50%</text>
+    </pressable>
+    <text>{{ permissionStatus?.status ?? 'checking…' }}</text>
+    <pressable @press="requestPermission()">
+      <text>Request permission</text>
+    </pressable>
+  </view>
 </template>
 ```
 
 ```svelte
 <!-- Svelte — trimmed from examples/expo-svelte/screens/BrightnessScreen.svelte -->
 <script lang="ts">
-  import { Pressable, Text, View } from '@symbiote-native/svelte';
   import {
     addBrightnessListener,
     getBrightnessAsync,
@@ -173,27 +170,32 @@ onUnmounted(() => subscription?.remove());
 
   $effect(() => {
     void getBrightnessAsync().then(value => (brightness = value));
-    subscription = addBrightnessListener(event => (brightness = event.brightness));
+    subscription = addBrightnessListener(
+      event => (brightness = event.brightness),
+    );
     return () => subscription?.remove();
   });
 </script>
 
-<View>
-  <Text>{brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`}</Text>
-  <Pressable onPress={() => setBrightnessAsync(0.5)}>
-    <Text>Set to 50%</Text>
-  </Pressable>
-  <Text>{permissions.status?.status ?? 'checking…'}</Text>
-  <Pressable onPress={() => permissions.request()}>
-    <Text>Request permission</Text>
-  </Pressable>
-</View>
+<view>
+  <text
+    >{brightness === null
+      ? 'checking…'
+      : `${Math.round(brightness * 100)}%`}</text
+  >
+  <pressable onPress={() => setBrightnessAsync(0.5)}>
+    <text>Set to 50%</text>
+  </pressable>
+  <text>{permissions.status?.status ?? 'checking…'}</text>
+  <pressable onPress={() => permissions.request()}>
+    <text>Request permission</text>
+  </pressable>
+</view>
 ```
 
 ```tsx
 // Solid — trimmed from examples/expo-solid/screens/BrightnessScreen.tsx
 import { createSignal, onCleanup } from 'solid-js';
-import { Pressable, Text, View } from '@symbiote-native/solid';
 import {
   addBrightnessListener,
   getBrightnessAsync,
@@ -203,25 +205,30 @@ import { createPermissions } from '@symbiote-native/brightness/solid';
 
 function BrightnessScreen() {
   const [brightness, setBrightness] = createSignal<number | null>(null);
-  const { status: permissionStatus, request: requestPermission } = createPermissions();
+  const { status: permissionStatus, request: requestPermission } =
+    createPermissions();
 
   getBrightnessAsync().then(setBrightness);
-  const subscription = addBrightnessListener(event => setBrightness(event.brightness));
+  const subscription = addBrightnessListener(event =>
+    setBrightness(event.brightness),
+  );
   onCleanup(() => subscription.remove());
 
   return (
-    <View>
-      <Text>
-        {brightness() === null ? 'checking…' : `${Math.round(brightness()! * 100)}%`}
-      </Text>
-      <Pressable onPress={() => setBrightnessAsync(0.5)}>
-        <Text>Set to 50%</Text>
-      </Pressable>
-      <Text>{permissionStatus()?.status ?? 'checking…'}</Text>
-      <Pressable onPress={() => requestPermission()}>
-        <Text>Request permission</Text>
-      </Pressable>
-    </View>
+    <view>
+      <text>
+        {brightness() === null
+          ? 'checking…'
+          : `${Math.round(brightness()! * 100)}%`}
+      </text>
+      <pressable onPress={() => setBrightnessAsync(0.5)}>
+        <text>Set to 50%</text>
+      </pressable>
+      <text>{permissionStatus()?.status ?? 'checking…'}</text>
+      <pressable onPress={() => requestPermission()}>
+        <text>Request permission</text>
+      </pressable>
+    </view>
   );
 }
 ```
@@ -229,7 +236,7 @@ function BrightnessScreen() {
 ```ts
 // Angular — trimmed from examples/expo-angular/src/screens/BrightnessScreen.ts
 import { Component, inject, signal } from '@angular/core';
-import { Pressable, Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   PermissionsService,
   addBrightnessListener,
@@ -240,18 +247,18 @@ import {
 @Component({
   selector: 'BrightnessScreen',
   standalone: true,
-  imports: [Pressable, Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <View>
-      <Text>{{ brightnessLabel() }}</Text>
-      <Pressable (press)="setBrightnessAsync(0.5)"
-        ><Text>Set to 50%</Text></Pressable
+    <view>
+      <text>{{ brightnessLabel() }}</text>
+      <pressable (press)="setBrightnessAsync(0.5)"
+        ><text>Set to 50%</text></pressable
       >
-      <Text>{{ permissionStatus()?.status ?? 'checking…' }}</Text>
-      <Pressable (press)="permissionsService.request()"
-        ><Text>Request permission</Text></Pressable
+      <text>{{ permissionStatus()?.status ?? 'checking…' }}</text>
+      <pressable (press)="permissionsService.request()"
+        ><text>Request permission</text></pressable
       >
-    </View>
+    </view>
   `,
 })
 export class BrightnessScreen {

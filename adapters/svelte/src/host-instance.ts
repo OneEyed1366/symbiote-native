@@ -39,19 +39,21 @@ function isShimElement(value: unknown): value is ShimElement {
 // the toPublicInstance call below is the identity; this helper exists only to give app code a correctly
 // TYPED accessor off the SHIM value (`ShimElement`) instead of the bare `.engineNode` field,
 // with no `as` cast at the call site.
-export function hostInstance(
-  shim: ShimElement | null | undefined,
-): IHostInstance | undefined {
-  if (shim === null || shim === undefined) return undefined;
+// `unknown` rather than `ShimElement`, and the guard is what makes that sound. svelte2tsx bakes a
+// `bind:this` return type out of `lib.dom`'s tag maps — an SVG element type for `view`/`text`/
+// `image`/`switch`, `any` for the other seventeen — and neither map accepts augmentation
+// (`src/intrinsic-elements.ts` records the measurement). So an app CANNOT declare its ref as
+// `ShimElement` without a cast, and this is the accessor that exists to keep casts out of app
+// code. Declaring the parameter `unknown` moves the narrowing where it can actually be checked.
+export function hostInstance(shim: unknown): IHostInstance | undefined {
+  if (!isShimElement(shim)) return undefined;
   const node = shim.engineNode;
   return node !== undefined && isSymbioteNode(node)
     ? toPublicInstance(node)
     : undefined;
 }
 
-export function findNodeHandle(
-  componentOrHandle: ShimElement | number | null | undefined,
-): number | null {
+export function findNodeHandle(componentOrHandle: unknown): number | null {
   if (componentOrHandle === null || componentOrHandle === undefined)
     return null;
   if (typeof componentOrHandle === 'number') return componentOrHandle;

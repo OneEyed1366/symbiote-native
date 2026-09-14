@@ -91,7 +91,7 @@ async function loadProbe(): Promise<Component> {
        const lowPowerMode = useLowPowerMode();
        $effect(() => { onValue(lowPowerMode.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'LowPowerModeProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

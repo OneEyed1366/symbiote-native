@@ -6,7 +6,6 @@
   // onStateChange) is built on. Restoring genuinely navigates: the stack becomes exactly the
   // serialized snapshot, which may move you away from this very screen. Svelte twin of
   // examples/vue-sfc/screens/StatePersistenceScreen.vue.
-  import { SafeAreaView, Text, View } from '@symbiote-native/svelte';
   import {
     deserializeNavigatorState,
     serializeNavigatorState,
@@ -61,28 +60,28 @@
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StatePersistence];
 </script>
 
-<SafeAreaView class="screen">
-  <View class="section">
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+<safe-area-view class="screen">
+  <view class="section">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View class="hero-badge" style={{ backgroundColor: LINE_COLOR.routing }}>
-        <Text class="hero-badge-text">SP</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">State persistence</Text>
-        <Text class="hero-body">
+      </text>
+    </view>
+    <view class="hero-card">
+      <view class="hero-badge" style={{ backgroundColor: LINE_COLOR.routing }}>
+        <text class="hero-badge-text">SP</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">State persistence</text>
+        <text class="hero-body">
           The Stack's own state serialized out and deserialized back in —
           restoring exactly where you left off.
-        </Text>
-      </View>
-    </View>
-    <Text class="info-text">
+        </text>
+      </view>
+    </view>
+    <text class="info-text">
       {`current stack depth: ${navigatorState.current.routes.length}`}
-    </Text>
+    </text>
     <ActionButton
       testID="persist-serialize"
       title="Serialize current stack"
@@ -96,12 +95,12 @@
       color={LINE_COLOR.routing}
     />
     {#if restoreError !== undefined}
-      <Text class="info-text">{`error: ${restoreError}`}</Text>
+      <text class="info-text">{`error: ${restoreError}`}</text>
     {/if}
-    <View class="box-list160">
-      <Text testID="persist-snapshot" class="list-row-text">
+    <view class="box-list160">
+      <text testID="persist-snapshot" class="list-row-text">
         {snapshot ?? 'tap Serialize to capture the current route stack as JSON'}
-      </Text>
-    </View>
-  </View>
-</SafeAreaView>
+      </text>
+    </view>
+  </view>
+</safe-area-view>

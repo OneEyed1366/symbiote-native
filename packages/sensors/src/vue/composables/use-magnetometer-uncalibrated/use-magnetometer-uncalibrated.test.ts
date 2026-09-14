@@ -58,7 +58,7 @@ function mountMagnetometerUncalibrated(
     defineComponent({
       setup: () => {
         measurement = useMagnetometerUncalibrated(updateIntervalMs);
-        return () => h('symbiote-text', {}, 'sensor');
+        return () => h('text', {}, 'sensor');
       },
     }),
   );

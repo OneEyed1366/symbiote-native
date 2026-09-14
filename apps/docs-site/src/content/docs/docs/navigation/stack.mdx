@@ -91,18 +91,18 @@ here is a JS-simulated animation.
     ```ts
     // home-screen.ts
     import { Component } from '@angular/core';
-    import { View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { injectStackNavigation } from '@symbiote-native/navigation/angular';
     import { ActionButton } from './action-button';
 
     @Component({
       selector: 'HomeScreen',
       standalone: true,
-      imports: [ActionButton, View],
+      imports: [ActionButton, SYMBIOTE_ELEMENTS],
       template: `
-        <View class="screen">
+        <view class="screen">
           <ActionButton title="Go to Details" (press)="navigation.push('Details', { id: 42 })"></ActionButton>
-        </View>
+        </view>
       `,
     })
     export class HomeScreen {
@@ -113,18 +113,18 @@ here is a JS-simulated animation.
     ```ts
     // details-screen.ts
     import { Component } from '@angular/core';
-    import { View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { injectStackNavigation } from '@symbiote-native/navigation/angular';
     import { ActionButton } from './action-button';
 
     @Component({
       selector: 'DetailsScreen',
       standalone: true,
-      imports: [ActionButton, View],
+      imports: [ActionButton, SYMBIOTE_ELEMENTS],
       template: `
-        <View class="screen">
+        <view class="screen">
           <ActionButton title="Back" (press)="navigation.pop()"></ActionButton>
-        </View>
+        </view>
       `,
     })
     export class DetailsScreen {

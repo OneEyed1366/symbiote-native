@@ -23,7 +23,7 @@ import type {
   ReactElement,
   RefAttributes,
 } from 'react';
-import { descriptorToReact, Image } from '@symbiote-native/react';
+import { descriptorToReact } from '@symbiote-native/react';
 import { resolveAccessibilityProps } from '@symbiote-native/components';
 import type {
   IDescriptor,
@@ -97,7 +97,7 @@ function toChild(child: IDescriptorChild): ReactElement | string {
   return typeof child === 'string' ? child : descriptorToReact(child);
 }
 
-// renderSlider's Descriptor IS the outer wrapper (symbiote-view hosting the native leaf +
+// renderSlider's Descriptor IS the outer wrapper (view hosting the native leaf +
 // optional steps overlay); className is reapplied on it here, exactly like ImageBackground's
 // wrapper.
 function withClassName(
@@ -265,7 +265,7 @@ export function createSlider(platform: ISliderPlatform): ISliderComponent {
         StepMarker,
       });
       return createElement(
-        'symbiote-view',
+        'view',
         {
           style: resolveStepsWrapperStyle(style, platform),
           onLayout: handleLayout,
@@ -333,13 +333,15 @@ function renderCustomStepsOverlay(params: ICustomStepsParams): ReactElement {
     if (params.thumbImage !== undefined && value === params.currentValue) {
       trackChildren.push(
         createElement(
-          'symbiote-view',
+          'view',
           {
             key: 'thumb',
             style: THUMB_IMAGE_CONTAINER_STYLE,
             testID: 'sliderTrackMark-thumbImage',
           },
-          createElement(Image, {
+          // An asset id still resolves: the fold that used to live in the Image wrapper is now
+          // `sourceOf` in the shared image behavior, which every path into the tag crosses.
+          createElement('image', {
             source: params.thumbImage,
             style: THUMB_IMAGE_STYLE,
           }),
@@ -348,7 +350,7 @@ function renderCustomStepsOverlay(params: ICustomStepsParams): ReactElement {
     }
     const cellChildren: ReactElement[] = [
       createElement(
-        'symbiote-view',
+        'view',
         { key: 'track', style: TRACK_MARK_CONTAINER_STYLE },
         ...trackChildren,
       ),
@@ -356,10 +358,10 @@ function renderCustomStepsOverlay(params: ICustomStepsParams): ReactElement {
     if (params.renderStepNumber) {
       cellChildren.push(
         createElement(
-          'symbiote-view',
+          'view',
           { key: 'number', style: STEP_NUMBER_CONTAINER_STYLE },
           createElement(
-            'symbiote-text',
+            'text',
             { testID: `${index}th-step`, style: { fontSize } },
             String(value),
           ),
@@ -367,13 +369,13 @@ function renderCustomStepsOverlay(params: ICustomStepsParams): ReactElement {
       );
     }
     return createElement(
-      'symbiote-view',
+      'view',
       { key: index, style: STEP_INDICATOR_ELEMENT_STYLE },
       ...cellChildren,
     );
   });
   return createElement(
-    'symbiote-view',
+    'view',
     {
       pointerEvents: 'none',
       testID: 'StepsIndicator-Container',

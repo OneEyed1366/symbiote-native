@@ -14,6 +14,7 @@ import {
   insertBefore,
   registerHostBehavior,
   removeChild,
+  setEventListener,
   setProp,
   type ISymbioteNode,
 } from './index';
@@ -365,5 +366,65 @@ describe('afterCommit', () => {
     surface.commit();
 
     expect(log.beats, 'no beat after the teardown commit').toHaveLength(1);
+  });
+});
+
+describe('onOwnedListenerChange', () => {
+  // The gap it fills: a behavior can owe PAYLOAD work to a listener's mere presence (ScrollView
+  // gates the content view's `onLayout` on `onContentSizeChange`), and a listener flip changes no
+  // payload by itself — so the commit after it is a no-op and `commitContainer` returns above
+  // `runPostCommitHooks`. `afterCommit` is exactly the hook that cannot see this.
+  interface IFlipLog extends ILog {
+    flips: Array<{ name: string; wired: boolean }>;
+  }
+
+  function trackFlips(component: string): IFlipLog {
+    const log: IFlipLog = { attached: [], detached: [], flips: [] };
+    registerHostBehavior(component, {
+      ownedListeners: ['load'],
+      attach: node => log.attached.push(node),
+      detach: node => log.detached.push(node),
+      onOwnedListenerChange: (_node, name, wired) => {
+        log.flips.push({ name, wired });
+      },
+    });
+    return log;
+  }
+
+  it('reports the wire and the unwire, and nothing in between', () => {
+    const log = trackFlips(PRESSABLE);
+    const { root } = mount();
+    const node = createElement(PRESSABLE);
+    appendChild(root, node);
+
+    setEventListener(node, 'load', () => {});
+    expect(log.flips).toEqual([{ name: 'load', wired: true }]);
+
+    // A FRESH CLOSURE for the same name, which is what a framework hands over on nearly every
+    // render. Notifying here would put a per-render callback on a per-mount seam, and a behavior
+    // acting on it would re-dirty its subtree every render — the reason `node.listeners` does not
+    // mark dirty at all.
+    setEventListener(node, 'load', () => {});
+    setEventListener(node, 'load', () => {});
+    expect(log.flips).toHaveLength(1);
+
+    setEventListener(node, 'load', undefined);
+    expect(log.flips).toEqual([
+      { name: 'load', wired: true },
+      { name: 'load', wired: false },
+    ]);
+  });
+
+  it('stays silent for a name the behavior does not own', () => {
+    const log = trackFlips(PRESSABLE);
+    const { root } = mount();
+    const node = createElement(PRESSABLE);
+    appendChild(root, node);
+
+    // A real ViewConfig event on this component, and not in `ownedListeners` — so it takes the
+    // ordinary path into `node.listeners` and this seam must not see it.
+    setEventListener(node, 'error', () => {});
+    expect(log.flips).toEqual([]);
+    expect(node.listeners?.get('error')).toBeDefined();
   });
 });

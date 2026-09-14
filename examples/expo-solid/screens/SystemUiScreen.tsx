@@ -1,5 +1,4 @@
 import { createSignal } from 'solid-js';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
 import {
   getBackgroundColorAsync,
   setBackgroundColorAsync,
@@ -13,10 +12,10 @@ const PRESET_BLUE = '#3b82f6';
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="capability-row">
-      <Text class="capability-label">{props.label}</Text>
-      <Text class="value-text">{props.value}</Text>
-    </View>
+    <view class="capability-row">
+      <text class="capability-label">{props.label}</text>
+      <text class="value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -29,9 +28,9 @@ export function SystemUiScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SystemUi];
   const lineColor = LINE_COLOR[lineInfo.line];
 
-  const [backgroundColor, setBackgroundColorValue] = createSignal<string | null>(
-    null,
-  );
+  const [backgroundColor, setBackgroundColorValue] = createSignal<
+    string | null
+  >(null);
 
   const refresh = () => {
     getBackgroundColorAsync().then(color => {
@@ -46,32 +45,32 @@ export function SystemUiScreen() {
   };
 
   return (
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="system-ui-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">System UI</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">System UI</text>
+            <text class="hero-body">
               @symbiote-native/system-ui — get/set the root view's background
               color.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="system-ui-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Root view background</Text>
-          </View>
+        <view testID="system-ui-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Root view background</text>
+          </view>
           <ValueRow
             label="Current color"
             value={backgroundColor() ?? 'not set'}
@@ -94,8 +93,8 @@ export function SystemUiScreen() {
             onPress={() => applyColor(null)}
             color={lineColor}
           />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

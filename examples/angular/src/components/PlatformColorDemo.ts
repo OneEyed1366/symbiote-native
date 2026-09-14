@@ -14,19 +14,19 @@ import './PlatformColorDemo.css';
   standalone: true,
   imports: [View, Text],
   template: `
-    <View class="section-nested">
-      <Text class="section-label">{{
+    <view class="section-nested">
+      <text class="section-label">{{
         'PlatformColor · semantic + DynamicColorIOS (' + schemeLabel + ')'
-      }}</Text>
-      <View class="row">
-        <View
+      }}</text>
+      <view class="row">
+        <view
           testID="system-blue-tile"
           class="color-tile"
           [style]="{ backgroundColor: systemBlue }"
         >
-          <Text class="tile-label">systemBlue</Text>
-        </View>
-        <View
+          <text class="tile-label">systemBlue</text>
+        </view>
+        <view
           testID="dynamic-color-tile"
           class="color-tile-bordered"
           [style]="{
@@ -34,12 +34,12 @@ import './PlatformColorDemo.css';
             borderColor: separatorColor,
           }"
         >
-          <Text class="bold-label" [style]="{ color: labelColor }"
-            >dynamic</Text
+          <text class="bold-label" [style]="{ color: labelColor }"
+            >dynamic</text
           >
-        </View>
-      </View>
-    </View>
+        </view>
+      </view>
+    </view>
   `,
 })
 export class PlatformColorDemo {

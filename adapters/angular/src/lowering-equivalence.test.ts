@@ -3,9 +3,8 @@
 // identical. `core/test-utils/src/lowering-equivalence.ts` holds the canonicaliser and the
 // assertions; the mounts are per-framework by construction and live here.
 //
-// This adapter was the LAST to get an arm and the first to turn lowering on app-wide: seven
-// primitives at once (`babel-lower-host-primitives.cjs`, `LOWERABLE_NAMES`). Every other adapter
-// had the oracle before it lowered.
+// Still worth running with the transforms gone: the two spellings are now what an app CHOOSES
+// between, so a fold only one of them applies is a live divergence rather than a compiler bug.
 //
 // TWO ASSERTIONS PER CASE, and neither is redundant:
 //   compareLoweringEquivalence  catches a fold ONE path lost   (the wrapper had it, the tag does not)
@@ -13,9 +12,9 @@
 // The second matters more here than anywhere: Angular applies its folds in the RENDERER, which BOTH
 // arms traverse, so a fold dying there moves both arms identically and they still agree.
 //
-// THE DUAL SELECTOR IS WHY THE LOWERED FIXTURE IMPORTS NOTHING. `ViewHost` declares
-// `selector: 'symbiote-view, View'` (primitives/index.ts), and Angular resolves directives per
-// TEMPLATE — so writing `<symbiote-view>` in a template whose `imports` still lists the primitive
+// THE HOST'S OWN SELECTOR IS WHY THE BARE FIXTURE IMPORTS NOTHING. `ViewHost` declares
+// `selector: 'view'` (primitives/index.ts), and Angular resolves directives per
+// TEMPLATE — so writing `<view>` in a template whose `imports` still lists the primitive
 // resolves straight back to the component and lowers NOTHING, silently. A lowered fixture that
 // imported its primitive would compare the component against itself and pass every case.
 import '@angular/compiler';
@@ -43,11 +42,6 @@ import {
 import './register';
 import { mount, unmount } from './render';
 import { ViewHost, TextHost } from './primitives';
-import { Image } from './components/image';
-import { InputAccessoryView } from './components/input-accessory-view';
-import { Pressable } from './components/pressable';
-import { Switch } from './components/switch';
-import { TextInput } from './components/text-input';
 
 const require_ = createRequire(import.meta.url);
 const { HOST_PRIMITIVES } = require_(
@@ -123,18 +117,6 @@ interface ICase {
   knownDifferences?: readonly string[];
 }
 
-// Angular's component path DROPS `id`: of the seven, only `Pressable` declares an `@Input() id`
-// (the other four carry `nativeID` only), so the binding lands on the anchor and never reaches the
-// node. The LOWERED path is the correct one — the renderer's alias fold covers it — which makes
-// this a lowering that ADDS a capability, and this repo treats a surface moving in either direction
-// as a bug.
-//
-// DELETE AN ENTRY when its component declares `id` and passes it into its host bag; the renderer
-// folds it from there, so that is the whole fix.
-const missingIdFold = (view: string): readonly string[] => [
-  `RCTView[0] > ${view}[0]: lowered has EXTRA "nativeID" = "probe-id"`,
-];
-
 const CASES: Record<string, ICase> = {
   View: {
     tag: 'View',
@@ -151,43 +133,8 @@ const CASES: Record<string, ICase> = {
     expected: { ...FOLDED, ellipsizeMode: 'tail', allowFontScaling: true },
     discriminates: false,
   },
-  Pressable: {
-    tag: 'Pressable',
-    imports: [Pressable],
-    expected: FOLDED,
-    discriminates: true,
-  },
-  TextInput: {
-    tag: 'TextInput',
-    imports: [TextInput],
-    expected: FOLDED,
-    discriminates: true,
-    knownDifferences: missingIdFold('RCTSinglelineTextInputView'),
-  },
-  Image: {
-    tag: 'Image',
-    imports: [Image],
-    extra: `[source]="{ uri: 'x' }"`,
-    // The array shape `normalizeSource` guarantees — the fold that lives in the BEHAVIOR rather
-    // than in `foldHostBag`, and is therefore reachable only through `register.ts`.
-    expected: { ...FOLDED, source: [{ uri: 'x' }] },
-    discriminates: true,
-    knownDifferences: missingIdFold('RCTImageView'),
-  },
-  InputAccessoryView: {
-    tag: 'InputAccessoryView',
-    imports: [InputAccessoryView],
-    expected: FOLDED,
-    discriminates: true,
-    knownDifferences: missingIdFold('RCTInputAccessoryView'),
-  },
-  Switch: {
-    tag: 'Switch',
-    imports: [Switch],
-    expected: FOLDED,
-    discriminates: true,
-    knownDifferences: missingIdFold('Switch'),
-  },
+  // RefreshControl left this table 2026-09-11: it is a TAG now, with no component arm left to
+  // compare against (`../components/refresh-control-props.ts`).
 };
 
 const NAMES = Object.keys(CASES);
@@ -242,17 +189,24 @@ describe('the two spellings of a primitive commit one tree', () => {
   // pins that the shared spec still carries what this adapter claims to lower.
   it('control: every case names a primitive the spec carries', () => {
     expect(NAMES.length).toBeGreaterThan(0);
-    for (const name of NAMES) expect(intrinsicOf(name)).toMatch(/^symbiote-/);
+    // A tag is lowercase kebab and carries no marker since the `symbiote-` prefix was dropped, so
+    // the control pins the SHAPE the spec must hand back rather than a prefix that no longer
+    // exists. Still discriminating: a primitive the spec does not carry yields undefined here.
+    for (const name of NAMES)
+      expect(intrinsicOf(name)).toMatch(/^[a-z][a-z-]*$/);
   });
 
-  // why: `discriminates: false` disables the one control that catches an arm which never lowered,
-  // so the flag is a hole by construction. Pin that it is not set everywhere — the state in which
-  // this whole file would pass against two identical arms.
-  it('control: the arms-are-distinct check is still applied somewhere', () => {
-    expect(
-      NAMES.filter(name => CASES[name].discriminates).length,
-    ).toBeGreaterThan(0);
-  });
+  // RETIRED 2026-09-11, the control this comment used to guard ("discriminates: false" disabling
+  // the one check that catches an arm which never lowered, applied to every remaining case). Its
+  // premise died for a real reason, not by neglect: RefreshControl was the LAST case here with a
+  // genuine component-vs-tag distinction — every other primitive that once had two forms
+  // (Pressable, TextInput, Switch, Button, Image, the Touchables, …) was already migrated off this
+  // table as each lost its component. `View`/`Text` never discriminated at all — they are one
+  // `SymbiotePrimitiveHost` under two selector spellings, not two implementations — so with
+  // RefreshControl gone this file has NO remaining primitive with two forms to compare, by design:
+  // the migration this control watched for is the same migration this table exists to prove
+  // finished. What survives below (`View`/`Text` folding the same either way) is a narrower, still
+  // real check — dual-selector correctness — just no longer a lowering-equivalence one.
 
   describe.each(NAMES)('%s', name => {
     const testCase = CASES[name];
@@ -285,7 +239,7 @@ describe('the two spellings of a primitive commit one tree', () => {
       // THE UNIVERSAL CONTROL, and it is textual because no runtime counter can serve here. For
       // `View`/`Text` the two arms census identically and commit identically — which is correct,
       // the component IS the node — so nothing observable separates "lowered" from "resolved back
-      // to the component". And those two are exactly the primitives carrying the DUAL selector, so
+      // to the component". And those two are exactly the primitives whose host IS the tag, so
       // the retained-count control is disabled precisely where its trap lives. Found by breaking
       // it: handing the lowered arm the imports left all nine rows green.
       //

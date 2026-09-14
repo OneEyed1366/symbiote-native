@@ -8,7 +8,7 @@
 //   `<View>` it refused      the wrapper folds it        covered by the wrapper
 //   a hand-authored tag      nobody folds it             covered by NOTHING
 //
-// The third path is not hypothetical: Svelte's `components/button.svelte` writes `<symbiote-text>`
+// The third path is not hypothetical: Svelte's `components/button.svelte` writes `<text>`
 // directly rather than composing `Text.svelte`, so its title reached Fabric with no
 // `ellipsizeMode` and clipped mid-word where every other adapter ellipsised (2026-08-31). Angular
 // shipped the identical defect from the identical cause, and both fixed it the same way — a seed
@@ -29,7 +29,7 @@ import {
 export type IHostBag = Record<string, unknown>;
 
 // Keyed by INTRINSIC TAG: the spec is keyed by component name (`View`), and by the time a bag
-// reaches an adapter's renderer the only name left is `symbiote-view`.
+// reaches an adapter's renderer the only name left is `view`.
 //
 // The spec's `aliases` and `defaults` are OBJECTS, and this runs once per node — 9 002 times on a
 // 1 000-row create. `Object.keys()` on each of them per call would allocate two arrays per element
@@ -55,7 +55,7 @@ const managedSpellingOf = (tag: string): string => `${tag}-managed`;
 // EVERY spelling a primitive commits under, and the two axes are independent.
 //
 // `intrinsicWhen` lets one primitive commit two different tags (`TextInput` ->
-// `symbiote-text-input` / `…-multiline`). `-managed` is the wrapper's twin of each of those. A map
+// `text-input` / `…-multiline`). `-managed` is the wrapper's twin of each of those. A map
 // keyed on the lowered spellings alone folds the lowered path and silently skips the component one
 // — which is exactly what shipped: TextInput and Switch committed a raw `id`, a key no ViewConfig
 // declares, so Fabric dropped it and the nativeID was lost on device with nothing red. Found by

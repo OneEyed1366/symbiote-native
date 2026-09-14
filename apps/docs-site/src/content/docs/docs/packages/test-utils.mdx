@@ -57,7 +57,7 @@ under it.
   <TabItem label="React">
     ```tsx
     import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-    import { mount, unmount, Switch } from '@symbiote-native/react';
+    import { mount, unmount } from '@symbiote-native/react';
     import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
     const ROOT_TAG = 190;
@@ -77,7 +77,7 @@ under it.
 
     describe('React Switch on the engine', () => {
       it('passes value through as a strict boolean', () => {
-        mount(ROOT_TAG, <Switch value />);
+        mount(ROOT_TAG, <switch value />);
         expect(switchNode().props.value).toBe(true);
       });
 
@@ -85,7 +85,7 @@ under it.
         let changed: boolean | undefined;
         mount(
           ROOT_TAG,
-          <Switch
+          <switch
             value={false}
             onValueChange={value => {
               changed = value;
@@ -105,7 +105,7 @@ under it.
     ```ts
     import { defineComponent, Fragment, h, ref } from '@vue/runtime-core';
     import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-    import { mount, unmount, View, Text } from '@symbiote-native/vue';
+    import { mount, unmount } from '@symbiote-native/vue';
     import { installFabric } from '@symbiote-native/test-utils';
 
     const ROOT_TAG = 31;
@@ -117,11 +117,11 @@ under it.
     // An explicit Fragment is what `v-for` compiles to.
     const App = defineComponent({
       setup: () => () =>
-        h(View, null, () => [
+        h('view', null, () => [
           h(
             Fragment,
             null,
-            rows.value.map((label, index) => h(Text, { key: index }, () => label)),
+            rows.value.map((label, index) => h('text', { key: index }, () => label)),
           ),
         ]),
     });
@@ -158,7 +158,7 @@ under it.
     import '@angular/compiler'; // JIT: a headless test compiles its template at runtime
     import { Component, signal } from '@angular/core';
     import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-    import { mount, unmount, ActivityIndicator } from '@symbiote-native/angular';
+    import { mount, unmount, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { installFabric } from '@symbiote-native/test-utils';
 
     const ROOT_TAG = 905;
@@ -168,9 +168,9 @@ under it.
     @Component({
       selector: 'symbiote-activity-indicator-host',
       standalone: true,
-      imports: [ActivityIndicator],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <ActivityIndicator [size]="size()" [color]="color()" [testID]="'spinner-wrapper'" />
+        <activity-indicator [size]="size()" [color]="color()" [testID]="'spinner-wrapper'" />
       `,
     })
     class ActivityIndicatorHost {
@@ -261,7 +261,7 @@ under it.
     import { createSignal } from 'solid-js';
     import { afterEach, beforeEach, describe, expect, it } from 'vitest';
     import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-    import { mount, unmount, Switch } from '@symbiote-native/solid';
+    import { mount, unmount } from '@symbiote-native/solid';
 
     const ROOT_TAG = 812;
     const fabric = installFabric();
@@ -284,14 +284,14 @@ under it.
 
     describe('Solid Switch on the engine', () => {
       it('passes value through as a strict boolean', async () => {
-        mount(ROOT_TAG, () => <Switch value />);
+        mount(ROOT_TAG, () => <switch value />);
         await tick();
         expect(committedSwitch().props.value).toBe(true);
       });
 
       it('derives onValueChange from the topChange event', async () => {
         const [value, setValue] = createSignal(false);
-        mount(ROOT_TAG, () => <Switch value={value()} onValueChange={setValue} />);
+        mount(ROOT_TAG, () => <switch value={value()} onValueChange={setValue} />);
         await tick();
 
         fabric.fireEvent(committedSwitch().instanceHandle, 'topChange', { value: true });

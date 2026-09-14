@@ -1,8 +1,13 @@
 // React-driven test proving the canonical scroll-driven animation:
-//   onScroll={Animated.event([{nativeEvent:{contentOffset:{y: scrollY}}}])} on an
-//   Animated.ScrollView, with a sibling Animated.View whose translateY binds scrollY.
+//   onScroll={Animated.event([{nativeEvent:{contentOffset:{y: scrollY}}}])} on a bare
+//   `<scroll-view>`, with a child Animated.View whose translateY binds scrollY.
 // The shared fake Fabric slot keeps each view's real props so the committed transform is
 // observable. No simulator.
+//
+// There is no `Animated.ScrollView` any more and nothing replaced it: the tag takes the handler
+// directly, and the engine binds it — `setEventListener` calls `bindAnimatedEvent` for any `on*`
+// prop on any host node (`core/engine/src/node.ts`). That was the one animated job a scroll
+// wrapper still appeared to hold, and it had already moved.
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -59,7 +64,7 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Animated scroll-driven animation', () => {
-  it('mounts Animated.ScrollView and drives the bound translateY from a scroll event', () => {
+  it('mounts a <scroll-view> and drives the bound translateY from a scroll event', () => {
     const scrollY = new Animated.Value(0);
     // The canonical handler, held by reference so the test can fire it the way the native scroll
     // event would. onScroll is registered through React's event system, not committed as a prop.
@@ -69,16 +74,16 @@ describe('Animated scroll-driven animation', () => {
 
     function App(): ReactElement {
       return (
-        <Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16}>
+        <scroll-view onScroll={onScroll} scrollEventThrottle={16}>
           <Animated.View style={{ transform: [{ translateY: scrollY }] }} />
-        </Animated.ScrollView>
+        </scroll-view>
       );
     }
 
     mount(ROOT_TAG, <App />);
 
-    // The Animated.ScrollView committed its native scroll node, proof the lazy getter resolved the
-    // wrapper without tripping the scroll-view <-> animated module cycle.
+    // The tag committed its native scroll node — an `Animated.event` handler must not stop the
+    // element being an ordinary scroll view.
     expect(findByViewName(fabric.committed, 'RCTScrollView')).toBeDefined();
 
     // The bound view (the leaf RCTView carrying the transform) paints at the initial value.

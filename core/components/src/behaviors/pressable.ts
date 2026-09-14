@@ -22,6 +22,7 @@ import {
   requestCommitFor,
   setBehaviorListener,
   setNodePressed,
+  type IHostBehavior,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import {
@@ -29,6 +30,7 @@ import {
   createPressRuntime,
   disposePressRuntime,
   DEFAULT_DELAY_LONG_PRESS_MS,
+  DEFAULT_MIN_PRESS_DURATION_MS,
   type IPressHost,
   type IPressHandler,
   type IPressMachineConfig,
@@ -41,13 +43,54 @@ import type { IAccessibilityStateValue } from '../accessibility-props';
 import {
   buildPressableListeners,
   resolveDisabledAccessibilityState,
+  resolvePressableFocusable,
 } from '../view/render-pressable';
 
-export const PRESSABLE_TAG = 'symbiote-pressable';
+export const PRESSABLE_TAG = 'pressable';
+
+/**
+ * A last look at the machine's config before its handlers are built, for a tag that IS a pressable
+ * plus something — TouchableOpacity, whose fade has to run between the machine and the app's own
+ * `onPressIn`.
+ *
+ * Called from `rebuild`, so once per gesture rather than once per mount: it sees the config the
+ * props actually hold by the time a finger lands, and anything it captures is discarded with the
+ * gesture. Per-node state that must OUTLIVE a gesture belongs on the caller's own WeakMap.
+ */
+export type IPressConfigRefinement = (
+  node: ISymbioteNode,
+  config: IPressMachineConfig,
+) => IPressMachineConfig;
+
+/**
+ * What the machine reads as `disabled`, for a tag whose spelling of it is not the raw prop.
+ *
+ * There is no resolver by default because RN's Pressable hands Pressability the RAW prop
+ * (`Pressable.js:266`) — `aria-disabled` there changes only what is ANNOUNCED. Button is the one
+ * primitive that differs: it resolves `disabled ?? aria-disabled ?? accessibilityState.disabled` in
+ * the component and passes the ANSWER down as the touchable's own prop (`Button.js:337` -> `:386`),
+ * which a single tag has no second node to pass to.
+ *
+ * Reads the bag and returns the answer; it must never write one back. `resolveButtonDisabled`
+ * short-circuits on an authored `disabled`, so a resolved value stored in `node.props.disabled`
+ * would answer the NEXT resolution as if the app had written it and the tag could never re-enable.
+ */
+export type IDisabledResolver = (
+  props: Readonly<Record<string, unknown>>,
+) => boolean | undefined;
 
 interface IBehaviorState {
   readonly runtime: IPressRuntime;
   readonly host: IPressHost;
+  readonly refine: IPressConfigRefinement | undefined;
+  readonly disabledOf: IDisabledResolver | undefined;
+  // Where the machine READS from, which is not always the node it acts ON. They differ for exactly
+  // one shape: a primitive that renders no view of its own and clones onto its single child
+  // (`./touchable-native-feedback`). There the props and the app's callbacks are on the OWNER, and
+  // the responder — the listeners, the Fabric tag `measure` and the pressed class need — is on the
+  // child, because a node with no committed view receives no events (`events/index.ts` skips
+  // anchors in `bubble`, and `handOverNativeResponder` has no handle to hand native).
+  readonly source: ISymbioteNode;
   readonly timers: Set<ReturnType<typeof setTimeout>>;
   // Replaced wholesale at each gesture start; see `rebuild`.
   listeners: Record<string, unknown>;
@@ -64,6 +107,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === 'number' ? value : fallback;
+}
+
+// The bag arrives as `unknown` off `node.props`; every RN default below is written against
+// `boolean | undefined`. Exported to the sibling behaviors folding the same bag, and deliberately
+// NOT to the shared barrel — same reasoning as `asAccessibilityState`.
+export function booleanOr(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
 }
 
 // A scalar offset or the per-edge object; anything else reads as "no offset", which the machine
@@ -99,6 +149,7 @@ const MACHINE_ONLY_KEYS = [
   'disabled',
   'cancelable',
   'delayLongPress',
+  'minPressDuration',
   'unstable_pressDelay',
   'pressRetentionOffset',
   'delayHoverIn',
@@ -106,10 +157,10 @@ const MACHINE_ONLY_KEYS = [
 ] as const;
 
 // Narrowed field by field rather than cast: the bag arrives as `unknown` off `node.props`. A local
-// twin of the guard each adapter keeps for its own attrs (Vue's `asAccessibilityState`) — not
-// hoisted to the shared barrel, because every adapter re-exports that barrel wholesale and a
-// narrowing helper is not API anyone should be able to import.
-function asAccessibilityState(
+// twin of the guard each adapter keeps for its own attrs (Vue's `asAccessibilityState`) — exported
+// to the sibling behaviors that fold the same bag, and deliberately NOT to the shared barrel, which
+// every adapter re-exports wholesale: a narrowing helper is not API anyone should be able to import.
+export function asAccessibilityState(
   value: unknown,
 ): IAccessibilityStateValue | undefined {
   if (!isRecord(value)) return undefined;
@@ -177,7 +228,28 @@ function foldPayload(
   // `accessibilityState: undefined` key on every lowered Pressable in the tree, and `fabricProps`
   // skipping undefined is a coincidence to lean on, not a contract to rely on here.
   if (resolved !== undefined) out.accessibilityState = resolved;
+  out.accessible = accessibleUnlessOptedOut(props);
+  // Pressable.js:258 — the plain form, with no press-handler or disabled leg. A Touchable composing
+  // this tag has already resolved its own three-leg formula and passed the answer in as `focusable`,
+  // which `!== false` leaves alone.
+  out.focusable = resolvePressableFocusable(booleanOr(props.focusable));
   return out;
+}
+
+// RN makes every pressable accessible unless the app opts OUT — `Pressable.js:252`
+// (`accessible: accessible !== false`), and the whole Touchable family repeats it verbatim
+// (`TouchableOpacity.js:303`, `TouchableHighlight.js:337`). `!== false` rather than `?? true`, so
+// only a literal `false` opts out and an explicit `undefined` still reads as accessible.
+//
+// Nothing in this repo did it until 2026-09-09, on either path, so a Pressable reached a screen
+// reader as a plain view unless the app wrote the prop. Landing it in the fold above alone reddens
+// four equivalence arms — correctly, since those compare the wrapper against the lowered path — so
+// the behavior and every adapter's wrapper have to move in ONE change. Exported for the wrappers
+// that need to say it themselves, and for the tags whose behavior is their only path.
+export function accessibleUnlessOptedOut(
+  props: Readonly<Record<string, unknown>>,
+): boolean {
+  return props.accessible !== false;
 }
 
 // From the STASH, not from `node.props`. Every name below is in `ownedListeners`, so `routeProp`
@@ -208,6 +280,14 @@ function configFor(node: ISymbioteNode): IPressMachineConfig {
       DEFAULT_DELAY_LONG_PRESS_MS,
     ),
     unstable_pressDelay: numberOr(node.props.unstable_pressDelay, 0),
+    // RN's Touchables own the deactivation floor in their OWN machine and hand Pressability
+    // `minPressDuration: 0` (TouchableOpacity.js:195). While they were wrappers they passed it as
+    // an internal input; on the tag there is nowhere else to say it, so the floor has to be a
+    // readable prop or every Touchable holds its fade for the machine's 130 ms default.
+    minPressDuration: numberOr(
+      node.props.minPressDuration,
+      DEFAULT_MIN_PRESS_DURATION_MS,
+    ),
     hitSlop: asRectOffset(node.props.hitSlop),
     pressRetentionOffset: asRectOffset(node.props.pressRetentionOffset),
   };
@@ -221,17 +301,27 @@ function configFor(node: ISymbioteNode): IPressMachineConfig {
 // once the props exist. A gesture is one interaction, so a handful of closures per press is
 // invisible — unlike doing it per prop write, which is the cost this whole tier exists to remove.
 function rebuild(node: ISymbioteNode, state: IBehaviorState): void {
+  // `state.source` for everything READ, `node` for the refinement, which acts on the responder
+  // (dispatching a view command needs the committed node, not the one holding the props).
+  const source = state.source;
+  const base = configFor(source);
   const handlers = createPressHandlers(
-    configFor(node),
+    state.refine === undefined ? base : state.refine(node, base),
     state.runtime,
     state.host,
   );
   state.isBuilt = true;
+  // Re-read every gesture, so a tag whose resolver looks past `disabled` — `./button`, at
+  // `aria-disabled` — re-enables on the next touch instead of latching at its first answer.
+  const disabled: unknown =
+    state.disabledOf === undefined
+      ? source.props.disabled
+      : state.disabledOf(source.props);
   state.listeners = buildPressableListeners(handlers, {
-    disabled: node.props.disabled === true ? true : undefined,
+    disabled: disabled === true ? true : undefined,
     cancelable:
-      typeof node.props.cancelable === 'boolean'
-        ? node.props.cancelable
+      typeof source.props.cancelable === 'boolean'
+        ? source.props.cancelable
         : undefined,
   });
 }
@@ -294,7 +384,43 @@ function installListeners(node: ISymbioteNode, state: IBehaviorState): void {
   }
 }
 
-function attach(node: ISymbioteNode): void {
+function attachWith(
+  refine: IPressConfigRefinement | undefined,
+  disabledOf: IDisabledResolver | undefined,
+): (node: ISymbioteNode) => void {
+  return node => attach(node, { refine, disabledOf });
+}
+
+/**
+ * The machine on `node`, reading its props and the app's callbacks off `options.source` when that
+ * is a different node.
+ *
+ * Exported for a behavior whose responder is not its own node — `./touchable-native-feedback`,
+ * whose tag commits nothing and adopts the app's single child as the responder. Every other caller
+ * goes through `createPressBehavior`, where source and node are the same.
+ *
+ * Re-callable on the same node: a second call replaces the state and the dispatchers, which is what
+ * a re-arm after `detachPressMachine` needs.
+ */
+export function attachPressMachine(
+  node: ISymbioteNode,
+  options: {
+    readonly refine?: IPressConfigRefinement;
+    readonly disabledOf?: IDisabledResolver;
+    readonly source?: ISymbioteNode;
+  } = {},
+): void {
+  attach(node, options);
+}
+
+function attach(
+  node: ISymbioteNode,
+  options: {
+    readonly refine?: IPressConfigRefinement;
+    readonly disabledOf?: IDisabledResolver;
+    readonly source?: ISymbioteNode;
+  },
+): void {
   const timers = new Set<ReturnType<typeof setTimeout>>();
   const runtime = createPressRuntime();
   const host: IPressHost = {
@@ -330,12 +456,20 @@ function attach(node: ISymbioteNode): void {
   const state: IBehaviorState = {
     runtime,
     host,
+    refine: options.refine,
+    disabledOf: options.disabledOf,
+    source: options.source ?? node,
     timers,
     listeners: {},
     isBuilt: false,
   };
   states.set(node, state);
   installListeners(node, state);
+}
+
+/** See `attachPressMachine`: the same teardown `createPressBehavior` registers as its `detach`. */
+export function detachPressMachine(node: ISymbioteNode): void {
+  detach(node);
 }
 
 function detach(node: ISymbioteNode): void {
@@ -352,11 +486,21 @@ function detach(node: ISymbioteNode): void {
   dlog('pressable behavior detached');
 }
 
-// Idempotent: an adapter entry may be imported more than once in a bundle, and re-registering the
-// same tag with an equivalent behavior must not double-install anything.
-export function registerPressableBehavior(): void {
-  registerHostBehavior(PRESSABLE_TAG, {
-    attach,
+/**
+ * The press machine as behavior parts, so a tag that is a pressable PLUS something can compose it
+ * instead of re-implementing it.
+ *
+ * Spread into the caller's own behavior and wrap `attach`/`detach` around these — the touchable
+ * family needs a per-node Animated value opened before the machine and closed after it. The
+ * WeakMap holding the machine's own state is keyed by node, so one node may hold exactly one of
+ * these; a tag composing it therefore must not also register the plain `pressable` behavior.
+ */
+export function createPressBehavior(
+  refine?: IPressConfigRefinement,
+  disabledOf?: IDisabledResolver,
+): Pick<IHostBehavior, 'attach' | 'detach' | 'foldPayload' | 'ownedListeners'> {
+  return {
+    attach: attachWith(refine, disabledOf),
     detach,
     foldPayload,
     // Every name the machine needs as an INPUT. The responder pair is not optional — it is how a
@@ -372,5 +516,11 @@ export function registerPressableBehavior(): void {
       'responderMove',
       'responderTerminationRequest',
     ],
-  });
+  };
+}
+
+// Idempotent: an adapter entry may be imported more than once in a bundle, and re-registering the
+// same tag with an equivalent behavior must not double-install anything.
+export function registerPressableBehavior(): void {
+  registerHostBehavior(PRESSABLE_TAG, createPressBehavior());
 }

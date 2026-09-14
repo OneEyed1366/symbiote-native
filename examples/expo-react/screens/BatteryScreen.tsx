@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/react';
+import { Platform } from '@symbiote-native/react';
 import {
   BatteryState,
   isAvailableAsync,
@@ -29,9 +23,9 @@ function CapabilityBadge({ status }: { status: ICapabilityStatus }) {
   const label =
     status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
-    <View className={`status-badge status-badge-${status}`}>
-      <Text className="status-badge-text">{label}</Text>
-    </View>
+    <view className={`status-badge status-badge-${status}`}>
+      <text className="status-badge-text">{label}</text>
+    </view>
   );
 }
 
@@ -45,10 +39,10 @@ function CapabilityRow({
   status: ICapabilityStatus;
 }) {
   return (
-    <View testID={testID} className="capability-row">
-      <Text className="capability-label">{label}</Text>
+    <view testID={testID} className="capability-row">
+      <text className="capability-label">{label}</text>
       <CapabilityBadge status={status} />
-    </View>
+    </view>
   );
 }
 
@@ -110,54 +104,54 @@ export function BatteryScreen() {
     batteryLevel < 0 ? 'unknown' : `${Math.round(batteryLevel * 100)}%`;
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="battery-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Battery</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Battery</text>
+            <text className="hero-body">
               @symbiote-native/battery — live battery level, charging state, and
               low-power mode via three subscription-backed hooks. A simulator
               reports the battery API as unavailable; a real device is needed to
               see live readings.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="battery-live-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Live status</Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">Battery level</Text>
-            <Text className="value-text">{batteryLevelLabel}</Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">Battery state</Text>
-            <Text className="value-text">
+        <view testID="battery-live-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Live status</text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">Battery level</text>
+            <text className="value-text">{batteryLevelLabel}</text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">Battery state</text>
+            <text className="value-text">
               {batteryStateLabel(batteryState)}
-            </Text>
-          </View>
-          <View className="capability-row">
-            <Text className="capability-label">Low power mode</Text>
-            <Text className="value-text">{lowPowerMode ? 'On' : 'Off'}</Text>
-          </View>
-        </View>
+            </text>
+          </view>
+          <view className="capability-row">
+            <text className="capability-label">Low power mode</text>
+            <text className="value-text">{lowPowerMode ? 'On' : 'Off'}</text>
+          </view>
+        </view>
 
-        <View testID="battery-capabilities-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Capabilities</Text>
-          </View>
+        <view testID="battery-capabilities-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Capabilities</text>
+          </view>
           <CapabilityRow
             testID="battery-available"
             label="Available"
@@ -170,8 +164,8 @@ export function BatteryScreen() {
               status={isBatteryOptimizationEnabled}
             />
           )}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

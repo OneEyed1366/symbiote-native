@@ -5,7 +5,7 @@ import { describe, it } from 'vitest';
 import { createSignal, For } from 'solid-js';
 import { installFabric } from '@symbiote-native/test-utils';
 import { censusRetainedTree, readCommitProfile } from '@symbiote-native/engine';
-import { mount, unmount, View, Text, Pressable } from './index';
+import { mount, unmount } from './index';
 
 const fabric = installFabric();
 const ROOT_TAG = 4244;
@@ -18,15 +18,15 @@ const noop = (): void => {};
 
 function Row(props: { id: number }) {
   return (
-    <View class="bench-row">
-      <Text class="bench-row-id">{String(props.id)}</Text>
-      <Pressable class="flex1" onPress={noop}>
-        <Text class="bench-row-label">{`row label number ${props.id}`}</Text>
-      </Pressable>
-      <Pressable class="bench-row-remove" onPress={noop}>
-        <Text class="bench-row-remove-text">x</Text>
-      </Pressable>
-    </View>
+    <view class="bench-row">
+      <text class="bench-row-id">{String(props.id)}</text>
+      <pressable class="flex1" onPress={noop}>
+        <text class="bench-row-label">{`row label number ${props.id}`}</text>
+      </pressable>
+      <pressable class="bench-row-remove" onPress={noop}>
+        <text class="bench-row-remove-text">x</text>
+      </pressable>
+    </view>
   );
 }
 
@@ -35,9 +35,9 @@ const [rows, setRows] = createSignal<readonly number[]>([]);
 describe('node census', () => {
   it('prices a reactive create of 1000 rows', async () => {
     const surface = mount(ROOT_TAG, () => (
-      <View class="screen">
+      <view class="screen">
         <For each={rows()}>{id => <Row id={id} />}</For>
-      </View>
+      </view>
     ));
     await tick();
     fabric.reset();

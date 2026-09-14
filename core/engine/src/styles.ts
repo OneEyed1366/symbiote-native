@@ -5,6 +5,7 @@
 // shadow / transform / text props, not the full surface. Agnostic types, so they
 // live in the engine next to the style processors; every adapter re-exports them.
 
+import type { AnimatedNode } from './animated/graph';
 import type { IColorValue } from './platform-color';
 
 // RN allows `%` strings for layout dimensions and insets, plus the 'auto' keyword.
@@ -315,7 +316,26 @@ export interface ITextStyle extends IViewStyle {
 // (returns the objects, not opaque numeric ids), so there is no id to model.
 type IStyleFalsy = false | null | undefined | '';
 type IRecursiveArray<T> = ReadonlyArray<T | IRecursiveArray<T>>;
-export type IStyleProp<T> = T | IStyleFalsy | IRecursiveArray<T | IStyleFalsy>;
+
+// An animated value may stand in for any LEAF of a style — `{opacity: value}`,
+// `transform: [{translateY: value}]`. It is not a wrapper's private surface: `routeProp`
+// resolves one on any node (animated/host-binding.ts), so a bare tag takes it too, and
+// `Animated.View` is the plain component. Mirrors RN's WithAnimatedValue<T>; recursing rather
+// than widening the leaf types keeps a non-style object from passing as a style.
+type IWithAnimated<T> = T extends AnimatedNode
+  ? T
+  : T extends string | number | boolean | null | undefined
+    ? T | AnimatedNode
+    : T extends ReadonlyArray<infer TItem>
+      ? ReadonlyArray<IWithAnimated<TItem>>
+      : T extends object
+        ? { [K in keyof T]: IWithAnimated<T[K]> }
+        : T;
+
+export type IStyleProp<T> =
+  | IWithAnimated<T>
+  | IStyleFalsy
+  | IRecursiveArray<IWithAnimated<T> | IStyleFalsy>;
 
 // The constraint behind StyleSheet.create. Mirrors RN's NamedStyles<T>
 // (StyleSheet.d.ts:26): it both validates each entry as a real style object AND

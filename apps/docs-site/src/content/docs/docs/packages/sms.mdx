@@ -67,7 +67,6 @@ subscription.
   <TabItem label="React">
     ```tsx
     import { useState } from 'react';
-    import { Button, Text, View } from '@symbiote-native/react';
     import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/react';
 
     export default function InviteByText() {
@@ -83,10 +82,10 @@ subscription.
       }
 
       return (
-        <View>
-          <Text>{status}</Text>
-          <Button title="Invite a friend" onPress={onInvite} />
-        </View>
+        <view>
+          <text>{status}</text>
+          <button title="Invite a friend" onPress={onInvite} />
+        </view>
       );
     }
     ```
@@ -96,7 +95,6 @@ subscription.
     ```vue
     <script setup lang="ts">
     import { ref } from 'vue';
-    import { Button, Text, View } from '@symbiote-native/vue';
     import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/vue';
 
     const status = ref('idle');
@@ -112,10 +110,10 @@ subscription.
     </script>
 
     <template>
-      <View>
-        <Text>{{ status }}</Text>
-        <Button title="Invite a friend" @press="onInvite" />
-      </View>
+      <view>
+        <text>{{ status }}</text>
+        <button title="Invite a friend" @press="onInvite" />
+      </view>
     </template>
     ```
 
@@ -123,17 +121,17 @@ subscription.
   <TabItem label="Angular">
     ```ts
     import { Component, signal } from '@angular/core';
-    import { Button, Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/angular';
 
     @Component({
       standalone: true,
-      imports: [Button, Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Text>{{ status() }}</Text>
-          <Button title="Invite a friend" (press)="onInvite()" />
-        </View>
+        <view>
+          <text>{{ status() }}</text>
+          <button title="Invite a friend" (press)="onInvite()" />
+        </view>
       `,
     })
     export class InviteByText {
@@ -157,7 +155,6 @@ subscription.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Button, Text, View } from '@symbiote-native/svelte';
       import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/svelte';
 
       let status = $state('idle');
@@ -172,14 +169,13 @@ subscription.
       }
     </script>
 
-    <View><Text>{status}</Text><Button title="Invite a friend" onPress={onInvite} /></View>
+    <view><text>{status}</text><button title="Invite a friend" onPress={onInvite} /></view>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
     import { createSignal } from 'solid-js';
-    import { Button, Text, View } from '@symbiote-native/solid';
     import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/solid';
 
     export default function InviteByText() {
@@ -195,10 +191,10 @@ subscription.
       }
 
       return (
-        <View>
-          <Text>{status()}</Text>
-          <Button title="Invite a friend" onPress={onInvite} />
-        </View>
+        <view>
+          <text>{status()}</text>
+          <button title="Invite a friend" onPress={onInvite} />
+        </view>
       );
     }
     ```

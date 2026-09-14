@@ -29,13 +29,11 @@ import {
   createEffect,
   createMemo,
   createSignal,
-  mergeProps,
   onCleanup,
   untrack,
 } from 'solid-js';
 import type { Accessor } from 'solid-js';
 import { Animated, createWindowDimensions } from '@symbiote-native/solid';
-import type { IAnimatedComponentProps } from '@symbiote-native/solid';
 import type { JSX } from '@symbiote-native/solid/jsx-runtime';
 // createComponent from solid-js, insert from the renderer - see stack/index.ts's note.
 import { createComponent } from 'solid-js';
@@ -509,25 +507,25 @@ function DrawerImpl(props: IDrawerProps): JSX.Element {
         if (children !== undefined) insert(node, children);
         return node;
       }
-      // ONE source, never a spread followed by an explicit prop: mergeProps takes the first
-      // NON-undefined value scanning back-to-front, so a later `undefined` silently loses to an
-      // earlier value (.claude/rules/solid-descriptor-bridge.md §6). Collapsing to a single bag
-      // removes the question. mergeProps still earns its place - it wraps the function source in a
-      // memo and hands Animated.View a reactive proxy, which is what keeps the slot's props live
-      // without rebuilding the node.
-      return createComponent(
-        Animated.View,
-        mergeProps((): IAnimatedComponentProps => ({
-          ...slotDescriptor(slot).props,
-          style: [slotDescriptor(slot).props.style, animatedStyle(slot)],
-          get children(): JSX.Element {
-            return slotChildren(slot);
-          },
-        })),
-      );
+      // ONE source, never a spread followed by an explicit prop: mergeProps took the first
+      // NON-undefined value scanning back-to-front, so a later `undefined` silently lost to an
+      // earlier one (.claude/rules/solid-descriptor-bridge.md §6). A single bag removes the
+      // question, and the thunk is what keeps the slot's props live without rebuilding the node.
+      //
+      // No Animated.View: the engine resolves an AnimatedNode written into any prop of any host
+      // node, so the interpolation in `animatedStyle` binds from a plain `view`.
+      const animated = hostElement('view', () => ({
+        ...slotDescriptor(slot).props,
+        style: [slotDescriptor(slot).props.style, animatedStyle(slot)],
+      }));
+      // An ACCESSOR, not a value: the slot's children are the focused screen, which mounts after
+      // this node is built. Reading once here yields the pre-mount slot and the screen never
+      // arrives — where the branch above may read eagerly, because its children are already built.
+      insert(animated, () => slotChildren(slot));
+      return animated;
     }
 
-    const root = hostElement('symbiote-view', () => ({
+    const root = hostElement('view', () => ({
       ...rootDescriptor().props,
       ...panResponder.panHandlers,
     }));
@@ -540,7 +538,7 @@ function DrawerImpl(props: IDrawerProps): JSX.Element {
     return untrack(() => buildDrawer(current));
   });
 
-  const host = hostElement('symbiote-view', () => ({ style: { flex: 1 } }));
+  const host = hostElement('view', () => ({ style: { flex: 1 } }));
   insert(host, drawer);
 
   return createComponent(ScreenCollectorProvider, {

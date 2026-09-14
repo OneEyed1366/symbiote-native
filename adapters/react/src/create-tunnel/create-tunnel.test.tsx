@@ -7,13 +7,7 @@
 
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  createTunnel,
-  mount,
-  unmount,
-  Text,
-  View,
-} from '@symbiote-native/react';
+import { createTunnel, mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const SOURCE_TAG = 610;
@@ -49,15 +43,15 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     function SourceApp(): React.ReactElement {
       return (
         <tunnel.In>
-          <Text>ported across surfaces</Text>
+          <text>ported across surfaces</text>
         </tunnel.In>
       );
     }
     function TargetApp(): React.ReactElement {
       return (
-        <View testID="target">
+        <view testID="target">
           <tunnel.Out />
-        </View>
+        </view>
       );
     }
 
@@ -82,15 +76,15 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     function SourceApp(): React.ReactElement {
       return (
         <tunnel.In>
-          <Text>still here</Text>
+          <text>still here</text>
         </tunnel.In>
       );
     }
     function TargetApp(): React.ReactElement {
       return (
-        <View testID="target">
+        <view testID="target">
           <tunnel.Out />
-        </View>
+        </view>
       );
     }
 
@@ -141,14 +135,14 @@ describe('createTunnel — genuine cross-surface delivery', () => {
       renderCount += 1;
       const [visible, setVisible] = useState(false);
       return (
-        <View testID="root" onLayout={() => setVisible(true)}>
+        <view testID="root" onLayout={() => setVisible(true)}>
           {visible && (
             <tunnel.In>
-              <Text>same-tree toast</Text>
+              <text>same-tree toast</text>
             </tunnel.In>
           )}
           <tunnel.Out />
-        </View>
+        </view>
       );
     }
 

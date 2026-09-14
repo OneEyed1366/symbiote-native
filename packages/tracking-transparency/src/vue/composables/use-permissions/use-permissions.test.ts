@@ -77,7 +77,7 @@ function mountPermissions(): ReturnType<typeof usePermissions> {
     defineComponent({
       setup: () => {
         result = usePermissions();
-        return () => h('symbiote-text', {}, 'tracking-transparency');
+        return () => h('text', {}, 'tracking-transparency');
       },
     }),
   );

@@ -69,19 +69,18 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Pressable, Text, View } from '@symbiote-native/react';
     import { usePermissions } from '@symbiote-native/tracking-transparency/react';
 
     export default function TrackingScreen() {
       const [status, request, get, error] = usePermissions();
 
       return (
-        <View>
-          <Text>{error ? `check failed: ${error.message}` : (status?.status ?? 'checking…')}</Text>
-          <Pressable onPress={() => (error ? get() : request())}>
-            <Text>{error ? 'Retry check' : 'Request tracking permission'}</Text>
-          </Pressable>
-        </View>
+        <view>
+          <text>{error ? `check failed: ${error.message}` : (status?.status ?? 'checking…')}</text>
+          <pressable onPress={() => (error ? get() : request())}>
+            <text>{error ? 'Retry check' : 'Request tracking permission'}</text>
+          </pressable>
+        </view>
       );
     }
     ```
@@ -90,19 +89,18 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
   <TabItem label="Vue">
     ```vue
     <script setup lang="ts">
-    import { Pressable, Text, View } from '@symbiote-native/vue';
     import { usePermissions } from '@symbiote-native/tracking-transparency/vue';
 
     const { status, error, request, get } = usePermissions();
     </script>
 
     <template>
-      <View>
-        <Text>{{ error ? `check failed: ${error.message}` : (status?.status ?? 'checking…') }}</Text>
-        <Pressable @press="error ? get() : request()">
-          <Text>{{ error ? 'Retry check' : 'Request tracking permission' }}</Text>
-        </Pressable>
-      </View>
+      <view>
+        <text>{{ error ? `check failed: ${error.message}` : (status?.status ?? 'checking…') }}</text>
+        <pressable @press="error ? get() : request()">
+          <text>{{ error ? 'Retry check' : 'Request tracking permission' }}</text>
+        </pressable>
+      </view>
     </template>
     ```
 
@@ -110,19 +108,19 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
   <TabItem label="Angular">
     ```ts
     import { Component, inject } from '@angular/core';
-    import { Pressable, Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { PermissionsService } from '@symbiote-native/tracking-transparency/angular';
 
     @Component({
       standalone: true,
-      imports: [Pressable, Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Text>{{ error() ? 'check failed: ' + error()?.message : (status()?.status ?? 'checking…') }}</Text>
-          <Pressable (press)="error() ? permissions.get() : permissions.request()">
-            <Text>{{ error() ? 'Retry check' : 'Request tracking permission' }}</Text>
-          </Pressable>
-        </View>
+        <view>
+          <text>{{ error() ? 'check failed: ' + error()?.message : (status()?.status ?? 'checking…') }}</text>
+          <pressable (press)="error() ? permissions.get() : permissions.request()">
+            <text>{{ error() ? 'Retry check' : 'Request tracking permission' }}</text>
+          </pressable>
+        </view>
       `,
     })
     export class TrackingScreen {
@@ -136,40 +134,38 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Pressable, Text, View } from '@symbiote-native/svelte';
       import { usePermissions } from '@symbiote-native/tracking-transparency/svelte';
 
       const permissions = usePermissions();
     </script>
 
-    <View>
-      <Text>
+    <view>
+      <text>
         {permissions.error
           ? `check failed: ${permissions.error.message}`
           : (permissions.status?.status ?? 'checking…')}
-      </Text>
-      <Pressable onPress={() => (permissions.error ? permissions.get() : permissions.request())}>
-        <Text>{permissions.error ? 'Retry check' : 'Request tracking permission'}</Text>
-      </Pressable>
-    </View>
+      </text>
+      <pressable onPress={() => (permissions.error ? permissions.get() : permissions.request())}>
+        <text>{permissions.error ? 'Retry check' : 'Request tracking permission'}</text>
+      </pressable>
+    </view>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Pressable, Text, View } from '@symbiote-native/solid';
     import { createPermissions } from '@symbiote-native/tracking-transparency/solid';
 
     export default function TrackingScreen() {
       const { status, error, request, get } = createPermissions();
 
       return (
-        <View>
-          <Text>{error() ? `check failed: ${error()?.message}` : (status()?.status ?? 'checking…')}</Text>
-          <Pressable onPress={() => (error() ? get() : request())}>
-            <Text>{error() ? 'Retry check' : 'Request tracking permission'}</Text>
-          </Pressable>
-        </View>
+        <view>
+          <text>{error() ? `check failed: ${error()?.message}` : (status()?.status ?? 'checking…')}</text>
+          <pressable onPress={() => (error() ? get() : request())}>
+            <text>{error() ? 'Retry check' : 'Request tracking permission'}</text>
+          </pressable>
+        </view>
       );
     }
     ```
@@ -204,8 +200,8 @@ const advertisingId = getAdvertisingId(); // null on the iOS Simulator, or befor
 
 ### `usePermissions()` / `createPermissions()`
 
-| React (`/react`) | Vue (`/vue`)     | Angular (`/angular`)           | Svelte (`/svelte`) | Solid (`/solid`)    | Signature | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ---------------- | ---------------- | ------------------------------ | ------------------- | -------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React (`/react`) | Vue (`/vue`)     | Angular (`/angular`)           | Svelte (`/svelte`) | Solid (`/solid`)    | Signature | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------- | ---------------- | ------------------------------ | ------------------ | ------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions`   | `createPermissions` | `()`      | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null`. Solid: `{ status, error, request, get }`, `status`/`error` are `Accessor<PermissionResponse \| null>` / `Accessor<Error \| null>` |
 
 ### Return value

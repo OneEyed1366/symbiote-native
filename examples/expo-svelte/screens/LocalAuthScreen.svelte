@@ -3,13 +3,7 @@
   // enrolled security level, supported biometric types) followed by a live authenticateAsync()
   // button. cancelAuthenticate() is Android-only upstream, so the Cancel button only renders
   // there. Svelte twin of ../../expo-vue-sfc/screens/LocalAuthScreen.vue.
-  import {
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    Text,
-    View,
-  } from '@symbiote-native/svelte';
+  import { Platform, ScrollView } from '@symbiote-native/svelte';
   import {
     AuthenticationType,
     SecurityLevel,
@@ -143,68 +137,68 @@
   }
 </script>
 
-<SafeAreaView class="screen">
+<safe-area-view class="screen">
   <ScrollView
     testID="local-auth-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-        <Text class="hero-badge-text">{lineInfo.code}</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">Local auth</Text>
-        <Text class="hero-body">
+      </text>
+    </view>
+    <view class="hero-card">
+      <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <text class="hero-badge-text">{lineInfo.code}</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">Local auth</text>
+        <text class="hero-body">
           @symbiote-native/local-auth — FaceID/TouchID on iOS, the
           Fingerprint/Biometric API on Android. A simulator with no enrolled
           biometrics reports "not enrolled"; a real device with
           FaceID/TouchID/fingerprint set up is needed to see a live prompt.
-        </Text>
-      </View>
-    </View>
-    <View testID="local-auth-capabilities-card" class="auth-card">
-      <View class="auth-card-header">
-        <Text class="auth-card-title">Capabilities</Text>
-      </View>
-      <View testID="local-auth-hardware" class="auth-capability-row">
-        <Text class="auth-capability-label">Hardware present</Text>
-        <View class={`auth-status-badge auth-status-badge-${hasHardware}`}>
-          <Text class="auth-status-text">
+        </text>
+      </view>
+    </view>
+    <view testID="local-auth-capabilities-card" class="auth-card">
+      <view class="auth-card-header">
+        <text class="auth-card-title">Capabilities</text>
+      </view>
+      <view testID="local-auth-hardware" class="auth-capability-row">
+        <text class="auth-capability-label">Hardware present</text>
+        <view class={`auth-status-badge auth-status-badge-${hasHardware}`}>
+          <text class="auth-status-text">
             {capabilityStatusText(hasHardware)}
-          </Text>
-        </View>
-      </View>
-      <View testID="local-auth-enrolled" class="auth-capability-row">
-        <Text class="auth-capability-label">Enrolled</Text>
-        <View class={`auth-status-badge auth-status-badge-${isEnrolled}`}>
-          <Text class="auth-status-text">
+          </text>
+        </view>
+      </view>
+      <view testID="local-auth-enrolled" class="auth-capability-row">
+        <text class="auth-capability-label">Enrolled</text>
+        <view class={`auth-status-badge auth-status-badge-${isEnrolled}`}>
+          <text class="auth-status-text">
             {capabilityStatusText(isEnrolled)}
-          </Text>
-        </View>
-      </View>
-      <View class="auth-capability-row">
-        <Text class="auth-capability-label">Enrolled level</Text>
-        <Text class="auth-value-text">{enrolledLevelText}</Text>
-      </View>
-      <View class="auth-capability-row">
-        <Text class="auth-capability-label">Supported types</Text>
-        <Text class="auth-value-text">{supportedTypesText}</Text>
-      </View>
-    </View>
-    <View testID="local-auth-authenticate-card" class="auth-card">
-      <View class="auth-card-header">
-        <Text class="auth-card-title">Authenticate</Text>
-      </View>
-      <Text class="info-text">
+          </text>
+        </view>
+      </view>
+      <view class="auth-capability-row">
+        <text class="auth-capability-label">Enrolled level</text>
+        <text class="auth-value-text">{enrolledLevelText}</text>
+      </view>
+      <view class="auth-capability-row">
+        <text class="auth-capability-label">Supported types</text>
+        <text class="auth-value-text">{supportedTypesText}</text>
+      </view>
+    </view>
+    <view testID="local-auth-authenticate-card" class="auth-card">
+      <view class="auth-card-header">
+        <text class="auth-card-title">Authenticate</text>
+      </view>
+      <text class="info-text">
         Prompts FaceID/TouchID on iOS, or the Biometric/Fingerprint dialog on
         Android.
-      </Text>
+      </text>
       <ActionButton
         testID="local-auth-authenticate-button"
         title={authenticateButtonTitle}
@@ -215,12 +209,12 @@
           title="Cancel"
           onPress={handleCancel}
           color={lineColor}
-        />{/if}{#if authResult}<View
+        />{/if}{#if authResult}<view
           testID="local-auth-result"
           class={authResultClass}
         >
-          <Text class="auth-result-text">{authResultText}</Text>
-        </View>{/if}
-    </View>
+          <text class="auth-result-text">{authResultText}</text>
+        </view>{/if}
+    </view>
   </ScrollView>
-</SafeAreaView>
+</safe-area-view>

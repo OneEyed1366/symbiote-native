@@ -21,7 +21,6 @@ import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
-import { Text } from './components/text';
 
 const ROOT_TAG = 9_477;
 const RAW_TEXT = 'RCTRawText';
@@ -54,7 +53,7 @@ describe('text children reaching Fabric', () => {
   // it is exactly what aborted the canary. The value must arrive as a string, not as a number.
   it('commits a numeric expression as a string', async () => {
     const [tiles] = createSignal([1, 2, 3]);
-    mount(ROOT_TAG, () => <Text>{tiles().length} tiles</Text>);
+    mount(ROOT_TAG, () => <text>{tiles().length} tiles</text>);
     await tick();
 
     expect(committedText()).toEqual(['3', ' tiles']);
@@ -64,7 +63,7 @@ describe('text children reaching Fabric', () => {
   // be committed as an empty raw text — that is the same abort, reached with pure strings.
   it('commits nothing for an expression that empties out', async () => {
     const [name, setName] = createSignal('Ada');
-    mount(ROOT_TAG, () => <Text>{name()} — hello</Text>);
+    mount(ROOT_TAG, () => <text>{name()} — hello</text>);
     await tick();
     expect(committedText()).toEqual(['Ada', ' — hello']);
 
@@ -77,9 +76,9 @@ describe('text children reaching Fabric', () => {
   // "a b" read as two words, so it has to survive everything above.
   it('keeps a whitespace-only literal between two nested texts', async () => {
     mount(ROOT_TAG, () => (
-      <Text>
-        <Text>a</Text> <Text>b</Text>
-      </Text>
+      <text>
+        <text>a</text> <text>b</text>
+      </text>
     ));
     await tick();
 

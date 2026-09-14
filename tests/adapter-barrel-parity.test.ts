@@ -52,20 +52,21 @@ const KNOWN_GAPS: Readonly<Record<string, readonly IAdapter[]>> = {
 // Candidate file names for a relative `export *` target, in resolution order.
 const MODULE_SUFFIXES = ['.ts', '.tsx', '/index.ts', '/index.tsx'];
 
-// Resolves the target of an `export *` to a file this scan can read. Only a relative specifier has
-// one; a package specifier is refused rather than skipped, since skipping would under-report the
-// barrel and invent gaps for names it does export.
-function starTarget(node: ts.ExportDeclaration, fromPath: string): string {
+// Resolves a RELATIVE `export *` to a file this scan can read. A package specifier (Vue's barrel
+// re-exports `export * from 'vue'`, wired so vue-tsc's `lib` option resolves ref/computed/
+// GlobalComponents off this package) is skipped: a third-party package can't plausibly re-export
+// one of OUR shared engine/components names (`I`-prefixed types, PascalCase components) under the
+// same identifier. A relative `export *` (Solid's own components module) genuinely can, so it's
+// still followed - skipping it would under-report the barrel.
+function starTarget(
+  node: ts.ExportDeclaration,
+  fromPath: string,
+): string | undefined {
   const specifier = node.moduleSpecifier;
-  if (
-    specifier === undefined ||
-    !ts.isStringLiteral(specifier) ||
-    !specifier.text.startsWith('.')
-  ) {
-    throw new Error(
-      `${fromPath}: \`export *\` from a package is not supported by the parity scan`,
-    );
+  if (specifier === undefined || !ts.isStringLiteral(specifier)) {
+    throw new Error(`${fromPath}: \`export *\` with no string specifier`);
   }
+  if (!specifier.text.startsWith('.')) return undefined;
   const base = path.join(path.dirname(fromPath), specifier.text);
   const found = MODULE_SUFFIXES.map(suffix => `${base}${suffix}`).find(
     candidate => fs.existsSync(path.join(REPO_ROOT, candidate)),
@@ -92,8 +93,9 @@ function exportedNames(relativePath: string): Set<string> {
     // `export * from './x'` hides names behind the file it names — Solid's barrel re-exports its
     // whole components module that way. Read through it rather than under-report the surface.
     if (node.exportClause === undefined) {
-      for (const name of exportedNames(starTarget(node, relativePath)))
-        names.add(name);
+      const target = starTarget(node, relativePath);
+      if (target === undefined) return;
+      for (const name of exportedNames(target)) names.add(name);
       return;
     }
     if (!ts.isNamedExports(node.exportClause)) return;

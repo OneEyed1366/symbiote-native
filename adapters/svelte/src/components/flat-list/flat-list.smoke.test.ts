@@ -11,6 +11,9 @@ import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import type { IFakeNode } from '@symbiote-native/test-utils';
+// See scroll-view.smoke.test.ts: mounting through `../../render` skips `index.ts`, so the host
+// behaviors have to be named here.
+import '../../register';
 import { mount, unmount } from '../../render';
 
 // fabric.find() walks the CREATION log, which never reflects a later clone's props
@@ -44,29 +47,6 @@ const LIST_OUT = join(
   'virtualized-list',
   '.smoke-compiled-virtualized-list-for-flat-list.mjs',
 );
-// VirtualizedList's index.svelte statically imports the REAL RefreshControl.svelte (gap 2). No
-// `.svelte`-aware loader is wired into this repo's Vitest, so it must ALSO be pre-compiled to a
-// co-located sibling `.mjs` here, with a name distinct from virtualized-list.smoke.test.ts's and
-// scroll-view.smoke.test.ts's own compiled-RefreshControl outputs for the same concurrency reason.
-const REFRESH_CONTROL_OUT = join(
-  __dirname,
-  '..',
-  '.smoke-compiled-refresh-control-for-flat-list.mjs',
-);
-// VirtualizedList's index.svelte also statically imports the REAL ScrollViewStickyHeader
-// (../scroll-view/sticky-header.svelte) — same "no .svelte-aware loader, pre-compile + rewrite"
-// treatment as RefreshControl above, with a name distinct from virtualized-list.smoke.test.ts's
-// own compiled output for the same concurrency reason.
-const STICKY_HEADER_OUT = join(
-  __dirname,
-  '..',
-  'scroll-view',
-  '.smoke-compiled-sticky-header-for-flat-list.mjs',
-);
-// sticky-header.svelte renders a real Animated.View (createAnimatedComponent(View)) — same treatment,
-// compiled to a sibling of the real file so ITS OWN relative imports keep resolving unchanged.
-const COMPONENTS_DIR = join(__dirname, '..');
-const VIEW_OUT = join(COMPONENTS_DIR, '.smoke-compiled-view-for-flat-list.mjs');
 const FLAT_OUT = join(__dirname, '.smoke-compiled-flat-list.mjs');
 const ROOT_OUT = join(__dirname, '.smoke-compiled-flat-root.mjs');
 const REFRESH_ROOT_OUT = join(
@@ -91,9 +71,6 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(REFRESH_CONTROL_OUT, { force: true });
-  rmSync(VIEW_OUT, { force: true });
-  rmSync(STICKY_HEADER_OUT, { force: true });
   rmSync(LIST_OUT, { force: true });
   rmSync(FLAT_OUT, { force: true });
   rmSync(ROOT_OUT, { force: true });
@@ -120,56 +97,16 @@ const ITEM_COUNT = 60;
 const DEFAULT_INITIAL_NUM_TO_RENDER = 10;
 
 function compileFlatListWithVirtualizedList(): void {
-  // VirtualizedList's real source imports the REAL RefreshControl.svelte — compile it too, into
-  // the exact relative location ('../RefreshControl.svelte' from virtualized-list/'s own compiled
-  // sibling) so that import resolves, then rewrite the compiled VirtualizedList's specifier the
-  // same way scroll-view.smoke.test.ts / virtualized-list.smoke.test.ts do.
-  const refreshControlSource = readFileSync(
-    join(__dirname, '..', 'RefreshControl.svelte'),
-    'utf8',
-  );
-  compileToFile(
-    refreshControlSource,
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
-  );
-
-  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
-  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
-
-  const stickyHeaderSource = readFileSync(
-    join(__dirname, '..', 'scroll-view', 'sticky-header.svelte'),
-    'utf8',
-  );
-  const stickyHeaderResult = compile(stickyHeaderSource, {
-    ...COMPILE_OPTIONS,
-    filename: 'sticky-header.svelte',
-  }).js.code.replace(
-    "from '../View.svelte'",
-    "from '../.smoke-compiled-view-for-flat-list.mjs'",
-  );
-  writeFileSync(STICKY_HEADER_OUT, stickyHeaderResult);
-
   // FlatList's own compiled output imports '../virtualized-list/index.svelte' — compile the real
   // VirtualizedList into that exact relative location so the import resolves.
-  const listSource = readFileSync(
-    join(__dirname, '..', 'virtualized-list', 'index.svelte'),
-    'utf8',
+  compileToFile(
+    readFileSync(
+      join(__dirname, '..', 'virtualized-list', 'index.svelte'),
+      'utf8',
+    ),
+    'VirtualizedList.svelte',
+    LIST_OUT,
   );
-  const listResult = compile(listSource, {
-    ...COMPILE_OPTIONS,
-    filename: 'VirtualizedList.svelte',
-  });
-  const rewrittenListSource = listResult.js.code
-    .replace(
-      "from '../RefreshControl.svelte'",
-      "from '../.smoke-compiled-refresh-control-for-flat-list.mjs'",
-    )
-    .replace(
-      "from '../scroll-view/sticky-header.svelte'",
-      "from '../scroll-view/.smoke-compiled-sticky-header-for-flat-list.mjs'",
-    );
-  writeFileSync(LIST_OUT, rewrittenListSource);
 
   // Redirect FlatList's real `'../virtualized-list/index.svelte'` import to the compiled sibling
   // written above (compile() does not rewrite import specifiers, and plain Node ESM cannot import
@@ -214,7 +151,7 @@ async function loadMountableWithColumns(
        import FlatList from './.smoke-compiled-flat-list.mjs';
        let { data } = $props();
      </script>
-     {#snippet cell({ item })}<symbiote-text p={{ text: item }}></symbiote-text>{/snippet}
+     {#snippet cell({ item })}<text p={{ text: item }}></text>{/snippet}
      <FlatList {data} item={cell} numColumns={${numColumns}} />`,
     'FlatListColumnsRoot.svelte',
     COLUMNS_ROOT_OUT,
@@ -315,7 +252,7 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
 
       const paintedItems = new Set<string>();
       for (const cellWrapper of content.children) {
-        // rowItem's own symbiote-view (flexDirection: 'row'), one level inside VirtualizedList's
+        // rowItem's own view (flexDirection: 'row'), one level inside VirtualizedList's
         // per-row measure wrapper.
         const row = cellWrapper.children[0];
         expect(
@@ -365,7 +302,7 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       );
       expect(
         refresh,
-        'a real RefreshControl.svelte painted PullToRefreshView',
+        'refresh-control painted PullToRefreshView',
       ).toBeDefined();
       expect(refresh?.props.refreshing).toBe(true);
       expect(

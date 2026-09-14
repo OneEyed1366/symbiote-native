@@ -1,23 +1,32 @@
-// Proves the ScrollView pipeline for real, the same way switch.smoke.test.ts proves Switch:
-// compiles the REAL index.svelte source (not a hand-written stand-in) through svelte/compiler,
-// mounts it via this adapter's own mount(), and asserts against a real fake-Fabric recorder. Two
-// things are proven here, matching the task's minimum bar:
-//   1. ScrollView mounts and paints the right nested intrinsic shape
-//      (RCTScrollView(RCTScrollContentView(...))).
-//   2. The imperative handle — calling `scrollTo`/`scrollToEnd`/`flashScrollIndicators` through a
-//      `bind:this` ref — dispatches the right command through dispatchViewCommand.
-// Co-located compiled output (not an isolated temp dir): the compiled file's own
-// `import { PLATFORM } from './scroll-view-platform'` etc. resolve relative to WHERE THE
-// COMPILED FILE LIVES, so it must sit next to the real sibling .ts modules, exactly like
-// switch.smoke.test.ts's SWITCH_OUT.
+// Proves the ScrollView pipeline for real: compiles a parent that writes the bare `<scroll-view>`
+// TAG through svelte/compiler, mounts it via this adapter's own mount(), and asserts against a real
+// fake-Fabric recorder. Two things are proven, and they are the two the deleted wrapper used to
+// carry:
+//   1. the tag paints the nested intrinsic shape (RCTScrollView(RCTScrollContentView(...))),
+//      which the ENGINE builds from `buildStructure` — no component instance anywhere.
+//   2. the imperative surface — scrollTo/scrollToEnd/flashScrollIndicators — is reachable from a
+//      `bind:this` through `hostInstance()`, which is what replaced the wrapper's exported
+//      functions.
+//
+// WHY THERE IS NO index.svelte HERE ANY MORE. The wrapper was deleted 2026-09-10: both reasons its
+// header gave had expired. `Animated.ScrollView` no longer needs a component (the engine resolves
+// an AnimatedNode, and `bindAnimatedEvent`, on any host node), and the imperative handle is on
+// `ISymbioteNode`'s own prototype — `IHostInstance` IS `ISymbioteNode`, so a `bind:this` already
+// types every command. So this file compiles only its own parents, with no sibling to pre-compile
+// and no import specifier to rewrite.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
+// The adapter entry's side-effect module. Mounting through `../../render` skips `index.ts`, so a
+// test that wants the ScrollView host behavior — the content node, the RefreshControl claim, the
+// folds — has to name it the same way `index.ts` does.
+import '../../register';
 import { mount, unmount } from '../../render';
+import { hostInstance } from '../../host-instance';
 
 if (globalThis.window === undefined)
   Object.assign(globalThis, { window: globalThis });
@@ -26,18 +35,6 @@ if (globalThis.navigator === undefined) {
 }
 
 const ROOT_TAG = 91_003;
-// index.svelte statically imports the REAL RefreshControl.svelte (no duplicate component — see
-// index.svelte's header comment). No `.svelte`-aware loader is wired into this repo's Vitest (the
-// switch/mount-pipeline smokes' own header comments), so RefreshControl must ALSO be pre-compiled
-// to a co-located sibling `.mjs`, with the compiled ScrollView's import specifier rewritten to
-// point at it — both compiled files stay in their REAL source directories so every OTHER relative
-// import (`./refresh-control-props`, `./scroll-view-platform`, …) keeps resolving unchanged.
-const COMPONENTS_DIR = join(__dirname, '..');
-const REFRESH_CONTROL_OUT = join(
-  COMPONENTS_DIR,
-  '.smoke-compiled-refresh-control.mjs',
-);
-const SCROLL_VIEW_OUT = join(__dirname, '.smoke-compiled-scroll-view.mjs');
 const PARENT_OUT = join(__dirname, '.smoke-compiled-scroll-parent.mjs');
 // A SEPARATE file, not a rewrite of PARENT_OUT: Node's dynamic `import()` caches by resolved
 // URL, so re-writing PARENT_OUT with different content and re-importing the SAME path would
@@ -61,8 +58,6 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(REFRESH_CONTROL_OUT, { force: true });
-  rmSync(SCROLL_VIEW_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
   rmSync(EVENT_PARENT_OUT, { force: true });
   rmSync(REFRESH_PARENT_OUT, { force: true });
@@ -83,70 +78,63 @@ function compileToFile(
   writeFileSync(outPath, result.js.code);
 }
 
-function compileScrollViewWithRefreshControl(): void {
-  const refreshControlSource = readFileSync(
-    join(COMPONENTS_DIR, 'RefreshControl.svelte'),
-    'utf8',
-  );
-  compileToFile(
-    refreshControlSource,
-    'RefreshControl.svelte',
-    REFRESH_CONTROL_OUT,
-  );
-
-  const scrollViewSource = readFileSync(
-    join(__dirname, 'index.svelte'),
-    'utf8',
-  );
-  const result = compile(scrollViewSource, {
-    ...COMPILE_OPTIONS,
-    filename: 'ScrollView.svelte',
-  });
-  const rewritten = result.js.code.replace(
-    "from '../RefreshControl.svelte'",
-    "from '../.smoke-compiled-refresh-control.mjs'",
-  );
-  writeFileSync(SCROLL_VIEW_OUT, rewritten);
-}
-
-async function loadMountable(): Promise<Component> {
-  compileScrollViewWithRefreshControl();
-
-  // A parent that renders a ScrollView with a `bind:this` ref, exposing scrollTo/scrollToEnd/
-  // flashScrollIndicators on `window.__scrollHandle` so the test can drive the imperative handle
-  // from outside the compiled component tree (mirrors switch.smoke.test.ts's ref-driven shape).
-  compileToFile(
-    `<script>
-       import ScrollView from './.smoke-compiled-scroll-view.mjs';
-       let handle = $state();
-       $effect(() => {
-         window.__scrollHandle = handle;
-       });
-     </script>
-     <ScrollView bind:this={handle} contentContainerStyle={{ padding: 8 }}>
-       <symbiote-view p={{}}></symbiote-view>
-     </ScrollView>`,
-    'ScrollParent.svelte',
-    PARENT_OUT,
-  );
-
-  const mod: unknown = await import(`file://${PARENT_OUT}`);
+async function loadParent(
+  source: string,
+  filename: string,
+  outPath: string,
+): Promise<Component> {
+  compileToFile(source, filename, outPath);
+  const mod: unknown = await import(`file://${outPath}`);
   if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
-    throw new Error('ScrollParent.svelte produced no default export');
+    throw new Error(`${filename} produced no default export`);
   }
   return mod.default as Component;
 }
 
-// No Negative group: ScrollView's prop surface (scroll-view-props.ts) is a permissive bag with no
-// runtime guard/throw path — every field is optional and every value the type allows is handled.
-// All scenarios below are Positive: the component mounts, wires its imperative handle, and forwards
-// native events, without ever needing to reject an input.
-describe('ScrollView (real compiled index.svelte)', () => {
+// window.__scrollRef mirrors the deleted wrapper test's trick: expose the bind:this value outside
+// the compiled tree so the test can reach the host instance from here. What it holds is now a
+// ShimElement rather than a component instance, which is exactly the change under test.
+async function loadMountable(): Promise<Component> {
+  return loadParent(
+    `<script>
+       let el = $state();
+       $effect(() => {
+         window.__scrollRef = el;
+       });
+     </script>
+     <scroll-view bind:this={el} p={{ contentContainerStyle: { padding: 8 } }}>
+       <view p={{}}></view>
+     </scroll-view>`,
+    'ScrollParent.svelte',
+    PARENT_OUT,
+  );
+}
+
+// The handle's shape is only known at runtime (the compiled parent's $effect writes the ref), so
+// narrow with a guard rather than an `as` cast.
+function scrollHandle(): {
+  scrollTo: (options?: { x?: number; y?: number; animated?: boolean }) => void;
+  flashScrollIndicators: () => void;
+} {
+  const host = hostInstance(
+    (globalThis as { __scrollRef?: unknown }).__scrollRef,
+  );
+  if (host === undefined)
+    throw new Error('bind:this never resolved to a host instance');
+  return host;
+}
+
+// No Negative group: the scroll-view tag's prop surface (scroll-view-props.ts) is a permissive bag
+// with no runtime guard/throw path — every field is optional and every value the type allows is
+// handled. All scenarios below are Positive: the tag mounts, exposes its imperative surface, and
+// forwards native events, without ever needing to reject an input.
+describe('the scroll-view tag (real compiled source)', () => {
   describe('Positive', () => {
     // why: proves the two-level intrinsic shape ScrollView must produce for Fabric to actually
-    // clip+scroll content (RCTScrollView wrapping RCTScrollContentView), and that a style prop
-    // (padding) reaches the content container rather than being dropped or misrouted to the outer
-    // clip view.
+    // clip+scroll content (RCTScrollView wrapping RCTScrollContentView), and that
+    // contentContainerStyle reaches the content container rather than being dropped or misrouted
+    // to the outer clip view. With the wrapper gone this shape comes from `buildStructure`, so a
+    // failure here means the engine never built the content node at all.
     it('commits the nested scroll-view/content shape', async () => {
       const ScrollParent = await loadMountable();
       mount(ROOT_TAG, ScrollParent);
@@ -164,36 +152,18 @@ describe('ScrollView (real compiled index.svelte)', () => {
       expect(outer?.props.overflow).toBe('scroll');
     });
 
-    // why: `bind:this` is the only way app code drives ScrollView imperatively (RN parity:
-    // scrollTo/scrollToEnd/flashScrollIndicators). The Svelte-specific risk is the export binding
-    // itself, not the command semantics (those are engine-level) — this proves the exported handle
-    // reaches a real dispatchViewCommand call against the right native node.
-    it('dispatches scrollTo through the bind:this imperative handle', async () => {
+    // why: `bind:this` is the only way app code drives a scroll view imperatively (RN parity:
+    // scrollTo/scrollToEnd/flashScrollIndicators). The Svelte-specific risk is the accessor, not
+    // the command semantics (those are engine-level) — this proves what the framework hands back
+    // reaches a real dispatchViewCommand against the right native node, which is the whole claim
+    // that licensed deleting the wrapper's exported functions.
+    it('dispatches scrollTo through the bind:this host instance', async () => {
       const ScrollParent = await loadMountable();
       mount(ROOT_TAG, ScrollParent);
       await tick();
       await tick();
 
-      const handle = (
-        globalThis as { __scrollHandle?: Record<string, unknown> }
-      ).__scrollHandle;
-      expect(
-        handle,
-        'imperative handle was exposed via bind:this',
-      ).toBeDefined();
-      const scrollTo = handle?.scrollTo;
-      expect(typeof scrollTo).toBe('function');
-      (
-        scrollTo as (options?: {
-          x?: number;
-          y?: number;
-          animated?: boolean;
-        }) => void
-      )({
-        x: 0,
-        y: 42,
-        animated: false,
-      });
+      scrollHandle().scrollTo({ x: 0, y: 42, animated: false });
 
       expect(fabric.commands).toHaveLength(1);
       expect(fabric.commands[0]?.commandName).toBe('scrollTo');
@@ -201,50 +171,39 @@ describe('ScrollView (real compiled index.svelte)', () => {
       expect(fabric.commands[0]?.node.viewName).toBe('RCTScrollView');
     });
 
-    // why: a second, independent imperative command through the same handle — proves the handle
-    // exposes the FULL imperative surface, not just the first method that happened to work.
-    it('dispatches flashScrollIndicators through the same handle', async () => {
+    // why: a second, independent command through the same accessor — proves the node carries the
+    // FULL imperative surface, not just the first method that happened to work.
+    it('dispatches flashScrollIndicators through the same host instance', async () => {
       const ScrollParent = await loadMountable();
       mount(ROOT_TAG, ScrollParent);
       await tick();
       await tick();
 
-      const handle = (
-        globalThis as { __scrollHandle?: Record<string, unknown> }
-      ).__scrollHandle;
-      const flashScrollIndicators = handle?.flashScrollIndicators;
-      expect(typeof flashScrollIndicators).toBe('function');
-      (flashScrollIndicators as () => void)();
+      scrollHandle().flashScrollIndicators();
 
       expect(fabric.commands).toHaveLength(1);
       expect(fabric.commands[0]?.commandName).toBe('flashScrollIndicators');
       expect(fabric.commands[0]?.args).toEqual([]);
     });
 
-    // why: the reverse direction of the imperative handle — a real native `topScroll` event must
-    // reach the user's `onScroll` prop with the native payload untouched, proving the Svelte event
-    // wiring (routeProp -> handler) doesn't drop or reshape the event.
+    // why: the reverse direction — a real native `topScroll` event must reach the user's `onScroll`
+    // with the native payload untouched, proving the Svelte event wiring (bag -> routeProp ->
+    // handler) doesn't drop or reshape the event now that the callback rides the `p` bag.
     it('forwards a real onScroll native event to the handler', async () => {
-      compileScrollViewWithRefreshControl();
-      compileToFile(
+      const EventParent = await loadParent(
         `<script>
-           import ScrollView from './.smoke-compiled-scroll-view.mjs';
            function onScroll(event) {
              window.__scrolled = event.nativeEvent;
            }
          </script>
-         <ScrollView onScroll={onScroll}>
-           <symbiote-view p={{}}></symbiote-view>
-         </ScrollView>`,
+         <scroll-view p={{ onScroll }}>
+           <view p={{}}></view>
+         </scroll-view>`,
         'ScrollEventParent.svelte',
         EVENT_PARENT_OUT,
       );
-      const mod: unknown = await import(`file://${EVENT_PARENT_OUT}`);
-      if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
-        throw new Error('ScrollEventParent.svelte produced no default export');
-      }
 
-      mount(ROOT_TAG, mod.default as Component);
+      mount(ROOT_TAG, EventParent);
       await tick();
       await tick();
 
@@ -263,29 +222,22 @@ describe('ScrollView (real compiled index.svelte)', () => {
       expect(scrolled).toBe(payload);
     });
 
-    // why: RefreshControl must attach as a real sibling of the content (iOS attachment mode), not
-    // a props-only stub — pull-to-refresh is a real native gesture surface, so a silently-inert
-    // `refreshControl` prop would ship broken UX with no error anywhere.
-    it('renders the real RefreshControl as a childless sibling before content (iOS attachment)', async () => {
-      compileScrollViewWithRefreshControl();
-      compileToFile(
-        `<script>
-           import ScrollView from './.smoke-compiled-scroll-view.mjs';
-         </script>
-         <ScrollView refreshControl={{ refreshing: true, tintColor: 'red' }}>
-           <symbiote-view p={{}}></symbiote-view>
-         </ScrollView>`,
+    // why: the `refresh-control` tag must attach as a real sibling of the content (iOS attachment
+    // mode), not a props-only stub — pull-to-refresh is a real native gesture surface, so a
+    // silently-inert refresh control would ship broken UX with no error anywhere. The app now
+    // writes the tag as an ordinary CHILD, which the scroll behavior claims; the deleted wrapper
+    // took a `refreshControl` object prop and rendered that child itself.
+    it('renders refresh-control as a childless sibling before content (iOS attachment)', async () => {
+      const RefreshParent = await loadParent(
+        `<scroll-view>
+           <refresh-control p={{ refreshing: true, tintColor: 'red' }} />
+           <view p={{}}></view>
+         </scroll-view>`,
         'ScrollRefreshParent.svelte',
         REFRESH_PARENT_OUT,
       );
-      const mod: unknown = await import(`file://${REFRESH_PARENT_OUT}`);
-      if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
-        throw new Error(
-          'ScrollRefreshParent.svelte produced no default export',
-        );
-      }
 
-      mount(ROOT_TAG, mod.default as Component);
+      mount(ROOT_TAG, RefreshParent);
       await tick();
       await tick();
 
@@ -296,11 +248,11 @@ describe('ScrollView (real compiled index.svelte)', () => {
       );
       expect(
         refresh,
-        'the real RefreshControl.svelte painted PullToRefreshView',
+        'refresh-control painted PullToRefreshView',
       ).toBeDefined();
       expect(refresh?.props.refreshing).toBe(true);
       expect(refresh?.props.tintColor).toBe('red');
-      // Sibling, not wrap: RefreshControl is a CHILD of the scroll view (iOS mode), not its parent.
+      // Sibling, not wrap: refresh-control is a CHILD of the scroll view (iOS mode), not its parent.
       expect(outer?.children.some(child => child.tag === refresh?.tag)).toBe(
         true,
       );

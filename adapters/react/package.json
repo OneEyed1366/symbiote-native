@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/react",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "SymbioteNative's React adapter — a react-reconciler host config (mutation mode) driving real native iOS/Android views through stock React Native Fabric.",
   "license": "MIT",
   "repository": {
@@ -33,7 +33,8 @@
     ".": "./src/index.ts",
     "./bootstrap": "./src/bootstrap.ts",
     "./metro-css-parser": "./metro-css-parser.cjs",
-    "./state-style": "./src/state-style.ts"
+    "./jsx-runtime": "./src/jsx-runtime.ts",
+    "./jsx-dev-runtime": "./src/jsx-dev-runtime.ts"
   },
   "files": [
     "build",
@@ -54,9 +55,13 @@
         "default": "./build/bootstrap.js"
       },
       "./metro-css-parser": "./metro-css-parser.cjs",
-      "./state-style": {
-        "types": "./build/state-style.d.ts",
-        "default": "./build/state-style.js"
+      "./jsx-runtime": {
+        "types": "./build/jsx-runtime.d.ts",
+        "default": "./build/jsx-runtime.js"
+      },
+      "./jsx-dev-runtime": {
+        "types": "./build/jsx-dev-runtime.d.ts",
+        "default": "./build/jsx-dev-runtime.js"
       }
     }
   },

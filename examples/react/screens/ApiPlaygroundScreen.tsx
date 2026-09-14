@@ -1,4 +1,3 @@
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 import { HooksStateContextDemo } from '../components/HooksStateContextDemo';
@@ -33,58 +32,58 @@ export function ApiPlaygroundScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.ApiPlayground];
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="api-playground-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view
             className="hero-badge"
             style={{ backgroundColor: LINE_COLOR.introspection }}
           >
-            <Text className="hero-badge-text">AP</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">API Playground</Text>
-            <Text className="hero-body">
+            <text className="hero-badge-text">AP</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">API Playground</text>
+            <text className="hero-body">
               React's own API surface, live — hooks, built-in components, the
               component model, and the handful of top-level APIs that still
               apply with react-dom out of the picture.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <Text className="category-header">Hooks</Text>
-        <Text className="category-intro">
+        <text className="category-header">Hooks</text>
+        <text className="category-intro">
           State, context, refs, effects, performance, and the newer
           resource/action hooks.
-        </Text>
+        </text>
         <HooksStateContextDemo />
         <HooksRefEffectDemo />
         <HooksPerformanceDemo />
         <HooksMiscDemo />
         <HooksActionsDemo />
 
-        <Text className="category-header">Built-in Components</Text>
-        <Text className="category-intro">
+        <text className="category-header">Built-in Components</text>
+        <text className="category-intro">
           Fragment, Profiler, StrictMode, memo/forwardRef/lazy, and the two
           Partial rows — Suspense and Activity — whose hide/unhide is currently
           a no-op.
-        </Text>
+        </text>
         <FragmentProfilerStrictModeDemo />
         <MemoForwardRefDemo />
         <SuspenseActivityLazyDemo />
 
-        <Text className="category-header">Component Model</Text>
-        <Text className="category-intro">
+        <text className="category-header">Component Model</text>
+        <text className="category-intro">
           Context, refs, the Elements/Children APIs, class components end to
           end, PureComponent, Error Boundaries, and createPortal.
-        </Text>
+        </text>
         <ContextProviderDemo />
         <RefsApiDemo />
         <ElementsApiDemo />
@@ -94,13 +93,13 @@ export function ApiPlaygroundScreen() {
         <ErrorBoundaryDemo />
         <PortalDemo />
 
-        <Text className="category-header">Other</Text>
-        <Text className="category-intro">
+        <text className="category-header">Other</text>
+        <text className="category-intro">
           The remaining top-level APIs that still apply with no react-dom in the
           picture.
-        </Text>
+        </text>
         <OtherApisDemo />
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

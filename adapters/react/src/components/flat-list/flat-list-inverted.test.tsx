@@ -47,7 +47,7 @@ function InvertedApp(): ReactElement {
       index,
     }),
     renderItem: ({ item }: { item: IRow }) =>
-      createElement('symbiote-text', { key: item.id }, item.label),
+      createElement('text', { key: item.id }, item.label),
   });
 }
 
@@ -68,7 +68,7 @@ function GatedApp(): ReactElement {
       viewableReports.push(info);
     },
     renderItem: ({ item }: { item: IRow }) =>
-      createElement('symbiote-text', { key: item.id }, item.label),
+      createElement('text', { key: item.id }, item.label),
   });
 }
 

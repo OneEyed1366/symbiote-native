@@ -28,9 +28,10 @@ if (globalThis.navigator === undefined) {
 }
 
 const ROOT_TAG = 91_902;
-// Next to the real View.svelte: the compiled output keeps View's own relative imports.
+// Compiled next to the adapter's own components so the fixture's `../runes/attachments` import
+// resolves the way a real component's does.
 const COMPONENTS_DIR = join(__dirname, '..', 'components');
-const VIEW_OUT = join(COMPONENTS_DIR, '.smoke-compiled-attachments-view.mjs');
+const HOST_OUT = join(COMPONENTS_DIR, '.smoke-compiled-attachments-view.mjs');
 const PARENT_OUT = join(
   COMPONENTS_DIR,
   '.smoke-compiled-attachments-parent.mjs',
@@ -41,17 +42,15 @@ const ACTION_OUT = join(
 );
 // Each compiled file sits next to its real source so that source's own relative imports still
 // resolve; a name unique to THIS suite keeps concurrently-running suites from racing on the path.
-const PRESSABLE_BASENAME = '.smoke-compiled-attachments-pressable.mjs';
-const PRESSABLE_OUT = join(COMPONENTS_DIR, 'pressable', PRESSABLE_BASENAME);
-const TOUCHABLE_OUT = join(
+const BARE_TAG_OWNER_OUT = join(
   COMPONENTS_DIR,
-  'touchable-opacity',
-  '.smoke-compiled-attachments-touchable.mjs',
+  'modal',
+  '.smoke-compiled-attachments-modal.mjs',
 );
-const TOUCHABLE_PARENT_OUT = join(
+const BARE_TAG_OWNER_PARENT_OUT = join(
   COMPONENTS_DIR,
-  'touchable-opacity',
-  '.smoke-compiled-attachments-touchable-parent.mjs',
+  'modal',
+  '.smoke-compiled-attachments-modal-parent.mjs',
 );
 
 const COMPILE_OPTIONS = {
@@ -86,29 +85,38 @@ async function loadComponent(outPath: string): Promise<Component> {
   return component;
 }
 
-function compileView(): void {
-  compileToFile(
-    readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'),
-    'View.svelte',
-    VIEW_OUT,
-  );
+// The seam under test is what a COMPONENT does to forward `{@attach}` down to the host tag it
+// owns, and this is that shape in fifteen lines. It used to be `View.svelte`; there is no View
+// component any more (a view is the `view` tag), so the fixture is written out rather than read
+// off disk — which also makes the suite about the rune instead of about one component.
+const HOST_SOURCE = `<script>
+  import { createAttachmentsSync } from '../runes/attachments';
+  let { children, ...rest } = $props();
+  let hostShim = $state.raw(null);
+  const syncAttachments = createAttachmentsSync();
+  $effect(() => { syncAttachments(hostShim, rest); });
+</script>
+<view p={rest} bind:this={hostShim}>{@render children?.()}</view>`;
+
+function compileHost(): void {
+  compileToFile(HOST_SOURCE, 'AttachmentHost.svelte', HOST_OUT);
 }
 
 // Node caches import() by path, so each differently-SOURCED parent needs its own filename
 // (svelte-adapter-dom-shim skill §15's harness gotchas).
 const SWAP_PARENT = `<script>
-  import View from './.smoke-compiled-attachments-view.mjs';
+  import Host from './.smoke-compiled-attachments-view.mjs';
   let { onEvent, onCapture } = $props();
   let which = $state('first');
   $effect(() => { onCapture?.((next) => { which = next; }); });
   const first = (node) => { onEvent('attach:first', node); return () => onEvent('teardown:first', node); };
   const second = (node) => { onEvent('attach:second', node); return () => onEvent('teardown:second', node); };
 </script>
-<View testID="attach-target" {@attach which === 'first' ? first : second} />`;
+<Host testID="attach-target" {@attach which === 'first' ? first : second} />`;
 
 const ACTION_PARENT = `<script>
   import { fromAction } from 'svelte/attachments';
-  import View from './.smoke-compiled-attachments-view.mjs';
+  import Host from './.smoke-compiled-attachments-view.mjs';
   let { onEvent, onCapture } = $props();
   let arg = $state('one');
   $effect(() => { onCapture?.((next) => { arg = next; }); });
@@ -120,7 +128,7 @@ const ACTION_PARENT = `<script>
     };
   };
 </script>
-<View testID="action-target" {@attach fromAction(action, () => arg)} />`;
+<Host testID="action-target" {@attach fromAction(action, () => arg)} />`;
 
 interface IEvent {
   name: string;
@@ -145,17 +153,16 @@ beforeEach(() => {
   fabric.reset();
   events = [];
   setValue = null;
-  compileView();
+  compileHost();
 });
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(VIEW_OUT, { force: true });
+  rmSync(HOST_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
   rmSync(ACTION_OUT, { force: true });
-  rmSync(PRESSABLE_OUT, { force: true });
-  rmSync(TOUCHABLE_OUT, { force: true });
-  rmSync(TOUCHABLE_PARENT_OUT, { force: true });
+  rmSync(BARE_TAG_OWNER_OUT, { force: true });
+  rmSync(BARE_TAG_OWNER_PARENT_OUT, { force: true });
 });
 
 describe('Positive — createAttachmentsSync', () => {
@@ -173,8 +180,8 @@ describe('Positive — createAttachmentsSync', () => {
   });
 });
 
-// The forwarding helper the list family and Animated.ScrollView rely on: those rebuild their
-// child's props by name (or through a string-keyed Record), which drops symbol keys silently.
+// The forwarding helper the list family relies on: those rebuild their child's props by name (or
+// through a string-keyed Record), which drops symbol keys silently.
 describe('Positive — pickAttachmentProps', () => {
   it('carries the attachment keys across and leaves everything else behind', () => {
     const attachmentKey = createAttachmentKey();
@@ -214,7 +221,7 @@ describe('Positive — {@attach} on a Symbiote component', () => {
 
     expect(events.map(entry => entry.name)).toEqual(['attach:first']);
     const node = events[0].node;
-    expect(node.tagName).toBe('symbiote-view');
+    expect(node.tagName).toBe('view');
     // The real proof it is the COMMITTED node, not a detached template prototype: the shim only
     // creates an engine node on insertion into a live tree, and the fake Fabric only hands out a
     // tag for a node it actually created.
@@ -253,52 +260,35 @@ describe('Positive — {@attach} on a Symbiote component', () => {
     expect(events[2].node).toBe(events[0].node);
   });
 
-  // why: TouchableOpacity owns no host tag of its own — it spreads `...rest` onto Pressable.
-  // Symbol keys survive a component spread (spread_props' ownKeys trap walks
-  // Object.getOwnPropertySymbols), so the attachment must land on Pressable's host node with NO
-  // per-component forwarding code. This is the "free" category from the adapter's own attachment
-  // design (skill §22c category 2) — a real, not assumed, proof it stays free.
-  it('reaches the host node through a component that only re-spreads its rest props', async () => {
+  // why: Modal owns its host node as a bare `modal` TAG, so the attach forwarding it needs is its
+  // own four lines of `createAttachmentsSync`, not something a wrapped-component ancestor supplies
+  // for free. This is the case that proves those lines are wired: a real shipped component,
+  // compiled from source, reaching its committed node.
+  //
+  // Modal is the subject on purpose, not RefreshControl or either Touchable variant that filled
+  // this role before: Modal is structurally UNLOWERABLE (`.claude/rules/host-primitive-tier.md`,
+  // "the disqualifier: a render that SYNTHESIZES a node" — a hidden modal commits zero nodes, so
+  // lowering it would be a regression, not an optimisation). Any component that renders a bare tag
+  // AND calls `createAttachmentsSync` serves, but this one will not need rehoming the next time a
+  // wrapper is deleted.
+  it('reaches the committed host node of a component that owns a bare tag', async () => {
     compileToFile(
-      readFileSync(join(COMPONENTS_DIR, 'pressable', 'index.svelte'), 'utf8'),
-      'Pressable.svelte',
-      PRESSABLE_OUT,
-    );
-    // TouchableOpacity's feedback node is an Animated.View over the real View.svelte, so View is
-    // compiled here too and its specifier rewritten alongside Pressable's.
-    compileToFile(
-      readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'),
-      'View.svelte',
-      VIEW_OUT,
-    );
-    compileToFile(
-      readFileSync(
-        join(COMPONENTS_DIR, 'touchable-opacity', 'index.svelte'),
-        'utf8',
-      )
-        .replace(
-          "'../pressable/index.svelte'",
-          `'../pressable/${PRESSABLE_BASENAME}'`,
-        )
-        .replace(
-          "'../View.svelte'",
-          "'../.smoke-compiled-attachments-view.mjs'",
-        ),
-      'TouchableOpacity.svelte',
-      TOUCHABLE_OUT,
+      readFileSync(join(COMPONENTS_DIR, 'modal', 'index.svelte'), 'utf8'),
+      'Modal.svelte',
+      BARE_TAG_OWNER_OUT,
     );
     compileToFile(
       `<script>
-         import TouchableOpacity from './.smoke-compiled-attachments-touchable.mjs';
+         import Modal from './.smoke-compiled-attachments-modal.mjs';
          let { onEvent } = $props();
          const mark = (node) => { onEvent('attach:touchable', node); };
        </script>
-       <TouchableOpacity testID="touchable-target" {@attach mark} />`,
-      'TouchableParent.svelte',
-      TOUCHABLE_PARENT_OUT,
+       <Modal testID="touchable-target" visible={true} {@attach mark} />`,
+      'BareTagOwnerParent.svelte',
+      BARE_TAG_OWNER_PARENT_OUT,
     );
 
-    const Parent = await loadComponent(TOUCHABLE_PARENT_OUT);
+    const Parent = await loadComponent(BARE_TAG_OWNER_PARENT_OUT);
     mount(ROOT_TAG, Parent, { onEvent: record });
     await tick();
     await tick();

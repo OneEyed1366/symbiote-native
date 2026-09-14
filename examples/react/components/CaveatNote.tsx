@@ -1,4 +1,3 @@
-import { Text } from '@symbiote-native/react';
 
 type ICaveatNoteProps = {
   children: string;
@@ -9,9 +8,9 @@ type ICaveatNoteProps = {
 // behavior IS the point of a Partial demo (see .docs/framework-api-surface/react.md).
 export function CaveatNote({ children, testID }: ICaveatNoteProps) {
   return (
-    <Text
+    <text
       testID={testID}
       className="caveat-text"
-    >{`Partial: ${children}`}</Text>
+    >{`Partial: ${children}`}</text>
   );
 }

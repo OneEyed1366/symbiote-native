@@ -28,11 +28,11 @@ const config = {
   // ./metro-css-parser export). Angular has no compiler-plugin conflict here: the ngc/linker
   // pipeline (see the block comment above) only ever sees .ts files, never .css.
   transformer: {
-    // metro-transformer, not metro-css-parser: it is the CSS transformer PLUS the host-primitive
-    // lowering, which has to rewrite the file's TEXT before Metro parses it. As a Babel plugin the
-    // lowering half-applies — see that file's own comment — so the two must not both be wired.
+    // Plain CSS transformer. It used to be `./metro-transformer`, which wrapped this one in a
+    // source pre-pass that rewrote <View>/<Text> to their intrinsic tags; the app writes the tag
+    // itself now, so the pre-pass and its wrapper are gone.
     babelTransformerPath:
-      require.resolve('@symbiote-native/angular/metro-transformer'),
+      require.resolve('@symbiote-native/angular/metro-css-parser'),
   },
   resolver: {
     // sourceExts + the ngc-outDir CSS-redirect resolveRequest — see

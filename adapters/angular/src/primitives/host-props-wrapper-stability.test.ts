@@ -63,7 +63,7 @@ let mounted: WrapperStabilityHost | undefined;
   selector: 'wrapper-stability-host',
   standalone: true,
   imports: [View, SymbioteHostPropsDirective],
-  template: `<View [symbioteHostProps]="bag"></View>`,
+  template: `<view [symbioteHostProps]="bag"></view>`,
 })
 class WrapperStabilityHost {
   taps = 0;

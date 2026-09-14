@@ -7,7 +7,7 @@
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import type { Locale } from '../../../core';
 import { useLocales } from './index';
@@ -70,7 +70,7 @@ const results: Locale[][] = [];
 
 function Probe(): ReactElement {
   results.push(useLocales());
-  return createElement(View);
+  return createElement('view');
 }
 
 const fabric = installFabric();

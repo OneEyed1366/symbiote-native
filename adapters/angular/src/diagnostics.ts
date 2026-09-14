@@ -16,7 +16,7 @@
 export interface IAngularProfile {
   // Change-detection passes: RendererFactory2.end() runs once per ApplicationRef.tick().
   cdPasses: number;
-  // Primitive host views (symbiote-view / symbiote-text / ...) Angular actually walked. Divided by
+  // Primitive host views (view / text / ...) Angular actually walked. Divided by
   // cdPasses this is the SIZE OF THE TREE one tick touches - the number that separates "the list is
   // expensive" from "every mounted screen is re-checked because a list scrolled". The primitives are
   // CheckAlways, and a Global tick refreshes every CheckAlways view in the application.

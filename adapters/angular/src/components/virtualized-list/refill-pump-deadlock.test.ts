@@ -111,12 +111,12 @@ const ROW_STYLE = { height: ROW_HEIGHT };
       [getItemLayout]="itemLayout"
     >
       <ng-template vSectionHeader let-section>
-        <symbiote-text [style]="headerStyle">{{ section.title }}</symbiote-text>
+        <text [style]="headerStyle">{{ section.title }}</text>
       </ng-template>
       <ng-template vSectionItem let-item>
-        <symbiote-view [style]="rowStyle">
-          <symbiote-text [testID]="item.id">{{ item.label }}</symbiote-text>
-        </symbiote-view>
+        <view [style]="rowStyle">
+          <text [testID]="item.id">{{ item.label }}</text>
+        </view>
       </ng-template>
     </SectionList>
   `,

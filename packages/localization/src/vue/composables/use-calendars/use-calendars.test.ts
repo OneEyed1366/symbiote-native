@@ -69,7 +69,7 @@ function mountCalendars(): Ref<Calendar[]> {
     defineComponent({
       setup: () => {
         calendars = useCalendars();
-        return () => h('symbiote-text', {}, 'calendars');
+        return () => h('text', {}, 'calendars');
       },
     }),
   );

@@ -1,11 +1,5 @@
 import { defineComponent, ref } from 'vue';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -110,34 +104,34 @@ export const HapticsScreen = defineComponent(
     }
 
     return () => (
-      <SafeAreaView class="screen">
-        <ScrollView
+      <safe-area-view class="screen">
+        <scroll-view
           testID="haptics-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Haptics</Text>
-              <Text class="hero-body">
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Haptics</text>
+              <text class="hero-body">
                 @symbiote-native/haptics — impact, notification, and selection
                 feedback via iOS's Taptic Engine and Android's Vibrator API.
                 Every button fires immediately; a physical device is needed to
                 feel it, the Simulator has no haptics hardware.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="haptics-impact-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Impact</Text>
-            </View>
+          <view testID="haptics-impact-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Impact</text>
+            </view>
             {IMPACT_STYLES.map(style => (
               <ActionButton
                 key={style}
@@ -147,12 +141,12 @@ export const HapticsScreen = defineComponent(
                 color={lineColor}
               />
             ))}
-          </View>
+          </view>
 
-          <View testID="haptics-notification-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Notification</Text>
-            </View>
+          <view testID="haptics-notification-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Notification</text>
+            </view>
             {NOTIFICATION_TYPES.map(type => (
               <ActionButton
                 key={type}
@@ -162,25 +156,25 @@ export const HapticsScreen = defineComponent(
                 color={lineColor}
               />
             ))}
-          </View>
+          </view>
 
-          <View testID="haptics-selection-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Selection</Text>
-            </View>
+          <view testID="haptics-selection-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Selection</text>
+            </view>
             <ActionButton
               testID="haptics-selection-button"
               title="Selection"
               onPress={handleSelection}
               color={lineColor}
             />
-          </View>
+          </view>
 
           {Platform.OS === 'android' && (
-            <View testID="haptics-android-card" class="auth-card">
-              <View class="auth-card-header">
-                <Text class="auth-card-title">Android haptics engine</Text>
-              </View>
+            <view testID="haptics-android-card" class="auth-card">
+              <view class="auth-card-header">
+                <text class="auth-card-title">Android haptics engine</text>
+              </view>
               {ANDROID_HAPTICS.map(type => (
                 <ActionButton
                   key={type}
@@ -190,16 +184,16 @@ export const HapticsScreen = defineComponent(
                   color={lineColor}
                 />
               ))}
-            </View>
+            </view>
           )}
 
           {lastFired.value && (
-            <View testID="haptics-last-fired" class="auth-card">
-              <Text class="auth-value-text">{`Last fired: ${lastFired.value}`}</Text>
-            </View>
+            <view testID="haptics-last-fired" class="auth-card">
+              <text class="auth-value-text">{`Last fired: ${lastFired.value}`}</text>
+            </view>
           )}
-        </ScrollView>
-      </SafeAreaView>
+        </scroll-view>
+      </safe-area-view>
     );
   },
   { name: 'HapticsScreen' },

@@ -8,34 +8,20 @@
 import './register';
 
 export {
-  ActivityIndicator,
   anchorHostStyle,
-  Button,
   FlatList,
   HorizontalScrollContentView,
   HorizontalScrollView,
   Image,
-  ImageBackground,
-  InputAccessoryView,
   KeyboardAvoidingView,
   Modal,
-  Pressable,
-  RefreshControl,
-  SafeAreaView,
   ScrollContentView,
-  ScrollView,
-  ScrollViewStickyHeader,
   SectionList,
   stableAnchorStyle,
-  Switch,
   SymbioteHostPropsDirective,
   SymbioteStyleInputDirective,
   Text,
-  TextInput,
-  TouchableHighlight,
   TouchableNativeFeedback,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
   VirtualizedList,
   VirtualizedSectionList,
@@ -75,6 +61,7 @@ export {
 export { createAnimatedComponent } from './modules/animated';
 export type {
   IActivityIndicatorProps,
+  IAngularPressableInputs,
   IAngularImageBackgroundProps,
   IAngularInputAccessoryViewProps,
   IAngularKeyboardAvoidingViewProps,
@@ -112,7 +99,6 @@ export type {
   ISectionListProps,
   ISeparatorProps,
   ISeparators,
-  IStickyHeaderComponentType,
   ISubmitBehavior,
   IThemeAttrBackground,
   IViewabilityConfig,
@@ -130,10 +116,61 @@ export type {
   ISection,
   ISwitchProps,
   ISwitchTrackColor,
+  ISwitchChangeEvent,
   ITextInputHandle,
   ITextInputSelection,
+  ITextInputChangeEvent,
 } from './components';
 export { setImageSourceResolver } from './components';
+// The element directives that make a HAND-WRITTEN intrinsic tag (`<view>`, `<text-input>`, ...)
+// compile under ngtsc with no schema, and with a real type on every declared prop. `imports:
+// [SYMBIOTE_ELEMENTS]` is the whole app-facing surface; the individual classes are exported for an
+// app that wants a narrower import. See `elements.ts`'s header for why a directive rather than
+// `CUSTOM_ELEMENTS_SCHEMA`/`NO_ERRORS_SCHEMA`.
+export {
+  SYMBIOTE_ELEMENTS,
+  SymbioteElement,
+  ActivityIndicatorElement,
+  ActivityIndicatorSpinnerElement,
+  ButtonElement,
+  HorizontalScrollContentElement,
+  HorizontalScrollViewElement,
+  ImageBackgroundElement,
+  ImageElement,
+  InputAccessoryViewElement,
+  ManagedMultilineTextInputElement,
+  ManagedSwitchElement,
+  ManagedTextInputElement,
+  ModalElement,
+  MultilineTextInputElement,
+  PressableElement,
+  RefreshControlElement,
+  SafeAreaViewElement,
+  ScrollContentElement,
+  ScrollViewElement,
+  StickyHeaderElement,
+  SwitchElement,
+  TextElement,
+  TextInputElement,
+  // The `[(ngModel)]` / `formControl*` accessors for the two controlled tags — where the deleted
+  // wrappers' `NG_VALUE_ACCESSOR` went. Both ride `SYMBIOTE_ELEMENTS`; named separately for an app
+  // that imports narrowly.
+  SwitchValueAccessor,
+  TextInputValueAccessor,
+  // The three the list omitted while their components still existed. These are now the ONLY
+  // replacements for their deleted components in an app's `imports`, so a narrower import has to be
+  // able to name them.
+  TouchableHighlightElement,
+  TouchableNativeFeedbackElement,
+  TouchableOpacityElement,
+  TouchableWithoutFeedbackElement,
+  ViewElement,
+} from './elements';
+export type {
+  IElementProps,
+  IStickyHeaderElementProps,
+  ITextElementProps,
+} from './element-props';
 export { mount, unmount } from './render';
 // The generic Descriptor→Angular bridge, the twin of descriptorToReact/descriptorToVue.
 // Exported so a component defined OUTSIDE this package (e.g.

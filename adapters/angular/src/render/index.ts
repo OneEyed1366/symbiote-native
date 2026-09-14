@@ -54,7 +54,7 @@ function asAngularHost(hostNode: SymbioteSurface | ISymbioteNode): Element {
   return hostNode as unknown as Element;
 }
 
-// A bare `symbiote-view` node, created directly through the engine (bypassing Angular's own
+// A bare `view` node, created directly through the engine (bypassing Angular's own
 // createElement, which only resolves KNOWN symbiote primitives, never an arbitrary component's
 // selector — see SymbioteRenderer.createElement). Used as the AppRegistry root's host when a
 // wrapperComponentProvider is set: Angular has no hostElement-less bootstrap for our renderer
@@ -62,9 +62,9 @@ function asAngularHost(hostNode: SymbioteSurface | ISymbioteNode): Element {
 // that isn't one of our primitives), so the root needs an explicit host too, one we then hand
 // to the wrapper as projectable content.
 function createDetachedViewHost(): ISymbioteNode {
-  // 'symbiote-view', not 'View': the public name is not a Fabric view name, and until
+  // 'view', not 'View': the public name is not a Fabric view name, and until
   // makeDescriptorFor learned to reject one it fell through to a view literally named `View`.
-  const descriptor = descriptorFor('symbiote-view');
+  const descriptor = descriptorFor('view');
   return toPublicInstance(
     createEngineElement(descriptor.component, descriptor.isText),
   );

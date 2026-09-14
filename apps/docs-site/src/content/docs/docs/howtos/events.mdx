@@ -13,9 +13,9 @@ shape of that event differs by framework.
     Callback props — the classic imperative style.
 
     ```tsx
-    <Pressable onPress={() => setCount(count + 1)} />
-    <Switch value={enabled} onValueChange={setEnabled} />
-    <TextInput value={name} onValueChange={setName} />
+    <pressable onPress={() => setCount(count + 1)} />
+    <switch value={enabled} onValueChange={setEnabled} />
+    <text-input value={name} onValueChange={setName} />
     ```
 
   </TabItem>
@@ -23,20 +23,21 @@ shape of that event differs by framework.
     Typed emits, or `v-model` sugar on controlled components.
 
     ```vue
-    <Pressable @press="count++" />
-    <Switch v-model="enabled" />
-    <TextInput v-model="name" />
+    <pressable @press="count++" />
+    <switch v-model="enabled" />
+    <text-input v-model="name" />
     ```
 
   </TabItem>
   <TabItem label="Angular">
-    Real `@Output()` `EventEmitter`s carry the event across the boundary.
+    Real `@Output()` `EventEmitter`s carry the event across the boundary. The component's
+    `imports: [SYMBIOTE_ELEMENTS]` is what makes the lowercase tags compile.
 
     ```ts
     template: `
-      <Pressable (press)="count = count + 1" />
-      <Switch [value]="enabled" (valueChange)="setEnabled($event)" />
-      <TextInput [value]="name" (valueChange)="setName($event)" />
+      <pressable (press)="count = count + 1" />
+      <switch [value]="enabled" (valueChange)="setEnabled($event)" />
+      <text-input [value]="name" (valueChange)="setName($event)" />
     `
     ```
 
@@ -47,9 +48,9 @@ shape of that event differs by framework.
     this looks just like React's.
 
     ```svelte
-    <Pressable onPress={() => (count += 1)} />
-    <Switch value={enabled} onValueChange={(next) => (enabled = next)} />
-    <TextInput value={name} onValueChange={(next) => (name = next)} />
+    <pressable onPress={() => (count += 1)} />
+    <switch value={enabled} onValueChange={(next) => (enabled = next)} />
+    <text-input value={name} onValueChange={(next) => (name = next)} />
     ```
 
   </TabItem>
@@ -58,9 +59,9 @@ shape of that event differs by framework.
     naming as React and Svelte.
 
     ```tsx
-    <Pressable onPress={() => setCount(count() + 1)} />
-    <Switch value={enabled()} onValueChange={setEnabled} />
-    <TextInput value={name()} onValueChange={setName} />
+    <pressable onPress={() => setCount(count() + 1)} />
+    <switch value={enabled()} onValueChange={setEnabled} />
+    <text-input value={name()} onValueChange={setName} />
     ```
 
   </TabItem>

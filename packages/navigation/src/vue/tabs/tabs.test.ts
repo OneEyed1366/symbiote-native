@@ -1,6 +1,6 @@
 // Co-located Vue-driven pipeline test, the Vue twin of react/tabs.test.tsx. Unlike Stack (which
 // drives real native RNSScreen views and needs an injected codegen-shaped ViewConfig - see
-// stack.test.ts), the tab bar is a PURE-JS UI painted from ordinary `symbiote-view`/`symbiote-text`
+// stack.test.ts), the tab bar is a PURE-JS UI painted from ordinary `view`/`text`
 // primitives, so no ViewConfig source is needed here at all. Proves: only the focused route's
 // screen mounts, jumpTo() moves focus, a tap (synthesized by the engine from a
 // topTouchStart/topTouchEnd pair on the tab button) drives the same jumpTo, and per-tab options
@@ -59,7 +59,7 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   return found;
 }
 
-// The tab bar row: the second child of Tab's root `symbiote-view` (content wrapper first, bar
+// The tab bar row: the second child of Tab's root `view` (content wrapper first, bar
 // second - see tabs.ts's final h() call).
 function tabBarRow(): IFakeNode {
   const root = fabric.appRoot();
@@ -84,11 +84,11 @@ async function tapItem(index: number): Promise<void> {
 }
 
 function HomeScreen() {
-  return h('symbiote-text', {}, 'home');
+  return h('text', {}, 'home');
 }
 
 function ProfileScreen() {
-  return h('symbiote-text', {}, 'profile');
+  return h('text', {}, 'profile');
 }
 
 // Publishes the live route so the unregister tests below can prove the SURVIVING route kept its
@@ -98,7 +98,7 @@ const TrackedHomeScreen = defineComponent(() => {
   const route = useRoute();
   return () => {
     capturedHomeRoute = route.value;
-    return h('symbiote-text', {}, 'home');
+    return h('text', {}, 'home');
   };
 });
 
@@ -242,7 +242,7 @@ describe('Vue Tab navigator', () => {
         const route = useRoute();
         return () => {
           receivedParams = route.value.params;
-          return h('symbiote-text', {}, 'params');
+          return h('text', {}, 'params');
         };
       });
       const handleRef = ref<ITabNavigatorHandle | null>(null);
@@ -308,14 +308,14 @@ describe('Vue Tab navigator', () => {
         return () => {
           homeIsFocused = isFocused.value;
           homeRouteName = route.value.name;
-          return h('symbiote-text', {}, 'home');
+          return h('text', {}, 'home');
         };
       });
       const TrackedProfileScreen = defineComponent(() => {
         const isFocused = useIsFocused();
         return () => {
           profileIsFocused = isFocused.value;
-          return h('symbiote-text', {}, 'profile');
+          return h('text', {}, 'profile');
         };
       });
 
@@ -352,7 +352,7 @@ describe('Vue Tab navigator', () => {
           events.push('effect');
           return () => events.push('cleanup');
         });
-        return () => h('symbiote-text', {}, 'home');
+        return () => h('text', {}, 'home');
       });
 
       const handleRef = ref<ITabNavigatorHandle | null>(null);

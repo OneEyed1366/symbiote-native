@@ -2,23 +2,26 @@
 // `Animated.Value`/`interpolate` reactively drives a style prop through the ordinary
 // flushValue -> AnimatedProps.update() -> setNativeProps commit path, with no native module and
 // no per-frame Svelte re-render — the everyday (non-native-driver) case every Animated consumer
-// hits before opting into useNativeDriver. Compiles the REAL View.svelte and wraps it with the
-// REAL createAnimatedComponent, same harness
-// shape as animated-native-driver.test.ts / components/switch/switch.smoke.test.ts.
+// hits before opting into useNativeDriver. Compiles app-authored markup, same harness shape as
+// animated-native-driver.test.ts / bare-tag-authored.test.ts.
+//
+// NO WRAPPER. The AnimatedValue rides an ordinary `<view style={{opacity}}>`; the engine's
+// `bindAnimatedValue` (core/engine/src/animated/host-binding.ts) picks it up out of routeProp. So
+// this file's Svelte-specific claim is now that our flat prop bag delivers an AnimatedNode to the
+// engine INTACT — Svelte's `p={{…}}` unpack must not stringify or clone it away — and that the
+// leaf therefore binds to the REAL committed host node rather than a stand-in.
 //
 // Scope note: flushValue's graph walk and AnimatedProps.update()'s rasterization are core/engine
-// (core/engine/src/animated/*.test.ts) and are used, not re-verified, here. This file's job is the
-// Svelte-specific claim: that the wrap's reconcile effect binds the leaf to the REAL committed
-// host node (not a stand-in), so a plain `setValue()` reaches the actual Fabric-facing props
-// without any native module installed. This is the counterpart of animated-native-driver.test.ts —
-// same component, no `nativeModuleProxy`, so `wantsNative` never engages.
+// (core/engine/src/animated/*.test.ts) and are used, not re-verified, here. This is the
+// counterpart of animated-native-driver.test.ts — same component, no `nativeModuleProxy`, so the
+// native driver never engages.
 //
 // No Negative group: `AnimatedValue.setValue()` and the reconcile $effect have no rejecting path
 // for this shape — every scenario below is a Positive "does the paint land" claim.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { AnimatedValue } from '@symbiote-native/engine';
@@ -43,9 +46,9 @@ const tick = (): Promise<void> =>
 // (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must
 // instead walk the currently COMMITTED tree, same as activity-indicator.smoke.test.ts's
 // findLive. Filtering on viewName==='RCTView' alone is not enough to identify OUR node:
-// root-element.ts's own mount target is ITSELF an unlabeled `symbiote-view` (RCTView, {}
-// props), sitting between the AppContainer and AnimatedView's real host node — so the search
-// must key on a prop only our own AnimatedView carries (testID), not the generic viewName.
+// root-element.ts's own mount target is ITSELF an unlabeled `view` (RCTView, {}
+// props), sitting between the AppContainer and our View's real host node — so the search
+// must key on a prop only our own View carries (testID), not the generic viewName.
 function findLive(
   node: IFakeNode,
   predicate: (n: IFakeNode) => boolean,
@@ -73,39 +76,20 @@ const COMPILE_OPTIONS = {
   fragments: 'tree',
   css: 'external',
 } as const;
-const COMPONENTS_DIR = join(__dirname, '..', '..', 'components');
-// The compiled base has to sit NEXT TO its real source: its own relative imports
-// (`../runes/attachments`) resolve from wherever the compiled FILE lives.
-const VIEW_OUT = join(
-  COMPONENTS_DIR,
-  '.smoke-compiled-view-for-animated-view-js.mjs',
-);
 const PARENT_OUT = join(__dirname, '.smoke-compiled-js-parent.mjs');
 
-function compileToFile(
-  source: string,
-  filename: string,
-  outPath: string,
-): void {
-  const result = compile(source, { ...COMPILE_OPTIONS, filename });
-  writeFileSync(outPath, result.js.code);
-}
-
+// One compile, no wrapper to build under it: the subject is the tag an app writes. `style` takes
+// svelte's `set_style` exit, which stringifies into `cssText` and caches the real object under a
+// private Symbol — so this fixture is also the only place the AnimatedNode could be lost.
 async function loadParent(): Promise<Component> {
-  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
-  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
-
-  compileToFile(
+  const result = compile(
     `<script>
-       import View from '../../components/.smoke-compiled-view-for-animated-view-js.mjs';
-       import { createAnimatedComponent } from './create-animated-component';
-       const AnimatedView = createAnimatedComponent(View);
        let { style, testID } = $props();
      </script>
-     <AnimatedView {style} {testID} />`,
-    'JsParent.svelte',
-    PARENT_OUT,
+     <view {style} testID={testID}></view>`,
+    { ...COMPILE_OPTIONS, filename: 'JsParent.svelte' },
   );
+  writeFileSync(PARENT_OUT, result.js.code);
 
   const mod: unknown = await import(`file://${PARENT_OUT}`);
   if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
@@ -120,7 +104,6 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
-  rmSync(VIEW_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
 });
 

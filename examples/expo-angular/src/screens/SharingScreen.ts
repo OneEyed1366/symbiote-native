@@ -1,9 +1,9 @@
 import { Component, signal } from '@angular/core';
 import {
-  SafeAreaView,
-  ScrollView,
+  SafeAreaViewElement,
+  ScrollViewElement,
   Text,
-  TextInput,
+  TextInputElement,
   View,
 } from '@symbiote-native/angular';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/angular';
@@ -26,81 +26,88 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 @Component({
   selector: 'SharingScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, TextInput, View],
+  imports: [
+    ActionButton,
+    SafeAreaViewElement,
+    ScrollViewElement,
+    Text,
+    TextInputElement,
+    View,
+  ],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="sharing-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Sharing</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Sharing</text>
+            <text class="hero-body">
               @symbiote-native/sharing — opens the platform share sheet for a
               local file. Outgoing only: it hands a file to another app, it does
               not receive one.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="sharing-capability-card" class="sharing-card">
-          <Text class="sharing-card-title">Capabilities</Text>
-          <View testID="sharing-available" class="sharing-row">
-            <Text class="sharing-row-label">Available</Text>
-            <View [class]="statusBadgeClass(isAvailable())">
-              <Text class="sharing-status-text">{{
+        <view testID="sharing-capability-card" class="sharing-card">
+          <text class="sharing-card-title">Capabilities</text>
+          <view testID="sharing-available" class="sharing-row">
+            <text class="sharing-row-label">Available</text>
+            <view [class]="statusBadgeClass(isAvailable())">
+              <text class="sharing-status-text">{{
                 statusLabel(isAvailable())
-              }}</Text>
-            </View>
-          </View>
-          <Text class="sharing-note">
+              }}</text>
+            </view>
+          </view>
+          <text class="sharing-note">
             Reports on the native module, not on any device capability — it is
             true on both platforms whenever the module is linked.
-          </Text>
-        </View>
+          </text>
+        </view>
 
-        <View testID="sharing-share-card" class="sharing-card">
-          <Text class="sharing-card-title">Share a file</Text>
-          <Text class="sharing-note">
+        <view testID="sharing-share-card" class="sharing-card">
+          <text class="sharing-card-title">Share a file</text>
+          <text class="sharing-note">
             A real local file URI is required — file:///… pointing at a file
             this app can read. There is no file-system package here to create
             one, so paste a path that already exists on the device.
-          </Text>
-          <TextInput
+          </text>
+          <text-input
             testID="sharing-uri-input"
             class="text-input"
             placeholder="file:///path/to/file.png"
             placeholderTextColor="#41506a"
             [value]="fileUri()"
             (valueChange)="fileUri.set($event)"
-          ></TextInput>
+          ></text-input>
           <ActionButton
             testID="sharing-share-button"
             title="Share"
             (press)="handleShare()"
             [color]="lineColor"
           ></ActionButton>
-        </View>
+        </view>
 
-        <View testID="sharing-result-card" class="sharing-card">
-          <Text class="sharing-card-title">Last result</Text>
-          <View class="sharing-row">
-            <Text class="sharing-row-label">Status</Text>
-            <Text testID="sharing-result" class="sharing-value-text">{{
+        <view testID="sharing-result-card" class="sharing-card">
+          <text class="sharing-card-title">Last result</text>
+          <view class="sharing-row">
+            <text class="sharing-row-label">Status</text>
+            <text testID="sharing-result" class="sharing-value-text">{{
               lastResult()
-            }}</Text>
-          </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+            }}</text>
+          </view>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class SharingScreen {

@@ -145,7 +145,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
   <TabItem label="React">
     ```tsx
     import { useState } from 'react';
-    import { View, Image, Animated } from '@symbiote-native/react';
+    import { Animated } from '@symbiote-native/react';
     import { useHideAnimation } from '@symbiote-native/splash-screen/react';
     import manifest from '../assets/bootsplash/manifest.json';
     import logo from '../assets/bootsplash/logo.png';
@@ -165,7 +165,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
 
       return (
         <Animated.View {...container} style={[container.style, { opacity }]}>
-          <Image {...logoProps} />
+          <image {...logoProps} />
         </Animated.View>
       );
     }
@@ -193,9 +193,9 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     </script>
 
     <template>
-      <View v-bind="hideAnimation.container">
-        <Image v-bind="hideAnimation.logo" />
-      </View>
+      <view v-bind="hideAnimation.container">
+        <image v-bind="hideAnimation.logo" />
+      </view>
     </template>
     ```
 
@@ -207,23 +207,23 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     ```ts
     import { Component, inject, signal } from '@angular/core';
     import { HideAnimationService } from '@symbiote-native/splash-screen/angular';
-    import { Image, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import manifest from '../assets/bootsplash/manifest.json';
     import logo from '../assets/bootsplash/logo.png';
 
     @Component({
       standalone: true,
-      imports: [View, Image],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View
+        <view
           [style]="hideAnimation().container.style"
           (layout)="hideAnimation().container.onLayout()"
         >
-          <Image
+          <image
             [source]="hideAnimation().logo.source"
             (loadEnd)="hideAnimation().logo.onLoadEnd?.()"
           />
-        </View>
+        </view>
       `,
     })
     export class AnimatedSplash {
@@ -252,7 +252,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { View, Image, Animated } from '@symbiote-native/svelte';
+      import { Animated } from '@symbiote-native/svelte';
       import { useHideAnimation } from '@symbiote-native/splash-screen/svelte';
       import manifest from '../assets/bootsplash/manifest.json';
       import logo from '../assets/bootsplash/logo.png';
@@ -273,7 +273,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     <Animated.View
       {...hideAnimation.current.container}
       style={[hideAnimation.current.container.style, { opacity }]}
-    ><Image {...hideAnimation.current.logo} /></Animated.View>
+    ><image {...hideAnimation.current.logo} /></Animated.View>
     ```
 
     `useHideAnimation` takes a config **getter**, not a plain value — a Svelte component's
@@ -286,7 +286,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
   <TabItem label="Solid">
     ```tsx
     import { createSignal } from 'solid-js';
-    import { View, Image, Animated } from '@symbiote-native/solid';
+    import { Animated } from '@symbiote-native/solid';
     import { createHideAnimation } from '@symbiote-native/splash-screen/solid';
     import manifest from '../assets/bootsplash/manifest.json';
     import logo from '../assets/bootsplash/logo.png';
@@ -309,7 +309,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
           {...hideAnimation().container}
           style={[hideAnimation().container.style, { opacity }]}
         >
-          <Image {...hideAnimation().logo} />
+          <image {...hideAnimation().logo} />
         </Animated.View>
       );
     }

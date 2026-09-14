@@ -308,7 +308,7 @@ describe('Solid Slider wrapper', () => {
           maximumValue={1}
           step={0.5}
           StepMarker={marker => (
-            <symbiote-view testID={`custom-marker-${marker().index}`} />
+            <view testID={`custom-marker-${marker().index}`} />
           )}
         />
       ));
@@ -336,7 +336,7 @@ describe('Solid Slider wrapper', () => {
           step={0.5}
           StepMarker={marker => {
             if (marker().stepMarked) markedIndex = marker().index;
-            return <symbiote-view />;
+            return <view />;
           }}
         />
       ));
@@ -352,7 +352,7 @@ describe('Solid Slider wrapper', () => {
           value={0.5}
           thumbTintColor="#0000ff"
           thumbImage={{ uri: 'https://example.com/thumb.png' }}
-          StepMarker={() => <symbiote-view />}
+          StepMarker={() => <view />}
         />
       ));
       await tick();
@@ -407,7 +407,7 @@ describe('Solid Slider wrapper', () => {
           StepMarker={marker => {
             invocations += 1;
             return (
-              <symbiote-view
+              <view
                 testID={`marker-${marker().index}`}
                 accessibilityLabel={((): string => {
                   latest = marker().stepMarked;

@@ -19,6 +19,9 @@ import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
+// registerScrollViewBehavior() is what builds the content container the assertions below read —
+// the tag has no content node of its own without it.
+import '../../register';
 import { mount, unmount } from '../../render';
 import { VirtualizedList } from './index';
 import { VListItemDirective, VListSeparatorDirective } from './directives';
@@ -60,12 +63,10 @@ let hostWindowSize = 1;
       [windowSize]="windowSize"
     >
       <ng-template vListItem let-item>
-        <symbiote-text [testID]="'row-' + item.id">{{
-          'row-' + item.id
-        }}</symbiote-text>
+        <text [testID]="'row-' + item.id">{{ 'row-' + item.id }}</text>
       </ng-template>
       <ng-template vListSeparator>
-        <symbiote-text testID="divider">divider</symbiote-text>
+        <text testID="divider">divider</text>
       </ng-template>
     </VirtualizedList>
   `,

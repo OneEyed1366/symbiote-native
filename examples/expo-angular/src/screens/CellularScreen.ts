@@ -1,8 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
 import {
   Platform,
-  SafeAreaView,
-  ScrollView,
+  SafeAreaViewElement,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -52,81 +52,81 @@ function valueLabel(value: string | boolean | null): string {
 @Component({
   selector: 'CellularScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="cellular-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Cellular</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Cellular</text>
+            <text class="hero-body">
               @symbiote-native/cellular — cellular generation and carrier/SIM
               info. Every field except generation is Android-only upstream
               (iOS/web return null); a physical device with an active SIM is
               needed for real values.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="cellular-info-card" class="capability-card">
-          <Text class="capability-card-title">Cellular info</Text>
-          <View class="capability-row">
-            <Text class="capability-label">Generation</Text>
-            <Text class="value-text">{{ generationLabel() }}</Text>
-          </View>
+        <view testID="cellular-info-card" class="capability-card">
+          <text class="capability-card-title">Cellular info</text>
+          <view class="capability-row">
+            <text class="capability-label">Generation</text>
+            <text class="value-text">{{ generationLabel() }}</text>
+          </view>
           @if (Platform.OS === 'android') {
-            <View class="capability-row">
-              <Text class="capability-label">Allows VoIP</Text>
-              <Text class="value-text">{{ valueLabel(allowsVoip()) }}</Text>
-            </View>
-            <View class="capability-row">
-              <Text class="capability-label">ISO country code</Text>
-              <Text class="value-text">{{ valueLabel(isoCountryCode()) }}</Text>
-            </View>
-            <View class="capability-row">
-              <Text class="capability-label">Carrier name</Text>
-              <Text class="value-text">{{ valueLabel(carrierName()) }}</Text>
-            </View>
-            <View class="capability-row">
-              <Text class="capability-label">Mobile country code</Text>
-              <Text class="value-text">{{
+            <view class="capability-row">
+              <text class="capability-label">Allows VoIP</text>
+              <text class="value-text">{{ valueLabel(allowsVoip()) }}</text>
+            </view>
+            <view class="capability-row">
+              <text class="capability-label">ISO country code</text>
+              <text class="value-text">{{ valueLabel(isoCountryCode()) }}</text>
+            </view>
+            <view class="capability-row">
+              <text class="capability-label">Carrier name</text>
+              <text class="value-text">{{ valueLabel(carrierName()) }}</text>
+            </view>
+            <view class="capability-row">
+              <text class="capability-label">Mobile country code</text>
+              <text class="value-text">{{
                 valueLabel(mobileCountryCode())
-              }}</Text>
-            </View>
-            <View class="capability-row">
-              <Text class="capability-label">Mobile network code</Text>
-              <Text class="value-text">{{
+              }}</text>
+            </view>
+            <view class="capability-row">
+              <text class="capability-label">Mobile network code</text>
+              <text class="value-text">{{
                 valueLabel(mobileNetworkCode())
-              }}</Text>
-            </View>
+              }}</text>
+            </view>
           }
-        </View>
+        </view>
 
-        <View testID="cellular-permission-card" class="capability-card">
-          <Text class="capability-card-title">Permission</Text>
-          <View class="capability-row">
-            <Text class="capability-label">Phone-state permission status</Text>
-            <Text class="value-text">{{ permissionLabel() }}</Text>
-          </View>
+        <view testID="cellular-permission-card" class="capability-card">
+          <text class="capability-card-title">Permission</text>
+          <view class="capability-row">
+            <text class="capability-label">Phone-state permission status</text>
+            <text class="value-text">{{ permissionLabel() }}</text>
+          </view>
           <ActionButton
             testID="cellular-request-permission"
             title="Request permission"
             [color]="lineColor"
             (press)="requestPermission()"
           ></ActionButton>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class CellularScreen {

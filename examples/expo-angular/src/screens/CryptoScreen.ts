@@ -1,5 +1,10 @@
 import { Component, signal } from '@angular/core';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  SafeAreaViewElement,
+  ScrollViewElement,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -23,71 +28,71 @@ const RANDOM_BYTE_COUNT = 16;
 @Component({
   selector: 'CryptoScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="crypto-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Crypto</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Crypto</text>
+            <text class="hero-body">
               @symbiote-native/crypto — cryptographically secure random bytes,
               randomUUID, and string digest hashing (SHA-1/256/384/512,
               MD2/4/5).
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="crypto-uuid-card" class="capability-card">
-          <Text class="capability-card-title">Random UUID</Text>
+        <view testID="crypto-uuid-card" class="capability-card">
+          <text class="capability-card-title">Random UUID</text>
           <ActionButton
             testID="crypto-generate-uuid-button"
             title="Generate UUID"
             (press)="handleGenerateUuid()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="crypto-uuid-result" class="value-text">{{
+          <text testID="crypto-uuid-result" class="value-text">{{
             uuidLabel()
-          }}</Text>
-        </View>
+          }}</text>
+        </view>
 
-        <View testID="crypto-digest-card" class="capability-card">
-          <Text class="capability-card-title">Digest</Text>
+        <view testID="crypto-digest-card" class="capability-card">
+          <text class="capability-card-title">Digest</text>
           <ActionButton
             testID="crypto-digest-sha256-button"
             title="Digest SHA-256"
             (press)="handleDigestSha256()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="crypto-digest-result" class="value-text">{{
+          <text testID="crypto-digest-result" class="value-text">{{
             digestLabel()
-          }}</Text>
-        </View>
+          }}</text>
+        </view>
 
-        <View testID="crypto-random-bytes-card" class="capability-card">
-          <Text class="capability-card-title">Random bytes</Text>
+        <view testID="crypto-random-bytes-card" class="capability-card">
+          <text class="capability-card-title">Random bytes</text>
           <ActionButton
             testID="crypto-random-bytes-button"
             title="Get 16 random bytes"
             (press)="handleGetRandomBytes()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="crypto-random-bytes-result" class="value-text">{{
+          <text testID="crypto-random-bytes-result" class="value-text">{{
             randomBytesLabel()
-          }}</Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          }}</text>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class CryptoScreen {

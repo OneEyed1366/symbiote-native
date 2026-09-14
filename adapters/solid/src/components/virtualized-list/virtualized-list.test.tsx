@@ -16,8 +16,8 @@ import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
+import '../../register';
 import { VirtualizedList } from './index';
-import { VirtualizedList as AndroidVirtualizedList } from './index.android';
 
 const ROOT_TAG = 819;
 const SCROLL_VIEW = 'RCTScrollView';
@@ -165,9 +165,7 @@ describe('Solid VirtualizedList on the engine', () => {
           data={[]}
           getItem={getItem}
           getItemCount={getItemCount}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -187,9 +185,7 @@ describe('Solid VirtualizedList on the engine', () => {
           getItem={getItem}
           getItemCount={getItemCount}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -213,9 +209,7 @@ describe('Solid VirtualizedList on the engine', () => {
           getItemCount={getItemCount}
           getItemLayout={getItemLayout}
           initialNumToRender={2}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -241,9 +235,7 @@ describe('Solid VirtualizedList on the engine', () => {
           getItemLayout={getItemLayout}
           initialNumToRender={2}
           windowSize={1}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -280,11 +272,9 @@ describe('Solid VirtualizedList on the engine', () => {
           getItemLayout={getItemLayout}
           initialNumToRender={2}
           windowSize={1}
-          ListHeaderComponent={<symbiote-text>the-header</symbiote-text>}
-          ListFooterComponent={<symbiote-text>the-footer</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          ListHeaderComponent={<text>the-header</text>}
+          ListFooterComponent={<text>the-footer</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -315,10 +305,8 @@ describe('Solid VirtualizedList on the engine', () => {
           getItemLayout={getItemLayout}
           initialNumToRender={2}
           windowSize={1}
-          ListEmptyComponent={<symbiote-text>nothing-here</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          ListEmptyComponent={<text>nothing-here</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -348,10 +336,8 @@ describe('Solid VirtualizedList on the engine', () => {
           getItemLayout={getItemLayout}
           initialNumToRender={2}
           windowSize={1}
-          ItemSeparatorComponent={() => <symbiote-text>divider</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          ItemSeparatorComponent={() => <text>divider</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -371,10 +357,8 @@ describe('Solid VirtualizedList on the engine', () => {
           getItem={getItem}
           getItemCount={getItemCount}
           getItemLayout={getItemLayout}
-          ItemSeparatorComponent={() => <symbiote-text>divider</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          ItemSeparatorComponent={() => <text>divider</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -406,10 +390,8 @@ describe('Solid VirtualizedList on the engine', () => {
           getItemLayout={getItemLayout}
           initialNumToRender={2}
           windowSize={1}
-          ItemSeparatorComponent={() => <symbiote-text>divider</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          ItemSeparatorComponent={() => <text>divider</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -441,13 +423,11 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           ItemSeparatorComponent={separatorProps => (
-            <symbiote-text>
-              {separatorProps.highlighted ? 'sep-on' : 'sep-off'}
-            </symbiote-text>
+            <text>{separatorProps.highlighted ? 'sep-on' : 'sep-off'}</text>
           )}
           renderItem={info => {
             if (info().index === 0) highlight = info().separators.highlight;
-            return <symbiote-text>{info().item.label}</symbiote-text>;
+            return <text>{info().item.label}</text>;
           }}
         />
       ));
@@ -486,17 +466,17 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           ItemSeparatorComponent={separatorProps => (
-            <symbiote-text>
+            <text>
               {typeof separatorProps.tag === 'string'
                 ? separatorProps.tag
                 : separatorProps.highlighted
                   ? 'sep-on'
                   : 'sep-off'}
-            </symbiote-text>
+            </text>
           )}
           renderItem={info => {
             if (info().index === 0) separators = info().separators;
-            return <symbiote-text>{info().item.label}</symbiote-text>;
+            return <text>{info().item.label}</text>;
           }}
         />
       ));
@@ -539,9 +519,7 @@ describe('Solid VirtualizedList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -584,9 +562,7 @@ describe('Solid VirtualizedList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -623,9 +599,7 @@ describe('Solid VirtualizedList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -656,9 +630,7 @@ describe('Solid VirtualizedList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -695,9 +667,7 @@ describe('Solid VirtualizedList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -733,9 +703,7 @@ describe('Solid VirtualizedList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -776,9 +744,7 @@ describe('Solid VirtualizedList on the engine', () => {
           getItemCount={getItemCount}
           initialNumToRender={2}
           windowSize={1}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -812,9 +778,7 @@ describe('Solid VirtualizedList on the engine', () => {
           windowSize={1}
           onEndReachedThreshold={0}
           onEndReached={onEndReached}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -849,9 +813,7 @@ describe('Solid VirtualizedList on the engine', () => {
           windowSize={1}
           onStartReachedThreshold={0}
           onStartReached={onStartReached}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -891,9 +853,7 @@ describe('Solid VirtualizedList on the engine', () => {
           windowSize={1}
           viewabilityConfig={{ itemVisiblePercentThreshold: 100 }}
           onViewableItemsChanged={info => changes.push(info)}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -944,9 +904,7 @@ describe('Solid VirtualizedList on the engine', () => {
               onViewableItemsChanged: fullyVisible,
             },
           ]}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -974,9 +932,7 @@ describe('Solid VirtualizedList on the engine', () => {
             minimumViewTime: 40,
           }}
           onViewableItemsChanged={onViewableItemsChanged}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1010,9 +966,7 @@ describe('Solid VirtualizedList on the engine', () => {
             waitForInteraction: true,
           }}
           onViewableItemsChanged={onViewableItemsChanged}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1039,9 +993,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           onScroll={onScroll}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1077,9 +1029,7 @@ describe('Solid VirtualizedList on the engine', () => {
           onScrollEndDrag={onScrollEndDrag}
           onMomentumScrollBegin={onMomentumScrollBegin}
           onMomentumScrollEnd={onMomentumScrollEnd}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1112,9 +1062,7 @@ describe('Solid VirtualizedList on the engine', () => {
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           scrollEventThrottle={16}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1139,9 +1087,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           horizontal
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -1182,9 +1128,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           inverted
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1235,9 +1179,7 @@ describe('Solid VirtualizedList on the engine', () => {
           class="frame"
           style={{ backgroundColor: 'red' }}
           contentContainerStyle="padded"
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1267,9 +1209,7 @@ describe('Solid VirtualizedList on the engine', () => {
           windowSize={1}
           testID="the-list"
           aria-label="Orders"
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1296,9 +1236,7 @@ describe('Solid VirtualizedList on the engine', () => {
           keyExtractor={keyExtractor}
           initialNumToRender={2}
           windowSize={1}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1338,9 +1276,7 @@ describe('Solid VirtualizedList on the engine', () => {
           onRefresh={() => {}}
           refreshing={refreshing()}
           progressViewOffset={12}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1363,44 +1299,16 @@ describe('Solid VirtualizedList on the engine', () => {
       ).toHaveLength(1);
     });
 
-    // why: an Android ScrollView hosts exactly ONE child, so RN cannot place the refresh control
-    // beside the content there — AndroidSwipeRefreshLayout WRAPS the scroll host instead. The wrapper
-    // then owns the frame, so RN's splitLayoutProps routes the LAYOUT half of the style (flex,
-    // margin, size, position) onto it and leaves the VISUAL half (background, padding, border) on the
-    // inner scroll view. Dumping the whole style on one of the two collapses the wrapper to zero
-    // height or loses the app's layout.
-    it('wraps the scroll host in the Android RefreshControl and splits the style across the two', async () => {
-      mount(ROOT_TAG, () => (
-        <AndroidVirtualizedList<IRow>
-          data={DATA}
-          getItem={getItem}
-          getItemCount={getItemCount}
-          getItemLayout={getItemLayout}
-          initialNumToRender={2}
-          windowSize={1}
-          onRefresh={() => {}}
-          refreshing={false}
-          style={{ flex: 1, backgroundColor: 'red' }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
-        />
-      ));
-      await settleViewport();
-
-      const control = committed(REFRESH_CONTROL);
-      expect(
-        control.children.map(child => child.viewName),
-        'the scroll host nests INSIDE the refresh control',
-      ).toEqual([SCROLL_VIEW]);
-      expect(control.props.flex, 'the layout half rides the wrapper').toBe(1);
-      expect(control.props.backgroundColor).toBeUndefined();
-      const scroll = committed(SCROLL_VIEW).props;
-      expect(scroll.backgroundColor, 'the visual half stays inside').toBe(
-        'red',
-      );
-      expect(scroll.flex).toBeUndefined();
-    });
+    // The Android wrap-and-split-style case moved out of this file entirely (2026-09-11): since
+    // VirtualizedList no longer builds its own scroll/content pair, WHICH platform wraps the
+    // RefreshControl is decided by which `<scroll-view>` behavior is registered
+    // (`core/components/src/behaviors/scroll-view/index.{ios,android}.ts`), not by which
+    // `VirtualizedList` factory an app imports — `./index.ios` and `./index.android` now produce
+    // byte-identical output, matching Vue's and Svelte's single, unsplit `VirtualizedList`. Headless
+    // registration is locked to the iOS variant for the whole process
+    // (`core/components/src/behaviors/scroll-view/index.ts` re-exports `index.ios`, same as Metro's
+    // own platform default), so an adapter-level test importing `index.android` here would still
+    // exercise the iOS-registered behavior — it is `wrap-android.test.ts`'s subject, not this file's.
 
     // why: RN implements sticky headers PURELY IN JS — the native scroll view ignores
     // stickyHeaderIndices entirely, so forwarding the array is a silent no-op that hides a missing
@@ -1416,9 +1324,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           stickyHeaderIndices={[0]}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1455,10 +1361,8 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           stickyHeaderIndices={[0, 15]}
-          ItemSeparatorComponent={() => <symbiote-text>divider</symbiote-text>}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          ItemSeparatorComponent={() => <text>divider</text>}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1484,9 +1388,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           stickyHeaderIndices={[0, 15]}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1524,9 +1426,7 @@ describe('Solid VirtualizedList on the engine', () => {
           getItemLayout={getItemLayout}
           initialNumToRender={2}
           windowSize={1}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1548,11 +1448,9 @@ describe('Solid VirtualizedList on the engine', () => {
           getItemLayout={getItemLayout}
           initialNumToRender={2}
           windowSize={1}
-          ListHeaderComponent={<symbiote-text>the-header</symbiote-text>}
+          ListHeaderComponent={<text>the-header</text>}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1580,9 +1478,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1617,9 +1513,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           initialScrollIndex={10}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1661,9 +1555,7 @@ describe('Solid VirtualizedList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       // No await: the engine has not committed yet, so there is no native handle.
@@ -1702,9 +1594,7 @@ describe('Solid VirtualizedList on the engine', () => {
           windowSize={1}
           maxToRenderPerBatch={2}
           updateCellsBatchingPeriod={10}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await tick();
@@ -1744,9 +1634,7 @@ describe('Solid VirtualizedList on the engine', () => {
           windowSize={1}
           stickyHeaderIndices={[0]}
           onScroll={onScroll}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1794,7 +1682,7 @@ describe('Solid VirtualizedList on the engine', () => {
         ref={handle => {
           list = handle;
         }}
-        renderItem={info => <symbiote-text>{info().item.label}</symbiote-text>}
+        renderItem={info => <text>{info().item.label}</text>}
       />
     ));
     await settleViewport();
@@ -1829,9 +1717,7 @@ describe('Solid VirtualizedList on the engine', () => {
           keyExtractor={keyExtractor}
           initialNumToRender={2}
           windowSize={1}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1871,7 +1757,7 @@ describe('Solid VirtualizedList on the engine', () => {
           windowSize={1}
           renderItem={info => {
             const label = info().item.label;
-            return <symbiote-text>{label}</symbiote-text>;
+            return <text>{label}</text>;
           }}
         />
       ));
@@ -1903,9 +1789,7 @@ describe('Solid VirtualizedList on the engine', () => {
           keyExtractor={keyExtractor}
           initialNumToRender={2}
           windowSize={1}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1937,9 +1821,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           keyboardDismissMode={dismiss()}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -1972,9 +1854,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           horizontal={horizontal()}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -2012,9 +1892,7 @@ describe('Solid VirtualizedList on the engine', () => {
           ref={handle => {
             list = handle;
           }}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();
@@ -2067,9 +1945,7 @@ describe('Solid VirtualizedList on the engine', () => {
           initialNumToRender={2}
           windowSize={1}
           extraData={extra()}
-          renderItem={info => (
-            <symbiote-text>{info().item.label}</symbiote-text>
-          )}
+          renderItem={info => <text>{info().item.label}</text>}
         />
       ));
       await settleViewport();

@@ -9,7 +9,6 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { SafeAreaView, Text, View } from '@symbiote-native/vue';
 import {
   deserializeNavigatorState,
   serializeNavigatorState,
@@ -59,31 +58,39 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StatePersistence];
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <View class="section">
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View
+  <safe-area-view class="screen">
+    <view class="section">
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
+      </view>
+      <view class="hero-card">
+        <view
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.routing }"
         >
-          <Text class="hero-badge-text">SP</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">State persistence</Text>
-          <Text class="hero-body"
-            >The Stack's own state serialized out and deserialized back in —
-            restoring exactly where you left off.</Text
-          >
-        </View>
-      </View>
-      <Text class="info-text">{{
-        `current stack depth: ${state.routes.length}`
-      }}</Text>
+          <text class="hero-badge-text">
+            SP
+          </text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">
+            State persistence
+          </text>
+          <text class="hero-body">
+            The Stack's own state serialized out and deserialized back in —
+            restoring exactly where you left off.
+          </text>
+        </view>
+      </view>
+      <text class="info-text">
+        {{
+          `current stack depth: ${state.routes.length}`
+        }}
+      </text>
       <ActionButton
         testID="persist-serialize"
         title="Serialize current stack"
@@ -96,14 +103,24 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StatePersistence];
         :onPress="onRestore"
         :color="LINE_COLOR.routing"
       />
-      <Text v-if="restoreError !== undefined" class="info-text">{{
-        `error: ${restoreError}`
-      }}</Text>
-      <View class="box-list160">
-        <Text testID="persist-snapshot" class="list-row-text">{{
-          snapshot ?? 'tap Serialize to capture the current route stack as JSON'
-        }}</Text>
-      </View>
-    </View>
-  </SafeAreaView>
+      <text
+        v-if="restoreError !== undefined"
+        class="info-text"
+      >
+        {{
+          `error: ${restoreError}`
+        }}
+      </text>
+      <view class="box-list160">
+        <text
+          testID="persist-snapshot"
+          class="list-row-text"
+        >
+          {{
+            snapshot ?? 'tap Serialize to capture the current route stack as JSON'
+          }}
+        </text>
+      </view>
+    </view>
+  </safe-area-view>
 </template>

@@ -3,7 +3,6 @@
 //
 // Same accessor discipline as DrawerHomeScreen — navigation() at the use site, never destructured.
 
-import { SafeAreaView, Text, View } from '@symbiote-native/solid';
 import { useDrawerNavigation } from '@symbiote-native/navigation/solid';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -16,21 +15,21 @@ export function DrawerSettingsScreen() {
   const navigation = useDrawerNavigation();
 
   return (
-    <SafeAreaView class="screen">
-      <View class="demo-section">
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">
+    <safe-area-view class="screen">
+      <view class="demo-section">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">
             {`${lineInfo.code} · ${lineInfo.label}`}
-          </Text>
-        </View>
-        <Text class="section-label">Drawer demo · Settings</Text>
+          </text>
+        </view>
+        <text class="section-label">Drawer demo · Settings</text>
         <ActionButton
           testID="drawer-close-from-settings"
           title="Close drawer"
           onPress={() => navigation().closeDrawer()}
           color={LINE_COLOR.structure}
         />
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   );
 }

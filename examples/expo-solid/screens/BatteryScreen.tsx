@@ -1,5 +1,5 @@
 import { createSignal, onCleanup } from 'solid-js';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   BatteryState,
   isAvailableAsync,
@@ -21,11 +21,15 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 
 function CapabilityBadge(props: { status: ICapabilityStatus }) {
   const label = () =>
-    props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO';
+    props.status === 'checking'
+      ? 'CHECKING…'
+      : props.status === 'yes'
+        ? 'YES'
+        : 'NO';
   return (
-    <View class={`status-badge status-badge-${props.status}`}>
-      <Text class="status-badge-text">{label()}</Text>
-    </View>
+    <view class={`status-badge status-badge-${props.status}`}>
+      <text class="status-badge-text">{label()}</text>
+    </view>
   );
 }
 
@@ -35,10 +39,10 @@ function CapabilityRow(props: {
   status: ICapabilityStatus;
 }) {
   return (
-    <View testID={props.testID} class="capability-row">
-      <Text class="capability-label">{props.label}</Text>
+    <view testID={props.testID} class="capability-row">
+      <text class="capability-label">{props.label}</text>
       <CapabilityBadge status={props.status} />
-    </View>
+    </view>
   );
 }
 
@@ -73,7 +77,8 @@ export function BatteryScreen() {
   const batteryState = createBatteryState();
   const lowPowerMode = createLowPowerMode();
 
-  const [isAvailable, setIsAvailable] = createSignal<ICapabilityStatus>('checking');
+  const [isAvailable, setIsAvailable] =
+    createSignal<ICapabilityStatus>('checking');
   const [isBatteryOptimizationEnabled, setIsBatteryOptimizationEnabled] =
     createSignal<ICapabilityStatus>('checking');
 
@@ -98,54 +103,52 @@ export function BatteryScreen() {
     batteryLevel() < 0 ? 'unknown' : `${Math.round(batteryLevel() * 100)}%`;
 
   return (
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="battery-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text class="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Battery</Text>
-            <Text class="hero-body">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text class="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Battery</text>
+            <text class="hero-body">
               @symbiote-native/battery — live battery level, charging state, and
               low-power mode via three subscription-backed primitives. A
-              simulator reports the battery API as unavailable; a real device
-              is needed to see live readings.
-            </Text>
-          </View>
-        </View>
+              simulator reports the battery API as unavailable; a real device is
+              needed to see live readings.
+            </text>
+          </view>
+        </view>
 
-        <View testID="battery-live-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Live status</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Battery level</Text>
-            <Text class="value-text">{batteryLevelLabel()}</Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Battery state</Text>
-            <Text class="value-text">
-              {batteryStateLabel(batteryState())}
-            </Text>
-          </View>
-          <View class="capability-row">
-            <Text class="capability-label">Low power mode</Text>
-            <Text class="value-text">{lowPowerMode() ? 'On' : 'Off'}</Text>
-          </View>
-        </View>
+        <view testID="battery-live-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Live status</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Battery level</text>
+            <text class="value-text">{batteryLevelLabel()}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Battery state</text>
+            <text class="value-text">{batteryStateLabel(batteryState())}</text>
+          </view>
+          <view class="capability-row">
+            <text class="capability-label">Low power mode</text>
+            <text class="value-text">{lowPowerMode() ? 'On' : 'Off'}</text>
+          </view>
+        </view>
 
-        <View testID="battery-capabilities-card" class="feature-card">
-          <View class="feature-card-header">
-            <Text class="feature-card-title">Capabilities</Text>
-          </View>
+        <view testID="battery-capabilities-card" class="feature-card">
+          <view class="feature-card-header">
+            <text class="feature-card-title">Capabilities</text>
+          </view>
           <CapabilityRow
             testID="battery-available"
             label="Available"
@@ -158,8 +161,8 @@ export function BatteryScreen() {
               status={isBatteryOptimizationEnabled()}
             />
           )}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

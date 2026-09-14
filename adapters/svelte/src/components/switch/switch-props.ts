@@ -5,9 +5,12 @@
 // CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter>. Svelte's idiom is `class`, matching
 // View/Text.
 //
-// `value` is declared `$bindable()` in index.svelte (`bind:value` sugar) — that is pure Svelte
-// compile-time behavior on the destructuring site and does not change the value's TYPE, so
-// `value?: boolean` here is unchanged from the base.
+// `bind:value` is NOT available on this primitive: Svelte's `bind:` directive only targets a
+// hardcoded list of native tag names (`compiler/phases/bindings.js`'s `valid_elements`), so it is a
+// compile error on our custom element, and `$bindable()` needs an actual component to destructure
+// it out of `$props()` — this primitive is a bare tag, not one. Two-way binding is the plain
+// controlled-prop pattern instead, same as every other adapter and RN itself: `value={x}
+// onValueChange={(e) => (x = e.value)}`.
 import type { IClassNameValue } from '@symbiote-native/engine';
 import type { ISwitchProps as ISwitchBaseProps } from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../../class-value';

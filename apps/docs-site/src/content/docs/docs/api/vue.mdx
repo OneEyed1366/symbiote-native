@@ -3,17 +3,13 @@ title: Vue API
 description: The Vue adapter public contract.
 ---
 
-Import app-facing APIs from `@symbiote-native/vue`:
+Primitives (`view`, `text`, `pressable`, `text-input`, `scroll-view`, ...) are
+plain lowercase intrinsic tags — write them directly in a template or JSX, no
+import needed. Import only what's still a real component or module from
+`@symbiote-native/vue`:
 
 ```ts
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/vue';
+import { StyleSheet } from '@symbiote-native/vue';
 ```
 
 Vue drives the same engine as React, but its public API follows Vue conventions.
@@ -34,9 +30,13 @@ files.
 
 ## Component shape
 
-- Events: typed emits like `@press` and `@value-change`.
+- Events: attrs listeners like `@press` and `@value-change`, routed straight
+  to the tag — same as any native DOM event in Vue.
 - Children: default slots.
-- Render children: scoped slots, for example `v-slot="{ pressed }"`.
+- Render children: list components only (`FlatList`, `SectionList`, ...) still
+  take a scoped slot; a primitive tag like `pressable` has no component body
+  to call one against — see [Slots](#slots) below for the pressed-state
+  workaround.
 - Refs: template refs to host nodes or exposed component handles.
 - Styles: `:style="styles.root"` with React Native-style objects. Most
   visual components — not just `View`/`Text` anymore — also accept
@@ -50,10 +50,10 @@ files.
 ## Common events
 
 ```vue
-<Pressable @press="onPress" @long-press="onLongPress" />
-<Switch v-model="enabled" />
-<TextInput v-model="text" @value-change="(text, event) => onChange(event)" />
-<View @layout="onLayout" />
+<pressable @press="onPress" @long-press="onLongPress" />
+<switch v-model="enabled" />
+<text-input v-model="text" @value-change="(text, event) => onChange(event)" />
+<view @layout="onLayout" />
 ```
 
 Vue event names are kebab-cased in templates. Their TypeScript source names use
@@ -65,17 +65,26 @@ pair, see [model bindings](#model-bindings-v-model) below.
 
 ## Slots
 
-React render props become scoped slots when they represent framework elements:
+`pressable` is a plain tag, so pressed state no longer arrives as a scoped
+slot — wire the two press events into local state instead:
 
 ```vue
-<Pressable v-slot="{ pressed }">
-  <Text>{{ pressed ? 'Release' : 'Press me' }}</Text>
-</Pressable>
+<script setup lang="ts">
+import { ref } from 'vue';
+
+const pressed = ref(false);
+</script>
+
+<template>
+  <pressable @press-in="pressed = true" @press-out="pressed = false">
+    <text>{{ pressed ? 'Release' : 'Press me' }}</text>
+  </pressable>
+</template>
 ```
 
-List renderers follow the same principle: the data and native list math are
-shared, while the rendered cell is a Vue slot or render function rather than a
-React node.
+List renderers still take a Vue slot or render function for their cell, since
+`renderItem` returns a framework element and stays a real component
+(`FlatList`, `SectionList`, `VirtualizedList`, `VirtualizedSectionList`).
 
 ## Refs and handles
 
@@ -85,13 +94,13 @@ components expose their own imperative handles through Vue's `expose()`.
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue';
-import { TextInput, type ITextInputHandle } from '@symbiote-native/vue';
+import type { ITextInputHandle } from '@symbiote-native/vue';
 
 const input = ref<ITextInputHandle | null>(null);
 </script>
 
 <template>
-  <TextInput ref="input" value="" @value-change="() => {}" />
+  <text-input ref="input" value="" @value-change="() => {}" />
 </template>
 ```
 
@@ -101,8 +110,8 @@ const input = ref<ITextInputHandle | null>(null);
 `v-model` on top of their existing `value`/`@change-*` contract:
 
 ```vue
-<Switch v-model="enabled" />
-<TextInput v-model="text" />
+<switch v-model="enabled" />
+<text-input v-model="text" />
 <Slider v-model="volume" :minimum-value="0" :maximum-value="1" />
 ```
 
@@ -122,9 +131,9 @@ node's native `style.display` between its resolved value and `'none'` instead
 of unmounting, matching Vue's DOM `v-show`:
 
 ```vue
-<View v-show="visible">
-  <Text>Stays mounted, just hidden</Text>
-</View>
+<view v-show="visible">
+  <text>Stays mounted, just hidden</text>
+</view>
 ```
 
 Unlike `v-if`, state under a `v-show="false"` node survives a hide/show
@@ -162,15 +171,15 @@ for the full surface and per-driver tradeoffs.
 ```vue
 <script setup lang="ts">
 import { shallowRef } from 'vue';
-import { View, type ISymbioteNode } from '@symbiote-native/vue';
+import type { ISymbioteNode } from '@symbiote-native/vue';
 
 const overlayHost = shallowRef<ISymbioteNode | null>(null);
 </script>
 
 <template>
-  <View ref="overlayHost" />
+  <view ref="overlayHost" />
   <Teleport :to="overlayHost" v-if="overlayHost">
-    <Text>Rendered under overlayHost, not here</Text>
+    <text>Rendered under overlayHost, not here</text>
   </Teleport>
 </template>
 ```
@@ -196,9 +205,9 @@ const overlayTunnel = createTunnel(); // module-level singleton, importable from
 
 <template>
   <!-- inside the surface that should paint the content -->
-  <View :style="styles.overlayHost">
+  <view :style="styles.overlayHost">
     <overlayTunnel.Out />
-  </View>
+  </view>
 
   <!-- inside any other component, in any surface -->
   <overlayTunnel.In v-if="toastVisible">

@@ -19,8 +19,8 @@ import type {
 // same native view; the tag is what decides whether the engine's TextInput machine attaches, and
 // on this path the adapter's own lifecycle already owns that state. Sharing the tag would run both
 // copies at once. Full reasoning in `component-names/shared.ts`.
-const SINGLELINE_INTRINSIC = 'symbiote-text-input-managed';
-const MULTILINE_INTRINSIC = 'symbiote-text-input-multiline-managed';
+const SINGLELINE_INTRINSIC = 'text-input-managed';
+const MULTILINE_INTRINSIC = 'text-input-multiline-managed';
 
 export type ITextInputViewProps = {
   multiline: boolean;

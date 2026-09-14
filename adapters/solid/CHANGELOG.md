@@ -1,5 +1,61 @@
 # @symbiote-native/solid
 
+## 2.0.0
+
+### Major Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `Button` and `ImageBackground` are no longer exported as components from `@symbiote-native/solid`,
+  and the `<scroll-view>` tag drops the last wrapper still standing behind it.
+
+  `Animated.View`, `Animated.Text` and `Animated.Image` are also gone — there is no dotted alias for a
+  primitive that is already a tag; an animated value resolves in any prop of the plain element
+  directly (`<view style={{ opacity: someAnimatedValue }}>`, `.claude/rules/animated-values-resolve-in-the-engine.md`).
+  Only `Animated.ScrollView`, `Animated.FlatList` and `Animated.SectionList` remain, for the three
+  primitives still genuinely components.
+
+  Migration: replace `import { Button } from '@symbiote-native/solid'` + `<Button .../>` with
+  `<button .../>`, and `<Animated.View style={...}/>` with `<view style={...}/>` — props are
+  unchanged.
+
+### Patch Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A claimed child can now become the owner's PARENT, which is what an Android RefreshControl is.
+
+  An Android ScrollView holds exactly one child, so a sibling refresh control is an `addViewAt`
+  crash — RN inverts the tree there instead of beside-placing like it does on iOS. `claimedChildren`
+  carries a mode per name, `beside` or `wrap`, and `ISymbioteNode.wrapper` records the inversion. The
+  adapter goes on naming the scroll view for every insert, prop write and command; only the two
+  structural entry points know a wrapper is what the tree holds.
+
+  `IHostBehavior.onWrapChange` is where a behavior answers for it. The wrapper is the app's own node,
+  so nothing could have given it a payload fold at creation — this is where the scroll view's layout
+  style moves up to it and its visual style stays below.
+
+  `splitScrollViewStyle` composes the axis base onto BOTH boxes, as RN does. All five adapters had
+  dropped it from the wrapper, so an `AndroidSwipeRefreshLayout` with no explicit user layout style
+  lost `flexGrow: 1` and collapsed to its content height inside a flex parent.
+
+  `insertBefore`'s `beforeChild` is typed nullable, which is what its callers always passed.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Fix `<scroll-view>` losing content children when one is removed: Solid's renderer walked the tag's
+  own node to find where a removed child had been, but a composed primitive's app-facing children
+  live under its internal slot (`ISymbioteNode.childHost`), not the owner directly. Removing a child
+  resolved the wrong parent and orphaned it instead of detaching it from the tree.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `@symbiote-native/vue` gains its own `jsx-runtime` module (for `jsxImportSource:
+'@symbiote-native/vue'` in Vue-TSX apps), built on the new `ICrossTypedIntrinsics` shape: every
+  intrinsic tag types as a loose attribute bag except the ones with a real prop type
+  (`IPressableProps`, `IRefreshControlProps`, …), which type-check for real instead of accepting
+  anything. `intrinsic-elements.ts` and the `.vue` SFC `GlobalComponents`/Volar table move onto the
+  same generic, so a template and a TSX file no longer disagree on what a tag accepts.
+
+  `@symbiote-native/solid`'s existing `jsx-runtime.ts` (it reached this shape first) extends onto the
+  same shared generic rather than its own hand-rolled version.
+
+- Updated dependencies [[`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f)]:
+  - @symbiote-native/engine@0.5.0
+  - @symbiote-native/components@2.0.0
+
 ## 1.0.0
 
 ### Minor Changes

@@ -5,23 +5,25 @@ description: Press feedback in React, Vue, Angular, Svelte, and Solid.
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`Pressable` shares the same press state machine across every adapter. They
-only differ in how they expose the transient `pressed` state to children, and
-in Angular's case, that its press events are a real `@Output()`.
+`pressable` shares the same press state machine across every adapter. React is
+the only one that still exposes the transient `pressed` state through a
+children render function — on the other four, a bare host tag has no such
+channel, so the app mirrors `pressed` into its own local state off
+`onPressIn`/`onPressOut` instead. Angular's press events are a real
+`@Output()`.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
     import './Pressable.css';
-    import { Pressable, Text } from '@symbiote-native/react';
 
     export function PressableLabel() {
       return (
-        <Pressable onPress={() => console.log('pressed')}>
+        <pressable onPress={() => console.log('pressed')}>
           {({ pressed }) => (
-            <Text className={pressed ? 'down' : 'up'}>{pressed ? 'Release' : 'Press me'}</Text>
+            <text className={pressed ? 'down' : 'up'}>{pressed ? 'Release' : 'Press me'}</text>
           )}
-        </Pressable>
+        </pressable>
       );
     }
     ```
@@ -36,15 +38,21 @@ in Angular's case, that its press events are a real `@Output()`.
   <TabItem label="Vue">
     ```vue
     <script setup lang="ts">
-    import { Pressable, Text } from '@symbiote-native/vue';
+    import { ref } from 'vue';
+
+    const pressed = ref(false);
     </script>
 
     <template>
-      <Pressable @press="console.log('pressed')" v-slot="{ pressed }">
-        <Text :class="pressed ? 'down' : 'up'">
+      <pressable
+        @press="console.log('pressed')"
+        @press-in="pressed = true"
+        @press-out="pressed = false"
+      >
+        <text :class="pressed ? 'down' : 'up'">
           {{ pressed ? 'Release' : 'Press me' }}
-        </Text>
-      </Pressable>
+        </text>
+      </pressable>
     </template>
 
     <style scoped>
@@ -57,21 +65,21 @@ in Angular's case, that its press events are a real `@Output()`.
   <TabItem label="Angular">
     ```ts
     import { Component } from '@angular/core';
-    import { Pressable, Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import './pressable.css';
 
     @Component({
       standalone: true,
-      imports: [Pressable, Text],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <Pressable
+        <pressable
           (press)="onPress()"
           (pressIn)="pressed = true"
           (pressOut)="pressed = false"
           [class]="pressed ? 'down' : 'up'"
         >
-          <Text>{{ pressed ? 'Release' : 'Press me' }}</Text>
-        </Pressable>
+          <text>{{ pressed ? 'Release' : 'Press me' }}</text>
+        </pressable>
       `,
     })
     export class PressableLabel {
@@ -93,14 +101,21 @@ in Angular's case, that its press events are a real `@Output()`.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Pressable, Text } from '@symbiote-native/svelte';
+      let pressed = $state(false);
     </script>
 
-    <Pressable onPress={() => console.log('pressed')}>
-      {#snippet children({ pressed })}
-        <Text class={pressed ? 'down' : 'up'}>{pressed ? 'Release' : 'Press me'}</Text>
-      {/snippet}
-    </Pressable>
+    <!-- Event handlers on a bare host tag go through the `p={{ … }}` bag — an
+         individual `on*` attribute is silently misrouted through Svelte's own
+         DOM event system instead of the engine. -->
+    <pressable
+      p={{
+        onPress: () => console.log('pressed'),
+        onPressIn: () => (pressed = true),
+        onPressOut: () => (pressed = false),
+      }}
+    >
+      <text class={pressed ? 'down' : 'up'}>{pressed ? 'Release' : 'Press me'}</text>
+    </pressable>
 
     <style>
       .up { opacity: 1; }
@@ -112,17 +127,21 @@ in Angular's case, that its press events are a real `@Output()`.
   <TabItem label="Solid">
     ```tsx
     import './Pressable.css';
-    import { Pressable, Text } from '@symbiote-native/solid';
+    import { createSignal } from 'solid-js';
 
     export function PressableLabel() {
+      const [pressed, setPressed] = createSignal(false);
+
       return (
-        <Pressable onPress={() => console.log('pressed')}>
-          {state => (
-            <Text class={state().pressed ? 'down' : 'up'}>
-              {state().pressed ? 'Release' : 'Press me'}
-            </Text>
-          )}
-        </Pressable>
+        <pressable
+          onPress={() => console.log('pressed')}
+          onPressIn={() => setPressed(true)}
+          onPressOut={() => setPressed(false)}
+        >
+          <text class={pressed() ? 'down' : 'up'}>
+            {pressed() ? 'Release' : 'Press me'}
+          </text>
+        </pressable>
       );
     }
     ```
@@ -138,17 +157,15 @@ in Angular's case, that its press events are a real `@Output()`.
 
 ## API takeaway
 
-React uses `children: (state) => ReactNode`. Vue uses a scoped default slot:
-`v-slot="{ pressed }"`. Svelte uses a parameterized named snippet prop:
-`{#snippet children({ pressed })}` — Svelte has no `bind:` sugar for a
-component prop like this, so the snippet is the whole mechanism, not shorthand
-over something more explicit. Solid's child function receives an _accessor_,
-`(state: Accessor<IPressState>) => JSX.Element`, called once and read as
-`state().pressed`. Solid has no reconciler to patch a child subtree in
-place, so the value has to cross the boundary lazily, or every press would
-tear down and rebuild it. Angular has no scoped-slot equivalent for
-`<ng-content>`, so a consumer tracks `pressed` itself off the real
-`(pressIn)`/`(pressOut)` `@Output()`s instead of receiving it from `Pressable`
-directly. All five read from the same shared press state machine underneath.
-`StyleSheet.create` works identically to a CSS class if you'd rather keep
-style objects inline — see the [Styling guide](/docs/learn/styling/).
+React is the only adapter where `pressable` still exposes state through a
+children render function, `children: (state) => ReactNode`. A lowered
+`pressable` tag on Vue, Angular, Svelte, and Solid has no render-prop channel
+for its children, so each one instead reads `onPressIn`/`onPressOut`
+directly and mirrors `pressed` into its own local reactive state, then derives
+a class or style from that: Vue's `@press-in`/`@press-out`, Angular's
+`(pressIn)`/`(pressOut)` `@Output()`s, Solid's `onPressIn`/`onPressOut` props
+setting a signal, and Svelte's `onPressIn`/`onPressOut` inside the `p={{ … }}`
+bag every event handler on a bare host tag needs. All five still read from the
+same shared press state machine underneath. `StyleSheet.create` works
+identically to a CSS class if you'd rather keep style objects inline — see the
+[Styling guide](/docs/learn/styling/).

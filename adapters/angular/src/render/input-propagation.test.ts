@@ -82,7 +82,7 @@ const flush = (): Promise<void> =>
   hostDirectives: [
     { directive: SymbioteStyleInputDirective, inputs: ['style'] },
   ],
-  template: `<View [symbioteHostProps]="bag"></View>`,
+  template: `<view [symbioteHostProps]="bag"></view>`,
 })
 class InputPropagationChild {
   @Input() style: unknown = undefined;
@@ -103,7 +103,7 @@ class InputPropagationChild {
     InputPropagationChild,
     SymbioteHostPropsDirective,
   ],
-  template: `<View [symbioteHostProps]="handlers"></View
+  template: `<view [symbioteHostProps]="handlers"></view
     ><input-propagation-child
       [style]="margins()"
       [testID]="'styled-leaf'"

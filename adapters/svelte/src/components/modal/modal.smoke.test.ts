@@ -161,7 +161,7 @@ async function loadDismissible(): Promise<Component> {
   // exactly the transition state/modal.ts's keep-alive reducer exists to survive. Written on one
   // line so the compiler emits no incidental whitespace-only text nodes between the tags.
   compileToFile(
-    `<script>import Modal from './.smoke-compiled-modal.mjs';let visible = $state(true);</script><Modal {visible} onRequestClose={() => { visible = false; }}><symbiote-view p={{}} /></Modal>`,
+    `<script>import Modal from './.smoke-compiled-modal.mjs';let visible = $state(true);</script><Modal {visible} onRequestClose={() => { visible = false; }}><view p={{}} /></Modal>`,
     'DismissibleParent.svelte',
     DISMISSIBLE_PARENT_OUT,
   );
@@ -178,7 +178,7 @@ async function loadModal(): Promise<Component> {
 async function loadHidden(): Promise<Component> {
   compileModal();
   compileToFile(
-    `<script>import Modal from './.smoke-compiled-modal.mjs';</script><Modal visible={false}><symbiote-view p={{}} /></Modal>`,
+    `<script>import Modal from './.smoke-compiled-modal.mjs';</script><Modal visible={false}><view p={{}} /></Modal>`,
     'HiddenParent.svelte',
     HIDDEN_PARENT_OUT,
   );
@@ -199,7 +199,7 @@ describe('Modal (real compiled index.svelte)', () => {
       await settle();
 
       // appRoot() is the engine's synthetic box-none AppContainer; its one child is this Svelte
-      // adapter's own root symbiote-view (root-element.ts), under which the mounted component's
+      // adapter's own root view (root-element.ts), under which the mounted component's
       // own output lands — hence the extra RCTView wrapper vs React's/Vue's own tests. `toContain`
       // (not exact equality), matching mount-pipeline.smoke.test.ts's own precedent: mount()'s
       // component boundary contributes a couple of empty RCTRawText siblings alongside the real

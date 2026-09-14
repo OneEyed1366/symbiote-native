@@ -7,6 +7,11 @@ export {
   createElement,
   createRawText,
   createAnchor,
+  // The component name of a node the commit walk skips and whose children flatten into its parent.
+  // Exported so a PRIMITIVE that renders no view of its own can be born with it — RN's
+  // TouchableNativeFeedback clones onto its single child and commits nothing
+  // (TouchableNativeFeedback.js:339) — rather than being converted after the fact.
+  ANCHOR_COMPONENT,
   isAnchor,
   appendChild,
   insertBefore,
@@ -25,6 +30,9 @@ export {
   RAW_TEXT_COMPONENT,
   debugNodeId,
 } from './node';
+// For a HOST BEHAVIOR that owns an animated style layer on its own node — TouchableOpacity's press
+// fade, which RN drives from an `Animated.View` the tag replaces.
+export { setAnimatedBehaviorStyle } from './animated/host-binding';
 export { isEventFor } from './view-config';
 export { registerComponent, setNativeViewConfigSource } from './registry';
 // Real cross-package consumer: core/components' KeyboardAvoidingView render narrows
@@ -90,7 +98,7 @@ export { registerPostCommit, unregisterPostCommit } from './post-commit';
 // The aria/role -> accessibility* fold. Lives here rather than in a component wrapper because a
 // LOWERED element has no wrapper: `fabricProps` runs it on the way to the payload, so every path
 // gets it. `core/components`' typed `resolveAccessibilityProps` delegates to this one.
-export { foldAriaProps } from './accessibility-props';
+export { ARIA_ALIAS_KEYS, foldAriaProps } from './accessibility-props';
 // The public instance every host node already is (React's getPublicInstance, the Vue renderer's
 // createElement): the imperative measure/setNativeProps/focus API, on the shared node prototype.
 // toPublicInstance is the identity that names the seam — see ./host-instance.
@@ -424,7 +432,15 @@ export {
   hostBehaviorFor,
   clearHostBehaviors,
   appListenerFor,
+  addDerivedNode,
 } from './host-behavior';
-export type { IHostBehavior } from './host-behavior';
+// `IPayloadFold` rides along because a behavior that BUILDS a node owns what that node carries: a
+// composed primitive assigns a fold to its own slot (`behaviors/scroll-view.ts`), and the owner's
+// `foldPayload` field cannot type that.
+export type { IClaimMode, IHostBehavior, IPayloadFold } from './host-behavior';
 export { requestCommitFor } from './commit';
-export { setBehaviorListener } from './node';
+// `markPropsDirty` is a behavior's only way to say "the fold reads state I just changed". Every
+// other dirtying route goes through a prop write, and a behavior whose payload is DERIVED — the
+// sticky header's debounced translateY lives in its own runtime, not in `node.props` — has no
+// prop to write. Pair it with `requestCommitFor`: dirtying is not publishing.
+export { setBehaviorListener, markPropsDirty } from './node';

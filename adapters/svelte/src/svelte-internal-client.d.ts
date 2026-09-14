@@ -47,4 +47,9 @@ declare module 'svelte/internal/client' {
   // return type is what lets a caller hand it to a base whose prop type is only known there,
   // without an `as` cast — the object really is assembled at runtime.
   export function spread_props<TProps>(...sources: unknown[]): TProps;
+
+  // internal/client/dom/elements/style.js. Called only by `dom-shim/style-cache.ts`, against a
+  // probe object, to learn the private Symbol it caches its argument under. The real call sites
+  // are the ones the compiler emits.
+  export function set_style(dom: unknown, value: unknown): void;
 }

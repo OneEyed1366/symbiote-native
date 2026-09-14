@@ -27,10 +27,10 @@ import { PlaygroundQueryItemDirective } from './PlaygroundDirectives';
   // import above, not a Component `imports` entry (which is for template-tag usage only).
   imports: [Text, View],
   template: `
-    <View class="pg-card" testID="pg-card">
+    <view class="pg-card" testID="pg-card">
       <ng-content select="[card-header]"></ng-content>
       <ng-content></ng-content>
-      <Text testID="pg-card-content-query" class="rstyle-caption">{{
+      <text testID="pg-card-content-query" class="rstyle-caption">{{
         'content children — decorator: ' +
           allContentItems.length +
           ' · signal: ' +
@@ -39,8 +39,8 @@ import { PlaygroundQueryItemDirective } from './PlaygroundDirectives';
           (firstContentItem?.label ?? '—') +
           ' · first (signal): ' +
           (firstContentItemSignal()?.label ?? '—')
-      }}</Text>
-    </View>
+      }}</text>
+    </view>
   `,
 })
 export class PlaygroundCard {

@@ -55,7 +55,7 @@ function containerNode(): IFakeNode {
 
 function mountModal(
   props: Record<string, unknown>,
-  onDefault = () => h('symbiote-view'),
+  onDefault = () => h('view'),
 ): void {
   mount(
     ROOT_TAG,
@@ -199,7 +199,7 @@ describe('Vue Modal on the engine', () => {
                 onRequestClose: () => (visible.value = false),
                 onDismiss: () => (dismissCount += 1),
               },
-              () => h('symbiote-view'),
+              () => h('view'),
             ),
         }),
       );

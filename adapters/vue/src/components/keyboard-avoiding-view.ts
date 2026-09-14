@@ -193,11 +193,11 @@ export const KeyboardAvoidingView = defineComponent<
       // 'nested' pushes the children in an inner view by `bottom: inset`; the wrapper modes
       // adjust the single wrapper directly.
       if (layout.kind === 'nested') {
-        return h('symbiote-view', wrapperProps, [
-          h('symbiote-view', { style: layout.innerStyle }, childNodes),
+        return h('view', wrapperProps, [
+          h('view', { style: layout.innerStyle }, childNodes),
         ]);
       }
-      return h('symbiote-view', wrapperProps, childNodes);
+      return h('view', wrapperProps, childNodes);
     };
   },
   {

@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-import { SafeAreaView, Text, View } from '@symbiote-native/react';
 import {
   useFocusEffect,
   useIsFocused,
@@ -31,49 +30,49 @@ export function HooksDemoScreen() {
   );
 
   return (
-    <SafeAreaView className="screen">
-      <View className="section">
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View
+    <safe-area-view className="screen">
+      <view className="section">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view
             className="hero-badge"
             style={{ backgroundColor: LINE_COLOR.introspection }}
           >
-            <Text className="hero-badge-text">HK</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Hooks</Text>
-            <Text className="hero-body">
+            <text className="hero-badge-text">HK</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Hooks</text>
+            <text className="hero-body">
               useFocusEffect, useIsFocused, and useNavigationState —
               introspecting the navigator's own live state from inside a screen.
-            </Text>
-          </View>
-        </View>
-        <Text
+            </text>
+          </view>
+        </view>
+        <text
           testID="hooks-is-focused"
           className="info-text"
-        >{`useIsFocused(): ${isFocused}`}</Text>
-        <Text
+        >{`useIsFocused(): ${isFocused}`}</text>
+        <text
           testID="hooks-focus-count"
           className="info-text"
-        >{`useFocusEffect focus count: ${focusCount}`}</Text>
-        <Text className="info-text">
+        >{`useFocusEffect focus count: ${focusCount}`}</text>
+        <text className="info-text">
           {lastBlurAt === undefined
             ? 'not blurred yet'
             : `last blurred at ${lastBlurAt}`}
-        </Text>
-        <Text className="section-label">
+        </text>
+        <text className="section-label">
           useNavigationState() · current route stack
-        </Text>
+        </text>
         {routeNames.map((name, index) => (
-          <Text
+          <text
             key={`${name}-${index}`}
             className="list-row-text"
-          >{`${index}. ${name}`}</Text>
+          >{`${index}. ${name}`}</text>
         ))}
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   );
 }

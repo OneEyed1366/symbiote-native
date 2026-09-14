@@ -57,7 +57,6 @@ with no runtime permission prompt on either platform.
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Text } from '@symbiote-native/react';
     import { useLocales, useCalendars } from '@symbiote-native/localization/react';
 
     export default function LocalizationScreen() {
@@ -66,8 +65,8 @@ with no runtime permission prompt on either platform.
 
       return (
         <>
-          <Text>{locales[0].languageTag}</Text>
-          <Text>{calendars[0].timeZone}</Text>
+          <text>{locales[0].languageTag}</text>
+          <text>{calendars[0].timeZone}</text>
         </>
       );
     }
@@ -77,7 +76,6 @@ with no runtime permission prompt on either platform.
   <TabItem label="Vue">
     ```vue
     <script setup lang="ts">
-    import { Text } from '@symbiote-native/vue';
     import { useLocales, useCalendars } from '@symbiote-native/localization/vue';
 
     const locales = useLocales();     // Ref<Locale[]>
@@ -85,8 +83,8 @@ with no runtime permission prompt on either platform.
     </script>
 
     <template>
-      <Text>{{ locales[0].languageTag }}</Text>
-      <Text>{{ calendars[0].timeZone }}</Text>
+      <text>{{ locales[0].languageTag }}</text>
+      <text>{{ calendars[0].timeZone }}</text>
     </template>
     ```
 
@@ -94,15 +92,15 @@ with no runtime permission prompt on either platform.
   <TabItem label="Angular">
     ```ts
     import { Component, inject } from '@angular/core';
-    import { Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { LocalesService, CalendarsService } from '@symbiote-native/localization/angular';
 
     @Component({
       standalone: true,
-      imports: [Text],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <Text>{{ locales()[0].languageTag }}</Text>
-        <Text>{{ calendars()[0].timeZone }}</Text>
+        <text>{{ locales()[0].languageTag }}</text>
+        <text>{{ calendars()[0].timeZone }}</text>
       `,
     })
     export class LocalizationScreen {
@@ -115,15 +113,14 @@ with no runtime permission prompt on either platform.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text } from '@symbiote-native/svelte';
       import { useLocales, useCalendars } from '@symbiote-native/localization/svelte';
 
       const locales = useLocales();     // { readonly current: Locale[] }
       const calendars = useCalendars(); // { readonly current: Calendar[] }
     </script>
 
-    <Text>{locales.current[0].languageTag}</Text>
-    <Text>{calendars.current[0].timeZone}</Text>
+    <text>{locales.current[0].languageTag}</text>
+    <text>{calendars.current[0].timeZone}</text>
     ```
 
     Both runes return a boxed getter object rather than a bare value — Svelte 5 reactivity does
@@ -133,7 +130,6 @@ with no runtime permission prompt on either platform.
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Text } from '@symbiote-native/solid';
     import { createLocales, createCalendars } from '@symbiote-native/localization/solid';
 
     export default function LocalizationScreen() {
@@ -142,8 +138,8 @@ with no runtime permission prompt on either platform.
 
       return (
         <>
-          <Text>{locales()[0].languageTag}</Text>
-          <Text>{calendars()[0].timeZone}</Text>
+          <text>{locales()[0].languageTag}</text>
+          <text>{calendars()[0].timeZone}</text>
         </>
       );
     }

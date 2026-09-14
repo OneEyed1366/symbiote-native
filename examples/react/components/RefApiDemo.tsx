@@ -1,10 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  findNodeHandle,
-  type IHostInstance,
-} from '@symbiote-native/react';
+import { findNodeHandle, type IHostInstance } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 
 // Imperative host-ref API: the seam reanimated / gesture-handler reach through.
@@ -44,34 +39,34 @@ export function RefApiDemo() {
   };
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">
+    <view className="section-nested">
+      <text className="section-label">
         Imperative ref · measure / setNativeProps / findNodeHandle
-      </Text>
-      <View ref={boxRef} testID="ref-box" className="ref-box">
-        <Text className="ref-box-text">{`native tag ${tag ?? '—'}`}</Text>
-      </View>
-      <Text
+      </text>
+      <view ref={boxRef} testID="ref-box" className="ref-box">
+        <text className="ref-box-text">{`native tag ${tag ?? '—'}`}</text>
+      </view>
+      <text
         testID="measure-frame"
         className="info-text"
-      >{`frame: ${frame}`}</Text>
-      <View className="row">
-        <View className="flex1">
+      >{`frame: ${frame}`}</text>
+      <view className="row">
+        <view className="flex1">
           <ActionButton
             testID="measure-btn"
             title="Measure"
             onPress={onMeasure}
             color="#7fb5ff"
           />
-        </View>
-        <View className="flex1">
+        </view>
+        <view className="flex1">
           <ActionButton
             title="Flash (setNativeProps)"
             onPress={onFlash}
             color="#f6ad55"
           />
-        </View>
-      </View>
-    </View>
+        </view>
+      </view>
+    </view>
   );
 }

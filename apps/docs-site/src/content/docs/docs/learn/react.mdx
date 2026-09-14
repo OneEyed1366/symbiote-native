@@ -12,24 +12,28 @@ SymbioteNative's shared engine instead of React Native's own Fabric host config.
 ```tsx
 import './App.css';
 import { useState } from 'react';
-import { Pressable, Text, View } from '@symbiote-native/react';
 
 export default function App() {
   const [count, setCount] = useState(0);
 
   return (
-    <View className="root">
-      <Pressable onPress={() => setCount(value => value + 1)}>
+    <view className="root">
+      <pressable onPress={() => setCount(value => value + 1)}>
         {({ pressed }) => (
-          <Text className={pressed ? 'pressed' : 'label'}>
+          <text className={pressed ? 'pressed' : 'label'}>
             Count is {count}
-          </Text>
+          </text>
         )}
-      </Pressable>
-    </View>
+      </pressable>
+    </view>
   );
 }
 ```
+
+`view`, `pressable`, and `text` are intrinsic tags — no import needed. Only a
+composed component (`FlatList`, `SectionList`, `VirtualizedList`,
+`VirtualizedSectionList`, `KeyboardAvoidingView`, hooks, …) still comes from
+`@symbiote-native/react`.
 
 ```css
 /* App.css */

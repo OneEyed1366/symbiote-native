@@ -125,13 +125,13 @@ const HOME_SOURCE = `<script lang="ts">
      const route = useRoute();
      const focused = useIsFocused();
    </script>
-   <symbiote-view p={{ testID: 'home', accessibilityLabel: route.current.name + ':' + String(focused.current) }} />`;
+   <view p={{ testID: 'home', accessibilityLabel: route.current.name + ':' + String(focused.current) }} />`;
 
-const DETAILS_SOURCE = `<symbiote-view p={{ testID: 'details' }} />`;
+const DETAILS_SOURCE = `<view p={{ testID: 'details' }} />`;
 
 // The app-level markers are written on SEPARATE LINES on purpose: that is how any reasonable
 // author formats them, and it is exactly the shape svelte-adapter-dom-shim skill §16 turns into
-// stray single-space text nodes. Rendering them inside the collapsed `symbiote-text` registry
+// stray single-space text nodes. Rendering them inside the collapsed `text` registry
 // host is what keeps that legal - the assertion on the committed outline below is what proves it.
 function appSource(stackAttributes: string, screenAttributes: string): string {
   return `<script lang="ts">
@@ -212,7 +212,7 @@ const DYNAMIC_APP_SOURCE = `<script lang="ts">
      <Screen name="profile" component={Profile} />
    </Stack>`;
 
-const PROFILE_SOURCE = `<symbiote-view p={{ testID: 'profile' }} />`;
+const PROFILE_SOURCE = `<view p={{ testID: 'profile' }} />`;
 
 function isDynamicControls(
   value: unknown,

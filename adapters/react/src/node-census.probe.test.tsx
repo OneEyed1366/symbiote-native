@@ -19,15 +19,15 @@ const noop = (): void => {};
 
 function Row({ id }: { id: number }): React.ReactNode {
   return (
-    <View className="bench-row">
-      <Text className="bench-row-id">{String(id)}</Text>
+    <view className="bench-row">
+      <text className="bench-row-id">{String(id)}</text>
       <Pressable className="flex1" onPress={noop}>
-        <Text className="bench-row-label">{`row label number ${id}`}</Text>
+        <text className="bench-row-label">{`row label number ${id}`}</text>
       </Pressable>
       <Pressable className="bench-row-remove" onPress={noop}>
-        <Text className="bench-row-remove-text">x</Text>
+        <text className="bench-row-remove-text">x</text>
       </Pressable>
-    </View>
+    </view>
   );
 }
 
@@ -37,11 +37,11 @@ function App(): React.ReactNode {
   const [ids, setIds] = useState<readonly number[]>([]);
   setRows = setIds;
   return (
-    <View className="screen">
+    <view className="screen">
       {ids.map(id => (
         <Row key={id} id={id} />
       ))}
-    </View>
+    </view>
   );
 }
 

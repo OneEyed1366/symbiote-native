@@ -93,9 +93,9 @@ const SOURCE = [
   `  let n = $state(0);`,
   `  register(() => { n += 10; });`,
   `</script>`,
-  `<symbiote-pressable p={{onPress: () => { n += 1; onPress(); }}}>`,
-  `  <symbiote-view p={{testID: \`v\${n}\`}}></symbiote-view>`,
-  `</symbiote-pressable>`,
+  `<pressable p={{onPress: () => { n += 1; onPress(); }}}>`,
+  `  <view p={{testID: \`v\${n}\`}}></view>`,
+  `</pressable>`,
 ].join('\n');
 
 describe('a lowered Pressable and its descendants', () => {

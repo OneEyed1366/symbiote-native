@@ -61,16 +61,15 @@ exactly what react-refresh's `isLikelyComponentType` heuristic looks for. It the
 React Fiber tree that does not exist in this path, and the update is swallowed with no error. Force a
 full reload instead: `unstable_forceFullRefreshPatterns: [/\.tsx$/]`.
 
-## Host-primitive lowering — `<View>`/`<Text>`/`<Pressable>` compile to intrinsics, not components
+## Primitives are plain intrinsic tags — `<view>`/`<text>`/`<pressable>`, no component involved
 
-`babel-preset-solid` (wired above) runs `babel-lower-host-primitives.cjs` before compiling: a
-`<View>`/`<Text>` with no reactive prop, and a `<Pressable>` whose `style`/children don't need a
-component instance, rewrite to the engine's intrinsic tags (`symbiote-view`, `symbiote-text`,
-`symbiote-pressable`) instead of going through `createComponent` + a props Proxy. Nothing in app
-code has to opt in — the preset does it transparently, and a call site that can't be lowered
-(a spread, a render-prop child, an unreadable attribute) falls back to the component path
-unchanged. See root `CLAUDE.md`, "Where we stand against stock React Native", for the measured
-device numbers this bought — do not hand-copy them here, they move with every engine/adapter cut.
+An app writes the lowercase tags directly (`view`, `text`, `pressable`, …) — `babel-preset-solid`'s
+own `isComponent` check already treats a lowercase name as an element, so JSX compiles straight to
+`createElement`/`setProp` calls against `symbiote-view` etc., no import and nothing to opt into.
+This retires the compile-time lowering transform that used to rewrite a `<View>`/`<Text>`/
+`<Pressable>` COMPONENT call site into the same intrinsics (`babel-lower-host-primitives.cjs`,
+deleted 2026-09-08) — there is no component call site left to rewrite. See root `CLAUDE.md`,
+"Where we stand against stock React Native", for the measured device numbers.
 
 ## `./renderer` is a compiler target, not a convenience export
 

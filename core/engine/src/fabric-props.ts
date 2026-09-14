@@ -309,7 +309,23 @@ function foldTextInputValue(
 
 export function fabricProps(node: ISymbioteNode): IFabricProps {
   if (node.component === RAW_TEXT_COMPONENT) {
-    return { text: node.props.text };
+    // A raw-text node gets its behavior's fold too — it TRANSFORMS the text that is already there
+    // (Button uppercases its label on Android) and may not SUPPLY one, which is narrower than this
+    // comment claimed when it landed. `isEmptyRawText` (node.ts) decides whether the node commits
+    // at all from `node.props.text`, before any fold runs, so a text that exists only as a fold
+    // result is dropped by `renderableChildren` and the fold never executes. Reported by the hook's
+    // first consumer, within the hour.
+    //
+    // Which is why the skip is NOT the thing to change: it runs for every raw-text node in every
+    // app, and consulting a fold there would put one on that walk. Get the value into `props.text`
+    // instead — Button routes the owner's `title` onto this node with `slotProps: {title: 'text'}`,
+    // so the skip and the fold read the same source and an empty title still commits nothing.
+    return {
+      text:
+        node.payloadFold !== undefined
+          ? node.payloadFold(node.props).text
+          : node.props.text,
+    };
   }
   // This runs once per node per commit - 9 000 times on one benchmark press - so the two loops
   // below iterate with Object.keys rather than Object.entries: entries allocates a fresh

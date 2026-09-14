@@ -12,7 +12,7 @@
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import { useGyroscope } from './index';
 import type { IGyroscopeMeasurement } from '../../../core';
@@ -42,7 +42,7 @@ const results: Array<IGyroscopeMeasurement | null> = [];
 
 function Probe(props: { updateIntervalMs?: number }): ReactElement {
   results.push(useGyroscope(props.updateIntervalMs));
-  return createElement(View);
+  return createElement('view');
 }
 
 const fabric = installFabric();

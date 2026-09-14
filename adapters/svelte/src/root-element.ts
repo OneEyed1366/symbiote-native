@@ -12,7 +12,7 @@
 import type { SymbioteSurface } from '@symbiote-native/engine';
 import { ShimElement } from './dom-shim';
 
-const ROOT_INTRINSIC = 'symbiote-view';
+const ROOT_INTRINSIC = 'view';
 
 // Unlike Vue/React, whose app root mounts directly onto the surface (its own flex:1
 // class/style reaches the engine's synthetic flex:1 AppContainer with nothing in between),

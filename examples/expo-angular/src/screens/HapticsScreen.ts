@@ -1,8 +1,8 @@
 import { Component, signal } from '@angular/core';
 import {
   Platform,
-  SafeAreaView,
-  ScrollView,
+  SafeAreaViewElement,
+  ScrollViewElement,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -76,35 +76,35 @@ const ANDROID_HAPTIC_OPTIONS: readonly IAndroidHapticOption[] = [
 @Component({
   selector: 'HapticsScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="haptics-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Haptics</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Haptics</text>
+            <text class="hero-body">
               @symbiote-native/haptics — impact, notification, and selection
               feedback via iOS's Taptic Engine and Android's Vibrator/haptics
               APIs. A simulator plays no physical feedback; a real device is
               needed to feel it.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="haptics-impact-card" class="capability-card">
-          <Text class="capability-card-title">Impact feedback</Text>
-          <View class="button-row">
+        <view testID="haptics-impact-card" class="capability-card">
+          <text class="capability-card-title">Impact feedback</text>
+          <view class="button-row">
             @for (item of impactOptions; track item.style) {
               <ActionButton
                 [testID]="'haptics-impact-button-' + item.style"
@@ -113,12 +113,12 @@ const ANDROID_HAPTIC_OPTIONS: readonly IAndroidHapticOption[] = [
                 [color]="lineColor"
               ></ActionButton>
             }
-          </View>
-        </View>
+          </view>
+        </view>
 
-        <View testID="haptics-notification-card" class="capability-card">
-          <Text class="capability-card-title">Notification feedback</Text>
-          <View class="button-row">
+        <view testID="haptics-notification-card" class="capability-card">
+          <text class="capability-card-title">Notification feedback</text>
+          <view class="button-row">
             @for (item of notificationOptions; track item.type) {
               <ActionButton
                 [testID]="'haptics-notification-button-' + item.type"
@@ -127,25 +127,25 @@ const ANDROID_HAPTIC_OPTIONS: readonly IAndroidHapticOption[] = [
                 [color]="lineColor"
               ></ActionButton>
             }
-          </View>
-        </View>
+          </view>
+        </view>
 
-        <View testID="haptics-selection-card" class="capability-card">
-          <Text class="capability-card-title">Selection</Text>
-          <View class="button-row">
+        <view testID="haptics-selection-card" class="capability-card">
+          <text class="capability-card-title">Selection</text>
+          <view class="button-row">
             <ActionButton
               testID="haptics-selection-button"
               title="Selection"
               (press)="handleSelection()"
               [color]="lineColor"
             ></ActionButton>
-          </View>
-        </View>
+          </view>
+        </view>
 
         @if (Platform.OS === 'android') {
-          <View testID="haptics-android-card" class="capability-card">
-            <Text class="capability-card-title">Android haptics</Text>
-            <View class="button-row">
+          <view testID="haptics-android-card" class="capability-card">
+            <text class="capability-card-title">Android haptics</text>
+            <view class="button-row">
               @for (item of androidHapticOptions; track item.effect) {
                 <ActionButton
                   [testID]="'haptics-android-button-' + item.effect"
@@ -154,17 +154,17 @@ const ANDROID_HAPTIC_OPTIONS: readonly IAndroidHapticOption[] = [
                   [color]="lineColor"
                 ></ActionButton>
               }
-            </View>
-          </View>
+            </view>
+          </view>
         }
 
         @if (lastFired(); as fired) {
-          <Text testID="haptics-last-fired" class="value-text">{{
+          <text testID="haptics-last-fired" class="value-text">{{
             'Last fired: ' + fired
-          }}</Text>
+          }}</text>
         }
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class HapticsScreen {

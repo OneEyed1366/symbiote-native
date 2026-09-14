@@ -104,7 +104,7 @@ async function loadProbe(): Promise<Component> {
        const calendars = useCalendars();
        $effect(() => { onValue(calendars.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'CalendarsProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

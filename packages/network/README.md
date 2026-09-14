@@ -95,13 +95,13 @@ function NetworkScreen() {
 
   return (
     <>
-      <Text>
+      <text>
         {networkState.isConnected
           ? `Connected via ${networkState.type}`
           : 'Offline'}
-      </Text>
-      <Text>{ipAddress ?? 'checking…'}</Text>
-      <Text>{isAirplaneMode ? 'Airplane mode: On' : 'Airplane mode: Off'}</Text>
+      </text>
+      <text>{ipAddress ?? 'checking…'}</text>
+      <text>{isAirplaneMode ? 'Airplane mode: On' : 'Airplane mode: Off'}</text>
     </>
   );
 }
@@ -111,7 +111,6 @@ function NetworkScreen() {
 <!-- Vue — examples/expo-vue-sfc/screens/NetworkScreen.vue -->
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { Text } from '@symbiote-native/vue';
 import {
   getIpAddressAsync,
   isAirplaneModeEnabledAsync,
@@ -136,10 +135,10 @@ watch(
 );
 </script>
 <template>
-  <Text>{{
+  <text>{{
     networkState.isConnected ? `Connected via ${networkState.type}` : 'Offline'
-  }}</Text>
-  <Text>{{ ipAddress ?? 'checking…' }}</Text>
+  }}</text>
+  <text>{{ ipAddress ?? 'checking…' }}</text>
 </template>
 ```
 
@@ -166,18 +165,19 @@ watch(
     );
   });
 </script>
-<Text>
+
+<text>
   {networkState.current.isConnected
     ? `Connected via ${networkState.current.type}`
     : 'Offline'}
-</Text>
-<Text>{ipAddress ?? 'checking…'}</Text>
+</text>
+<text>{ipAddress ?? 'checking…'}</text>
 ```
 
 ```ts
 // Angular — examples/expo-angular/src/screens/NetworkScreen.ts
 import { Component, effect, inject, signal } from '@angular/core';
-import { Text } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   NetworkStateService,
   getIpAddressAsync,
@@ -186,8 +186,8 @@ import {
 
 @Component({
   standalone: true,
-  imports: [Text],
-  template: `<Text>{{ ipAddress() }}</Text>`,
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `<text>{{ ipAddress() }}</text>`,
 })
 export class NetworkScreen {
   readonly networkState = inject(NetworkStateService).connect(); // Signal<NetworkState>
@@ -209,7 +209,6 @@ export class NetworkScreen {
 ```tsx
 // Solid — the accessor is CALLED; a Solid component body runs once, so a snapshot would freeze.
 import { createSignal, onMount } from 'solid-js';
-import { Text } from '@symbiote-native/solid';
 import {
   getIpAddressAsync,
   isAirplaneModeEnabledAsync,
@@ -234,15 +233,15 @@ function NetworkScreen() {
 
   return (
     <>
-      <Text>
+      <text>
         {networkState().isConnected
           ? `Connected via ${networkState().type}`
           : 'Offline'}
-      </Text>
-      <Text>{ipAddress() ?? 'checking…'}</Text>
-      <Text>
+      </text>
+      <text>{ipAddress() ?? 'checking…'}</text>
+      <text>
         {isAirplaneMode() ? 'Airplane mode: On' : 'Airplane mode: Off'}
-      </Text>
+      </text>
     </>
   );
 }

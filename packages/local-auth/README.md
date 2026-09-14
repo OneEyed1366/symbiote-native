@@ -65,7 +65,7 @@ src/angular/  @symbiote-native/local-auth/angular — export * from '../core'
 ```tsx
 // React
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, Text, View } from '@symbiote-native/react';
+import { Platform } from '@symbiote-native/react';
 import {
   authenticateAsync,
   cancelAuthenticate,
@@ -92,26 +92,26 @@ function LocalAuthScreen() {
   };
 
   return (
-    <View>
-      <Text>
+    <view>
+      <text>
         {hasHardware && isEnrolled
           ? 'Ready to authenticate'
           : 'No biometrics enrolled'}
-      </Text>
-      <Pressable onPress={handleAuthenticate}>
-        <Text>Authenticate</Text>
-      </Pressable>
+      </text>
+      <pressable onPress={handleAuthenticate}>
+        <text>Authenticate</text>
+      </pressable>
       {Platform.OS === 'android' && (
-        <Pressable onPress={() => cancelAuthenticate()}>
-          <Text>Cancel</Text>
-        </Pressable>
+        <pressable onPress={() => cancelAuthenticate()}>
+          <text>Cancel</text>
+        </pressable>
       )}
       {authResult && (
-        <Text>
+        <text>
           {authResult.success ? 'Success' : `Failed: ${authResult.error}`}
-        </Text>
+        </text>
       )}
-    </View>
+    </view>
   );
 }
 ```
@@ -120,7 +120,7 @@ function LocalAuthScreen() {
 <!-- Vue -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { Platform, Pressable, Text, View } from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   authenticateAsync,
   cancelAuthenticate,
@@ -146,29 +146,29 @@ function handleAuthenticate(): void {
 </script>
 
 <template>
-  <View>
-    <Text>{{
+  <view>
+    <text>{{
       hasHardware && isEnrolled
         ? 'Ready to authenticate'
         : 'No biometrics enrolled'
-    }}</Text>
-    <Pressable @press="handleAuthenticate">
-      <Text>Authenticate</Text>
-    </Pressable>
-    <Pressable v-if="Platform.OS === 'android'" @press="cancelAuthenticate">
-      <Text>Cancel</Text>
-    </Pressable>
-    <Text v-if="authResult">{{
+    }}</text>
+    <pressable @press="handleAuthenticate">
+      <text>Authenticate</text>
+    </pressable>
+    <pressable v-if="Platform.OS === 'android'" @press="cancelAuthenticate">
+      <text>Cancel</text>
+    </pressable>
+    <text v-if="authResult">{{
       authResult.success ? 'Success' : `Failed: ${authResult.error}`
-    }}</Text>
-  </View>
+    }}</text>
+  </view>
 </template>
 ```
 
 ```svelte
 <!-- Svelte -->
 <script lang="ts">
-  import { Platform, Pressable, Text, View } from '@symbiote-native/svelte';
+  import { Platform } from '@symbiote-native/svelte';
   import {
     authenticateAsync,
     cancelAuthenticate,
@@ -193,28 +193,31 @@ function handleAuthenticate(): void {
   }
 </script>
 
-<View>
-  <Text>
-    {hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled'}
-  </Text>
-  <Pressable onPress={handleAuthenticate}>
-    <Text>Authenticate</Text>
-  </Pressable>
+<view>
+  <text>
+    {hasHardware && isEnrolled
+      ? 'Ready to authenticate'
+      : 'No biometrics enrolled'}
+  </text>
+  <pressable onPress={handleAuthenticate}>
+    <text>Authenticate</text>
+  </pressable>
   {#if Platform.OS === 'android'}
-    <Pressable onPress={() => cancelAuthenticate()}>
-      <Text>Cancel</Text>
-    </Pressable>
+    <pressable onPress={() => cancelAuthenticate()}>
+      <text>Cancel</text>
+    </pressable>
   {/if}
   {#if authResult}
-    <Text>{authResult.success ? 'Success' : `Failed: ${authResult.error}`}</Text>
+    <text>{authResult.success ? 'Success' : `Failed: ${authResult.error}`}</text
+    >
   {/if}
-</View>
+</view>
 ```
 
 ```tsx
 // Solid
 import { Show, createSignal, onMount } from 'solid-js';
-import { Platform, Pressable, Text, View } from '@symbiote-native/solid';
+import { Platform } from '@symbiote-native/solid';
 import {
   authenticateAsync,
   cancelAuthenticate,
@@ -241,28 +244,26 @@ function LocalAuthScreen() {
   };
 
   return (
-    <View>
-      <Text>
+    <view>
+      <text>
         {hasHardware() && isEnrolled()
           ? 'Ready to authenticate'
           : 'No biometrics enrolled'}
-      </Text>
-      <Pressable onPress={handleAuthenticate}>
-        <Text>Authenticate</Text>
-      </Pressable>
+      </text>
+      <pressable onPress={handleAuthenticate}>
+        <text>Authenticate</text>
+      </pressable>
       {Platform.OS === 'android' && (
-        <Pressable onPress={() => cancelAuthenticate()}>
-          <Text>Cancel</Text>
-        </Pressable>
+        <pressable onPress={() => cancelAuthenticate()}>
+          <text>Cancel</text>
+        </pressable>
       )}
       <Show when={authResult()} keyed>
         {result => (
-          <Text>
-            {result.success ? 'Success' : `Failed: ${result.error}`}
-          </Text>
+          <text>{result.success ? 'Success' : `Failed: ${result.error}`}</text>
         )}
       </Show>
-    </View>
+    </view>
   );
 }
 ```
@@ -270,7 +271,7 @@ function LocalAuthScreen() {
 ```ts
 // Angular
 import { Component, signal } from '@angular/core';
-import { Platform, Pressable, Text, View } from '@symbiote-native/angular';
+import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   authenticateAsync,
   cancelAuthenticate,
@@ -281,28 +282,28 @@ import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/ang
 
 @Component({
   standalone: true,
-  imports: [Pressable, Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <View>
-      <Text>{{
+    <view>
+      <text>{{
         hasHardware() && isEnrolled()
           ? 'Ready to authenticate'
           : 'No biometrics enrolled'
-      }}</Text>
-      <Pressable (press)="handleAuthenticate()">
-        <Text>Authenticate</Text>
-      </Pressable>
+      }}</text>
+      <pressable (press)="handleAuthenticate()">
+        <text>Authenticate</text>
+      </pressable>
       @if (Platform.OS === 'android') {
-        <Pressable (press)="handleCancel()">
-          <Text>Cancel</Text>
-        </Pressable>
+        <pressable (press)="handleCancel()">
+          <text>Cancel</text>
+        </pressable>
       }
       @if (authResult(); as result) {
-        <Text>{{
+        <text>{{
           result.success ? 'Success' : 'Failed: ' + result.error
-        }}</Text>
+        }}</text>
       }
-    </View>
+    </view>
   `,
 })
 export class LocalAuthScreen {

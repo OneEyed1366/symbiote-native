@@ -1,12 +1,6 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   CellularGeneration,
   allowsVoipAsync,
@@ -45,10 +39,10 @@ function valueLabel(value: string | boolean | null): string {
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="auth-capability-row">
-      <Text class="auth-capability-label">{props.label}</Text>
-      <Text class="auth-value-text">{props.value}</Text>
-    </View>
+    <view class="auth-capability-row">
+      <text class="auth-capability-label">{props.label}</text>
+      <text class="auth-value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -110,34 +104,34 @@ export const CellularScreen = defineComponent(
     );
 
     return () => (
-      <SafeAreaView class="screen">
-        <ScrollView
+      <safe-area-view class="screen">
+        <scroll-view
           testID="cellular-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Cellular</Text>
-              <Text class="hero-body">
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Cellular</text>
+              <text class="hero-body">
                 @symbiote-native/cellular — cellular generation and carrier/SIM
                 info. Every field except generation is Android-only upstream
                 (iOS/web return null); a physical device with an active SIM is
                 needed for real values.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="cellular-info-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Cellular info</Text>
-            </View>
+          <view testID="cellular-info-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Cellular info</text>
+            </view>
             <ValueRow label="Generation" value={generationLabelText.value} />
             {Platform.OS === 'android' && (
               <>
@@ -163,12 +157,12 @@ export const CellularScreen = defineComponent(
                 />
               </>
             )}
-          </View>
+          </view>
 
-          <View testID="cellular-permission-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Permission</Text>
-            </View>
+          <view testID="cellular-permission-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Permission</text>
+            </view>
             <ValueRow
               label="Phone-state permission status"
               value={permissionLabel.value}
@@ -179,9 +173,9 @@ export const CellularScreen = defineComponent(
               onPress={() => requestPermission()}
               color={lineColor}
             />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+          </view>
+        </scroll-view>
+      </safe-area-view>
     );
   },
   { name: 'CellularScreen' },

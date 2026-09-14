@@ -17,9 +17,12 @@
 // WHAT IT DOES NOT FIX, measured rather than assumed. npm's lockfile still short-circuits: publish
 // new bytes under the SAME version, run a plain `npm install`, and npm prints `up to date` and
 // leaves the old copy in place — the identical failure the `file:` dance has, and the reason
-// CLAUDE.md tells you to delete both the lockfile and the folder. The difference is the repair:
-// ONE explicit `npm install <pkg>@<version>` picks up the new bytes (measured, 468ms), where the
-// tarball route needs the folder AND the lockfile deleted first. `refresh` below does exactly that.
+// CLAUDE.md tells you to delete both the lockfile and the folder. `refresh` below does exactly
+// that: wipes `node_modules` and `package-lock.json`, then a full install. A targeted
+// `npm install <pkg>@<version>` is faster but trusts that the rest of an example's `node_modules`
+// is already consistent — device-observed 2026-09-13, an interrupted manual reinstall left
+// `node_modules` on a stale build with no lockfile at all, and a targeted install would have
+// layered on top of that instead of fixing it.
 //
 // And `pod install` is still owed afterwards, for the reason CLAUDE.md gives: replacing a package
 // folder deletes `@symbiote-native/splash-screen/.rn-bootsplash/`, which the podspec vendors at
@@ -152,8 +155,19 @@ function commandOff(targets) {
 // existing version ("You cannot publish over the previously published versions"), and the dev loop
 // republishes one version many times a day. Verdaccio allows it because this config sets
 // `unpublish: $all`; real npm does not, which is half of why this is not a dist-tag on npmjs.
+//
+// `pnpm pack` ships whatever is already sitting in `build/` — most packages have no `prepack`
+// build step of their own (only svelte and angular do), so without this, publishing after an edit
+// with no manual `pnpm run prepublish-build` first silently republishes STALE or EMPTY bytes: no
+// error, a tarball that installs fine, and an example that measures last week's code. Building
+// here, always, closes that gap instead of documenting it as a step to remember.
 async function commandPublish(dirs) {
   const token = await ensureToken();
+  console.log('building a fresh package tree (pnpm run prepublish-build) ...');
+  execFileSync('pnpm', ['run', 'prepublish-build'], {
+    cwd: REPO_ROOT,
+    stdio: 'inherit',
+  });
   const entries = publishablePackageEntries();
   // No argument means EVERY publishable package. Naming them was the default because publishing is
   // the slow half, but a list you have to remember is a list that goes stale mid-loop — and the
@@ -221,42 +235,30 @@ async function commandPublish(dirs) {
     console.log(`\nFAILED to publish ${failed.length}:`);
     for (const line of failed) console.log(`  ${line}`);
     console.log(
-      '\nMost often a missing build/ — run `pnpm run prepublish-build` and retry.',
+      '\nThe build ran fresh just before this — check the build output above for a type error.',
     );
     process.exitCode = 1;
   }
 }
 
-// The repair for the lockfile short-circuit described in this file's header. An explicit
-// `<name>@<version>` is what makes npm go back to the registry; a bare `npm install` will not.
+// The repair for the lockfile short-circuit described in this file's header — and for any other
+// way an example's `node_modules` can drift out of sync with its manifest (a killed install, a
+// half-applied `rm -rf`). Wiping both `node_modules` and `package-lock.json` before a full
+// `npm install` is the only repair that cannot leave stale bytes behind; a targeted
+// `npm install <pkg>@<version>` is faster but assumes the rest of the tree is already correct.
 function commandRefresh(targets) {
-  const ours = publishablePackageEntries().filter(entry =>
-    entry.name.startsWith(`${SCOPE}/`),
-  );
   let done = 0;
   for (const dir of targets) {
     done += 1;
     console.log(`\n  [${done}/${targets.length}] ${dir}`);
     const exampleRoot = join(REPO_ROOT, dir);
-    const manifest = JSON.parse(
-      readFileSync(join(exampleRoot, 'package.json'), 'utf8'),
-    );
-    const declared = { ...manifest.dependencies, ...manifest.devDependencies };
-    const specifiers = ours
-      .filter(entry => typeof declared[entry.name] === 'string')
-      // Skip anything still pinned at a `file:` tarball — that one is on the old loop and
-      // reinstalling it from the registry would silently change which build the example carries.
-      .filter(entry => !declared[entry.name].startsWith('file:'))
-      .map(entry => `${entry.name}@${versionOf(entry)}`);
-    if (specifiers.length === 0) {
-      console.log(`  ${dir}: nothing to refresh`);
-      continue;
-    }
-    execFileSync('npm', ['install', ...specifiers, '--no-audit', '--no-fund'], {
+    rmSync(join(exampleRoot, 'node_modules'), { recursive: true, force: true });
+    rmSync(join(exampleRoot, 'package-lock.json'), { force: true });
+    execFileSync('npm', ['install', '--no-audit', '--no-fund'], {
       cwd: exampleRoot,
       stdio: 'inherit',
     });
-    console.log(`  ${dir}: refreshed ${specifiers.length} package(s)`);
+    console.log(`  ${dir}: reinstalled from a clean node_modules`);
   }
 }
 

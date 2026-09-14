@@ -63,12 +63,13 @@ const passthrough = (
 });
 
 const CALLBACK_CASES: Record<string, ICallbackCase> = {
-  // The one fold: not a Fabric event name at all, so nothing routes it. Text first, raw event
-  // second — the shape the component wrapper produced and the shape apps are written against.
+  // The one fold: not a Fabric event name at all, so nothing routes it. ONE argument — the event,
+  // with `text` carried on it as a field, mutated in place by `Object.assign` — never a second
+  // `(text, event)` argument (Svelte's `target_handler` crashes on a bare-string sole argument).
   onValueChange: {
     nativeEvent: 'change',
     payload: { nativeEvent: { text: 'typed', eventCount: 4 } },
-    expected: payload => ['typed', payload],
+    expected: payload => [payload],
   },
   // Owned by the machine (`ownedListeners`), so the app's handler is parked in the stash and the
   // behavior is what calls it. A row that passes here proves the stash forwards, not merely that

@@ -16,7 +16,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import type { SymbioteSurface } from '@symbiote-native/engine';
 import { mount, unmount } from '../render';
-import { Text, View } from '../components';
 import type { IHostInstance } from '../host-instance';
 import { Portal, type IPortalTarget } from './index';
 
@@ -87,18 +86,18 @@ describe('Portal', () => {
       // <Show> is the idiomatic gate — the Solid analogue of React's callback-ref timing gotcha.
       const [overlay, setOverlay] = createSignal<IHostInstance | undefined>();
       return (
-        <View testID="root">
-          <View testID="source">
+        <view testID="root">
+          <view testID="source">
             <Show when={overlay()}>
               {target => (
                 <Portal mount={target()}>
-                  <Text>ported in</Text>
+                  <text>ported in</text>
                 </Portal>
               )}
             </Show>
-          </View>
-          <View testID="overlay-host" ref={setOverlay} />
-        </View>
+          </view>
+          <view testID="overlay-host" ref={setOverlay} />
+        </view>
       );
     }
 
@@ -137,16 +136,16 @@ describe('Portal', () => {
     function App() {
       const [overlay, setOverlay] = createSignal<IHostInstance | undefined>();
       return (
-        <View testID="root">
+        <view testID="root">
           <Show when={overlay()}>
             {target => (
               <Portal mount={target()}>
-                <Text testID="ported">direct</Text>
+                <text testID="ported">direct</text>
               </Portal>
             )}
           </Show>
-          <View testID="overlay-host" ref={setOverlay} />
-        </View>
+          <view testID="overlay-host" ref={setOverlay} />
+        </view>
       );
     }
 
@@ -178,16 +177,16 @@ describe('Portal', () => {
       const [label, setLabelSignal] = createSignal('first');
       setLabel = setLabelSignal;
       return (
-        <View testID="root">
+        <view testID="root">
           <Show when={overlay()}>
             {target => (
               <Portal mount={target()}>
-                {label() === 'first' ? <Text>first</Text> : <Text>second</Text>}
+                {label() === 'first' ? <text>first</text> : <text>second</text>}
               </Portal>
             )}
           </Show>
-          <View testID="overlay-host" ref={setOverlay} />
-        </View>
+          <view testID="overlay-host" ref={setOverlay} />
+        </view>
       );
     }
 
@@ -228,16 +227,16 @@ describe('Portal', () => {
       const [visible, setVisibleSignal] = createSignal(true);
       setVisible = setVisibleSignal;
       return (
-        <View testID="root">
+        <view testID="root">
           <Show when={visible() ? overlay() : undefined}>
             {target => (
               <Portal mount={target()}>
-                <Text>transient</Text>
+                <text>transient</text>
               </Portal>
             )}
           </Show>
-          <View testID="overlay-host" ref={setOverlay} />
-        </View>
+          <view testID="overlay-host" ref={setOverlay} />
+        </view>
       );
     }
 
@@ -271,17 +270,17 @@ describe('Portal', () => {
       const target = (): IHostInstance | undefined =>
         useSecond() ? second() : first();
       return (
-        <View testID="root">
+        <view testID="root">
           <Show when={target()}>
             {mount => (
               <Portal mount={mount()}>
-                <Text testID="ported">movable</Text>
+                <text testID="ported">movable</text>
               </Portal>
             )}
           </Show>
-          <View testID="host-a" ref={setFirst} />
-          <View testID="host-b" ref={setSecondHost} />
-        </View>
+          <view testID="host-a" ref={setFirst} />
+          <view testID="host-b" ref={setSecondHost} />
+        </view>
       );
     }
 
@@ -317,15 +316,15 @@ describe('Portal', () => {
 
     function App() {
       return (
-        <View testID="source">
+        <view testID="source">
           <Show when={target()}>
             {surface => (
               <Portal mount={surface()}>
-                <Text>top level</Text>
+                <text>top level</text>
               </Portal>
             )}
           </Show>
-        </View>
+        </view>
       );
     }
 
@@ -356,13 +355,13 @@ describe('Portal', () => {
     const OriginContext = createContext('default');
 
     function Consumer() {
-      return <Text>{useContext(OriginContext)}</Text>;
+      return <text>{useContext(OriginContext)}</text>;
     }
 
     function App() {
       const [overlay, setOverlay] = createSignal<IHostInstance | undefined>();
       return (
-        <View testID="root">
+        <view testID="root">
           <OriginContext.Provider value="call site">
             <Show when={overlay()}>
               {target => (
@@ -372,8 +371,8 @@ describe('Portal', () => {
               )}
             </Show>
           </OriginContext.Provider>
-          <View testID="overlay-host" ref={setOverlay} />
-        </View>
+          <view testID="overlay-host" ref={setOverlay} />
+        </view>
       );
     }
 

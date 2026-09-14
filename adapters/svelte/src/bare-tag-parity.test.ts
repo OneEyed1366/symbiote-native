@@ -2,21 +2,23 @@
 // work. The question was "does a bare tag commit a payload identical to the wrapper's". Here it
 // does not, and the reason is the funnel: our props do not reach the engine as props. Every lowered
 // element takes ONE `p={{…}}` object and the shim's `p` setter fans it out through `routeProp`; an
-// app-authored `<symbiote-view class="x" id="y">` has no bag, and Svelte's own codegen sends its
+// app-authored `<view class="x" id="y">` has no bag, and Svelte's own codegen sends its
 // attributes three different ways, none of which the shim implements.
 //
 // Measured, four arms, `bag` acting as the live control:
 //
 //   wrapper  <View id testID accessible>            { testID, accessible, nativeID:'ident' }
-//   bag      <symbiote-view p={{…}}>                IDENTICAL  <- the parity this file asserts
-//   bare     <symbiote-view id testID accessible>   NOTHING commits; the node mounts empty
+//   bag      <view p={{…}}>                IDENTICAL  <- the parity this file asserts
+//   bare     <view id testID accessible>   NOTHING commits; the node mounts empty
 //   bare + style/class                              THROWS: cannot set 'cssText' of undefined
 //
-// The throw is `set_style` writing `dom.style.cssText` (svelte's own elements/style.js) on a
-// ShimElement that has no `.style`; `class` goes to `set_class` and everything else to
-// `set_custom_element_data`, which stringifies. So on Svelte "the primitive is a tag" does not
-// remove the transform — it makes the transform MANDATORY, since without it props stop reaching the
-// engine and a `style` attribute crashes the mount.
+// SUPERSEDED 2026-09-07 — the two bare rows above are a dated reading, kept because the CODEGEN
+// half of them is still exactly right and is what the fixes had to be aimed at. The shim now
+// implements all four doors (`setAttribute`, `className`, the `set_style` Symbol, and an
+// `addEventListener` that normalises the event name), so a bare tag commits and does not throw;
+// `bare-tag-authored.test.ts` compiles real markup with no preprocessor and pins each one. What is
+// still the compiler's and not ours: a STATIC attribute name is lowercased, and a hyphenated tag
+// stringifies a scalar — both properties of the tag alphabet.
 //
 // Only the wrapper/bag parity is asserted below. The bare-tag readings stay a dated measurement and
 // NOT assertions, on purpose: pinning them would encode today's limitation as a contract, so a
@@ -40,11 +42,6 @@ const fabric = installFabric();
 // Named for this suite alone: two suites sharing a compiled artifact race
 // (`.claude/rules/smoke-compiled-artifact-collisions.md`).
 const PROBE_OUT = join(__dirname, '.smoke-compiled-bare-tag-probe.mjs');
-const VIEW_OUT = join(
-  __dirname,
-  'components',
-  '.smoke-compiled-view-for-bare-tag.mjs',
-);
 
 const COMPILE_OPTIONS = {
   generate: 'client',
@@ -106,75 +103,28 @@ async function arm(
 
 afterAll(() => {
   rmSync(PROBE_OUT, { force: true });
-  rmSync(VIEW_OUT, { force: true });
 });
 
-describe('the wrapper and the bag commit the same payload', () => {
-  it('agree key for key, with both arms shown to be live', async () => {
-    writeFileSync(
-      VIEW_OUT,
-      compile(
-        readFileSync(join(__dirname, 'components', 'View.svelte'), 'utf8'),
-        { ...COMPILE_OPTIONS, filename: 'View.svelte' },
-      ).js.code,
-    );
-
-    // The first mount in a process builds surface chrome the later ones reuse, so one throwaway arm
-    // runs before anything is compared (test-harness-false-greens.md §18).
-    await arm(
-      '<symbiote-view p={{ testID: "warmup" }}></symbiote-view>',
-      9_700,
-      'warmup',
-    );
-
-    const wrapper = await arm(
-      [
-        '<script>',
-        `  import View from '${VIEW_OUT}';`,
-        '</script>',
-        '<View id="ident" testID="wrapper" accessible={true}></View>',
-      ].join('\n'),
-      9_701,
-      'wrapper',
-    );
-
-    const bag = await arm(
-      '<symbiote-view p={{ id: "ident", testID: "bag", accessible: true }}></symbiote-view>',
-      9_702,
-      'bag',
-    );
-
-    // Neither arm may be empty: two arms that both commit nothing agree with each other, which is a
-    // tautology rather than parity (test-harness-false-greens.md §13).
-    expect(wrapper, 'wrapper arm committed').toBeDefined();
-    expect(bag, 'bag arm committed').toBeDefined();
-    // And the fold ran on both — `id` is the wrapper's own alias and must survive the lowered path.
-    expect(wrapper?.nativeID, 'wrapper folded id').toBe('ident');
-    expect(bag?.nativeID, 'bag folded id').toBe('ident');
-
-    const strip = (props: Record<string, unknown>): Record<string, unknown> => {
-      const { testID: _armLabel, ...rest } = props;
-      return rest;
-    };
-    expect(strip(bag ?? {})).toEqual(strip(wrapper ?? {}));
-  });
-});
+// The wrapper-vs-bag comparison this file opened with is GONE with the wrappers. What replaced it
+// is not a smaller version of it: `tag-fold-coverage.test.ts` asserts every primitive's fold
+// ABSOLUTELY, against the spec, which is the half a cross-arm comparison was structurally blind to
+// anyway (`test-harness-false-greens.md` §16).
 
 describe('children under a tag', () => {
   it('mount as markup, which a `children` key in the bag never does', async () => {
     const kid = await arm(
       [
-        '<symbiote-view p={{ testID: "parent" }}>',
-        '  <symbiote-text p={{ testID: "kid" }}>hi</symbiote-text>',
-        '</symbiote-view>',
+        '<view p={{ testID: "parent" }}>',
+        '  <text p={{ testID: "kid" }}>hi</text>',
+        '</view>',
       ].join('\n'),
       9_705,
       'kid',
     );
 
-    // The counterpart is measured in `preprocessor/ref-refusal.test.ts`: the same child handed over
-    // as a bag KEY never mounts. So that hazard belongs to the funnel, not to the primitive — the
-    // distinction the universal spread refusal rests on.
+    // The counterpart matters more now that a bag is something an app writes by hand rather than
+    // something a transform emitted: the same child handed over as a bag KEY never mounts, because
+    // `routeProp` treats `children` as an ordinary prop and a Snippet is not markup there.
     expect(kid, 'a child written as markup commits').toBeDefined();
     expect(kid?.ellipsizeMode, 'and its Text defaults are folded').toBe('tail');
   });

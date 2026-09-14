@@ -1,6 +1,6 @@
 // TabBar: the render half (framework-agnostic). A bottom-tabs bar is a PURE-JS UI - unlike
 // Stack, which drives real native RNSScreen/RNSScreenStack views, this paints ordinary
-// `symbiote-view`/`symbiote-text` primitives, so it needs no react-native-screens ViewConfig
+// `view`/`text` primitives, so it needs no react-native-screens ViewConfig
 // work at all (see the task brief in packages/navigation's skill notes). Mirrors renderSwitch's
 // shape: pure prop-driven functions building a `Descriptor` tree from pre-resolved view props;
 // the adapter supplies focus state, tint-color resolution inputs, and the press wiring via
@@ -115,7 +115,7 @@ function renderBadge(
   badge: string | number | undefined,
 ): IDescriptor | undefined {
   if (badge === undefined) return undefined;
-  return el('symbiote-view', { style: BADGE_STYLE }, [
+  return el('view', { style: BADGE_STYLE }, [
     txt({ style: BADGE_TEXT_STYLE }, [String(badge)]),
   ]);
 }
@@ -131,15 +131,13 @@ export function renderTabBarItem(item: ITabBarItemView): IDescriptor {
 
   const children: IDescriptor[] = [];
   if (iconChildren.length > 0)
-    children.push(
-      el('symbiote-view', { style: ICON_WRAPPER_STYLE }, iconChildren),
-    );
+    children.push(el('view', { style: ICON_WRAPPER_STYLE }, iconChildren));
   children.push(
     txt({ style: { color, fontSize: TAB_LABEL_FONT_SIZE } }, [item.label]),
   );
 
   return el(
-    'symbiote-view',
+    'view',
     { ...item.passthrough, style: TAB_ITEM_STYLE, accessibilityRole: 'tab' },
     children,
     item.key,
@@ -149,7 +147,7 @@ export function renderTabBarItem(item: ITabBarItemView): IDescriptor {
 export function renderTabBar(view: ITabBarViewProps): IDescriptor {
   const items = view.items.map(renderTabBarItem);
   return el(
-    'symbiote-view',
+    'view',
     { ...view.passthrough, style: [TAB_BAR_STYLE, view.style] },
     items,
   );

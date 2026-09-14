@@ -13,7 +13,7 @@
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import { usePedometer } from './index';
 import type { IPedometerResult } from '../../../core';
@@ -36,7 +36,7 @@ const results: Array<IPedometerResult | null> = [];
 
 function Probe(): ReactElement {
   results.push(usePedometer());
-  return createElement(View);
+  return createElement('view');
 }
 
 const fabric = installFabric();

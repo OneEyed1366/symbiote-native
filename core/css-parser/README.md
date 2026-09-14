@@ -52,7 +52,7 @@ import './theme.css'; // plain CSS — registers classes globally, no export
 ```
 
 ```tsx
-<View className="card" style={styles.highlight} /> // React
+<view className="card" style={styles.highlight} /> // React
 ```
 
 ```html

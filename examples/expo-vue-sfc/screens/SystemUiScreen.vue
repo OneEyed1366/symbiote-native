@@ -5,7 +5,7 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   getBackgroundColorAsync,
   setBackgroundColorAsync,
@@ -45,41 +45,58 @@ onMounted(() => {
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <ScrollView
+  <safe-area-view class="screen">
+    <scroll-view
       testID="system-ui-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">System UI</Text>
-          <Text class="hero-body"
-            >@symbiote-native/system-ui — sets and reads the root view's
-            background color.</Text
-          >
-        </View>
-      </View>
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">
+          {{
+            `${lineInfo.code} · ${lineInfo.label}`
+          }}
+        </text>
+      </view>
+      <view class="hero-card">
+        <view
+          class="hero-badge"
+          :style="{ backgroundColor: lineColor }"
+        >
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title">
+            System UI
+          </text>
+          <text class="hero-body">
+            @symbiote-native/system-ui — sets and reads the root view's
+            background color.
+          </text>
+        </view>
+      </view>
 
-      <View testID="system-ui-card" class="system-ui-card">
-        <Text class="system-ui-card-title">Background color</Text>
-        <View class="system-ui-row">
-          <Text class="system-ui-row-label">Current</Text>
-          <Text
+      <view
+        testID="system-ui-card"
+        class="system-ui-card"
+      >
+        <text class="system-ui-card-title">
+          Background color
+        </text>
+        <view class="system-ui-row">
+          <text class="system-ui-row-label">
+            Current
+          </text>
+          <text
             testID="system-ui-background-color-value"
             class="system-ui-value-text"
-            >{{ backgroundColor ?? 'not set' }}</Text
           >
-        </View>
-        <View class="button-row">
+            {{ backgroundColor ?? 'not set' }}
+          </text>
+        </view>
+        <view class="button-row">
           <ActionButton
             testID="system-ui-set-red-button"
             title="Red"
@@ -98,8 +115,8 @@ onMounted(() => {
             :onPress="handleReset"
             :color="lineColor"
           />
-        </View>
-      </View>
-    </ScrollView>
-  </SafeAreaView>
+        </view>
+      </view>
+    </scroll-view>
+  </safe-area-view>
 </template>

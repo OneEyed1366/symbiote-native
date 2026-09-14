@@ -18,8 +18,8 @@
 // is looking for. That false red cost a debugging round before it was recognised.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-const SINGLE_LINE = 'symbiote-text-input';
-const MULTILINE = 'symbiote-text-input-multiline';
+const SINGLE_LINE = 'text-input';
+const MULTILINE = 'text-input-multiline';
 
 let foldHostBag: (tag: string, bag: Record<string, unknown>) => unknown;
 

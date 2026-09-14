@@ -1,5 +1,4 @@
 import { Component, PureComponent, useState } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 
@@ -10,9 +9,9 @@ class RegularChild extends Component<IRenderCounterProps> {
   render() {
     regularRenders += 1;
     return (
-      <Text testID="pure-regular-renders" className="info-text">
+      <text testID="pure-regular-renders" className="info-text">
         {`Component (no shouldComponentUpdate): rendered ${regularRenders} time(s)`}
-      </Text>
+      </text>
     );
   }
 }
@@ -24,9 +23,9 @@ class PureChild extends PureComponent<IRenderCounterProps> {
   render() {
     pureRenders += 1;
     return (
-      <Text testID="pure-pure-renders" className="info-text">
+      <text testID="pure-pure-renders" className="info-text">
         {`PureComponent: rendered ${pureRenders} time(s)`}
-      </Text>
+      </text>
     );
   }
 }
@@ -36,8 +35,8 @@ export function PureComponentDemo() {
   const [unrelatedTick, setUnrelatedTick] = useState(0);
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">PureComponent</Text>
+    <view className="section-nested">
+      <text className="section-label">PureComponent</text>
       <RegularChild value={value} />
       <PureChild value={value} />
       <ActionButton
@@ -52,7 +51,7 @@ export function PureComponentDemo() {
         onPress={() => setUnrelatedTick(current => current + 1)}
         color={LINE_COLOR.introspection}
       />
-      <Text className="note-text">{`unrelated ticks: ${unrelatedTick}`}</Text>
-    </View>
+      <text className="note-text">{`unrelated ticks: ${unrelatedTick}`}</text>
+    </view>
   );
 }

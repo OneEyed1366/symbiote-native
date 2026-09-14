@@ -55,7 +55,7 @@ function rowsWithFlexDirection(): IFakeNode[] {
       [columnWrapperStyle]="'gap8'"
     >
       <ng-template vListItem let-item>
-        <symbiote-text [testID]="item.id">{{ item.label }}</symbiote-text>
+        <text [testID]="item.id">{{ item.label }}</text>
       </ng-template>
     </FlatList>
   `,
@@ -77,7 +77,7 @@ class FlatListColumnStyleClassHost {
       [columnWrapperStyle]="{ gap: 4 }"
     >
       <ng-template vListItem let-item>
-        <symbiote-text [testID]="item.id">{{ item.label }}</symbiote-text>
+        <text [testID]="item.id">{{ item.label }}</text>
       </ng-template>
     </FlatList>
   `,

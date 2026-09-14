@@ -99,7 +99,7 @@ async function loadProbe(): Promise<Component> {
        const batteryState = useBatteryState();
        $effect(() => { onValue(batteryState.current); });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'BatteryStateProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

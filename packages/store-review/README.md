@@ -56,12 +56,11 @@ src/angular/  @symbiote-native/store-review/angular — export * from '../core'
 
 ```tsx
 // React
-import { Button } from '@symbiote-native/react';
 import { requestReview } from '@symbiote-native/store-review/react';
 
 function RateAppButton() {
   return (
-    <Button
+    <button
       title="Rate this app"
       onPress={() =>
         requestReview({
@@ -78,7 +77,6 @@ function RateAppButton() {
 ```vue
 <!-- Vue -->
 <script setup lang="ts">
-import { Button } from '@symbiote-native/vue';
 import { requestReview } from '@symbiote-native/store-review/vue';
 
 function onRatePress() {
@@ -91,14 +89,13 @@ function onRatePress() {
 </script>
 
 <template>
-  <Button title="Rate this app" @press="onRatePress" />
+  <button title="Rate this app" @press="onRatePress" />
 </template>
 ```
 
 ```svelte
 <!-- Svelte -->
 <script lang="ts">
-  import { Button } from '@symbiote-native/svelte';
   import { requestReview } from '@symbiote-native/store-review/svelte';
 
   function onRatePress(): void {
@@ -110,12 +107,11 @@ function onRatePress() {
   }
 </script>
 
-<Button title="Rate this app" onPress={onRatePress} />
+<button title="Rate this app" onPress={onRatePress} />
 ```
 
 ```tsx
 // Solid
-import { Button } from '@symbiote-native/solid';
 import { requestReview } from '@symbiote-native/store-review/solid';
 
 function RateAppButton() {
@@ -126,20 +122,20 @@ function RateAppButton() {
         'https://play.google.com/store/apps/details?id=com.example.app',
     });
 
-  return <Button title="Rate this app" onPress={onRatePress} />;
+  return <button title="Rate this app" onPress={onRatePress} />;
 }
 ```
 
 ```ts
 // Angular
 import { Component } from '@angular/core';
-import { Button } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { requestReview } from '@symbiote-native/store-review/angular';
 
 @Component({
   standalone: true,
-  imports: [Button],
-  template: `<Button title="Rate this app" (press)="onRatePress()" />`,
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `<button title="Rate this app" (press)="onRatePress()" />`,
 })
 export class RateAppButton {
   onRatePress(): void {
