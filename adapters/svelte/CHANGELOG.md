@@ -1,5 +1,50 @@
 # @symbiote-native/svelte
 
+## 2.0.0
+
+### Major Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `ActivityIndicator`, `Image`, `ImageBackground`, `RefreshControl`, `TouchableOpacity`,
+  `TouchableHighlight`, `TouchableWithoutFeedback`, `TouchableNativeFeedback`, `Button` and
+  `ScrollView` are no longer exported as components from `@symbiote-native/svelte`.
+
+  Every one is now the intrinsic tag Svelte's preprocessor lowers at compile time
+  (`<symbiote-view>` underneath `<view>`, and so on) — there is nothing left to import. `Image` and
+  `TouchableNativeFeedback` survive as RN's static namespaces (`Image.getSize`,
+  `TouchableNativeFeedback.Ripple`), moved to the module block since neither carries a view.
+  `KeyboardAvoidingView`, `Modal`, `VirtualizedList`, `FlatList` and `VirtualizedSectionList` are
+  unaffected. `Animated`'s component aliases go with them — there is no `Animated.View` /
+  `Animated.Text` / `Animated.Image` any more; an animated value resolves in any prop of the plain
+  tag directly (`<view style={{ opacity: someAnimatedValue }}>`), only `FlatList`/`SectionList`
+  still need the `Animated.*` alias form.
+
+  Migration: replace `import { Button } from '@symbiote-native/svelte'` + `<Button .../>` with
+  `<button .../>` — props are unchanged.
+
+### Patch Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A claimed child can now become the owner's PARENT, which is what an Android RefreshControl is.
+
+  An Android ScrollView holds exactly one child, so a sibling refresh control is an `addViewAt`
+  crash — RN inverts the tree there instead of beside-placing like it does on iOS. `claimedChildren`
+  carries a mode per name, `beside` or `wrap`, and `ISymbioteNode.wrapper` records the inversion. The
+  adapter goes on naming the scroll view for every insert, prop write and command; only the two
+  structural entry points know a wrapper is what the tree holds.
+
+  `IHostBehavior.onWrapChange` is where a behavior answers for it. The wrapper is the app's own node,
+  so nothing could have given it a payload fold at creation — this is where the scroll view's layout
+  style moves up to it and its visual style stays below.
+
+  `splitScrollViewStyle` composes the axis base onto BOTH boxes, as RN does. All five adapters had
+  dropped it from the wrapper, so an `AndroidSwipeRefreshLayout` with no explicit user layout style
+  lost `flexGrow: 1` and collapsed to its content height inside a flex parent.
+
+  `insertBefore`'s `beforeChild` is typed nullable, which is what its callers always passed.
+
+- Updated dependencies [[`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f)]:
+  - @symbiote-native/engine@0.5.0
+  - @symbiote-native/components@2.0.0
+
 ## 1.0.0
 
 ### Minor Changes
