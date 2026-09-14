@@ -1,11 +1,5 @@
 import { Component } from '@angular/core';
-import {
-  PressableElement,
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  View,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { injectStackNavigation } from '@symbiote-native/navigation/angular';
 import { ROUTE_NAME } from '../routes';
 import { ROUTE_LINE_INFO } from '../navigation-lines';
@@ -98,13 +92,7 @@ const MENU_ITEMS: readonly IMenuItem[] = [
 @Component({
   selector: 'MenuScreen',
   standalone: true,
-  imports: [
-    PressableElement,
-    SafeAreaViewElement,
-    ScrollViewElement,
-    Text,
-    View,
-  ],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

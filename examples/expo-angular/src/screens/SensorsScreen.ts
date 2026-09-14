@@ -8,11 +8,8 @@ import {
 } from '@angular/core';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import {
-  SafeAreaViewElement,
-  ScrollViewElement,
+  SYMBIOTE_ELEMENTS,
   SymbioteHostPropsDirective,
-  Text,
-  View,
 } from '@symbiote-native/angular';
 import {
   AccelerometerService,
@@ -136,13 +133,7 @@ type IAxisSensorCard = {
 @Component({
   selector: 'SensorsScreen',
   standalone: true,
-  imports: [
-    SafeAreaViewElement,
-    ScrollViewElement,
-    SymbioteHostPropsDirective,
-    Text,
-    View,
-  ],
+  imports: [SYMBIOTE_ELEMENTS, SymbioteHostPropsDirective],
   template: `
     <safe-area-view class="screen">
       <scroll-view

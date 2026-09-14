@@ -28,13 +28,12 @@ file globally, from any adapter's own source file:
 
 ```tsx
 import './App.css';
-import { Text, View } from '@symbiote-native/react';
 
 function Card() {
   return (
-    <View className="card">
-      <Text className="title">Native surface</Text>
-    </View>
+    <view className="card">
+      <text className="title">Native surface</text>
+    </view>
   );
 }
 ```
@@ -60,9 +59,9 @@ exists:
 
 ```vue
 <template>
-  <View class="card">
-    <Text class="title">Native surface</Text>
-  </View>
+  <view class="card">
+    <text class="title">Native surface</text>
+  </view>
 </template>
 
 <style scoped>
@@ -113,9 +112,9 @@ the same way, through the same build-time compiler — with one difference from
 Vue: scoping is **on by default**, no `scoped` attribute to opt into:
 
 ```svelte
-<View class="card">
-  <Text class="title">Native surface</Text>
-</View>
+<view class="card">
+  <text class="title">Native surface</text>
+</view>
 
 <style>
   .card {
@@ -152,14 +151,10 @@ scheme (a per-file scope id).
 Inline, in the same SFC, exactly like real Vue:
 
 ```vue
-<script setup lang="ts">
-import { Text, View } from '@symbiote-native/vue';
-</script>
-
 <template>
-  <View :class="$style.card">
-    <Text :class="$style.title">Native surface</Text>
-  </View>
+  <view :class="$style.card">
+    <text :class="$style.title">Native surface</text>
+  </view>
 </template>
 
 <style module>
@@ -201,44 +196,42 @@ the engine, not per adapter.
 ```
 
 ```tsx
-import { Text, View } from '@symbiote-native/react';
 import styles from './Card.module.css';
 
 function Card() {
   return (
-    <View className={styles.card}>
-      <Text className={styles.title}>Native surface</Text>
-    </View>
+    <view className={styles.card}>
+      <text className={styles.title}>Native surface</text>
+    </view>
   );
 }
 ```
 
 ```vue
 <script setup lang="ts">
-import { Text, View } from '@symbiote-native/vue';
 import styles from './Card.module.css';
 </script>
 
 <template>
-  <View :class="styles.card">
-    <Text :class="styles.title">Native surface</Text>
-  </View>
+  <view :class="styles.card">
+    <text :class="styles.title">Native surface</text>
+  </view>
 </template>
 ```
 
 ```ts
 import { Component } from '@angular/core';
-import { Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import styles from './card.module.css';
 
 @Component({
   selector: 'app-card',
   standalone: true,
-  imports: [Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <View [class]="styles.card">
-      <Text [class]="styles.title">Native surface</Text>
-    </View>
+    <view [class]="styles.card">
+      <text [class]="styles.title">Native surface</text>
+    </view>
   `,
 })
 export class CardComponent {
@@ -401,13 +394,13 @@ it for a value that's genuinely computed at runtime, or if you'd rather not
 introduce a CSS file at all:
 
 ```tsx
-import { StyleSheet, Text, View } from '@symbiote-native/react';
+import { StyleSheet } from '@symbiote-native/react';
 
 function Card() {
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>Native surface</Text>
-    </View>
+    <view style={styles.card}>
+      <text style={styles.title}>Native surface</text>
+    </view>
   );
 }
 
@@ -419,7 +412,7 @@ const styles = StyleSheet.create({
 
 ```vue
 <script setup lang="ts">
-import { StyleSheet, Text, View } from '@symbiote-native/vue';
+import { StyleSheet } from '@symbiote-native/vue';
 
 const styles = StyleSheet.create({
   card: { padding: 16, borderRadius: 12, backgroundColor: '#111827' },
@@ -428,24 +421,24 @@ const styles = StyleSheet.create({
 </script>
 
 <template>
-  <View :style="styles.card">
-    <Text :style="styles.title">Native surface</Text>
-  </View>
+  <view :style="styles.card">
+    <text :style="styles.title">Native surface</text>
+  </view>
 </template>
 ```
 
 ```ts
 import { Component } from '@angular/core';
-import { StyleSheet, Text, View } from '@symbiote-native/angular';
+import { StyleSheet, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 
 @Component({
   selector: 'app-card',
   standalone: true,
-  imports: [Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <View [style]="styles.card">
-      <Text [style]="styles.title">Native surface</Text>
-    </View>
+    <view [style]="styles.card">
+      <text [style]="styles.title">Native surface</text>
+    </view>
   `,
 })
 export class CardComponent {

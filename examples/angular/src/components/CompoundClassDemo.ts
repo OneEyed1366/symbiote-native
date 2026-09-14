@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { ActionButton } from './ActionButton';
 // static look lives in the compiled stylesheet
 import './CompoundClassDemo.css';
@@ -20,7 +20,7 @@ import './CompoundClassDemo.css';
 @Component({
   selector: 'CompoundClassDemo',
   standalone: true,
-  imports: [View, Text, ActionButton],
+  imports: [SYMBIOTE_ELEMENTS, ActionButton],
   template: `
     <view class="section-nested">
       <text class="section-label">Compound class · component stylesheet</text>

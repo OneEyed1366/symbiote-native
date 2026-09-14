@@ -56,12 +56,8 @@ import {
 } from '@angular/core/rxjs-interop';
 import { interval, map, timer } from 'rxjs';
 import {
-  SafeAreaViewElement,
-  ScrollViewElement,
+  SYMBIOTE_ELEMENTS,
   SymbioteHostPropsDirective,
-  Text,
-  TextInputElement,
-  View,
 } from '@symbiote-native/angular';
 import { ActionButton } from '../components/ActionButton';
 import { PlaygroundCard } from '../components/PlaygroundCard';
@@ -131,15 +127,11 @@ const PLAYGROUND_ITEMS: readonly IPlaygroundItem[] = [
     PlaygroundLifecycleLogger,
     PlaygroundQueryItemDirective,
     PlaygroundShoutPipe,
-    SafeAreaViewElement,
-    ScrollViewElement,
     SlicePipe,
+    SYMBIOTE_ELEMENTS,
     SymbioteHostPropsDirective,
-    Text,
-    TextInputElement,
     TitleCasePipe,
     UpperCasePipe,
-    View,
   ],
   template: `
     <safe-area-view class="screen">

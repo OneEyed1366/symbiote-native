@@ -1,10 +1,5 @@
 import { Component, signal } from '@angular/core';
-import {
-  SafeAreaViewElement,
-  Text,
-  TextInputElement,
-  View,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { resolveRouteFromUrl } from '@symbiote-native/navigation';
 import { ActionButton } from '../components/ActionButton';
 import {
@@ -24,7 +19,7 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 @Component({
   selector: 'DeepLinkingScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, Text, TextInputElement, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">

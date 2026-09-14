@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { PressableElement, Text } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 
 // Drop-in replacement for RN's stock <Button> (same title/color/testID surface, `press` as a real
 // Angular @Output() instead of React's onPress prop — Angular's own idiom, see
@@ -10,7 +10,7 @@ import { PressableElement, Text } from '@symbiote-native/angular';
 @Component({
   selector: 'ActionButton',
   standalone: true,
-  imports: [PressableElement, Text],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <pressable
       [testID]="testID"

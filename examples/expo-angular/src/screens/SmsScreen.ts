@@ -1,11 +1,5 @@
 import { Component, signal } from '@angular/core';
-import {
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  TextInputElement,
-  View,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/angular';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -25,14 +19,7 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 @Component({
   selector: 'SmsScreen',
   standalone: true,
-  imports: [
-    ActionButton,
-    SafeAreaViewElement,
-    ScrollViewElement,
-    Text,
-    TextInputElement,
-    View,
-  ],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

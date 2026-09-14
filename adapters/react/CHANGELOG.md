@@ -1,5 +1,76 @@
 # @symbiote-native/react
 
+## 2.0.0
+
+### Major Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `View`, `Text`, `Image`, `ScrollView`, `TextInput`, `Switch`, `SafeAreaView`, `RefreshControl`,
+  `InputAccessoryView`, `ActivityIndicator`, `ImageBackground`, `Button`, `TouchableWithoutFeedback`
+  and `TouchableNativeFeedback` are no longer exported as components from `@symbiote-native/react`.
+
+  Each is now the intrinsic tag it already lowered to under `jsxImportSource: '@symbiote-native/react'`
+  (`<view>`, `<text>`, `<scroll-view>`, `<switch>`, …) — write the tag directly, there is nothing left
+  to import in the wrapper's place. `TouchableNativeFeedback` and `Image` survive as RN's own static
+  namespaces (`Image.getSize`, `TouchableNativeFeedback.Ripple`), re-exported from
+  `@symbiote-native/components` instead of a local wrapper. Every prop type (`IViewProps`,
+  `ITextProps`, `IScrollViewProps`, …) still exports for a component that forwards a bag onward.
+
+  `KeyboardAvoidingView`, `Modal`, `Pressable`, `TouchableOpacity`, `TouchableHighlight`,
+  `FlatList`, `VirtualizedList` and `SectionList` are unaffected — real composite behavior a single
+  tag cannot express, or (`Pressable`, the two remaining Touchables) still genuinely components on
+  this adapter.
+
+  Migration: replace `import { ScrollView } from '@symbiote-native/react'; <ScrollView .../>` with
+  `<scroll-view .../>` — no import needed, the props are unchanged.
+
+### Minor Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `@symbiote-native/react` now ships its own `jsx-runtime` / `jsx-dev-runtime` entry points and a
+  freshly-declared `JSX.IntrinsicElements`, in place of the old `declare module 'react'` merge that
+  `src/jsx.ts` used to perform.
+
+  A merge inherits every key `@types/react` already owns — `view`, `text`, `image` and `switch` are
+  real SVG element names there, so an unprefixed intrinsic tag of one of those names was a TS2717
+  ("subsequent property declarations must have the same type"). Declaring the namespace fresh, and
+  pointing an app's `jsxImportSource` at `@symbiote-native/react`, is what frees the short tag names
+  from that collision — the prerequisite the later wrapper-retirement commits build on, not yet the
+  retirement itself.
+
+### Patch Changes
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A claimed child can now become the owner's PARENT, which is what an Android RefreshControl is.
+
+  An Android ScrollView holds exactly one child, so a sibling refresh control is an `addViewAt`
+  crash — RN inverts the tree there instead of beside-placing like it does on iOS. `claimedChildren`
+  carries a mode per name, `beside` or `wrap`, and `ISymbioteNode.wrapper` records the inversion. The
+  adapter goes on naming the scroll view for every insert, prop write and command; only the two
+  structural entry points know a wrapper is what the tree holds.
+
+  `IHostBehavior.onWrapChange` is where a behavior answers for it. The wrapper is the app's own node,
+  so nothing could have given it a payload fold at creation — this is where the scroll view's layout
+  style moves up to it and its visual style stays below.
+
+  `splitScrollViewStyle` composes the axis base onto BOTH boxes, as RN does. All five adapters had
+  dropped it from the wrapper, so an `AndroidSwipeRefreshLayout` with no explicit user layout style
+  lost `flexGrow: 1` and collapsed to its content height inside a flex parent.
+
+  `insertBefore`'s `beforeChild` is typed nullable, which is what its callers always passed.
+
+- [#72](https://github.com/OneEyed1366/symbiote-native/pull/72) [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - React's host config now passes the intrinsic tag to the engine's `createElement`.
+
+  The host-behavior registry is keyed by intrinsic tag, never by Fabric view name — `symbiote-pressable`
+  and a plain `View` both resolve to `RCTView`. React computed the tag to resolve the view name and
+  then dropped it, so any behavior lookup ran against `RCTView` and matched nothing.
+
+  Inert on landing: nothing registers a behavior under a tag React emits, and the
+  `symbiote-text-input-managed` / `symbiote-switch-managed` split keeps a wrapper-built node out of a
+  lowered tag's machine once something does. It is the prerequisite for host behaviors on this
+  adapter, which is the only one of the five that was not passing it.
+
+- Updated dependencies [[`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f), [`022b9fd`](https://github.com/OneEyed1366/symbiote-native/commit/022b9fdcc39640e6b99ddc9068242d9ac41bbd5f)]:
+  - @symbiote-native/engine@0.5.0
+  - @symbiote-native/components@2.0.0
+
 ## 1.0.0
 
 ### Minor Changes

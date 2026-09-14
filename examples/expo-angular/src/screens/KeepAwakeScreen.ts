@@ -1,10 +1,5 @@
 import { Component, Injector, effect, inject, signal } from '@angular/core';
-import {
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  View,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   KeepAwakeService,
   deactivateKeepAwake,
@@ -38,7 +33,7 @@ const KEEP_AWAKE_DEMO_TAG = 'keep-awake-screen-demo';
 @Component({
   selector: 'KeepAwakeScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

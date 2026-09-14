@@ -1,8 +1,7 @@
 import { Component } from '@angular/core';
 import {
+  SYMBIOTE_ELEMENTS,
   SymbioteHostPropsDirective,
-  Text,
-  View,
   type ISymbioteEvent,
 } from '@symbiote-native/angular';
 // static look lives here, compiled at build time by @symbiote-native/css-parser
@@ -48,7 +47,7 @@ const CHIP_ACTIVE_BORDER = '#ffb3c1';
 @Component({
   selector: 'ResponderDemo',
   standalone: true,
-  imports: [View, Text, SymbioteHostPropsDirective],
+  imports: [SYMBIOTE_ELEMENTS, SymbioteHostPropsDirective],
   template: `
     <view class="section-tight">
       <text class="section-label"
