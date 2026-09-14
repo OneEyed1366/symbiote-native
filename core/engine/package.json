@@ -79,6 +79,7 @@
   "peerDependencies": {
     "react-native": ">=0.86"
   },
+  "peerDependenciesMeta": {},
   "devDependencies": {
     "@symbiote-native/test-utils": "workspace:*"
   }

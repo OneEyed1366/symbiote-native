@@ -78,10 +78,31 @@ function resolveSpecifier(
   fromFile: string,
   specifier: string,
 ): string | undefined {
-  if (!specifier.startsWith('.')) return undefined;
+  if (!specifier.startsWith('.')) return resolveWorkspaceSubpath(specifier);
   const base = resolve(dirname(fromFile), specifier);
   for (const candidate of [`${base}.ts`, join(base, 'index.ts')]) {
     if (existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+// A WORKSPACE SUBPATH, through the target package's own `exports` map. Without it a module reached
+// as `@symbiote-native/components/register` looks unreferenced, and the check then reports the one
+// shape it exists to bless — a bare side-effect import — as its failure. Derived from the manifest
+// rather than listed, so a new subpath needs no edit here.
+function resolveWorkspaceSubpath(specifier: string): string | undefined {
+  const match = /^@symbiote-native\/([^/]+)\/(.+)$/.exec(specifier);
+  if (match === null) return undefined;
+  for (const area of SCANNED_ROOTS) {
+    const manifest = join(REPO_ROOT, area, match[1], 'package.json');
+    if (!existsSync(manifest)) continue;
+    const { exports }: { exports?: Record<string, unknown> } = JSON.parse(
+      readFileSync(manifest, 'utf8'),
+    );
+    const target = exports?.[`./${match[2]}`];
+    if (typeof target !== 'string') return undefined;
+    const file = join(REPO_ROOT, area, match[1], target);
+    return existsSync(file) ? file : undefined;
   }
   return undefined;
 }

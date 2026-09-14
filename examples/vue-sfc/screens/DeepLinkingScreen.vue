@@ -7,7 +7,6 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { SafeAreaView, Text, TextInput, View } from '@symbiote-native/vue';
 import { resolveRouteFromUrl } from '@symbiote-native/navigation';
 import ActionButton from '../components/ActionButton.vue';
 import {
@@ -29,39 +28,37 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <View class="section">
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View
+  <safe-area-view class="screen">
+    <view class="section">
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
+        </text>
+      </view>
+      <view class="hero-card">
+        <view
           class="hero-badge"
           :style="{ backgroundColor: LINE_COLOR.routing }"
         >
-          <Text class="hero-badge-text">DL</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Deep linking</Text>
-          <Text class="hero-body"
-            >A typed URL resolved to a route through resolveRouteFromUrl, the
-            same path a real deep link or push notification would take.</Text
-          >
-        </View>
-      </View>
-      <Text class="info-text"
-        >prefixes: symbiotecanaryvuesfc:// ·
-        https://canary.symbiote-native.dev</Text
-      >
-      <Text class="note-text"
-        >Details → details/:id · HeaderOptions → header-options · TabsDemo →
-        tabs</Text
-      >
-      <TextInput
-        testID="deep-link-input"
+          <text class="hero-badge-text"> DL </text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title"> Deep linking </text>
+          <text class="hero-body">
+            A typed URL resolved to a route through resolveRouteFromUrl, the
+            same path a real deep link or push notification would take.
+          </text>
+        </view>
+      </view>
+      <text class="info-text">
+        prefixes: symbiotecanaryvuesfc:// · https://canary.symbiote-native.dev
+      </text>
+      <text class="note-text">
+        Details → details/:id · HeaderOptions → header-options · TabsDemo → tabs
+      </text>
+      <text-input
         v-model="url"
+        testID="deep-link-input"
         placeholder="symbiotecanaryvuesfc://details/42"
         placeholder-text-color="#41506a"
         class="text-input"
@@ -72,11 +69,11 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
         :onPress="onResolve"
         :color="LINE_COLOR.routing"
       />
-      <View class="parity-list">
-        <Text testID="deep-link-result" class="list-row-text">{{
-          resolved ?? 'tap Resolve to see the parsed route'
-        }}</Text>
-      </View>
-    </View>
-  </SafeAreaView>
+      <view class="parity-list">
+        <text testID="deep-link-result" class="list-row-text">
+          {{ resolved ?? 'tap Resolve to see the parsed route' }}
+        </text>
+      </view>
+    </view>
+  </safe-area-view>
 </template>

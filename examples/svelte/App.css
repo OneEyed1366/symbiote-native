@@ -1071,3 +1071,37 @@
   font-size: 18px;
   font-weight: bold;
 }
+
+/* PrimitiveBenchScreen. The mounted section is clipped to a fixed box so the frame meter stays on
+   screen while a step holds the JS thread. Every tag is still MOUNTED; only the paint is bounded. */
+.pb-viewport {
+  height: 160px;
+  border-radius: 12px;
+  background-color: #0f1e30;
+  overflow: hidden;
+}
+
+.pb-strip {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+/* ONE class for every primitive's cell. A resolved class flattens into the committed payload one
+   key per declaration, so a section with its own rule would price a different element and the
+   delta between two sections would stop being the primitive. */
+.pb-cell {
+  width: 30px;
+  height: 18px;
+  margin-right: 2px;
+  margin-bottom: 2px;
+  border-radius: 3px;
+  background-color: var(--paper);
+  color: var(--mist);
+  font-size: 9px;
+}
+
+/* The selected cell's tint, added as a SECOND token rather than by editing .pb-cell — the Select
+   step measures a class write, and rewriting the whole rule would measure something else. */
+.pb-cell-on {
+  background-color: var(--line-performance);
+}

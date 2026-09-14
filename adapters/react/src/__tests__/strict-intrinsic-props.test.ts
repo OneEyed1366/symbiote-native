@@ -1,11 +1,16 @@
-// A primitive that has become a public TAG must carry its own strict prop type in the intrinsic
-// table — and this test exists because losing that is SILENT.
+// Which intrinsics carry a STRICT prop type, and which still accept anything.
 //
-// While a primitive is a component, its props come from `FC<IXProps>` and its intrinsic entry is
-// deliberately loose (`HostProps`, index signature); the strictness lives on the component and the
-// entry is plumbing. The day it becomes a tag, the entry IS the app's public type surface — but the
-// entry already exists and already accepts anything, so `<Image nope={1}/>` silently stops being a
-// TS2322 and nothing goes red. There is no failing state to notice.
+// SECOND PREMISE SHIFT (2026-09-14, first one dated 2026-09-11 below): `jsx-runtime.ts` no longer
+// hand-rolls `Omit<Record<ISymbioteIntrinsic, IHostProps>, 'view' | 'text'>` plus two explicit
+// fields. It now calls the same `ICrossTypedIntrinsics` generic Vue/Svelte/Solid already use, fed
+// an `ICrossedPrimitiveProps` interface that lists every crossed tag directly — 18 of them now
+// (pressable, button, image, scroll-view, switch, text-input, ... ), not just view/text. The
+// extraction below reads that interface's own keys instead of an Omit clause that no longer exists.
+//
+// Original premise (2026-09-11): this used to derive "is this primitive a tag yet" from
+// `export const View = 'view'` in `components.ts` — a capitalized alias whose value was the tag
+// string. Every alias was deleted that day: an app writes `<view>` / `<text>` directly, so that
+// oracle went to zero and nothing was a component any more.
 //
 // Read as source rather than checked by the compiler on purpose: NO test file in this repo is
 // type-checked (every package's tsconfig excludes `**/*.test.ts`, and vitest strips types without
@@ -17,59 +22,62 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SRC = join(__dirname, '..');
-const componentsSource = readFileSync(join(SRC, 'components.ts'), 'utf8');
-const jsxSource = readFileSync(join(SRC, 'jsx.ts'), 'utf8');
+const jsxSource = readFileSync(join(SRC, 'jsx-runtime.ts'), 'utf8');
 
-// A primitive is a TAG here exactly when the barrel exports its name as a string constant whose
-// value is the intrinsic — `export const View = 'symbiote-view'`. No annotation and no `as const`:
-// a `const` already infers the literal type, and both spellings are lint errors here. Derived from the
-// source rather than listed, so a primitive that crosses is picked up by this test in the same
-// commit that crosses it.
-function taggedIntrinsics(): string[] {
-  const found = [
-    ...componentsSource.matchAll(
-      /export const [A-Za-z]+ = '(symbiote-[a-z-]+)';/g,
-    ),
-  ].map(match => match[1]);
-  return [...new Set(found)].sort();
-}
-
-// The names the table declares strictly: everything omitted from the loose Record and re-declared.
+// The names the table declares strictly: every key of `ICrossedPrimitiveProps`.
 function strictlyDeclared(): string[] {
-  const omit = jsxSource.match(
-    /Record<ISymbioteIntrinsic, HostProps>,\s*([^>]+)>/s,
-  );
-  if (omit === null) return [];
-  return [...omit[1].matchAll(/'(symbiote-[a-z-]+)'/g)]
+  const body = jsxSource.match(/interface ICrossedPrimitiveProps \{([^}]+)\}/s);
+  if (body === null) return [];
+  return [...body[1].matchAll(/^\s*'?([a-zA-Z][a-zA-Z-]*)'?:/gm)]
     .map(match => match[1])
     .sort();
 }
 
-describe('intrinsic prop strictness follows the tags', () => {
-  // why: the control. Every row below compares two derived lists, and two EMPTY lists compare
+// Equality, not a floor: an entry added without a strict type reddens here, and so does one
+// removed. Growing this list is the intended direction — every name still absent is a primitive
+// whose props an app can misspell with nothing red.
+const STRICT = [
+  'activity-indicator',
+  'button',
+  'image',
+  'image-background',
+  'input-accessory-view',
+  'modal',
+  'pressable',
+  'refresh-control',
+  'safe-area-view',
+  'scroll-view',
+  'switch',
+  'text',
+  'text-input',
+  'touchable-highlight',
+  'touchable-native-feedback',
+  'touchable-opacity',
+  'touchable-without-feedback',
+  'view',
+];
+
+describe('intrinsic prop strictness', () => {
+  // why: the control. The assertion below compares two derived lists, and two EMPTY lists compare
   // equal — the shape that reports agreement while measuring nothing. If the extraction stops
   // matching (a rename, a formatting change), this fails first and says so.
-  it('control: both extractions find something', () => {
-    expect(
-      taggedIntrinsics().length,
-      'primitives exported as tags',
-    ).toBeGreaterThan(0);
+  it('control: the extraction finds something', () => {
     expect(
       strictlyDeclared().length,
-      'strict entries in jsx.ts',
+      'strict entries in jsx-runtime.ts',
     ).toBeGreaterThan(0);
   });
 
-  // why: THE assertion. A primitive that is already a tag and is still typed `HostProps` accepts
-  // any prop, so the app loses its compile-time surface with nothing to show for it.
-  it('every primitive that is already a tag has a strict entry', () => {
-    expect(strictlyDeclared()).toEqual(taggedIntrinsics());
+  it('declares exactly the strict entries this adapter has', () => {
+    expect(strictlyDeclared()).toEqual(STRICT);
   });
 
-  // why: the table must stay DERIVED from the union. It had drifted four names behind while it was
-  // hand-written — `symbiote-pressable` among them, the next primitive due to cross — and a
-  // hand-written list cannot report a name that is absent from it.
+  // why: the table must stay DERIVED from the union, not hand-listed. `ICrossTypedIntrinsics`
+  // (`Omit<Record<ISymbioteIntrinsic, LooseProps>, keyof Crossed> & Crossed`) is what does that
+  // derivation now, shared verbatim with Vue/Svelte/Solid — a tag missing from `Crossed` falls
+  // through to the loose bag instead of vanishing, which the old hand-written interface couldn't
+  // guarantee.
   it('declares the tag set by deriving it, not by listing it', () => {
-    expect(jsxSource).toContain('Record<ISymbioteIntrinsic, HostProps>');
+    expect(jsxSource).toContain('ICrossTypedIntrinsics<');
   });
 });

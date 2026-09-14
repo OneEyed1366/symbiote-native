@@ -22,7 +22,6 @@
 // than one static sample.
 
 import { For, createSignal, onCleanup, onMount } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 import {
   subscribeListDiagnostics,
   type IListDiagnosticFrame,
@@ -90,23 +89,23 @@ export function ListDiagnostics() {
   };
 
   return (
-    <View class="hud">
-      <Text class="hud-line" numberOfLines={1}>
+    <view class="hud">
+      <text class="hud-line" numberOfLines={1}>
         RESID {signed(residual())} · frames {frameCount()} · moved {moveCount()}
-      </Text>
-      <Text class="hud-line" numberOfLines={1}>
+      </text>
+      <text class="hud-line" numberOfLines={1}>
         win {latest()?.first ?? '—'}..{latest()?.last ?? '—'} · target{' '}
         {latest()?.targetFirst ?? '—'}..{latest()?.targetLast ?? '—'} · measured{' '}
         {latest()?.measuredCount ?? 0}/{latest()?.count ?? 0}
-      </Text>
-      <Text class="hud-line" numberOfLines={1}>
+      </text>
+      <text class="hud-line" numberOfLines={1}>
         avg len {px(latest()?.averageLength)} · stride{' '}
         {px(latest()?.averageStride)} · total {px(latest()?.total)}
-      </Text>
-      <Text class="hud-line" numberOfLines={1}>
+      </text>
+      <text class="hud-line" numberOfLines={1}>
         lead {px(latest()?.leadingExtent)} · trail{' '}
         {px(latest()?.trailingExtent)}
-      </Text>
+      </text>
 
       <For each={FRAME_SLOTS}>
         {slot => {
@@ -126,9 +125,9 @@ export function ListDiagnostics() {
             return `y ${px(current.scrollOffset)} Δ${delta(one => one.scrollOffset)} · f${idx(current.first)} d${delta(one => one.first)} · model ${px(current.firstOffset)} Δ${delta(one => one.firstOffset)} · raw ${px(current.firstRaw)}`;
           };
           return (
-            <Text class="hud-row" numberOfLines={1}>
+            <text class="hud-row" numberOfLines={1}>
               {line()}
-            </Text>
+            </text>
           );
         }}
       </For>
@@ -142,12 +141,12 @@ export function ListDiagnostics() {
             return `${tag} #${idx(move.index)} ${px(move.from)} → ${px(move.to)} (${signed(move.to - move.from)})`;
           };
           return (
-            <Text class="hud-move" numberOfLines={1}>
+            <text class="hud-move" numberOfLines={1}>
               {line()}
-            </Text>
+            </text>
           );
         }}
       </For>
-    </View>
+    </view>
   );
 }

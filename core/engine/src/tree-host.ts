@@ -84,6 +84,13 @@ export const EMPTY_CENSUS: ITreeCensus = {
 export type ITreeHost = {
   applyOps: (batch: IMutationBatch) => void;
   propOf: (handle: object, key: string) => unknown;
+  // The whole bag, for the callers that fold over it rather than ask for one name — every host
+  // behavior's payload fold. Kept beside `propOf` rather than derived from it: the host holds the
+  // map, and rebuilding one key at a time from JS would need the key list first.
+  propsOf: (handle: object) => Readonly<Record<string, unknown>>;
+  // "Rebuild this node's payload even though no op named it." The one dirtying route a behavior
+  // with a DERIVED payload has; see `markPropsDirty` (node.ts).
+  markPropsDirty: (handle: object) => void;
   committedRecordOf: (handle: object) => ICommittedRecord | undefined;
   parentOf: (handle: object) => object | undefined;
   childrenOf: (handle: object) => readonly object[];

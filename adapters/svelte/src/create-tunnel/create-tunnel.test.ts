@@ -109,7 +109,7 @@ async function loadMountable(): Promise<Component> {
        let { visible = false } = $props();
        const tunnel = createTunnel();
      </script>
-     <symbiote-view p={{}}>{#if visible}<TunnelIn tunnel={tunnel}>{#snippet children()}<symbiote-text p={{}}>tunneled</symbiote-text>{/snippet}</TunnelIn>{/if}<TunnelOut tunnel={tunnel} /></symbiote-view>`,
+     <view p={{}}>{#if visible}<TunnelIn tunnel={tunnel}>{#snippet children()}<text p={{}}>tunneled</text>{/snippet}</TunnelIn>{/if}<TunnelOut tunnel={tunnel} /></view>`,
     'TunnelParent.svelte',
     PARENT_OUT,
   );
@@ -140,7 +140,7 @@ async function loadToggleMountable(): Promise<Component> {
        function toggle() { visible = !visible; }
        $effect(() => { onReady?.(toggle); });
      </script>
-     <symbiote-view p={{}}>{#if visible}<TunnelIn tunnel={tunnel}>{#snippet children()}<symbiote-text p={{}}>tunneled</symbiote-text>{/snippet}</TunnelIn>{/if}<TunnelOut tunnel={tunnel} /></symbiote-view>`,
+     <view p={{}}>{#if visible}<TunnelIn tunnel={tunnel}>{#snippet children()}<text p={{}}>tunneled</text>{/snippet}</TunnelIn>{/if}<TunnelOut tunnel={tunnel} /></view>`,
     'TunnelToggleParent.svelte',
     TOGGLE_PARENT_OUT,
   );
@@ -165,11 +165,11 @@ async function loadMultiMountable(): Promise<Component> {
        import { createTunnel } from './tunnel.ts';
        const tunnel = createTunnel();
      </script>
-     <symbiote-view p={{}}>
-       <TunnelIn tunnel={tunnel}>{#snippet children()}<symbiote-text p={{}}>first</symbiote-text>{/snippet}</TunnelIn>
-       <TunnelIn tunnel={tunnel}>{#snippet children()}<symbiote-text p={{}}>second</symbiote-text>{/snippet}</TunnelIn>
+     <view p={{}}>
+       <TunnelIn tunnel={tunnel}>{#snippet children()}<text p={{}}>first</text>{/snippet}</TunnelIn>
+       <TunnelIn tunnel={tunnel}>{#snippet children()}<text p={{}}>second</text>{/snippet}</TunnelIn>
        <TunnelOut tunnel={tunnel} />
-     </symbiote-view>`,
+     </view>`,
     'TunnelMultiParent.svelte',
     MULTI_PARENT_OUT,
   );

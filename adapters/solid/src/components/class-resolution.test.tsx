@@ -1,20 +1,16 @@
-// Class-name resolution through the ADAPTER'S components, not through a raw host intrinsic.
+// Class-name resolution on the bare host tags — there is no adapter component left to route
+// through.
 //
 // Why this file exists: every canary styles its layout with a CSS class, so if `class` fails to
-// resolve through `View`, the root box loses both its `flex: 1` and its background and the app
-// paints a blank white screen — with nothing thrown, nothing logged, and every other test green.
-// That is exactly what happened when examples/solid moved off raw `symbiote-*` intrinsics onto
-// these components: `Image` had a class test, `View`/`Text`/`Pressable` did not, so the whole
-// layer went unpinned. The resolution itself is the engine's (routeProp's centralized class+style
-// merge); what is asserted here is only that each component actually HANDS it the class.
+// resolve on `view`, the root box loses both its `flex: 1` and its background and the app paints
+// a blank white screen — with nothing thrown, nothing logged, and every other test green. The
+// resolution itself is the engine's (routeProp's centralized class+style merge); what is asserted
+// here is only that a bare tag actually hands it the class.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
-import { Pressable } from './pressable';
-import { Text } from './text';
-import { View } from './view';
 
 const ROOT_TAG = 977;
 const SCREEN_FLEX = 1;
@@ -79,7 +75,7 @@ describe('class resolution through the adapter components', () => {
   // why: this is the exact shape of every canary's root box. A `class` that does not resolve
   // leaves the root with no flex and no background — a blank screen, silently.
   it('resolves a registered class on View into real style props', async () => {
-    mount(ROOT_TAG, () => <View class="screen" testID={PROBE} />);
+    mount(ROOT_TAG, () => <view class="screen" testID={PROBE} />);
     await tick();
 
     const view = committed(PROBE);
@@ -91,9 +87,9 @@ describe('class resolution through the adapter components', () => {
 
   it('resolves a registered class on Text', async () => {
     mount(ROOT_TAG, () => (
-      <Text class="label" testID={PROBE}>
+      <text class="label" testID={PROBE}>
         hi
-      </Text>
+      </text>
     ));
     await tick();
 
@@ -102,8 +98,8 @@ describe('class resolution through the adapter components', () => {
     expect('class' in (text?.props ?? {})).toBe(false);
   });
 
-  it('resolves a registered class on Pressable', async () => {
-    mount(ROOT_TAG, () => <Pressable class="screen" testID={PROBE} />);
+  it('resolves a registered class on the pressable tag', async () => {
+    mount(ROOT_TAG, () => <pressable class="screen" testID={PROBE} />);
     await tick();
 
     const view = committed(PROBE);
@@ -117,7 +113,7 @@ describe('class resolution through the adapter components', () => {
   // it from an adapter file would duplicate the contract in a place that cannot fix it.
   it('forwards class and an explicit style together on View', async () => {
     mount(ROOT_TAG, () => (
-      <View class="screen" style={{ margin: 7 }} testID={PROBE} />
+      <view class="screen" style={{ margin: 7 }} testID={PROBE} />
     ));
     await tick();
 

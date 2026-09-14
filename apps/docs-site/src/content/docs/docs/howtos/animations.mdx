@@ -3,13 +3,15 @@ title: 'How to: animate a value'
 description: Driving a native prop with Animated.Value, the JS driver, and the native driver.
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
 You want to animate a style prop (fade, slide, scale, a collapsing header)
 without reaching for a third-party animation library.
 
 ## Every adapter — the same `Animated` namespace
 
 ```tsx
-import { Animated } from '@symbiote-native/react'; // or '@symbiote-native/vue' / '@symbiote-native/angular' / '@symbiote-native/solid'
+import { Animated } from '@symbiote-native/react'; // or '@symbiote-native/vue' / '@symbiote-native/angular' / '@symbiote-native/svelte' / '@symbiote-native/solid'
 
 const opacity = new Animated.Value(0);
 
@@ -20,12 +22,84 @@ Animated.timing(opacity, {
 }).start();
 ```
 
-Wrap the view you want to animate in `Animated.View` — the dotted form works
-as written on React, Vue, Svelte and Solid. Angular is the exception: import
-`AnimatedView` by name there, because its AOT compiler cannot trace a component
-class through property access. See the [Animations guide](/docs/learn/animations/) for the full
-per-adapter reasoning and the rest of the surface (`ValueXY`, tracking,
-`diffClamp`, `Animated.event`).
+## Wire it into a primitive's `style`
+
+An `AnimatedNode` written into any style prop of any host tag resolves directly in the
+engine — the value publishes, subscribes, and gets pushed through a targeted native commit
+every frame, no wrapper required:
+
+```tsx
+<view style={{ opacity }} />
+```
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    `Animated.View`/`Animated.Text`/`Animated.Image` still exist, as thin convenience aliases
+    over the tags — the dotted form works as written:
+
+    ```tsx
+    <Animated.View style={{ opacity }}>
+      <Animated.Text>faded</Animated.Text>
+    </Animated.View>
+    ```
+
+    There is no `Animated.ScrollView` any more — style `<scroll-view>` directly, the same as
+    any other tag: `<scroll-view style={{ opacity }} onScroll={Animated.event(...)} />`.
+
+  </TabItem>
+  <TabItem label="Vue">
+    Same as React: `Animated.View`/`Animated.Text`/`Animated.Image` are still RN-compatible
+    aliases over the tags, and the dotted form works as written:
+
+    ```vue
+    <Animated.View :style="{ opacity }">
+      <Animated.Text>faded</Animated.Text>
+    </Animated.View>
+    ```
+
+    `Animated.ScrollView` is gone the same way — put the animated value straight on
+    `<scroll-view>`.
+
+  </TabItem>
+  <TabItem label="Angular">
+    Angular's AOT compiler can't trace a component class through property access, so there's no
+    dotted `<Animated.View>` here — import the name directly:
+
+    ```ts
+    import { AnimatedView, AnimatedText } from '@symbiote-native/angular';
+    // template: `<AnimatedView [style]="{ opacity }"><AnimatedText>faded</AnimatedText></AnimatedView>`
+    ```
+
+    `AnimatedScrollView`, `AnimatedFlatList`, and `AnimatedSectionList` are also named imports,
+    for the same reason.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    There is no `Animated.View`/`Animated.Text`/`Animated.Image`/`Animated.ScrollView` at all —
+    put the animated value straight on the tag:
+
+    ```svelte
+    <view style={{ opacity }}><text>faded</text></view>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    Same as Svelte for `View`/`Text`/`Image` — no wrapper, style the tag directly:
+
+    ```tsx
+    <view style={{ opacity: opacity() }}>
+      <text>faded</text>
+    </view>
+    ```
+
+    `Animated.ScrollView` is still a real component (the list family stays components), and
+    Solid's JSX takes the dotted form as written.
+
+  </TabItem>
+</Tabs>
+
+See the [Animations guide](/docs/learn/animations/) for the rest of the surface (`ValueXY`,
+tracking, `diffClamp`, `Animated.event`).
 
 ## Choose a driver
 

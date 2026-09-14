@@ -48,7 +48,7 @@ function mountBatteryLevel(): Ref<number> {
     defineComponent({
       setup: () => {
         batteryLevel = useBatteryLevel();
-        return () => h('symbiote-text', {}, 'battery');
+        return () => h('text', {}, 'battery');
       },
     }),
   );

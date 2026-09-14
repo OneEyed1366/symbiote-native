@@ -58,6 +58,16 @@ export interface IFabricRecorder {
     args: readonly unknown[];
   }>;
   /**
+   * Every `setIsJSResponder` — the call that tells a native scroll view a JS responder has taken
+   * the gesture. Recorded rather than counted because BOTH flags matter: the handover is
+   * (old owner, false) then (new owner, true), and only the second carries the block.
+   */
+  responderHandovers: Array<{
+    node: IFakeNode;
+    isResponder: boolean;
+    blockNativeResponder: boolean;
+  }>;
+  /**
    * Call counters, for tests that assert "exactly N native nodes were created" — and for pricing
    * a commit's PROTOCOL half against its walk half. `appendChild` and `clone` are the two Fabric
    * makes unavoidable: a parent whose child set changed is cloned empty and re-appends every child
@@ -147,6 +157,11 @@ export function installFabric(): IFabricRecorder {
     commandName: string;
     args: readonly unknown[];
   }> = [];
+  const responderHandovers: Array<{
+    node: IFakeNode;
+    isResponder: boolean;
+    blockNativeResponder: boolean;
+  }> = [];
   const counts = { createNode: 0, completeRoot: 0, appendChild: 0, clone: 0 };
   let eventHandler: IEventHandler | undefined;
 
@@ -232,6 +247,13 @@ export function installFabric(): IFabricRecorder {
     ): void {
       commands.push({ node, commandName, args });
     },
+    setIsJSResponder(
+      node: IFakeNode,
+      isResponder: boolean,
+      blockNativeResponder: boolean,
+    ): void {
+      responderHandovers.push({ node, isResponder, blockNativeResponder });
+    },
   };
 
   Object.assign(globalThis, { nativeFabricUIManager: slot });
@@ -257,6 +279,7 @@ export function installFabric(): IFabricRecorder {
     },
     created,
     commands,
+    responderHandovers,
     counts,
     appRoot(): IFakeNode {
       const root = committed[0];
@@ -287,6 +310,7 @@ export function installFabric(): IFabricRecorder {
       forgetCommittedRoots();
       created.length = 0;
       commands.length = 0;
+      responderHandovers.length = 0;
       // Every counter, not a subset: `appendChild` and `clone` were left out, so any assertion
       // on them across a reset read the PREVIOUS phase's total and could not fail. Both are now
       // the metric that prices the clone protocol, so a stale one is a silent wrong answer.

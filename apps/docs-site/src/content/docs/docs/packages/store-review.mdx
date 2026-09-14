@@ -76,12 +76,11 @@ subscription.
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Button } from '@symbiote-native/react';
     import { requestReview } from '@symbiote-native/store-review/react';
 
     export default function RateAppButton() {
       return (
-        <Button
+        <button
           title="Rate this app"
           onPress={() =>
             requestReview({
@@ -98,7 +97,6 @@ subscription.
   <TabItem label="Vue">
     ```vue
     <script setup lang="ts">
-    import { Button } from '@symbiote-native/vue';
     import { requestReview } from '@symbiote-native/store-review/vue';
 
     function onRatePress() {
@@ -110,7 +108,7 @@ subscription.
     </script>
 
     <template>
-      <Button title="Rate this app" @press="onRatePress" />
+      <button title="Rate this app" @press="onRatePress" />
     </template>
     ```
 
@@ -118,13 +116,13 @@ subscription.
   <TabItem label="Angular">
     ```ts
     import { Component } from '@angular/core';
-    import { Button } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { requestReview } from '@symbiote-native/store-review/angular';
 
     @Component({
       standalone: true,
-      imports: [Button],
-      template: `<Button title="Rate this app" (press)="onRatePress()" />`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<button title="Rate this app" (press)="onRatePress()" />`,
     })
     export class RateAppButton {
       onRatePress(): void {
@@ -143,7 +141,6 @@ subscription.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Button } from '@symbiote-native/svelte';
       import { requestReview } from '@symbiote-native/store-review/svelte';
 
       function onRatePress() {
@@ -154,13 +151,12 @@ subscription.
       }
     </script>
 
-    <Button title="Rate this app" onPress={onRatePress} />
+    <button title="Rate this app" onPress={onRatePress} />
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Button } from '@symbiote-native/solid';
     import { requestReview } from '@symbiote-native/store-review/solid';
 
     function onRatePress() {
@@ -171,7 +167,7 @@ subscription.
     }
 
     export function RateAppButton() {
-      return <Button title="Rate this app" onPress={onRatePress} />;
+      return <button title="Rate this app" onPress={onRatePress} />;
     }
     ```
 

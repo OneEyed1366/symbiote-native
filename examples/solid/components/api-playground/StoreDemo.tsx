@@ -13,7 +13,6 @@
 
 import { createSignal } from 'solid-js';
 import { createStore, produce, reconcile, unwrap } from 'solid-js/store';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -50,20 +49,20 @@ export function StoreDemo() {
   };
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">
+    <view class="section-nested">
+      <text class="section-label">
         createStore · produce · reconcile · unwrap
-      </Text>
-      <Text class="ap-value" testID="store-name">
+      </text>
+      <text class="ap-value" testID="store-name">
         {`name: ${profile.name}`}
-      </Text>
-      <Text class="ap-value" testID="store-city">
+      </text>
+      <text class="ap-value" testID="store-city">
         {`address.city: ${profile.address.city} (${profile.address.zip})`}
-      </Text>
-      <Text class="ap-value" testID="store-visits">
+      </text>
+      <text class="ap-value" testID="store-visits">
         {`visits: ${profile.visits} · tags: ${profile.tags.join(', ')}`}
-      </Text>
-      <View class="ap-wrap">
+      </text>
+      <view class="ap-wrap">
         <ActionButton
           testID="store-path-set"
           title="path setter → city"
@@ -105,10 +104,10 @@ export function StoreDemo() {
           color={ACCENT}
           onPress={() => setSnapshot(JSON.stringify(unwrap(profile)))}
         />
-      </View>
-      <Text class="subtle" testID="store-snapshot">
+      </view>
+      <text class="subtle" testID="store-snapshot">
         {`unwrap(): ${snapshot()}`}
-      </Text>
-    </View>
+      </text>
+    </view>
   );
 }

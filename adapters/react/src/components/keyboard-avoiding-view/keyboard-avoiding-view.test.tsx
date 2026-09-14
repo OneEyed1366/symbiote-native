@@ -30,12 +30,7 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  KeyboardAvoidingView,
-  Text,
-  mount,
-  unmount,
-} from '@symbiote-native/react';
+import { KeyboardAvoidingView, mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 290;
@@ -120,7 +115,7 @@ function App(
 ): ReactElement {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} {...props}>
-      <Text>type here</Text>
+      <text>type here</text>
     </KeyboardAvoidingView>
   );
 }
@@ -200,7 +195,7 @@ describe('KeyboardAvoidingView', () => {
     // why: 'position' is the only behavior that NESTS content in an inner view pushed up by
     // `bottom: inset`, instead of resizing the wrapper itself (resolveKeyboardAvoidingLayout's
     // 'nested' branch) — this proves the React FC actually builds that extra inner View
-    // (`createElement(View, { style: layout.innerStyle }, children)`), not just picks the
+    // (`createElement('view', { style: layout.innerStyle }, children)`), not just picks the
     // style.
     it('behavior="position": nests children in an inner view whose bottom tracks the inset', () => {
       mount(ROOT_TAG, <App behavior="position" />);

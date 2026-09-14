@@ -327,9 +327,16 @@ between those steps produces a tarball that installs and then fails at runtime o
 specifiers. Angular is the exception that hides this — it carries `prepack: ng:build`, so it
 rebuilds itself and looks fine while its neighbours do not.
 
-So the honest loop before a device measurement is `pnpm run prepublish-build` and THEN
-`registry:sync`. Skipping the build is the same measurement-that-lies failure the lockfile
-short-circuit above produces, arrived at from the other end.
+**SUPERSEDED 2026-09-11 — `commandPublish` now runs `pnpm run prepublish-build` itself, always,
+before packing anything.** A manual pre-step was a step someone eventually skipped — the same
+"a list you have to remember is a list that goes stale" reasoning `commandPublish` already applies
+to naming packages, now applied to remembering the build. `registry:publish` and `registry:sync`
+(which calls `commandPublish` internally) are a single command again: `pnpm run registry:sync`
+alone rebuilds everything, publishes it, points every example at the registry, and refreshes them.
+The full build costs ~27s (`stale-build-output.md`) and runs unconditionally — there is no flag to
+skip it, on purpose, because a skippable build is a build someone skips under a deadline. If the
+build itself fails (a type error), `commandPublish` aborts before packing anything, which is the
+correct failure: a broken build must never reach the registry.
 
 ## Diagnosing "the example is running old code"
 

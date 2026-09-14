@@ -1053,6 +1053,28 @@ jsi::Value Tree::getProp(jsi::Runtime &runtime, const jsi::Value *arguments, siz
   return jsi::valueFromDynamic(runtime, *found);
 }
 
+jsi::Value Tree::getProps(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
+  if (count < 1) {
+    throw jsi::JSError(runtime, "symbiote engine: expected getProps(handle)");
+  }
+  const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "getProps");
+  // The whole bag in one crossing. The per-key alternative needs the key list first, which is a
+  // crossing of its own, and a payload fold reads most of what it is handed.
+  return jsi::valueFromDynamic(runtime, node->props);
+}
+
+jsi::Value Tree::markPropsDirty(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
+  if (count < 1) {
+    throw jsi::JSError(runtime, "symbiote engine: expected markPropsDirty(handle)");
+  }
+  const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "markPropsDirty");
+  // The same mark an op leaves. A behavior whose payload is DERIVED — the sticky header's
+  // translateY lives in its own runtime, not in the node's props — writes nothing, so without this
+  // the commit skips the node it is about to change.
+  markDirty(*node);
+  return jsi::Value::undefined();
+}
+
 jsi::Value Tree::getViewName(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
   if (count < 1) {
     throw jsi::JSError(runtime, "symbiote engine: expected getViewName(handle)");

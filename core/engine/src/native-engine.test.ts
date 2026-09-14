@@ -32,6 +32,8 @@ function fakeBindings(version: number): INativeEngineBindings {
     probeUIManager: (): number => 0,
     applyOps: (): void => {},
     getProp: (): unknown => undefined,
+    getProps: (): Readonly<Record<string, unknown>> => ({}),
+    markPropsDirty: (): void => {},
     getViewName: (): string => '',
     parentOf: (): object | undefined => undefined,
     childrenOf: (): readonly object[] => [],

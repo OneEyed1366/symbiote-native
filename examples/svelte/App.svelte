@@ -19,7 +19,7 @@
   // The markers below can be laid out normally. A whitespace-only text node under a parent that
   // takes no raw text becomes an anchor in the shim, so the gap between two <Screen> markers
   // never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b) — on top of the
-  // navigator already parking the markers inside a collapsed symbiote-text.
+  // navigator already parking the markers inside a collapsed text.
   import './App.css';
   import {
     Screen,
@@ -46,6 +46,7 @@
   import DeepLinkingScreen from './screens/DeepLinkingScreen.svelte';
   import StatePersistenceScreen from './screens/StatePersistenceScreen.svelte';
   import BenchmarkScreen from './screens/BenchmarkScreen.svelte';
+  import PrimitiveBenchScreen from './screens/PrimitiveBenchScreen.svelte';
   import StyleShowcaseScreen from './screens/StyleShowcaseScreen.svelte';
   import { APP_LINKING_CONFIG } from './navigation-linking';
   import { ROUTE_NAME } from './routes';
@@ -156,6 +157,10 @@
     'Benchmark',
     LINE_COLOR.performance,
   );
+  const primitiveBenchScreenOptions: IScreenOptions = darkHeader(
+    'Primitive benchmark',
+    LINE_COLOR.performance,
+  );
   const styleShowcaseScreenOptions: IScreenOptions = darkHeader(
     'Styling showcase',
     LINE_COLOR.styling,
@@ -256,6 +261,11 @@
     name={ROUTE_NAME.Benchmark}
     component={BenchmarkScreen}
     options={benchmarkScreenOptions}
+  />
+  <Screen
+    name={ROUTE_NAME.PrimitiveBench}
+    component={PrimitiveBenchScreen}
+    options={primitiveBenchScreenOptions}
   />
   <Screen
     name={ROUTE_NAME.StyleShowcase}

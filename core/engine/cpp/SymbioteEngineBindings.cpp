@@ -156,6 +156,8 @@ void installBindings(jsi::Runtime &runtime) {
   // placeholder object `applyOps` attached the node to, and none is on a commit path: they run at
   // gesture or lifecycle rate. `census` is deliberately absent; see `native-tree-host.ts`.
   install("getProp", 2, &Tree::getProp);
+  install("getProps", 1, &Tree::getProps);
+  install("markPropsDirty", 1, &Tree::markPropsDirty);
   install("getViewName", 1, &Tree::getViewName);
   install("parentOf", 1, &Tree::parentOf);
   install("childrenOf", 1, &Tree::childrenOf);

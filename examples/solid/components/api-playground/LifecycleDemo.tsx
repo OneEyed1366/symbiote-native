@@ -6,7 +6,6 @@
 // the pairing honest — one mount line per unmount line, always.
 
 import { Index, Show, createSignal, onCleanup, onMount } from 'solid-js';
-import { Text, View } from '@symbiote-native/solid';
 import { ActionButton } from '../ActionButton';
 import { LINE_COLOR } from '../../navigation-lines';
 
@@ -28,11 +27,11 @@ function TickingChild(props: { log: (line: string) => void }) {
   });
 
   return (
-    <View class="ap-panel">
-      <Text class="ap-value" testID="lifecycle-child">
+    <view class="ap-panel">
+      <text class="ap-value" testID="lifecycle-child">
         {`child alive · ${ticks()} ticks`}
-      </Text>
-    </View>
+      </text>
+    </view>
   );
 }
 
@@ -47,8 +46,8 @@ export function LifecycleDemo() {
   onMount(() => push('screen section onMount'));
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">onMount · onCleanup</Text>
+    <view class="section-nested">
+      <text class="section-label">onMount · onCleanup</text>
       <ActionButton
         testID="lifecycle-toggle"
         title={alive() ? 'unmount child' : 'mount child'}
@@ -58,11 +57,11 @@ export function LifecycleDemo() {
       <Show when={alive()}>
         <TickingChild log={push} />
       </Show>
-      <View class="ap-log" testID="lifecycle-log">
+      <view class="ap-log" testID="lifecycle-log">
         <Index each={log()}>
-          {line => <Text class="ap-log-line">{line()}</Text>}
+          {line => <text class="ap-log-line">{line()}</text>}
         </Index>
-      </View>
-    </View>
+      </view>
+    </view>
   );
 }

@@ -1,11 +1,5 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   useBatteryLevel,
   useBatteryState,
@@ -48,27 +42,27 @@ function CapabilityRow(props: {
   status: ICapabilityStatus;
 }) {
   return (
-    <View testID={props.testID} class="auth-capability-row">
-      <Text class="auth-capability-label">{props.label}</Text>
-      <View class={`auth-status-badge auth-status-badge-${props.status}`}>
-        <Text class="auth-status-text">
+    <view testID={props.testID} class="auth-capability-row">
+      <text class="auth-capability-label">{props.label}</text>
+      <view class={`auth-status-badge auth-status-badge-${props.status}`}>
+        <text class="auth-status-text">
           {props.status === 'checking'
             ? 'CHECKING…'
             : props.status === 'yes'
               ? 'YES'
               : 'NO'}
-        </Text>
-      </View>
-    </View>
+        </text>
+      </view>
+    </view>
   );
 }
 
 function ValueRow(props: { label: string; value: string }) {
   return (
-    <View class="auth-capability-row">
-      <Text class="auth-capability-label">{props.label}</Text>
-      <Text class="auth-value-text">{props.value}</Text>
-    </View>
+    <view class="auth-capability-row">
+      <text class="auth-capability-label">{props.label}</text>
+      <text class="auth-value-text">{props.value}</text>
+    </view>
   );
 }
 
@@ -115,34 +109,34 @@ export const BatteryScreen = defineComponent(
     });
 
     return () => (
-      <SafeAreaView class="screen">
-        <ScrollView
+      <safe-area-view class="screen">
+        <scroll-view
           testID="battery-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Battery</Text>
-              <Text class="hero-body">
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Battery</text>
+              <text class="hero-body">
                 @symbiote-native/battery — live battery level, charging state,
                 and low-power-mode, via three composables. The iOS Simulator
                 reports battery level as unknown — a real device is needed for
                 live readings.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="battery-live-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Live state</Text>
-            </View>
+          <view testID="battery-live-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Live state</text>
+            </view>
             <ValueRow label="Battery level" value={batteryLevelLabel.value} />
             <ValueRow
               label="Battery state"
@@ -153,12 +147,12 @@ export const BatteryScreen = defineComponent(
               label="Low power mode"
               status={toCapabilityStatus(lowPowerMode.value)}
             />
-          </View>
+          </view>
 
-          <View testID="battery-capabilities-card" class="auth-card">
-            <View class="auth-card-header">
-              <Text class="auth-card-title">Capabilities</Text>
-            </View>
+          <view testID="battery-capabilities-card" class="auth-card">
+            <view class="auth-card-header">
+              <text class="auth-card-title">Capabilities</text>
+            </view>
             <CapabilityRow
               testID="battery-available"
               label="Battery API available"
@@ -171,9 +165,9 @@ export const BatteryScreen = defineComponent(
                 status={isBatteryOptimizationEnabled.value}
               />
             )}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+          </view>
+        </scroll-view>
+      </safe-area-view>
     );
   },
   { name: 'BatteryScreen' },

@@ -1,6 +1,5 @@
 <script lang="ts" module>
   import { onDestroy, onMount } from 'svelte';
-  import { Text } from '@symbiote-native/svelte';
   import { dlog } from '@symbiote-native/engine';
 </script>
 
@@ -18,6 +17,6 @@
   });
 </script>
 
-<Text class="info-text" testID="lifecycle-child">
+<text class="info-text" testID="lifecycle-child">
   DestroyableChild is mounted.
-</Text>
+</text>

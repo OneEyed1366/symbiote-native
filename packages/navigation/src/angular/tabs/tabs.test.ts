@@ -64,8 +64,7 @@ let capturedProfileInstance: ProfileScreenComponent | undefined;
   selector: 'feed-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>feed</symbiote-text
-    ><symbiote-text>{{ paramsLabel() }}</symbiote-text>`,
+  template: `<text>feed</text><text>{{ paramsLabel() }}</text>`,
 })
 class FeedScreenComponent {
   // Real screens (e.g. examples/angular's TabHomeScreen) call injectIsFocused() - see the
@@ -90,7 +89,7 @@ class FeedScreenComponent {
   selector: 'profile-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>profile</symbiote-text>`,
+  template: `<text>profile</text>`,
 })
 class ProfileScreenComponent {
   readonly isFocused: Signal<boolean> = injectIsFocused();

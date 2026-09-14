@@ -15,11 +15,10 @@ adapter — this is what every current example app (`examples/react`,
 
 ```tsx
 import './App.css';
-import { Text, View } from '@symbiote-native/react';
 
-<View className="card">
-  <Text>Native surface</Text>
-</View>;
+<view className="card">
+  <text>Native surface</text>
+</view>;
 ```
 
 `@symbiote-native/css-parser` compiles the rule at build time; `className="card"`
@@ -38,7 +37,7 @@ needed:
 
 ```vue
 <template>
-  <View class="card"><Text>Native surface</Text></View>
+  <view class="card"><text>Native surface</text></view>
 </template>
 
 <style scoped>
@@ -51,14 +50,14 @@ needed:
 ```
 
 ```svelte
-<View class="card"><Text>Native surface</Text></View>
+<view class="card"><text>Native surface</text></view>
 
 <style>
-.card {
-  padding: 16px;
-  border-radius: 12px;
-  background-color: #111827;
-}
+  .card {
+    padding: 16px;
+    border-radius: 12px;
+    background-color: #111827;
+  }
 </style>
 ```
 
@@ -69,15 +68,15 @@ fully supported and needs no build-time CSS step — reach for it for a value
 that's genuinely computed at runtime, or if you'd rather skip CSS entirely:
 
 ```tsx
-import { StyleSheet, Text, View } from '@symbiote-native/react';
+import { StyleSheet } from '@symbiote-native/react';
 
 const styles = StyleSheet.create({
   card: { padding: 16, borderRadius: 12, backgroundColor: '#111827' },
 });
 
-<View style={styles.card}>
-  <Text>Native surface</Text>
-</View>;
+<view style={styles.card}>
+  <text>Native surface</text>
+</view>;
 ```
 
 `StyleSheet.create()` is identity at runtime — the engine flattens plain

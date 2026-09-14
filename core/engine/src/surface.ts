@@ -14,8 +14,14 @@
 import type { IRootTag } from './fabric';
 import { dlog } from './debug';
 import { installEventHandler } from './events';
+import { detachAnimatedProps } from './animated/host-binding';
 import { childrenOf } from './host-access';
-import { runDeferredAttaches, sweepDetachedBehaviors } from './host-behavior';
+import {
+  runCommittedHooks,
+  runDeferredAttaches,
+  sweepDetachedBehaviors,
+  teardownSubtree,
+} from './host-behavior';
 import {
   getNativeTag,
   notifyCommitted,
@@ -29,9 +35,15 @@ import {
   removeChild,
   type ISymbioteNode,
 } from './node';
-import { commitSurfaceOps } from './tree-host';
+import { commitSurfaceOps, flushOps } from './tree-host';
 
 const NO_CO_COMMITTERS: readonly (readonly [IRootTag, object])[] = [];
+
+// The predicate both behavior drains take. Passed in rather than imported by `host-behavior.ts`,
+// keeping that dependency one-directional — a cycle there is a live hazard under Metro's
+// `inlineRequires`.
+const isNodeCommitted = (node: ISymbioteNode): boolean =>
+  getNativeTag(node) !== undefined;
 
 export class SymbioteSurface {
   readonly rootTag: IRootTag;
@@ -86,12 +98,32 @@ export class SymbioteSurface {
     insertBefore(this.node, child, beforeChild);
   }
 
+  // Nomination for teardown rides on `node.ts`'s `removeChild`, and only NOMINATES for the reason
+  // stated there: a framework may spell a move as remove-then-reinsert, so the commit sweep
+  // decides. The surface is one ordinary node, so it is not a second removal path that could miss
+  // the sweep and leave a behavior — its timers included — outliving the surface.
   removeChild(child: ISymbioteNode): void {
     removeChild(this.node, child);
   }
 
   clear(): void {
     for (const child of this.children) removeChild(this.node, child);
+  }
+
+  /**
+   * Release every host behavior still standing under this surface, at unmount.
+   *
+   * The sweep above cannot answer this: it only sees nodes a `removeChild` NOMINATED, and an
+   * unmount removes nothing — the adapter drops the whole surface. Without it every node keeps its
+   * `afterCommit` registration and its timers, and a restarted surface's commits drain the dead
+   * one's hooks forever.
+   */
+  teardown(): void {
+    // The nominations first: an adapter that empties the surface and disposes it without a commit
+    // in between (React's `clearContainer`) never reaches the commit sweep, and the walk below
+    // cannot see those nodes either — they already left the tree.
+    sweepDetachedBehaviors(this.children, detachAnimatedProps);
+    teardownSubtree(this.node, detachAnimatedProps);
   }
 
   // Synchronous commit: used by React's resetAfterCommit, which already batches per logical update.
@@ -102,6 +134,16 @@ export class SymbioteSurface {
     // commit lands AFTER the new one's mount commit and would hand Fabric the emptied tree.
     // An UNREGISTERED surface is not superseded — nobody took the root, so its final emptied tree
     // is still the truth for it. Only a live OTHER owner suppresses the op.
+    // The teardown half of the behavior lifecycle. It runs AFTER the ops are applied — it decides
+    // what really left by asking the host for a parent, and the host does not know about a removal
+    // it has not been handed — but BEFORE the root is completed, so a behavior's parting writes
+    // (ScrollView taking its forced `scrollEventThrottle` back) ride this commit instead of owing
+    // another one. `flushOps` is that split: apply, do not publish.
+    //
+    // `removeChild` only NOMINATES — a framework spells a move as remove-then-reinsert, so tearing
+    // down at the call would kill a machine that comes back in the same batch.
+    flushOps();
+    sweepDetachedBehaviors(this.children, detachAnimatedProps);
     const owner = surfaces.get(this.rootTag);
     const superseded = owner !== undefined && owner !== this;
     commitSurfaceOps(
@@ -109,12 +151,6 @@ export class SymbioteSurface {
       this.node,
       SymbioteSurface.others(this),
     );
-    // The teardown half of the behavior lifecycle, and it has to run AFTER the ops are applied: it
-    // decides what really left by asking the host for a parent, and the host does not know about a
-    // removal it has not been handed. `removeChild` only NOMINATES — a framework spells a move as
-    // remove-then-reinsert, so tearing down at the call would kill a machine that comes back in the
-    // same batch.
-    sweepDetachedBehaviors(this.children);
     // Fresh Fabric handles are now assigned, so the three things that could not run before one
     // existed all drain here — this is the moment the old `commitChildren` drained them too.
     //
@@ -126,7 +162,13 @@ export class SymbioteSurface {
     // there is a live hazard under Metro's `inlineRequires`.
     notifyCommitted();
     runPostCommitHooks();
-    runDeferredAttaches(node => getNativeTag(node) !== undefined);
+    runDeferredAttaches(isNodeCommitted);
+    // After the setup half, never before it: a node carrying both hooks has `attachAfterCommit`
+    // seed the mirrors `afterCommit` then compares against. Unlike the two above it asks only
+    // "props were published", so it is NOT gated on the commit having made native calls — a fold
+    // that strips a prop makes its own commit byte-identical, and the hook that must react to the
+    // flip would be the one the flip cannot wake.
+    runCommittedHooks(isNodeCommitted);
   }
 
   // Coalesced commit: for reactive frameworks that emit many mutations per tick. Collapses to a
@@ -151,7 +193,9 @@ registerSurfaceCommit(
     surfaces.get(rootTag)?.commit();
   },
   rootTag => {
+    const surface = surfaces.get(rootTag);
     surfaces.delete(rootTag);
+    surface?.teardown();
   },
 );
 

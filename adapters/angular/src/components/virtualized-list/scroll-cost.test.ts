@@ -85,9 +85,9 @@ let mountedScreen: VListCostScreen | undefined;
   // VirtualizedList trips a JIT circular-dependency error (NG0919) that AOT does not have.
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
-    <symbiote-text>{{ ownLabel }}</symbiote-text>
+    <text>{{ ownLabel }}</text>
     @for (row of screenRows; track row) {
-      <symbiote-text>{{ rowLabel }}</symbiote-text>
+      <text>{{ rowLabel }}</text>
     }
     <VirtualizedList
       [testID]="'vlist-cost-host'"
@@ -97,7 +97,7 @@ let mountedScreen: VListCostScreen | undefined;
       [keyExtractor]="rowKey"
     >
       <ng-template vListItem>
-        <symbiote-text>cell</symbiote-text>
+        <text>cell</text>
       </ng-template>
     </VirtualizedList>
   `,
@@ -242,7 +242,7 @@ let flingScreen: VListFlingScreen | undefined;
   imports: [VirtualizedList, VListItemDirective],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
-    <symbiote-text>{{ ownLabel }}</symbiote-text>
+    <text>{{ ownLabel }}</text>
     <VirtualizedList
       [testID]="'vlist-fling-host'"
       [data]="entries"
@@ -254,8 +254,8 @@ let flingScreen: VListFlingScreen | undefined;
       [scrollEventThrottle]="16"
     >
       <ng-template vListItem let-entry>
-        <symbiote-view
-          ><symbiote-text>{{ entry.id }}</symbiote-text></symbiote-view
+        <view
+          ><text>{{ entry.id }}</text></view
         >
       </ng-template>
     </VirtualizedList>

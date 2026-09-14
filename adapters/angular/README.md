@@ -52,24 +52,27 @@ RNAppRegistry.registerRunnable(appName, ({ rootTag }) => {
 });
 ```
 
-The app is ordinary standalone Angular — it just imports primitives from `@symbiote-native/angular`
-instead of `react-native`. A tap→increment counter:
+The app is ordinary standalone Angular. The native primitives are lowercase intrinsic tags, same as
+every other adapter — Angular still needs them declared in the component's `imports:` array (an
+Angular "element directive" is what makes `ngtsc` accept the tag with typed props), so
+`SYMBIOTE_ELEMENTS` from `@symbiote-native/angular` covers the whole primitive surface in one import.
+A tap→increment counter:
 
 ```ts
 import { Component, signal } from '@angular/core';
-import { View, Text, Pressable } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [View, Text, Pressable],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <View [style]="{ padding: 24 }">
-      <Text>Taps: {{ count() }}</Text>
-      <Pressable (press)="count.set(count() + 1)">
-        <Text>Tap me</Text>
-      </Pressable>
-    </View>
+    <view [style]="{ padding: 24 }">
+      <text>Taps: {{ count() }}</text>
+      <pressable (press)="count.set(count() + 1)">
+        <text>Tap me</text>
+      </pressable>
+    </view>
   `,
 })
 export class AppComponent {

@@ -37,7 +37,7 @@ import {
   type ISeparatorProps,
   type IVirtualizedListHandle,
 } from '../virtualized-list';
-import type { IScrollViewHandle } from '../scroll-view';
+import type { IScrollViewHandle } from '../scroll-view/scroll-view-props';
 import type {
   IAccessibilityProps,
   IAriaProps,

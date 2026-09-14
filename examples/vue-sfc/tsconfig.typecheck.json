@@ -3,5 +3,8 @@
   "comment": "vue-tsc typecheck of the app + SFC components. @symbiote-native/* resolve to source (the monorepo's by-design source resolution), so this also re-checks adapter/engine source — `types: [node]` restores the runtime globals (setTimeout/process/console/queueMicrotask) the app tsconfig strips with `types: []`. That is the ONLY thing this file adds: the e2e exclusion lives in tsconfig.json, so an editor sees it too.",
   "compilerOptions": {
     "types": ["node"]
-  }
+  },
+  // vueCompilerOptions.lib lives in the base tsconfig.json now (the editor's Volar needs it too,
+  // not just this CLI config) - inherited here via "extends", not duplicated.
+  "exclude": ["**/node_modules", "**/Pods", "e2e"]
 }

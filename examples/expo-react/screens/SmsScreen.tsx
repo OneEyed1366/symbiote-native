@@ -1,11 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/react';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -29,12 +22,12 @@ function CapabilityRow({
   const text =
     status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
-    <View testID={testID} className="capability-row">
-      <Text className="capability-label">{label}</Text>
-      <View className={`status-badge status-badge-${status}`}>
-        <Text className="status-badge-text">{text}</Text>
-      </View>
-    </View>
+    <view testID={testID} className="capability-row">
+      <text className="capability-label">{label}</text>
+      <view className={`status-badge status-badge-${status}`}>
+        <text className="status-badge-text">{text}</text>
+      </view>
+    </view>
   );
 }
 
@@ -83,62 +76,62 @@ export function SmsScreen() {
   }, [recipients, message]);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="sms-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">SMS</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">SMS</text>
+            <text className="hero-body">
               @symbiote-native/sms — opens the system SMS composer prefilled
               with recipients and a message. It never sends anything by itself;
               the user does.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="sms-capability-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Capabilities</Text>
-          </View>
+        <view testID="sms-capability-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Capabilities</text>
+          </view>
           <CapabilityRow
             testID="sms-available"
             label="Available"
             status={isAvailable}
           />
-          <Text className="info-text">
+          <text className="info-text">
             NO is expected on the iOS simulator, which has no Messages app, and
             on Android devices without telephony hardware. Only a real phone
             reports YES.
-          </Text>
-        </View>
+          </text>
+        </view>
 
-        <View testID="sms-compose-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Compose</Text>
-          </View>
-          <TextInput
+        <view testID="sms-compose-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Compose</text>
+          </view>
+          <text-input
             testID="sms-recipients-input"
             value={recipients}
-            onValueChange={setRecipients}
+            onValueChange={event => setRecipients(event.text)}
             placeholder="0123456789, 9876543210"
             placeholderTextColor="#41506a"
             autoCapitalize="none"
             className="text-input"
           />
-          <TextInput
+          <text-input
             testID="sms-message-input"
             value={message}
-            onValueChange={setMessage}
+            onValueChange={event => setMessage(event.text)}
             placeholder="Message"
             placeholderTextColor="#41506a"
             className="text-input"
@@ -149,20 +142,20 @@ export function SmsScreen() {
             onPress={handleSend}
             color={lineColor}
           />
-          <View className="capability-row">
-            <Text className="capability-label">Last result</Text>
-            <Text testID="sms-result" className="value-text">
+          <view className="capability-row">
+            <text className="capability-label">Last result</text>
+            <text testID="sms-result" className="value-text">
               {lastResult}
-            </Text>
-          </View>
-          <Text className="info-text">
+            </text>
+          </view>
+          <text className="info-text">
             Android always reports unknown — reading the real outcome needs
             READ_SMS, which Google restricts to default-SMS-app publishers.
             Treat it as the composer closed, not as a failure. iOS reports sent
             or cancelled.
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          </text>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

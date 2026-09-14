@@ -90,13 +90,13 @@ async function compileComponent(
   return loadComponent(compileToFile(source, name), name);
 }
 
-// root-element.ts inserts an unlabeled `symbiote-view` between the box-none AppContainer and the
+// root-element.ts inserts an unlabeled `view` between the box-none AppContainer and the
 // mounted component (skill §15). Reading children off `fabric.appRoot()` rather than
 // `fabric.find()` is deliberate: find() walks the creation log and would still report a subtree
 // the boundary has since torn down.
 function appChildren(): IFakeNode[] {
   const wrapper = fabric.appRoot().children[0];
-  expect(wrapper, 'the root wrapper symbiote-view committed').toBeDefined();
+  expect(wrapper, 'the root wrapper view committed').toBeDefined();
   return wrapper?.children ?? [];
 }
 
@@ -138,8 +138,7 @@ const THROWING_CHILD_SOURCE =
   `<script>
      let { control } = $props();
      if (control.shouldThrow) throw new Error('child exploded');
-   </script>` +
-  `<symbiote-view p={{ testID: 'child' }}><symbiote-text p={{}}>ok</symbiote-text></symbiote-view>`;
+   </script>` + `<view p={{ testID: 'child' }}><text p={{}}>ok</text></view>`;
 
 describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
   // No true Negative group: `mount()` itself never throws in any of these scenarios — a child
@@ -152,8 +151,8 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
     it('is transparent when nothing throws — children commit, the failed snippet does not', async () => {
       const Guarded = await compileComponent(
         `<svelte:boundary>` +
-          `<symbiote-view p={{ testID: 'child' }}><symbiote-text p={{}}>ok</symbiote-text></symbiote-view>` +
-          `{#snippet failed(error, reset)}<symbiote-view p={{ testID: 'failed' }}></symbiote-view>{/snippet}` +
+          `<view p={{ testID: 'child' }}><text p={{}}>ok</text></view>` +
+          `{#snippet failed(error, reset)}<view p={{ testID: 'failed' }}></view>{/snippet}` +
           `</svelte:boundary>`,
         'Transparent',
       );
@@ -180,12 +179,12 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
          let rows = $state(control.rows);
          control.setRows = next => { rows = next; };
        </script>` +
-          `<symbiote-view p={{ testID: 'list' }}>` +
+          `<view p={{ testID: 'list' }}>` +
           `<svelte:boundary>` +
-          `{#each rows as row (row)}<symbiote-view p={{ testID: row }}><symbiote-text p={{}}>{row}</symbiote-text></symbiote-view>{/each}` +
-          `{#snippet failed(error, reset)}<symbiote-view p={{ testID: 'failed' }}></symbiote-view>{/snippet}` +
+          `{#each rows as row (row)}<view p={{ testID: row }}><text p={{}}>{row}</text></view>{/each}` +
+          `{#snippet failed(error, reset)}<view p={{ testID: 'failed' }}></view>{/snippet}` +
           `</svelte:boundary>` +
-          `</symbiote-view>`,
+          `</view>`,
         'BoundaryList',
       );
 
@@ -235,7 +234,7 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
           `<svelte:boundary onerror={control.onError}>` +
           `<Child {control} />` +
           `{#snippet failed(error, reset)}` +
-          `<symbiote-view p={{ testID: 'failed' }}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>` +
+          `<view p={{ testID: 'failed' }}><text p={{}}>{error.message}</text></view>` +
           `{/snippet}` +
           `</svelte:boundary>`,
         'CatchingBoundary',
@@ -274,7 +273,7 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
           `<svelte:boundary>` +
           `<Child {control} />` +
           `{#snippet failed(error, reset)}` +
-          `<symbiote-view p={control.failedBag(reset)}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>` +
+          `<view p={control.failedBag(reset)}><text p={{}}>{error.message}</text></view>` +
           `{/snippet}` +
           `</svelte:boundary>`,
         'ResettableBoundary',

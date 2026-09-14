@@ -62,17 +62,16 @@ subscription.
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Button, View } from '@symbiote-native/react';
     import { openBrowserAsync } from '@symbiote-native/web-browser/react';
 
     export default function Docs() {
       return (
-        <View>
-          <Button
+        <view>
+          <button
             title="Read the docs"
             onPress={() => openBrowserAsync('https://example.com')}
           />
-        </View>
+        </view>
       );
     }
     ```
@@ -81,7 +80,6 @@ subscription.
   <TabItem label="Vue">
     ```vue
     <script setup lang="ts">
-    import { Button, View } from '@symbiote-native/vue';
     import { openBrowserAsync } from '@symbiote-native/web-browser/vue';
 
     function onOpen() {
@@ -90,9 +88,9 @@ subscription.
     </script>
 
     <template>
-      <View>
-        <Button title="Read the docs" @press="onOpen" />
-      </View>
+      <view>
+        <button title="Read the docs" @press="onOpen" />
+      </view>
     </template>
     ```
 
@@ -100,16 +98,16 @@ subscription.
   <TabItem label="Angular">
     ```ts
     import { Component } from '@angular/core';
-    import { Button, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { openBrowserAsync } from '@symbiote-native/web-browser/angular';
 
     @Component({
       standalone: true,
-      imports: [Button, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Button title="Read the docs" (press)="onOpen()" />
-        </View>
+        <view>
+          <button title="Read the docs" (press)="onOpen()" />
+        </view>
       `,
     })
     export class Docs {
@@ -126,7 +124,6 @@ subscription.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Button, View } from '@symbiote-native/svelte';
       import { openBrowserAsync } from '@symbiote-native/web-browser/svelte';
 
       function onOpen() {
@@ -134,20 +131,19 @@ subscription.
       }
     </script>
 
-    <View><Button title="Read the docs" onPress={onOpen} /></View>
+    <view><button title="Read the docs" onPress={onOpen} /></view>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Button, View } from '@symbiote-native/solid';
     import { openBrowserAsync } from '@symbiote-native/web-browser/solid';
 
     export default function Docs() {
       return (
-        <View>
-          <Button title="Read the docs" onPress={() => openBrowserAsync('https://example.com')} />
-        </View>
+        <view>
+          <button title="Read the docs" onPress={() => openBrowserAsync('https://example.com')} />
+        </view>
       );
     }
     ```
@@ -165,7 +161,6 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
   <TabItem label="React">
     ```tsx
     import { useState } from 'react';
-    import { Button, Text, View } from '@symbiote-native/react';
     import { openAuthSessionAsync } from '@symbiote-native/web-browser/react';
 
     const AUTHORIZE_URL = 'https://auth.example.com/authorize?redirect_uri=myapp://callback';
@@ -179,10 +174,10 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
       }
 
       return (
-        <View>
-          <Text>{code ?? 'not signed in'}</Text>
-          <Button title="Sign in" onPress={onSignIn} />
-        </View>
+        <view>
+          <text>{code ?? 'not signed in'}</text>
+          <button title="Sign in" onPress={onSignIn} />
+        </view>
       );
     }
     ```
@@ -192,7 +187,6 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
     ```vue
     <script setup lang="ts">
     import { ref } from 'vue';
-    import { Button, Text, View } from '@symbiote-native/vue';
     import { openAuthSessionAsync } from '@symbiote-native/web-browser/vue';
 
     const AUTHORIZE_URL = 'https://auth.example.com/authorize?redirect_uri=myapp://callback';
@@ -206,10 +200,10 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
     </script>
 
     <template>
-      <View>
-        <Text>{{ code ?? 'not signed in' }}</Text>
-        <Button title="Sign in" @press="onSignIn" />
-      </View>
+      <view>
+        <text>{{ code ?? 'not signed in' }}</text>
+        <button title="Sign in" @press="onSignIn" />
+      </view>
     </template>
     ```
 
@@ -217,19 +211,19 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
   <TabItem label="Angular">
     ```ts
     import { Component, signal } from '@angular/core';
-    import { Button, Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { openAuthSessionAsync } from '@symbiote-native/web-browser/angular';
 
     const AUTHORIZE_URL = 'https://auth.example.com/authorize?redirect_uri=myapp://callback';
 
     @Component({
       standalone: true,
-      imports: [Button, Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Text>{{ code() ?? 'not signed in' }}</Text>
-          <Button title="Sign in" (press)="onSignIn()" />
-        </View>
+        <view>
+          <text>{{ code() ?? 'not signed in' }}</text>
+          <button title="Sign in" (press)="onSignIn()" />
+        </view>
       `,
     })
     export class SignIn {
@@ -248,7 +242,6 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Button, Text, View } from '@symbiote-native/svelte';
       import { openAuthSessionAsync } from '@symbiote-native/web-browser/svelte';
 
       const AUTHORIZE_URL = 'https://auth.example.com/authorize?redirect_uri=myapp://callback';
@@ -261,14 +254,13 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
       }
     </script>
 
-    <View><Text>{code ?? 'not signed in'}</Text><Button title="Sign in" onPress={onSignIn} /></View>
+    <view><text>{code ?? 'not signed in'}</text><button title="Sign in" onPress={onSignIn} /></view>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
     import { createSignal } from 'solid-js';
-    import { Button, Text, View } from '@symbiote-native/solid';
     import { openAuthSessionAsync } from '@symbiote-native/web-browser/solid';
 
     const AUTHORIZE_URL = 'https://auth.example.com/authorize?redirect_uri=myapp://callback';
@@ -282,10 +274,10 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
       }
 
       return (
-        <View>
-          <Text>{code() ?? 'not signed in'}</Text>
-          <Button title="Sign in" onPress={onSignIn} />
-        </View>
+        <view>
+          <text>{code() ?? 'not signed in'}</text>
+          <button title="Sign in" onPress={onSignIn} />
+        </view>
       );
     }
     ```

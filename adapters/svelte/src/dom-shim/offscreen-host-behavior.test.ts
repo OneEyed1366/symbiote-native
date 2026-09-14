@@ -45,10 +45,10 @@ const ROOT_TAG = 91_327;
 //
 // Registered by INTRINSIC TAG, not by the Fabric component name. The registry is tag-keyed and the
 // tag reaches it as `createElement`'s third argument, which `ShimElement.createEngineNode` passes;
-// `node.component` is already the resolved Fabric name (`symbiote-image` -> `RCTImageView`) by
+// `node.component` is already the resolved Fabric name (`image` -> `RCTImageView`) by
 // then. Registering under the component name silently matches nothing — this file was written
 // against the earlier component-keyed lookup and caught the change by going red.
-const LEAF_TAG = 'symbiote-image';
+const LEAF_TAG = 'image';
 
 const fabric = installFabric();
 const tick = (): Promise<void> =>
@@ -95,7 +95,7 @@ describe('a subtree Svelte parks in an offscreen fragment', () => {
   // park from a removal and must not treat re-insertion as impossible.
   it('gets its behaviour back when the framework puts it on screen again', async () => {
     const root = liveRoot();
-    const wrapper = new ShimElement('symbiote-view');
+    const wrapper = new ShimElement('view');
     const leaf = new ShimElement(LEAF_TAG);
     wrapper.appendChild(leaf);
     root.appendChild(wrapper);
@@ -130,7 +130,7 @@ describe('a subtree Svelte parks in an offscreen fragment', () => {
   // subtree which genuinely leaves still gets torn down exactly once and never re-attached.
   it('stays torn down when the framework does not put it back', async () => {
     const root = liveRoot();
-    const wrapper = new ShimElement('symbiote-view');
+    const wrapper = new ShimElement('view');
     const leaf = new ShimElement(LEAF_TAG);
     wrapper.appendChild(leaf);
     root.appendChild(wrapper);

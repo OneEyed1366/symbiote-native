@@ -92,9 +92,7 @@ function mountList(extra: Record<string, unknown>): Promise<void> {
             ...extra,
           },
           {
-            item: ({ item }: { item: IRow }) => [
-              h('symbiote-text', {}, item.label),
-            ],
+            item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
           },
         ),
     }),

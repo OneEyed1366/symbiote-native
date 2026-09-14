@@ -76,7 +76,6 @@ adapter, with no hook/composable/service in the way:
   <TabItem label="React">
     ```tsx
     import { useEffect, useState } from 'react';
-    import { Text } from '@symbiote-native/react';
     import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
 
     export default function CellularInfo() {
@@ -88,7 +87,7 @@ adapter, with no hook/composable/service in the way:
         getCarrierNameAsync().then(setCarrierName); // Android only — always null on iOS
       }, []);
 
-      return <Text>{carrierName ?? `generation ${generation}`}</Text>;
+      return <text>{carrierName ?? `generation ${generation}`}</text>;
     }
     ```
 
@@ -97,7 +96,6 @@ adapter, with no hook/composable/service in the way:
     ```vue
     <script setup lang="ts">
     import { onMounted, ref } from 'vue';
-    import { Text } from '@symbiote-native/vue';
     import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
 
     const generation = ref<CellularGeneration | null>(null);
@@ -110,7 +108,7 @@ adapter, with no hook/composable/service in the way:
     </script>
 
     <template>
-      <Text>{{ carrierName ?? `generation ${generation}` }}</Text>
+      <text>{{ carrierName ?? `generation ${generation}` }}</text>
     </template>
     ```
 
@@ -118,13 +116,13 @@ adapter, with no hook/composable/service in the way:
   <TabItem label="Angular">
     ```ts
     import { Component, signal } from '@angular/core';
-    import { Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
 
     @Component({
       standalone: true,
-      imports: [Text],
-      template: `<Text>{{ carrierName() ?? 'generation ' + generation() }}</Text>`,
+      imports: [SYMBIOTE_ELEMENTS],
+      template: `<text>{{ carrierName() ?? 'generation ' + generation() }}</text>`,
     })
     export class CellularInfo {
       readonly generation = signal<CellularGeneration | null>(null);
@@ -144,7 +142,6 @@ adapter, with no hook/composable/service in the way:
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text } from '@symbiote-native/svelte';
       import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
 
       let generation = $state<CellularGeneration | null>(null);
@@ -156,7 +153,7 @@ adapter, with no hook/composable/service in the way:
       });
     </script>
 
-    <Text>{carrierName ?? `generation ${generation}`}</Text>
+    <text>{carrierName ?? `generation ${generation}`}</text>
     ```
 
     There's no per-instance rune to reach for here either — every function is a plain free
@@ -166,7 +163,6 @@ adapter, with no hook/composable/service in the way:
   <TabItem label="Solid">
     ```tsx
     import { createSignal } from 'solid-js';
-    import { Text } from '@symbiote-native/solid';
     import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
 
     export function CellularInfo() {
@@ -176,7 +172,7 @@ adapter, with no hook/composable/service in the way:
       getCellularGenerationAsync().then(setGeneration);
       getCarrierNameAsync().then(setCarrierName); // Android only — always null on iOS
 
-      return <Text>{carrierName() ?? `generation ${generation()}`}</Text>;
+      return <text>{carrierName() ?? `generation ${generation()}`}</text>;
     }
     ```
 
@@ -191,7 +187,6 @@ adapter, with no hook/composable/service in the way:
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
-    import { Pressable, Text } from '@symbiote-native/react';
     import { usePermissions } from '@symbiote-native/cellular/react';
 
     export default function CellularPermission() {
@@ -199,10 +194,10 @@ adapter, with no hook/composable/service in the way:
 
       return (
         <>
-          <Text>{error ? `check failed: ${error.message}` : (status?.status ?? 'checking…')}</Text>
-          <Pressable onPress={() => (error ? get() : request())}>
-            <Text>{error ? 'Retry check' : 'Request permission'}</Text>
-          </Pressable>
+          <text>{error ? `check failed: ${error.message}` : (status?.status ?? 'checking…')}</text>
+          <pressable onPress={() => (error ? get() : request())}>
+            <text>{error ? 'Retry check' : 'Request permission'}</text>
+          </pressable>
         </>
       );
     }
@@ -218,10 +213,10 @@ adapter, with no hook/composable/service in the way:
     </script>
 
     <template>
-      <Text>{{ error ? `check failed: ${error.message}` : (status?.status ?? 'checking…') }}</Text>
-      <Pressable @press="error ? get() : request()">
-        <Text>{{ error ? 'Retry check' : 'Request permission' }}</Text>
-      </Pressable>
+      <text>{{ error ? `check failed: ${error.message}` : (status?.status ?? 'checking…') }}</text>
+      <pressable @press="error ? get() : request()">
+        <text>{{ error ? 'Retry check' : 'Request permission' }}</text>
+      </pressable>
     </template>
     ```
 
@@ -229,17 +224,17 @@ adapter, with no hook/composable/service in the way:
   <TabItem label="Angular">
     ```ts
     import { Component, inject } from '@angular/core';
-    import { Pressable, Text } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import { PermissionsService } from '@symbiote-native/cellular/angular';
 
     @Component({
       standalone: true,
-      imports: [Pressable, Text],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <Text>{{ error() ? 'check failed: ' + error()?.message : (status()?.status ?? 'checking…') }}</Text>
-        <Pressable (press)="error() ? permissions.get() : permissions.request()">
-          <Text>{{ error() ? 'Retry check' : 'Request permission' }}</Text>
-        </Pressable>
+        <text>{{ error() ? 'check failed: ' + error()?.message : (status()?.status ?? 'checking…') }}</text>
+        <pressable (press)="error() ? permissions.get() : permissions.request()">
+          <text>{{ error() ? 'Retry check' : 'Request permission' }}</text>
+        </pressable>
       `,
     })
     export class CellularPermission {
@@ -253,26 +248,24 @@ adapter, with no hook/composable/service in the way:
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Pressable, Text } from '@symbiote-native/svelte';
       import { usePermissions } from '@symbiote-native/cellular/svelte';
 
       const permissions = usePermissions();
     </script>
 
-    <Text>
+    <text>
       {permissions.error
         ? `check failed: ${permissions.error.message}`
         : (permissions.status?.status ?? 'checking…')}
-    </Text>
-    <Pressable onPress={() => (permissions.error ? permissions.get() : permissions.request())}>
-      <Text>{permissions.error ? 'Retry check' : 'Request permission'}</Text>
-    </Pressable>
+    </text>
+    <pressable onPress={() => (permissions.error ? permissions.get() : permissions.request())}>
+      <text>{permissions.error ? 'Retry check' : 'Request permission'}</text>
+    </pressable>
     ```
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
-    import { Pressable, Text } from '@symbiote-native/solid';
     import { createPermissions } from '@symbiote-native/cellular/solid';
 
     export function CellularPermission() {
@@ -280,10 +273,10 @@ adapter, with no hook/composable/service in the way:
 
       return (
         <>
-          <Text>{error() ? `check failed: ${error()!.message}` : (status()?.status ?? 'checking…')}</Text>
-          <Pressable onPress={() => (error() ? get() : request())}>
-            <Text>{error() ? 'Retry check' : 'Request permission'}</Text>
-          </Pressable>
+          <text>{error() ? `check failed: ${error()!.message}` : (status()?.status ?? 'checking…')}</text>
+          <pressable onPress={() => (error() ? get() : request())}>
+            <text>{error() ? 'Retry check' : 'Request permission'}</text>
+          </pressable>
         </>
       );
     }
@@ -312,8 +305,8 @@ tells those two apart; `get()` re-runs the check without prompting the user.
 
 ### `usePermissions()`
 
-| React (`/react`) | Vue (`/vue`)     | Angular (`/angular`)           | Svelte (`/svelte`) | Solid (`/solid`)     | Signature | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ---------------- | ---------------- | ------------------------------ | ------------------ | --------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React (`/react`) | Vue (`/vue`)     | Angular (`/angular`)           | Svelte (`/svelte`) | Solid (`/solid`)    | Signature | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------- | ---------------- | ------------------------------ | ------------------ | ------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions`   | `createPermissions` | `()`      | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null`. Solid: `{ status: Accessor<PermissionResponse \| null>, error: Accessor<Error \| null>, request, get }` |
 
 ### `usePermissions()` return value

@@ -739,6 +739,24 @@ export function propOfNode(handle: object, key: string): unknown {
   return nodes.get(handle)?.props[key];
 }
 
+const NO_PROPS: Readonly<Record<string, unknown>> = {};
+
+/** The whole bag, for a payload fold. The node's own object — callers must not write to it. */
+export function propsOfNode(handle: object): Readonly<Record<string, unknown>> {
+  return nodes.get(handle)?.props ?? NO_PROPS;
+}
+
+/**
+ * Dirty a node no op named — the DERIVED-payload route (`markPropsDirty`, node.ts).
+ *
+ * The same mark a prop write leaves, which is the point: a behavior whose fold reads its own
+ * runtime has nothing to write, and without this the walk skips the node it is about to change.
+ */
+export function markNodePropsDirty(handle: object): void {
+  const node = nodes.get(handle);
+  if (node !== undefined) markDirty(node);
+}
+
 /**
  * What a node currently IS in Fabric, or `undefined` before its first commit.
  *
@@ -844,6 +862,8 @@ function committedOf(handle: object): IFabricNode | undefined {
 export const treeApplierHost: ITreeHost = {
   applyOps: batch => applyBatch(batch, getSlot()),
   propOf: propOfNode,
+  propsOf: propsOfNode,
+  markPropsDirty: markNodePropsDirty,
   committedRecordOf,
   parentOf: parentHandleOf,
   childrenOf: childHandlesOf,

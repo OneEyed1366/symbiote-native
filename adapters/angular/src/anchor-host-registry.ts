@@ -34,7 +34,6 @@ const ANCHOR_HOST_COMPONENTS: Set<string> = new Set(
     // view instead (a real device-visible bug, not a silent no-op). This Set holds only
     // adapter/engine-owned selectors; app code and third-party packages self-register their own
     // composed components through registerComposedComponent instead of being hardcoded here.
-    'ActivityIndicator',
     'Button',
     'FlatList',
     'AnimatedView',
@@ -48,30 +47,15 @@ const ANCHOR_HOST_COMPONENTS: Set<string> = new Set(
     'symbiote-descriptor-outlet',
     'tunnel-out',
     'Image',
-    'ImageBackground',
-    'InputAccessoryView',
     'KeyboardAvoidingView',
     'Modal',
-    'Pressable',
-    'RefreshControl',
-    'SafeAreaView',
-    'ScrollView',
-    'ScrollViewStickyHeader',
     'SectionList',
-    'symbiote-sticky-header',
+    'sticky-header',
     'StatusBar',
     'Switch',
     'Text',
-    'TextInput',
-    'TouchableHighlight',
-    'TouchableNativeFeedback',
-    'TouchableOpacity',
-    'TouchableWithoutFeedback',
     'VirtualizedList',
     'VirtualizedSectionList',
-    // 'symbiote-pressable' deliberately NOT here — see Pressable's own @Component comment
-    // (components/pressable/index.ts). It is the host-behavior registry's tag, never a spelling
-    // of the composed component now, so it must resolve to a real, painting node.
   ].map(selector => selector.toLowerCase()),
 );
 

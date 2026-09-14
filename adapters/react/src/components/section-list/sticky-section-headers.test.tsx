@@ -1,12 +1,15 @@
 /** @jsxRuntime automatic */
-// Proves that VirtualizedSectionList sticks its section
-// headers. Stickiness is a JS layer (ScrollView wraps each flagged child in a
-// ScrollViewStickyHeader, an Animated.View with collapsable:false and a translateY
-// transform driven by the scroll offset; the native scroll view does NOT honor a bare index
-// array). We mount two small sections (all entries inside the initial window) and assert the
-// two section headers each get wrapped in a transform-bearing sticky wrapper, and that
-// stickySectionHeadersEnabled={false} wraps nothing. This exercises the full
-// VirtualizedSectionList -> ScrollView -> wrapStickyHeaders path.
+// Proves that VirtualizedSectionList sticks its section headers. Stickiness is a JS layer — the
+// native scroll view does NOT honor a bare index array — and the engine owns it: a flagged child
+// is a `sticky-header` node, `collapsable:false` so Yoga cannot flatten the box its translateY
+// rides on. We mount two small sections (all entries inside the initial window) and assert the two
+// section headers get marked and that stickySectionHeadersEnabled={false} marks nothing.
+//
+// The path this exercises is VirtualizedSectionList -> VirtualizedList -> the `sticky-header` TAG.
+// It is NOT `stickyHeaderIndices` on the scroll view: the behavior resolves that prop against the
+// OWNER's paint children, and a windowed list paints a header, a spacer and a slice, so data index
+// 3 is almost never paint child 3. The list emits the tag on the cell instead, which pins by
+// document order and survives the window sliding.
 //
 // SCOPE: the translateY interpolation reducer (reduceSticky, createInitialStickyState) is
 // exhaustively unit-tested at core/components/src/state/sticky-header-reducer.test.ts — N/A
@@ -15,8 +18,8 @@
 // test below exercises it only incidentally (default-unset resolves headers to sticky on this
 // iOS-resolved headless host, per that function's `enabled ?? platformOS === 'ios'`), it does
 // not re-prove the fold's own branches. What IS proven here, and nowhere else: that the computed
-// sticky header INDICES actually reach ScrollView and get the right DOM children wrapped in a
-// real collapsable:false transform-bearing node — the end-to-end wiring, not the math.
+// sticky header indices pick the right CELLS out of a flattened section stream — the end-to-end
+// wiring, not the math.
 //
 // No Negative group: sections/renderItem/renderSectionHeader are required props (a TS contract,
 // not a runtime guard) and stickySectionHeadersEnabled=false is a valid configuration, not an
@@ -41,10 +44,20 @@ const fabric = installFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-// A sticky-header wrapper is the only node carrying a `transform` (its translateY); regular
-// cells and the content container don't. So transform-bearing nodes count the wrapped headers.
+// `collapsable: false` is what the sticky seam sets at CREATE, and nothing else in this tree sets
+// it — a plain cell wrapper leaves it absent. The translateY is NOT the oracle: it needs a
+// measurement round trip, so a create-time `Array.isArray(transform)` reads 0 for a correct tree
+// and would also read "present" for a frozen pin (`test-harness-false-greens.md` §34). The pin's
+// motion is core's to prove; this file's question is which CHILDREN got marked.
 function stickyWrappers(): IFakeNode[] {
-  return fabric.created.filter(n => Array.isArray(n.props.transform));
+  return fabric.created.filter(
+    n =>
+      n.props.collapsable === false &&
+      // The scroll view's own CONTENT node carries it too — Yoga must not flatten the box the
+      // sticky pins are measured against. It is not a header, and the disabled case is what makes
+      // that visible: one such node with zero sticky cells.
+      n.viewName !== 'RCTScrollContentView',
+  );
 }
 
 function renderSection(props: {
@@ -55,9 +68,8 @@ function renderSection(props: {
     sections: props.sections,
     stickySectionHeadersEnabled: props.stickySectionHeadersEnabled,
     renderSectionHeader: ({ section }) =>
-      createElement('symbiote-text', {}, section.title),
-    renderItem: ({ item }) =>
-      createElement('symbiote-text', {}, `row-${item.id}`),
+      createElement('text', {}, section.title),
+    renderItem: ({ item }) => createElement('text', {}, `row-${item.id}`),
   });
 }
 
@@ -71,7 +83,7 @@ describe('VirtualizedSectionList sticky section headers', () => {
   // headers visually stick at all. Wrapping the WRONG count/nodes (e.g. items instead of
   // headers) would silently break scroll UX with no runtime error to catch it. Also proves the
   // unset-`stickySectionHeadersEnabled` default resolves to enabled on this host.
-  it('wraps each of the two section headers in a collapsable:false sticky wrapper', () => {
+  it('marks each of the two section headers collapsable:false', () => {
     mount(ROOT_TAG, renderSection({ sections: SECTIONS }));
     const wrappers = stickyWrappers();
     expect(wrappers.length, 'one sticky wrapper per section header').toBe(2);

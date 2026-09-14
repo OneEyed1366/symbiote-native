@@ -1,6 +1,6 @@
 // Regression coverage for the eager accessibility-gate binding
 // (`.claude/rules/fabric-boolean-event-gates.md`). Before this, the template bound the four
-// accessibility events unconditionally on the wrapper <symbiote-view>, so every KeyboardAvoidingView
+// accessibility events unconditionally on the wrapper <view>, so every KeyboardAvoidingView
 // lit all four gate flags whether or not an app ever subscribed. `layout` is DELIBERATELY excluded
 // from this fix and stays unconditional — the component reads its own onLayout internally
 // (handleLayout feeds the inset fixpoint math), so gating it on `.observed` would silently break
@@ -30,7 +30,7 @@ Object.assign(globalThis, {
   imports: [KeyboardAvoidingView],
   template: `
     <KeyboardAvoidingView [testID]="'kav'" behavior="padding">
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </KeyboardAvoidingView>
   `,
 })
@@ -46,7 +46,7 @@ class KeyboardAvoidingViewNoSubscriberFixture {}
       behavior="padding"
       (accessibilityAction)="onAction($event)"
     >
-      <symbiote-text>Hello</symbiote-text>
+      <text>Hello</text>
     </KeyboardAvoidingView>
   `,
 })

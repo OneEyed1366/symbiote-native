@@ -22,7 +22,7 @@
 // `*tunnelIn` directly on the portable content, the same way `*ngIf` sits directly on an
 // element instead of wrapping it in a named `<ng-template>`:
 //   @if (toastVisible) {
-//     <View *tunnelIn="overlayTunnel"><Text>…</Text></View>
+//     <view *tunnelIn="overlayTunnel"><text>…</text></view>
 //   }
 //   …
 //   <tunnel-out [tunnel]="overlayTunnel" />

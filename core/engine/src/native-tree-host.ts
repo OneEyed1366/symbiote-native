@@ -39,6 +39,8 @@ export function nativeTreeHost(bindings: INativeEngineBindings): ITreeHost {
         batch.handles,
       ),
     propOf: bindings.getProp,
+    propsOf: bindings.getProps,
+    markPropsDirty: bindings.markPropsDirty,
     committedRecordOf: bindings.committedRecordOf,
     parentOf: bindings.parentOf,
     childrenOf: bindings.childrenOf,

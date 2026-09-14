@@ -1,5 +1,4 @@
 import { defineComponent, onMounted, onUnmounted, ref, shallowRef } from 'vue';
-import { Text, View } from '@symbiote-native/vue';
 import {
   readCommitProfile,
   type ICommitProfile,
@@ -141,66 +140,66 @@ export const JsFrameRateMeter = defineComponent<IJsFrameRateMeterProps>(
     };
 
     return () => (
-      <View class="bench-meter">
-        <Text class="section-label">JS-THREAD FRAME RATE</Text>
-        <View class="bench-meter-row">
-          <View class="bench-metric">
-            <Text
+      <view class="bench-meter">
+        <text class="section-label">JS-THREAD FRAME RATE</text>
+        <view class="bench-meter-row">
+          <view class="bench-metric">
+            <text
               testID="bench-fps"
               class="bench-metric-value"
               style={{ color: props.accent }}
             >
               {String(framesPerSecond.value)}
-            </Text>
-            <Text class="bench-metric-label">fps</Text>
-          </View>
-          <View class="bench-metric">
-            <Text
+            </text>
+            <text class="bench-metric-label">fps</text>
+          </view>
+          <view class="bench-metric">
+            <text
               testID="bench-dropped"
               class="bench-metric-value"
               style={{ color: props.accent }}
             >
               {String(droppedFrames.value)}
-            </Text>
-            <Text class="bench-metric-label">dropped</Text>
-          </View>
-          <View class="bench-metric">
-            <Text class="bench-metric-value" style={{ color: props.accent }}>
+            </text>
+            <text class="bench-metric-label">dropped</text>
+          </view>
+          <view class="bench-metric">
+            <text class="bench-metric-value" style={{ color: props.accent }}>
               {worstFrameMs.value.toFixed(0)}
-            </Text>
-            <Text class="bench-metric-label">worst ms</Text>
-          </View>
-        </View>
-        <Text class="section-label">ENGINE PER WINDOW</Text>
-        <View class="bench-meter-row">
-          <View class="bench-metric">
-            <Text
+            </text>
+            <text class="bench-metric-label">worst ms</text>
+          </view>
+        </view>
+        <text class="section-label">ENGINE PER WINDOW</text>
+        <view class="bench-meter-row">
+          <view class="bench-metric">
+            <text
               testID="bench-commits"
               class="bench-metric-value"
               style={{ color: props.accent }}
             >
               {String(engine.value.commits)}
-            </Text>
-            <Text class="bench-metric-label">commits</Text>
-          </View>
-          <View class="bench-metric">
-            <Text
+            </text>
+            <text class="bench-metric-label">commits</text>
+          </view>
+          <view class="bench-metric">
+            <text
               testID="bench-commit-writes"
               class="bench-metric-value"
               style={{ color: props.accent }}
             >
               {String(engine.value.propWrites)}
-            </Text>
-            <Text class="bench-metric-label">prop writes</Text>
-          </View>
-        </View>
+            </text>
+            <text class="bench-metric-label">prop writes</text>
+          </view>
+        </view>
         <ActionButton
           testID="bench-fps-reset"
           title="Reset frame counters"
           onPress={onReset}
           color={props.accent}
         />
-      </View>
+      </view>
     );
   },
   { name: 'JsFrameRateMeter', props: ['accent'] },

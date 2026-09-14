@@ -15,8 +15,6 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { findNodeHandle } from '../host-instance';
 import type { IHostInstance } from '../host-instance';
 import { mount, unmount } from '../render';
-import { Text } from './text';
-import { View } from './view';
 
 const ROOT_TAG = 8_202;
 
@@ -57,7 +55,7 @@ describe('Solid Text on the engine', () => {
     // rather than a `text` prop — an adapter that flattened the string onto the parent would paint
     // nothing on a real host.
     it('commits as RCTText with the string content as an RCTRawText child', async () => {
-      mount(ROOT_TAG, () => <Text testID="probe">hello</Text>);
+      mount(ROOT_TAG, () => <text testID="probe">hello</text>);
       await tick();
 
       expect(fabric.serialize([probe()])).toBe('RCTText(RCTRawText "hello")');
@@ -68,7 +66,7 @@ describe('Solid Text on the engine', () => {
     // color processor. All three must land as real Fabric props.
     it('forwards the text-shaping props to the native node', async () => {
       mount(ROOT_TAG, () => (
-        <Text
+        <text
           testID="probe"
           numberOfLines={2}
           ellipsizeMode="tail"
@@ -76,7 +74,7 @@ describe('Solid Text on the engine', () => {
           allowFontScaling
         >
           clipped
-        </Text>
+        </text>
       ));
       await tick();
 
@@ -92,9 +90,9 @@ describe('Solid Text on the engine', () => {
     // hasTextAncestor flag and picks the name.
     it('renders a nested Text as RCTVirtualText and an unnested one as RCTText', async () => {
       mount(ROOT_TAG, () => (
-        <Text testID="probe">
-          outer <Text testID="inner">inner</Text>
-        </Text>
+        <text testID="probe">
+          outer <text testID="inner">inner</text>
+        </text>
       ));
       await tick();
 
@@ -110,15 +108,15 @@ describe('Solid Text on the engine', () => {
     it('flips a Text back to RCTText when it stops having a Text ancestor', async () => {
       const [nested, setNested] = createSignal(true);
       mount(ROOT_TAG, () => (
-        <View>
+        <view>
           {nested() ? (
-            <Text>
-              outer <Text testID="probe">moving</Text>
-            </Text>
+            <text>
+              outer <text testID="probe">moving</text>
+            </text>
           ) : (
-            <Text testID="probe">moving</Text>
+            <text testID="probe">moving</text>
           )}
-        </View>
+        </view>
       ));
       await tick();
       expect(probe().viewName).toBe('RCTVirtualText');
@@ -134,7 +132,7 @@ describe('Solid Text on the engine', () => {
     // native-owned state (selection, measured layout) on every character.
     it('updates dynamic text without re-creating the native node', async () => {
       const [name, setName] = createSignal('one');
-      mount(ROOT_TAG, () => <Text testID="probe">{name()}</Text>);
+      mount(ROOT_TAG, () => <text testID="probe">{name()}</text>);
       await tick();
       const createdAtMount = fabric.counts.createNode;
       expect(fabric.serialize([probe()])).toBe('RCTText(RCTRawText "one")');
@@ -153,9 +151,9 @@ describe('Solid Text on the engine', () => {
     // a meaningless prop and the text unlabelled for a screen reader.
     it('folds aria aliases into the canonical accessibility props', async () => {
       mount(ROOT_TAG, () => (
-        <Text testID="probe" aria-label="greeting" aria-hidden>
+        <text testID="probe" aria-label="greeting" aria-hidden>
           hi
-        </Text>
+        </text>
       ));
       await tick();
 
@@ -168,9 +166,9 @@ describe('Solid Text on the engine', () => {
     // would crash Android's folly::dynamic serializer.
     it('raises the onLayout flag and keeps the text-layout handler off the prop bag', async () => {
       mount(ROOT_TAG, () => (
-        <Text testID="probe" onLayout={() => {}} onTextLayout={() => {}}>
+        <text testID="probe" onLayout={() => {}} onTextLayout={() => {}}>
           measured
-        </Text>
+        </text>
       ));
       await tick();
 
@@ -184,9 +182,9 @@ describe('Solid Text on the engine', () => {
       // See view.test.tsx's ref case for why this is a signal setter and not `ref={el}`.
       const [node, setNode] = createSignal<IHostInstance | undefined>();
       mount(ROOT_TAG, () => (
-        <Text testID="probe" ref={setNode}>
+        <text testID="probe" ref={setNode}>
           hi
-        </Text>
+        </text>
       ));
       await tick();
 

@@ -70,7 +70,7 @@ across both platforms.
   <TabItem label="React">
     ```tsx
     import { useEffect, useState } from 'react';
-    import { KEYBOARD_EVENT, Keyboard, Settings, Text, View } from '@symbiote-native/react';
+    import { KEYBOARD_EVENT, Keyboard, Settings } from '@symbiote-native/react';
 
     export default function KeyboardStatus() {
       const [height, setHeight] = useState(0);
@@ -91,9 +91,9 @@ across both platforms.
       }, []);
 
       return (
-        <View>
-          <Text>Keyboard height: {height}</Text>
-        </View>
+        <view>
+          <text>Keyboard height: {height}</text>
+        </view>
       );
     }
     ```
@@ -103,7 +103,7 @@ across both platforms.
     ```vue
     <script setup lang="ts">
     import { onMounted, onUnmounted, ref } from 'vue';
-    import { KEYBOARD_EVENT, Keyboard, Settings, Text, View } from '@symbiote-native/vue';
+    import { KEYBOARD_EVENT, Keyboard, Settings } from '@symbiote-native/vue';
 
     const height = ref(0);
     let subscriptions: ReturnType<typeof Keyboard.addListener>[] = [];
@@ -127,9 +127,9 @@ across both platforms.
     </script>
 
     <template>
-      <View>
-        <Text>Keyboard height: {{ height }}</Text>
-      </View>
+      <view>
+        <text>Keyboard height: {{ height }}</text>
+      </view>
     </template>
     ```
 
@@ -137,15 +137,15 @@ across both platforms.
   <TabItem label="Angular">
     ```ts
     import { Component, OnDestroy, OnInit, signal } from '@angular/core';
-    import { KEYBOARD_EVENT, Keyboard, Settings, Text, View } from '@symbiote-native/angular';
+    import { KEYBOARD_EVENT, Keyboard, Settings, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 
     @Component({
       standalone: true,
-      imports: [Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View>
-          <Text>Keyboard height: {{ height() }}</Text>
-        </View>
+        <view>
+          <text>Keyboard height: {{ height() }}</text>
+        </view>
       `,
     })
     export class KeyboardStatus implements OnInit, OnDestroy {
@@ -177,7 +177,7 @@ across both platforms.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { KEYBOARD_EVENT, Keyboard, Settings, Text, View } from '@symbiote-native/svelte';
+      import { KEYBOARD_EVENT, Keyboard, Settings } from '@symbiote-native/svelte';
 
       let height = $state(0);
 
@@ -197,9 +197,9 @@ across both platforms.
       });
     </script>
 
-    <View>
-      <Text>Keyboard height: {height}</Text>
-    </View>
+    <view>
+      <text>Keyboard height: {height}</text>
+    </view>
     ```
 
     `Keyboard` and `Settings` are plain objects off the adapter barrel here too, same as on
@@ -210,7 +210,7 @@ across both platforms.
   <TabItem label="Solid">
     ```tsx
     import { createSignal, onCleanup } from 'solid-js';
-    import { KEYBOARD_EVENT, Keyboard, Settings, Text, View } from '@symbiote-native/solid';
+    import { KEYBOARD_EVENT, Keyboard, Settings } from '@symbiote-native/solid';
 
     export function KeyboardStatus() {
       const [height, setHeight] = createSignal(0);
@@ -229,9 +229,9 @@ across both platforms.
       });
 
       return (
-        <View>
-          <Text>Keyboard height: {height()}</Text>
-        </View>
+        <view>
+          <text>Keyboard height: {height()}</text>
+        </view>
       );
     }
     ```

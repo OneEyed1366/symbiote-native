@@ -7,7 +7,7 @@
 // the engine's WeakMap mirror misses. Nothing here destructures props.
 
 import { createSignal, onCleanup, onMount } from 'solid-js';
-import { Animated, PanResponder, Text, View } from '@symbiote-native/solid';
+import { Animated, PanResponder } from '@symbiote-native/solid';
 import { ActionButton } from './ActionButton';
 
 const XY_SPAN = 96;
@@ -79,37 +79,34 @@ export function AnimatedParityDemo() {
   };
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">
+    <view class="section-nested">
+      <text class="section-label">
         Animated · ValueXY / tracking / diffClamp
-      </Text>
+      </text>
 
       {/* ValueXY box you drag with a finger (PanResponder). panHandlers is a fixed bag of
           functions built once, so spreading it needs no accessor. */}
-      <Text class="drag-hint">drag the purple box →</Text>
-      <View class="xy-frame">
-        <Animated.View
+      <text class="drag-hint">drag the purple box →</text>
+      <view class="xy-frame">
+        <view
           {...panResponder.panHandlers}
           testID="xy-box"
           class="xy-box"
           style={{ transform: xy.getTranslateTransform() }}
         />
-      </View>
+      </view>
 
       {/* Tracking: lead dot (blue) and follower (orange) that lags behind it */}
-      <View class="track-row">
-        <Animated.View
-          class="lead-dot"
-          style={{ transform: [{ translateX: lead }] }}
-        />
-      </View>
-      <View class="track-row">
-        <Animated.View
+      <view class="track-row">
+        <view class="lead-dot" style={{ transform: [{ translateX: lead }] }} />
+      </view>
+      <view class="track-row">
+        <view
           testID="follow-dot"
           class="follow-dot"
           style={{ transform: [{ translateX: follow }] }}
         />
-      </View>
+      </view>
       <ActionButton
         testID="track-btn"
         title="Move target (follower chases)"
@@ -118,30 +115,30 @@ export function AnimatedParityDemo() {
       />
 
       {/* diffClamp collapsing header */}
-      <View class="collapse-frame">
-        <Animated.View
+      <view class="collapse-frame">
+        <view
           class="collapse-header"
           style={{ transform: [{ translateY: headerOffset }] }}
         >
-          <Text class="collapse-header-text">collapsing header</Text>
-        </Animated.View>
-      </View>
-      <View class="row-tight">
-        <View class="flex1">
+          <text class="collapse-header-text">collapsing header</text>
+        </view>
+      </view>
+      <view class="row-tight">
+        <view class="flex1">
           <ActionButton
             title="Scroll ↓"
             onPress={() => scrollBy(40)}
             color="#38b2ac"
           />
-        </View>
-        <View class="flex1">
+        </view>
+        <view class="flex1">
           <ActionButton
             title="Scroll ↑"
             onPress={() => scrollBy(-40)}
             color="#38b2ac"
           />
-        </View>
-      </View>
-    </View>
+        </view>
+      </view>
+    </view>
   );
 }

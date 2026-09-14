@@ -13,7 +13,6 @@
     writable,
   } from 'svelte/store';
   import type { Readable, StartStopNotifier, Writable } from 'svelte/store';
-  import { Text, View } from '@symbiote-native/svelte';
   import ActionButton from '../ActionButton.svelte';
 
   const ACCENT = '#4fd1a5';
@@ -55,11 +54,11 @@
   const backToRune = fromStore(countStore);
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">
+<view class="section-nested">
+  <text class="section-label">
     Stores · writable, derived, get, readonly, toStore/fromStore
-  </Text>
-  <View class="row-align-center">
+  </text>
+  <view class="row-align-center">
     <ActionButton
       testID="stores-decrement"
       title="countStore.update(-1)"
@@ -78,34 +77,34 @@
       color={ACCENT}
       onPress={() => countStore.update(value => value + 1)}
     />
-  </View>
-  <Text class="info-text" testID="stores-count-readout">
+  </view>
+  <text class="info-text" testID="stores-count-readout">
     {`$countStore: ${$countStore} · derived $doubledStore: ${$doubledStore} · readonly $readonlyCountStore: ${$readonlyCountStore}`}
-  </Text>
+  </text>
   <ActionButton
     testID="stores-get-once"
     title="get(countStore)"
     color={ACCENT}
     onPress={readOnce}
   />
-  <Text class="note-text" testID="stores-get-readout">
+  <text class="note-text" testID="stores-get-readout">
     {getReadout}
-  </Text>
-  <Text class="info-text" testID="stores-clock-readout">
+  </text>
+  <text class="info-text" testID="stores-clock-readout">
     {`readable() ticking clock: ${$clockStore}`}
-  </Text>
-  <Text class="section-label">
+  </text>
+  <text class="section-label">
     toStore / fromStore — bridging a $state rune
-  </Text>
-  <View class="row-align-center">
+  </text>
+  <view class="row-align-center">
     <ActionButton
       testID="stores-bridge-set"
       title="bridgeStore.set(bridgeRune + 1)"
       color={ACCENT}
       onPress={() => bridgeStore.set(bridgeRune + 1)}
     />
-  </View>
-  <Text class="info-text" testID="stores-bridge-readout">
+  </view>
+  <text class="info-text" testID="stores-bridge-readout">
     {`bridgeRune ($state): ${bridgeRune} · $bridgeStore (toStore of it): ${$bridgeStore} · fromStore(countStore).current: ${backToRune.current}`}
-  </Text>
-</View>
+  </text>
+</view>

@@ -62,7 +62,7 @@ function mountKeepAwake(options: IKeepAwakeProbeOptions = {}): void {
     defineComponent({
       setup: () => {
         useKeepAwake(tag, { listener, suppressDeactivateWarnings });
-        return () => h('symbiote-text', {}, 'keep-awake');
+        return () => h('text', {}, 'keep-awake');
       },
     }),
   );

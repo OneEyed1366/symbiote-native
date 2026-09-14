@@ -18,7 +18,7 @@ import {
   type Accessor,
   type Setter,
 } from 'solid-js';
-import { Animated, Text, View } from '@symbiote-native/solid';
+import { Animated } from '@symbiote-native/solid';
 import { ActionButton } from './ActionButton';
 
 const SLIDE_DISTANCE = 220;
@@ -98,26 +98,26 @@ export function AnimatedDemo() {
   };
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">Animated · JS vs native driver</Text>
+    <view class="section-nested">
+      <text class="section-label">Animated · JS vs native driver</text>
 
       {/* native-driven perpetual pulse */}
-      <View class="pulse-frame">
-        <Animated.View
+      <view class="pulse-frame">
+        <view
           testID="pulse-dot"
           class="pulse-dot"
           style={{ opacity: pulseOpacity, transform: [{ scale: pulseScale }] }}
         />
-      </View>
+      </view>
 
       {/* JS-driven slide: a commit per frame */}
-      <View class="slide-track">
-        <Animated.View
+      <view class="slide-track">
+        <view
           testID="slide-js-dot"
           class="js-slide-dot"
           style={{ transform: [{ translateX: jsX }] }}
         />
-      </View>
+      </view>
       <ActionButton
         testID="slide-js-btn"
         title="Slide (JS driver)"
@@ -126,13 +126,13 @@ export function AnimatedDemo() {
       />
 
       {/* native-driven slide: offloaded, zero JS frames */}
-      <View class="slide-track">
-        <Animated.View
+      <view class="slide-track">
+        <view
           testID="slide-native-dot"
           class="native-slide-dot"
           style={{ transform: [{ translateX: nativeX }] }}
         />
-      </View>
+      </view>
       <ActionButton
         testID="slide-native-btn"
         title="Slide (native driver)"
@@ -148,6 +148,6 @@ export function AnimatedDemo() {
         onPress={freezeJs}
         color="#fc8181"
       />
-    </View>
+    </view>
   );
 }

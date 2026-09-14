@@ -21,14 +21,14 @@ const drainAngularAndCommit = async (): Promise<void> => {
 
 class TestView {}
 Component({
-  selector: 'symbiote-view',
+  selector: 'view',
   standalone: true,
   template: '<ng-content></ng-content>',
 })(TestView);
 
 class TestText {}
 Component({
-  selector: 'symbiote-text',
+  selector: 'text',
   standalone: true,
   template: '<ng-content></ng-content>',
 })(TestText);
@@ -47,7 +47,7 @@ Component({
   selector: 'symbiote-angular-smoke',
   standalone: true,
   imports: [TestView, TestText],
-  template: `<symbiote-view [style]="boxStyle"><symbiote-text>Hello {{ name }}</symbiote-text><symbiote-view testID="counter" (press)="increment()"><symbiote-text>tapped {{ count }}×</symbiote-text></symbiote-view></symbiote-view>`,
+  template: `<view [style]="boxStyle"><text>Hello {{ name }}</text><view testID="counter" (press)="increment()"><text>tapped {{ count }}×</text></view></view>`,
 })(SmokeComponent);
 
 beforeEach(() => fabric.reset());
@@ -76,7 +76,7 @@ Component({
   standalone: true,
   imports: [TestView, TestText],
   template:
-    '<symbiote-view testID="counter" (press)="increment()"><symbiote-text>tapped {{ count }}×</symbiote-text></symbiote-view>',
+    '<view testID="counter" (press)="increment()"><text>tapped {{ count }}×</text></view>',
 })(CounterChild);
 
 class UnrelatedSiblingChild {
@@ -88,7 +88,7 @@ class UnrelatedSiblingChild {
 Component({
   selector: 'unrelated-sibling-child',
   standalone: true,
-  template: '<symbiote-text>unrelated {{ trackRender() }}</symbiote-text>',
+  template: '<text>unrelated {{ trackRender() }}</text>',
 })(UnrelatedSiblingChild);
 
 class TargetedComponent {}
@@ -96,7 +96,7 @@ Component({
   selector: 'symbiote-angular-targeted',
   standalone: true,
   imports: [TestView, CounterChild, UnrelatedSiblingChild],
-  template: `<symbiote-view><counter-child /><unrelated-sibling-child /></symbiote-view>`,
+  template: `<view><counter-child /><unrelated-sibling-child /></view>`,
 })(TargetedComponent);
 
 // A component whose only unusual move is calling `resource()`. Angular resolves TransferState
@@ -112,7 +112,7 @@ Component({
   selector: 'symbiote-angular-resource',
   standalone: true,
   imports: [TestText],
-  template: '<symbiote-text>resource mounted</symbiote-text>',
+  template: '<text>resource mounted</text>',
 })(ResourceComponent);
 
 class InitialPropsComponent {
@@ -123,7 +123,7 @@ Component({
   standalone: true,
   imports: [TestText],
   inputs: ['greeting'],
-  template: '<symbiote-text>{{ greeting }}</symbiote-text>',
+  template: '<text>{{ greeting }}</text>',
 })(InitialPropsComponent);
 
 // mount() has no throwing path of its own (Angular bootstrap errors surface through the

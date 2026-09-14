@@ -5,7 +5,6 @@
 // navigation scope already on the owner chain — but the memo behind it re-derives the handle, so a
 // body-level destructure would pin this screen to whatever the chain held at mount.
 
-import { SafeAreaView, Text, View } from '@symbiote-native/solid';
 import { useDrawerNavigation } from '@symbiote-native/navigation/solid';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -18,32 +17,32 @@ export function DrawerHomeScreen() {
   const navigation = useDrawerNavigation();
 
   return (
-    <SafeAreaView class="screen">
-      <View class="demo-section">
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">
+    <safe-area-view class="screen">
+      <view class="demo-section">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">
             {`${lineInfo.code} · ${lineInfo.label}`}
-          </Text>
-        </View>
-        <View class="hero-card">
-          <View
+          </text>
+        </view>
+        <view class="hero-card">
+          <view
             class="hero-badge"
             style={{ backgroundColor: LINE_COLOR.structure }}
           >
-            <Text class="hero-badge-text">DR</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Drawer</Text>
-            <Text class="hero-body">
+            <text class="hero-badge-text">DR</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Drawer</text>
+            <text class="hero-body">
               A swipeable drawer sliding in from the right, driven by the
               navigator's own gesture handler.
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">
+            </text>
+          </view>
+        </view>
+        <text class="info-text">
           drawerPosition: right · drawerType: slide — swipe from the RIGHT edge,
           or use a button
-        </Text>
+        </text>
         <ActionButton
           testID="drawer-open"
           title="Open drawer"
@@ -56,7 +55,7 @@ export function DrawerHomeScreen() {
           onPress={() => navigation().toggleDrawer()}
           color={LINE_COLOR.structure}
         />
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   );
 }

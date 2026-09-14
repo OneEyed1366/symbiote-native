@@ -92,7 +92,7 @@ async function compileComponent(
 
 function appChildren(): IFakeNode[] {
   const wrapper = fabric.appRoot().children[0];
-  expect(wrapper, 'the root wrapper symbiote-view committed').toBeDefined();
+  expect(wrapper, 'the root wrapper view committed').toBeDefined();
   return wrapper?.children ?? [];
 }
 
@@ -126,8 +126,8 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
          let current = $state(control.initial);
          control.swap = next => { current = next; };
        </script>` +
-        `{#await current}<symbiote-view p={{ testID: 'pending' }}><symbiote-text p={{}}>loading</symbiote-text></symbiote-view>` +
-        `{:then value}<symbiote-view p={{ testID: 'then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>{/await}`,
+        `{#await current}<view p={{ testID: 'pending' }}><text p={{}}>loading</text></view>` +
+        `{:then value}<view p={{ testID: 'then' }}><text p={{}}>{value}</text></view>{/await}`,
       'DeferredAwaiter',
     );
 
@@ -185,7 +185,7 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
          let { gate } = $props();
          const label = await gate.promise;
        </script>` +
-        `<symbiote-view p={{ testID: 'child' }}><symbiote-text p={{}}>{label}</symbiote-text></symbiote-view>`,
+        `<view p={{ testID: 'child' }}><text p={{}}>{label}</text></view>`,
       'AwaitingChild',
       AWAITING_CHILD_MODULE,
     );
@@ -197,7 +197,7 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
        </script>` +
         `<svelte:boundary>` +
         `<Child {gate} />` +
-        `{#snippet pending()}<symbiote-view p={{ testID: 'pending' }}><symbiote-text p={{}}>loading</symbiote-text></symbiote-view>{/snippet}` +
+        `{#snippet pending()}<view p={{ testID: 'pending' }}><text p={{}}>loading</text></view>{/snippet}` +
         `</svelte:boundary>`,
       'PendingBoundary',
     );
@@ -241,7 +241,7 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
          let { gate } = $props();
          const label = await gate.promise;
        </script>` +
-        `<symbiote-view p={{ testID: 'child' }}><symbiote-text p={{}}>{label}</symbiote-text></symbiote-view>`,
+        `<view p={{ testID: 'child' }}><text p={{}}>{label}</text></view>`,
       'AwaitingChild',
       AWAITING_CHILD_MODULE,
     );
@@ -252,9 +252,9 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
          let { gate } = $props();
        </script>` +
         `<svelte:boundary>` +
-        `<symbiote-view p={{ testID: 'sibling' }}><symbiote-text p={{}}>sync</symbiote-text></symbiote-view>` +
+        `<view p={{ testID: 'sibling' }}><text p={{}}>sync</text></view>` +
         `<Child {gate} />` +
-        `{#snippet pending()}<symbiote-view p={{ testID: 'pending' }}><symbiote-text p={{}}>loading</symbiote-text></symbiote-view>{/snippet}` +
+        `{#snippet pending()}<view p={{ testID: 'pending' }}><text p={{}}>loading</text></view>{/snippet}` +
         `</svelte:boundary>`,
       'PendingBoundaryWithSibling',
     );

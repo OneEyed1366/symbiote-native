@@ -107,7 +107,7 @@ describe('$inspect under the svelte adapter mount pipeline', () => {
            $inspect(count).with((type, value) => { globalThis.__inspectLog.push(value); });
            $effect(() => { if (count < 2) count = count + 1; });
          </script>
-         <symbiote-text p={{}}>count {count}</symbiote-text>`,
+         <text p={{}}>count {count}</text>`,
         'InspectCounter',
       );
 
@@ -142,7 +142,7 @@ describe('$inspect under the svelte adapter mount pipeline', () => {
            $inspect(count).with((type, value) => { globalThis.__inspectLog.push(value); });
            $effect(() => { if (count < 2) count = count + 1; });
          </script>
-         <symbiote-text p={{}}>count {count}</symbiote-text>`,
+         <text p={{}}>count {count}</text>`,
         'InspectCounterDev',
         true,
       );

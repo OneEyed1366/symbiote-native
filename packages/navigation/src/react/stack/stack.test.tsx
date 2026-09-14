@@ -140,15 +140,15 @@ function headerConfigOf(screen: IFakeNode): IFakeNode {
 }
 
 function HomeScreen(): ReturnType<typeof createElement> {
-  return createElement('symbiote-text', {}, 'home');
+  return createElement('text', {}, 'home');
 }
 
 function DetailsScreen(): ReturnType<typeof createElement> {
-  return createElement('symbiote-text', {}, 'details');
+  return createElement('text', {}, 'details');
 }
 
 function ProfileScreen(): ReturnType<typeof createElement> {
-  return createElement('symbiote-text', {}, 'profile');
+  return createElement('text', {}, 'profile');
 }
 
 // Captured on render so a test can drop the Details marker mid-flight (the mount/unmount harness
@@ -346,7 +346,7 @@ describe('React Stack navigator', () => {
       let receivedParams: unknown;
       function ParamsScreen(): ReturnType<typeof createElement> {
         receivedParams = useRoute().params;
-        return createElement('symbiote-text', {}, 'params');
+        return createElement('text', {}, 'params');
       }
       const ref = createRef<INavigatorHandle>();
       mount(
@@ -371,7 +371,7 @@ describe('React Stack navigator', () => {
       let receivedParams: unknown;
       function ParamsScreen(): ReturnType<typeof createElement> {
         receivedParams = useRoute().params;
-        return createElement('symbiote-text', {}, 'params');
+        return createElement('text', {}, 'params');
       }
       const ref = createRef<INavigatorHandle>();
       mount(
@@ -401,7 +401,7 @@ describe('React Stack navigator', () => {
         const route = useRoute();
         homeKey = route.key;
         homeParams = route.params;
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
       const ref = createRef<INavigatorHandle>();
       mount(

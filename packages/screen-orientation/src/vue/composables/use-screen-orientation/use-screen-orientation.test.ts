@@ -56,7 +56,7 @@ function mountScreenOrientation(): Ref<IScreenOrientationState> {
     defineComponent({
       setup: () => {
         screenOrientation = useScreenOrientation();
-        return () => h('symbiote-text', {}, 'screen-orientation');
+        return () => h('text', {}, 'screen-orientation');
       },
     }),
   );

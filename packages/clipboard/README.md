@@ -93,7 +93,7 @@ function ClipboardScreen() {
   const handleCopy = (input: string) =>
     setStringAsync(input).then(() => getStringAsync().then(setText));
 
-  return <Text>{text ?? 'checking…'}</Text>;
+  return <text>{text ?? 'checking…'}</text>;
 }
 ```
 
@@ -122,7 +122,7 @@ function handleCopy(input: string): void {
 }
 </script>
 <template>
-  <Text>{{ text }}</Text>
+  <text>{{ text }}</text>
 </template>
 ```
 
@@ -151,7 +151,7 @@ function handleCopy(input: string): void {
   }
 </script>
 
-<Text>{text}</Text>
+<text>{text}</text>
 ```
 
 ```tsx
@@ -173,10 +173,9 @@ function ClipboardScreen() {
     if (clipboardEvent() !== null) refresh();
   });
 
-  const handleCopy = (input: string) =>
-    setStringAsync(input).then(refresh);
+  const handleCopy = (input: string) => setStringAsync(input).then(refresh);
 
-  return <Text>{text()}</Text>;
+  return <text>{text()}</text>;
 }
 ```
 

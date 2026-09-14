@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { mount, unmount, View } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 909;
@@ -33,7 +33,7 @@ describe('React className prop', () => {
           style: { padding: 10 },
         },
       ]);
-      mount(ROOT_TAG, <View testID="probe" className="card" />);
+      mount(ROOT_TAG, <view testID="probe" className="card" />);
 
       const committed = fabric.find(node => node.props.testID === 'probe');
       expect(committed?.props.padding).toBe(10);
@@ -53,7 +53,7 @@ describe('React className prop', () => {
       ]);
       mount(
         ROOT_TAG,
-        <View
+        <view
           testID="probe"
           className="card"
           style={{ backgroundColor: 'blue' }}

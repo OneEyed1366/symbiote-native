@@ -7,7 +7,7 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, View, PanResponder } from '@symbiote-native/react';
+import { mount, unmount, PanResponder } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 170;
@@ -55,7 +55,7 @@ describe('React PanResponder multitouch through the event layer', () => {
 
     function App(): ReactElement {
       return (
-        <View {...responder.panHandlers} style={{ width: 200, height: 200 }} />
+        <view {...responder.panHandlers} style={{ width: 200, height: 200 }} />
       );
     }
 

@@ -7,7 +7,7 @@
 
 import { Activity, useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Text, View, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 11;
@@ -44,9 +44,9 @@ function panelProps(): Record<string, unknown> {
 function Panel({ hidden }: { hidden: boolean }): ReactElement {
   return (
     <Activity mode={hidden ? 'hidden' : 'visible'}>
-      <View testID="activity-panel" style={{ backgroundColor: '#24304a' }}>
-        <Text>panel</Text>
-      </View>
+      <view testID="activity-panel" style={{ backgroundColor: '#24304a' }}>
+        <text>panel</text>
+      </view>
     </Activity>
   );
 }
@@ -54,9 +54,9 @@ function Panel({ hidden }: { hidden: boolean }): ReactElement {
 function Host(): ReactElement {
   const [hidden, setHidden] = useState(false);
   return (
-    <View testID="activity-host" onPress={() => setHidden(value => !value)}>
+    <view testID="activity-host" onPress={() => setHidden(value => !value)}>
       <Panel hidden={hidden} />
-    </View>
+    </view>
   );
 }
 

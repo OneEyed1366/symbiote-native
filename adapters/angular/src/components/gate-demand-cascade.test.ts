@@ -11,10 +11,15 @@
 // file asserts: it CHAINS through however many wrappers deep, and it does NOT reach content the
 // app projects INTO a wrapper.
 //
-// The chains under test are the real ones, at their real depth:
+// The chain under test is the real one, at its real depth:
 //
-//   Button      -> TouchableOpacity      -> Pressable    3 deep
 //   SectionList -> VirtualizedSectionList -> VirtualizedList -> ScrollView   4 deep
+//
+// It used to carry a second, 3-deep arm — `Button -> TouchableOpacity -> Pressable` — and both of
+// its links are TAGS now, so the chain does not exist to be tested. Nothing was lost: a tag binds
+// no `@Output()` on anything, which is the cascade's cause, and the surviving arm is strictly
+// deeper and ends at a DIFFERENT leaf implementation (`gatedAccessibilityCallback`, not Pressable's
+// `accessibilityEmitterHandler`).
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -22,10 +27,21 @@ import { clearGlobalStyles } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
-import { Button } from './button';
-import { Pressable } from './pressable/index';
-import { SectionList } from './section-list/index';
-import { TouchableOpacity } from './touchable/index';
+// Through the package's own barrel, which is the shape an app writes — and here it is load-bearing
+// rather than cosmetic. Reaching the components by deep path made the SectionList chain resolve in
+// whatever order this file's own import list happened to give, and dropping the `./button` import
+// changed that order enough to break it: Angular's JIT read `VirtualizedSectionList`'s
+// `@ContentChild` selectors while the directive module was still evaluating and threw
+// "Can't construct a query … since the query selector wasn't defined", plus NG0919 on the
+// projection fixture. The barrel evaluates the graph in one fixed order, so the fixtures below no
+// longer depend on which of them happens to be imported first.
+import {
+  SectionList,
+  VirtualizedList,
+  VListItemDirective,
+} from '../components';
+import { provideGateDemand } from '../gate-demand';
+import { registerComposedComponent } from '../anchor-host-registry';
 import { VSectionItemDirective } from './virtualized-section-list/directives';
 
 const ROOT_TAG = 979;
@@ -38,40 +54,52 @@ const GATE_KEYS = [
   'onAccessibilityEscape',
 ] as const;
 
+// The projection boundary. A wrapper that DEMANDS NOTHING, with an app-authored consumer projected
+// INTO it: under `providers` the consumer would inherit that empty demand and light no gate; under
+// `viewProviders` it must answer from its own `.observed` exactly as it would standing alone.
+//
+// The wrapper is local rather than shipped, and that is forced rather than convenient: every
+// wrapper this file used to reach for — `Button`, `TouchableOpacity`, `Pressable` — is a TAG now,
+// and a tag provides nothing and consumes nothing. It still exercises the shipped pair
+// (`provideGateDemand` here, `injectGateDemandAbove` inside `VirtualizedList`), which is the whole
+// mechanism; what it stands in for is only the wrapper's IDENTITY.
 @Component({
-  selector: 'gate-cascade-button-quiet',
+  selector: 'gate-cascade-wrapper',
   standalone: true,
-  imports: [Button],
-  template: `<Button [testID]="'btn'" [title]="'Go'"></Button>`,
+  viewProviders: [provideGateDemand(() => GateCascadeWrapper)],
+  template: '<ng-content></ng-content>',
 })
-class ButtonQuietFixture {}
+class GateCascadeWrapper {}
 
-@Component({
-  selector: 'gate-cascade-button-subscribed',
-  standalone: true,
-  imports: [Button],
-  template: `<Button
-    [testID]="'btn'"
-    [title]="'Go'"
-    (accessibilityTap)="onTap()"
-  ></Button>`,
-})
-class ButtonSubscribedFixture {
-  onTap(): void {}
-}
+registerComposedComponent('gate-cascade-wrapper');
 
-// The app writes its OWN Pressable and projects it through a wrapper. Under `providers` this
-// Pressable would inherit the wrapper's demand; under `viewProviders` it must not, and must answer
-// from its own `.observed` exactly as it would standing alone.
+const PROJECTED_ROWS = ['row'];
+
 @Component({
   selector: 'gate-cascade-projected',
   standalone: true,
-  imports: [TouchableOpacity, Pressable],
-  template: `<TouchableOpacity [testID]="'outer'">
-    <Pressable [testID]="'mine'" (accessibilityTap)="onTap()"></Pressable>
-  </TouchableOpacity>`,
+  imports: [GateCascadeWrapper, VirtualizedList, VListItemDirective],
+  template: `
+    <gate-cascade-wrapper>
+      <VirtualizedList
+        [testID]="'mine'"
+        [data]="rows"
+        [getItem]="getRow"
+        [getItemCount]="countRows"
+        (accessibilityTap)="onTap()"
+      >
+        <ng-template vListItem let-item>
+          <text>{{ item }}</text>
+        </ng-template>
+      </VirtualizedList>
+    </gate-cascade-wrapper>
+  `,
 })
-class ProjectedPressableFixture {
+class ProjectedConsumerFixture {
+  rows = PROJECTED_ROWS;
+  getRow = (data: unknown, index: number): string =>
+    PROJECTED_ROWS[index] ?? '';
+  countRows = (): number => PROJECTED_ROWS.length;
   onTap(): void {}
 }
 
@@ -87,7 +115,7 @@ const SECTIONS = [{ title: 'A', data: [{ id: 'row' }] }];
   template: `
     <SectionList [testID]="'list'" [sections]="sections">
       <ng-template vSectionItem let-item>
-        <symbiote-text [testID]="item.id">{{ item.id }}</symbiote-text>
+        <text [testID]="item.id">{{ item.id }}</text>
       </ng-template>
     </SectionList>
   `,
@@ -103,7 +131,7 @@ class SectionListQuietFixture {
   template: `
     <SectionList [testID]="'list'" [sections]="sections" (magicTap)="onTap()">
       <ng-template vSectionItem let-item>
-        <symbiote-text [testID]="item.id">{{ item.id }}</symbiote-text>
+        <text [testID]="item.id">{{ item.id }}</text>
       </ng-template>
     </SectionList>
   `,
@@ -153,16 +181,8 @@ describe('a wrapper answers the gate for the component it renders', () => {
   describe('Positive', () => {
     // why: the control, and it has to come first. Every negative row below is satisfied by a tree
     // that never mounted or a testID that never matched, so something must be shown to LIGHT
-    // before an absence means anything.
-    it('lights exactly the subscribed gate three wrappers down', async () => {
-      mount(ROOT_TAG, ButtonSubscribedFixture);
-      await settle();
-
-      expect(litGates('btn')).toEqual(['onAccessibilityTap']);
-    });
-
-    // why: the same mechanism one link deeper and through a different leaf implementation. Four
-    // wrappers separate the app's binding from the node that writes the flag.
+    // before an absence means anything. Four wrappers separate the app's binding from the node
+    // that writes the flag.
     it('lights exactly the subscribed gate four wrappers down', async () => {
       mount(ROOT_TAG, SectionListSubscribedFixture);
       await settle();
@@ -171,10 +191,10 @@ describe('a wrapper answers the gate for the component it renders', () => {
     });
 
     // why: the projection boundary, which is the whole reason the provider is `viewProviders` and
-    // not `providers`. An app's own Pressable must behave as it would standing alone — under
+    // not `providers`. An app's own component must behave as it would standing alone — under
     // `providers` this reads `[]`, because the wrapper's demand says nobody asked.
-    it('leaves an app’s own projected Pressable answering for itself', async () => {
-      mount(ROOT_TAG, ProjectedPressableFixture);
+    it('leaves an app’s own projected consumer answering for itself', async () => {
+      mount(ROOT_TAG, ProjectedConsumerFixture);
       await settle();
 
       expect(litGates('mine')).toEqual(['onAccessibilityTap']);
@@ -182,20 +202,11 @@ describe('a wrapper answers the gate for the component it renders', () => {
   });
 
   describe('Negative', () => {
-    // why: THE assertion, and the defect this file exists for. Before the demand, Button's own
-    // template binding on TouchableOpacity — and TouchableOpacity's on Pressable — made all four
-    // flags true on every Button in every app, so native fired accessibility events into handlers
-    // that only re-emitted into nothing.
-    it('lights nothing when the app subscribed to none of them', async () => {
-      mount(ROOT_TAG, ButtonQuietFixture);
-      await settle();
-
-      expect(litGates('btn')).toEqual([]);
-    });
-
-    // why: the four-deep twin of the row above. Every middle link's own emitter is `.observed`
-    // because the level above bound it, so a demand answering from the LOCAL emitter passes the
-    // positive rows and fails only here.
+    // why: THE assertion, and the defect this file exists for. Before the demand, every middle
+    // link's own template binding made all four flags true on every instance in every app, so
+    // native fired accessibility events into handlers that only re-emitted into nothing. Every
+    // middle link's emitter is `.observed` because the level above bound it, so a demand answering
+    // from the LOCAL emitter passes the positive rows and fails only here.
     it('lights nothing four wrappers down when the app subscribed to none', async () => {
       mount(ROOT_TAG, SectionListQuietFixture);
       await settle();
@@ -207,12 +218,12 @@ describe('a wrapper answers the gate for the component it renders', () => {
     // answered "yes" for every name would pass the positive row above and this one is what
     // separates them.
     it('lights only the one subscribed name, not its three siblings', async () => {
-      mount(ROOT_TAG, ButtonSubscribedFixture);
+      mount(ROOT_TAG, SectionListSubscribedFixture);
       await settle();
 
-      const lit = litGates('btn');
+      const lit = litGates('list');
       expect(lit).not.toContain('onAccessibilityAction');
-      expect(lit).not.toContain('onMagicTap');
+      expect(lit).not.toContain('onAccessibilityTap');
       expect(lit).not.toContain('onAccessibilityEscape');
     });
   });

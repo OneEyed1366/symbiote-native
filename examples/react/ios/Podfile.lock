@@ -2353,8 +2353,8 @@ SPEC CHECKSUMS:
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
   symbiote-engine: 5d3a500bcfb9124e09d4250fa78a7e01f40db6cf
-  symbiote-navigation: 942a12430482cf1862f04014e1f873419b23452b
-  symbiote-slider: 9323ef00684d2c1f2dd5250f9bfa5794e07a01ce
+  symbiote-navigation: d890a373b5ad88847887ed53cc6205edc9e2bbdb
+  symbiote-slider: f866475c11d02613eb3d32f3bfeb9670b6e559cf
   symbiote-splash-screen: 082b03d52ce7abc1d965eb356d808eae3cccba66
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 

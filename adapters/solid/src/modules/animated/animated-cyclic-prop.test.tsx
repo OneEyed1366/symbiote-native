@@ -67,7 +67,7 @@ function cyclicPath(
 
 describe('Solid Animated: nothing cyclic reaches a prop write', () => {
   describe('Positive', () => {
-    // why: the xy-box in AnimatedParityDemo — a PanResponder bag spread onto an Animated.View
+    // why: the xy-box in AnimatedParityDemo — a PanResponder bag spread onto a `<view>`
     // whose style carries a ValueXY translate transform. The handler bag is functions, which
     // `writeProp` stashes rather than sending; the transform is what has to rasterize.
     it('commits no cyclic value for a ValueXY drag box', async () => {
@@ -79,7 +79,7 @@ describe('Solid Animated: nothing cyclic reaches a prop write', () => {
       });
 
       mount(ROOT_TAG, () => (
-        <Animated.View
+        <view
           {...panResponder.panHandlers}
           style={{ transform: xy.getTranslateTransform() }}
         />
@@ -100,7 +100,7 @@ describe('Solid Animated: nothing cyclic reaches a prop write', () => {
       }).start();
 
       mount(ROOT_TAG, () => (
-        <Animated.View style={{ transform: [{ translateX: follow }] }} />
+        <view style={{ transform: [{ translateX: follow }] }} />
       ));
       await tick();
 
@@ -117,7 +117,7 @@ describe('Solid Animated: nothing cyclic reaches a prop write', () => {
       });
 
       mount(ROOT_TAG, () => (
-        <Animated.View style={{ transform: [{ translateY: offset }] }} />
+        <view style={{ transform: [{ translateY: offset }] }} />
       ));
       await tick();
 
@@ -135,7 +135,7 @@ describe('Solid Animated: nothing cyclic reaches a prop write', () => {
       });
 
       mount(ROOT_TAG, () => (
-        <Animated.View style={{ transform: [{ translateY: offset }] }} />
+        <view style={{ transform: [{ translateY: offset }] }} />
       ));
       await tick();
 
@@ -161,7 +161,7 @@ describe('Solid Animated: nothing cyclic reaches a prop write', () => {
       moduleSelf.exports = moduleSelf;
 
       mount(ROOT_TAG, () => (
-        <Animated.View
+        <view
           __self={moduleSelf}
           style={{ transform: [{ translateY: offset }] }}
         />

@@ -3,17 +3,13 @@ title: Solid API
 description: The Solid adapter public contract.
 ---
 
-Import app-facing APIs from `@symbiote-native/solid`:
+Primitives (`view`, `text`, `pressable`, `text-input`, `scroll-view`, ...) are
+plain lowercase intrinsic tags — write them directly in JSX, no import needed.
+Import only what's still a real component or module from
+`@symbiote-native/solid`:
 
 ```ts
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/solid';
+import { StyleSheet } from '@symbiote-native/solid';
 ```
 
 Solid drives the same engine as React/Vue/Svelte/Angular, through
@@ -61,10 +57,11 @@ Two things Metro/Babel/tsc all need, none optional:
 - Events: real camelCase **props** (`onPress`, `onLongPress`,
   `onValueChange`, `onLayout`) passed straight through the compiled JSX,
   same as Svelte's shape, no directive and no kebab-case step.
-- Children: ordinary JSX, built once per component body. A component that
-  hands state back to its children (`Pressable`'s `pressed`) takes a
-  **function child called with an `Accessor`**, not a snapshot object. See
-  [Children](#children) below.
+- Children: ordinary JSX, built once per component body. `pressable` is a
+  plain tag, so pressed state no longer arrives as a render-prop function
+  child — wire `onPressIn`/`onPressOut` into a signal instead. List
+  components (`FlatList`, `SectionList`, ...) still take a function child.
+  See [Children](#children) below.
 - Refs: `ref={callback}`, a compile-time rewrite into a callback prop, not a
   runtime ref object. See [Refs and handles](#refs-and-handles) below.
 - Styles: `style`/`class` props, resolved through the same style registry
@@ -77,13 +74,13 @@ Two things Metro/Babel/tsc all need, none optional:
 ## Common events
 
 ```tsx
-<Pressable onPress={onTap} onLongPress={onHold} />
-<Switch value={enabled()} onValueChange={setEnabled} />
-<TextInput
+<pressable onPress={onTap} onLongPress={onHold} />
+<switch value={enabled()} onValueChange={setEnabled} />
+<text-input
   value={text()}
   onValueChange={(next, event) => onChange(event)}
 />
-<View onLayout={onLayout} />
+<view onLayout={onLayout} />
 ```
 
 `TextInput`'s `onValueChange` fires `(text, event)`, the same merged shape
@@ -92,23 +89,29 @@ React and Svelte use, unlike Angular, which needs a second output because an
 
 ## Children
 
-```tsx
-import { Pressable, Text } from '@symbiote-native/solid';
+`pressable` is a plain tag, so there's no component body left to call a
+render-prop function child against — wire the two press events into a signal
+instead; reading it inside the JSX stays reactive the same way reading an
+`Accessor` would:
 
-<Pressable onPress={onTap}>
-  {state => <Text>{state().pressed ? 'Release' : 'Press me'}</Text>}
-</Pressable>;
+```tsx
+import { createSignal } from 'solid-js';
+
+const [pressed, setPressed] = createSignal(false);
+
+<pressable
+  onPress={onTap}
+  onPressIn={() => setPressed(true)}
+  onPressOut={() => setPressed(false)}
+>
+  <text>{pressed() ? 'Release' : 'Press me'}</text>
+</pressable>;
 ```
 
-The child function is called **once, untracked**, and handed an
-`Accessor<IPressState>`. Reading `state()` inside the JSX (or inside a
-`<Show>`) stays reactive; reading it at the top of the function freezes it at
-its first value. This is the Solid-specific fix for a real device bug, not a
-stylistic choice: Solid has no reconciler to diff a rebuilt subtree against,
-so a snapshot value read inside a render effect tears the child tree down and
-rebuilds it on every press, which can lose the native responder grant
-mid-gesture. Full mechanism: [Solid
-reactivity](/docs/howtos/solid-reactivity/#render-children-take-an-accessor).
+List components (`FlatList`, `SectionList`, ...) still take a genuine render
+function per cell — see [Solid
+reactivity](/docs/howtos/solid-reactivity/#render-children-take-an-accessor)
+for that pattern and the device bug it was built to avoid.
 
 List renderers follow the same principle: the data and native list math are
 shared with every other adapter, while the rendered cell is ordinary Solid
@@ -119,11 +122,11 @@ snippet.
 
 ```tsx
 import { createSignal } from 'solid-js';
-import { TextInput, type IHostInstance } from '@symbiote-native/solid';
+import type { IHostInstance } from '@symbiote-native/solid';
 
 const [input, setInput] = createSignal<IHostInstance | null>(null);
 
-<TextInput ref={setInput} value="" onValueChange={() => {}} />;
+<text-input ref={setInput} value="" onValueChange={() => {}} />;
 ```
 
 Solid's `ref={el}` is a compile-time construct: the compiler rewrites it
@@ -166,9 +169,9 @@ import {
 const scheme = createColorScheme();
 const dimensions = createWindowDimensions();
 
-<Text>
+<text>
   {dimensions().width}×{dimensions().height} · {scheme()}
-</Text>;
+</text>;
 ```
 
 Each returns an **accessor**, never a bare value: a Solid component body
@@ -200,21 +203,15 @@ Angular, whose AOT compiler needs a named import instead.
 
 ```tsx
 import { createSignal } from 'solid-js';
-import {
-  Portal,
-  Show,
-  Text,
-  View,
-  type ISymbioteNode,
-} from '@symbiote-native/solid';
+import { Portal, Show, type ISymbioteNode } from '@symbiote-native/solid';
 
 const [overlayHost, setOverlayHost] = createSignal<ISymbioteNode | null>(null);
 
-<View ref={node => setOverlayHost(node)} />;
+<view ref={node => setOverlayHost(node)} />;
 <Show when={overlayHost()}>
   {host => (
     <Portal mount={host()}>
-      <Text>Rendered under overlayHost, not here</Text>
+      <text>Rendered under overlayHost, not here</text>
     </Portal>
   )}
 </Show>;
@@ -236,7 +233,7 @@ the tree.
 ## Cross-surface content (`createTunnel`)
 
 ```tsx
-import { createTunnel, Show, Text } from '@symbiote-native/solid';
+import { createTunnel, Show } from '@symbiote-native/solid';
 
 const overlayTunnel = createTunnel(); // module-level singleton, importable from both surfaces
 
@@ -246,7 +243,7 @@ const overlayTunnel = createTunnel(); // module-level singleton, importable from
 // inside any other component, in any surface
 <Show when={toastVisible()}>
   <overlayTunnel.In>
-    <Text>Toast</Text>
+    <text>Toast</text>
   </overlayTunnel.In>
 </Show>;
 ```

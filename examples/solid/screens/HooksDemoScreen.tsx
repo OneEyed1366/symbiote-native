@@ -20,7 +20,6 @@
 // `undefined`, which builds fine and throws at runtime (.claude/rules/solid-descriptor-bridge.md §3).
 
 import { Index, createSignal } from 'solid-js';
-import { SafeAreaView, Text, View } from '@symbiote-native/solid';
 import {
   createFocusEffect,
   createIsFocused,
@@ -47,46 +46,46 @@ export function HooksDemoScreen() {
   });
 
   return (
-    <SafeAreaView class="screen">
-      <View class="demo-section">
-        <View class={`line-tag line-tag-${lineInfo.line}`}>
-          <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View class="hero-card">
-          <View
+    <safe-area-view class="screen">
+      <view class="demo-section">
+        <view class={`line-tag line-tag-${lineInfo.line}`}>
+          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view class="hero-card">
+          <view
             class="hero-badge"
             style={{ backgroundColor: LINE_COLOR.introspection }}
           >
-            <Text class="hero-badge-text">HK</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Navigation primitives</Text>
-            <Text class="hero-body">
+            <text class="hero-badge-text">HK</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Navigation primitives</text>
+            <text class="hero-body">
               createFocusEffect, createIsFocused and createNavigationState —
               introspecting the navigator's own live state from inside a screen.
-            </Text>
-          </View>
-        </View>
-        <Text testID="hooks-is-focused" class="info-text">
+            </text>
+          </view>
+        </view>
+        <text testID="hooks-is-focused" class="info-text">
           {`createIsFocused(): ${isFocused()}`}
-        </Text>
-        <Text testID="hooks-focus-count" class="info-text">
+        </text>
+        <text testID="hooks-focus-count" class="info-text">
           {`createFocusEffect focus count: ${focusCount()}`}
-        </Text>
-        <Text class="info-text">
+        </text>
+        <text class="info-text">
           {lastBlurAt() === undefined
             ? 'not blurred yet'
             : `last blurred at ${lastBlurAt()}`}
-        </Text>
-        <Text class="note-text">
+        </text>
+        <text class="note-text">
           createNavigationState() · current route stack
-        </Text>
+        </text>
         <Index each={routeNames()}>
           {(name, index) => (
-            <Text class="hooks-list-row">{`${index}. ${name()}`}</Text>
+            <text class="hooks-list-row">{`${index}. ${name()}`}</text>
           )}
         </Index>
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   );
 }

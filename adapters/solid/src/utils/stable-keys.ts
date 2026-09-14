@@ -12,21 +12,22 @@
 // the actual diffing. Never hand-roll that diff instead.
 //
 // Lives here rather than beside either caller because BOTH reach for it: descriptorToSolid wraps
-// a render fn's Descriptor props, and the host primitives (View, Text) wrap their own
-// resolveAccessibilityProps output — the same function, the same two-branch key set. Any future
-// Solid component that folds props through a whole-object transform belongs on this too.
+// a render fn's Descriptor props, and a component that spreads a folded bag onto a bare `<view>`
+// (Pressable, KeyboardAvoidingView) wraps its own — the same function, the same two-branch key
+// set. This is the one capability a bare tag does NOT inherit from the wrappers that used to own
+// it, so any Solid component folding props through a whole-object transform belongs on it too.
 
-export function withStableKeys(
-  props: () => Record<string, unknown>,
+export function withStableKeys<TProps extends object>(
+  props: () => TProps,
 ): () => Record<string, unknown> {
   const seen = new Set<string>();
   return () => {
     const next = props();
     const widened: Record<string, unknown> = {};
     for (const key of seen) widened[key] = undefined;
-    for (const key of Object.keys(next)) {
+    for (const [key, value] of Object.entries(next)) {
       seen.add(key);
-      widened[key] = next[key];
+      widened[key] = value;
     }
     return widened;
   };

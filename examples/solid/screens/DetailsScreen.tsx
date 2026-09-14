@@ -11,7 +11,6 @@
 // "setParams reaches a mounted screen" test exists to catch).
 
 import { createMemo } from 'solid-js';
-import { SafeAreaView, Text, View } from '@symbiote-native/solid';
 import {
   useRoute,
   useStackNavigation,
@@ -34,18 +33,18 @@ export function DetailsScreen() {
   });
 
   return (
-    <SafeAreaView class="screen">
-      <View class="demo-section">
-        <Text class="note-text">Navigation demo · Details screen</Text>
-        <Text class="info-text">{`route.params: ${paramsLabel()}`}</Text>
-        <Text class="info-text">{`canGoBack: ${navigation().canGoBack()}`}</Text>
+    <safe-area-view class="screen">
+      <view class="demo-section">
+        <text class="note-text">Navigation demo · Details screen</text>
+        <text class="info-text">{`route.params: ${paramsLabel()}`}</text>
+        <text class="info-text">{`canGoBack: ${navigation().canGoBack()}`}</text>
         <ActionButton
           testID="nav-pop"
           title="← Pop back"
           onPress={() => navigation().pop()}
           color={LINE_COLOR.primitives}
         />
-      </View>
-    </SafeAreaView>
+      </view>
+    </safe-area-view>
   );
 }

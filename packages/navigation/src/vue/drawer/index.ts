@@ -608,7 +608,7 @@ const DrawerImpl = defineComponent<IDrawerProps>(
         .filter((element): element is VNode => element !== null);
 
       return h(
-        'symbiote-view',
+        'view',
         { style: root.props.style, ...panResponder.panHandlers },
         drawerChildren,
       );

@@ -1,16 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  SectionList,
-  Text,
-  TextInput,
-  View,
-  type ISection,
-} from '@symbiote-native/react';
+import { FlatList, SectionList, type ISection } from '@symbiote-native/react';
 import {
   readCommitProfile,
   registerPostCommit,
@@ -413,28 +402,28 @@ const BenchmarkRow = memo(function BenchmarkRowView({
   onRemove,
 }: IBenchmarkRowProps) {
   return (
-    <View className={isSelected ? 'bench-row bench-row-selected' : 'bench-row'}>
-      <Text className="bench-row-id">{String(row.id)}</Text>
-      <Pressable className="flex1" onPress={() => onSelect(row.id)}>
-        <Text className="bench-row-label">{row.label}</Text>
-      </Pressable>
-      <Pressable className="bench-row-remove" onPress={() => onRemove(row.id)}>
-        <Text className="bench-row-remove-text">×</Text>
-      </Pressable>
+    <view className={isSelected ? 'bench-row bench-row-selected' : 'bench-row'}>
+      <text className="bench-row-id">{String(row.id)}</text>
+      <pressable className="flex1" onPress={() => onSelect(row.id)}>
+        <text className="bench-row-label">{row.label}</text>
+      </pressable>
+      <pressable className="bench-row-remove" onPress={() => onRemove(row.id)}>
+        <text className="bench-row-remove-text">×</text>
+      </pressable>
       {/* LAST child, and deliberately bare: no `multiline` (it would pick the other native view
         and, being a runtime value, refuse to lower at all), no change handler and no ref (a ref
         refuses to lower on the adapters that check for one). CONTROLLED rather than
         `defaultValue`, because the controlled write is the beat the engine-side machine exists
         for and an uncontrolled input would never run it. React has no lowering transform, so
         here it stays a component — this column is the control the lowered ones are read against. */}
-      <TextInput className="bench-row-input" value={row.label} />
-    </View>
+      <text-input className="bench-row-input" value={row.label} />
+    </view>
   );
 });
 
 /**
- * Sticky path A - a plain ScrollView with stickyHeaderIndices. Stickiness is computed in JS (the
- * adapter wraps each flagged child and drives it off the scroll offset), but nothing else runs
+ * Sticky path A - a plain scroll-view with stickyHeaderIndices. Stickiness is computed in JS (the
+ * engine wraps each flagged child and drives it off the scroll offset), but nothing else runs
  * per frame: every child is mounted up front, there is no windowing. Memoized with no props so a
  * benchmark run never re-renders it and never contaminates the numbers next to the buttons.
  */
@@ -445,13 +434,13 @@ const StickyScrollViewBlock = memo(function StickyScrollViewBlockView() {
   const children = useMemo(
     () =>
       Array.from({ length: STICKY_SECTION_COUNT }, (_value, section) => [
-        <Text key={`sticky-header-${section}`} className="section-header">
+        <text key={`sticky-header-${section}`} className="section-header">
           {`SECTION ${section + 1}`}
-        </Text>,
+        </text>,
         ...Array.from({ length: STICKY_ROWS_PER_SECTION }, (_rowValue, row) => (
-          <Text key={`sticky-row-${section}-${row}`} className="list-row-text">
+          <text key={`sticky-row-${section}-${row}`} className="list-row-text">
             {`row ${section + 1}.${row + 1}`}
-          </Text>
+          </text>
         )),
       ]).flat(),
     [],
@@ -467,10 +456,10 @@ const StickyScrollViewBlock = memo(function StickyScrollViewBlockView() {
 
   return (
     <>
-      <Text className="section-label">
-        STICKY PATH A · ScrollView · stickyHeaderIndices
-      </Text>
-      <ScrollView
+      <text className="section-label">
+        STICKY PATH A · scroll-view · stickyHeaderIndices
+      </text>
+      <scroll-view
         testID="benchmark-sticky-scroll"
         className="bench-sticky"
         stickyHeaderIndices={headerIndices}
@@ -478,10 +467,10 @@ const StickyScrollViewBlock = memo(function StickyScrollViewBlockView() {
         nestedScrollEnabled
       >
         {children}
-      </ScrollView>
-      <Text className="note-text">
+      </scroll-view>
+      <text className="note-text">
         {`${STICKY_SECTION_COUNT} sections, every row mounted — no virtualization in the frame.`}
-      </Text>
+      </text>
     </>
   );
 });
@@ -497,9 +486,9 @@ const StickyScrollViewBlock = memo(function StickyScrollViewBlockView() {
 const StickySectionListBlock = memo(function StickySectionListBlockView() {
   return (
     <>
-      <Text className="section-label">
+      <text className="section-label">
         STICKY PATH B · SectionList · stickySectionHeadersEnabled
-      </Text>
+      </text>
       <SectionList
         testID="benchmark-sticky-section-list"
         sections={BENCHMARK_SECTIONS}
@@ -512,25 +501,25 @@ const StickySectionListBlock = memo(function StickySectionListBlockView() {
           // Height is pinned inline rather than in the stylesheet because the number has to agree
           // with sectionListItemLayout's arithmetic; splitting it across two files is how that
           // pair silently drifts apart.
-          <Text
+          <text
             className="section-header"
             style={{ height: SECTION_LIST_HEADER_HEIGHT }}
           >
             {section.title}
-          </Text>
+          </text>
         )}
         renderItem={({ item }) => (
-          <View
+          <view
             className="parity-row"
             style={{ height: SECTION_LIST_ROW_HEIGHT }}
           >
-            <Text className="list-row-text">{item.label}</Text>
-          </View>
+            <text className="list-row-text">{item.label}</text>
+          </view>
         )}
       />
-      <Text className="note-text">
+      <text className="note-text">
         {`${SECTION_LIST_SECTION_COUNT} sections x ${SECTION_LIST_ROWS_PER_SECTION} rows — windowed, sticky math inside the list.`}
-      </Text>
+      </text>
     </>
   );
 });
@@ -969,36 +958,36 @@ export function BenchmarkScreen() {
   }
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="benchmark-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: accent }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Benchmark</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: accent }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Benchmark</text>
+            <text className="hero-body">
               The js-framework-benchmark operations, run on device against the
               engine's commit path — with the JS-thread frame rate beside them.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <Text className="section-label">MEASUREMENTS</Text>
+        <text className="section-label">MEASUREMENTS</text>
         <JsFrameRateMeter accent={accent} />
 
         {/* Buttons and results sit DIRECTLY under the meter, and everything they stress sits
           below: a suite step holds the JS thread, so the dip has to be readable in the same
           screenful as the press that caused it. */}
-        <View className="bench-run-row">
-          <View className="flex1">
+        <view className="bench-run-row">
+          <view className="flex1">
             <ActionButton
               testID="bench-run-suite-all"
               title={
@@ -1009,8 +998,8 @@ export function BenchmarkScreen() {
               onPress={() => onRunSuite(MOUNT_MODE.All)}
               color={accent}
             />
-          </View>
-          <View className="flex1">
+          </view>
+          <view className="flex1">
             <ActionButton
               testID="bench-run-suite-virtualized"
               title={
@@ -1021,144 +1010,144 @@ export function BenchmarkScreen() {
               onPress={() => onRunSuite(MOUNT_MODE.Virtualized)}
               color={accent}
             />
-          </View>
-        </View>
+          </view>
+        </view>
 
         {progress !== undefined && (
-          <View testID="bench-suite-progress" className="bench-progress">
-            <ActivityIndicator color={accent} />
-            <Text className="bench-progress-text">
+          <view testID="bench-suite-progress" className="bench-progress">
+            <activity-indicator color={accent} />
+            <text className="bench-progress-text">
               {`${progress.mode === MOUNT_MODE.All ? 'All mounted' : 'Virtualized'} · ${progress.label}`}
-            </Text>
-            <Text className="bench-progress-count">
+            </text>
+            <text className="bench-progress-count">
               {`${progress.done}/${SUITE_STEPS.length}`}
-            </Text>
-          </View>
+            </text>
+          </view>
         )}
 
         {hasSuiteResults ? (
-          <View>
-            <View className="bench-compare-row">
-              <Text className="bench-compare-label" />
-              <Text className="bench-compare-head-cell">ALL MOUNTED</Text>
-              <Text className="bench-compare-head-cell">VIRTUALIZED</Text>
-            </View>
+          <view>
+            <view className="bench-compare-row">
+              <text className="bench-compare-label" />
+              <text className="bench-compare-head-cell">ALL MOUNTED</text>
+              <text className="bench-compare-head-cell">VIRTUALIZED</text>
+            </view>
             {SUITE_STEPS.map(step => (
-              <View
+              <view
                 key={step.op}
                 testID={`bench-suite-${step.op}`}
                 className="bench-compare-row"
               >
-                <Text className="bench-compare-label">{step.label}</Text>
-                <Text className="bench-compare-cell">
+                <text className="bench-compare-label">{step.label}</text>
+                <text className="bench-compare-cell">
                   {formatDuration(allDurations.get(step.op))}
-                </Text>
-                <Text className="bench-compare-cell">
+                </text>
+                <text className="bench-compare-cell">
                   {formatDuration(virtualizedDurations.get(step.op))}
-                </Text>
-              </View>
+                </text>
+              </view>
             ))}
-          </View>
+          </view>
         ) : (
-          <Text testID="bench-suite-empty" className="note-text">
+          <text testID="bench-suite-empty" className="note-text">
             No suite run yet.
-          </Text>
+          </text>
         )}
 
         {hasSuiteResults && (
-          <View>
-            <Text className="section-label">ENGINE PER STEP · ALL MOUNTED</Text>
-            <View className="bench-compare-row">
-              <Text className="bench-compare-label" />
-              <Text className="bench-compare-head-cell">WRITES</Text>
-              <Text className="bench-compare-head-cell">TEXTS</Text>
-              <Text className="bench-compare-head-cell">TEXT ms</Text>
-              <Text className="bench-compare-head-cell">NODES</Text>
-              <Text className="bench-compare-head-cell">DIRTY</Text>
-              <Text className="bench-compare-head-cell">FABRIC</Text>
-            </View>
+          <view>
+            <text className="section-label">ENGINE PER STEP · ALL MOUNTED</text>
+            <view className="bench-compare-row">
+              <text className="bench-compare-label" />
+              <text className="bench-compare-head-cell">WRITES</text>
+              <text className="bench-compare-head-cell">TEXTS</text>
+              <text className="bench-compare-head-cell">TEXT ms</text>
+              <text className="bench-compare-head-cell">NODES</text>
+              <text className="bench-compare-head-cell">DIRTY</text>
+              <text className="bench-compare-head-cell">FABRIC</text>
+            </view>
             {SUITE_STEPS.map(step => {
               const profile = allProfiles.get(step.op);
               return (
-                <View
+                <view
                   key={`engine-${step.op}`}
                   testID={`bench-engine-${step.op}`}
                   className="bench-compare-row"
                 >
-                  <Text className="bench-compare-label">{step.label}</Text>
-                  <Text className="bench-compare-cell">
+                  <text className="bench-compare-label">{step.label}</text>
+                  <text className="bench-compare-cell">
                     {profile === undefined ? '—' : String(profile.propWrites)}
-                  </Text>
-                  <Text className="bench-compare-cell">
+                  </text>
+                  <text className="bench-compare-cell">
                     {profile === undefined ? '—' : String(profile.textMeasures)}
-                  </Text>
-                  <Text className="bench-compare-cell">
+                  </text>
+                  <text className="bench-compare-cell">
                     {profile === undefined ? '—' : profile.textMs.toFixed(1)}
-                  </Text>
-                  <Text className="bench-compare-cell">
+                  </text>
+                  <text className="bench-compare-cell">
                     {profile === undefined ? '—' : String(profile.layoutNodes)}
-                  </Text>
-                  <Text className="bench-compare-cell">
+                  </text>
+                  <text className="bench-compare-cell">
                     {profile === undefined ? '—' : String(profile.dirtyTexts)}
-                  </Text>
-                  <Text className="bench-compare-cell">
+                  </text>
+                  <text className="bench-compare-cell">
                     {profile === undefined ? '—' : profile.commitMs.toFixed(1)}
-                  </Text>
-                </View>
+                  </text>
+                </view>
               );
             })}
-            <Text className="note-text">
+            <text className="note-text">
               {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS is off this table for width and still in the profile; it has read 1 in every measurement, and anything higher would mean a foreign commit landed inside the window.There is no node count: the tree lives in C++ and JS only fills a command buffer. FABRIC is completeSurface timed by the native host — Fabric's own commit, the differ, layout and the mount pass; BUILD, our tree walk, is off this table because it has read ~1 ms on every row and is still in the profile. TEXTS, TEXT ms and LAYOUT come out of RN's own commit telemetry, not our clock, and TEXTS is the one term inside a layout pass that costs tens of microseconds rather than one. TEXTS is a symptom and NODES is the disease: only a dirty leaf is ever re-measured, so a step whose NODES covers the whole tree will re-measure the whole tree's text whatever the change was. React Native's own renderer, measured against this same row in this same binary (the STOCK_ARM constant in index.js), commits a one-row Select with NODES 1006 and TEXTS 0 where this host reports 8477 and 2869 — same device, same tree, so the cost is this host's and not Fabric's. DIRTY is what splits the remaining question: it counts measurable text nodes ALREADY dirty in the tree handed to completeSurface, so DIRTY near TEXTS means our own walk leaves them dirty and the bug is in the walk, while DIRTY near zero means they are clean when we hand them over and something inside the commit dirties them.`}
-            </Text>
-          </View>
+            </text>
+          </view>
         )}
 
         {hasSuiteResults && (
-          <View>
-            <Text className="section-label">FABRIC CALLS · ALL MOUNTED</Text>
-            <View className="bench-compare-row">
-              <Text className="bench-compare-label" />
-              <Text className="bench-compare-head-cell">
+          <view>
+            <text className="section-label">FABRIC CALLS · ALL MOUNTED</text>
+            <view className="bench-compare-row">
+              <text className="bench-compare-label" />
+              <text className="bench-compare-head-cell">
                 CREATE/APPEND/CLONE
-              </Text>
-              <Text className="bench-compare-head-cell">PROP KEYS</Text>
-            </View>
+              </text>
+              <text className="bench-compare-head-cell">PROP KEYS</text>
+            </view>
             {SUITE_STEPS.map(step => {
               const fabric = allFabricProfiles.get(step.op);
               return (
-                <View
+                <view
                   key={`fabric-${step.op}`}
                   testID={`bench-fabric-${step.op}`}
                   className="bench-compare-row"
                 >
-                  <Text className="bench-compare-label">{step.label}</Text>
-                  <Text className="bench-compare-cell">
+                  <text className="bench-compare-label">{step.label}</text>
+                  <text className="bench-compare-cell">
                     {formatFabric(fabric)}
-                  </Text>
-                  <Text className="bench-compare-cell">
+                  </text>
+                  <text className="bench-compare-cell">
                     {fabric === undefined ? '—' : String(fabric.totalPropKeys)}
-                  </Text>
-                </View>
+                  </text>
+                </view>
               );
             })}
-            <Text className="note-text">
+            <text className="note-text">
               {`Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no command buffer to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`}
-            </Text>
-          </View>
+            </text>
+          </view>
         )}
-        <Text className="note-text">
+        <text className="note-text">
           {`Every operation in a fixed order, each timed step starting from exactly ${SUITE_ROWS} rows, with untimed resets in between. All-mounted is krausest's own shape (${NATIVE_VIEWS_PER_ROW} native views per row) and the column that compares to the published web numbers; virtualized mounts a window instead, so it prices what an app ships rather than the commit path itself. Pressing the operation buttons by hand leaves Remove and Append measuring whatever happened to be on screen.`}
-        </Text>
+        </text>
 
         {/* Both sticky paths and the row list sit under the buttons: the meter above stays on
           screen while either box is being dragged — the concrete case the benchmark exists for. */}
         <StickyScrollViewBlock />
         <StickySectionListBlock />
-        <Text className="note-text">
+        <text className="note-text">
           Drag inside a box (not the page) and watch the counters above — the
           two boxes differ only in which sticky implementation carries the
           frame.
-        </Text>
+        </text>
 
         {/* These sat BELOW the rows until 2026-09-07, deliberately, so nobody would report
           numbers from them: their Remove and Append act on whatever happened to be on screen,
@@ -1167,38 +1156,38 @@ export function BenchmarkScreen() {
           list holds a thousand rows, which is exactly the state you are in when you want to poke
           at one commit shape. A caveat keeps working from the top of the screen; a scroll
           position does not. */}
-        <Text className="section-label">OPERATIONS · LAST RUN</Text>
+        <text className="section-label">OPERATIONS · LAST RUN</text>
         {operations.map(operation => (
-          <View key={operation.id} className="bench-op-row">
-            <View className="flex1">
+          <view key={operation.id} className="bench-op-row">
+            <view className="flex1">
               <ActionButton
                 testID={`bench-op-${operation.id}`}
                 title={operation.label}
                 onPress={operation.onPress}
                 color={accent}
               />
-            </View>
-            <Text
+            </view>
+            <text
               testID={`bench-result-${operation.id}`}
               className="bench-op-result"
             >
               {formatDuration(lastDurations.get(operation.id))}
-            </Text>
-          </View>
+            </text>
+          </view>
         ))}
-        <Text className="note-text">
+        <text className="note-text">
           Single operations, for poking at one commit shape while debugging. Do
           NOT report from them — Remove and Append act on whatever row count is
           on screen, which is what the suite above removes.
-        </Text>
+        </text>
 
-        <Text testID="bench-row-count" className="info-text">
+        <text testID="bench-row-count" className="info-text">
           {`rows: ${rows.length} · ${mountedViews} native views mounted · selected: ${selectedId ?? 'none'}`}
-        </Text>
+        </text>
 
-        <Text className="section-label">
+        <text className="section-label">
           {isAllMounted ? 'ROWS · ALL MOUNTED' : 'ROWS · VIRTUALIZED'}
-        </Text>
+        </text>
         {isAllMounted ? (
           rows.map(row => (
             <BenchmarkRow
@@ -1231,19 +1220,19 @@ export function BenchmarkScreen() {
           />
         )}
 
-        <Text className="section-label">{`HISTORY · LAST ${HISTORY_LIMIT} MEASUREMENTS`}</Text>
+        <text className="section-label">{`HISTORY · LAST ${HISTORY_LIMIT} MEASUREMENTS`}</text>
         {history.length === 0 ? (
-          <Text className="note-text">
+          <text className="note-text">
             Run an operation above to record a measurement.
-          </Text>
+          </text>
         ) : (
           history.map(entry => (
-            <Text key={entry.seq} className="bench-history-row">
+            <text key={entry.seq} className="bench-history-row">
               {`${entry.label} — ${formatDuration(entry.durationMs)} · ${entry.rowCount} rows`}
-            </Text>
+            </text>
           ))
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </scroll-view>
+    </safe-area-view>
   );
 }

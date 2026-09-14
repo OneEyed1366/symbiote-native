@@ -88,10 +88,10 @@ afterEach(() => {
 });
 
 function HomeScreen() {
-  return h('symbiote-text', {}, 'home');
+  return h('text', {}, 'home');
 }
 function ProfileScreen() {
-  return h('symbiote-text', {}, 'profile');
+  return h('text', {}, 'profile');
 }
 
 function findAllText(nodes: readonly IFakeNode[]): string[] {
@@ -491,14 +491,14 @@ describe('Vue Drawer navigator', () => {
         return () => {
           homeIsFocused = isFocused.value;
           homeRouteName = route.value.name;
-          return h('symbiote-text', {}, 'home');
+          return h('text', {}, 'home');
         };
       });
       const TrackedProfileScreen = defineComponent(() => {
         const isFocused = useIsFocused();
         return () => {
           profileIsFocused = isFocused.value;
-          return h('symbiote-text', {}, 'profile');
+          return h('text', {}, 'profile');
         };
       });
 
@@ -526,7 +526,7 @@ describe('Vue Drawer navigator', () => {
           events.push('effect');
           return () => events.push('cleanup');
         });
-        return () => h('symbiote-text', {}, 'home');
+        return () => h('text', {}, 'home');
       });
 
       const handleRef = ref<IDrawerNavigatorHandle | null>(null);

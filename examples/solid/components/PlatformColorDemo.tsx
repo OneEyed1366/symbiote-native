@@ -7,8 +7,6 @@
 import {
   DynamicColorIOS,
   PlatformColor,
-  Text,
-  View,
   createColorScheme,
 } from '@symbiote-native/solid';
 import './PlatformColorDemo.css';
@@ -21,18 +19,18 @@ export function PlatformColorDemo() {
   const scheme = createColorScheme();
 
   return (
-    <View class="section-nested">
-      <Text class="section-label">
+    <view class="section-nested">
+      <text class="section-label">
         {`PlatformColor · semantic + DynamicColorIOS (${scheme() ?? 'unknown'})`}
-      </Text>
-      <View class="row">
-        <View
+      </text>
+      <view class="row">
+        <view
           class="color-tile"
           style={{ backgroundColor: PlatformColor('systemBlue') }}
         >
-          <Text class="color-tile-label">systemBlue</Text>
-        </View>
-        <View
+          <text class="color-tile-label">systemBlue</text>
+        </view>
+        <view
           class="color-tile-bordered"
           style={{
             backgroundColor: DynamicColorIOS({
@@ -42,14 +40,14 @@ export function PlatformColorDemo() {
             borderColor: PlatformColor('separator'),
           }}
         >
-          <Text
+          <text
             class="color-tile-label"
             style={{ color: PlatformColor('label') }}
           >
             dynamic
-          </Text>
-        </View>
-      </View>
-    </View>
+          </text>
+        </view>
+      </view>
+    </view>
   );
 }

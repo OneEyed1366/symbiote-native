@@ -1,9 +1,10 @@
-// Regression tests for two Android-only bugs AnimatedScrollView's bespoke template hit because
-// it talks to the raw symbiote-scroll-view primitive directly instead of reusing the real
-// ScrollView component (which already has both fixes — see scroll-view/shared.ts):
+// Regression tests for two Android-only bugs AnimatedScrollView's bespoke template used to hit
+// while it built its own `<scroll-content>` child by hand instead of leaving the tag's content
+// node to the engine (`registerScrollViewBehavior()`, `../../register.ts`, which now owns both
+// fixes — see core/components/src/behaviors/scroll-view/shared.ts):
 //
-// 1. It projected <ng-content> straight into symbiote-scroll-view with no content wrapper. On
-//    Android, symbiote-scroll-content resolves to a plain RCTView, which Fabric view-flattens
+// 1. It projected <ng-content> straight into scroll-view with no content wrapper. On
+//    Android, scroll-content resolves to a plain RCTView, which Fabric view-flattens
 //    away unless collapsable:false pins it — so multiple projected children were hoisted up as
 //    direct children of the scroll view, which natively hosts exactly one ("ScrollView can
 //    host only one direct child" -> addViewAt crash).
@@ -28,6 +29,8 @@ import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
+// registerScrollViewBehavior() is what builds the content container the assertions below read.
+import '../../register';
 import { mount, unmount } from '../../render';
 import { AnimatedScrollView } from './create-animated-component';
 
@@ -45,8 +48,8 @@ Component({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <AnimatedScrollView>
-      <symbiote-view testID="a"></symbiote-view>
-      <symbiote-view testID="b"></symbiote-view>
+      <view testID="a"></view>
+      <view testID="b"></view>
     </AnimatedScrollView>
   `,
 })(AnimatedScrollViewApp);
@@ -59,7 +62,7 @@ Component({
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <AnimatedScrollView [animatedProps]="{ nestedScrollEnabled: false }">
-      <symbiote-view testID="a"></symbiote-view>
+      <view testID="a"></view>
     </AnimatedScrollView>
   `,
 })(AnimatedScrollViewOverrideApp);
@@ -71,7 +74,7 @@ afterEach(() => {
 });
 
 describe('AnimatedScrollView', () => {
-  // why: bug #1 in the file header — projecting content straight into symbiote-scroll-view
+  // why: bug #1 in the file header — projecting content straight into scroll-view
   // with no wrapper lets Android's Fabric view-flattening hoist multiple children up to be
   // direct children of the native scroll view, which crashes since it hosts exactly one. The
   // wrapper + `collapsable: false` is what pins the content view and keeps it un-flattened.
@@ -93,9 +96,10 @@ describe('AnimatedScrollView', () => {
   });
 
   // Regression test for a THIRD bug in this same bespoke-template class, this one iOS-only (the
-  // inverse of the two Android bugs above): AnimatedScrollView never applied
-  // selectScrollIntrinsics' scrollViewBaseStyle (overflow: 'scroll') to its host node, unlike the
-  // real ScrollView component. On iOS Fabric a scroll view only clips its content to its own
+  // inverse of the two Android bugs above): AnimatedScrollView never applied the scroll view's
+  // base style (overflow: 'scroll') to its host node — now the engine's own default, folded onto
+  // every `scroll-view`/`horizontal-scroll-view` regardless of who mounts it. On iOS Fabric a
+  // scroll view only clips its content to its own
   // frame when `overflow: 'scroll'` is set; without it, content taller than the frame bleeds out
   // over sibling views instead of scrolling clipped (Android's native ViewGroup clips regardless
   // of the style prop, which is why this was invisible there). See

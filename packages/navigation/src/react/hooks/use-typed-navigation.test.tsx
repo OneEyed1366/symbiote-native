@@ -66,7 +66,7 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 function textScreen(label: string) {
-  return () => createElement('symbiote-text', {}, label);
+  return () => createElement('text', {}, label);
 }
 
 // Each of the three hooks below is a THIN union-narrowing wrapper over useNavigation() (see
@@ -86,7 +86,7 @@ describe('useStackNavigation', () => {
       function TrackedHomeScreen(): ReturnType<typeof createElement> {
         const navigation = useStackNavigation();
         canPush = typeof navigation.push === 'function';
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
 
       const ref = createRef<INavigatorHandle>();
@@ -116,7 +116,7 @@ describe('useStackNavigation', () => {
     it('throws when the nearest navigator is a Tab, not a Stack', () => {
       function TrackedHomeTab(): ReturnType<typeof createElement> {
         useStackNavigation();
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
 
       expect(() => {
@@ -150,7 +150,7 @@ describe('useTabNavigation', () => {
       function TrackedHomeTab(): ReturnType<typeof createElement> {
         const navigation = useTabNavigation();
         canJumpTo = typeof navigation.jumpTo === 'function';
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
 
       mount(
@@ -177,7 +177,7 @@ describe('useTabNavigation', () => {
     it('throws when the nearest navigator is a Stack, not a Tab', () => {
       function TrackedHomeScreen(): ReturnType<typeof createElement> {
         useTabNavigation();
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
 
       expect(() => {
@@ -211,7 +211,7 @@ describe('useDrawerNavigation', () => {
       function TrackedHomeScreen(): ReturnType<typeof createElement> {
         const navigation = useDrawerNavigation();
         canOpenDrawer = typeof navigation.openDrawer === 'function';
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
 
       mount(
@@ -238,7 +238,7 @@ describe('useDrawerNavigation', () => {
     it('throws when the nearest navigator is a Stack, not a Drawer', () => {
       function TrackedHomeScreen(): ReturnType<typeof createElement> {
         useDrawerNavigation();
-        return createElement('symbiote-text', {}, 'home');
+        return createElement('text', {}, 'home');
       }
 
       expect(() => {

@@ -15,7 +15,7 @@ import {
   type VNode,
 } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { View, mount, setAppConfigurator, unmount } from '@symbiote-native/vue';
+import { mount, setAppConfigurator, unmount } from '@symbiote-native/vue';
 import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 219;
@@ -38,7 +38,7 @@ const Boundary = defineComponent({
       hasFailed.value = true;
       return false;
     });
-    return (): unknown => (hasFailed.value ? h(View) : slots.default?.());
+    return (): unknown => (hasFailed.value ? h('view') : slots.default?.());
   },
 });
 
@@ -51,7 +51,7 @@ const LeakyBoundary = defineComponent({
     onErrorCaptured(() => {
       hasFailed.value = true;
     });
-    return (): unknown => (hasFailed.value ? h(View) : slots.default?.());
+    return (): unknown => (hasFailed.value ? h('view') : slots.default?.());
   },
 });
 
@@ -175,5 +175,117 @@ describe('setAppConfigurator', () => {
 
     expect(ownHandler).toHaveBeenCalledOnce();
     expect(reportError).not.toHaveBeenCalled();
+  });
+});
+
+// Regression for a device-reported redbox (2026-09-11): a throw from a REAL press dispatch
+// reached Hermes's own top-level handler directly, bypassing both `onErrorCaptured` and
+// `app.config.errorHandler` — the reported call stack traced through the actual dispatch chain
+// (pressable.ts's dispatch -> bubble -> runWrapped), which carries no try/catch anywhere: Vue's
+// default `wrapDispatch` is a bare pass-through, so a throw from the app's own listener escaped
+// every framework error boundary and painted a native redbox with no Vue componentStack framing.
+//
+// Fixed in renderer/index.ts: patchProp wraps any `on*`-named function prop with Vue's own
+// `callWithErrorHandling`, captured at `patchProp` time (the one point still holding a live
+// `getCurrentInstance()`), so a thrown listener routes through the same pipeline a throw from
+// render/setup already used.
+//
+// Driven through fabric.fireEvent (topTouchStart/topTouchEnd), never a direct call to the `onPress`
+// prop — a direct call bypasses exactly the dispatch machinery that lost the error, per
+// test-harness-false-greens.md's "a synthetic stand-in for the real input is a different input".
+describe('Negative — a real press listener throws', () => {
+  const DISPATCH_ROOT_TAG = 812;
+  const DISPATCH_BOOM = 'listener exploded';
+
+  beforeEach(() => {
+    fabric.reset();
+  });
+  afterEach(() => {
+    unmount(DISPATCH_ROOT_TAG);
+    setAppConfigurator(undefined);
+  });
+
+  async function press(testID: string): Promise<void> {
+    const target = fabric.find(node => node.props.testID === testID);
+    expect(target).toBeDefined();
+    fabric.fireEvent(target?.instanceHandle, 'topTouchStart');
+    fabric.fireEvent(target?.instanceHandle, 'topTouchEnd');
+    await tick();
+  }
+
+  // Mirrors LifecycleLogChild's own demo intent (examples/vue-sfc): an ancestor's
+  // `onErrorCaptured` hook that deliberately does NOT return `false`, so the same throw also
+  // reaches the app-level `errorHandler` — proving both fire from one throw.
+  it('reaches both onErrorCaptured and app.config.errorHandler from one throw', async () => {
+    const captured: unknown[] = [];
+    const globalErrors: unknown[] = [];
+    setAppConfigurator(app => {
+      app.config.errorHandler = error => {
+        globalErrors.push(error);
+      };
+    });
+
+    // onErrorCaptured only catches a throw from a DESCENDANT component's own instance, never from
+    // an element its own template declares directly — the registering component's `.parent` is
+    // where Vue's handleError starts its walk. So the boundary must wrap a CHILD component (as
+    // ApiPlaygroundScreen wraps LifecycleLogChild in the real app), not a slot rendered in its own
+    // scope — a slot's host elements are attributed to the RENDERING instance, i.e. the boundary
+    // itself, which the walk skips.
+    const Thrower = defineComponent({
+      setup: () => () =>
+        h('pressable', {
+          testID: 'boom-target',
+          onPress: () => {
+            throw new Error(DISPATCH_BOOM);
+          },
+        }),
+    });
+    const DispatchBoundary = defineComponent({
+      setup() {
+        onErrorCaptured(error => {
+          captured.push(error);
+        });
+        return () => h(Thrower);
+      },
+    });
+
+    mount(DISPATCH_ROOT_TAG, DispatchBoundary);
+    await tick();
+
+    await press('boom-target');
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toMatchObject({ message: DISPATCH_BOOM });
+    expect(globalErrors).toHaveLength(1);
+    expect(globalErrors[0]).toMatchObject({ message: DISPATCH_BOOM });
+  });
+
+  it('keeps the press machine running after the throw — a second press still fires', async () => {
+    setAppConfigurator(app => {
+      app.config.errorHandler = () => {};
+    });
+
+    let pressInCount = 0;
+    mount(
+      DISPATCH_ROOT_TAG,
+      defineComponent({
+        setup: () => () =>
+          h('pressable', {
+            testID: 'boom-target',
+            onPressIn: () => {
+              pressInCount++;
+            },
+            onPress: () => {
+              throw new Error(DISPATCH_BOOM);
+            },
+          }),
+      }),
+    );
+    await tick();
+
+    await press('boom-target');
+    await press('boom-target');
+
+    expect(pressInCount).toBe(2);
   });
 });

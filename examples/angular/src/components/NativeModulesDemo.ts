@@ -6,9 +6,10 @@ import {
   inject,
 } from '@angular/core';
 import {
-  Button,
+  ButtonElement,
   I18nManager,
   Image,
+  ImageElement,
   Settings,
   Text,
   View,
@@ -22,60 +23,60 @@ import './NativeModulesDemo.css';
 const LOGO_URI = 'https://angular.io/assets/images/logos/angular/angular.png';
 // A distinct cache key for the prefetch demo: same asset, different URL (query
 // string), so nothing has loaded it yet. The cache starts cold and the button
-// visibly warms it, unlike LOGO_URI, which getSize + the <Image> already pulled in.
+// visibly warms it, unlike LOGO_URI, which getSize + the <image> already pulled in.
 const PREFETCH_URI = LOGO_URI + '?warm=symbiote';
 const TAP_KEY = 'symbiote.tapCount';
 
 @Component({
   selector: 'NativeModulesDemo',
   standalone: true,
-  imports: [View, Text, Button, Image],
+  imports: [View, Text, ButtonElement, ImageElement],
   template: `
-    <View class="section-nested">
-      <Text class="section-label"
-        >Runtime modules · I18nManager / Settings / Image statics</Text
+    <view class="section-nested">
+      <text class="section-label"
+        >Runtime modules · I18nManager / Settings / Image statics</text
       >
-      <Text testID="rtl-status" class="info-text">{{
+      <text testID="rtl-status" class="info-text">{{
         'RTL: ' +
           (rtl.isRTL ? 'on' : 'off') +
           ' · swap L/R: ' +
           (rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no')
-      }}</Text>
-      <Button
+      }}</text>
+      <button
         testID="force-rtl-btn"
         [title]="
           rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'
         "
         (press)="onForceRtl()"
         color="#dd0031"
-      ></Button>
+      ></button>
 
-      <Text testID="persist-count" class="info-text">{{
+      <text testID="persist-count" class="info-text">{{
         'persisted taps: ' + persisted + ' · survives relaunch'
-      }}</Text>
-      <Button
+      }}</text>
+      <button
         testID="persist-btn"
         title="Persist a tap"
         (press)="persistTap()"
         color="#dd0031"
-      ></Button>
+      ></button>
 
-      <View class="row-align-center">
-        <Image [source]="{ uri: LOGO_URI }" class="logo-thumb" />
-        <Text testID="logo-size" class="info-text-flex">{{
+      <view class="row-align-center">
+        <image [source]="{ uri: LOGO_URI }" class="logo-thumb"></image>
+        <text testID="logo-size" class="info-text-flex">{{
           'logo size: ' + imageSize
-        }}</Text>
-      </View>
-      <Text testID="cache-state" class="info-text">{{
+        }}</text>
+      </view>
+      <text testID="cache-state" class="info-text">{{
         'prefetch cache: ' + cacheState
-      }}</Text>
-      <Button
+      }}</text>
+      <button
         testID="prefetch-btn"
         title="Prefetch logo"
         (press)="prefetchLogo()"
         color="#dd0031"
-      ></Button>
-    </View>
+      ></button>
+    </view>
   `,
 })
 export class NativeModulesDemo implements OnInit, OnDestroy {

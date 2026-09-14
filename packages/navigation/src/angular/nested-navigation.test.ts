@@ -86,7 +86,7 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   selector: 'root-plain-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>root</symbiote-text>`,
+  template: `<text>root</text>`,
 })
 class RootPlainScreenComponent {}
 
@@ -94,7 +94,7 @@ class RootPlainScreenComponent {}
   selector: 'stack-details-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>stack-details</symbiote-text>`,
+  template: `<text>stack-details</text>`,
 })
 class StackDetailsScreenComponent {}
 
@@ -105,7 +105,7 @@ let getParentCalled = false;
   selector: 'root-getparent-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>root</symbiote-text>`,
+  template: `<text>root</text>`,
 })
 class RootGetParentScreenComponent {
   constructor() {
@@ -118,7 +118,7 @@ class RootGetParentScreenComponent {
   selector: 'nested-tab-home-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>tab-home</symbiote-text>`,
+  template: `<text>tab-home</text>`,
 })
 class NestedTabHomeScreenComponent {
   constructor() {

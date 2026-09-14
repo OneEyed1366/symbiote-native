@@ -3,12 +3,7 @@
   // via the polyfill's own `webCrypto.getRandomValues` (rendered as a hex string, same "long value"
   // case CryptoScreen's stacked result-box handles), and install the polyfill onto `globalThis.crypto`
   // then report whether it stuck. Svelte twin of examples/expo-vue-sfc/screens/WebCryptoScreen.vue.
-  import {
-    SafeAreaView,
-    ScrollView,
-    Text,
-    View,
-  } from '@symbiote-native/svelte';
+  import { ScrollView } from '@symbiote-native/svelte';
   import {
     webCrypto,
     polyfillWebCrypto,
@@ -44,62 +39,62 @@
   }
 </script>
 
-<SafeAreaView class="screen">
+<safe-area-view class="screen">
   <ScrollView
     testID="web-crypto-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-        <Text class="hero-badge-text">{lineInfo.code}</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">Web Crypto</Text>
-        <Text class="hero-body">
+      </text>
+    </view>
+    <view class="hero-card">
+      <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <text class="hero-badge-text">{lineInfo.code}</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">Web Crypto</text>
+        <text class="hero-body">
           @symbiote-native/standard-web-crypto — a Web Crypto API
           `getRandomValues` polyfill built on @symbiote-native/crypto's native
           random source.
-        </Text>
-      </View>
-    </View>
-    <View testID="web-crypto-random-bytes-card" class="web-crypto-card">
-      <Text class="web-crypto-card-title">Random bytes</Text>
+        </text>
+      </view>
+    </view>
+    <view testID="web-crypto-random-bytes-card" class="web-crypto-card">
+      <text class="web-crypto-card-title">Random bytes</text>
       <ActionButton
         testID="web-crypto-generate-random-bytes-button"
         title="Generate 16 random bytes"
         onPress={handleGenerateRandomBytes}
         color={lineColor}
-      />{#if randomBytesResult !== null}<View class="web-crypto-result-box">
-          <Text
+      />{#if randomBytesResult !== null}<view class="web-crypto-result-box">
+          <text
             testID="web-crypto-random-bytes-result-value"
             class="web-crypto-result-text"
           >
             {randomBytesResult}
-          </Text>
-        </View>{/if}
-    </View>
-    <View testID="web-crypto-polyfill-card" class="web-crypto-card">
-      <Text class="web-crypto-card-title">Polyfill</Text>
+          </text>
+        </view>{/if}
+    </view>
+    <view testID="web-crypto-polyfill-card" class="web-crypto-card">
+      <text class="web-crypto-card-title">Polyfill</text>
       <ActionButton
         testID="web-crypto-install-polyfill-button"
         title="Install polyfill"
         onPress={handleInstallPolyfill}
         color={lineColor}
-      />{#if isPolyfillInstalledResult !== null}<View class="web-crypto-row">
-          <Text class="web-crypto-row-label">globalThis.crypto defined</Text>
-          <Text
+      />{#if isPolyfillInstalledResult !== null}<view class="web-crypto-row">
+          <text class="web-crypto-row-label">globalThis.crypto defined</text>
+          <text
             testID="web-crypto-polyfill-result-value"
             class="web-crypto-value-text"
           >
             {isPolyfillInstalledResult ? 'Yes' : 'No'}
-          </Text>
-        </View>{/if}
-    </View>
+          </text>
+        </view>{/if}
+    </view>
   </ScrollView>
-</SafeAreaView>
+</safe-area-view>

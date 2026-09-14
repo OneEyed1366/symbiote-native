@@ -4,15 +4,15 @@
 
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, Text, mount, unmount } from '@symbiote-native/react';
+import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 function Counter(): ReactElement {
   const [count, setCount] = useState(0);
   return (
-    <View onPress={() => setCount(value => value + 1)}>
-      <Text>{`count: ${count}`}</Text>
-    </View>
+    <view onPress={() => setCount(value => value + 1)}>
+      <text>{`count: ${count}`}</text>
+    </view>
   );
 }
 

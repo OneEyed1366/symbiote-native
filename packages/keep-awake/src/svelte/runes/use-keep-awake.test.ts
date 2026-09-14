@@ -102,7 +102,7 @@ async function loadProbe(): Promise<Component> {
        } = $props();
        useKeepAwake(tag, { listener, suppressDeactivateWarnings });
      </script>
-     <symbiote-view p={{}} />`,
+     <view p={{}} />`,
     { ...COMPILE_OPTIONS, filename: 'KeepAwakeProbe.svelte' },
   );
   writeFileSync(PROBE_OUT, result.js.code);

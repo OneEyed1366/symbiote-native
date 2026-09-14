@@ -96,11 +96,11 @@ function screenNodes(): IFakeNode[] {
 }
 
 function HomeScreen() {
-  return h('symbiote-text', {}, 'home');
+  return h('text', {}, 'home');
 }
 
 function DetailsScreen() {
-  return h('symbiote-text', {}, 'details');
+  return h('text', {}, 'details');
 }
 
 // `mount()` no longer lets a render error escape: adapters/vue/src/render.ts installs a default
@@ -133,7 +133,7 @@ describe('navigation composables', () => {
         const isFocused = useIsFocused();
         return () => {
           latestIsFocused = isFocused.value;
-          return h('symbiote-text', {}, 'home');
+          return h('text', {}, 'home');
         };
       });
 
@@ -171,7 +171,7 @@ describe('navigation composables', () => {
           events.push('effect');
           return () => events.push('cleanup');
         });
-        return () => h('symbiote-text', {}, 'home');
+        return () => h('text', {}, 'home');
       });
 
       mount(
@@ -212,7 +212,7 @@ describe('navigation composables', () => {
         capturedName = route.value.name;
         capturedParams = route.value.params;
         navigation.value.addListener('focus', () => focusEvents.push('focus'));
-        return () => h('symbiote-text', {}, 'details');
+        return () => h('text', {}, 'details');
       });
 
       const handleRef = ref<INavigatorHandle | null>(null);
@@ -250,7 +250,7 @@ describe('navigation composables', () => {
         const count = useNavigationState(state => state.routes.length);
         return () => {
           routeCount = count.value;
-          return h('symbiote-text', {}, 'home');
+          return h('text', {}, 'home');
         };
       });
 
@@ -291,7 +291,7 @@ describe('navigation composables', () => {
     it('useRoute() throws when rendered outside any navigator screen', () => {
       const OrphanScreen = defineComponent(() => {
         useRoute();
-        return () => h('symbiote-text', {}, 'orphan');
+        return () => h('text', {}, 'orphan');
       });
 
       // `mount()` no longer lets a render error escape: adapters/vue/src/render.ts installs a

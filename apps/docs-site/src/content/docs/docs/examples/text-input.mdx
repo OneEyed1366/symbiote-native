@@ -5,7 +5,7 @@ description: Controlled text input in React, Vue, Angular, Svelte, and Solid.
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`TextInput` is controlled through a `value` prop and a text-change event. The
+`text-input` is controlled through a `value` prop and a text-change event. The
 controlled write handshake is shared; the public event name is framework-shaped.
 
 <Tabs syncKey="framework">
@@ -13,16 +13,15 @@ controlled write handshake is shared; the public event name is framework-shaped.
     ```tsx
     import './NameInput.css';
     import { useState } from 'react';
-    import { Text, TextInput, View } from '@symbiote-native/react';
 
     export function NameInput() {
       const [name, setName] = useState('Symbiote');
 
       return (
-        <View className="root">
-          <TextInput value={name} onValueChange={setName} className="input" />
-          <Text>Hello, {name}</Text>
-        </View>
+        <view className="root">
+          <text-input value={name} onValueChange={event => setName(event.text)} className="input" />
+          <text>Hello, {name}</text>
+        </view>
       );
     }
     ```
@@ -38,16 +37,15 @@ controlled write handshake is shared; the public event name is framework-shaped.
     ```vue
     <script setup lang="ts">
     import { ref } from 'vue';
-    import { Text, TextInput, View } from '@symbiote-native/vue';
 
     const name = ref('Symbiote');
     </script>
 
     <template>
-      <View class="root">
-        <TextInput v-model="name" class="input" />
-        <Text>Hello, {{ name }}</Text>
-      </View>
+      <view class="root">
+        <text-input v-model="name" class="input" />
+        <text>Hello, {{ name }}</text>
+      </view>
     </template>
 
     <style scoped>
@@ -57,24 +55,26 @@ controlled write handshake is shared; the public event name is framework-shaped.
     ```
 
     `v-model="name"` is sugar over the same `:value`/`@value-change` pair — write
-    that explicit form instead if you also need the raw native event, which
-    arrives as `@value-change`'s second argument: `@value-change="(text, event) => …"`.
+    that explicit form instead if you also need the raw native event:
+    `@value-change="event => setName(event.text)"`. The event handed to
+    `@value-change` IS the native change event, with `text` merged onto it —
+    there is no separate second argument.
 
   </TabItem>
   <TabItem label="Angular">
     ```ts
     import { Component } from '@angular/core';
-    import { Text, TextInput, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import './name-input.css';
 
     @Component({
       standalone: true,
-      imports: [Text, TextInput, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View class="root">
-          <TextInput [(value)]="name" class="input" />
-          <Text>Hello, {{ name }}</Text>
-        </View>
+        <view class="root">
+          <text-input [(value)]="name" class="input" />
+          <text>Hello, {{ name }}</text>
+        </view>
       `,
     })
     export class NameInput {
@@ -99,12 +99,17 @@ controlled write handshake is shared; the public event name is framework-shaped.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text, TextInput, View } from '@symbiote-native/svelte';
-
       let name = $state('Symbiote');
     </script>
 
-    <View class="root"><TextInput value={name} onValueChange={next => (name = next)} class="input" /><Text>Hello, {name}</Text></View>
+    <view class="root">
+      <text-input
+        value={name}
+        onValueChange={event => (name = event.text)}
+        class="input"
+      ></text-input>
+      <text>Hello, {name}</text>
+    </view>
 
     <style>
       .root { gap: 12px; }
@@ -114,24 +119,25 @@ controlled write handshake is shared; the public event name is framework-shaped.
 
     Svelte's own element `bind:value` is explicitly unsupported by this
     adapter's DOM shim — there is no sugar over `value`/`onValueChange` here,
-    same as React. `onValueChange`'s second argument is the raw native event,
-    same controlled-write contract every other adapter shares underneath.
+    same as React. Unlike a plain `onPress`, `onValueChange` is safe to write
+    as an individual attribute directly: it is always called with a single
+    change-event object, so it never trips the crash an individual callback
+    prop can otherwise hit on a bare host tag.
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
     import './NameInput.css';
     import { createSignal } from 'solid-js';
-    import { Text, TextInput, View } from '@symbiote-native/solid';
 
     export function NameInput() {
       const [name, setName] = createSignal('Symbiote');
 
       return (
-        <View class="root">
-          <TextInput value={name()} onValueChange={setName} class="input" />
-          <Text>Hello, {name()}</Text>
-        </View>
+        <view class="root">
+          <text-input value={name()} onValueChange={event => setName(event.text)} class="input" />
+          <text>Hello, {name()}</text>
+        </view>
       );
     }
     ```
@@ -143,20 +149,25 @@ controlled write handshake is shared; the public event name is framework-shaped.
     ```
 
     No `v-model`-style sugar here either: `value`/`onValueChange` is the
-    whole contract, same as React and Svelte. `onValueChange`'s second
-    argument is the raw native event: `onValueChange={(text, event) => …}`.
+    whole contract, same as React and Svelte.
 
   </TabItem>
 </Tabs>
 
 ## API takeaway
 
-| Concern           | React                        | Vue                               | Angular                                               | Svelte                                             | Solid                                |
-| ----------------- | ---------------------------- | --------------------------------- | ----------------------------------------------------- | -------------------------------------------------- | ------------------------------------ |
-| Text prop         | `value`                      | `:value`<br />or `v-model`        | `[value]`<br />or `[(value)]`                         | `value`                                            | `value`                              |
-| Text change       | `onValueChange(text, event)` | `@value-change`<br />or `v-model` | `(valueChange)="handler($event)"` (text only)         | `onValueChange={(text, event) => …}`               | `onValueChange={(text, event) => …}` |
-| Native event      | _(same callback, 2nd arg)_   | _(same emit, 2nd arg)_            | `(change)="handler($event)"` (separate output)        | _(same callback, 2nd arg)_                         | _(same callback, 2nd arg)_           |
-| Imperative handle | React `ref`                  | Vue template ref / exposed handle | `@ViewChild(TextInput)` (the component IS the handle) | `bind:this` (a `ShimElement`) via `hostInstance()` | `ref` over an `ITextInputHandle`     |
+| Concern           | React                          | Vue                               | Angular                                               | Svelte                                | Solid                          |
+| ------------------ | ------------------------------- | ---------------------------------- | ------------------------------------------------------ | --------------------------------------- | -------------------------------- |
+| Text prop         | `value`                        | `:value`<br />or `v-model`         | `[value]`<br />or `[(value)]`                          | `value`                                 | `value`                          |
+| Text change       | `onValueChange={event => …}`   | `@value-change`<br />or `v-model`  | `(valueChange)="handler($event)"` (text only)          | `onValueChange={event => …}`            | `onValueChange={event => …}`     |
+| Native event      | _(same event object)_          | _(same emit, same event object)_   | `(change)="handler($event)"` (separate output)         | _(same event object)_                   | _(same event object)_            |
+
+All five now share one contract: `onValueChange` (or its per-adapter emit/output
+spelling) is called with a **single** change-event object, `event.text` carries
+the current text, and `event` itself is the native change event — there is no
+separate second argument anywhere. Angular is the one exception, since its
+`(valueChange)` output is deliberately text-only to keep `[(value)]` working,
+with `(change)` carrying the full event instead.
 
 `StyleSheet.create` works identically to a CSS class if you'd rather keep
 style objects inline — see the [Styling guide](/docs/learn/styling/).

@@ -22,29 +22,29 @@ import './CompoundClassDemo.css';
   standalone: true,
   imports: [View, Text, ActionButton],
   template: `
-    <View class="section-nested">
-      <Text class="section-label">Compound class · component stylesheet</Text>
-      <View class="row">
-        <View class="badge" testID="angular-compound-badge-plain">
-          <Text class="badge-text">plain</Text>
-        </View>
-        <View class="badge loud" testID="angular-compound-badge-loud">
-          <Text class="badge-text">loud</Text>
-        </View>
-        <View [class]="dynamicClass" testID="angular-compound-badge-dynamic">
-          <Text class="badge-text">dynamic</Text>
-        </View>
-      </View>
-      <Text class="note-text" testID="angular-compound-badge-readout">{{
+    <view class="section-nested">
+      <text class="section-label">Compound class · component stylesheet</text>
+      <view class="row">
+        <view class="badge" testID="angular-compound-badge-plain">
+          <text class="badge-text">plain</text>
+        </view>
+        <view class="badge loud" testID="angular-compound-badge-loud">
+          <text class="badge-text">loud</text>
+        </view>
+        <view [class]="dynamicClass" testID="angular-compound-badge-dynamic">
+          <text class="badge-text">dynamic</text>
+        </view>
+      </view>
+      <text class="note-text" testID="angular-compound-badge-readout">{{
         readout
-      }}</Text>
+      }}</text>
       <ActionButton
         testID="angular-compound-badge-toggle"
         [title]="isLoud ? 'Drop .loud' : 'Add .loud'"
         color="#dd0031"
         (press)="toggle()"
       ></ActionButton>
-    </View>
+    </view>
   `,
 })
 export class CompoundClassDemo {

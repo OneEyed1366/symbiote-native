@@ -38,6 +38,7 @@
 import { flushOps, treeHost } from './tree-host';
 import {
   functionPropOf,
+  functionPropsOf,
   isSymbioteNode,
   RAW_TEXT_COMPONENT,
   SURFACE_COMPONENT,
@@ -167,6 +168,32 @@ export function textOf(node: ISymbioteNode): string | undefined {
  * `style` after a class merge is the `[classStyle, explicitStyle]` ARRAY rather than the author's
  * object. `getExplicitStyle` exists for that question and this is not a substitute for it.
  */
+const NO_PROPS: Readonly<Record<string, unknown>> = {};
+
+/**
+ * Every prop standing on the node, function props included.
+ *
+ * The bag a payload fold reads. Two sources, because a function never crossed the wire (`writeProp`,
+ * node.ts): the host holds the values it could take, JS holds the callbacks it could not, and a fold
+ * asking for `onPress` must see the one the app wrote rather than the `undefined` the host was
+ * handed in its place.
+ *
+ * A COPY when anything was stashed, the host's own object when nothing was — which is nearly every
+ * node. Same caveat as `propOf`: `style` after a class merge is the `[classStyle, explicitStyle]`
+ * array, not the author's object.
+ */
+export function propsOf(
+  node: ISymbioteNode,
+): Readonly<Record<string, unknown>> {
+  flushOps();
+  const stored = treeHost()?.propsOf(node) ?? NO_PROPS;
+  const stashed = functionPropsOf(node);
+  if (stashed === undefined) return stored;
+  const merged: Record<string, unknown> = { ...stored };
+  for (const [key, value] of stashed) merged[key] = value;
+  return merged;
+}
+
 export function propOf(node: ISymbioteNode, key: string): unknown {
   // Before the host, because a function prop never reached it — see `writeProp`. Cheap enough to be
   // unconditional: this runs at gesture and lifecycle rate, never on a commit path.

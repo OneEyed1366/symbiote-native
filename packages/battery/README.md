@@ -89,11 +89,11 @@ function BatteryScreen() {
 
   return (
     <>
-      <Text>{batteryLevelLabel}</Text>
-      <Text>
+      <text>{batteryLevelLabel}</text>
+      <text>
         {batteryState === BatteryState.CHARGING ? 'Charging' : 'Not charging'}
-      </Text>
-      <Text>{lowPowerMode ? 'On' : 'Off'}</Text>
+      </text>
+      <text>{lowPowerMode ? 'On' : 'Off'}</text>
     </>
   );
 }
@@ -120,8 +120,8 @@ const batteryLevelText = computed(() =>
 );
 </script>
 <template>
-  <Text>{{ batteryLevelText }}</Text>
-  <Text>{{ lowPowerMode ? 'ON' : 'OFF' }}</Text>
+  <text>{{ batteryLevelText }}</text>
+  <text>{{ lowPowerMode ? 'ON' : 'OFF' }}</text>
 </template>
 ```
 
@@ -148,11 +148,11 @@ const batteryLevelText = computed(() =>
   );
 </script>
 
-<Text>{batteryLevelLabel}</Text>
-<Text>
+<text>{batteryLevelLabel}</text>
+<text>
   {batteryState.current === BatteryState.CHARGING ? 'Charging' : 'Not charging'}
-</Text>
-<Text>{lowPowerMode.current ? 'On' : 'Off'}</Text>
+</text>
+<text>{lowPowerMode.current ? 'On' : 'Off'}</text>
 ```
 
 ```tsx
@@ -172,15 +172,15 @@ function BatteryScreen() {
 
   return (
     <>
-      <Text>
+      <text>
         {batteryLevel() < 0
           ? 'unknown'
           : `${Math.round(batteryLevel() * 100)}%`}
-      </Text>
-      <Text>
+      </text>
+      <text>
         {batteryState() === BatteryState.CHARGING ? 'Charging' : 'Not charging'}
-      </Text>
-      <Text>{lowPowerMode() ? 'On' : 'Off'}</Text>
+      </text>
+      <text>{lowPowerMode() ? 'On' : 'Off'}</text>
     </>
   );
 }

@@ -18,6 +18,11 @@ dist/
 # only the *.svelte.d.ts across to build/ — removed in a finally, this covers a crashed run.
 .svelte-dts/
 
+# adapters/angular/src/style-input-aot.test.ts compiles fixtures through ngtsc + the linker here —
+# removed in afterAll, so this covers a crashed run. Deliberately not under build/, which
+# tests/build-output-has-no-orphans.test.ts audits while this suite is mid-run.
+.aot-fixtures/
+
 # Native source vendored into a package's proxy podspec at pod-install time (CocoaPods'
 # Dir.glob never crosses a symlink, so a pnpm .pnpm-store symlink breaks pointing
 # source_files at the nested lib in place — see symbiote-third-party-native-view skill).

@@ -5,13 +5,7 @@
   // getAndroidId/getInstallReferrerAsync; iOS: getIosIdForVendorAsync/
   // getIosApplicationReleaseTypeAsync). Svelte twin of
   // examples/expo-vue-sfc/screens/ApplicationScreen.vue.
-  import {
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    Text,
-    View,
-  } from '@symbiote-native/svelte';
+  import { Platform, ScrollView } from '@symbiote-native/svelte';
   import {
     ApplicationReleaseType,
     applicationId,
@@ -83,73 +77,74 @@
   }
 </script>
 
-<SafeAreaView class="screen">
+<safe-area-view class="screen">
   <ScrollView
     testID="application-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-        <Text class="hero-badge-text">{lineInfo.code}</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">Application</Text>
-        <Text class="hero-body">
+      </text>
+    </view>
+    <view class="hero-card">
+      <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <text class="hero-badge-text">{lineInfo.code}</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">Application</text>
+        <text class="hero-body">
           @symbiote-native/application — app version/build/name/ID, install
           time, the Android ID and install referrer on Android, the vendor ID
           and release type on iOS.
-        </Text>
-      </View>
-    </View>
-    <View testID="application-info-card" class="application-card">
-      <Text class="application-card-title">Info</Text>
-      <View class="application-row">
-        <Text class="application-row-label">Name</Text>
-        <Text class="application-value-text">
+        </text>
+      </view>
+    </view>
+    <view testID="application-info-card" class="application-card">
+      <text class="application-card-title">Info</text>
+      <view class="application-row">
+        <text class="application-row-label">Name</text>
+        <text class="application-value-text">
           {applicationName ?? 'unknown'}
-        </Text>
-      </View>
-      <View class="application-row">
-        <Text class="application-row-label">ID</Text>
-        <Text class="application-value-text">{applicationId ?? 'unknown'}</Text>
-      </View>
-      <View class="application-row">
-        <Text class="application-row-label">Version</Text>
-        <Text class="application-value-text">
+        </text>
+      </view>
+      <view class="application-row">
+        <text class="application-row-label">ID</text>
+        <text class="application-value-text">{applicationId ?? 'unknown'}</text>
+      </view>
+      <view class="application-row">
+        <text class="application-row-label">Version</text>
+        <text class="application-value-text">
           {nativeApplicationVersion ?? 'unknown'}
-        </Text>
-      </View>
-      <View class="application-row">
-        <Text class="application-row-label">Build</Text>
-        <Text class="application-value-text">
+        </text>
+      </view>
+      <view class="application-row">
+        <text class="application-row-label">Build</text>
+        <text class="application-value-text">
           {nativeBuildVersion ?? 'unknown'}
-        </Text>
-      </View>
-    </View>
-    <View testID="application-actions-card" class="application-card">
-      <Text class="application-card-title">Actions</Text>
-      <View class="button-row">
+        </text>
+      </view>
+    </view>
+    <view testID="application-actions-card" class="application-card">
+      <text class="application-card-title">Actions</text>
+      <view class="button-row">
         <ActionButton
           testID="application-installation-time-button"
           title="Get Installation Time"
           onPress={handleGetInstallationTime}
           color={lineColor}
         />
-      </View>{#if installationTimeResult !== null}<View class="application-row">
-          <Text class="application-row-label">Installed</Text>
-          <Text
+      </view>
+      {#if installationTimeResult !== null}<view class="application-row">
+          <text class="application-row-label">Installed</text>
+          <text
             testID="application-installation-time-value"
             class="application-value-text"
           >
             {installationTimeResult}
-          </Text>
-        </View>{/if}{#if Platform.OS === 'android'}<View class="button-row">
+          </text>
+        </view>{/if}{#if Platform.OS === 'android'}<view class="button-row">
           <ActionButton
             testID="application-android-id-button"
             title="Get Android ID"
@@ -162,25 +157,25 @@
             onPress={handleGetInstallReferrer}
             color={lineColor}
           />
-        </View>{/if}{#if androidIdResult !== null}<View class="application-row">
-          <Text class="application-row-label">Android ID</Text>
-          <Text
+        </view>{/if}{#if androidIdResult !== null}<view class="application-row">
+          <text class="application-row-label">Android ID</text>
+          <text
             testID="application-android-id-value"
             class="application-value-text"
           >
             {androidIdResult}
-          </Text>
-        </View>{/if}{#if installReferrerResult !== null}<View
+          </text>
+        </view>{/if}{#if installReferrerResult !== null}<view
           class="application-row"
         >
-          <Text class="application-row-label">Install referrer</Text>
-          <Text
+          <text class="application-row-label">Install referrer</text>
+          <text
             testID="application-install-referrer-value"
             class="application-value-text"
           >
             {installReferrerResult}
-          </Text>
-        </View>{/if}{#if Platform.OS === 'ios'}<View class="button-row">
+          </text>
+        </view>{/if}{#if Platform.OS === 'ios'}<view class="button-row">
           <ActionButton
             testID="application-ios-vendor-id-button"
             title="Get iOS ID For Vendor"
@@ -193,27 +188,27 @@
             onPress={handleGetIosReleaseType}
             color={lineColor}
           />
-        </View>{/if}{#if iosVendorIdResult !== null}<View
+        </view>{/if}{#if iosVendorIdResult !== null}<view
           class="application-row"
         >
-          <Text class="application-row-label">iOS vendor ID</Text>
-          <Text
+          <text class="application-row-label">iOS vendor ID</text>
+          <text
             testID="application-ios-vendor-id-value"
             class="application-value-text"
           >
             {iosVendorIdResult}
-          </Text>
-        </View>{/if}{#if iosReleaseTypeResult !== null}<View
+          </text>
+        </view>{/if}{#if iosReleaseTypeResult !== null}<view
           class="application-row"
         >
-          <Text class="application-row-label">iOS release type</Text>
-          <Text
+          <text class="application-row-label">iOS release type</text>
+          <text
             testID="application-ios-release-type-value"
             class="application-value-text"
           >
             {iosReleaseTypeResult}
-          </Text>
-        </View>{/if}
-    </View>
+          </text>
+        </view>{/if}
+    </view>
   </ScrollView>
-</SafeAreaView>
+</safe-area-view>

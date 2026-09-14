@@ -7,13 +7,7 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  View,
-} from '@symbiote-native/vue';
+import { Platform } from '@symbiote-native/vue';
 import {
   BrightnessMode,
   addBrightnessListener,
@@ -121,41 +115,43 @@ const permissionLabel = computed(() =>
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <ScrollView
+  <safe-area-view class="screen">
+    <scroll-view
       testID="brightness-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: lineColor }">
-          <Text class="hero-badge-text">{{ lineInfo.code }}</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">Brightness</Text>
-          <Text class="hero-body"
-            >@symbiote-native/brightness — screen brightness get/set, Android
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
+        </text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" :style="{ backgroundColor: lineColor }">
+          <text class="hero-badge-text">
+            {{ lineInfo.code }}
+          </text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title"> Brightness </text>
+          <text class="hero-body">
+            @symbiote-native/brightness — screen brightness get/set, Android
             system-brightness mode, and an iOS-only live listener. Requires
             SYSTEM_BRIGHTNESS permission on Android before setting the
-            system-wide value.</Text
-          >
-        </View>
-      </View>
+            system-wide value.
+          </text>
+        </view>
+      </view>
 
-      <View testID="brightness-live-card" class="brightness-card">
-        <Text class="brightness-card-title">Live brightness</Text>
-        <View class="brightness-row">
-          <Text class="brightness-row-label">Screen brightness</Text>
-          <Text testID="brightness-level-value" class="brightness-value-text">{{
-            brightnessLabel
-          }}</Text>
-        </View>
-        <View class="button-row">
+      <view testID="brightness-live-card" class="brightness-card">
+        <text class="brightness-card-title"> Live brightness </text>
+        <view class="brightness-row">
+          <text class="brightness-row-label"> Screen brightness </text>
+          <text testID="brightness-level-value" class="brightness-value-text">
+            {{ brightnessLabel }}
+          </text>
+        </view>
+        <view class="button-row">
           <ActionButton
             v-for="step in BRIGHTNESS_STEPS"
             :key="step.label"
@@ -164,38 +160,40 @@ const permissionLabel = computed(() =>
             :onPress="() => handleSetBrightness(step.value)"
             :color="lineColor"
           />
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View
+      <view
         v-if="Platform.OS === 'android'"
         testID="brightness-system-card"
         class="brightness-card"
       >
-        <Text class="brightness-card-title"
-          >System brightness (Android only)</Text
-        >
-        <View class="brightness-row">
-          <Text class="brightness-row-label">Mode</Text>
-          <Text testID="brightness-mode-value" class="brightness-value-text">{{
-            systemModeLabel
-          }}</Text>
-        </View>
-        <View testID="brightness-using-system" class="brightness-row">
-          <Text class="brightness-row-label">Using system value</Text>
-          <View
+        <text class="brightness-card-title">
+          System brightness (Android only)
+        </text>
+        <view class="brightness-row">
+          <text class="brightness-row-label"> Mode </text>
+          <text testID="brightness-mode-value" class="brightness-value-text">
+            {{ systemModeLabel }}
+          </text>
+        </view>
+        <view testID="brightness-using-system" class="brightness-row">
+          <text class="brightness-row-label"> Using system value </text>
+          <view
             :class="`brightness-status-badge brightness-status-badge-${isUsingSystem}`"
           >
-            <Text class="brightness-status-text">{{
-              isUsingSystem === 'checking'
-                ? 'CHECKING…'
-                : isUsingSystem === 'yes'
-                  ? 'YES'
-                  : 'NO'
-            }}</Text>
-          </View>
-        </View>
-        <View class="button-row">
+            <text class="brightness-status-text">
+              {{
+                isUsingSystem === 'checking'
+                  ? 'CHECKING…'
+                  : isUsingSystem === 'yes'
+                    ? 'YES'
+                    : 'NO'
+              }}
+            </text>
+          </view>
+        </view>
+        <view class="button-row">
           <ActionButton
             testID="brightness-mode-automatic"
             title="Automatic"
@@ -214,26 +212,27 @@ const permissionLabel = computed(() =>
             :onPress="handleRestoreSystem"
             :color="lineColor"
           />
-        </View>
-      </View>
+        </view>
+      </view>
 
-      <View testID="brightness-permission-card" class="brightness-card">
-        <Text class="brightness-card-title">Permission</Text>
-        <View class="brightness-row">
-          <Text class="brightness-row-label">SYSTEM_BRIGHTNESS status</Text>
-          <Text
+      <view testID="brightness-permission-card" class="brightness-card">
+        <text class="brightness-card-title"> Permission </text>
+        <view class="brightness-row">
+          <text class="brightness-row-label"> SYSTEM_BRIGHTNESS status </text>
+          <text
             testID="brightness-permission-value"
             class="brightness-value-text"
-            >{{ permissionLabel }}</Text
           >
-        </View>
+            {{ permissionLabel }}
+          </text>
+        </view>
         <ActionButton
           testID="brightness-request-permission"
           title="Request permission"
           :onPress="() => requestPermission()"
           :color="lineColor"
         />
-      </View>
-    </ScrollView>
-  </SafeAreaView>
+      </view>
+    </scroll-view>
+  </safe-area-view>
 </template>

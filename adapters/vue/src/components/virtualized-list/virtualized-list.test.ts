@@ -145,9 +145,7 @@ function makeList(
           ...extra,
         },
         {
-          item: ({ item }: { item: IRow }) => [
-            h('symbiote-text', {}, item.label),
-          ],
+          item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
           ...extraSlots,
         },
       ),
@@ -293,7 +291,7 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
     await mountWithViewport(
       {},
       {
-        separator: () => [h('symbiote-text', {}, 'divider')],
+        separator: () => [h('text', {}, 'divider')],
       },
     );
 
@@ -316,7 +314,7 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
     await mountWithViewport(
       {},
       {
-        separator: () => [h('symbiote-text', {}, 'divider')],
+        separator: () => [h('text', {}, 'divider')],
       },
     );
 
@@ -335,7 +333,7 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
     await mountWithViewport(
       { data: two },
       {
-        separator: () => [h('symbiote-text', {}, 'divider')],
+        separator: () => [h('text', {}, 'divider')],
       },
     );
 
@@ -459,9 +457,7 @@ function makeStickyList(): ReturnType<typeof defineComponent> {
           windowSize: 1,
         },
         {
-          item: ({ item }: { item: IRow }) => [
-            h('symbiote-text', {}, item.label),
-          ],
+          item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
         },
       ),
   });
@@ -530,9 +526,7 @@ function makeMvcpList(): ReturnType<typeof defineComponent> {
           maintainVisibleContentPosition: { minIndexForVisible: 0 },
         },
         {
-          item: ({ item }: { item: IRow }) => [
-            h('symbiote-text', {}, item.label),
-          ],
+          item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
         },
       ),
   });
@@ -552,9 +546,7 @@ function makeFailList(): ReturnType<typeof defineComponent> {
             failures.push(info),
         },
         {
-          item: ({ item }: { item: IRow }) => [
-            h('symbiote-text', {}, item.label),
-          ],
+          item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
         },
       ),
   });
@@ -573,7 +565,7 @@ describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex f
         },
       },
       // A #header slot occupies child 0, so RN bumps minIndexForVisible by 1 (1 -> 2).
-      { header: () => [h('symbiote-text', {}, 'header')] },
+      { header: () => [h('text', {}, 'header')] },
     );
 
     // Read from the COMMITTED tree (the clones): fabric.find returns the createNode node whose props

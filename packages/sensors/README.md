@@ -77,10 +77,10 @@ import { useAccelerometer } from '@symbiote-native/sensors/react';
 function SensorsScreen() {
   const accelerometer = useAccelerometer();
   return (
-    <Text>
+    <text>
       {accelerometer &&
         `x ${accelerometer.x} · y ${accelerometer.y} · z ${accelerometer.z}`}
-    </Text>
+    </text>
   );
 }
 ```
@@ -93,10 +93,10 @@ import { useAccelerometer } from '@symbiote-native/sensors/vue';
 const accelerometer = useAccelerometer();
 </script>
 <template>
-  <Text>{{
+  <text>{{
     accelerometer &&
     `x ${accelerometer.x} · y ${accelerometer.y} · z ${accelerometer.z}`
-  }}</Text>
+  }}</text>
 </template>
 ```
 
@@ -109,11 +109,11 @@ import { createAccelerometer } from '@symbiote-native/sensors/solid';
 function SensorsScreen() {
   const accelerometer = createAccelerometer();
   return (
-    <Text>
+    <text>
       <Show when={accelerometer()}>
         {reading => `x ${reading().x} · y ${reading().y} · z ${reading().z}`}
       </Show>
-    </Text>
+    </text>
   );
 }
 ```

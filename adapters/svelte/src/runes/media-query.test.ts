@@ -83,7 +83,7 @@ const PROBE = `<script lang="ts">
     });
   });
 </script>
-<symbiote-view p={{}} />`;
+<view p={{}} />`;
 
 interface IQueryState {
   orientation: string;

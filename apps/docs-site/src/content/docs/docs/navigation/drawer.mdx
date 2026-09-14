@@ -45,13 +45,13 @@ Angular, a snippet in Svelte, a render prop over an accessor in Solid.
       navigation: IDrawerNavigatorHandle;
     }) {
       return (
-        <SafeAreaView className="drawer-panel">
+        <safe-area-view className="drawer-panel">
           {state.routes.map(route => (
-            <Pressable key={route.key} onPress={() => navigation.jumpTo(route.name)}>
-              <Text>{descriptors[route.key]?.options.drawerLabel ?? route.name}</Text>
-            </Pressable>
+            <pressable key={route.key} onPress={() => navigation.jumpTo(route.name)}>
+              <text>{descriptors[route.key]?.options.drawerLabel ?? route.name}</text>
+            </pressable>
           ))}
-        </SafeAreaView>
+        </safe-area-view>
       );
     }
 
@@ -84,11 +84,11 @@ Angular, a snippet in Svelte, a render prop over an accessor in Solid.
         <DrawerScreen name="Home" :component="HomeScreen" :options="{ title: 'Home', drawerLabel: 'Home' }" />
         <DrawerScreen name="Settings" :component="SettingsScreen" :options="{ title: 'Settings', drawerLabel: 'Settings' }" />
         <template #drawerContent="{ state, descriptors, navigation }">
-          <SafeAreaView class="drawer-panel">
-            <Pressable v-for="route in state.routes" :key="route.key" @press="() => navigation.jumpTo(route.name)">
-              <Text>{{ descriptors[route.key]?.options.drawerLabel ?? route.name }}</Text>
-            </Pressable>
-          </SafeAreaView>
+          <safe-area-view class="drawer-panel">
+            <pressable v-for="route in state.routes" :key="route.key" @press="() => navigation.jumpTo(route.name)">
+              <text>{{ descriptors[route.key]?.options.drawerLabel ?? route.name }}</text>
+            </pressable>
+          </safe-area-view>
         </template>
       </Drawer>
     </template>
@@ -109,19 +109,19 @@ Angular, a snippet in Svelte, a render prop over an accessor in Solid.
     @Component({
       selector: 'DrawerDemoScreen',
       standalone: true,
-      imports: [Drawer, DrawerScreenDirective, Pressable, SafeAreaView, Text],
+      imports: [Drawer, DrawerScreenDirective, SYMBIOTE_ELEMENTS],
       template: `
         <Drawer initialRouteName="Home" drawerPosition="right" drawerType="slide">
           <ng-template symbioteDrawerScreen name="Home" [component]="homeScreen" [options]="homeOptions"></ng-template>
           <ng-template symbioteDrawerScreen name="Settings" [component]="settingsScreen" [options]="settingsOptions"></ng-template>
           <ng-template #drawerContent let-ctx>
-            <SafeAreaView class="drawer-panel">
+            <safe-area-view class="drawer-panel">
               @for (route of ctx.state.routes; track route.key) {
-                <Pressable (press)="ctx.navigation.jumpTo(route.name)">
-                  <Text>{{ drawerLabelFor(ctx.descriptors, route) }}</Text>
-                </Pressable>
+                <pressable (press)="ctx.navigation.jumpTo(route.name)">
+                  <text>{{ drawerLabelFor(ctx.descriptors, route) }}</text>
+                </pressable>
               }
-            </SafeAreaView>
+            </safe-area-view>
           </ng-template>
         </Drawer>
       `,
@@ -155,7 +155,6 @@ Angular, a snippet in Svelte, a render prop over an accessor in Solid.
     <script lang="ts">
       import { Drawer, DrawerScreen } from '@symbiote-native/navigation/svelte';
       import type { IDrawerContentSlotProps } from '@symbiote-native/navigation/svelte';
-      import { Pressable, SafeAreaView, Text } from '@symbiote-native/svelte';
       import HomeScreen from './HomeScreen.svelte';
       import SettingsScreen from './SettingsScreen.svelte';
     </script>
@@ -169,10 +168,10 @@ Angular, a snippet in Svelte, a render prop over an accessor in Solid.
         name="Settings"
         component={SettingsScreen}
         options={{ title: 'Settings', drawerLabel: 'Settings' }}
-      />{#snippet drawerContent(slot: IDrawerContentSlotProps)}<SafeAreaView class="drawer-panel"
-        >{#each slot.state.routes as route (route.key)}<Pressable
+      />{#snippet drawerContent(slot: IDrawerContentSlotProps)}<safe-area-view class="drawer-panel"
+        >{#each slot.state.routes as route (route.key)}<pressable
           onPress={() => slot.navigation.jumpTo(route.name)}
-          ><Text>{slot.descriptors[route.key]?.options.drawerLabel ?? route.name}</Text></Pressable
+          ><text>{slot.descriptors[route.key]?.options.drawerLabel ?? route.name}</text></Pressable
         >{/each}</SafeAreaView
       >{/snippet}</Drawer
     >
@@ -194,21 +193,20 @@ Angular, a snippet in Svelte, a render prop over an accessor in Solid.
     import { For } from 'solid-js';
     import { Drawer } from '@symbiote-native/navigation/solid';
     import type { IDrawerContentSlotProps } from '@symbiote-native/navigation/solid';
-    import { Pressable, SafeAreaView, Text } from '@symbiote-native/solid';
     import HomeScreen from './HomeScreen';
     import SettingsScreen from './SettingsScreen';
 
     function renderDrawerContent(slot: Accessor<IDrawerContentSlotProps>) {
       return (
-        <SafeAreaView class="drawer-panel">
+        <safe-area-view class="drawer-panel">
           <For each={slot().state.routes}>
             {route => (
-              <Pressable onPress={() => slot().navigation.jumpTo(route.name)}>
-                <Text>{slot().descriptors[route.key]?.options.drawerLabel ?? route.name}</Text>
-              </Pressable>
+              <pressable onPress={() => slot().navigation.jumpTo(route.name)}>
+                <text>{slot().descriptors[route.key]?.options.drawerLabel ?? route.name}</text>
+              </pressable>
             )}
           </For>
-        </SafeAreaView>
+        </safe-area-view>
       );
     }
 
@@ -309,12 +307,12 @@ type IDrawerDescriptorMap = Record<
 How you supply the content differs by framework, matching each one's own idiom for
 "caller-supplied UI that needs live data":
 
-| Framework | Mechanism                         | Description                                                                                                                                                                      |
-| --------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| React     | `renderDrawerContent` render prop | A `(props) => ReactNode` function passed directly to `<Drawer>`                                                                                                                  |
-| Vue       | `drawerContent` scoped slot       | `<template #drawerContent="{ state, descriptors, navigation }">` in SFC, or a `{ drawerContent: (props) => ... }` slots object in TSX                                            |
-| Angular   | `TemplateRef` via `@ContentChild` | A projected `<ng-template #drawerContent let-ctx>` — the ref variable name **must** be exactly `drawerContent`, read via `@ContentChild('drawerContent', { read: TemplateRef })` |
-| Svelte    | `drawerContent` Snippet prop      | `{#snippet drawerContent(slot: IDrawerContentSlotProps)}...{/snippet}` passed as the `drawerContent` prop on `<Drawer>`                                                          |
+| Framework | Mechanism                         | Description                                                                                                                                                                                    |
+| --------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React     | `renderDrawerContent` render prop | A `(props) => ReactNode` function passed directly to `<Drawer>`                                                                                                                                |
+| Vue       | `drawerContent` scoped slot       | `<template #drawerContent="{ state, descriptors, navigation }">` in SFC, or a `{ drawerContent: (props) => ... }` slots object in TSX                                                          |
+| Angular   | `TemplateRef` via `@ContentChild` | A projected `<ng-template #drawerContent let-ctx>` — the ref variable name **must** be exactly `drawerContent`, read via `@ContentChild('drawerContent', { read: TemplateRef })`               |
+| Svelte    | `drawerContent` Snippet prop      | `{#snippet drawerContent(slot: IDrawerContentSlotProps)}...{/snippet}` passed as the `drawerContent` prop on `<Drawer>`                                                                        |
 | Solid     | `drawerContent` render prop       | `(slot: Accessor<IDrawerContentSlotProps>) => JSX.Element` passed as the `drawerContent` prop on `<Drawer>`; called once, untracked, read `slot()` inside, not at the callback's own top level |
 
 If you skip the render prop/slot/template entirely, the panel slot renders empty — Drawer never

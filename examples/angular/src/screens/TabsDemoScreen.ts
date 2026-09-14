@@ -1,5 +1,5 @@
 import { Component, type Signal } from '@angular/core';
-import { SafeAreaView, Text, View } from '@symbiote-native/angular';
+import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
 import {
   Tab,
   TabScreenDirective,
@@ -15,28 +15,28 @@ const tabLineTagLabel = `${tabsLineInfo.code} · ${tabsLineInfo.label}`;
 @Component({
   selector: 'TabHomeScreen',
   standalone: true,
-  imports: [SafeAreaView, Text, View],
+  imports: [SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">TB</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Tabs</Text>
-            <Text class="hero-body">
+    <safe-area-view class="screen">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">TB</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Tabs</text>
+            <text class="hero-body">
               A bottom-tabs navigator — icon, badge, and tint, each tab a real
               native view.
-            </Text>
-          </View>
-        </View>
-        <Text class="info-text">{{ 'focused: ' + isFocused() }}</Text>
-      </View>
-    </SafeAreaView>
+            </text>
+          </view>
+        </view>
+        <text class="info-text">{{ 'focused: ' + isFocused() }}</text>
+      </view>
+    </safe-area-view>
   `,
 })
 export class TabHomeScreen {
@@ -53,17 +53,17 @@ export class TabHomeScreen {
 @Component({
   selector: 'TabSearchScreen',
   standalone: true,
-  imports: [SafeAreaView, Text, View],
+  imports: [SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <Text class="section-label">Search tab</Text>
-        <Text class="info-text">{{ 'focused: ' + isFocused() }}</Text>
-      </View>
-    </SafeAreaView>
+    <safe-area-view class="screen">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <text class="section-label">Search tab</text>
+        <text class="info-text">{{ 'focused: ' + isFocused() }}</text>
+      </view>
+    </safe-area-view>
   `,
 })
 export class TabSearchScreen {
@@ -79,17 +79,17 @@ export class TabSearchScreen {
 @Component({
   selector: 'TabProfileScreen',
   standalone: true,
-  imports: [SafeAreaView, Text, View],
+  imports: [SafeAreaViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <View class="section">
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <Text class="section-label">Profile tab</Text>
-        <Text class="info-text">{{ 'focused: ' + isFocused() }}</Text>
-      </View>
-    </SafeAreaView>
+    <safe-area-view class="screen">
+      <view class="section">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <text class="section-label">Profile tab</text>
+        <text class="info-text">{{ 'focused: ' + isFocused() }}</text>
+      </view>
+    </safe-area-view>
   `,
 })
 export class TabProfileScreen {

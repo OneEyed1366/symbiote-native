@@ -54,7 +54,7 @@ function mountBatteryState(): Ref<number> {
     defineComponent({
       setup: () => {
         batteryState = useBatteryState();
-        return () => h('symbiote-text', {}, 'battery');
+        return () => h('text', {}, 'battery');
       },
     }),
   );

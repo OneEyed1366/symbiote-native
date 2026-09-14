@@ -9,7 +9,7 @@
   surface byte-for-byte across every screen that uses it.
 -->
 <script setup lang="ts">
-import { Pressable, Text } from '@symbiote-native/vue';
+import type { IPressState } from '@symbiote-native/components';
 
 const props = defineProps<{
   title: string;
@@ -18,22 +18,25 @@ const props = defineProps<{
   testID?: string;
 }>();
 
-// Pressable's `style` prop is a FUNCTION of press state (RN's own idiom, mirrored by
-// @symbiote-native/vue's Pressable) — see App.vue's own pressableStyle/retentionStyle for the
-// same shape.
-const actionButtonStyle = ({ pressed }: { pressed: boolean }) => ({
+// The pressed look, as a `style` FUNCTION of press state — RN's own idiom. It works on the bare
+// `<pressable>` tag because the ENGINE resolves it: `routeProp`'s `isStyleCallback` evaluates the
+// callback at both values of `pressed` and swaps the pressed one in while the node is held
+// (`core/engine/src/node.ts`). No component has to read press state for this.
+const actionButtonStyle = ({ pressed }: IPressState) => ({
   borderColor: props.color,
   opacity: pressed ? 0.6 : 1,
 });
 </script>
 
 <template>
-  <Pressable
+  <pressable
     :testID="testID"
-    @press="onPress"
     class="action-button"
     :style="actionButtonStyle"
+    @press="onPress"
   >
-    <Text class="action-button-text" :style="{ color }">{{ title }}</Text>
-  </Pressable>
+    <text class="action-button-text" :style="{ color }">
+      {{ title }}
+    </text>
+  </pressable>
 </template>

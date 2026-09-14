@@ -19,37 +19,36 @@
   //
   // `section-nested` / `section-label` / `row` are NOT defined below — they come from App.css
   // and pass through unscoped, which is the other half of the rule.
-  import { View, Text } from '@symbiote-native/svelte';
   import ActionButton from './ActionButton.svelte';
 
   let isLoud = $state(false);
 </script>
 
-<View class="section-nested">
-  <Text class="section-label">Compound class · scoped style block</Text>
-  <View class="row">
-    <View class="badge" testID="compound-badge-plain">
-      <Text class="badge-text">plain</Text>
-    </View>
-    <View class="badge loud" testID="compound-badge-loud">
-      <Text class="badge-text">loud</Text>
-    </View>
-    <View class={['badge', isLoud && 'loud']} testID="compound-badge-dynamic">
-      <Text class="badge-text">dynamic</Text>
-    </View>
-  </View>
-  <Text class="note-text" testID="compound-badge-readout">
+<view class="section-nested">
+  <text class="section-label">Compound class · scoped style block</text>
+  <view class="row">
+    <view class="badge" testID="compound-badge-plain">
+      <text class="badge-text">plain</text>
+    </view>
+    <view class="badge loud" testID="compound-badge-loud">
+      <text class="badge-text">loud</text>
+    </view>
+    <view class={['badge', isLoud && 'loud']} testID="compound-badge-dynamic">
+      <text class="badge-text">dynamic</text>
+    </view>
+  </view>
+  <text class="note-text" testID="compound-badge-readout">
     {isLoud
       ? 'dynamic badge carries both tokens — flame border, same pill shape'
       : 'dynamic badge carries only .badge — grey border'}
-  </Text>
+  </text>
   <ActionButton
     testID="compound-badge-toggle"
     title={isLoud ? 'Drop .loud' : 'Add .loud'}
     color="#ff3e00"
     onPress={() => (isLoud = !isLoud)}
   />
-</View>
+</view>
 
 <style>
   .badge {

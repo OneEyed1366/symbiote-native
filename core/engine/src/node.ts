@@ -35,11 +35,20 @@ import {
 } from './style-registry';
 import { dlog } from './debug';
 import {
+  appListenerFor,
   attachHostBehavior,
+  claimModeFor,
   hasHostBehaviors,
   markDetachCandidate,
+  notifyChildInserted,
+  notifyOwnedListenerChange,
+  notifyWrapChange,
   ownsListener,
   reattachHostBehaviors,
+  derivedNodesOf,
+  slotDerivesFrom,
+  slotPropNameFor,
+  slotTakesChildren,
   stashAppListener,
   type IPayloadFold,
 } from './host-behavior';
@@ -66,6 +75,16 @@ import {
   treeHost,
   type ITreeCensus,
 } from './tree-host';
+// The same deliberate cycle, for the same reason: `routeProp` resolves an AnimatedNode written
+// into a prop, and the module that owns that resolution reaches back here for `setProp`. See
+// `animated/host-binding.ts`'s header.
+import { hasAnimatedNodes } from './animated/graph';
+import {
+  bindAnimatedEvent,
+  bindAnimatedValue,
+  hasAnimatedBindings,
+  reattachAnimatedProps,
+} from './animated/host-binding';
 
 const BRAND: unique symbol = Symbol('symbiote.node');
 
@@ -137,8 +156,8 @@ export interface ISymbioteNode {
   //
   // WHY IT HANGS OFF THE BEHAVIOR AND NOT OFF `node.component`, which is how the aria and
   // value->text folds next to it are keyed. A wrapper and its lowered twin commit the SAME Fabric
-  // view name — `RCTSinglelineTextInputView` for both `symbiote-text-input` and
-  // `symbiote-text-input-managed` — so a fold keyed on the component name runs on both, and the
+  // view name — `RCTSinglelineTextInputView` for both `text-input` and
+  // `text-input-managed` — so a fold keyed on the component name runs on both, and the
   // wrapper has already folded in its own body. Double-folding is the hazard. A behavior attaches
   // to the LOWERED tag alone, so it is the discriminator that already exists.
   payloadFold: IPayloadFold | undefined;
@@ -154,6 +173,44 @@ export interface ISymbioteNode {
   //
   // ENGINE-OWNED. An adapter reads and writes style through routeProp, never through this field.
   styleParts: IClassStyleParts | undefined;
+
+  // Where this node's APP children go, when the node owns an internal subtree of its own.
+  //
+  // A host primitive that is a COMPOSITION — ScrollView is a scroll view wrapping a content view —
+  // has structure the app never wrote and must never see. In a component that structure lives in
+  // the wrapper's body, which is exactly the per-instance cost lowering exists to delete; on the
+  // host path the behavior builds it once at attach (`IHostBehavior.buildStructure`) and points
+  // this at the node the app's own children belong under. `appendChild` / `insertBefore` /
+  // `removeChild` then redirect, so the adapter keeps calling them with the OWNER and never learns
+  // that a slot exists. The browser's twin is a UA shadow tree: `<video>`'s controls are real nodes
+  // the page cannot address, and an author's `<track>` still lands where the element decides.
+  //
+  // NOT a serialization of children, and that alternative is worth naming because it is the one
+  // that gets proposed: app children stay ordinary engine nodes, owned by the engine, and only
+  // their PARENT differs from the one the framework named. Nothing is copied, flattened or
+  // replayed.
+  //
+  // A FIELD rather than a WeakMap, for the reason `payloadFold` is one: the redirect is read on
+  // every structural op (~9 000 appends on one benchmark create), so it must not cost a hash probe
+  // to discover that almost no node has a slot. `undefined` on every node that does not.
+  //
+  // SINGLE HOP by design. A slot that itself carried a slot would make "where does this child go"
+  // a walk, on the hottest path in the engine, to express a structure no primitive has. A behavior
+  // that needs depth builds the chain and points this at the innermost node directly.
+  childHost: ISymbioteNode | undefined;
+
+  // The node that stands in THIS node's place in its parent's child list. Set when a behavior
+  // claims a child in `wrap` mode, which is how an Android ScrollView takes a RefreshControl: the
+  // refresh layout becomes the scroll view's parent, because an Android ScrollView holds exactly
+  // one child and a sibling refresh control is an `addViewAt` crash.
+  //
+  // The inversion is confined to the two structural entry points, and only they read this: the
+  // adapter still names the scroll view for every insert, prop write and command, because that is
+  // the node it holds. Nothing above `appendChild` learns the wrapper exists.
+  //
+  // A FIELD for the same reason `childHost` is one, and beside it in the constructor so the pair
+  // costs no extra shape transition.
+  wrapper: ISymbioteNode | undefined;
 
   // RN's ReactFabricHostComponent surface - what a template/function ref hands back and what
   // reanimated / gesture-handler / react-navigation reach through. Each resolves the node's
@@ -177,10 +234,32 @@ export interface ISymbioteNode {
   setNativeProps(nativeProps: Record<string, unknown>): void;
   focus(): void;
   blur(): void;
+  // The scroll commands, on every node for the same reason `focus`/`blur` are: a lowered primitive
+  // hands the app its engine NODE, so anything the wrapper's imperative handle offered has to be
+  // reachable from here or the surface silently shrinks when a primitive stops being a component.
+  //
+  // ON THE SHARED PROTOTYPE, not per-tag, and that is a trade rather than an oversight. The
+  // browser's shape is per-tag — `HTMLVideoElement.play` is not on `HTMLElement` — and it is
+  // reachable here too, by registering one subclass per tag so `createElement` can construct with
+  // the right prototype. It was not taken: that gives the commit walk N node shapes where it has
+  // one today, and every call site in `reconcile`/`fabricProps` that is monomorphic on
+  // `SymbioteNode` becomes polymorphic. The cost is unmeasured, the benefit is type hygiene, and
+  // this file's own history says the prototype question is decided by measurement (see the
+  // toPublicInstance note above). Revisit with numbers, not with taste.
+  //
+  // Harmless where meaningless: `focus()` on a View already dispatches a command native ignores,
+  // and RN's own host component carries the same universal surface.
+  scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void;
+  scrollToEnd(options?: { animated?: boolean }): void;
+  flashScrollIndicators(): void;
 }
 
 const FOCUS_COMMAND = 'focus';
 const BLUR_COMMAND = 'blur';
+// Names and arg order mirror RN's ScrollViewCommands.
+const SCROLL_TO_COMMAND = 'scrollTo';
+const SCROLL_TO_END_COMMAND = 'scrollToEnd';
+const FLASH_SCROLL_INDICATORS_COMMAND = 'flashScrollIndicators';
 
 // The one shape every retained node has. A class, not an object literal, for two reasons: the six
 // imperative methods live on the shared prototype instead of being allocated per node (see
@@ -198,6 +277,8 @@ class SymbioteNode implements ISymbioteNode {
   declare hasAriaAlias: boolean;
   declare styleParts: IClassStyleParts | undefined;
   declare payloadFold: IPayloadFold | undefined;
+  declare childHost: ISymbioteNode | undefined;
+  declare wrapper: ISymbioteNode | undefined;
 
   constructor(component: string, isText: boolean) {
     this[BRAND] = true;
@@ -215,6 +296,11 @@ class SymbioteNode implements ISymbioteNode {
     // Assigned here for the same hidden-class reason as `hasAriaAlias` above; `attachHostBehavior`
     // overwrites it a few lines later for the rare node that has a behavior.
     this.payloadFold = undefined;
+    // Same reason again, and here it is load-bearing rather than tidy: the redirect below is read
+    // on every append, so the slot must be a stable slot on one hidden class, not a property added
+    // to a few nodes after the fact.
+    this.childHost = undefined;
+    this.wrapper = undefined;
   }
 
   measure(callback: IMeasureOnSuccess): void {
@@ -248,6 +334,28 @@ class SymbioteNode implements ISymbioteNode {
   blur(): void {
     dispatchViewCommand(this, BLUR_COMMAND, []);
   }
+
+  // The defaults live HERE and nowhere else. `buildScrollViewHandle`
+  // (`@symbiote-native/components`) used to own them and now delegates, so the wrapper's handle and
+  // a lowered element's node cannot drift on what `scrollTo()` with no argument means.
+  scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void {
+    const x = options?.x ?? 0;
+    const y = options?.y ?? 0;
+    const animated = options?.animated ?? true;
+    dlog(`ScrollView.scrollTo x=${x} y=${y} animated=${animated}`);
+    dispatchViewCommand(this, SCROLL_TO_COMMAND, [x, y, animated]);
+  }
+
+  scrollToEnd(options?: { animated?: boolean }): void {
+    const animated = options?.animated ?? true;
+    dlog(`ScrollView.scrollToEnd animated=${animated}`);
+    dispatchViewCommand(this, SCROLL_TO_END_COMMAND, [animated]);
+  }
+
+  flashScrollIndicators(): void {
+    dlog('ScrollView.flashScrollIndicators');
+    dispatchViewCommand(this, FLASH_SCROLL_INDICATORS_COMMAND, []);
+  }
 }
 
 // The committed record — handle, tag, rootTag — is the host's to keep, and `committedRecordOf`
@@ -277,9 +385,15 @@ export function createElement(
   tag: string = component,
 ): ISymbioteNode {
   const node = new SymbioteNode(component, isText);
+  // A primitive that commits NO VIEW resolves to the anchor component through `descriptorFor`
+  // (`touchable-without-feedback`, `touchable-native-feedback`), and reaches this function rather
+  // than `createAnchor` because the caller only knows it has a descriptor. The kind is an OPCODE
+  // now, not a name the commit walk reads, so the name alone would give the host an ordinary
+  // element called `#anchor` — one that really paints.
+  if (component === ANCHOR_COMPONENT) recordCreateAnchor(node);
   // `instanceHandle` is the node itself: it round-trips through Fabric unchanged and comes back as
   // the event target, and the BRAND below is how the event handler confirms it is one of ours.
-  recordCreateElement(node, component, isText, node);
+  else recordCreateElement(node, component, isText, node);
   // Gated on the boolean, not on the Map: this runs ~9 000 times per benchmark create, and an app
   // that registers nothing must pay one boolean read rather than a hash lookup per node.
   if (hasHostBehaviors()) attachHostBehavior(node, tag);
@@ -467,6 +581,19 @@ export function setProp(
   // activeStyle, on* — return before reaching here and none of them can carry an alias, so every
   // `role` / `aria-*` write in the engine passes through this line.
   if (!node.hasAriaAlias && isAriaAliasKey(key)) node.hasAriaAlias = true;
+  // A composed primitive's slot — and its wrapper, where it has one — can carry a value DERIVED
+  // from an owner prop, and `markPropsDirty` bubbles up, so neither ever learns. Here rather than
+  // in `routeProp` because this is the one choke point every writer passes (a structural adapter's
+  // `setProperty` does not go through routeProp), and past the identity guard so a re-render
+  // writing an unchanged value costs them nothing. See `IHostBehavior.slotDerived`.
+  if (node.childHost !== undefined && slotDerivesFrom(node, key)) {
+    markPropsDirty(node.childHost);
+    // Past the slot: a `buildStructure` that builds a CHAIN registers the deeper nodes here, and
+    // each keeps its own pure fold reading the owner. See `addDerivedNode`.
+    const derived = derivedNodesOf(node);
+    if (derived !== undefined) for (const each of derived) markPropsDirty(each);
+    if (node.wrapper !== undefined) markPropsDirty(node.wrapper);
+  }
   propStats.writes += 1;
   writeProp(node, key, value);
 }
@@ -540,6 +667,32 @@ export function functionPropOf(node: ISymbioteNode, key: string): unknown {
   return functionProps.get(node)?.get(key);
 }
 
+/**
+ * The same stash, whole — what `propsOf` layers over the host's answer.
+ *
+ * `undefined` rather than an empty Map for a node that stashed nothing, which is nearly every node:
+ * the caller then hands back the host's own object instead of copying it.
+ */
+export function functionPropsOf(
+  node: ISymbioteNode,
+): ReadonlyMap<string, unknown> | undefined {
+  return functionProps.get(node);
+}
+
+/**
+ * "Rebuild this node's payload — the fold reads state I just changed."
+ *
+ * A behavior whose payload is DERIVED has no prop to write: the sticky header's debounced
+ * translateY lives in its own runtime, not on the node, so nothing names the node and the host
+ * never marks it. This is the one route that says so directly.
+ *
+ * Dirtying is not publishing — pair it with `requestCommitFor` (imperative.ts).
+ */
+export function markPropsDirty(node: ISymbioteNode): void {
+  flushOps();
+  treeHost()?.markPropsDirty(node);
+}
+
 // Fabric gates a handful of events behind a BOOLEAN prop: unlike scroll / touch / change, which
 // the native component emits unconditionally, these fire only when the shadow node carries the
 // flag. RN raises them with an `on*: true` validAttribute; we drop function props from the
@@ -578,15 +731,22 @@ const GATED_EVENT_PROPS: ReadonlyMap<string, string> = new Map([
  * `setEventListener` diverts an owned name into the stash, which is right for an app listener and
  * circular for the behavior's own dispatcher — it would stash itself and never occupy the slot it
  * exists to hold. This is the one writer allowed past that gate.
+ *
+ * `undefined` removes it, gate flag included. A behavior whose dispatcher is conditional needs
+ * that as much as it needs the install: ScrollView takes the owner's `layout` only while the app
+ * or an inverted sticky header wants it, and a one-way installer leaves `onLayout: true` standing
+ * in the payload of a ScrollView that no longer reads the event.
  */
 export function setBehaviorListener(
   node: ISymbioteNode,
   name: string,
-  listener: IListener,
+  listener: IListener | undefined,
 ): void {
-  (node.listeners ??= new Map()).set(name, listener);
+  if (listener === undefined) node.listeners?.delete(name);
+  else (node.listeners ??= new Map()).set(name, listener);
   const flagProp = GATED_EVENT_PROPS.get(name);
-  if (flagProp !== undefined) setProp(node, flagProp, true);
+  if (flagProp !== undefined)
+    setProp(node, flagProp, listener === undefined ? undefined : true);
 }
 
 export function setEventListener(
@@ -603,7 +763,13 @@ export function setEventListener(
   // reached the node; lowering removes the mediator. Gated on the boolean first, so an app with no
   // behavior registered pays one read.
   if (hasHostBehaviors() && ownsListener(node, name)) {
+    // The PRESENCE only, never the identity: listeners deliberately do not notify (a framework
+    // hands a fresh closure nearly every render — see `markDirty`'s note on why that must stay
+    // free). A flip is a mount-time event, not a per-render one.
+    const wasWired = appListenerFor(node, name) !== undefined;
     stashAppListener(node, name, isHandler ? value : undefined);
+    if (wasWired !== isHandler)
+      notifyOwnedListenerChange(node, name, isHandler);
     const flagged = GATED_EVENT_PROPS.get(name);
     if (flagged !== undefined)
       setProp(node, flagged, isHandler ? true : undefined);
@@ -953,13 +1119,51 @@ export function routeProp(
   value: unknown,
 ): void {
   if (REACT_JSX_DEV_PROPS.has(key)) return;
+  // The prop twin of the child redirect in `appendChild`. A composed primitive's owner is written
+  // with props that belong to its internal slot — `contentContainerStyle` on a ScrollView styles
+  // the content view — and the adapter names the OWNER for a prop for the same reason it names the
+  // owner for a child: that is where the app wrote it.
+  //
+  // Gated on the FIELD, so a node with no slot pays one load and one branch and never touches the
+  // registry. The redirected write recurses into the slot's own `routeProp`, which is single-hop
+  // by construction: a slot has no slot of its own (`childHost` is documented single-hop, and
+  // `buildStructure` is what would have to nest one).
+  if (node.childHost !== undefined) {
+    const slotKey = slotPropNameFor(node, key);
+    if (slotKey !== undefined) {
+      // A class NAME is a legal spelling of `contentContainerStyle` — every canary writes
+      // `contentContainerStyle="scroll-content"` — so a string has to land on the slot as a
+      // CLASS. Only the class branch consults the registry; renaming it verbatim would publish a
+      // `style` holding a string, which is not a style and is dropped with nothing red. React's
+      // wrapper resolves the name itself (components/scroll-view/shared.ts), so this gap could
+      // only ever show on the tag path.
+      routeProp(
+        node.childHost,
+        slotKey === 'style' && typeof value === 'string' ? 'class' : slotKey,
+        value,
+      );
+      return;
+    }
+  }
+  // An AnimatedNode written straight into a prop — `<view style={{opacity: value}}/>` — is
+  // resolved here into the value to PUBLISH, with the engine holding the subscription. Same
+  // shape as the `style` callback below: a value the engine interprets rather than forwards.
+  // Returns its input by identity when nothing is animated, so every branch under this line is
+  // unchanged. See `animated/host-binding.ts`; the gate is one boolean for an app that animates
+  // nothing.
+  //
+  // AFTER the slot redirect, so an animated `contentContainerStyle` binds on the node that
+  // actually carries the style.
+  const resolved = hasAnimatedNodes()
+    ? bindAnimatedValue(node, key, value)
+    : value;
   if (CLASS_PROP_KEYS.has(key)) {
     const parts = stylePartsOf(node);
     // Canonicalised HERE so the stored value is what everything downstream keys on: an all-string
     // array becomes one string, and then the pressed variant and isAlreadyPublished work on it
     // exactly as on an authored string. One `typeof` for the common case.
     parts.className = canonicalClassName(
-      isClassNameValue(value) ? value : undefined,
+      isClassNameValue(resolved) ? resolved : undefined,
     );
     parts.classStyle = resolveClassName(parts.className);
     pushClassStyle(node, parts);
@@ -980,12 +1184,12 @@ export function routeProp(
     //
     // The callback must be PURE in `pressed`: its result is read once per state, here and under
     // every transform's emission (`core/components/src/state-style.ts` carries the same contract).
-    if (isStyleCallback(value)) {
-      parts.explicitStyle = value({ pressed: false });
-      parts.activeStyle = value({ pressed: true });
+    if (isStyleCallback(resolved)) {
+      parts.explicitStyle = resolved({ pressed: false });
+      parts.activeStyle = resolved({ pressed: true });
       parts.activeStyleFromCallback = true;
     } else {
-      parts.explicitStyle = value;
+      parts.explicitStyle = resolved;
       // Only a variant WE derived is stale now. `style` switching from a callback to a plain value
       // must not leave the old pressed look standing, and an `activeStyle` the transform wrote must
       // survive a `style` write, because the two arrive as independent props in an unspecified
@@ -1002,7 +1206,7 @@ export function routeProp(
   // in the app carries an unknown key to native.
   if (key === 'activeStyle') {
     const parts = stylePartsOf(node);
-    parts.activeStyle = value;
+    parts.activeStyle = resolved;
     // Slot 1 is no longer ours, by definition — whatever a callback derived earlier has just been
     // replaced. Without this the flag outlives the value it describes: a callback sets it, this
     // branch overwrites the slot silently, and a later plain `style` then clears a variant the
@@ -1014,6 +1218,9 @@ export function routeProp(
     return;
   }
   if (ON_PREFIX.test(key)) {
+    // A native-driven `Animated.event` needs the native module as well as the listener map, and
+    // registers under the PROP name — see `bindAnimatedEvent`, which no-ops for anything else.
+    if (hasAnimatedNodes()) bindAnimatedEvent(node, key, resolved);
     const name = listenerName(key);
     const isRegisteredEvent =
       RESPONDER_EVENTS.has(name) || isEventFor(node.component, name);
@@ -1029,11 +1236,11 @@ export function routeProp(
       );
     }
     if (isRegisteredEvent) {
-      setEventListener(node, name, value);
+      setEventListener(node, name, resolved);
       return;
     }
   }
-  setProp(node, key, value);
+  setProp(node, key, resolved);
 }
 
 // Counted in the same propStats, because a text write IS a prop write: it reaches Fabric as
@@ -1054,11 +1261,119 @@ export function setText(node: ISymbioteNode, text: string): void {
 // one — frameworks spell a MOVE as remove-then-insert and can arrive after the insert already
 // re-parented the node. That is why there is no `detach` here any more; JS does not know the old
 // parent and does not need to.
-export function appendChild(parent: ISymbioteNode, child: ISymbioteNode): void {
+//
+// What they DO still decide in JS is which node an op names, and there are two such redirects — a
+// composed primitive's slot and a wrap claim. Both are read off a field on the node, so a tree with
+// neither pays one load and one branch per op.
+
+// The host's raw answer, surface INCLUDED — unlike `parentOf` (host-access.ts), which reports a
+// top-level node as parentless by design. The two swaps below have to NAME the holder in an op, and
+// for a wrapped node sitting directly under a surface that holder is the surface node.
+function holderOf(node: ISymbioteNode): ISymbioteNode | undefined {
+  flushOps();
+  const parent = treeHost()?.parentOf(node);
+  return isSymbioteNode(parent) ? parent : undefined;
+}
+
+// Which node a child actually lands on. See `ISymbioteNode.childHost`: the adapter always names the
+// OWNER, and a node whose behavior built an internal subtree redirects the app's children into it —
+// unless the behavior CLAIMS this particular child, which keeps it on the owner (`claimedChildren`).
+//
+// SINGLE HOP, not a loop, and the field's own comment says why — a chain would put a walk on the
+// engine's hottest path to express a depth no primitive has. A behavior needing depth points
+// `childHost` at the innermost node itself.
+//
+// Reads a field that is `undefined` on every node in every app that registers no composed
+// primitive, so the cost is one load and one branch — deliberately NOT behind `hasHostBehaviors()`,
+// which would be a second read to save nothing. The claim check sits BEHIND that branch, so only a
+// slot-bearing node ever pays the registry probe.
+function hostFor(parent: ISymbioteNode, child: ISymbioteNode): ISymbioteNode {
+  const slot = parent.childHost;
+  if (slot === undefined) return parent;
+  // A slot that is a built SIBLING rather than a container — ImageBackground's absolutely-filled
+  // image — keeps the app's children on the owner. See `IHostBehavior.slotTakesNoChildren`.
+  if (!slotTakesChildren(parent)) return parent;
+  return claimModeFor(parent, child.component) === undefined ? slot : parent;
+}
+
+// The node a child must be inserted BEFORE, or `undefined` for an ordinary append.
+//
+// A host that STILL has a slot at this point is an owner taking a CLAIMED child, and that child
+// goes before the slot whatever the framework asked for. RN renders `{refreshControl}{content}` in
+// that order, and the node a framework names as `beforeChild` lives inside the slot, so the host
+// could not place against it here anyway.
+//
+// A SIBLING slot is the opposite placement: RN paints the background image first and the app's
+// children over it (ImageBackground.js:80-102), so they append past it rather than in front of it —
+// which is what `undefined` here leaves alone.
+function slotAnchorOf(host: ISymbioteNode): ISymbioteNode | undefined {
+  const slot = host.childHost;
+  if (slot === undefined || !slotTakesChildren(host)) return undefined;
+  return slot;
+}
+
+// What actually occupies this node's place in its parent's child list. See `ISymbioteNode.wrapper`:
+// a wrapped owner is what the adapter names and the wrapper is what the tree holds, so every
+// structural op takes the owner and moves the wrapper.
+function placedNode(node: ISymbioteNode): ISymbioteNode {
+  return node.wrapper ?? node;
+}
+
+// Make `child` the owner's parent, in place. Returns false when this is not a wrap claim, so the
+// two inserts fall through to the ordinary path on one call.
+//
+// The owner being UNATTACHED is the normal case rather than the edge one: every adapter fills a
+// node's children before appending it to its own parent, so the wrap usually happens while the
+// owner has no holder and only the second op runs. The later `appendChild(root, owner)` then
+// inserts the wrapper instead, because `placedNode` says so.
+function wrapsOwner(owner: ISymbioteNode, child: ISymbioteNode): boolean {
+  if (owner.childHost === undefined) return false;
+  if (claimModeFor(owner, child.component) !== 'wrap') return false;
+  if (hasHostBehaviors()) reattachHostBehaviors(child);
+  if (hasAnimatedBindings()) reattachAnimatedProps(child);
+  const holder = holderOf(owner);
+  // Wrapper takes the owner's place first, then the owner moves under it — the host's own detach
+  // on link is what unlinks the owner from `holder`, so no removal op is needed.
+  if (holder !== undefined) recordInsertBefore(holder, child, owner);
+  owner.wrapper = child;
+  recordAppendChild(child, owner);
+  notifyWrapChange(owner, child);
+  return true;
+}
+
+// Put the owner back where its wrapper stood — the mirror of `wrapsOwner`. It must leave the owner
+// ATTACHED: the framework is removing the RefreshControl, not the ScrollView.
+function unwrapsOwner(owner: ISymbioteNode, child: ISymbioteNode): boolean {
+  if (owner.wrapper !== child) return false;
+  owner.wrapper = undefined;
+  const holder = holderOf(child);
+  if (holder === undefined) {
+    // The wrapper never reached a parent, so there is no place to take back — the owner simply
+    // stops hanging off it.
+    recordRemoveChild(child, owner);
+  } else {
+    recordInsertBefore(holder, owner, child);
+    recordRemoveChild(holder, child);
+  }
+  notifyWrapChange(owner, undefined);
+  return true;
+}
+
+export function appendChild(
+  requestedParent: ISymbioteNode,
+  child: ISymbioteNode,
+): void {
+  if (wrapsOwner(requestedParent, child)) return;
+  const parent = hostFor(requestedParent, child);
   // A node the sweep tore down can be put back — Svelte parks live subtrees offscreen across
   // commits. A WeakSet miss for anything freshly built, so the create path pays nothing.
   if (hasHostBehaviors()) reattachHostBehaviors(child);
-  recordAppendChild(parent, child);
+  if (hasAnimatedBindings()) reattachAnimatedProps(child);
+  const placed = placedNode(child);
+  const anchor = slotAnchorOf(parent);
+  if (anchor === undefined) recordAppendChild(parent, placed);
+  else recordInsertBefore(parent, placed, anchor);
+  if (hasHostBehaviors()) notifyChildInserted(parent, placed);
 }
 
 // NO ANCHOR MEANS APPEND, and it is a real call rather than a defensive guard: solid-js/universal
@@ -1067,24 +1382,50 @@ export function appendChild(parent: ISymbioteNode, child: ISymbioteNode): void {
 // is -1, and the insert fell through to a push. On the wire it cannot: a slot has to name a node, so
 // an unanchored insert IS an append and is recorded as one.
 export function insertBefore(
-  parent: ISymbioteNode,
+  requestedParent: ISymbioteNode,
   child: ISymbioteNode,
   beforeChild: ISymbioteNode | null | undefined,
 ): void {
+  if (wrapsOwner(requestedParent, child)) return;
+  const parent = hostFor(requestedParent, child);
   if (hasHostBehaviors()) reattachHostBehaviors(child);
-  if (beforeChild === null || beforeChild === undefined) {
-    recordAppendChild(parent, child);
-    return;
-  }
-  recordInsertBefore(parent, child, beforeChild);
+  if (hasAnimatedBindings()) reattachAnimatedProps(child);
+  const placed = placedNode(child);
+  const anchor =
+    slotAnchorOf(parent) ??
+    (beforeChild === null || beforeChild === undefined
+      ? undefined
+      : placedNode(beforeChild));
+  if (anchor === undefined) recordAppendChild(parent, placed);
+  else recordInsertBefore(parent, placed, anchor);
+  if (hasHostBehaviors()) notifyChildInserted(parent, placed);
 }
 
 // Removal only NOMINATES a behavior for teardown; the commit sweep decides. A framework may spell
 // a move as remove-then-reinsert (Solid does), so tearing down here kills the machine of a node
 // that comes back alive in the same batch — see host-behavior.ts's markDetachCandidate.
-export function removeChild(parent: ISymbioteNode, child: ISymbioteNode): void {
-  if (hasHostBehaviors()) markDetachCandidate(child);
-  recordRemoveChild(parent, child);
+export function removeChild(
+  requestedParent: ISymbioteNode,
+  child: ISymbioteNode,
+): void {
+  // A wrap claim leaving: the owner takes its own place back and stays in the tree. Nominated for
+  // teardown like any other removed node, because the wrapper IS leaving.
+  if (unwrapsOwner(requestedParent, child)) {
+    if (hasHostBehaviors() || hasAnimatedBindings()) markDetachCandidate(child);
+    return;
+  }
+  // A slot that IS the child being removed stops being one. Only a behavior that adopts an APP
+  // child as its slot can reach this (`onChildInserted`); a `buildStructure` slot is internal and
+  // no framework removes it. Without the clear, `hostFor` below redirects the removal INTO the very
+  // node being removed, and the child stays committed under a parent the framework believes it
+  // left — and the NEXT child appended nests inside the orphan.
+  if (requestedParent.childHost === child)
+    requestedParent.childHost = undefined;
+  // Redirected for the same reason the two inserts are: the adapter removes from the node it
+  // appended to, which is the OWNER, while the child actually lives in the slot.
+  const parent = hostFor(requestedParent, child);
+  if (hasHostBehaviors() || hasAnimatedBindings()) markDetachCandidate(child);
+  recordRemoveChild(parent, placedNode(child));
 }
 
 // Re-exported from its own module so the census keeps ONE public spelling: it moved to `tree-host.ts`

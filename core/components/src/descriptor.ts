@@ -4,11 +4,11 @@
 // adapter's host element then flows on through its reconciler → engine → Fabric.
 //
 // `type` is an open host-component string, not a closed two-member union, because
-// symbiote paints one host element PER native component (`symbiote-activity-indicator`,
-// `symbiote-switch`, …), not just a generic box/text pair.
+// symbiote paints one host element PER native component (`activity-indicator`,
+// `switch`, …), not just a generic box/text pair.
 
-// The host component to paint. The three primitives (`symbiote-view` / `symbiote-text` /
-// `symbiote-image`) plus any native leaf a component emits, kept open as a string since
+// The host component to paint. The three primitives (`view` / `text` /
+// `image`) plus any native leaf a component emits, kept open as a string since
 // components register their own host element names with the engine.
 export type IDescriptorType = string;
 
@@ -25,7 +25,7 @@ export type IDescriptor = {
   key?: string;
 };
 
-// el(): a host element of any type. txt(): shorthand for the `symbiote-text` primitive.
+// el(): a host element of any type. txt(): shorthand for the `text` primitive.
 export function el(
   type: IDescriptorType,
   props: IDescriptorProps = {},
@@ -39,7 +39,7 @@ export function txt(
   props: IDescriptorProps = {},
   children: IDescriptorChild[] = [],
 ): IDescriptor {
-  return { type: 'symbiote-text', props, children };
+  return { type: 'text', props, children };
 }
 
 // The shape-stability contract, enforced next to the type it guards.

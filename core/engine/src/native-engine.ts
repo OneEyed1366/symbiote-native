@@ -116,6 +116,9 @@ export type INativeEngineBindings = {
    * knows.
    */
   getProp: (handle: object, key: string) => unknown;
+  getProps: (handle: object) => Readonly<Record<string, unknown>>;
+  /** The one WRITE among them: dirty a node no op named. See `markPropsDirty` (node.ts). */
+  markPropsDirty: (handle: object) => void;
   getViewName: (handle: object) => string;
   parentOf: (handle: object) => object | undefined;
   childrenOf: (handle: object) => readonly object[];
@@ -225,6 +228,8 @@ function isBindings(value: unknown): value is INativeEngineBindings {
   // throws at the first call site, which is a gesture or a `measure()` — one language and several
   // seconds away from the install that caused it.
   if (typeof value.getProp !== 'function') return false;
+  if (typeof value.getProps !== 'function') return false;
+  if (typeof value.markPropsDirty !== 'function') return false;
   if (typeof value.getViewName !== 'function') return false;
   if (typeof value.parentOf !== 'function') return false;
   if (typeof value.childrenOf !== 'function') return false;

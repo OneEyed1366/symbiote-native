@@ -54,6 +54,13 @@ function fakeBindings(version: number): {
       calls.push(['getProp', handle, key]);
       return `prop:${key}`;
     },
+    getProps: handle => {
+      calls.push(['getProps', handle]);
+      return {};
+    },
+    markPropsDirty: handle => {
+      calls.push(['markPropsDirty', handle]);
+    },
     getViewName: handle => {
       calls.push(['getViewName', handle]);
       return 'RCTVirtualText';

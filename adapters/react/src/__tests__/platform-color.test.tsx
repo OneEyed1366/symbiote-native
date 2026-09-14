@@ -10,7 +10,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   DynamicColorIOS,
   PlatformColor,
-  View,
   mount,
   processColor,
   unmount,
@@ -25,7 +24,7 @@ const ROOT_TAG = 260;
 let seen: unknown[] = [];
 
 function App(): ReactElement {
-  return <View style={{ backgroundColor: PlatformColor('labelColor') }} />;
+  return <view style={{ backgroundColor: PlatformColor('labelColor') }} />;
 }
 
 const fabric = installFabric();

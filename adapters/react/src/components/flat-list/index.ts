@@ -170,12 +170,12 @@ export function FlatList<ItemT>(
       // The row IS the virtualized cell, so every item in it shares the row's separators handle
       // (the divider sits between rows, not columns), like RN's multi-column FlatList.
       return createElement(
-        'symbiote-view',
+        'view',
         { key, style: { flex: 1 } },
         renderItem({ item, index, separators: info.separators }),
       );
     });
-    return createElement('symbiote-view', { style: rowStyle }, ...cells);
+    return createElement('view', { style: rowStyle }, ...cells);
   };
 
   // Viewability over rows expands back to per-item tokens so the caller sees item-level

@@ -74,14 +74,14 @@ async function compileComponent(
   return component;
 }
 
-// root-element.ts inserts an unlabeled `symbiote-view` between the box-none AppContainer and the
+// root-element.ts inserts an unlabeled `view` between the box-none AppContainer and the
 // mounted component (skill §15), so the component's own top-level nodes are the WRAPPER's
 // children. Reading them off `fabric.appRoot()` (which re-reads the latest child set) rather than
 // `fabric.find()` is deliberate: find() walks the creation log and would still report a branch
 // that has since been swapped out.
 function appChildren(): IFakeNode[] {
   const wrapper = fabric.appRoot().children[0];
-  expect(wrapper, 'the root wrapper symbiote-view committed').toBeDefined();
+  expect(wrapper, 'the root wrapper view committed').toBeDefined();
   return wrapper?.children ?? [];
 }
 
@@ -94,7 +94,7 @@ function testIds(): Array<unknown> {
 // child set. Packed edge-to-edge: whitespace between sibling symbiote-* tags becomes a real
 // RCTRawText node (skill §16).
 function branchMarkup(id: string, label: string): string {
-  return `<symbiote-view p={{ testID: '${id}' }}><symbiote-text p={{}}>${label}</symbiote-text></symbiote-view>`;
+  return `<view p={{ testID: '${id}' }}><text p={{}}>${label}</text></view>`;
 }
 
 type IDeferred = {
@@ -126,7 +126,7 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       const Awaiter = await compileComponent(
         `<script>let { promise } = $props();</script>` +
           `{#await promise}${branchMarkup('pending', 'loading')}` +
-          `{:then value}<symbiote-view p={{ testID: 'then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>` +
+          `{:then value}<view p={{ testID: 'then' }}><text p={{}}>{value}</text></view>` +
           `{:catch error}${branchMarkup('catch', 'boom')}{/await}`,
         'Awaiter',
       );
@@ -160,7 +160,7 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
     it('renders nothing until resolution in the `{#await expr then value}` short form', async () => {
       const Awaiter = await compileComponent(
         `<script>let { promise } = $props();</script>` +
-          `{#await promise then value}<symbiote-view p={{ testID: 'then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>{/await}`,
+          `{#await promise then value}<view p={{ testID: 'then' }}><text p={{}}>{value}</text></view>{/await}`,
         'AwaiterShort',
       );
 
@@ -197,7 +197,7 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
          control.swap = next => { current = next; };
        </script>` +
           `{#await current}${branchMarkup('pending', 'loading')}` +
-          `{:then value}<symbiote-view p={{ testID: 'then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>` +
+          `{:then value}<view p={{ testID: 'then' }}><text p={{}}>{value}</text></view>` +
           `{:catch error}${branchMarkup('catch', 'boom')}{/await}`,
         'AwaiterSwap',
       );
@@ -243,12 +243,12 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
     it('interleaves block anchors correctly when nested inside {#each}', async () => {
       const List = await compileComponent(
         `<script>let { rows } = $props();</script>` +
-          `<symbiote-view p={{ testID: 'list' }}>` +
+          `<view p={{ testID: 'list' }}>` +
           `{#each rows as row (row.key)}` +
-          `{#await row.promise}<symbiote-view p={{ testID: row.key + '-pending' }}></symbiote-view>` +
-          `{:then value}<symbiote-view p={{ testID: row.key + '-then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>{/await}` +
+          `{#await row.promise}<view p={{ testID: row.key + '-pending' }}></view>` +
+          `{:then value}<view p={{ testID: row.key + '-then' }}><text p={{}}>{value}</text></view>{/await}` +
           `{/each}` +
-          `</symbiote-view>`,
+          `</view>`,
         'AwaitInEach',
       );
 
@@ -301,7 +301,7 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
         `<script>let { promise } = $props();</script>` +
           `{#await promise}${branchMarkup('pending', 'loading')}` +
           `{:then value}${branchMarkup('then', 'ok')}` +
-          `{:catch error}<symbiote-view p={{ testID: 'catch' }}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>{/await}`,
+          `{:catch error}<view p={{ testID: 'catch' }}><text p={{}}>{error.message}</text></view>{/await}`,
         'AwaiterReject',
       );
 

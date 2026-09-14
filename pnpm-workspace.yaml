@@ -155,6 +155,10 @@ catalog:
   '@eslint/json': ^2.0.1
   eslint-config-prettier: ^10.1.8
   eslint-plugin-react-hooks: ^7.1.1
+  # Lints adapters/svelte's and packages/*/src/svelte's .svelte source through eslint.config.js's
+  # per-framework layer — bundles svelte-eslint-parser. Peers eslint ^10.0.0 / svelte ^5.0.0, both
+  # already the catalog versions above.
+  eslint-plugin-svelte: ^3.23.0
   typescript-eslint: ^8.62.0
   globals: ^17.7.0
   husky: ^9.1.7

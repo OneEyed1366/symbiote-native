@@ -1,5 +1,14 @@
 <script lang="ts" module>
   import type { IFabricCallProfile } from '../fabric-call-counter';
+  import {
+    BENCH_OP,
+    SUITE_STEPS,
+    formatDuration,
+    formatFabric,
+    suiteLabel,
+    type IBenchOpId,
+    type IStepProfile,
+  } from './bench-clock';
 
   // Word lists and row shape are taken verbatim from js-framework-benchmark (krausest) so the
   // numbers here can be read next to the published Vue/Svelte/Solid ones. Its rules forbid
@@ -108,11 +117,6 @@
 
   // Every timed step of the suite below starts from exactly this many rows.
   const SUITE_ROWS = ROW_BATCH;
-  // A step that never commits would leave the suite awaiting forever and the screen frozen mid-run.
-  // Timing out into a reported `timeout` row instead keeps the rest of the suite measurable and
-  // names the broken operation - which is worth more than a hung screen.
-  const SUITE_STEP_TIMEOUT_MS = 30_000;
-  const SUITE_TIMED_OUT = Number.NaN;
 
   // Two sticky paths are on this screen on purpose (see the markup below): a plain ScrollView, and
   // a SectionList. Same viewport height and same header look, so a difference between the two
@@ -228,28 +232,6 @@
     ],
   ).flat();
 
-  // Supplied even though this adapter cannot honor it as an auto-wrap (see the markup comment):
-  // it is what flips ScrollView into its `sticky-js` scroll-forwarding mode, which is what drives
-  // the shared AnimatedValue the manually-composed headers below interpolate off.
-  const STICKY_HEADER_INDICES: number[] = Array.from(
-    { length: STICKY_SECTION_COUNT },
-    (_value, section) => section * (STICKY_ROWS_PER_SECTION + 1),
-  );
-
-  const BENCH_OP = {
-    Create: 'create',
-    Replace: 'replace',
-    Update: 'update',
-    Select: 'select',
-    Swap: 'swap',
-    Remove: 'remove',
-    CreateLots: 'createLots',
-    Append: 'append',
-    Clear: 'clear',
-  } as const;
-
-  type IBenchOpId = (typeof BENCH_OP)[keyof typeof BENCH_OP];
-
   type IBenchOperation = {
     id: IBenchOpId;
     label: string;
@@ -264,48 +246,6 @@
     rowCount: number;
   };
 
-  // What the ENGINE did inside one timed step, captured from readCommitProfile() around the step
-  // rather than sampled on a timer. This is the number that separates "our commit is expensive"
-  // from "the framework above it is expensive": every adapter builds the same 9 001-node tree for
-  // Create 1 000, so a propWrites that differs between adapters on the SAME step is work the screen
-  // is generating, not a cost of the platform.
-  //
-  // There is no walk number here any more, and none is coming back: the shadow tree lives in C++
-  // and JS holds only a command buffer, so what the host spends turning that buffer into a tree is
-  // not observable from JS at all. Sizing it means instrumenting the host.
-  type IStepProfile = {
-    propWrites: number;
-    commits: number;
-  };
-
-  const EMPTY_STEP_PROFILE: IStepProfile = {
-    propWrites: 0,
-    commits: 0,
-  };
-
-  const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
-    calls: {},
-    propKeys: {},
-    totalCalls: 0,
-    totalPropKeys: 0,
-  };
-
-  // The one quantity this canary and `examples/bare-rn` (stock React Native on React's own Fabric
-  // renderer) can both report. IStepProfile above counts what OUR engine buffered, which stock
-  // has no equivalent of; `global.nativeFabricUIManager` is what both stacks actually drive, so
-  // counting calls there is the only like-for-like number between them.
-  function formatFabric(profile: IFabricCallProfile | undefined): string {
-    if (profile === undefined) return '—';
-    const create = profile.calls.createNode ?? 0;
-    const append = profile.calls.appendChild ?? 0;
-    const clones =
-      (profile.calls.cloneNode ?? 0) +
-      (profile.calls.cloneNodeWithNewChildren ?? 0) +
-      (profile.calls.cloneNodeWithNewProps ?? 0) +
-      (profile.calls.cloneNodeWithNewChildrenAndProps ?? 0);
-    return `${create}/${append}/${clones}`;
-  }
-
   // One row of the fixed-order suite. `startRows` is recorded rather than derived because it is the
   // number the whole suite exists to pin down - a duration is meaningless without it.
   type ISuiteEntry = {
@@ -316,23 +256,6 @@
     profile: IStepProfile;
     fabric: IFabricCallProfile;
   };
-
-  // The suite's fixed order, shared by the runner and the comparison table below, so a step can
-  // never run without a row to land in (or a row exist for a step that never runs).
-  export const SUITE_STEPS: readonly { op: IBenchOpId; label: string }[] = [
-    { op: BENCH_OP.Create, label: 'Create 1,000 rows' },
-    { op: BENCH_OP.Replace, label: 'Replace all 1,000 rows' },
-    { op: BENCH_OP.Update, label: 'Partial update · every 10th row' },
-    { op: BENCH_OP.Select, label: 'Select row' },
-    { op: BENCH_OP.Swap, label: 'Swap 2 rows' },
-    { op: BENCH_OP.Remove, label: 'Remove row' },
-    { op: BENCH_OP.Append, label: 'Append 1,000 rows' },
-    { op: BENCH_OP.Clear, label: 'Clear' },
-  ];
-
-  function suiteLabel(op: IBenchOpId): string {
-    return SUITE_STEPS.find(step => step.op === op)?.label ?? op;
-  }
 
   // Which mode is mid-run and how far along. Rendered as its own block rather than folded into
   // the button title, because a suite step can hold the JS thread for hundreds of milliseconds
@@ -407,12 +330,6 @@
     }
     return rows;
   }
-
-  function formatDuration(durationMs: number | undefined): string {
-    if (durationMs === undefined) return '—';
-    if (!Number.isFinite(durationMs)) return 'timeout';
-    return `${durationMs.toFixed(1)} ms`;
-  }
 </script>
 
 <script lang="ts">
@@ -432,26 +349,15 @@
    * whitespace-only node that spans a newline and collapses a wrapped sentence, which covers both
    * shapes normal formatting produces. Verified 2026-08-19 by compiling this file through the real
    * preprocessor chain: zero whitespace-only literals, zero text nodes carrying a newline. Only a
-   * same-LINE gap between two siblings (`<View><A /> <B /></View>`) is still uncaught, and normal
+   * same-LINE gap between two siblings (`<view><A /> <B /></view>`) is still uncaught, and normal
    * formatting does not produce one.
    */
   import {
-    ActivityIndicator,
     FlatList,
-    SafeAreaView,
-    ScrollView,
-    ScrollViewStickyHeader,
     SectionList,
-    Text,
-    View,
     type ISection,
   } from '@symbiote-native/svelte';
-  import {
-    readCommitProfile,
-    registerPostCommit,
-    unregisterPostCommit,
-  } from '@symbiote-native/engine';
-  import { readFabricCallProfile } from '../fabric-call-counter';
+  import { createBenchClock } from './bench-clock';
   import ActionButton from '../components/ActionButton.svelte';
   import BenchmarkRow from '../components/BenchmarkRow.svelte';
   import type { IBenchmarkRow } from '../components/BenchmarkRow.svelte';
@@ -473,362 +379,11 @@
   const rows = $derived(list.rows);
   const selectedId = $derived(list.selectedId);
 
-  // Deliberately NOT runes (React's useRef pair): the pending stopwatch and the sequence counter
-  // are read and written by the measurement machinery itself, and making them reactive would
-  // schedule a commit from inside the post-commit hook that is trying to time one.
-  let pending: {
-    startedAt: number;
-    settle: (durationMs: number) => void;
-  } | null = null;
+  // Not a rune: making the sequence counter reactive would schedule a commit from inside the hook
+  // that is timing one.
   let seq = 0;
-  // Filled by the post-commit hook, read by `timed` right after its own `await runStep(mutate)`.
-  // Plain, for the same reason as `pending`: it is written from inside the hook that times a
-  // commit, and a rune write there would schedule another one. Steps are serialized and `timed`
-  // awaits the progress step BEFORE the measured one, so what stands here when it reads is always
-  // the measured step's.
-  let lastStepProfile: IStepProfile = EMPTY_STEP_PROFILE;
-  let lastFabricProfile: IFabricCallProfile = EMPTY_FABRIC_PROFILE;
-
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Benchmark];
-  const accent = LINE_COLOR.performance;
-
-  // THE timing primitive - every number on this screen, button or suite, comes through here. The
-  // clock starts here (a rune write is asynchronous, so a performance.now() pair wrapped around the
-  // mutation would time the scheduling call and nothing else) and stops in the post-commit hook
-  // below, which resolves this promise. Awaiting it is what lets the suite drive one operation at a
-  // time from a known state instead of racing its own steps.
-  function runStep(mutate: () => void): Promise<number> {
-    return new Promise<number>(resolve => {
-      let isSettled = false;
-      const settle = (durationMs: number): void => {
-        if (isSettled) return;
-        isSettled = true;
-        clearTimeout(timer);
-        // Release before resolving, so the meter is live again the moment the step is over even if
-        // a caller does more work synchronously off this promise.
-        commitProfileGate.isHeldByBenchmark = false;
-        resolve(durationMs);
-      };
-      const timer = setTimeout(() => {
-        // Drop the pending record too: leaving it would make the NEXT step's commit stop this
-        // step's stopwatch and report a duration against the wrong operation.
-        pending = null;
-        lastStepProfile = EMPTY_STEP_PROFILE;
-        lastFabricProfile = EMPTY_FABRIC_PROFILE;
-        settle(SUITE_TIMED_OUT);
-      }, SUITE_STEP_TIMEOUT_MS);
-
-      // Stop the meter and zero both sets of counters LAST, immediately before the mutation, so
-      // nothing between here and the commit lands in the step's profile. No install retry for the
-      // Fabric counter: its wrapper has to be in place while the engine binds the slot, which
-      // index.js already did and nothing can redo — an all-zero FABRIC CALLS table means that
-      // install did not land.
-      commitProfileGate.isHeldByBenchmark = true;
-      readCommitProfile();
-      readFabricCallProfile();
-      pending = { startedAt: performance.now(), settle };
-      mutate();
-    });
-  }
-
-  // `rowCount` is passed in rather than read back from state afterwards: this closes over the list
-  // as it was when the button was pressed, and reading it later would report the post-mutation one.
-  function measure(
-    op: IBenchOpId,
-    label: string,
-    rowCount: number,
-    mutate: () => void,
-  ): void {
-    // A press mid-suite would install its own pending record over the suite's, and the next commit
-    // would stop the wrong stopwatch - attributing one operation's cost to another, silently. One
-    // rune carries the fact for both the guard and the progress block: a rune read here is live,
-    // not a captured snapshot, so a second non-reactive copy would only be a second thing to
-    // desync.
-    if (progress !== undefined) return;
-    runStep(mutate).then(durationMs => {
-      seq += 1;
-      history = [{ seq, op, label, durationMs, rowCount }, ...history].slice(
-        0,
-        HISTORY_LIMIT,
-      );
-    });
-  }
-
-  // Stopped by the ENGINE's post-commit hook, not by Svelte's own after-update hook, and that
-  // choice is what makes this screen comparable across adapters at all. Svelte batches its update
-  // and the engine coalesces the commit onto a microtask, so `tick()` resolves at a DIFFERENT
-  // point relative to completeRoot than React's useLayoutEffect does - this repo has already been
-  // bitten by exactly that ordering, where a parity test needed a second tick() to drain a
-  // coalesced flush. Four framework hooks would silently measure four different quantities under
-  // one name and the cross-adapter table would be fiction. registerPostCommit means one definition
-  // of "done" everywhere: completeRoot has returned. Native layout and paint happen after that and
-  // are not in the number; the frame counter above is what shows those.
-  $effect(() => {
-    const onCommitted = (): void => {
-      const finished = pending;
-      if (finished === null) return;
-      pending = null;
-      const durationMs = performance.now() - finished.startedAt;
-      // Safe to read here: the commit is recorded BEFORE completeRoot, and runPostCommitHooks()
-      // fires after it, so the profile for this commit is already complete.
-      const profile = readCommitProfile();
-      lastStepProfile = {
-        propWrites: profile.propWrites,
-        commits: profile.commits,
-      };
-      lastFabricProfile = readFabricCallProfile();
-      finished.settle(durationMs);
-    };
-    registerPostCommit(onCommitted);
-    return (): void => unregisterPostCommit(onCommitted);
-  });
-
-  // The guards below keep an operation from recording a measurement of nothing - an empty list,
-  // or an index krausest's fixed row numbers put past the end of a short one.
-  function onSelect(id: number): void {
-    measure(BENCH_OP.Select, 'Select row', list.rows.length, () => {
-      list = {
-        ...list,
-        selectedId: list.selectedId === id ? undefined : id,
-      };
-    });
-  }
-
-  function onRemove(id: number): void {
-    measure(BENCH_OP.Remove, 'Remove row', list.rows.length - 1, () => {
-      list = { ...list, rows: list.rows.filter(row => row.id !== id) };
-    });
-  }
-
-  function onCreate(): void {
-    measure(BENCH_OP.Create, 'Create 1,000 rows', ROW_BATCH, () => {
-      list = { rows: buildRows(ROW_BATCH), selectedId: undefined };
-    });
-  }
-
-  // Same call as Create - krausest scores them apart because the starting state differs: this one
-  // swaps a full keyed list for another, the other one mounts into an empty container.
-  function onReplace(): void {
-    measure(BENCH_OP.Replace, 'Replace all 1,000 rows', ROW_BATCH, () => {
-      list = { rows: buildRows(ROW_BATCH), selectedId: undefined };
-    });
-  }
-
-  function onCreateLots(): void {
-    measure(BENCH_OP.CreateLots, 'Create 10,000 rows', ROW_BATCH_LARGE, () => {
-      list = { rows: buildRows(ROW_BATCH_LARGE), selectedId: undefined };
-    });
-  }
-
-  function onAppend(): void {
-    measure(
-      BENCH_OP.Append,
-      'Append 1,000 rows',
-      list.rows.length + ROW_BATCH,
-      () => {
-        list = { ...list, rows: list.rows.concat(buildRows(ROW_BATCH)) };
-      },
-    );
-  }
-
-  function onUpdate(): void {
-    if (list.rows.length === 0) return;
-    measure(
-      BENCH_OP.Update,
-      'Partial update (every 10th)',
-      list.rows.length,
-      () => {
-        list = {
-          ...list,
-          rows: list.rows.map((row, index) =>
-            index % UPDATE_STRIDE === 0
-              ? { ...row, label: row.label + UPDATE_SUFFIX }
-              : row,
-          ),
-        };
-      },
-    );
-  }
-
-  function onSelectSample(): void {
-    if (list.rows.length <= SELECT_INDEX) return;
-    onSelect(list.rows[SELECT_INDEX].id);
-  }
-
-  function onRemoveSample(): void {
-    if (list.rows.length <= REMOVE_INDEX) return;
-    onRemove(list.rows[REMOVE_INDEX].id);
-  }
-
-  function onSwap(): void {
-    if (list.rows.length <= SWAP_HIGH_INDEX) return;
-    measure(BENCH_OP.Swap, 'Swap 2 rows', list.rows.length, () => {
-      const next = list.rows.slice();
-      const low = next[SWAP_LOW_INDEX];
-      next[SWAP_LOW_INDEX] = next[SWAP_HIGH_INDEX];
-      next[SWAP_HIGH_INDEX] = low;
-      list = { ...list, rows: next };
-    });
-  }
-
-  // Clear wipes the recorded measurements too, not just the rows. A duration stays pinned next to
-  // its button until that operation runs again, so a number measured under one set of conditions
-  // reads as current under another - a Create 10,000 timed in virtualized mode sat next to the
-  // button in all-mounted mode and looked like an all-mounted result. Resetting the run alongside
-  // the list keeps a stale figure from ever being read as a fresh one. Clear's OWN measurement
-  // still lands (the post-commit hook runs after this commit and prepends to the emptied history),
-  // so the button that was just pressed does not read as "did nothing".
-  function onClear(): void {
-    if (list.rows.length === 0) return;
-    measure(BENCH_OP.Clear, 'Clear', 0, () => {
-      list = { rows: [], selectedId: undefined };
-      history = [];
-    });
-  }
-
-  const operations: readonly IBenchOperation[] = [
-    { id: BENCH_OP.Create, label: 'Create 1,000 rows', onPress: onCreate },
-    {
-      id: BENCH_OP.Replace,
-      label: 'Replace all 1,000 rows',
-      onPress: onReplace,
-    },
-    {
-      id: BENCH_OP.Update,
-      label: 'Partial update · every 10th row',
-      onPress: onUpdate,
-    },
-    { id: BENCH_OP.Select, label: 'Select row', onPress: onSelectSample },
-    { id: BENCH_OP.Swap, label: 'Swap 2 rows', onPress: onSwap },
-    { id: BENCH_OP.Remove, label: 'Remove row', onPress: onRemoveSample },
-    {
-      id: BENCH_OP.CreateLots,
-      label: 'Create 10,000 rows',
-      onPress: onCreateLots,
-    },
-    { id: BENCH_OP.Append, label: 'Append 1,000 rows', onPress: onAppend },
-    { id: BENCH_OP.Clear, label: 'Clear', onPress: onClear },
-  ];
-
-  const isAllMounted = $derived(mountMode === MOUNT_MODE.All);
-
-  /**
-   * The whole ruler in one press, in a FIXED order, each timed operation starting from exactly
-   * SUITE_ROWS rows.
-   *
-   * Pressing the buttons by hand does not measure what it looks like it measures. `Remove` and
-   * `Append` cost scale with the rows currently on screen (a flat parent re-appends every child
-   * handle on any structural change), so their numbers depend on which buttons were pressed
-   * before them. Measured 2026-08-18, React Debug, same build twice: Remove 87-107 ms against
-   * 418.6 ms, Append 953 against 1678 ms, while Create / Replace / Partial / Select / Swap
-   * reproduced inside 1-3%. Two runs of the SAME adapter disagreed 4x - so a cross-ADAPTER
-   * comparison off those rows was measuring press order, not the adapter.
-   *
-   * Hence: untimed setup steps in between, awaited through the same engine post-commit seam as
-   * the timed ones, so each measurement begins from a state this function chose rather than one
-   * the operator happened to leave behind.
-   *
-   * Runs in EITHER mount mode - the pressed button picks it. No 10,000-row step in either: 10,000
-   * rows is 100,000 native views, which the host does not survive in all-mounted (see
-   * NATIVE_VIEWS_PER_ROW), and a suite that hangs the screen measures nothing.
-   */
-  async function runSuite(mode: IMountMode): Promise<void> {
-    resetRowData();
-
-    const entries: ISuiteEntry[] = [];
-    const clearRows = (): void => {
-      list = { rows: [], selectedId: undefined };
-    };
-    const fillRows = (): void => {
-      list = { rows: buildRows(SUITE_ROWS), selectedId: undefined };
-    };
-
-    // The suite's own UI is committed and PAINTED before any measured step starts. The engine
-    // coalesces commits onto a microtask, so setting a running flag and then immediately mutating
-    // the list puts the spinner and the first (heaviest) step in one commit: the operator presses
-    // the button and gets several hundred milliseconds of frozen screen with the button still
-    // reading "Run". Awaiting a commit that carries only the progress block splits the two.
-    const showProgress = (label: string): Promise<number> =>
-      runStep(() => {
-        progress = { mode, label, done: entries.length };
-      });
-
-    const timed = async (
-      op: IBenchOpId,
-      startRows: number,
-      mutate: () => void,
-    ): Promise<void> => {
-      const label = suiteLabel(op);
-      await showProgress(label);
-      const durationMs = await runStep(mutate);
-      // Read AFTER the measured step, never after showProgress: the holder carries whichever step
-      // committed last, and the progress step commits first by construction.
-      entries.push({
-        op,
-        label,
-        durationMs,
-        startRows,
-        profile: lastStepProfile,
-        fabric: lastFabricProfile,
-      });
-    };
-
-    // One commit for the whole prologue: the mode this run measures, an emptied list, and the
-    // progress block appearing. It always changes the tree (the block goes from absent to present)
-    // - which matters, because `commitContainer` returns early on a commit that produced no native
-    // change (`if (!result.changed) return` sits ABOVE `runPostCommitHooks()` in
-    // core/engine/src/commit.ts), so a no-op mutation never resolves its step and would stall the
-    // suite until the timeout. Every step after this one changes the tree by construction.
-    await runStep(() => {
-      mountMode = mode;
-      suiteResults = { ...suiteResults, [mode]: [] };
-      history = [];
-      progress = { mode, label: 'Preparing', done: 0 };
-      clearRows();
-    });
-
-    await timed(BENCH_OP.Create, 0, fillRows);
-    await timed(BENCH_OP.Replace, SUITE_ROWS, fillRows);
-    await timed(BENCH_OP.Update, SUITE_ROWS, () => {
-      list = {
-        ...list,
-        rows: list.rows.map((row, index) =>
-          index % UPDATE_STRIDE === 0
-            ? { ...row, label: row.label + UPDATE_SUFFIX }
-            : row,
-        ),
-      };
-    });
-    await timed(BENCH_OP.Select, SUITE_ROWS, () => {
-      list = { ...list, selectedId: list.rows[SELECT_INDEX].id };
-    });
-    await timed(BENCH_OP.Swap, SUITE_ROWS, () => {
-      const next = list.rows.slice();
-      const low = next[SWAP_LOW_INDEX];
-      next[SWAP_LOW_INDEX] = next[SWAP_HIGH_INDEX];
-      next[SWAP_HIGH_INDEX] = low;
-      list = { ...list, rows: next };
-    });
-    await timed(BENCH_OP.Remove, SUITE_ROWS, () => {
-      list = {
-        ...list,
-        rows: list.rows.filter((_row, index) => index !== REMOVE_INDEX),
-      };
-    });
-
-    await runStep(clearRows);
-    await runStep(fillRows);
-    await timed(BENCH_OP.Append, SUITE_ROWS, () => {
-      list = { ...list, rows: list.rows.concat(buildRows(SUITE_ROWS)) };
-    });
-
-    await runStep(clearRows);
-    await runStep(fillRows);
-    await timed(BENCH_OP.Clear, SUITE_ROWS, clearRows);
-
-    suiteResults = { ...suiteResults, [mode]: entries };
-    progress = undefined;
-  }
+  const clock = createBenchClock(commitProfileGate);
+  const runStep = clock.runStep;
 
   function onRunSuite(mode: IMountMode): void {
     if (progress !== undefined) return;
@@ -879,6 +434,7 @@
 
   // History is newest-first, so the first entry found for an operation is its latest run.
   const lastDurations = $derived.by(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- built once, returned, and never mutated after that
     const durations = new Map<IBenchOpId, number>();
     for (const entry of history) {
       if (!durations.has(entry.op)) durations.set(entry.op, entry.durationMs);
@@ -887,38 +443,38 @@
   });
 </script>
 
-<SafeAreaView class="screen">
-  <ScrollView
+<safe-area-view class="screen">
+  <scroll-view
     testID="benchmark-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
   >
-    <View class={`line-tag line-tag-${lineInfo.line}`}>
-      <Text class="line-tag-text">
+    <view class={`line-tag line-tag-${lineInfo.line}`}>
+      <text class="line-tag-text">
         {`${lineInfo.code} · ${lineInfo.label}`}
-      </Text>
-    </View>
-    <View class="hero-card">
-      <View class="hero-badge" style={{ backgroundColor: accent }}>
-        <Text class="hero-badge-text">{lineInfo.code}</Text>
-      </View>
-      <View class="hero-copy">
-        <Text class="hero-title">Benchmark</Text>
-        <Text class="hero-body">
+      </text>
+    </view>
+    <view class="hero-card">
+      <view class="hero-badge" style={{ backgroundColor: accent }}>
+        <text class="hero-badge-text">{lineInfo.code}</text>
+      </view>
+      <view class="hero-copy">
+        <text class="hero-title">Benchmark</text>
+        <text class="hero-body">
           The js-framework-benchmark operations, run on device against the
           engine's commit path — with the JS-thread frame rate beside them.
-        </Text>
-      </View>
-    </View>
+        </text>
+      </view>
+    </view>
 
-    <Text class="section-label">MEASUREMENTS</Text>
+    <text class="section-label">MEASUREMENTS</text>
     <JsFrameRateMeter {accent} />
 
     <!-- Buttons and results sit DIRECTLY under the meter, and everything they stress sits below:
       a suite step holds the JS thread, so the dip has to be readable in the same screenful as the
       press that caused it. -->
-    <View class="bench-run-row">
-      <View class="flex1">
+    <view class="bench-run-row">
+      <view class="flex1">
         <ActionButton
           testID="bench-run-suite-all"
           title={progress?.mode === MOUNT_MODE.All
@@ -927,8 +483,8 @@
           onPress={() => onRunSuite(MOUNT_MODE.All)}
           color={accent}
         />
-      </View>
-      <View class="flex1">
+      </view>
+      <view class="flex1">
         <ActionButton
           testID="bench-run-suite-virtualized"
           title={progress?.mode === MOUNT_MODE.Virtualized
@@ -937,132 +493,140 @@
           onPress={() => onRunSuite(MOUNT_MODE.Virtualized)}
           color={accent}
         />
-      </View>
-    </View>
+      </view>
+    </view>
 
     {#if progress !== undefined}
-      <View testID="bench-suite-progress" class="bench-progress">
-        <ActivityIndicator color={accent} />
-        <Text class="bench-progress-text">
+      <view testID="bench-suite-progress" class="bench-progress">
+        <activity-indicator color={accent} />
+        <text class="bench-progress-text">
           {`${progress.mode === MOUNT_MODE.All ? 'All mounted' : 'Virtualized'} · ${progress.label}`}
-        </Text>
-        <Text class="bench-progress-count">
+        </text>
+        <text class="bench-progress-count">
           {`${progress.done}/${SUITE_STEPS.length}`}
-        </Text>
-      </View>
+        </text>
+      </view>
     {/if}
 
     {#if hasSuiteResults}
-      <View class="bench-compare-row">
-        <Text class="bench-compare-label" />
-        <Text class="bench-compare-head-cell">ALL MOUNTED</Text>
-        <Text class="bench-compare-head-cell">VIRTUALIZED</Text>
-      </View>
+      <view class="bench-compare-row">
+        <text class="bench-compare-label" />
+        <text class="bench-compare-head-cell">ALL MOUNTED</text>
+        <text class="bench-compare-head-cell">VIRTUALIZED</text>
+      </view>
       {#each SUITE_STEPS as step (step.op)}
-        <View testID={`bench-suite-${step.op}`} class="bench-compare-row">
-          <Text class="bench-compare-label">{step.label}</Text>
-          <Text class="bench-compare-cell">
+        <view testID={`bench-suite-${step.op}`} class="bench-compare-row">
+          <text class="bench-compare-label">{step.label}</text>
+          <text class="bench-compare-cell">
             {formatDuration(allDurations.get(step.op))}
-          </Text>
-          <Text class="bench-compare-cell">
+          </text>
+          <text class="bench-compare-cell">
             {formatDuration(virtualizedDurations.get(step.op))}
-          </Text>
-        </View>
+          </text>
+        </view>
       {/each}
     {:else}
-      <Text testID="bench-suite-empty" class="note-text">
+      <text testID="bench-suite-empty" class="note-text">
         No suite run yet.
-      </Text>
+      </text>
     {/if}
 
     {#if hasSuiteResults}
-      <Text class="section-label">ENGINE PER STEP · ALL MOUNTED</Text>
-      <View class="bench-compare-row">
-        <Text class="bench-compare-label" />
-        <Text class="bench-compare-head-cell">WRITES</Text>
-        <Text class="bench-compare-head-cell">COMMITS</Text>
-      </View>
+      <text class="section-label">ENGINE PER STEP · ALL MOUNTED</text>
+      <view class="bench-compare-row">
+        <text class="bench-compare-label" />
+        <text class="bench-compare-head-cell">WRITES</text>
+        <text class="bench-compare-head-cell">COMMITS</text>
+      </view>
       {#each SUITE_STEPS as step (step.op)}
         {@const profile = allProfiles.get(step.op)}
-        <View testID={`bench-engine-${step.op}`} class="bench-compare-row">
-          <Text class="bench-compare-label">{step.label}</Text>
-          <Text class="bench-compare-cell">
+        <view testID={`bench-engine-${step.op}`} class="bench-compare-row">
+          <text class="bench-compare-label">{step.label}</text>
+          <text class="bench-compare-cell">
             {profile === undefined ? '—' : String(profile.propWrites)}
-          </Text>
-          <Text class="bench-compare-cell">
+          </text>
+          <text class="bench-compare-cell">
             {profile === undefined ? '—' : String(profile.commits)}
-          </Text>
-        </View>
+          </text>
+        </view>
       {/each}
-      <Text class="note-text">
+      <text class="note-text">
         {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. There is no ms here and no node count: the tree lives in C++ and JS only fills a command buffer, so what the host spends applying it is invisible from JS.`}
-      </Text>
+      </text>
     {/if}
 
     {#if hasSuiteResults}
-      <Text class="section-label">FABRIC CALLS · ALL MOUNTED</Text>
-      <View class="bench-compare-row">
-        <Text class="bench-compare-label" />
-        <Text class="bench-compare-head-cell">CREATE/APPEND/CLONE</Text>
-        <Text class="bench-compare-head-cell">PROP KEYS</Text>
-      </View>
+      <text class="section-label">FABRIC CALLS · ALL MOUNTED</text>
+      <view class="bench-compare-row">
+        <text class="bench-compare-label" />
+        <text class="bench-compare-head-cell">CREATE/APPEND/CLONE</text>
+        <text class="bench-compare-head-cell">PROP KEYS</text>
+      </view>
       {#each SUITE_STEPS as step (step.op)}
         {@const fabric = allFabricProfiles.get(step.op)}
-        <View testID={`bench-fabric-${step.op}`} class="bench-compare-row">
-          <Text class="bench-compare-label">{step.label}</Text>
-          <Text class="bench-compare-cell">{formatFabric(fabric)}</Text>
-          <Text class="bench-compare-cell">
+        <view testID={`bench-fabric-${step.op}`} class="bench-compare-row">
+          <text class="bench-compare-label">{step.label}</text>
+          <text class="bench-compare-cell">{formatFabric(fabric)}</text>
+          <text class="bench-compare-cell">
             {fabric === undefined ? '—' : String(fabric.totalPropKeys)}
-          </Text>
-        </View>
+          </text>
+        </view>
       {/each}
-      <Text class="note-text">
-        {`Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no reconcile walk to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`}
-      </Text>
+      <text class="note-text">
+        Counted by wrapping global.nativeFabricUIManager before the engine binds
+        it — the one surface this canary and the stock-React-Native baseline
+        (examples/bare-rn) genuinely share, and therefore the only like-for-like
+        number between them. The ENGINE table above has no counterpart over
+        there: stock has no reconcile walk to count. Read as two questions.
+        CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP
+        KEYS answers the other half, "or the same number of times with fatter
+        payloads". The wrapper costs one JS call per crossing and is therefore
+        in every timing on this screen — the comparison holds only because the
+        other side carries the identical wrapper.
+      </text>
     {/if}
-    <Text class="note-text">
+    <text class="note-text">
       {`Every operation in a fixed order, each timed step starting from exactly ${SUITE_ROWS} rows, with untimed resets in between. All-mounted is krausest's own shape (${NATIVE_VIEWS_PER_ROW} native views per row) and the column that compares to the published web numbers; virtualized mounts a window instead, so it prices what an app ships rather than the commit path itself. Pressing the operation buttons by hand leaves Remove and Append measuring whatever happened to be on screen.`}
-    </Text>
+    </text>
 
     <!-- Both sticky paths and the row list sit under the buttons: the meter above stays on screen
       while either box is being dragged — the concrete case the benchmark exists for. Neither box
       is a child component: Svelte's reactivity already gives what React needs `memo` for, since
       nothing below reads `rows`, so a benchmark run never re-renders either box. -->
-    <Text class="section-label">
-      STICKY PATH A · ScrollView · stickyHeaderIndices
-    </Text>
-    <!-- KNOWN GAP, and the ONE invariant this port cannot express the way React does: this adapter
-      never auto-wraps a child by index, because Svelte hands a component an opaque Snippet rather
-      than an indexable child list (scroll-view-props.ts). `stickyHeaderIndices` is still passed —
-      it is what puts the ScrollView in `sticky-js` forwarding mode so the shared scroll
-      AnimatedValue actually gets driven — and each header is composed inside
-      ScrollViewStickyHeader by hand, which is the SAME component and the same extra host view
-      React's auto-wrap inserts. What is missing is the cross-talk: no headerLayoutYs map exists
-      without the wrap, so a pinned header is never pushed off by the next one. -->
-    <ScrollView
+    <text class="section-label">
+      STICKY PATH A · ScrollView · sticky-header tag
+    </text>
+    <!-- A header is MARKED with the `sticky-header` TAG, not wrapped in a component and not named
+      by an index. The ScrollView host behavior registers that tag, each header finds this
+      ScrollView by walking up, and the collision point — the y at which one pin is pushed off by
+      the next — comes from the owner's DOCUMENT order, so nothing here computes or forwards an
+      index. `stickyHeaderIndices` WOULD work here too, since 2026-09-10 — the behavior walks the
+      committed children, so deleting the ScrollView component (which used to strip the prop) turned
+      RN's own API on. This path stays index-free on purpose: an index has to be kept in step with
+      the children, and a tag does not. -->
+    <scroll-view
       testID="benchmark-sticky-scroll"
       class="bench-sticky"
-      stickyHeaderIndices={STICKY_HEADER_INDICES}
       scrollEventThrottle={SCROLL_EVENT_THROTTLE_MS}
       nestedScrollEnabled
     >
       {#each STICKY_ENTRIES as entry (entry.key)}
         {#if entry.kind === 'header'}
-          <ScrollViewStickyHeader>
-            <Text class="section-header">{entry.text}</Text>
-          </ScrollViewStickyHeader>
+          <sticky-header>
+            <text class="section-header">{entry.text}</text>
+          </sticky-header>
         {:else}
-          <Text class="list-row-text">{entry.text}</Text>
+          <text class="list-row-text">{entry.text}</text>
         {/if}
       {/each}
-    </ScrollView>
-    <Text class="note-text">
+    </scroll-view>
+    <text class="note-text">
       {`${STICKY_SECTION_COUNT} sections, every row mounted — no virtualization in the frame.`}
-    </Text>
+    </text>
 
-    <Text class="section-label">
+    <text class="section-label">
       STICKY PATH B · SectionList · stickySectionHeadersEnabled
-    </Text>
+    </text>
     <SectionList
       testID="benchmark-sticky-section-list"
       sections={BENCHMARK_SECTIONS}
@@ -1073,26 +637,26 @@
       getItemLayout={sectionListItemLayout}
     >
       {#snippet sectionHeader({ section })}
-        <Text
+        <text
           class="section-header"
           style={{ height: SECTION_LIST_HEADER_HEIGHT }}
         >
           {section.title}
-        </Text>
+        </text>
       {/snippet}
       {#snippet item({ item })}
-        <View class="parity-row" style={{ height: SECTION_LIST_ROW_HEIGHT }}>
-          <Text class="list-row-text">{item.label}</Text>
-        </View>
+        <view class="parity-row" style={{ height: SECTION_LIST_ROW_HEIGHT }}>
+          <text class="list-row-text">{item.label}</text>
+        </view>
       {/snippet}
     </SectionList>
-    <Text class="note-text">
+    <text class="note-text">
       {`${SECTION_LIST_SECTION_COUNT} sections x ${SECTION_LIST_ROWS_PER_SECTION} rows — windowed, sticky math inside the list.`}
-    </Text>
-    <Text class="note-text">
+    </text>
+    <text class="note-text">
       Drag inside a box (not the page) and watch the counters above — the two
       boxes differ only in which sticky implementation carries the frame.
-    </Text>
+    </text>
 
     <!-- These sat BELOW the rows until 2026-09-07, deliberately, so nobody would report numbers
       from them: their Remove and Append act on whatever happened to be on screen, which is the
@@ -1103,35 +667,35 @@
 
       No `{#if}` added here: on this adapter one costs an anchor per instantiation even when its
       condition is false, and this block sits above the row loop now. -->
-    <Text class="section-label">OPERATIONS · LAST RUN</Text>
+    <text class="section-label">OPERATIONS · LAST RUN</text>
     {#each operations as operation (operation.id)}
-      <View class="bench-op-row">
-        <View class="flex1">
+      <view class="bench-op-row">
+        <view class="flex1">
           <ActionButton
             testID={`bench-op-${operation.id}`}
             title={operation.label}
             onPress={operation.onPress}
             color={accent}
           />
-        </View>
-        <Text testID={`bench-result-${operation.id}`} class="bench-op-result">
+        </view>
+        <text testID={`bench-result-${operation.id}`} class="bench-op-result">
           {formatDuration(lastDurations.get(operation.id))}
-        </Text>
-      </View>
+        </text>
+      </view>
     {/each}
-    <Text class="note-text">
+    <text class="note-text">
       Single operations, for poking at one commit shape while debugging. Do NOT
       report from them — Remove and Append act on whatever row count is on
       screen, which is what the suite above removes.
-    </Text>
+    </text>
 
-    <Text testID="bench-row-count" class="info-text">
+    <text testID="bench-row-count" class="info-text">
       {`rows: ${rows.length} · ${mountedViews} native views mounted · selected: ${selectedId ?? 'none'}`}
-    </Text>
+    </text>
 
-    <Text class="section-label">
+    <text class="section-label">
       {isAllMounted ? 'ROWS · ALL MOUNTED' : 'ROWS · VIRTUALIZED'}
-    </Text>
+    </text>
     {#if isAllMounted}
       <!-- No conditional anywhere under this loop, and on this adapter that is a measurement
         decision rather than tidiness: an `{#if}` costs one anchor per instantiation EVEN WHEN ITS
@@ -1169,19 +733,19 @@
       </FlatList>
     {/if}
 
-    <Text class="section-label">
+    <text class="section-label">
       {`HISTORY · LAST ${HISTORY_LIMIT} MEASUREMENTS`}
-    </Text>
+    </text>
     {#if history.length === 0}
-      <Text class="note-text">
+      <text class="note-text">
         Run an operation above to record a measurement.
-      </Text>
+      </text>
     {:else}
       {#each history as entry (entry.seq)}
-        <Text class="bench-history-row">
+        <text class="bench-history-row">
           {`${entry.label} — ${formatDuration(entry.durationMs)} · ${entry.rowCount} rows`}
-        </Text>
+        </text>
       {/each}
     {/if}
-  </ScrollView>
-</SafeAreaView>
+  </scroll-view>
+</safe-area-view>

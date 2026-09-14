@@ -6,9 +6,12 @@
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// SIDE-EFFECT IMPORT: the controlled-spinner handshake lives in the tag's behavior, and only this
+// module installs it. An app reaches it through the package barrel; a test importing render does not.
+import '../register';
 import { mount, unmount } from '../render';
-import { View } from './view';
-import { RefreshControl } from './refresh-control';
+// SIDE-EFFECT IMPORT: the controlled-spinner handshake reaches `<refresh-control>` through
+// `registerRefreshControlBehavior`, which only this module calls.
 
 const ROOT_TAG = 819;
 const REFRESH_CONTROL = 'PullToRefreshView';
@@ -47,7 +50,7 @@ describe('Solid RefreshControl on the engine', () => {
     // intrinsic to AndroidSwipeRefreshLayout). A wrong name means the host never resolves a
     // component and nothing paints, which no JS-level check would catch.
     it('emits the Fabric view name and forwards refreshing', async () => {
-      mount(ROOT_TAG, () => <RefreshControl refreshing />);
+      mount(ROOT_TAG, () => <refresh-control refreshing />);
       await tick();
       expect(committedControl().props.refreshing).toBe(true);
     });
@@ -59,7 +62,7 @@ describe('Solid RefreshControl on the engine', () => {
     it('routes onRefresh to the native refresh event and never onto the prop bag', async () => {
       let refreshes = 0;
       mount(ROOT_TAG, () => (
-        <RefreshControl
+        <refresh-control
           refreshing={false}
           onRefresh={() => {
             refreshes++;
@@ -78,7 +81,7 @@ describe('Solid RefreshControl on the engine', () => {
     // is its own job — skipping it leaves the control unlabelled for a screen reader.
     it('folds aria aliases into the canonical accessibility props', async () => {
       mount(ROOT_TAG, () => (
-        <RefreshControl refreshing={false} aria-label="reload" aria-busy />
+        <refresh-control refreshing={false} aria-label="reload" aria-busy />
       ));
       await tick();
 
@@ -96,7 +99,7 @@ describe('Solid RefreshControl on the engine', () => {
     it('clears a folded accessibility prop when its aria alias goes undefined', async () => {
       const [label, setLabel] = createSignal<string | undefined>('reload');
       mount(ROOT_TAG, () => (
-        <RefreshControl refreshing={false} aria-label={label()} />
+        <refresh-control refreshing={false} aria-label={label()} />
       ));
       await tick();
       expect(committedControl().props.accessibilityLabel).toBe('reload');
@@ -113,7 +116,7 @@ describe('Solid RefreshControl on the engine', () => {
     // theming while iOS looked fine.
     it('forwards the Android-only spinner props untouched', async () => {
       mount(ROOT_TAG, () => (
-        <RefreshControl
+        <refresh-control
           refreshing={false}
           colors={['#ff0000']}
           progressBackgroundColor="#ffffff"
@@ -137,9 +140,9 @@ describe('Solid RefreshControl on the engine', () => {
     // Android.
     it('hosts a child', async () => {
       mount(ROOT_TAG, () => (
-        <RefreshControl refreshing={false}>
-          <View testID="wrapped" />
-        </RefreshControl>
+        <refresh-control refreshing={false}>
+          <view testID="wrapped" />
+        </refresh-control>
       ));
       await tick();
       expect(committedControl().children[0]?.props.testID).toBe('wrapped');
@@ -150,7 +153,7 @@ describe('Solid RefreshControl on the engine', () => {
     // why: `onRefresh` is optional in RN — a display-only control (refreshing driven entirely by the
     // parent) must not throw when native reports the gesture with nothing wired.
     it('tolerates a refresh event with no handler', async () => {
-      mount(ROOT_TAG, () => <RefreshControl refreshing={false} />);
+      mount(ROOT_TAG, () => <refresh-control refreshing={false} />);
       await tick();
       expect(() => {
         fabric.fireEvent(createdControl().instanceHandle, 'topRefresh');

@@ -71,9 +71,7 @@ function mountFlatList(columnWrapperStyle: unknown): Promise<void> {
           FlatListHost,
           { data, numColumns: 2, columnWrapperStyle },
           {
-            item: ({ item }: { item: IRow }) => [
-              h('symbiote-text', {}, item.label),
-            ],
+            item: ({ item }: { item: IRow }) => [h('text', {}, item.label)],
           },
         ),
     }),

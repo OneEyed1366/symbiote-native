@@ -53,19 +53,19 @@ the React, Vue, Svelte, and Solid canaries, driven through `Renderer2` instead._
 
 ```ts
 import { Component } from '@angular/core';
-import { Pressable, Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import './app.css';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [Pressable, Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <View class="root">
-      <Pressable (press)="increment()">
-        <Text class="label">Count is {{ count }}</Text>
-      </Pressable>
-    </View>
+    <view class="root">
+      <pressable (press)="increment()">
+        <text class="label">Count is {{ count }}</text>
+      </pressable>
+    </view>
   `,
 })
 export class App {
@@ -97,8 +97,16 @@ for both paths.
 
 Angular is a standalone-components-only adapter:
 
-- every SymbioteNative component is `standalone: true` — import it directly in the
-  consuming component's `imports` array, there is no `NgModule`;
+- the 19 primitive tags (`view`, `pressable`, `text`, `text-input`, `switch`, …)
+  are Angular **element directives**, not components — `SYMBIOTE_ELEMENTS`
+  (or an individual `<Name>Element`, e.g. `ViewElement`, `PressableElement`)
+  declared in the component's `imports` array is what lets `ngtsc` accept the
+  lowercase tag with typed props; templates write the tag directly
+  (`<view>`/`<pressable>`/`<text>`), matching every other adapter one-for-one;
+- every non-primitive SymbioteNative component (`FlatList`, `SectionList`,
+  `VirtualizedList`, `VirtualizedSectionList`, `KeyboardAvoidingView`, …) is
+  `standalone: true` and imported directly the same way — there is no
+  `NgModule`;
 - every component event is a real Angular `@Output()` `EventEmitter` —
   `(press)="onTap($event)"`, `(longPress)="..."`, `(hoverIn)="..."`,
   `(valueChange)="..."`, `(accessibilityAction)="..."`, and so on across
@@ -116,10 +124,6 @@ Angular is a standalone-components-only adapter:
   `ScrollView` and the list components, because they can carry an
   `Animated.event(...)` marker for native-driven scroll and `@Output()` can't
   bind an arbitrary value, only a template listener expression;
-- component selectors accept **both** a PascalCase alias and the
-  `symbiote-*` prefix (`selector: 'Pressable, symbiote-pressable'`), so
-  templates read like `<Pressable>`/`<View>`/`<Text>` while the underlying
-  primitive hosts stay `symbiote-view` / `symbiote-text` / etc.;
 - imperative handles use `@ViewChild(..., { read: ElementRef })` — the
   `nativeElement` is the SymbioteNative host node, not a DOM element;
 - change detection is zoneless: the adapter runs on Angular's own

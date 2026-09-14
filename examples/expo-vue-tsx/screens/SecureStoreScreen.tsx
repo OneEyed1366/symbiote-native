@@ -1,12 +1,6 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import {
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from '@symbiote-native/vue';
+import {} from '@symbiote-native/vue';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
@@ -38,14 +32,14 @@ function CapabilityRow(props: {
         ? 'YES'
         : 'NO';
   return (
-    <View testID={props.testID} class="secure-store-row">
-      <Text class="secure-store-row-label">{props.label}</Text>
-      <View
+    <view testID={props.testID} class="secure-store-row">
+      <text class="secure-store-row-label">{props.label}</text>
+      <view
         class={`secure-store-status-badge secure-store-status-badge-${props.status}`}
       >
-        <Text class="secure-store-status-text">{text}</Text>
-      </View>
-    </View>
+        <text class="secure-store-status-text">{text}</text>
+      </view>
+    </view>
   );
 }
 
@@ -127,31 +121,31 @@ export const SecureStoreScreen = defineComponent(
     }
 
     return () => (
-      <SafeAreaView class="screen">
-        <ScrollView
+      <safe-area-view class="screen">
+        <scroll-view
           testID="secure-store-scroll"
           class="screen"
           contentContainerStyle="scroll-content"
         >
-          <View class={`line-tag line-tag-${lineInfo.line}`}>
-            <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-          </View>
-          <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: lineColor }}>
-              <Text class="hero-badge-text">{lineInfo.code}</Text>
-            </View>
-            <View class="hero-copy">
-              <Text class="hero-title">Secure Store</Text>
-              <Text class="hero-body">
+          <view class={`line-tag line-tag-${lineInfo.line}`}>
+            <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+          </view>
+          <view class="hero-card">
+            <view class="hero-badge" style={{ backgroundColor: lineColor }}>
+              <text class="hero-badge-text">{lineInfo.code}</text>
+            </view>
+            <view class="hero-copy">
+              <text class="hero-title">Secure Store</text>
+              <text class="hero-body">
                 @symbiote-native/secure-store — encrypted key/value storage in
                 the iOS Keychain and the Android Keystore. Save a value, kill
                 the app, relaunch, and read it back.
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="secure-store-capability-card" class="secure-store-card">
-            <Text class="secure-store-card-title">Capabilities</Text>
+          <view testID="secure-store-capability-card" class="secure-store-card">
+            <text class="secure-store-card-title">Capabilities</text>
             <CapabilityRow
               testID="secure-store-available"
               label="Available"
@@ -162,30 +156,30 @@ export const SecureStoreScreen = defineComponent(
               label="Biometrics usable"
               status={canUseBiometrics.value}
             />
-          </View>
+          </view>
 
-          <View testID="secure-store-value-card" class="secure-store-card">
-            <Text class="secure-store-card-title">Stored value</Text>
-            <View class="secure-store-row">
-              <Text class="secure-store-row-label">{DEMO_KEY}</Text>
-              <Text testID="secure-store-value" class="secure-store-value-text">
+          <view testID="secure-store-value-card" class="secure-store-card">
+            <text class="secure-store-card-title">Stored value</text>
+            <view class="secure-store-row">
+              <text class="secure-store-row-label">{DEMO_KEY}</text>
+              <text testID="secure-store-value" class="secure-store-value-text">
                 {storedValue.value === null ? '(no entry)' : storedValue.value}
-              </Text>
-            </View>
-            <View class="secure-store-row">
-              <Text class="secure-store-row-label">Last result</Text>
-              <Text
+              </text>
+            </view>
+            <view class="secure-store-row">
+              <text class="secure-store-row-label">Last result</text>
+              <text
                 testID="secure-store-result"
                 class="secure-store-value-text"
               >
                 {lastResult.value}
-              </Text>
-            </View>
-          </View>
+              </text>
+            </view>
+          </view>
 
-          <View testID="secure-store-write-card" class="secure-store-card">
-            <Text class="secure-store-card-title">Write, read, delete</Text>
-            <TextInput
+          <view testID="secure-store-write-card" class="secure-store-card">
+            <text class="secure-store-card-title">Write, read, delete</text>
+            <text-input
               testID="secure-store-input"
               value={inputText.value}
               onValueChange={(text: string) => {
@@ -219,9 +213,9 @@ export const SecureStoreScreen = defineComponent(
               onPress={handleDelete}
               color={lineColor}
             />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+          </view>
+        </scroll-view>
+      </safe-area-view>
     );
   },
   { name: 'SecureStoreScreen' },

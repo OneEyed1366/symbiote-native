@@ -9,7 +9,6 @@
 -->
 <script lang="ts">
 import { defineComponent } from 'vue';
-import { View, Text } from '@symbiote-native/vue';
 import ActionButton from '../ActionButton.vue';
 import { loggingMixin, baseCounterOptions } from './options-api-shared';
 
@@ -19,7 +18,7 @@ let externalTicks = 0;
 
 export default defineComponent({
   name: 'OptionsApiChild',
-  components: { View, Text, ActionButton },
+  components: { ActionButton },
   extends: baseCounterOptions,
   mixins: [loggingMixin],
   inheritAttrs: false,
@@ -61,39 +60,47 @@ export default defineComponent({
 </script>
 
 <template>
-  <View
+  <view
     ref="innerBox"
     class="a11y-card"
     :style="{ borderWidth: 1, borderColor: '#f5a623' }"
   >
-    <Text class="switch-label"
-      >OptionsApiChild — Options API, mixins + extends</Text
-    >
-    <Text class="note-text" testID="options-mixin-extends">{{
-      `props.seed=${seed} · extends → extendedFlag=${extendedFlag} · mixins → mixinHit=${mixinHit}`
-    }}</Text>
-    <Text class="note-text" testID="options-instance-props">{{
-      `mounted(): $refs.innerBox seen=${hasInnerRef} · $parent=${hasParent} · $root=${hasRoot} · $slots.default=${hasDefaultSlot}`
-    }}</Text>
-    <Text class="note-text">{{
-      `$attrs (inheritAttrs:false) = ${JSON.stringify($attrs)}`
-    }}</Text>
-    <Text class="note-text">{{
-      `app.config.globalProperties.$playgroundGreeting = ${$playgroundGreeting ?? 'not installed yet'}`
-    }}</Text>
-    <Text class="list-row-text" testID="options-count">{{
-      `count=${count}`
-    }}</Text>
+    <text class="switch-label">
+      OptionsApiChild — Options API, mixins + extends
+    </text>
+    <text class="note-text" testID="options-mixin-extends">
+      {{
+        `props.seed=${seed} · extends → extendedFlag=${extendedFlag} · mixins → mixinHit=${mixinHit}`
+      }}
+    </text>
+    <text class="note-text" testID="options-instance-props">
+      {{
+        `mounted(): $refs.innerBox seen=${hasInnerRef} · $parent=${hasParent} · $root=${hasRoot} · $slots.default=${hasDefaultSlot}`
+      }}
+    </text>
+    <text class="note-text">
+      {{ `$attrs (inheritAttrs:false) = ${JSON.stringify($attrs)}` }}
+    </text>
+    <text class="note-text">
+      {{
+        `app.config.globalProperties.$playgroundGreeting = ${$playgroundGreeting ?? 'not installed yet'}`
+      }}
+    </text>
+    <text class="list-row-text" testID="options-count">
+      {{ `count=${count}` }}
+    </text>
     <ActionButton
       testID="options-bump"
       title="bump() → $emit('ping')"
       :onPress="bump"
       color="#f5a623"
     />
-    <Text class="list-row-text" testID="options-external-ticks">{{
-      `non-reactive external ticks (as last rendered)=${externalTicksSnapshot()}`
-    }}</Text>
-    <View class="row-tight">
+    <text class="list-row-text" testID="options-external-ticks">
+      {{
+        `non-reactive external ticks (as last rendered)=${externalTicksSnapshot()}`
+      }}
+    </text>
+    <view class="row-tight">
       <ActionButton
         testID="options-mutate-external"
         title="mutate outside reactivity"
@@ -106,7 +113,7 @@ export default defineComponent({
         :onPress="forceRerender"
         color="#f5a623"
       />
-    </View>
+    </view>
     <slot />
-  </View>
+  </view>
 </template>

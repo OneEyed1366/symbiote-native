@@ -12,15 +12,14 @@ This example shows state, native layout, text, and a press event.
     ```tsx
     import './App.css';
     import { useState } from 'react';
-    import { Text, View } from '@symbiote-native/react';
 
     export default function App() {
       const [count, setCount] = useState(0);
 
       return (
-        <View className="root" onPress={() => setCount(value => value + 1)}>
-          <Text className="text">Count is {count}</Text>
-        </View>
+        <view className="root" onPress={() => setCount(value => value + 1)}>
+          <text className="text">Count is {count}</text>
+        </view>
       );
     }
     ```
@@ -36,15 +35,14 @@ This example shows state, native layout, text, and a press event.
     ```vue
     <script setup lang="ts">
     import { ref } from 'vue';
-    import { Text, View } from '@symbiote-native/vue';
 
     const count = ref(0);
     </script>
 
     <template>
-      <View class="root" @press="count += 1">
-        <Text class="text">Count is {{ count }}</Text>
-      </View>
+      <view class="root" @press="count += 1">
+        <text class="text">Count is {{ count }}</text>
+      </view>
     </template>
 
     <style scoped>
@@ -57,19 +55,19 @@ This example shows state, native layout, text, and a press event.
   <TabItem label="Angular">
     ```ts
     import { Component } from '@angular/core';
-    import { Pressable, Text, View } from '@symbiote-native/angular';
+    import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
     import './app.css';
 
     @Component({
       selector: 'app-root',
       standalone: true,
-      imports: [Pressable, Text, View],
+      imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <View class="root">
-          <Pressable (press)="count = count + 1">
-            <Text class="text">Count is {{ count }}</Text>
-          </Pressable>
-        </View>
+        <view class="root">
+          <pressable (press)="count = count + 1">
+            <text class="text">Count is {{ count }}</text>
+          </pressable>
+        </view>
       `,
     })
     export class App {
@@ -87,12 +85,15 @@ This example shows state, native layout, text, and a press event.
   <TabItem label="Svelte">
     ```svelte
     <script lang="ts">
-      import { Text, View } from '@symbiote-native/svelte';
-
       let count = $state(0);
     </script>
 
-    <View class="root" onPress={() => (count += 1)}><Text class="text">Count is {count}</Text></View>
+    <!-- A press callback on a bare host tag goes through the `p={{ … }}` bag — an
+         individual `onPress={…}` attribute is silently misrouted through Svelte's
+         own DOM event system instead of the engine. -->
+    <view class="root" p={{ onPress: () => (count += 1) }}>
+      <text class="text">Count is {count}</text>
+    </view>
 
     <style>
       .root { flex: 1; align-items: center; justify-content: center; }
@@ -105,15 +106,14 @@ This example shows state, native layout, text, and a press event.
     ```tsx
     import './App.css';
     import { createSignal } from 'solid-js';
-    import { Text, View } from '@symbiote-native/solid';
 
     export function App() {
       const [count, setCount] = createSignal(0);
 
       return (
-        <View class="root" onPress={() => setCount(value => value + 1)}>
-          <Text class="text">Count is {count()}</Text>
-        </View>
+        <view class="root" onPress={() => setCount(value => value + 1)}>
+          <text class="text">Count is {count()}</text>
+        </view>
       );
     }
     ```
@@ -129,17 +129,20 @@ This example shows state, native layout, text, and a press event.
 
 ## What changed
 
-| Concern     | React                          | Vue                            | Angular                            | Svelte                               | Solid                        |
-| ----------- | ------------------------------ | ------------------------------ | ---------------------------------- | ------------------------------------ | ---------------------------- |
-| State       | `useState()`                   | `ref()`                        | plain class field                  | `$state()` rune                      | `createSignal()`             |
-| Press event | `onPress` directly on `View`   | `@press` directly on `View`    | `(press)` on a `Pressable` wrapper | `onPress` directly on `View`         | `onPress` directly on `View` |
-| Styling     | `className="root"` + `App.css` | `class="root"` + SFC `<style>` | `class="root"` + `app.css`         | `class="root"` + component `<style>` | `class="root"` + `App.css`   |
-| Native path | shared engine                  | shared engine                  | shared engine                      | shared engine                        | shared engine                |
+| Concern     | React                          | Vue                            | Angular                             | Svelte                                 | Solid                        |
+| ----------- | ------------------------------ | ------------------------------- | ------------------------------------ | --------------------------------------- | ----------------------------- |
+| State       | `useState()`                   | `ref()`                         | plain class field                    | `$state()` rune                         | `createSignal()`              |
+| Press event | `onPress` directly on `view`   | `@press` directly on `view`     | `(press)` on a `pressable` tag       | `onPress` via a `p={{ onPress }}` bag   | `onPress` directly on `view`  |
+| Styling     | `className="root"` + `App.css` | `class="root"` + SFC `<style>`  | `class="root"` + `app.css`           | `class="root"` + component `<style>`    | `class="root"` + `App.css`    |
+| Native path | shared engine                  | shared engine                   | shared engine                        | shared engine                           | shared engine                 |
 
-`View` itself carries `onPress`/`onPressIn`/`onPressOut` — React, Vue,
-Svelte, and Solid's simplest counter reaches for it directly rather than
-wrapping in `Pressable`. Angular's counter uses `Pressable` here since its
-non-function-children form is the idiomatic starting point on that adapter;
-either works on every adapter (see the [Pressable example](/docs/examples/pressable/)).
+The `view` tag itself carries `onPress`/`onPressIn`/`onPressOut` — React, Vue,
+and Solid's simplest counter reaches for it directly rather than wrapping in
+`pressable`. Svelte needs the same handlers wrapped in a `p={{ … }}` bag
+because an individual `on*` attribute on a bare host tag is intercepted by
+Svelte's own compiled event system rather than reaching the engine directly.
+Angular's counter uses the `pressable` tag here since its non-function-children
+form is the idiomatic starting point on that adapter; either works on every
+adapter (see the [Pressable example](/docs/examples/pressable/)).
 `StyleSheet.create` works identically to a CSS class if you'd rather keep
 style objects inline — see the [Styling guide](/docs/learn/styling/).

@@ -1,5 +1,5 @@
 import { defineComponent } from 'vue';
-import { Pressable, Text } from '@symbiote-native/vue';
+import type { IPressState } from '@symbiote-native/components';
 
 export type IActionButtonProps = {
   title: string;
@@ -17,19 +17,19 @@ export type IActionButtonProps = {
 export const ActionButton = defineComponent<IActionButtonProps>(
   props => {
     return () => (
-      <Pressable
+      <pressable
         testID={props.testID}
         onPress={props.onPress}
         class="action-button"
-        style={({ pressed }: { pressed: boolean }) => ({
+        style={({ pressed }: IPressState) => ({
           borderColor: props.color,
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        <Text class="action-button-text" style={{ color: props.color }}>
+        <text class="action-button-text" style={{ color: props.color }}>
           {props.title}
-        </Text>
-      </Pressable>
+        </text>
+      </pressable>
     );
   },
   { name: 'ActionButton', props: ['title', 'onPress', 'color', 'testID'] },

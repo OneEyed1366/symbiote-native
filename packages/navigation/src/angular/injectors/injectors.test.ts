@@ -89,7 +89,7 @@ function screenNodes(): IFakeNode[] {
   selector: 'plain-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>plain</symbiote-text>`,
+  template: `<text>plain</text>`,
 })
 class PlainScreenComponent {}
 
@@ -99,7 +99,7 @@ let capturedIsFocused: Signal<boolean> | undefined;
   selector: 'is-focused-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>home</symbiote-text>`,
+  template: `<text>home</text>`,
 })
 class IsFocusedScreenComponent {
   constructor() {
@@ -113,7 +113,7 @@ const focusEffectEvents: string[] = [];
   selector: 'focus-effect-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>home</symbiote-text>`,
+  template: `<text>home</text>`,
 })
 class FocusEffectScreenComponent {
   constructor() {
@@ -132,7 +132,7 @@ const focusListenerEvents: string[] = [];
   selector: 'navigation-route-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>details</symbiote-text>`,
+  template: `<text>details</text>`,
 })
 class NavigationRouteScreenComponent {
   constructor() {
@@ -150,7 +150,7 @@ let capturedRouteCount: Signal<number> | undefined;
   selector: 'navigation-state-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>home</symbiote-text>`,
+  template: `<text>home</text>`,
 })
 class NavigationStateScreenComponent {
   constructor() {

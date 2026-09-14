@@ -35,7 +35,7 @@ function App(): ReactElement {
       index,
     }),
     renderItem: ({ item }: { item: IRow; index: number }) =>
-      createElement('symbiote-view', {
+      createElement('view', {
         key: item.id,
         style: { width: ITEM_WIDTH, height: 40 },
       }),

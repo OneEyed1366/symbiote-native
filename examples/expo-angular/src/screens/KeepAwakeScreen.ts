@@ -1,5 +1,10 @@
 import { Component, Injector, effect, inject, signal } from '@angular/core';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  SafeAreaViewElement,
+  ScrollViewElement,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   KeepAwakeService,
   deactivateKeepAwake,
@@ -33,61 +38,61 @@ const KEEP_AWAKE_DEMO_TAG = 'keep-awake-screen-demo';
 @Component({
   selector: 'KeepAwakeScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="keep-awake-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Keep Awake</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Keep Awake</text>
+            <text class="hero-body">
               @symbiote-native/keep-awake — keeps the screen on for as long as a
               tagged activation stays engaged.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="keep-awake-capability-card" class="capability-card">
-          <Text class="capability-card-title">Capabilities</Text>
-          <View testID="keep-awake-is-available" class="capability-row">
-            <Text class="capability-label">isAvailableAsync()</Text>
-            <View [class]="statusBadgeClass(isAvailable())">
-              <Text class="status-badge-text">{{
+        <view testID="keep-awake-capability-card" class="capability-card">
+          <text class="capability-card-title">Capabilities</text>
+          <view testID="keep-awake-is-available" class="capability-row">
+            <text class="capability-label">isAvailableAsync()</text>
+            <view [class]="statusBadgeClass(isAvailable())">
+              <text class="status-badge-text">{{
                 statusLabel(isAvailable())
-              }}</Text>
-            </View>
-          </View>
-        </View>
+              }}</text>
+            </view>
+          </view>
+        </view>
 
-        <View testID="keep-awake-toggle-card" class="capability-card">
-          <Text class="capability-card-title">Keep screen awake</Text>
-          <View testID="keep-awake-engaged" class="capability-row">
-            <Text class="capability-label">Engaged</Text>
-            <View [class]="statusBadgeClass(engagedStatus())">
-              <Text class="status-badge-text">{{
+        <view testID="keep-awake-toggle-card" class="capability-card">
+          <text class="capability-card-title">Keep screen awake</text>
+          <view testID="keep-awake-engaged" class="capability-row">
+            <text class="capability-label">Engaged</text>
+            <view [class]="statusBadgeClass(engagedStatus())">
+              <text class="status-badge-text">{{
                 statusLabel(engagedStatus())
-              }}</Text>
-            </View>
-          </View>
+              }}</text>
+            </view>
+          </view>
           <ActionButton
             testID="keep-awake-toggle-button"
             [title]="toggleTitle()"
             (press)="toggleKeepAwake()"
             [color]="lineColor"
           ></ActionButton>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class KeepAwakeScreen {

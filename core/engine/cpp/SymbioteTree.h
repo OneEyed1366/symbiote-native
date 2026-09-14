@@ -97,6 +97,16 @@ class Tree {
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
+  /** `getProps(handle)` — every prop standing on the node, in one crossing. */
+  facebook::jsi::Value getProps(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /** `markPropsDirty(handle)` — the dirtying route a DERIVED payload has, since it writes no prop. */
+  facebook::jsi::Value markPropsDirty(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
   facebook::jsi::Value getViewName(
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,

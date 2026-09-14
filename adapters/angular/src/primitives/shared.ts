@@ -10,6 +10,7 @@ import {
   type SimpleChanges,
 } from '@angular/core';
 import { countAngular } from '../diagnostics';
+import { createCallbackWrapper } from '../change-detection-flush';
 import {
   flattenStyle,
   isSymbioteNode,
@@ -109,18 +110,6 @@ export function stableAnchorStyle(
     : next;
 }
 
-const ON_PREFIX = /^on[A-Z]/;
-
-// The one `onX` that fires per FRAME rather than per gesture, and with sticky headers RN pins
-// `scrollEventThrottle` to 1 (ScrollView.js), so 60 times a second. Since markForCheck walks
-// RefreshView|Dirty to the ROOT, wrapping it cost one full ancestor-screen template execution per
-// frame - the canary's ~37fps scroll (components/virtualized-list/scroll-cost.test.ts).
-//
-// Nothing lost its refresh: VirtualizedList marks itself when the window moves, sticky rides the
-// native driver, and a caller's own handler is typically an Animated.event touching no Angular
-// state. Drag/momentum begin/end stay wrapped - once per gesture is not a hot path.
-const PER_FRAME_CALLBACK = 'onScroll';
-
 /**
  * Restores the OnPush dirty-marking Angular skips for a `[style]` binding that a directive
  * declares as an input. Attach it to any component declaring a `style` input:
@@ -195,7 +184,7 @@ function isAnchorStyleUnchanged(previous: unknown, next: unknown): boolean {
 }
 
 /**
- * Base for all Angular primitive host components (`symbiote-view`, `symbiote-text`, ...).
+ * Base for all Angular primitive host components (`view`, `text`, ...).
  * RN's `StyleProp` can be an object, an array, nested arrays, falsy entries, and Animated
  * values. Angular's raw `[style]` binding on a custom element routes through the CSS style
  * engine (`setStyle` per key), which crashes on numeric array keys. By declaring `style` as
@@ -266,20 +255,15 @@ export class SymbioteHostPropsDirective {
   // The directive lives in its HOST component's template, so its injected ChangeDetectorRef IS
   // that component's own view detector — the one thing that can refresh it (see wrapCallback).
   private readonly cdr = inject(ChangeDetectorRef);
-  // One wrapper per ORIGINAL handler, for the lifetime of this directive. Without it every push
-  // of the props bag allocated a brand-new closure for every `onX` key, and the engine stored it
-  // as a new listener (`setEventListener` allocates its own closure on top) - per key, per push,
-  // on a path a scroll frame reaches 60 times a second. The wrapper body closes over nothing but
-  // `value` and this instance's `cdr`, so the handler alone is a complete cache key; `key` is
-  // read only by the ON_PREFIX guard above and never enters the wrapper.
-  //
-  // Reference stability is the point, not just the allocation: a fresh function on every push
-  // defeats every downstream identity check on the bag, so nothing upstream could ever conclude
-  // "this bag is unchanged" while a callback prop was in it.
-  private readonly wrappers = new WeakMap<
-    object,
-    (...args: unknown[]) => unknown
-  >();
+  // A flat-bag `onX` callback (responder negotiation, onLongPress, …) is invoked by the engine's
+  // event dispatch — a plain JS call, entirely outside Angular — so nothing dirties the view that
+  // binds its result: the "pan does nothing" bug. Shared with the TAG path's `SymbioteElement`,
+  // which has the identical deficit; the mechanism, the `onScroll` exemption and why the wrapper
+  // is cached per original handler live in `createCallbackWrapper`.
+  private readonly wrapCallback = createCallbackWrapper(
+    this.cdr,
+    this.elementRef.nativeElement,
+  );
 
   // Values pushed by the previous bag, so a push writes only what actually moved. Copied rather
   // than aliased: a component is free to hand back the same object with mutated fields.
@@ -331,21 +315,4 @@ export class SymbioteHostPropsDirective {
   // (`_cdRefInjectingView`, i.e. the host component), unlike `detectChanges()` which acts on a
   // resolved `_lView` that is NOT the host component here. The Angular twin of what React/Vue get
   // for free (setState / proxy reactivity).
-  private wrapCallback(key: string, value: unknown): unknown {
-    if (!ON_PREFIX.test(key) || typeof value !== 'function') return value;
-    if (key === PER_FRAME_CALLBACK) return value;
-    const cached = this.wrappers.get(value);
-    if (cached !== undefined) return cached;
-    // Reflect.apply rather than calling a cast-to-signature local: `typeof value === 'function'`
-    // narrows to `Function`, which has no call signature TypeScript will accept, and this repo
-    // does not use `as` to paper over that. `undefined` as the receiver preserves the previous
-    // unbound call.
-    const wrapper = (...args: unknown[]): unknown => {
-      const result: unknown = Reflect.apply(value, undefined, args);
-      this.cdr.markForCheck();
-      return result;
-    };
-    this.wrappers.set(value, wrapper);
-    return wrapper;
-  }
 }

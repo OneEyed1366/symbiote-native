@@ -1,7 +1,7 @@
 <script lang="ts" module>
   // VirtualizedList: real windowing over a hand-authored minimal scroll host. Only cells whose
   // computed offset falls inside the visible window (plus a leading/trailing buffer) render;
-  // the rest collapses into two spacer symbiote-view nodes.
+  // the rest collapses into two spacer view nodes.
   //
   // The orchestration - window recompute, edge-reached, viewability, batch fill, MVCP, imperative
   // scrolls - is the framework-agnostic `reduceList` state machine in @symbiote-native/components
@@ -10,16 +10,22 @@
   // (`listState`), runs the returned EFFECTS with Svelte primitives, and renders the windowed slice
   // with `{#each plan.cells}` (Lists have no Descriptor render fn, per svelte-adapter-dom-shim §15).
   //
-  // This file hand-authors the raw `symbiote-scroll-view`/`symbiote-scroll-content` intrinsics
-  // directly rather than rendering <ScrollView>: unlike ScrollView.svelte, it walks an indexable
-  // `plan.cells` list instead of an opaque children Snippet, so it can auto-wrap sticky cells
-  // itself. `onContentSizeChange` remains the one gap left from that; nestedScrollEnabled, the
-  // Android RefreshControl wrap style-split, and JS sticky-header wrapping are all wired directly
-  // here instead.
+  // This file authors the raw `scroll-view` intrinsic directly, and needs to: it walks an indexable
+  // `plan.cells` list rather than taking an opaque children Snippet, so it can mark sticky cells
+  // itself. (There is no ScrollView component to render instead — it was deleted 2026-09-10 and an
+  // app writes the tag too.)
   //
-  // RefreshControl attaches directly to these raw scroll intrinsics: a sibling before the content
-  // on iOS, wrapping the whole scroll view on Android (PLATFORM.refreshControlMode) - the same
-  // shape ScrollView's own index.svelte uses.
+  // It does NOT author the CONTENT node. `registerScrollViewBehavior()` puts a `buildStructure` on
+  // the scroll tags, and exactly one thing may build `RCTScrollContentView` — emitting one here as
+  // well nests a second one inside the engine's. Everything that used to live here because the
+  // content node did (`contentContainerStyle`, the axis base style, `nestedScrollEnabled`, the
+  // Android RefreshControl wrap style-split, the JS sticky-header wrapping and its collision map)
+  // is the behavior's now; `contentContainerStyle` travels as an OWNER prop and the behavior
+  // renames it onto the slot.
+  //
+  // RefreshControl is written as an ordinary child of the scroll tag on both platforms: the
+  // behavior CLAIMS it, keeping it beside the content view on iOS and wrapping the scroll view
+  // with it on Android.
   //
   // `<svelte:element>` is forbidden (svelte-adapter-dom-shim skill §4/§7 - its shim surface isn't
   // implemented), so the horizontal/vertical choice is two static branches sharing one
@@ -44,24 +50,17 @@
     FIRST_INDEX,
     INVERTED_X_STYLE,
     INVERTED_Y_STYLE,
-    attachStickyScroll,
     buildListPlan,
     buildScrollViewHandle,
     buildViewabilityPairs,
     createInitialListState,
-    forwardScrollEvent,
     isSeparatorGapInRange,
     listEffectSignature,
-    nextStickyHeaderY,
     readLayoutLength,
     readLayoutOffset,
-    readLayoutNumber,
     readScrollOffset,
     reduceList,
     resolveItemKey,
-    resolveScrollForwarding,
-    selectScrollIntrinsics,
-    splitLayoutProps,
     type IListAction,
     type IListEffect,
     type IListReducerInputs,
@@ -71,24 +70,11 @@
     type ISeparators,
   } from '@symbiote-native/components';
   import {
-    AnimatedValue,
     dlog,
-    event as animatedEvent,
-    isNativeAnimatedAvailable,
-    resolveClassName,
     type ISymbioteEvent,
     type ISymbioteNode,
   } from '@symbiote-native/engine';
-  import { resolveSvelteClass } from '../../class-value';
-  import { setContext } from 'svelte';
   import type { ShimElement } from '../../dom-shim';
-  import RefreshControl from '../RefreshControl.svelte';
-  import { PLATFORM } from '../scroll-view/scroll-view-platform';
-  import ScrollViewStickyHeader from '../scroll-view/sticky-header.svelte';
-  import {
-    SCROLL_VIEW_STICKY_CONTEXT_KEY,
-    type IScrollViewStickyContext,
-  } from '../scroll-view/scroll-view-sticky-context';
   import {
     pickAccessibilityProps,
     type IVirtualizedListProps as IProps,
@@ -128,22 +114,6 @@
   const separatorOverrides = new Map<number, Partial<ISeparatorProps<ItemT>>>();
   let viewableTimer: ReturnType<typeof setTimeout> | null = null;
   let batchTimer: ReturnType<typeof setTimeout> | null = null;
-
-  // Sticky headers: this file hand-rolls the raw scroll intrinsic (see the header comment), so it
-  // can't lean on ScrollView.svelte's sticky wiring directly - it mirrors the same
-  // scrollAnimatedValue/attachStickyScroll/context wiring here, applied per windowed cell.
-  const scrollAnimatedValue = new AnimatedValue(0);
-  let viewportHeight = $state<number | undefined>(undefined);
-  // y of each measured sticky header, keyed by ORIGINAL list index (RN's _headerLayoutYs) - plain,
-  // not $state; stickyVersion (below) drives re-derivation of the collision math that reads it.
-  const headerLayoutYs = new Map<number, number>();
-  let stickyVersion = $state(0);
-
-  setContext<IScrollViewStickyContext>(SCROLL_VIEW_STICKY_CONTEXT_KEY, {
-    scrollAnimatedValue,
-    getInverted: () => narrowed.inverted,
-    getViewportHeight: () => viewportHeight,
-  });
 
   const narrowed = $derived.by(() => {
     // extraData has no field of its own; reading it tracks it so a change forces this derived to
@@ -323,58 +293,6 @@
     return listEffectSignature(listState);
   });
 
-  const hasStickyHeaders = $derived(
-    narrowed.stickyHeaderIndices !== undefined &&
-      narrowed.stickyHeaderIndices.length > 0,
-  );
-  // Resolved dynamically, exactly like React (adapters/react/.../scroll-view/shared.ts:267). Do
-  // not hardcode this false to keep the JS listener alive - RN gates native the same way
-  // (AnimatedWithChildren.js:74 `if (!this.__isNative)`) and the pin is the native transform, not
-  // the listener, so forcing JS mode only trades away the native driver: header lag on iOS,
-  // outright failure on Android (commit debounce 15ms vs iOS's 64ms - render-scroll-sticky.ts).
-  const nativeStickyAvailable = $derived(
-    hasStickyHeaders && isNativeAnimatedAvailable(),
-  );
-  // RN's FlatList/SectionList expose no invertStickyHeaders of their own (only ScrollView does) -
-  // sticky headers always pin to the top here, matching RN.
-  const forwarding = $derived(
-    resolveScrollForwarding({
-      hasStickyHeaders,
-      nativeStickyAvailable,
-      invertStickyHeaders: undefined,
-      scrollEventThrottle: narrowed.scrollEventThrottle,
-      maintainVisibleContentPosition: narrowed.maintainVisibleContentPosition,
-      snapToAlignment: undefined,
-    }),
-  );
-
-  $effect(() => {
-    dlog(
-      `VirtualizedList sticky hasStickyHeaders=${hasStickyHeaders} nativeStickyAvailable=${nativeStickyAvailable} mode=${forwarding.mode} scrollEventThrottle=${String(forwarding.scrollEventThrottle)}`,
-    );
-  });
-
-  // Drive the sticky scroll value on the native UI thread once the scroll host commits (mirrors
-  // ScrollView.svelte). No-op without the native animated module - the JS fallback below still
-  // keeps headers pinned via onScroll.
-  $effect(() => {
-    if (!nativeStickyAvailable) {
-      dlog(
-        'VirtualizedList sticky attachStickyScroll skipped: nativeStickyAvailable=false',
-      );
-      return;
-    }
-    const node = hostShim?.engineNode;
-    if (node === undefined) {
-      dlog(
-        'VirtualizedList sticky attachStickyScroll skipped: engineNode not ready yet',
-      );
-      return;
-    }
-    dlog('VirtualizedList sticky attachStickyScroll attached');
-    return attachStickyScroll(node, scrollAnimatedValue);
-  });
-
   function handleScroll(event: ISymbioteEvent): void {
     const offset = readScrollOffset(event, narrowed.horizontal);
     if (offset === undefined) return;
@@ -384,66 +302,11 @@
     narrowed.userOnScroll?.(event);
   }
 
-  // sticky-js: no native Animated module, so the scroll value is driven off the JS thread via the
-  // same wrapped-listener shape ScrollView.svelte uses. sticky-native/plain: forward untouched.
-  const onScroll = $derived.by(() => {
-    if (forwarding.mode !== 'sticky-js') return handleScroll;
-    return animatedEvent(
-      [{ nativeEvent: { contentOffset: { y: scrollAnimatedValue } } }],
-      {
-        listener: (...args: unknown[]) =>
-          forwardScrollEvent(handleScroll, args),
-      },
-    );
-  });
-
   function onViewportLayout(event: ISymbioteEvent): void {
     const length = readLayoutLength(event, narrowed.horizontal);
     if (length === undefined) return;
     dlog(`VirtualizedList onLayout viewport=${length}`);
     dispatch({ kind: 'layout', length });
-    if (forwarding.capturesViewportHeight) {
-      const height = readLayoutNumber(event, 'height');
-      if (height !== undefined) viewportHeight = height;
-    }
-  }
-
-  // Records a sticky header's measured y (RN's _headerLayoutYs) so the NEXT sticky header down the
-  // list can compute its collision point - without this every header would stick indefinitely
-  // instead of being pushed off by the one behind it.
-  function recordHeaderY(index: number, event: ISymbioteEvent): void {
-    const y = readLayoutNumber(event, 'y');
-    if (y === undefined) return;
-    // This map is the ONLY source of nextHeaderLayoutY for every header ahead of this one; if a
-    // later header's onLayout never fires (windowing drops its cell) the collision math upstream
-    // falls back to `?? 0` (collisionPoint = -layoutHeight), which is almost certainly wrong.
-    dlog(`VirtualizedList recordHeaderY index=${index} y=${y}`);
-    headerLayoutYs.set(index, y);
-    stickyVersion += 1;
-  }
-
-  function stickyLayoutFor(index: number): (event: ISymbioteEvent) => void {
-    const measure = makeCellMeasure(index);
-    return (event: ISymbioteEvent): void => {
-      measure(event);
-      recordHeaderY(index, event);
-    };
-  }
-
-  // Only a header MOUNTED RIGHT NOW can collide with this one, matching React (its ScrollView
-  // receives `renderedStickyIndices`, not the full section list -
-  // adapters/react/.../virtualized-list/index.ts:732). Passing the full index list instead let a
-  // header collide against a stale y from one that had already scrolled out and unmounted,
-  // freezing it in place - proven by sticky-collision-parity.test.ts against the React reference.
-  // The map itself is deliberately NOT pruned (React doesn't either): a measured y stays valid for
-  // when that header scrolls back in.
-  function nextStickyHeaderYFor(index: number): number | undefined {
-    void stickyVersion;
-    const indices = narrowed.stickyHeaderIndices;
-    if (indices === undefined) return undefined;
-    const mounted = new Set(allCells.map(cell => cell.index));
-    const rendered = indices.filter(stickyIndex => mounted.has(stickyIndex));
-    return nextStickyHeaderY(rendered, rendered.indexOf(index), headerLayoutYs);
   }
 
   function makeCellMeasure(index: number): (event: ISymbioteEvent) => void {
@@ -573,10 +436,6 @@
     };
   });
 
-  const scrollViewIntrinsics = $derived(
-    selectScrollIntrinsics(narrowed.horizontal, narrowed.contentContainerStyle),
-  );
-
   const resolvedStyle = $derived(
     narrowed.inverted
       ? [
@@ -585,44 +444,30 @@
         ]
       : narrowed.style,
   );
+  // Travels on the OWNER: `slotProps` renames it onto the content node the behavior built, so it
+  // goes through the slot's own routeProp and inherits class resolution and style merging. The
+  // horizontal `flexDirection: 'row'` is the behavior's constant and is composed OVER this, so
+  // only the measured total width is added here.
   const resolvedContentContainerStyle = $derived(
     narrowed.horizontal
-      ? [scrollViewIntrinsics.contentStyle, { width: metrics.total }]
-      : scrollViewIntrinsics.contentStyle,
-  );
-
-  // Android wrap mode only: mirrors ScrollView's own index.svelte - RN's splitLayoutProps routes
-  // LAYOUT props (margin/flex/size/position/...) onto the wrapping AndroidSwipeRefreshLayout,
-  // VISUAL props (background/padding/border/...) onto the inner scroll view, instead of leaving
-  // the wrapper unstyled (which collapses it to zero height).
-  const layoutSplit = $derived(
-    shouldWrapRefreshControl
-      ? splitLayoutProps([resolveSvelteClass(narrowed.class), resolvedStyle])
-      : undefined,
+      ? [narrowed.contentContainerStyle, { width: metrics.total }]
+      : narrowed.contentContainerStyle,
   );
 
   const outerBag = $derived.by(() => {
     const bag: Record<string, unknown> = {
-      style: [
-        scrollViewIntrinsics.scrollViewBaseStyle,
-        layoutSplit !== undefined ? layoutSplit.inner : resolvedStyle,
-      ],
-      horizontal: narrowed.horizontal,
-      // RN defaults nested scrolling ON (ScrollView.js `nestedScrollEnabled ?? true`). This file
-      // hand-rolls the raw scroll intrinsic instead of rendering <ScrollView>, so it never
-      // inherited that default - on Android, a list nested inside a page ScrollView never got
-      // nested-scroll gesture arbitration and only the outer page scrolled.
-      nestedScrollEnabled: true,
-      onScroll,
+      style: resolvedStyle,
+      class: narrowed.class,
+      contentContainerStyle: resolvedContentContainerStyle,
+      onScroll: handleScroll,
       onLayout: onViewportLayout,
     };
-    if (layoutSplit === undefined) bag.class = narrowed.class;
     if (commandedOffset !== undefined) bag.contentOffset = commandedOffset;
-    // forwarding.scrollEventThrottle (not the raw prop): folds in the sticky-mode default
-    // (1 native / 16 JS-fallback) when unset - without it a sticky header rebuilt off too-sparse
-    // scroll events pins/collides late.
-    if (forwarding.scrollEventThrottle !== undefined)
-      bag.scrollEventThrottle = forwarding.scrollEventThrottle;
+    // The RAW prop. A sticky header raises the throttle from the behavior, once it has actually
+    // registered — folding a sticky default in here would hand the behavior a number it reads back
+    // as the app's and could never take away again.
+    if (narrowed.scrollEventThrottle !== undefined)
+      bag.scrollEventThrottle = narrowed.scrollEventThrottle;
     if (narrowed.onScrollBeginDrag !== undefined)
       bag.onScrollBeginDrag = narrowed.onScrollBeginDrag;
     if (narrowed.onScrollEndDrag !== undefined)
@@ -636,8 +481,11 @@
     }
     if (narrowed.keyboardDismissMode !== undefined)
       bag.keyboardDismissMode = narrowed.keyboardDismissMode;
-    if (narrowed.stickyHeaderIndices !== undefined)
-      bag.stickyHeaderIndices = narrowed.stickyHeaderIndices;
+    // `stickyHeaderIndices` is deliberately NOT forwarded. The behavior honours it by numbering the
+    // owner's own PAINT children, and this list's indices are into the DATA stream — a windowed
+    // list paints a spacer, a header and a slice, so index 3 of the data is almost never paint
+    // child 3. The cells that should pin carry the `sticky-header` tag directly instead, which is
+    // the one form that survives windowing.
     if (narrowed.maintainVisibleContentPosition !== undefined) {
       bag.maintainVisibleContentPosition =
         narrowed.maintainVisibleContentPosition;
@@ -659,18 +507,6 @@
       progressViewOffset: narrowed.progressViewOffset,
     };
   });
-  // iOS: RefreshControl is a childless sibling before the content container. Android: it WRAPS the
-  // whole scroll view (an Android ScrollView accepts only one child) - same PLATFORM.
-  // refreshControlMode ScrollView's own index.svelte reads.
-  const shouldWrapRefreshControl = $derived(
-    PLATFORM.refreshControlMode === 'wrap' && refreshControlProps !== undefined,
-  );
-
-  const contentBag = $derived({
-    style: resolvedContentContainerStyle,
-    collapsable: false,
-  });
-
   const stickySet = $derived(
     narrowed.stickyHeaderIndices !== undefined
       ? new Set(narrowed.stickyHeaderIndices)
@@ -740,19 +576,19 @@
   lets virtualized-list.smoke.test.ts still assert an exact windowed child count.
 -->
   {#if hasHeader}
-    <symbiote-view p={{}}>
+    <view p={{}}>
       {@render props.header?.()}
-    </symbiote-view>
+    </view>
   {/if}
   {#if metrics.count === FIRST_INDEX}
     {#if props.empty}
-      <symbiote-view p={{}}>
+      <view p={{}}>
         {@render props.empty()}
-      </symbiote-view>
+      </view>
     {/if}
   {:else if plan}
     {#if plan.leadingExtent > EMPTY_OFFSET}
-      <symbiote-view
+      <view
         p={{
           style: narrowed.horizontal
             ? { width: plan.leadingExtent }
@@ -762,23 +598,24 @@
     {/if}
     {#each allCells as cell (cell.key)}
       {#if stickySet?.has(cell.index)}
-        <ScrollViewStickyHeader
-          onLayout={stickyLayoutFor(cell.index)}
-          nextHeaderLayoutY={nextStickyHeaderYFor(cell.index)}
-        >
+        <!-- The TAG, not a component: `registerScrollViewBehavior()` registers `sticky-header`
+             alongside the scroll tags, and its behavior finds this ScrollView by walking up. The
+             collision point comes from the owner's DOCUMENT order, so nothing here computes or
+             forwards an index. `onLayout` is forwarded by the behavior, not replaced. -->
+        <sticky-header p={{ onLayout: makeCellMeasure(cell.index) }}>
           {@render props.item({
             item: narrowed.getItem(narrowed.data, cell.index),
             index: cell.index,
             separators: makeSeparators(cell.index),
           })}
           {#if props.separator && cell.index < metrics.count - 1}
-            <symbiote-view p={{}}>
+            <view p={{}}>
               {@render props.separator(separatorPropsFor(cell.index))}
-            </symbiote-view>
+            </view>
           {/if}
-        </ScrollViewStickyHeader>
+        </sticky-header>
       {:else}
-        <symbiote-view
+        <view
           p={{
             onLayout: makeCellMeasure(cell.index),
             style: cellInvertedStyle,
@@ -790,14 +627,14 @@
             separators: makeSeparators(cell.index),
           })}
           {#if props.separator && cell.index < metrics.count - 1}
-            <symbiote-view p={{}}>
+            <view p={{}}>
               {@render props.separator(separatorPropsFor(cell.index))}
-            </symbiote-view>
+            </view>
           {/if}
-        </symbiote-view>
+        </view>
       {/if}
       {#if plan.forcedStickyCell && cell.index === plan.forcedStickyCell.index && plan.gapExtent > EMPTY_OFFSET}
-        <symbiote-view
+        <view
           p={{
             style: narrowed.horizontal
               ? { width: plan.gapExtent }
@@ -807,7 +644,7 @@
       {/if}
     {/each}
     {#if plan.trailingExtent > EMPTY_OFFSET}
-      <symbiote-view
+      <view
         p={{
           style: narrowed.horizontal
             ? { width: plan.trailingExtent }
@@ -817,49 +654,33 @@
     {/if}
   {/if}
   {#if props.footer}
-    <symbiote-view p={{}}>
+    <view p={{}}>
       {@render props.footer()}
-    </symbiote-view>
+    </view>
   {/if}
 {/snippet}
 
 {#snippet scrollBody()}
   <!--
-  Same as listBody() above: on iOS the non-wrapping RefreshControl and the content container are
-  siblings of one parent, and the gap between them is dropped before it reaches Fabric.
+  Same as listBody() above: the RefreshControl and the cells are siblings of one parent here, and
+  the whitespace between them is dropped before it reaches Fabric.
+
+  RefreshControl is written as an ordinary child on BOTH platforms — the behavior CLAIMS it, so
+  the engine keeps it beside the content view on iOS and inverts the tree on Android. Everything
+  after it lands in the content node the behavior built.
 -->
-  {#if !shouldWrapRefreshControl && refreshControlProps !== undefined}
-    <RefreshControl {...refreshControlProps} />
+  {#if refreshControlProps !== undefined}
+    <refresh-control p={refreshControlProps} />
   {/if}
-  {#if narrowed.horizontal}
-    <symbiote-horizontal-scroll-content p={contentBag}>
-      {@render listBody()}
-    </symbiote-horizontal-scroll-content>
-  {:else}
-    <symbiote-scroll-content p={contentBag}>
-      {@render listBody()}
-    </symbiote-scroll-content>
-  {/if}
+  {@render listBody()}
 {/snippet}
 
-{#if shouldWrapRefreshControl && refreshControlProps !== undefined}
-  <RefreshControl {...refreshControlProps} style={layoutSplit?.outer}>
-    {#if narrowed.horizontal}
-      <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>
-        {@render scrollBody()}
-      </symbiote-horizontal-scroll-view>
-    {:else}
-      <symbiote-scroll-view p={outerBag} bind:this={hostShim}>
-        {@render scrollBody()}
-      </symbiote-scroll-view>
-    {/if}
-  </RefreshControl>
-{:else if narrowed.horizontal}
-  <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>
+{#if narrowed.horizontal}
+  <horizontal-scroll-view p={outerBag} bind:this={hostShim}>
     {@render scrollBody()}
-  </symbiote-horizontal-scroll-view>
+  </horizontal-scroll-view>
 {:else}
-  <symbiote-scroll-view p={outerBag} bind:this={hostShim}>
+  <scroll-view p={outerBag} bind:this={hostShim}>
     {@render scrollBody()}
-  </symbiote-scroll-view>
+  </scroll-view>
 {/if}

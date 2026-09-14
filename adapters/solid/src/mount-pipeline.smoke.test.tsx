@@ -47,9 +47,9 @@ describe('solid adapter — static paint', () => {
   it('commits a host element tree with props and nested text', async () => {
     function App() {
       return (
-        <symbiote-view testID="root" style={{ flex: 1 }}>
-          <symbiote-text>hello</symbiote-text>
-        </symbiote-view>
+        <view testID="root" style={{ flex: 1 }}>
+          <text>hello</text>
+        </view>
       );
     }
 
@@ -78,7 +78,7 @@ describe('solid adapter — static paint', () => {
     // the one loud failure in the seam — it must throw at mount rather than build an invalid tree.
     function Stray() {
       const label = (): string => 'stray';
-      return <symbiote-view>{label()}</symbiote-view>;
+      return <view>{label()}</view>;
     }
 
     expect(() => mount(ROOT_TAG, Stray)).toThrow(

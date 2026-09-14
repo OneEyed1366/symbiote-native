@@ -6,7 +6,6 @@ import {
   useOptimistic,
   useState,
 } from 'react';
-import { Text, View } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { CaveatNote } from './CaveatNote';
 import { LINE_COLOR } from '../navigation-lines';
@@ -28,10 +27,10 @@ function UsePromiseDemo({ showContext }: IUsePromiseDemoProps) {
   // use(Context): unlike useContext, `use` can be called conditionally — this branch is real.
   const greeting = showContext ? use(GreetingContext) : 'context skipped';
   return (
-    <Text
+    <text
       testID="hooks-actions-use"
       className="info-text"
-    >{`use(): "${serverData}" · ${greeting}`}</Text>
+    >{`use(): "${serverData}" · ${greeting}`}</text>
   );
 }
 
@@ -62,12 +61,12 @@ export function HooksActionsDemo() {
 
   return (
     <GreetingContext value="hello from GreetingContext">
-      <View className="section-nested">
-        <Text className="section-label">
+      <view className="section-nested">
+        <text className="section-label">
           useActionState · useOptimistic · use
-        </Text>
+        </text>
         <Suspense
-          fallback={<Text className="info-text">loading via use()…</Text>}
+          fallback={<text className="info-text">loading via use()…</text>}
         >
           <UsePromiseDemo showContext={showContext} />
         </Suspense>
@@ -77,9 +76,9 @@ export function HooksActionsDemo() {
           onPress={() => setShowContext(current => !current)}
           color={LINE_COLOR.introspection}
         />
-        <Text testID="hooks-actions-state" className="info-text">
+        <text testID="hooks-actions-state" className="info-text">
           {`useActionState: ${savedName}${isSubmitting ? ' (pending…)' : ''}`}
-        </Text>
+        </text>
         <ActionButton
           testID="hooks-actions-submit"
           title="Submit name via Action"
@@ -87,9 +86,9 @@ export function HooksActionsDemo() {
           color={LINE_COLOR.introspection}
         />
         {items.map((item, index) => (
-          <Text key={`${item}-${index}`} className="list-row-text">
+          <text key={`${item}-${index}`} className="list-row-text">
             {item}
-          </Text>
+          </text>
         ))}
         <ActionButton
           testID="hooks-actions-optimistic"
@@ -103,7 +102,7 @@ export function HooksActionsDemo() {
           built on Transitions, so it shares useTransition's LegacyRoot caveat —
           the pending flag collapses onto the sync lane.
         </CaveatNote>
-      </View>
+      </view>
     </GreetingContext>
   );
 }

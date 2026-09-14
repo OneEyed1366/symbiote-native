@@ -82,7 +82,7 @@ describe('the shim prop bag', () => {
   // view keeps painting the old value with nothing in the tree saying so.
   it('resets a key that the next bag no longer carries', async () => {
     const root = liveRoot();
-    const element = new ShimElement('symbiote-view');
+    const element = new ShimElement('view');
     element.p = { testID: 'bag', accessibilityLabel: 'before' };
     root.appendChild(element);
     await tick();
@@ -97,7 +97,7 @@ describe('the shim prop bag', () => {
   // why: `attributes` is lazy, so the whole set/get/remove path runs against a map that may not
   // exist yet, and `cloneNode` has to copy it without creating one on an element that has none.
   it('round-trips attributes through the lazily created map', () => {
-    const element = new ShimElement('symbiote-view');
+    const element = new ShimElement('view');
     expect(element.getAttribute('data-x')).toBeNull();
 
     element.setAttribute('data-x', '1');
@@ -105,7 +105,7 @@ describe('the shim prop bag', () => {
 
     const clone = element.cloneNode();
     expect(clone.getAttribute('data-x')).toBe('1');
-    expect(new ShimElement('symbiote-view').getAttribute('data-x')).toBeNull();
+    expect(new ShimElement('view').getAttribute('data-x')).toBeNull();
 
     element.removeAttribute('data-x');
     expect(element.getAttribute('data-x')).toBeNull();

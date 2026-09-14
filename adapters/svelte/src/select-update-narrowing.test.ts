@@ -59,9 +59,9 @@ const ROW_SOURCE = [
   '  const mark = () => { globalThis.__rowBagEvals = (globalThis.__rowBagEvals ?? 0) + 1; return true; };',
   '</script>',
   '',
-  "<symbiote-view p={{ class: isSelected ? 'bench-row bench-row-selected' : 'bench-row', nativeID: (mark(), isSelected ? 'sel' : 'unsel'), testID: `row-${row.id}` }}>",
-  '  <symbiote-text p={{ class: "bench-row-id" }}>{String(row.id)}</symbiote-text>',
-  '</symbiote-view>',
+  "<view p={{ class: isSelected ? 'bench-row bench-row-selected' : 'bench-row', nativeID: (mark(), isSelected ? 'sel' : 'unsel'), testID: `row-${row.id}` }}>",
+  '  <text p={{ class: "bench-row-id" }}>{String(row.id)}</text>',
+  '</view>',
 ].join('\n');
 
 const APP_SOURCE = [

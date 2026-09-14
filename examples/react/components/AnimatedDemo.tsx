@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Animated } from '@symbiote-native/react';
+import { Animated } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 
 const SLIDE_DISTANCE = 220;
@@ -78,26 +78,26 @@ export function AnimatedDemo() {
   };
 
   return (
-    <View className="section-nested">
-      <Text className="section-label">Animated · JS vs native driver</Text>
+    <view className="section-nested">
+      <text className="section-label">Animated · JS vs native driver</text>
 
       {/* native-driven perpetual pulse */}
-      <View className="pulse-frame">
+      <view className="pulse-frame">
         <Animated.View
           testID="pulse-dot"
           className="pulse-dot"
           style={{ opacity: pulseOpacity, transform: [{ scale: pulseScale }] }}
         />
-      </View>
+      </view>
 
       {/* JS-driven slide: a commit per frame */}
-      <View className="slide-track">
+      <view className="slide-track">
         <Animated.View
           testID="slide-js-dot"
           className="js-slide-dot"
           style={{ transform: [{ translateX: jsX }] }}
         />
-      </View>
+      </view>
       <ActionButton
         testID="slide-js-btn"
         title="Slide (JS driver)"
@@ -106,13 +106,13 @@ export function AnimatedDemo() {
       />
 
       {/* native-driven slide: offloaded, zero JS frames */}
-      <View className="slide-track">
+      <view className="slide-track">
         <Animated.View
           testID="slide-native-dot"
           className="native-slide-dot"
           style={{ transform: [{ translateX: nativeX }] }}
         />
-      </View>
+      </view>
       <ActionButton
         testID="slide-native-btn"
         title="Slide (native driver)"
@@ -124,6 +124,6 @@ export function AnimatedDemo() {
 
       {/* Freeze the JS thread 1.5s: native (pulse + green) keep moving, JS (orange) stalls */}
       <ActionButton title="Freeze JS 1.5s" onPress={freezeJs} color="#fc8181" />
-    </View>
+    </view>
   );
 }

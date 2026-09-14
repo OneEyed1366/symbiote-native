@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
 import {
   hasAction,
   isAvailableAsync,
@@ -11,10 +10,10 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function ValueRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="capability-row">
-      <Text className="capability-label">{label}</Text>
-      <Text className="value-text">{value}</Text>
-    </View>
+    <view className="capability-row">
+      <text className="capability-label">{label}</text>
+      <text className="value-text">{value}</text>
+    </view>
   );
 }
 
@@ -58,32 +57,32 @@ export function StoreReviewScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="screen">
-      <ScrollView
+    <safe-area-view className="screen">
+      <scroll-view
         testID="store-review-scroll"
         className="screen"
         contentContainerStyle="scroll-content"
       >
-        <View className={`line-tag line-tag-${lineInfo.line}`}>
-          <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
-        </View>
-        <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: lineColor }}>
-            <Text className="hero-badge-text">{lineInfo.code}</Text>
-          </View>
-          <View className="hero-copy">
-            <Text className="hero-title">Store Review</Text>
-            <Text className="hero-body">
+        <view className={`line-tag line-tag-${lineInfo.line}`}>
+          <text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+        </view>
+        <view className="hero-card">
+          <view className="hero-badge" style={{ backgroundColor: lineColor }}>
+            <text className="hero-badge-text">{lineInfo.code}</text>
+          </view>
+          <view className="hero-copy">
+            <text className="hero-title">Store Review</text>
+            <text className="hero-body">
               @symbiote-native/store-review — prompts the platform's native
               in-app review flow.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="store-review-capability-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Capability</Text>
-          </View>
+        <view testID="store-review-capability-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Capability</text>
+          </view>
           <ValueRow
             label="Native flow available"
             value={
@@ -100,33 +99,33 @@ export function StoreReviewScreen() {
                   : 'No'
             }
           />
-        </View>
+        </view>
 
-        <View testID="store-review-action-card" className="feature-card">
-          <View className="feature-card-header">
-            <Text className="feature-card-title">Request review</Text>
-          </View>
+        <view testID="store-review-action-card" className="feature-card">
+          <view className="feature-card-header">
+            <text className="feature-card-title">Request review</text>
+          </view>
           <ActionButton
             testID="store-review-request-button"
             title="Request Review"
             onPress={handleRequestReview}
             color={lineColor}
           />
-          <View className="capability-row">
-            <Text className="capability-label">Last result</Text>
-            <Text testID="store-review-result" className="value-text">
+          <view className="capability-row">
+            <text className="capability-label">Last result</text>
+            <text testID="store-review-result" className="value-text">
               {lastResult}
-            </Text>
-          </View>
-          <Text className="info-text">
+            </text>
+          </view>
+          <text className="info-text">
             resolved means the call completed, not that a prompt appeared. On
             Android the Play dialog only shows for a build installed from Google
             Play (internal test track, internal app sharing, or production); a
             sideloaded debug build resolves silently. iOS shows it in debug
             builds. Both stores also enforce a quota.
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          </text>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   );
 }

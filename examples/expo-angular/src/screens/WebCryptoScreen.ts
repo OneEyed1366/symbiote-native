@@ -1,5 +1,10 @@
 import { Component, signal } from '@angular/core';
-import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  SafeAreaViewElement,
+  ScrollViewElement,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   polyfillWebCrypto,
   webCrypto,
@@ -26,58 +31,58 @@ function toHex(bytes: Uint8Array): string {
 @Component({
   selector: 'WebCryptoScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
+  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
   template: `
-    <SafeAreaView class="screen">
-      <ScrollView
+    <safe-area-view class="screen">
+      <scroll-view
         testID="web-crypto-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >
-        <View [class]="lineTagClass">
-          <Text class="line-tag-text">{{ lineTagLabel }}</Text>
-        </View>
-        <View class="hero-card">
-          <View class="hero-badge" [style]="heroBadgeStyle">
-            <Text class="hero-badge-text">{{ heroBadgeCode }}</Text>
-          </View>
-          <View class="hero-copy">
-            <Text class="hero-title">Web Crypto</Text>
-            <Text class="hero-body">
+        <view [class]="lineTagClass">
+          <text class="line-tag-text">{{ lineTagLabel }}</text>
+        </view>
+        <view class="hero-card">
+          <view class="hero-badge" [style]="heroBadgeStyle">
+            <text class="hero-badge-text">{{ heroBadgeCode }}</text>
+          </view>
+          <view class="hero-copy">
+            <text class="hero-title">Web Crypto</text>
+            <text class="hero-body">
               @symbiote-native/standard-web-crypto — a partial W3C Web Crypto
               polyfill exposing crypto.getRandomValues, backed by
               @symbiote-native/crypto's native random source.
-            </Text>
-          </View>
-        </View>
+            </text>
+          </view>
+        </view>
 
-        <View testID="web-crypto-random-bytes-card" class="capability-card">
-          <Text class="capability-card-title">Random bytes</Text>
+        <view testID="web-crypto-random-bytes-card" class="capability-card">
+          <text class="capability-card-title">Random bytes</text>
           <ActionButton
             testID="web-crypto-generate-button"
             title="Generate 16 random bytes"
             (press)="handleGenerateRandomBytes()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="web-crypto-random-bytes-result" class="value-text">{{
+          <text testID="web-crypto-random-bytes-result" class="value-text">{{
             randomBytesLabel()
-          }}</Text>
-        </View>
+          }}</text>
+        </view>
 
-        <View testID="web-crypto-polyfill-card" class="capability-card">
-          <Text class="capability-card-title">Polyfill</Text>
+        <view testID="web-crypto-polyfill-card" class="capability-card">
+          <text class="capability-card-title">Polyfill</text>
           <ActionButton
             testID="web-crypto-install-polyfill-button"
             title="Install polyfill"
             (press)="handleInstallPolyfill()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="web-crypto-polyfill-result" class="value-text">{{
+          <text testID="web-crypto-polyfill-result" class="value-text">{{
             polyfillLabel()
-          }}</Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          }}</text>
+        </view>
+      </scroll-view>
+    </safe-area-view>
   `,
 })
 export class WebCryptoScreen {

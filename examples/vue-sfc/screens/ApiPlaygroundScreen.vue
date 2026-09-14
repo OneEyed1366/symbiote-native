@@ -23,14 +23,6 @@ import {
   getCurrentInstance,
   useTemplateRef,
 } from 'vue';
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  TextInput,
-  Pressable,
-} from '@symbiote-native/vue';
 import type { IHostInstance } from '@symbiote-native/vue';
 import { setNativeProps, whenCommitted } from '@symbiote-native/engine';
 import ActionButton from '../components/ActionButton.vue';
@@ -75,7 +67,7 @@ const expanded = ref(false);
 const showPulse = ref(true);
 const vModelText = ref('');
 const vTextValue =
-  'rendered via v-text (equivalent to {{ }}, restricted to living inside <Text>)';
+  'rendered via v-text (equivalent to {{ }}, restricted to living inside <text>)';
 const vOnceCounter = ref(0);
 const vMemoTrigger = ref(0);
 const highlightOn = ref(false);
@@ -202,39 +194,38 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
 </script>
 
 <template>
-  <SafeAreaView class="screen">
-    <ScrollView
+  <safe-area-view class="screen">
+    <scroll-view
       testID="api-playground-scroll"
       class="screen"
       content-container-style="scroll-content"
     >
-      <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{
-          `${lineInfo.code} · ${lineInfo.label}`
-        }}</Text>
-      </View>
-      <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: ACCENT }">
-          <Text class="hero-badge-text">AP</Text>
-        </View>
-        <View class="hero-copy">
-          <Text class="hero-title">API Playground</Text>
-          <Text class="hero-body"
-            >Vue's own template/Composition API surface, running live under
-            Symbiote's renderer — not @symbiote-native/navigation this
-            time.</Text
-          >
-        </View>
-      </View>
+      <view :class="`line-tag line-tag-${lineInfo.line}`">
+        <text class="line-tag-text">
+          {{ `${lineInfo.code} · ${lineInfo.label}` }}
+        </text>
+      </view>
+      <view class="hero-card">
+        <view class="hero-badge" :style="{ backgroundColor: ACCENT }">
+          <text class="hero-badge-text"> AP </text>
+        </view>
+        <view class="hero-copy">
+          <text class="hero-title"> API Playground </text>
+          <text class="hero-body">
+            Vue's own template/Composition API surface, running live under
+            Symbiote's renderer — not @symbiote-native/navigation this time.
+          </text>
+        </view>
+      </view>
 
       <!-- ══════════════════════ Template Directives ══════════════════════ -->
-      <View class="section-nested">
-        <Text class="section-header">Template Directives</Text>
+      <view class="section-nested">
+        <text class="section-header"> Template Directives </text>
 
-        <Text class="section-label"
-          >v-if / v-else-if / v-else + &lt;template v-if&gt;</Text
-        >
-        <View class="row-tight">
+        <text class="section-label">
+          v-if / v-else-if / v-else + &lt;template v-if&gt;
+        </text>
+        <view class="row-tight">
           <ActionButton
             v-for="opt in MODES"
             :key="opt"
@@ -243,19 +234,20 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
             :onPress="() => (mode = opt)"
             :color="ACCENT"
           />
-        </View>
-        <Text v-if="mode === 'a'" class="list-row-text" testID="mode-branch"
-          >Branch A</Text
-        >
-        <Text
+        </view>
+        <text v-if="mode === 'a'" class="list-row-text" testID="mode-branch">
+          Branch A
+        </text>
+        <text
           v-else-if="mode === 'b'"
           class="list-row-text"
           testID="mode-branch"
-          >Branch B</Text
         >
-        <Text v-else class="list-row-text" testID="mode-branch"
-          >Branch C (v-else fallback)</Text
-        >
+          Branch B
+        </text>
+        <text v-else class="list-row-text" testID="mode-branch">
+          Branch C (v-else fallback)
+        </text>
         <ActionButton
           testID="template-expand-toggle"
           :title="
@@ -265,56 +257,56 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           :color="ACCENT"
         />
         <template v-if="expanded">
-          <Text class="note-text"
-            >Grouped sibling 1 — no wrapper element, via &lt;template
-            v-if&gt;</Text
-          >
-          <Text class="note-text"
-            >Grouped sibling 2 — same &lt;template&gt; block</Text
-          >
+          <text class="note-text">
+            Grouped sibling 1 — no wrapper element, via &lt;template v-if&gt;
+          </text>
+          <text class="note-text">
+            Grouped sibling 2 — same &lt;template&gt; block
+          </text>
         </template>
 
-        <Text class="section-label">v-show</Text>
+        <text class="section-label"> v-show </text>
         <ActionButton
           :testID="'v-show-toggle'"
           :title="showPulse ? 'Hide (v-show)' : 'Show (v-show)'"
           :onPress="() => (showPulse = !showPulse)"
           :color="ACCENT"
         />
-        <View v-show="showPulse" testID="v-show-target" class="chip">
-          <Text class="chip-text">👁</Text>
-        </View>
-        <Text class="note-text"
-          >v-show sets style.display via setNativeProps (whenCommitted-guarded),
+        <view v-show="showPulse" testID="v-show-target" class="chip">
+          <text class="chip-text"> 👁 </text>
+        </view>
+        <text class="note-text">
+          v-show sets style.display via setNativeProps (whenCommitted-guarded),
           NOT CSS display — the element stays mounted the whole time
-          (vue-adapter-directives).</Text
-        >
+          (vue-adapter-directives).
+        </text>
 
-        <Text class="section-label"
-          >v-model (Partial — Symbiote components only)</Text
-        >
-        <TextInput
+        <text class="section-label">
+          v-model (Partial — Symbiote components only)
+        </text>
+        <text-input
           v-model="vModelText"
           class="focus-input"
           placeholder="type…"
           testID="v-model-input"
         />
-        <Text class="note-text"
-          >Works because TextInput is a Symbiote COMPONENT
-          (resolveModelValue/emitModelUpdate) — there's no bare native
-          &lt;input&gt; for the DOM-element half of v-model to target.</Text
-        >
+        <text class="note-text">
+          `text-input` is an intrinsic TAG, so the compiler expands v-model to a
+          runtime directive rather than a modelValue prop pair. The adapter
+          ships that directive (runtime-helpers/vModelText) — Vue's own lives in
+          @vue/runtime-dom, which never enters this bundle.
+        </text>
 
-        <Text class="section-label">v-bind (:prop) + v-bind.camel</Text>
-        <Text class="note-text"
-          >Every dynamic prop on this screen already goes through v-bind's `:`
+        <text class="section-label"> v-bind (:prop) + v-bind.camel </text>
+        <text class="note-text">
+          Every dynamic prop on this screen already goes through v-bind's `:`
           shorthand → routeProp → the engine. `.camel` folds a kebab-case
           attribute to camelCase at compile time — largely redundant here since
-          normalizeVueAttrs already folds kebab-case generally.</Text
-        >
+          normalizeVueAttrs already folds kebab-case generally.
+        </text>
 
-        <Text class="section-label">v-on (@press) + .self + .stop</Text>
-        <Pressable
+        <text class="section-label"> v-on (@press) + .self + .stop </text>
+        <pressable
           testID="press-outer-self"
           class="pressable-card"
           :style="{ padding: 24, borderColor: ACCENT }"
@@ -325,8 +317,8 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
               )
           "
         >
-          <Text class="note-text">tap this border vs the button below</Text>
-          <Pressable
+          <text class="note-text"> tap this border vs the button below </text>
+          <pressable
             testID="press-inner-plain"
             class="pressable-card"
             :style="{ borderColor: NESTED_TARGET_BORDER }"
@@ -335,22 +327,23 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
                 logSelfPress('inner fired (its own listener — always fires)')
             "
           >
-            <Text class="pressable-label">inner (@press, no modifier)</Text>
-          </Pressable>
-        </Pressable>
-        <Text
+            <text class="pressable-label"> inner (@press, no modifier) </text>
+          </pressable>
+        </pressable>
+        <text
           v-for="(entry, index) in selfPressLog"
           :key="index"
           class="list-row-text"
-          >{{ entry }}</Text
         >
-        <Pressable
+          {{ entry }}
+        </text>
+        <pressable
           testID="press-outer-plain"
           class="pressable-card"
           :style="{ padding: 16, borderColor: ACCENT }"
           @press="() => logStopPress('outer fired (bubbled)')"
         >
-          <Pressable
+          <pressable
             testID="press-inner-stop"
             class="pressable-card"
             :style="{ borderColor: NESTED_TARGET_BORDER }"
@@ -358,124 +351,128 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
               () => logStopPress('inner-stop fired (.stop — never bubbles)')
             "
           >
-            <Text class="pressable-label">inner (@press.stop)</Text>
-          </Pressable>
-          <Pressable
+            <text class="pressable-label"> inner (@press.stop) </text>
+          </pressable>
+          <pressable
             testID="press-inner-plain2"
             class="pressable-card"
             :style="{ borderColor: NESTED_TARGET_BORDER }"
             @press="() => logStopPress('inner-plain2 fired')"
           >
-            <Text class="pressable-label">inner (@press, no modifier)</Text>
-          </Pressable>
-        </Pressable>
-        <Text
+            <text class="pressable-label"> inner (@press, no modifier) </text>
+          </pressable>
+        </pressable>
+        <text
           v-for="(entry, index) in stopPressLog"
           :key="index"
           class="list-row-text"
-          >{{ entry }}</Text
         >
+          {{ entry }}
+        </text>
 
-        <Text class="section-label">v-text (Partial) + v-pre (not supported)</Text>
-        <Text v-text="vTextValue" class="note-text" testID="v-text-demo" />
-        <Text class="note-text"
-          >v-pre is NOT demoed live: it makes the compiler skip codegen for its subtree and emit a
-          DOM-oriented static-content node (hostInsertStaticContent), which our renderer has no
-          host op for — mounting one throws "text must be rendered inside a &lt;Text&gt;" and takes
-          the whole screen's commit down with it (createElement calls fire, the subtree never links
-          into the tree, and the app.config.errorHandler installed below swallows the error
-          silently). Not a partial gap like v-text — genuinely unsupported.</Text
-        >
+        <text class="section-label">
+          v-text (Partial) + v-pre (not supported)
+        </text>
+        <text class="note-text" testID="v-text-demo" v-text="vTextValue" />
+        <text class="note-text">
+          v-pre is NOT demoed live: it makes the compiler skip codegen for its
+          subtree and emit a DOM-oriented static-content node
+          (hostInsertStaticContent), which our renderer has no host op for —
+          mounting one throws "text must be rendered inside a &lt;Text&gt;" and
+          takes the whole screen's commit down with it (createElement calls
+          fire, the subtree never links into the tree, and the
+          app.config.errorHandler installed below swallows the error silently).
+          Not a partial gap like v-text — genuinely unsupported.
+        </text>
 
-        <Text class="section-label">v-once vs v-memo</Text>
+        <text class="section-label"> v-once vs v-memo </text>
         <ActionButton
           testID="vonce-bump"
           title="bump counter"
           :onPress="() => (vOnceCounter += 1)"
           :color="ACCENT"
         />
-        <Text v-once class="list-row-text" testID="vonce-frozen">{{
-          `v-once (frozen at first render): ${vOnceCounter}`
-        }}</Text>
-        <Text class="list-row-text" testID="vonce-live">{{
-          `live (no v-once): ${vOnceCounter}`
-        }}</Text>
+        <text v-once class="list-row-text" testID="vonce-frozen">
+          {{ `v-once (frozen at first render): ${vOnceCounter}` }}
+        </text>
+        <text class="list-row-text" testID="vonce-live">
+          {{ `live (no v-once): ${vOnceCounter}` }}
+        </text>
         <ActionButton
           testID="vmemo-bump"
           title="bump v-memo dep"
           :onPress="() => (vMemoTrigger += 1)"
           :color="ACCENT"
         />
-        <Text
+        <text
           v-memo="[vMemoTrigger]"
           class="list-row-text"
           testID="vmemo-timestamp"
-          >{{
-            `v-memo'd (deps: [vMemoTrigger]) timestamp: ${Date.now()}`
-          }}</Text
         >
-        <Text class="list-row-text" testID="live-timestamp">{{
-          `not memoized, timestamp: ${Date.now()}`
-        }}</Text>
-        <Text class="note-text"
-          >Trigger ANY other button above and re-check: the non-memoized
+          {{ `v-memo'd (deps: [vMemoTrigger]) timestamp: ${Date.now()}` }}
+        </text>
+        <text class="list-row-text" testID="live-timestamp">
+          {{ `not memoized, timestamp: ${Date.now()}` }}
+        </text>
+        <text class="note-text">
+          Trigger ANY other button above and re-check: the non-memoized
           timestamp always moves, the v-memo'd one only moves when its own "bump
-          v-memo dep" button was pressed.</Text
-        >
+          v-memo dep" button was pressed.
+        </text>
 
-        <Text class="section-label">Custom directive (v-highlight)</Text>
+        <text class="section-label"> Custom directive (v-highlight) </text>
         <ActionButton
           testID="directive-toggle"
           :title="highlightOn ? 'highlight: on' : 'highlight: off'"
           :onPress="() => (highlightOn = !highlightOn)"
           :color="ACCENT"
         />
-        <View
+        <view
           v-highlight="highlightOn"
           testID="custom-directive-chip"
           class="chip"
         />
-        <Text class="note-text"
-          >Local `vHighlight` object directive (mounted/updated/unmounted
-          hooks), reused programmatically via withDirectives() in the Other
-          section below.</Text
-        >
+        <text class="note-text">
+          Local `vHighlight` object directive (mounted/updated/unmounted hooks),
+          reused programmatically via withDirectives() in the Other section
+          below.
+        </text>
 
-        <Text class="note-text"
-          >v-slot (#name) — the full slot demo lives in Slots &amp; Template
-          Refs below, not duplicated here.</Text
-        >
-      </View>
+        <text class="note-text">
+          v-slot (#name) — the full slot demo lives in Slots &amp; Template Refs
+          below, not duplicated here.
+        </text>
+      </view>
 
       <!-- ══════════════════════ Built-in Components ══════════════════════ -->
-      <View class="section-nested">
-        <Text class="section-header">Built-in Components</Text>
+      <view class="section-nested">
+        <text class="section-header"> Built-in Components </text>
         <KeepAliveDemo />
         <SuspenseDemo />
-        <Text class="note-text"
-          >&lt;component :is&gt; is exercised above, inside &lt;KeepAlive&gt;.
+        <text class="note-text">
+          &lt;component :is&gt; is exercised above, inside &lt;KeepAlive&gt;.
           &lt;slot&gt; + &lt;template&gt; are exercised throughout this screen
           (every `#name` slot below, every grouped &lt;template v-if&gt; above).
           &lt;Teleport&gt; already has a live demo on CanaryScreen.vue ("Show
-          toast (Teleport)") — not re-demoed here.</Text
-        >
-      </View>
+          toast (Teleport)") — not re-demoed here.
+        </text>
+      </view>
 
       <!-- ══════════════════════ Reactivity API ══════════════════════ -->
-      <View class="section-nested">
-        <Text class="section-header">Reactivity API</Text>
+      <view class="section-nested">
+        <text class="section-header"> Reactivity API </text>
         <CounterWatchDemo />
         <ShallowRefDemo />
         <CustomRefDebounceDemo />
         <ToRefsDemo />
         <EffectScopeDemo />
         <ReactivityChecksDemo />
-      </View>
+      </view>
 
       <!-- ══════════════════════ Lifecycle Hooks ══════════════════════ -->
-      <View class="section-nested">
-        <Text class="section-header">Lifecycle Hooks</Text>
-        <View class="row-tight">
+      <view class="section-nested">
+        <text class="section-header"> Lifecycle Hooks </text>
+        <view class="row-tight">
           <ActionButton
             testID="lifecycle-mount-toggle"
             :title="lifecycleMounted ? 'Unmount child' : 'Mount child'"
@@ -488,40 +485,41 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
             :onPress="() => (lifecycleSeed += 1)"
             :color="ACCENT"
           />
-        </View>
+        </view>
         <LifecycleLogChild
           v-if="lifecycleMounted"
           :seed="lifecycleSeed"
           @log="pushLifecycleLog"
         />
-        <Text class="section-label">hook log</Text>
-        <Text
+        <text class="section-label"> hook log </text>
+        <text
           v-for="(entry, index) in lifecycleLog"
           :key="index"
           class="list-row-text"
-          >{{ entry }}</Text
         >
-        <Text class="section-label"
-          >onErrorCaptured (this screen's own hook, does not stop
-          propagation)</Text
-        >
-        <Text
+          {{ entry }}
+        </text>
+        <text class="section-label">
+          onErrorCaptured (this screen's own hook, does not stop propagation)
+        </text>
+        <text
           v-for="(entry, index) in capturedErrors"
           :key="index"
           class="list-row-text"
-          >{{ entry }}</Text
         >
-      </View>
+          {{ entry }}
+        </text>
+      </view>
 
       <!-- ══════════════════════ Composition API / Dependency Injection ══════════════════════ -->
-      <View class="section-nested">
-        <Text class="section-header"
-          >Composition API / Dependency Injection</Text
-        >
-        <Text class="section-label"
-          >provide() + inject() (3 levels deep) + hasInjectionContext() +
-          getCurrentInstance()</Text
-        >
+      <view class="section-nested">
+        <text class="section-header">
+          Composition API / Dependency Injection
+        </text>
+        <text class="section-label">
+          provide() + inject() (3 levels deep) + hasInjectionContext() +
+          getCurrentInstance()
+        </text>
         <ActionButton
           testID="theme-toggle"
           :title="`toggle theme (currently: ${theme.tone})`"
@@ -529,10 +527,10 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           :color="ACCENT"
         />
         <ThemeConsumer :depth="0" />
-        <Text class="section-label"
-          >nextTick() (Partial) vs whenCommitted() — same async-commit gotcha as
-          onMounted</Text
-        >
+        <text class="section-label">
+          nextTick() (Partial) vs whenCommitted() — same async-commit gotcha as
+          onMounted
+        </text>
         <ActionButton
           testID="nexttick-mount-probe"
           title="mount fresh probe node"
@@ -544,48 +542,51 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           :key="nextTickProbeMountCount"
           @result="pushNextTickResult"
         />
-        <Text
+        <text
           v-for="(entry, index) in nextTickLog"
           :key="index"
           class="list-row-text"
-          >{{ entry }}</Text
         >
-        <Text class="note-text"
-          >direct app.provide() (installed in this screen's own setup):
-          {{ directProvideValue }}</Text
-        >
-      </View>
+          {{ entry }}
+        </text>
+        <text class="note-text">
+          direct app.provide() (installed in this screen's own setup):
+          {{ directProvideValue }}
+        </text>
+      </view>
 
       <!-- ══════════════════════ Slots & Template Refs ══════════════════════ -->
-      <View class="section-nested">
-        <Text class="section-header">Slots &amp; Template Refs</Text>
+      <view class="section-nested">
+        <text class="section-header"> Slots &amp; Template Refs </text>
         <SlotsDemoCard>
-          <Text class="note-text">default slot content</Text>
+          <text class="note-text"> default slot content </text>
           <template #body="{ tone }">
-            <Text class="note-text">{{ `scoped slot: tone="${tone}"` }}</Text>
+            <text class="note-text">
+              {{ `scoped slot: tone="${tone}"` }}
+            </text>
           </template>
           <template #footer>
-            <Text class="note-text">named #footer slot content</Text>
+            <text class="note-text"> named #footer slot content </text>
           </template>
         </SlotsDemoCard>
 
-        <Text class="section-label"
-          >Template ref (Partial — deep ref()) vs useTemplateRef() (3.5+)</Text
-        >
-        <View :style="{ flexDirection: 'row', gap: 12 }">
-          <View ref="deepRefTarget" testID="deep-ref-target" class="chip" />
-          <View
+        <text class="section-label">
+          Template ref (Partial — deep ref()) vs useTemplateRef() (3.5+)
+        </text>
+        <view :style="{ flexDirection: 'row', gap: 12 }">
+          <view ref="deepRefTarget" testID="deep-ref-target" class="chip" />
+          <view
             ref="correctRefTarget"
             testID="correct-ref-target"
             class="chip"
           />
-        </View>
-        <Text class="note-text"
-          >Left chip's ref is deliberately the deep `ref()` form (Gotcha 1) —
+        </view>
+        <text class="note-text">
+          Left chip's ref is deliberately the deep `ref()` form (Gotcha 1) —
           never wired to any imperative call, kept for contrast only. Right chip
           uses `useTemplateRef()`, shallow by construction, safely wired to a
-          real setNativeProps flash below.</Text
-        >
+          real setNativeProps flash below.
+        </text>
         <ActionButton
           testID="flash-correct-ref"
           title="flash the right chip"
@@ -593,51 +594,56 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           :color="ACCENT"
         />
 
-        <Text class="section-label">ref_for — an array of refs from v-for</Text>
-        <View :style="{ flexDirection: 'row', gap: 12 }">
-          <View
+        <text class="section-label">
+          ref_for — an array of refs from v-for
+        </text>
+        <view :style="{ flexDirection: 'row', gap: 12 }">
+          <view
             v-for="chip in REF_FOR_CHIPS"
             :key="chip.id"
-            ref_for
             ref="chipRefs"
             class="chip"
           >
-            <Text class="chip-text">{{ chip.id }}</Text>
-          </View>
-        </View>
+            <text class="chip-text">
+              {{ chip.id }}
+            </text>
+          </view>
+        </view>
         <ActionButton
           testID="ref-for-read"
           title="read chipRefs.length"
           :onPress="readChipRefCount"
           :color="ACCENT"
         />
-        <Text
+        <text
           v-if="chipRefCount !== undefined"
           class="list-row-text"
           testID="ref-for-count"
-          >{{ `chipRefs.value.length = ${chipRefCount}` }}</Text
         >
-        <Text class="note-text"
-          >`key` and `is` are exercised throughout this screen (every v-for
-          above, KeepAlive's &lt;component :is&gt;).</Text
-        >
-      </View>
+          {{ `chipRefs.value.length = ${chipRefCount}` }}
+        </text>
+        <text class="note-text">
+          `key` and `is` are exercised throughout this screen (every v-for
+          above, KeepAlive's &lt;component :is&gt;).
+        </text>
+      </view>
 
       <!-- ══════════════════════ Component Communication ══════════════════════ -->
-      <View class="section-nested">
-        <Text class="section-header">Component Communication</Text>
+      <view class="section-nested">
+        <text class="section-header"> Component Communication </text>
         <CounterCapsule
           ref="capsuleRef"
           v-model:count="capsuleCount"
           data-note="fallthrough-demo"
           @threshold="capsuleThresholdHit = true"
         />
-        <Text
+        <text
           v-if="capsuleThresholdHit"
           class="note-text"
           testID="capsule-threshold"
-          >threshold event fired — count reached 10</Text
         >
+          threshold event fired — count reached 10
+        </text>
         <ActionButton
           testID="capsule-reset"
           title="reset() via defineExpose + template ref"
@@ -652,37 +658,40 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           data-note="options-fallthrough"
           @ping="onPing"
         >
-          <Text class="note-text">passed via default slot</Text>
+          <text class="note-text"> passed via default slot </text>
         </OptionsApiChild>
-        <Text
+        <text
           v-for="(entry, index) in pingLog"
           :key="index"
           class="list-row-text"
-          >{{ entry }}</Text
         >
-      </View>
+          {{ entry }}
+        </text>
+      </view>
 
       <GlobalApiDemo />
-      <View class="section-tight">
-        <Text class="section-label">app.mixin() mount log</Text>
-        <Text
+      <view class="section-tight">
+        <text class="section-label"> app.mixin() mount log </text>
+        <text
           v-for="(entry, index) in mixinMountLog"
           :key="index"
           class="list-row-text"
-          >{{ entry }}</Text
         >
-        <Text class="section-label"
-          >app.config.errorHandler / warnHandler log</Text
-        >
-        <Text
+          {{ entry }}
+        </text>
+        <text class="section-label">
+          app.config.errorHandler / warnHandler log
+        </text>
+        <text
           v-for="(entry, index) in appHandlerLog"
           :key="index"
           class="list-row-text"
-          >{{ entry }}</Text
         >
-      </View>
+          {{ entry }}
+        </text>
+      </view>
 
       <OtherApiDemo />
-    </ScrollView>
-  </SafeAreaView>
+    </scroll-view>
+  </safe-area-view>
 </template>
