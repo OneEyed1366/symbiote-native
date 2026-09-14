@@ -15,7 +15,7 @@ import {
   type INativeEngineBindings,
 } from './native-engine';
 import { installNativeTreeHost, nativeTreeHost } from './native-tree-host';
-import { readCommitProfile, setTreeHost, treeHost } from './tree-host';
+import { setTreeHost, treeHost } from './tree-host';
 import { getSlot, resetSlot } from './fabric';
 import type { IMutationBatch } from './mutation-buffer';
 import type { IFabricNode } from './fabric';
@@ -82,6 +82,7 @@ function fakeBindings(version: number): {
     measure: () => {},
     measureInWindow: () => {},
     measureLayout: () => {},
+    setIsJSResponder: () => {},
   };
   return { bindings, calls, parent, child, record };
 }
@@ -214,55 +215,5 @@ describe('the native tree host', () => {
       flattenWidths: [],
     });
     expect(calls).toEqual([]);
-  });
-
-  // `takeCommitSplit` is the ONE optional member of the ABI, and both halves of that are load-
-  // bearing: a pod carrying it must have its numbers reach the profile, and a pod predating it must
-  // keep its entire native tree rather than lose it to a diagnostic. `fakeBindings` does not declare
-  // it, so the second arm is the fixture itself.
-  //
-  // Zeroing is NATIVE-side — this reads what it was handed and never resets it, so a second read
-  // returning zeroes is the native half doing its job, not this one.
-  it('reports the commit split when the pod carries it, and zeroes when it does not', () => {
-    const zeroes = {
-      buildMs: 0,
-      commitMs: 0,
-      adoptSwaps: 0,
-      propClones: 0,
-      textSwaps: 0,
-      dirtyTexts: 0,
-      layoutMs: 0,
-      textMs: 0,
-      layoutNodes: 0,
-      textMeasures: 0,
-    };
-    const { bindings } = fakeBindings(SUPPORTED_NATIVE_VERSION);
-    installFakeBindings(bindings);
-    expect(readCommitProfile()).toMatchObject(zeroes);
-
-    let reads = 0;
-    installFakeBindings({
-      ...bindings,
-      takeCommitSplit: () => {
-        reads += 1;
-        return reads === 1
-          ? {
-              ...zeroes,
-              buildMs: 12.5,
-              commitMs: 93.25,
-              adoptSwaps: 1000,
-              propClones: 35,
-            }
-          : zeroes;
-      },
-    });
-    expect(readCommitProfile()).toMatchObject({
-      buildMs: 12.5,
-      commitMs: 93.25,
-      adoptSwaps: 1000,
-      propClones: 35,
-    });
-    expect(readCommitProfile()).toMatchObject(zeroes);
-    expect(reads).toBe(2);
   });
 });

@@ -42,9 +42,9 @@ namespace symbiote {
  * succeeds against the wrong object and commits a wrong tree rather than throwing, which is exactly
  * the class this number exists to refuse. A refusal by luck, on the reads, is not a refusal.
  *
- * It did NOT move for `takeCommitSplit`: no layout and no calling convention changed, and JS reads
- * that one optionally so a pod without it degrades to zeroes rather than throwing. Same reasoning
- * `native-engine.ts` records for `probeUIManager`.
+ * It does NOT move for a diagnostic: `readSurfaceTelemetry` changes no layout and no calling
+ * convention, and JS reads it optionally, so a pod without it degrades to "no answer" rather than
+ * throwing. Same reasoning `native-engine.ts` records for `probeUIManager`.
  */
 constexpr double kNativeVersion = 4;
 

@@ -203,6 +203,25 @@ export function measureLayout(
   treeHost()?.measureLayout(node, relativeTo, onFail, onSuccess);
 }
 
+/**
+ * Tell native that JS has taken the gesture, or given it up.
+ *
+ * Through the HOST like the five above it, never through the Fabric slot: under the native tree
+ * host the committed handle is our placeholder, and `nativeFabricUIManager.setIsJSResponder` unwraps
+ * only a `ShadowNode` reference it minted itself.
+ */
+export function setIsJSResponder(
+  node: ISymbioteNode,
+  isResponder: boolean,
+  blockNativeResponder: boolean,
+): void {
+  if (committedRecordOf(node) === undefined) {
+    dlog('setIsJSResponder skipped: node not committed');
+    return;
+  }
+  treeHost()?.setIsJSResponder(node, isResponder, blockNativeResponder);
+}
+
 /** The node's CURRENT prop value, as the host holds it. The behaviors' one read. */
 export function propOf(node: ISymbioteNode, key: string): unknown {
   flushOps();

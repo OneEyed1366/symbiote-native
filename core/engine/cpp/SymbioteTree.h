@@ -128,7 +128,7 @@ class Tree {
       size_t count);
 
   /**
-   * The imperative five, taking the same placeholder object `applyOps` attached the node to.
+   * The imperative six, taking the same placeholder object `applyOps` attached the node to.
    *
    * Each is the matching branch of `UIManagerBinding::get` with one substitution: where the binding
    * unwraps a handle IT minted, these unwrap ours and then take the `ShadowNode` the last commit
@@ -143,6 +143,7 @@ class Tree {
    *   dispatchCommand(handle, name, args)   sendAccessibilityEvent(handle, eventType)
    *   measure(handle, cb)                   measureInWindow(handle, cb)
    *   measureLayout(handle, relativeTo, onFail, onSuccess)
+   *   setIsJSResponder(handle, isResponder, blockNativeResponder)
    */
   facebook::jsi::Value dispatchCommand(
       facebook::jsi::Runtime &runtime,
@@ -164,25 +165,7 @@ class Tree {
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
-
-  /**
-   * Milliseconds spent in each half of a commit since the last read, and zeroed by reading —
-   * `{ buildMs, commitMs }`.
-   *
-   * DIAGNOSTIC, and the only thing on this ABI that is. It exists because `applyMs` in
-   * `tree-host.ts` prices the whole crossing as one number, and the two halves have completely
-   * different fixes: `buildMs` is OUR walk plus every `createNode`/`cloneNode` it issues, and
-   * `commitMs` is `completeSurface` — Fabric's own `ShadowTree::commit`, the differ, layout and the
-   * mount pass. A step that is slow says nothing about which one owns it.
-   *
-   * `buildMs` is itself split, on the create branch: `foldProbeMs` and `payloadMs` are ours (the
-   * per-node `payloadFold` probe, and `fabricProps`), `createNodeMs` and `appendChildMs` are
-   * Fabric's per-node construction, which stock pays identically. What is left over is the walk.
-   *
-   * It has to reach JS rather than a log: `dlog` needs `DEBUG=1`, and a Debug build cannot be
-   * benchmarked at all — the sign of the headline metric flips (root `CLAUDE.md`).
-   */
-  facebook::jsi::Value takeCommitSplit(
+  facebook::jsi::Value setIsJSResponder(
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
@@ -191,29 +174,13 @@ class Tree {
    * RN's own commit telemetry for ANY surface, read on demand — `{ layoutMs, textMs, layoutNodes,
    * textMeasures }` for whichever commit produced that surface's current revision.
    *
-   * The pair of `takeCommitSplit`, and the difference is the whole point: that one accumulates
-   * inside our own commit and can therefore only describe a tree this host built. This one takes a
-   * surface id, so it can be pointed at a surface REACT drove — which is the only way to answer
-   * whether a tree-wide text re-measure is something we cause or something a Fabric commit costs.
+   * It takes a surface id, so it can be pointed at a surface REACT drove — the only way to answer
+   * whether a tree-wide text re-measure is ours or something a Fabric commit costs.
    */
   facebook::jsi::Value readSurfaceTelemetry(
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
-
- private:
-  double buildMs_ = 0;
-  double commitMs_ = 0;
-  // Read out of RN's OWN telemetry after each `completeSurface`, not timed by us: a
-  // `ShadowTreeRevision` carries the `TransactionTelemetry` of the commit that produced it, and
-  // `ShadowTree::getCurrentRevision()` is public. So this is the inside of `commitMs_` without a
-  // fork and without a hook — layout wall time, how many layoutable nodes layout actually touched,
-  // and what text measurement cost, which is the one part of a Fabric commit that scales with the
-  // TREE rather than with the change.
-  double layoutMs_ = 0;
-  double textMs_ = 0;
-  int layoutNodes_ = 0;
-  int textMeasures_ = 0;
 };
 
 } // namespace symbiote

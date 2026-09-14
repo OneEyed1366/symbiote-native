@@ -124,11 +124,11 @@ export type INativeEngineBindings = {
   childrenOf: (handle: object) => readonly object[];
   committedRecordOf: (handle: object) => ICommittedRecord | undefined;
   /**
-   * The imperative five, taking the same placeholder object `applyOps` put the node on.
+   * The imperative six, taking the same placeholder object `applyOps` put the node on.
    *
    * They are here because `nativeFabricUIManager`'s own copies unwrap a handle IT minted, and under
    * the batched applier every handle in play was minted by the batching slot. Ours carry the node on
-   * their `NativeState` exactly as RN's do, so these five are the same code reading a different
+   * their `NativeState` exactly as RN's do, so these six are the same code reading a different
    * object. An app calling `measure()` on a ref reaches native through here or not at all.
    *
    * The callback protocol is Fabric's own, not ours: `measure` answers six numbers, `measureInWindow`
@@ -162,55 +162,21 @@ export type INativeEngineBindings = {
     onFail: () => void,
     onSuccess: (x: number, y: number, width: number, height: number) => void,
   ) => void;
-  /**
-   * Milliseconds in each half of a commit since the last read, zeroed by reading.
-   *
-   * `buildMs` is the native tree walk plus every `createNode`/`cloneNode` it issues; `commitMs` is
-   * `completeSurface` — Fabric's own commit, the differ, layout and the mount pass. `applyMs` in
-   * `tree-host.ts` prices both as one number, and the two halves have different fixes.
-   *
-   * OPTIONAL, and the only optional member here. The rest are in `isBindings` because a missing one
-   * throws at a gesture, seconds and one language away from the install; this one is read with `?.`
-   * and cannot, so requiring it would cost a pod predating it its entire native tree to announce a
-   * diagnostic. Same trade `probeUIManager` is recorded under, decided the other way for the same
-   * reason.
-   */
-  takeCommitSplit?: () => {
-    buildMs: number;
-    commitMs: number;
-    /**
-     * The create branch of `buildMs`, split four ways. OPTIONAL where the rest are not, and for a
-     * different reason than the function itself: a pod carrying `takeCommitSplit` may simply
-     * predate these four, and then the object comes back without them. `readCommitProfile` merges
-     * over a zeroed default so the profile stays whole — a `undefined` reaching a benchmark screen
-     * is the measurement-that-lies shape, not a missing feature.
-     */
-    foldProbeMs?: number;
-    payloadMs?: number;
-    foldCallMs?: number;
-    foldedNodes?: number;
-    createNodeMs?: number;
-    appendChildMs?: number;
-    adoptSwaps: number;
-    propClones: number;
-    textSwaps: number;
-    dirtyTexts: number;
-    layoutMs: number;
-    textMs: number;
-    layoutNodes: number;
-    textMeasures: number;
-  };
+  setIsJSResponder: (
+    handle: object,
+    isResponder: boolean,
+    blockNativeResponder: boolean,
+  ) => void;
   /**
    * RN's own commit telemetry for ANY surface, including one this host never drove.
    *
-   * Optional for the same reason `takeCommitSplit` is: a pod predating it must keep its native tree
-   * rather than lose it to a diagnostic. Read with `?.` and treat an absent member as "no answer",
-   * never as zeroes — a zero here would read as "React's commit measures no text", which is exactly
-   * the claim this exists to test.
+   * OPTIONAL: it is read with `?.`, so a pod predating it degrades instead of throwing, unlike the
+   * members above that `isBindings` requires. Treat an absent member as "no answer", never as
+   * zeroes — a zero reads as "React's commit measures no text", the claim this exists to test.
    */
   readSurfaceTelemetry?: (surfaceId: number) => {
     /**
-     * The inside of `commitMs`, read out of RN's OWN `TransactionTelemetry` rather than timed by us
+     * The inside of a commit, read out of RN's OWN `TransactionTelemetry` rather than timed by us
      * — a `ShadowTreeRevision` carries the telemetry of the commit that produced it.
      *
      * `layoutNodes` is the one that answers the question the timings only pose: Yoga reports how
@@ -247,14 +213,15 @@ function isBindings(value: unknown): value is INativeEngineBindings {
   if (typeof value.parentOf !== 'function') return false;
   if (typeof value.childrenOf !== 'function') return false;
   if (typeof value.committedRecordOf !== 'function') return false;
-  // The imperative five, checked by name for the same reason as the rest: a pod that has `applyOps`
+  // The imperative six, checked by name for the same reason as the rest: a pod that has `applyOps`
   // but not these is an OLDER binary, and accepting it would leave `measure()` reaching a method
   // that is not there — at the moment an app measures a ref, not at bring-up.
   if (typeof value.dispatchCommand !== 'function') return false;
   if (typeof value.sendAccessibilityEvent !== 'function') return false;
   if (typeof value.measure !== 'function') return false;
   if (typeof value.measureInWindow !== 'function') return false;
-  return typeof value.measureLayout === 'function';
+  if (typeof value.measureLayout !== 'function') return false;
+  return typeof value.setIsJSResponder === 'function';
 }
 
 // Why `SUPPORTED_NATIVE_VERSION` did NOT move when `probeUIManager` was added, since bumping it is

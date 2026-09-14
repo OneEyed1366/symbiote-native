@@ -21,7 +21,6 @@
   // MARKUP FORMATTING IS LOAD-BEARING here as everywhere in this example: sibling tags are packed
   // edge-to-edge with zero whitespace (svelte-adapter-dom-shim skill §16). Verify with
   // `node scripts/audit-svelte-stray-whitespace.mjs`.
-  import { Text, View } from '@symbiote-native/svelte';
   import {
     readCommitProfile,
     type ICommitProfile,
@@ -57,17 +56,6 @@
   const EMPTY_COMMIT_SAMPLE: ICommitProfile = {
     commits: 0,
     propWrites: 0,
-    applyMs: 0,
-    buildMs: 0,
-    commitMs: 0,
-    adoptSwaps: 0,
-    propClones: 0,
-    textSwaps: 0,
-    dirtyTexts: 0,
-    layoutMs: 0,
-    textMs: 0,
-    layoutNodes: 0,
-    textMeasures: 0,
   };
 
   let { accent }: { accent: string } = $props();

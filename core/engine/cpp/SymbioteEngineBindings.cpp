@@ -152,7 +152,7 @@ void installBindings(jsi::Runtime &runtime) {
   // The one member on a commit path.
   install("applyOps", 5, &Tree::applyOps);
 
-  // The five reads — two value, three structural — and the imperative five. All ten take the same
+  // The five reads — two value, three structural — and the imperative six. All eleven take the same
   // placeholder object `applyOps` attached the node to, and none is on a commit path: they run at
   // gesture or lifecycle rate. `census` is deliberately absent; see `native-tree-host.ts`.
   install("getProp", 2, &Tree::getProp);
@@ -168,9 +168,9 @@ void installBindings(jsi::Runtime &runtime) {
   install("measure", 2, &Tree::measure);
   install("measureInWindow", 2, &Tree::measureInWindow);
   install("measureLayout", 4, &Tree::measureLayout);
+  install("setIsJSResponder", 3, &Tree::setIsJSResponder);
 
-  // Diagnostics, read once per profile window rather than per op. See `Tree::takeCommitSplit`.
-  install("takeCommitSplit", 0, &Tree::takeCommitSplit);
+  // Diagnostic, read on demand rather than per op. See `Tree::readSurfaceTelemetry`.
   install("readSurfaceTelemetry", 1, &Tree::readSurfaceTelemetry);
 
   runtime.global().setProperty(runtime, "__symbioteEngineNative", std::move(bindings));

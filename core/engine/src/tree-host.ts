@@ -96,7 +96,7 @@ export type ITreeHost = {
   childrenOf: (handle: object) => readonly object[];
   census: (roots: readonly object[]) => ITreeCensus;
 
-  // ── THE IMPERATIVE FIVE ────────────────────────────────────────────────────────────────────────
+  // ── THE IMPERATIVE SIX ─────────────────────────────────────────────────────────────────────────
   //
   // They belong to the HOST, not to the Fabric slot, and the reason is the one this whole seam rests
   // on: a JSI handle carries exactly ONE `NativeState`. Under the native host that state is our
@@ -124,6 +124,14 @@ export type ITreeHost = {
     relativeTo: object,
     onFail: () => void,
     onSuccess: IMeasureLayoutOnSuccess,
+  ) => void;
+  // Claim or release the gesture with native. Through the host, not the Fabric slot: the handover
+  // is reached by any touch on a scrollable subtree, so a placeholder handed to the slot redboxes
+  // with `Value state is nullptr` on the first scroll rather than on some rare ref.
+  setIsJSResponder: (
+    handle: object,
+    isResponder: boolean,
+    blockNativeResponder: boolean,
   ) => void;
 };
 
@@ -156,45 +164,11 @@ export function treeHost(): ITreeHost | undefined {
  */
 export function flushOps(): void {
   if (host === undefined || !hasPendingOps()) return;
-  applyTimed(host, takeBatch());
+  host.applyOps(takeBatch());
 }
 
 // Commits this window, for readCommitProfile below.
 let commits = 0;
-
-// Wall time inside the host, this window. The ONE number JS can still take about work it no longer
-// does: everything past this call — the tree build, Fabric's commit, layout, the mount pass — is
-// native and invisible from here, so a step that is slow tells you nothing about WHICH half is slow
-// without it. Both drains go through here; `flushOps` is called on every read, so timing only the
-// commit would attribute a read's flush to whatever ran next.
-//
-let applyMs = 0;
-
-/**
- * A monotonic millisecond clock, resolved ONCE and guarded.
- *
- * `performance.now()` is what this wants — the small rows split into single-digit milliseconds,
- * which is at or under `Date.now()`'s resolution — and it is a global the ENGINE has never named
- * before. RN installs one and Node has one, but "never named before" is exactly the shape that
- * turns an absent global into a throw on every commit rather than a missing number, so it is read
- * off `globalThis` with a fallback instead of being declared.
- */
-const monotonicNow = ((): (() => number) => {
-  const perf: unknown = Reflect.get(globalThis, 'performance');
-  if (typeof perf !== 'object' || perf === null) return Date.now;
-  const now: unknown = Reflect.get(perf, 'now');
-  if (typeof now !== 'function') return Date.now;
-  return () => {
-    const value: unknown = Reflect.apply(now, perf, []);
-    return typeof value === 'number' ? value : Date.now();
-  };
-})();
-
-function applyTimed(target: ITreeHost, batch: IMutationBatch): void {
-  const started = monotonicNow();
-  target.applyOps(batch);
-  applyMs += monotonicNow() - started;
-}
 
 /**
  * Record a surface's commit and drain the buffer into the host.
@@ -235,7 +209,7 @@ export function commitSurfaceOps(
   // it. Its ops still drain, because a teardown is what carries the removals; completing the root
   // would hand Fabric the dead surface's emptied tree over the live one's.
   if (rootTag !== undefined) recordCommit(rootTag, surface);
-  applyTimed(host, takeBatch());
+  host.applyOps(takeBatch());
 }
 
 // What the commit path cost on this host since the last read. Reading zeroes the accumulator, so a
@@ -250,161 +224,19 @@ export function commitSurfaceOps(
 // A field that is structurally always zero reads as "the adapter is clean" and is worse than absent.
 //
 // The WALK numbers this profile used to carry — nodesVisited, propsBuilt, childScans and the rest —
-// are gone with the walk itself. There is no JS tree to walk any more, and the host's own cost is not
-// observable from here; measuring it means instrumenting the host.
+// are gone with the walk itself. There is no JS tree to walk any more.
+//
+// The host's own cost was instrumented too, end to end: the build/commit split across the ABI, the
+// create branch timed in four stages, Fabric's adopt-swaps, Yoga's telemetry. None of it was
+// actionable, so it all came out again. A timer added back here re-opens a question already closed.
 export interface ICommitProfile {
   commits: number;
   propWrites: number;
-  /**
-   * Milliseconds spent inside the host's `applyOps`, this window.
-   *
-   * It splits a slow step in two and answers which half owns it: the time NOT in here is the
-   * adapter's own pass plus whatever the engine does before the buffer drains, and the time in here
-   * is the host — natively, that is the C++ tree build, Fabric's commit, layout and the mount pass.
-   *
-   * Headless it measures the TypeScript applier, which is a different machine entirely, so a number
-   * from `installFabric()` says nothing about a device.
-   */
-  applyMs: number;
-  /**
-   * `applyMs` split in two, by the native host itself. Both zero on any runtime whose bindings
-   * predate the split, and on every headless run.
-   *
-   * `buildMs` is the native tree walk plus every `createNode`/`cloneNode` it issues — OUR work.
-   * `commitMs` is `completeSurface`: Fabric's own `ShadowTree::commit`, the differ, layout and the
-   * mount pass — work we only ASK for. A step that is slow says nothing about which one owns it,
-   * and the two have unrelated fixes, which is the whole reason this crosses the ABI instead of
-   * being logged (a `dlog` needs `DEBUG=1`, and a Debug build cannot be benchmarked at all).
-   *
-   * `applyMs - (buildMs + commitMs)` is what the crossing itself costs — the argument marshalling
-   * and the opcode read, which nothing else prices.
-   */
-  buildMs: number;
-  commitMs: number;
-  /**
-   * The inside of `buildMs`, on the CREATE branch only — the four things a new node costs, split so
-   * that what is ours and what is Fabric's can be read apart.
-   *
-   * `foldProbeMs` and `payloadMs` are OURS: the per-node probe for a `payloadFold`, and the C++
-   * payload builder with the fold's own call SUBTRACTED out. `createNodeMs` and `appendChildMs` are
-   * FABRIC'S — `UIManager::createNode` with its descriptor lookup, RawProps parse, `ShadowNode`,
-   * family, event emitter and Yoga node, and `adoptYogaChild` per child. Stock React Native pays
-   * those two per node as well, which is what makes them the wrong place to look for a deficit and
-   * the right place to stop looking. Measured on device 2026-09-10 (Svelte, 1 000 rows, `buildMs`
-   * 52.5): 1.7 / 17.0 / 28.1 / 0.9, residual 4.8 — so Fabric's own construction is 55% of BUILD,
-   * against the ~87% that had been assumed without measuring.
-   *
-   * `buildMs - (the four)` is the residual: the walk, the reuse checks, the child vectors, the
-   * clone branch — and the instrument's own ~25 ns × 6 per created node, which lands there rather
-   * than in any stage it brackets.
-   *
-   * Zero on a step that creates nothing, and on every headless run.
-   */
-  foldProbeMs: number;
-  payloadMs: number;
-  createNodeMs: number;
-  appendChildMs: number;
-  /**
-   * What a behavior's `payloadFold` costs the walk, and how many nodes paid it.
-   *
-   * One JSI round trip per folded node with the whole bag marshalled both ways — the only part of
-   * the payload build that is not C++ at all, which is why it is broken out of `payloadMs` rather
-   * than left inside it. `foldedNodes` is beside it so the per-call price is read rather than
-   * inferred from a guess at how many nodes carry a behavior.
-   *
-   * THE ONE COUNTER HERE THAT SPANS BOTH BRANCHES: a dirty node re-folds on the clone path too, so
-   * this is non-zero on a step that creates nothing while the four above read zero. That is not an
-   * inconsistency to reconcile — it is the number that says what the fold costs an UPDATE, which is
-   * the case a real screen hits constantly and a create row never shows.
-   */
-  foldCallMs: number;
-  foldedNodes: number;
-  /**
-   * Child pointers Fabric swapped out from under the host this window.
-   *
-   * Fabric does not always keep the children it is handed: a child still owned by its previous
-   * parent's yoga node is cloned and the clone put in its place. Holding the original then defeats
-   * every pointer-identity short circuit in the commit, so the host takes the landed ones back —
-   * and this counts how often that fires, because a repair that never fires and a repair that works
-   * produce the same tree.
-   */
-  adoptSwaps: number;
-  /**
-   * Nodes this host cloned WITH a props payload this window.
-   *
-   * Read beside `textMeasures`, and it settles which side dirties measurement. A measurable Yoga
-   * node is re-measured only when it is dirty, and the only gate a host trips from outside is the
-   * props fragment of a clone — so this is the ceiling on what our own walk could have dirtied.
-   * Near `propWrites` means the dirtying happens inside Fabric's commit and the walk is innocent;
-   * near `textMeasures` means it is ours.
-   */
-  propClones: number;
-  /**
-   * Of `adoptSwaps`, the ones where the node Fabric substituted is a Paragraph.
-   *
-   * Only that kind's swap costs more than a pointer: a Paragraph memoises its measured content in a
-   * field the clone constructor does not copy, so a replaced one re-derives its measurement cache
-   * key — and the key embeds the node's own layout frame, which is zero while the tree is being
-   * created and distinct per row ever after. That is the whole difference between a create
-   * measuring 1890 texts and a one-row mutation measuring 2869 on the identical tree.
-   */
-  textSwaps: number;
-  /**
-   * Measurable text nodes already dirty in the tree handed to Fabric, counted BEFORE the commit.
-   *
-   * It splits the last open question in two and nothing else can. React's own renderer commits the
-   * identical tree with zero text measurements where this host reports thousands, and only a dirty
-   * leaf produces a measurement — so either the host's own build phase leaves them dirty, which
-   * this counts, or they are clean here and the commit dirties them. The two have nothing in
-   * common: one is a bug in the walk, the other is upstream of it.
-   */
-  dirtyTexts: number;
-  /**
-   * The inside of `commitMs`, taken from RN's own `TransactionTelemetry` rather than timed by us.
-   *
-   * `layoutNodes` is the decisive one: Yoga reports how many layoutable nodes the pass actually
-   * touched, so a one-row change reporting the whole tree is a RE-LAYOUT, which no amount of making
-   * layout faster would fix. `textMeasures` is the other tree-sized term a Fabric commit can carry.
-   */
-  layoutMs: number;
-  textMs: number;
-  layoutNodes: number;
-  textMeasures: number;
 }
 
-const EMPTY_SPLIT = {
-  buildMs: 0,
-  commitMs: 0,
-  foldProbeMs: 0,
-  payloadMs: 0,
-  foldCallMs: 0,
-  foldedNodes: 0,
-  createNodeMs: 0,
-  appendChildMs: 0,
-  adoptSwaps: 0,
-  propClones: 0,
-  textSwaps: 0,
-  dirtyTexts: 0,
-  layoutMs: 0,
-  textMs: 0,
-  layoutNodes: 0,
-  textMeasures: 0,
-};
-
 export function readCommitProfile(): ICommitProfile {
-  // MERGED over the zeroed default rather than substituted for it: a pod can carry
-  // `takeCommitSplit` and predate a field it grew later, and the spread below would then leave that
-  // field `undefined` on a profile typed as all numbers — which reaches a benchmark screen as a
-  // blank cell reading like a measurement rather than a missing binding.
-  const split = { ...EMPTY_SPLIT, ...nativeEngine()?.takeCommitSplit?.() };
-  const snapshot = {
-    commits,
-    propWrites: takePropStats().writes,
-    applyMs,
-    ...split,
-  };
+  const snapshot = { commits, propWrites: takePropStats().writes };
   commits = 0;
-  applyMs = 0;
   return snapshot;
 }
 

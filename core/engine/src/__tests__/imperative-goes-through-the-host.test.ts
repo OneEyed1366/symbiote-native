@@ -1,4 +1,4 @@
-// The imperative five must reach the HOST, never the Fabric slot.
+// The imperative six must reach the HOST, never the Fabric slot.
 //
 // A JSI handle carries exactly one `NativeState`. Under the native host that state is our `Node`, so
 // `nativeFabricUIManager.measure` — which expects a `ShadowNode` reference — throws `Value state is
@@ -19,10 +19,11 @@ import {
   measure,
   measureInWindow,
   sendAccessibilityEvent,
+  setEventListener,
 } from '../index';
 import { setTreeHost, treeHost, type ITreeHost } from '../tree-host';
 
-installFabric();
+const fabric = installFabric();
 let nextRootTag = 9500;
 
 function mounted() {
@@ -45,6 +46,7 @@ function withSpiedHost(
     measureInWindow: vi.fn(),
     dispatchCommand: vi.fn(),
     sendAccessibilityEvent: vi.fn(),
+    setIsJSResponder: vi.fn(),
   };
   const spied: ITreeHost = { ...real, ...spies };
   setTreeHost(spied);
@@ -81,6 +83,25 @@ describe('an imperative call is routed to the tree host', () => {
       expect(spies.dispatchCommand).toHaveBeenCalledWith(node, 'focus', [1]);
       expect(spies.sendAccessibilityEvent).toHaveBeenCalledWith(node, 'focus');
     });
+  });
+
+  // Driven by a real touch rather than by calling the wrapper, because the defect was at the CALL
+  // SITE: the handover read `committedRecordOf(node).handle` and handed that to the Fabric slot. On
+  // a device that is the placeholder, so the first scroll of the session redboxed with `Value state
+  // is nullptr` — while every responder test here stayed green, the applier's handle being a real
+  // fake-Fabric node.
+  it('claims the gesture through the host, from a real grant', () => {
+    const node = mounted();
+    setEventListener(node, 'startShouldSetResponder', () => true);
+    setEventListener(node, 'responderGrant', () => true);
+
+    withSpiedHost(spies => {
+      fabric.fireEvent(node, 'topTouchStart');
+      expect(spies.setIsJSResponder).toHaveBeenCalledWith(node, true, true);
+    });
+
+    // The responder is a module singleton: end the gesture or the next test starts owned.
+    fabric.fireEvent(node, 'topTouchEnd', { touches: [], changedTouches: [] });
   });
 
   it('stays silent for a node that has never committed', () => {

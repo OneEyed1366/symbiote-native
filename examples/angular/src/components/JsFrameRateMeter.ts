@@ -35,17 +35,6 @@ const SAMPLE_WINDOW_MS = 500;
 const EMPTY_COMMIT_PROFILE: ICommitProfile = {
   commits: 0,
   propWrites: 0,
-  applyMs: 0,
-  buildMs: 0,
-  commitMs: 0,
-  adoptSwaps: 0,
-  propClones: 0,
-  textSwaps: 0,
-  dirtyTexts: 0,
-  layoutMs: 0,
-  textMs: 0,
-  layoutNodes: 0,
-  textMeasures: 0,
 };
 
 // `readCommitProfile()` is read-and-RESET, and this meter calls it once per window off rAF. A

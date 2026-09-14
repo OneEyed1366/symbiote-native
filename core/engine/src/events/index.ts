@@ -17,7 +17,7 @@ import {
 } from '../node';
 import { registeredNativeEvent } from '../registry';
 import { parentOf } from '../host-access';
-import { getNativeNode } from '../imperative';
+import { setIsJSResponder } from '../imperative';
 import {
   attachTouchHistory,
   recordTouchTrack,
@@ -321,17 +321,12 @@ function handOverNativeResponder(
   to: ISymbioteNode | undefined,
   blockNativeResponder: boolean,
 ): void {
-  const slot = getSlot();
-  const fromHandle = from === undefined ? undefined : getNativeNode(from);
-  const toHandle = to === undefined ? undefined : getNativeNode(to);
   dlog(
-    `setIsJSResponder from=${from === undefined ? 'none' : fromHandle === undefined ? 'UNCOMMITTED' : 'yes'} ` +
-      `to=${to === undefined ? 'none' : toHandle === undefined ? 'UNCOMMITTED' : 'yes'} block=${blockNativeResponder}`,
+    `setIsJSResponder from=${from === undefined ? 'none' : 'yes'} ` +
+      `to=${to === undefined ? 'none' : 'yes'} block=${blockNativeResponder}`,
   );
-  if (fromHandle !== undefined)
-    slot.setIsJSResponder(fromHandle, false, blockNativeResponder);
-  if (toHandle !== undefined)
-    slot.setIsJSResponder(toHandle, true, blockNativeResponder);
+  if (from !== undefined) setIsJSResponder(from, false, blockNativeResponder);
+  if (to !== undefined) setIsJSResponder(to, true, blockNativeResponder);
 }
 
 // Whether the taker asked native to stand down. RN reads this off the grant dispatch's return;

@@ -245,17 +245,6 @@ type IBenchResult = {
 const EMPTY_STEP_PROFILE: ICommitProfile = {
   commits: 0,
   propWrites: 0,
-  applyMs: 0,
-  buildMs: 0,
-  commitMs: 0,
-  adoptSwaps: 0,
-  propClones: 0,
-  textSwaps: 0,
-  dirtyTexts: 0,
-  layoutMs: 0,
-  textMs: 0,
-  layoutNodes: 0,
-  textMeasures: 0,
 };
 
 const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
@@ -1058,11 +1047,7 @@ export function BenchmarkScreen() {
             <view className="bench-compare-row">
               <text className="bench-compare-label" />
               <text className="bench-compare-head-cell">WRITES</text>
-              <text className="bench-compare-head-cell">TEXTS</text>
-              <text className="bench-compare-head-cell">TEXT ms</text>
-              <text className="bench-compare-head-cell">NODES</text>
-              <text className="bench-compare-head-cell">DIRTY</text>
-              <text className="bench-compare-head-cell">FABRIC</text>
+              <text className="bench-compare-head-cell">COMMITS</text>
             </view>
             {SUITE_STEPS.map(step => {
               const profile = allProfiles.get(step.op);
@@ -1077,25 +1062,13 @@ export function BenchmarkScreen() {
                     {profile === undefined ? '—' : String(profile.propWrites)}
                   </text>
                   <text className="bench-compare-cell">
-                    {profile === undefined ? '—' : String(profile.textMeasures)}
-                  </text>
-                  <text className="bench-compare-cell">
-                    {profile === undefined ? '—' : profile.textMs.toFixed(1)}
-                  </text>
-                  <text className="bench-compare-cell">
-                    {profile === undefined ? '—' : String(profile.layoutNodes)}
-                  </text>
-                  <text className="bench-compare-cell">
-                    {profile === undefined ? '—' : String(profile.dirtyTexts)}
-                  </text>
-                  <text className="bench-compare-cell">
-                    {profile === undefined ? '—' : profile.commitMs.toFixed(1)}
+                    {profile === undefined ? '—' : String(profile.commits)}
                   </text>
                 </view>
               );
             })}
             <text className="note-text">
-              {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS is off this table for width and still in the profile; it has read 1 in every measurement, and anything higher would mean a foreign commit landed inside the window.There is no node count: the tree lives in C++ and JS only fills a command buffer. FABRIC is completeSurface timed by the native host — Fabric's own commit, the differ, layout and the mount pass; BUILD, our tree walk, is off this table because it has read ~1 ms on every row and is still in the profile. TEXTS, TEXT ms and LAYOUT come out of RN's own commit telemetry, not our clock, and TEXTS is the one term inside a layout pass that costs tens of microseconds rather than one. TEXTS is a symptom and NODES is the disease: only a dirty leaf is ever re-measured, so a step whose NODES covers the whole tree will re-measure the whole tree's text whatever the change was. React Native's own renderer, measured against this same row in this same binary (the STOCK_ARM constant in index.js), commits a one-row Select with NODES 1006 and TEXTS 0 where this host reports 8477 and 2869 — same device, same tree, so the cost is this host's and not Fabric's. DIRTY is what splits the remaining question: it counts measurable text nodes ALREADY dirty in the tree handed to completeSurface, so DIRTY near TEXTS means our own walk leaves them dirty and the bug is in the walk, while DIRTY near zero means they are clean when we hand them over and something inside the commit dirties them.`}
+              {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. There is no ms here and no node count: the tree lives in C++ and JS only fills a command buffer, so what the host spends applying it is invisible from JS. It was instrumented once, end to end, and the commit structure held nothing actionable, so it all came out again. The stock comparison below reads a surface instead of our own window, which is why it survived.`}
             </text>
           </view>
         )}

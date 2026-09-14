@@ -392,56 +392,6 @@ std::shared_ptr<const react::ShadowNode> materialize(
     react::SurfaceId surfaceId,
     const Node *fabricParent);
 
-// ── THE INSIDE OF `buildMs`, on the CREATE branch only ──────────────────────────────────────────
-//
-// `buildMs` is ~52 ms of a ~235 ms Svelte create row — the largest single item this project owns
-// and, until these counters existed, the least examined: ~87% of it had been ATTRIBUTED to Fabric's
-// own node construction by reasoning and never measured. Measured, that reasoning was wrong by
-// nearly a factor of two.
-//
-//   foldProbeMs   OURS, and the PROBE only — a `WeakObject` lock plus a property read per node. On
-//                 a create every node is new, so `foldProbe` caches nothing and all ~10 000 pay it.
-//   payloadMs     OURS. `fabricProps` in C++, MINUS the fold call, which is broken out below.
-//   foldCallMs    OURS, and a subset of the walk's JS traffic rather than of its C++: one JSI round
-//                 trip per FOLDED node with the whole bag marshalled both ways. Counted beside
-//                 `foldedNodes` so the per-call price is readable rather than inferred from a
-//                 guess at how many nodes carry a behavior.
-//   createNodeMs  FABRIC'S. `UIManager::createNode` — descriptor lookup, `createFamily`,
-//                 `cloneProps` (the RawProps parse), `createInitialState`, `createShadowNode` with
-//                 its Yoga node. Stock pays the same call per node.
-//   appendChildMs FABRIC'S. `YogaLayoutableShadowNode::appendChild` -> `adoptYogaChild` per child.
-//
-// `buildMs` minus their sum is the residual: the walk itself, the reuse checks, the child vectors,
-// and the clone branch — which is why the clone branch is deliberately NOT split here. A create row
-// is the question; splitting the other branch would double the clock reads for a row this cannot
-// answer anyway.
-//
-// Measured on device 2026-09-10, iOS 26.5 Release, Svelte, 1 000 rows (`buildMs` 52.5):
-//
-//   FOLD 1.7 · PAYLOAD 17.0 · CREATE 28.1 · APPEND 0.9 · WALK 4.8
-//
-// The four plus the residual reproduce `buildMs` to 0.1 ms on all three create-shaped rows, which is
-// the control that says the stages bracket what they claim to. Two findings came straight out of it:
-// Fabric's own construction is 55% of BUILD rather than the ~87% that had been assumed, and PAYLOAD
-// came in EIGHT TIMES its prediction — the JS twin of the builder measures 2.1 ms per 10 000 nodes.
-// `foldCallMs` exists to say which half of that 17.0 is the JSI traffic and which is the builder.
-//
-// WHAT IT COSTS TO KNOW, stated because it lands in the number being read: six
-// `steady_clock::now()` per created node, ~25 ns each on arm64, so ~1.5 ms per 10 000-node create,
-// and it falls inside the RESIDUAL rather than inside any stage it brackets.
-double foldProbeMs = 0;
-double payloadMs = 0;
-double foldCallMs = 0;
-double createNodeMs = 0;
-double appendChildMs = 0;
-size_t foldedNodes = 0;
-
-double millisFrom(
-    std::chrono::steady_clock::time_point started,
-    std::chrono::steady_clock::time_point ended) {
-  return std::chrono::duration<double, std::milli>(ended - started).count();
-}
-
 /**
  * The node's own payload fold, reached through the JS handle it is published on.
  *
@@ -477,18 +427,11 @@ IPayloadFold foldFor(jsi::Runtime &runtime, Node &node) {
   // Through a `shared_ptr` because `IPayloadFold` is a `std::function`, which requires a COPYABLE
   // callable, and `jsi::Function` is move-only. Capturing it by value does not compile.
   auto function = std::make_shared<jsi::Function>(fold.getObject(runtime).getFunction(runtime));
-  // Timed HERE rather than at the call site in `fabricProps`, because this is the whole of what a
-  // fold costs the walk — the bag out as a JSI value, the JS call, the result back as a
-  // `folly::dynamic` — and it is the one part of `payloadMs` that is not C++ at all.
   return [&runtime, function](const folly::dynamic &props) {
-    const auto startedAt = std::chrono::steady_clock::now();
-    folly::dynamic out = boundedDynamicFrom(
+    return boundedDynamicFrom(
         runtime,
         function->call(runtime, jsi::valueFromDynamic(runtime, props)),
         "the payloadFold result");
-    foldCallMs += millisFrom(startedAt, std::chrono::steady_clock::now());
-    foldedNodes += 1;
-    return out;
   };
 }
 
@@ -532,60 +475,6 @@ void appendRenderable(
   owners.push_back(&node);
 }
 
-// Child pointers Fabric swapped out from under us since the last read, reported through
-// `takeCommitSplit`. A diagnostic and nothing reads it in anger: it is the ONLY way to see whether
-// `adoptLandedChildren` below fires at all, and a fix that fires zero times is indistinguishable
-// from a fix that works.
-size_t adoptSwaps = 0;
-
-// `cloneNode` calls this host issued that carried a NON-EMPTY props payload, per commit window.
-//
-// It exists to settle one question that no counter on either side could answer: RN reported 2 869
-// text measurements on a 35-write step, and a measurement happens only when a measurable yoga node
-// is DIRTY (`Node.h:43` — a yoga clone copies `layout_`, cache included, so cloning alone measures
-// nothing). The one dirtying gate a host can trip from outside is `completeClone`, and it reads
-// `fragment.props != nullptr` on a Paragraph and `true` on everything else measurable
-// (`YogaLayoutableShadowNode.cpp:322` — only Paragraph narrows it, so a TextInput is dirtied by ANY
-// fragment). `UIManager::cloneNode` fills that fragment only when `!rawProps.isEmpty()`
-// (`UIManager.cpp:123`), so this number IS how many nodes we could possibly have dirtied.
-//
-// Reading it against `textMeasures` separates the two hypotheses outright: near the write count
-// means the dirtying happens INSIDE the commit and our walk is innocent; near the measurement count
-// means it is ours. Nothing else distinguishes them — RN's telemetry counts measurements and never
-// says which node asked.
-size_t propClones = 0;
-
-// Of `adoptSwaps`, the ones where the node Fabric put in our place is a Paragraph. See
-// `adoptLandedChildren` for why that kind is the only one whose swap costs more than a pointer.
-size_t textSwaps = 0;
-
-// Measurable text nodes already DIRTY in the tree we are about to hand `completeSurface`.
-//
-// It splits the last question in two, and nothing else can. React's own renderer commits this exact
-// tree with 0 text measurements and 1 006 affected layout nodes where we report 2 869 and 8 477
-// (`STOCK_ARM` in the react example), and the yoga bench proved only a DIRTY LEAF produces a
-// measurement. So either our build phase leaves the leaves dirty — and this counts them before
-// Fabric is involved at all — or they are clean here and something inside the commit dirties them.
-// The two have nothing in common: the first is our bug in this file, the second is upstream of it.
-size_t dirtyTextsBeforeCommit = 0;
-
-// Walks what we are about to commit and counts the dirty measurable text nodes. O(tree) per commit
-// and DIAGNOSTIC-ONLY, which is why it is gated on the counter being read at all — a benchmark step
-// pays it, a real app never reaches it.
-void countDirtyTexts(const react::ShadowNode &node) {
-  // Through the BASE class, not `YogaLayoutableShadowNode`: `getIsLayoutClean` is pure virtual on
-  // `LayoutableShadowNode`, which lives in `core/` — a folder ReactAndroid does export in its
-  // prefab, unlike the Yoga-specific one. Same reasoning the `dom/` guard at the top of this file
-  // records, arrived at before it cost a broken Android build rather than after.
-  const auto *layoutable = dynamic_cast<const react::LayoutableShadowNode *>(&node);
-  if (layoutable != nullptr &&
-      node.getTraits().check(react::ShadowNodeTraits::Trait::MeasurableYogaNode) &&
-      !layoutable->getIsLayoutClean()) {
-    dirtyTextsBeforeCommit += 1;
-  }
-  for (const auto &child : node.getChildren()) countDirtyTexts(*child);
-}
-
 // Take back the children Fabric actually kept, because it does NOT always keep the ones it was
 // given.
 //
@@ -599,29 +488,16 @@ void countDirtyTexts(const react::ShadowNode &node) {
 // IDENTICAL between revisions. Handing back the orphan makes every child differ on the next commit,
 // so both walks — and the differ behind them — descend the entire tree for a one-row change.
 //
-// Returns how many pointers Fabric swapped, which is the only way to see from JS whether this fires
-// at all.
-size_t adoptLandedChildren(Node &node, const std::vector<Node *> &owners) {
+void adoptLandedChildren(Node &node, const std::vector<Node *> &owners) {
   const ChildSet &landed = node.committed->getChildren();
-  size_t swapped = 0;
   const size_t count = std::min(owners.size(), landed.size());
   for (size_t index = 0; index < count; index++) {
     if (owners[index]->committed == landed[index]) continue;
-    // WHICH nodes Fabric replaced, not just how many. A Paragraph is the one kind whose swap has a
-    // price beyond the pointer: its measured content is memoised in a `mutable` field that the
-    // clone constructor does not copy (`ParagraphShadowNode.h:133`), so a replaced Paragraph
-    // re-derives its measurement cache key — and that key embeds the node's own layout frame
-    // (`AttributedString.cpp:32`), which is zero at create time and distinct per row afterwards.
-    // That is the difference between a create measuring 1890 texts and a one-row mutation
-    // measuring 2869 on the identical tree with the identical strings.
-    if (std::string_view(landed[index]->getComponentName()) == "Paragraph") textSwaps += 1;
     owners[index]->committed = landed[index];
-    swapped += 1;
   }
   // What Fabric HOLDS, not what we offered — `sameNodes` on the next commit has to compare against
   // the tree that exists, or an unchanged list reads as changed forever.
   node.committedChildren = landed;
-  return swapped;
 }
 
 // `appendRenderable`'s traversal with the materialising taken out: which of our nodes contribute
@@ -639,8 +515,9 @@ void collectRenderableOwners(Node &node, std::vector<Node *> &owners) {
 
 // Re-point the retained tree at the nodes Fabric ACTUALLY COMMITTED, after the commit.
 //
-// This is the repair for the one number that never moved: `dirtyTexts` read 4 971 on every step,
-// including the one immediately after a full layout. Yoga clears a node's dirty flag on the object
+// This is the repair for the one number that never moved: the measurable text nodes still DIRTY in
+// the tree about to be committed read 4 971 on every step, even right after a full layout. Yoga
+// clears a node's dirty flag on the object
 // it laid out (`CalculateLayout.cpp`, `setDirty(false)` under `performLayout`), so ours staying
 // dirty forever means the objects that got laid out were not ours — Fabric substituted clones
 // inside the commit and we went on holding the originals. Every later commit then handed it a tree
@@ -654,26 +531,24 @@ void collectRenderableOwners(Node &node, std::vector<Node *> &owners) {
 //
 // O(changed), not O(tree): a ShadowNode is immutable, so an identical pointer means an identical
 // subtree and the descent stops there.
-size_t adoptCommitted(Node &node, const std::shared_ptr<const react::ShadowNode> &landed) {
-  if (node.committed == nullptr || landed == nullptr) return 0;
+void adoptCommitted(Node &node, const std::shared_ptr<const react::ShadowNode> &landed) {
+  if (node.committed == nullptr || landed == nullptr) return;
   // A stranger is not adopted. `completeSurface` returns void, so a commit that was cancelled or
   // lost a race leaves the registry holding the PREVIOUS revision — and walking that would drag our
   // pointers backwards, which is worse than the staleness this exists to fix. Family identity is
   // what tells the two apart.
-  if (!react::ShadowNode::sameFamily(*node.committed, *landed)) return 0;
-  if (node.committed == landed) return 0;
+  if (!react::ShadowNode::sameFamily(*node.committed, *landed)) return;
+  if (node.committed == landed) return;
 
   node.committed = landed;
-  size_t swapped = 1;
   std::vector<Node *> owners;
   collectRenderableOwners(node, owners);
   const ChildSet &children = landed->getChildren();
   const size_t count = std::min(owners.size(), children.size());
   for (size_t index = 0; index < count; index++) {
-    swapped += adoptCommitted(*owners[index], children[index]);
+    adoptCommitted(*owners[index], children[index]);
   }
   node.committedChildren = children;
-  return swapped;
 }
 
 std::shared_ptr<const react::ShadowNode> materialize(
@@ -728,29 +603,15 @@ std::shared_ptr<const react::ShadowNode> materialize(
     // AUTHORED component, which a nested `<Text>` never has rewritten to `RCTVirtualText`. Passing
     // the local would silently change which processors run on every nested text node.
     //
-    const auto foldStartedAt = std::chrono::steady_clock::now();
-    IPayloadFold fold = foldFor(runtime, node);
-    const auto payloadStartedAt = std::chrono::steady_clock::now();
-    // Snapshotted so the fold's JSI round trip can be SUBTRACTED out below: `fabricProps` calls the
-    // fold from inside itself, so the bracket around it would otherwise report the builder and the
-    // crossing as one number — which is exactly the ambiguity the first run of this table hit.
-    const double foldCallBefore = foldCallMs;
-    const folly::dynamic payload = fabricProps(node.viewName, node.props, fold);
-    const auto createStartedAt = std::chrono::steady_clock::now();
+    const folly::dynamic payload =
+        fabricProps(node.viewName, node.props, foldFor(runtime, node));
     auto created = uiManager.createNode(
         node.tag,
         viewName,
         surfaceId,
         react::RawProps(folly::dynamic(payload)),
         node.instanceHandle);
-    const auto appendStartedAt = std::chrono::steady_clock::now();
     for (const auto &child : *children) uiManager.appendChild(created, child);
-    const auto appendEndedAt = std::chrono::steady_clock::now();
-    foldProbeMs += millisFrom(foldStartedAt, payloadStartedAt);
-    payloadMs +=
-        millisFrom(payloadStartedAt, createStartedAt) - (foldCallMs - foldCallBefore);
-    createNodeMs += millisFrom(createStartedAt, appendStartedAt);
-    appendChildMs += millisFrom(appendStartedAt, appendEndedAt);
     node.committed = created;
     node.committedProps = payload;
   } else {
@@ -788,7 +649,6 @@ std::shared_ptr<const react::ShadowNode> materialize(
       std::shared_ptr<const ChildSet> handedChildren =
           react::ShadowNodeFragment::childrenPlaceholder();
       if (!childrenHeld) handedChildren = children;
-      if (node.selfDirty && !payload.empty()) propClones += 1;
       node.committed = uiManager.cloneNode(
           *node.committed,
           handedChildren,
@@ -797,7 +657,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
     if (node.selfDirty) node.committedProps = std::move(next);
   }
 
-  adoptSwaps += adoptLandedChildren(node, owners);
+  adoptLandedChildren(node, owners);
   node.committedViewName = viewName;
   node.committedParent = fabricParent;
   node.committedTextAncestor = hasTextAncestor;
@@ -805,15 +665,6 @@ std::shared_ptr<const react::ShadowNode> materialize(
   node.selfDirty = false;
   node.pathDirty = false;
   return node.committed;
-}
-
-// `steady_clock` rather than `system_clock`: this measures an interval, and only the steady one is
-// guaranteed not to jump. Sub-millisecond resolution matters — the halves being split are single
-// milliseconds on a small step.
-double millisSince(std::chrono::steady_clock::time_point started) {
-  return std::chrono::duration<double, std::milli>(
-             std::chrono::steady_clock::now() - started)
-      .count();
 }
 
 // A telemetry interval, or zero when either end was never stamped. `TelemetryClock` IS
@@ -1045,10 +896,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         // never see the result of — so there is nothing to adopt back here, and these owners are
         // collected only because `appendRenderable` needs somewhere to put them.
         std::vector<Node *> rootOwners;
-        const auto buildStartedAt = std::chrono::steady_clock::now();
         appendRenderable(
             runtime, uiManager, *childSet, rootOwners, *surface, false, surfaceId, nullptr);
-        buildMs_ += millisSince(buildStartedAt);
         // SKIPPED when the root child set comes back identical. `materialize` already declines to
         // clone a node nothing changed, so an unchanged tree produces the same handles — and
         // `completeSurface` on them is a full `ShadowTree::commit`, with layout and a mount pass,
@@ -1067,43 +916,23 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         // `completeSurface` runs `ShadowTree::commit` itself, with a lambda that REPLACES the root's
         // children outright — so a retry against a moved root is harmless and there is nothing to
         // rebase. That is why this needs neither a commit hook nor a retained pending root.
-        // BEFORE `completeSurface`, deliberately: the whole value of this number is that it is read
-        // while the tree is still only ours.
-        for (const auto &child : *childSet) countDirtyTexts(*child);
-        const auto commitStartedAt = std::chrono::steady_clock::now();
         uiManager.completeSurface(
             surfaceId,
             childSet,
             {.enableStateReconciliation = true,
              .mountSynchronously = false,
              .source = react::ShadowTree::CommitSource::React});
-        commitMs_ += millisSince(commitStartedAt);
-        // RN's own accounting for the commit that just ran. `getCurrentRevision()` is public and the
-        // revision carries the `TransactionTelemetry` the commit filled in, so this reads the inside
-        // of `commitMs_` without a hook, a fork, or a second clock.
-        //
-        // Read HERE rather than from a mount hook on purpose: a mount hook fires on the UI thread
-        // after the mount pass, so its numbers would land in whichever profile window happened to be
-        // open — one step late, and silently.
         uiManager.getShadowTreeRegistry().visit(
-            surfaceId, [this, &rootOwners](const react::ShadowTree &shadowTree) {
-              const react::ShadowTreeRevision revision = shadowTree.getCurrentRevision();
+            surfaceId, [&rootOwners](const react::ShadowTree &shadowTree) {
               // THE REPAIR, and it must run here rather than in `materialize`: substitution happens
               // INSIDE the commit, so the only tree that can be believed is the one the registry
               // holds once `completeSurface` has returned. See `adoptCommitted`.
-              const ChildSet &landedRoot = revision.rootShadowNode->getChildren();
+              const ChildSet &landedRoot =
+                  shadowTree.getCurrentRevision().rootShadowNode->getChildren();
               const size_t rootCount = std::min(rootOwners.size(), landedRoot.size());
               for (size_t index = 0; index < rootCount; index++) {
-                adoptSwaps += adoptCommitted(*rootOwners[index], landedRoot[index]);
+                adoptCommitted(*rootOwners[index], landedRoot[index]);
               }
-              const react::TransactionTelemetry telemetry = revision.telemetry;
-              layoutMs_ += millisBetween(
-                  telemetry.getLayoutStartTime(), telemetry.getLayoutEndTime());
-              textMs_ += std::chrono::duration<double, std::milli>(
-                             telemetry.getTextMeasureTime())
-                             .count();
-              layoutNodes_ += telemetry.getAffectedLayoutNodesCount();
-              textMeasures_ += telemetry.getNumberOfTextMeasurements();
             });
         break;
       }
@@ -1267,6 +1096,24 @@ jsi::Value Tree::sendAccessibilityEvent(
   return jsi::Value::undefined();
 }
 
+// A JS responder that never reaches native loses the gesture to any scroll view above it, silently:
+// the UIScrollView keeps competing and every move after the first arrives as `topScroll`.
+jsi::Value Tree::setIsJSResponder(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count) {
+  if (count < 3) {
+    throw jsi::JSError(
+        runtime,
+        "symbiote engine: expected setIsJSResponder(handle, isResponder, blockNativeResponder)");
+  }
+  const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "setIsJSResponder");
+  if (node->committed == nullptr) return jsi::Value::undefined();
+  uiManagerFor(runtime, "setIsJSResponder")
+      .setIsJSResponder(node->committed, arguments[1].getBool(), arguments[2].getBool());
+  return jsi::Value::undefined();
+}
+
 #ifndef SYMBIOTE_HAS_DOM_MEASURE
 
 // The header is absent on this toolchain (Android's prefab does not export `react/renderer/dom/`).
@@ -1402,10 +1249,10 @@ jsi::Value Tree::readSurfaceTelemetry(
   double textMs = 0;
   int layoutNodes = 0;
   int textMeasures = 0;
-  // ANY surface, not only one this host drives — which is the entire reason it exists. The
-  // `takeCommitSplit` numbers accumulate inside our own `kOpCommit`, so they can only ever describe
-  // a tree we committed. To answer "does React's own renderer pay this too" the same telemetry has
-  // to be readable for a surface React drove, and `getCurrentRevision()` is public and carries the
+  // ANY surface, not only one this host drives. Anything accumulated inside our own `kOpCommit`
+  // describes only a tree we committed; to answer "does React's own renderer pay this too" the
+  // telemetry has to be readable for a surface React drove. `getCurrentRevision()` is public and
+  // carries the
   // `TransactionTelemetry` of whichever commit produced the revision, whoever produced it.
   //
   // Read on demand rather than accumulated: there is no hook of ours in a foreign commit, so the
@@ -1425,46 +1272,6 @@ jsi::Value Tree::readSurfaceTelemetry(
   result.setProperty(runtime, "layoutNodes", jsi::Value(static_cast<double>(layoutNodes)));
   result.setProperty(runtime, "textMeasures", jsi::Value(static_cast<double>(textMeasures)));
   return result;
-}
-
-jsi::Value Tree::takeCommitSplit(jsi::Runtime &runtime, const jsi::Value *, size_t) {
-  auto split = jsi::Object(runtime);
-  split.setProperty(runtime, "buildMs", jsi::Value(buildMs_));
-  split.setProperty(runtime, "commitMs", jsi::Value(commitMs_));
-  split.setProperty(runtime, "foldProbeMs", jsi::Value(foldProbeMs));
-  split.setProperty(runtime, "payloadMs", jsi::Value(payloadMs));
-  split.setProperty(runtime, "foldCallMs", jsi::Value(foldCallMs));
-  split.setProperty(runtime, "foldedNodes", jsi::Value(static_cast<double>(foldedNodes)));
-  split.setProperty(runtime, "createNodeMs", jsi::Value(createNodeMs));
-  split.setProperty(runtime, "appendChildMs", jsi::Value(appendChildMs));
-  split.setProperty(runtime, "adoptSwaps", jsi::Value(static_cast<double>(adoptSwaps)));
-  split.setProperty(runtime, "propClones", jsi::Value(static_cast<double>(propClones)));
-  split.setProperty(runtime, "textSwaps", jsi::Value(static_cast<double>(textSwaps)));
-  split.setProperty(
-      runtime, "dirtyTexts", jsi::Value(static_cast<double>(dirtyTextsBeforeCommit)));
-  split.setProperty(runtime, "layoutMs", jsi::Value(layoutMs_));
-  split.setProperty(runtime, "textMs", jsi::Value(textMs_));
-  split.setProperty(runtime, "layoutNodes", jsi::Value(static_cast<double>(layoutNodes_)));
-  split.setProperty(runtime, "textMeasures", jsi::Value(static_cast<double>(textMeasures_)));
-  // READ-AND-RESET, so a sampler on an interval gets disjoint windows rather than a growing total —
-  // the same contract `readCommitProfile` already carries on the JS side.
-  buildMs_ = 0;
-  commitMs_ = 0;
-  foldProbeMs = 0;
-  payloadMs = 0;
-  foldCallMs = 0;
-  foldedNodes = 0;
-  createNodeMs = 0;
-  appendChildMs = 0;
-  adoptSwaps = 0;
-  propClones = 0;
-  textSwaps = 0;
-  dirtyTextsBeforeCommit = 0;
-  layoutMs_ = 0;
-  textMs_ = 0;
-  layoutNodes_ = 0;
-  textMeasures_ = 0;
-  return split;
 }
 
 } // namespace symbiote

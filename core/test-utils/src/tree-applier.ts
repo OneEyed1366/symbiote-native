@@ -846,7 +846,7 @@ function censusOf(roots: readonly object[]): ITreeCensus {
  * The slot is resolved per call rather than captured: a fixture routinely installs a fake and then
  * calls `resetSlot()`, and a captured facade would answer about the previous one.
  */
-// ── THE IMPERATIVE FIVE ──────────────────────────────────────────────────────────────────────────
+// ── THE IMPERATIVE SIX ───────────────────────────────────────────────────────────────────────────
 //
 // Native answers these off the `ShadowNode` its last commit left on the node; here the equivalent is
 // the fake Fabric node, and the slot's own methods do the work. So this half is a lookup and a
@@ -897,5 +897,11 @@ export const treeApplierHost: ITreeHost = {
       return;
     }
     getSlot().measureLayout(committed, relative, onFail, onSuccess);
+  },
+  setIsJSResponder: (handle, isResponder, blockNativeResponder) => {
+    const committed = committedOf(handle);
+    if (committed !== undefined) {
+      getSlot().setIsJSResponder(committed, isResponder, blockNativeResponder);
+    }
   },
 };

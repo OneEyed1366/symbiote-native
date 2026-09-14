@@ -43,6 +43,7 @@ function fakeBindings(version: number): INativeEngineBindings {
     measure: (): void => {},
     measureInWindow: (): void => {},
     measureLayout: (): void => {},
+    setIsJSResponder: (): void => {},
   };
 }
 
