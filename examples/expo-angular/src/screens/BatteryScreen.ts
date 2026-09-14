@@ -1,11 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import {
-  Platform,
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  View,
-} from '@symbiote-native/angular';
+import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   BatteryLevelService,
   BatteryState,
@@ -49,7 +43,7 @@ function formatBatteryState(state: BatteryState): string {
 @Component({
   selector: 'BatteryScreen',
   standalone: true,
-  imports: [SafeAreaViewElement, ScrollViewElement, Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

@@ -1,12 +1,5 @@
 import { Component, Injector, effect, inject, signal } from '@angular/core';
-import {
-  Platform,
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  TextInputElement,
-  View,
-} from '@symbiote-native/angular';
+import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   ClipboardService,
   getStringAsync,
@@ -38,14 +31,7 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 @Component({
   selector: 'ClipboardScreen',
   standalone: true,
-  imports: [
-    ActionButton,
-    SafeAreaViewElement,
-    ScrollViewElement,
-    Text,
-    TextInputElement,
-    View,
-  ],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

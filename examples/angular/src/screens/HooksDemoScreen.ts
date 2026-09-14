@@ -1,5 +1,5 @@
 import { Component, signal, type Signal } from '@angular/core';
-import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   injectFocusEffect,
   injectIsFocused,
@@ -19,7 +19,7 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 @Component({
   selector: 'HooksDemoScreen',
   standalone: true,
-  imports: [SafeAreaViewElement, Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">

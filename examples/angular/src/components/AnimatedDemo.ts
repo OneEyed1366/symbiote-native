@@ -13,9 +13,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import {
   Animated,
   AnimatedView,
-  ButtonElement,
-  Text,
-  View,
+  SYMBIOTE_ELEMENTS,
 } from '@symbiote-native/angular';
 // Static look lives in AnimatedDemo.css — compiled at build time by @symbiote-native/css-parser.
 import './AnimatedDemo.css';
@@ -28,7 +26,7 @@ const FREEZE_MS = 1500;
 @Component({
   selector: 'AnimatedDemo',
   standalone: true,
-  imports: [View, Text, ButtonElement, AnimatedView],
+  imports: [SYMBIOTE_ELEMENTS, AnimatedView],
   template: `
     <view class="section-nested">
       <text class="section-label">Animated · JS vs native driver</text>

@@ -11,7 +11,7 @@ import {
   runInInjectionContext,
   type EnvironmentProviders,
 } from '@angular/core';
-import { Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 
 export const PLAYGROUND_GREETING_PREFIX = new InjectionToken<string>(
   'PLAYGROUND_GREETING_PREFIX',
@@ -85,7 +85,7 @@ export const playgroundLegacyProviders: EnvironmentProviders =
 @Component({
   selector: 'PlaygroundDiConsumer',
   standalone: true,
-  imports: [Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   // Provider-recipe shapes, all four: useClass (explicit), useValue, useExisting (aliases
   // PLAYGROUND_LOCAL_PREFIX onto PLAYGROUND_LOCAL_PREFIX_ALIAS without a second instance),
   // useFactory + deps. Registering PlaygroundGreetingService again HERE, component-scoped, is

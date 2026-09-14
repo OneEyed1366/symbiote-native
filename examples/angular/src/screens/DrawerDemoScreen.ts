@@ -1,10 +1,5 @@
 import { Component } from '@angular/core';
-import {
-  PressableElement,
-  SafeAreaViewElement,
-  Text,
-  View,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   Drawer,
   DrawerScreenDirective,
@@ -23,7 +18,7 @@ const drawerLineTagLabel = `${drawerLineInfo.code} · ${drawerLineInfo.label}`;
 @Component({
   selector: 'DrawerHomeScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">
@@ -82,7 +77,7 @@ export class DrawerHomeScreen {
 @Component({
   selector: 'DrawerSettingsScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">
@@ -125,13 +120,7 @@ export class DrawerSettingsScreen {
 @Component({
   selector: 'DrawerDemoScreen',
   standalone: true,
-  imports: [
-    Drawer,
-    DrawerScreenDirective,
-    PressableElement,
-    SafeAreaViewElement,
-    Text,
-  ],
+  imports: [Drawer, DrawerScreenDirective, SYMBIOTE_ELEMENTS],
   template: `
     <Drawer
       initialRouteName="Home"

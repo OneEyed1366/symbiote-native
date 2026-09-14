@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { ScrollViewElement, Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { injectStackNavigation } from '@symbiote-native/navigation/angular';
 import type { IAngularScreenOptions } from '@symbiote-native/navigation/angular';
 import { ROUTE_NAME } from '../routes';
@@ -34,7 +34,7 @@ export const sheetDemoScreenOptions: IAngularScreenOptions = {
 @Component({
   selector: 'SheetDemoScreen',
   standalone: true,
-  imports: [ActionButton, ScrollViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <scroll-view class="screen" contentContainerStyle="section">
       <view [class]="lineTagClass">

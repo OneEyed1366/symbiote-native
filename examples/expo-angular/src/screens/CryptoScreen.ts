@@ -1,10 +1,5 @@
 import { Component, signal } from '@angular/core';
-import {
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  View,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   CryptoDigestAlgorithm,
   digestStringAsync,
@@ -28,7 +23,7 @@ const RANDOM_BYTE_COUNT = 16;
 @Component({
   selector: 'CryptoScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

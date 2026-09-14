@@ -1,9 +1,5 @@
 import { Component, ElementRef, HostBinding, inject } from '@angular/core';
-import {
-  PressableElement,
-  Text,
-  anchorHostStyle,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS, anchorHostStyle } from '@symbiote-native/angular';
 import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import { PlaygroundQueryItemDirective } from './PlaygroundDirectives';
 
@@ -29,7 +25,7 @@ const TILE_BASE_STYLE: IViewStyle = { borderWidth: 2, borderRadius: 8 };
 @Component({
   selector: 'PlaygroundHostBindingTile',
   standalone: true,
-  imports: [PressableElement, Text],
+  imports: [SYMBIOTE_ELEMENTS],
   hostDirectives: [
     { directive: PlaygroundQueryItemDirective, inputs: ['label: tileLabel'] },
   ],

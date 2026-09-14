@@ -1,5 +1,5 @@
 import { Component, Input, OnDestroy, OnInit, signal } from '@angular/core';
-import { Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { readCommitProfile } from '@symbiote-native/engine';
 import { ActionButton } from './ActionButton';
 import './JsFrameRateMeter.css';
@@ -69,7 +69,7 @@ export const commitProfileGate = { isHeldByBenchmark: false };
 @Component({
   selector: 'JsFrameRateMeter',
   standalone: true,
-  imports: [ActionButton, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <view class="bench-meter">
       <text class="section-label">JS-THREAD FRAME RATE</text>

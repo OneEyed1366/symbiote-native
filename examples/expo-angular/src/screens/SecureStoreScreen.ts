@@ -1,11 +1,5 @@
 import { Component, signal } from '@angular/core';
-import {
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  TextInputElement,
-  View,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
@@ -35,14 +29,7 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
 @Component({
   selector: 'SecureStoreScreen',
   standalone: true,
-  imports: [
-    ActionButton,
-    SafeAreaViewElement,
-    ScrollViewElement,
-    Text,
-    TextInputElement,
-    View,
-  ],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view

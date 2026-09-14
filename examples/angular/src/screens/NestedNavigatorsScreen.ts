@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { SafeAreaViewElement, Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   Tab,
   TabScreenDirective,
@@ -20,7 +20,7 @@ function canPop(handle: unknown): handle is { pop: () => void } {
 @Component({
   selector: 'NestedTabHomeScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">
@@ -81,7 +81,7 @@ export class NestedTabHomeScreen {
 @Component({
   selector: 'NestedTabInfoScreen',
   standalone: true,
-  imports: [SafeAreaViewElement, Text, View],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <view class="section">

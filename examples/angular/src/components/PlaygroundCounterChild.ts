@@ -1,7 +1,7 @@
 import { Component, input, model, output } from '@angular/core';
 import { outputFromObservable } from '@angular/core/rxjs-interop';
 import { Subject } from 'rxjs';
-import { Text, View } from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import { ActionButton } from './ActionButton';
 
 // Signal-based component API: input()/input.required() with a `transform`, model() for two-way
@@ -10,7 +10,7 @@ import { ActionButton } from './ActionButton';
 @Component({
   selector: 'PlaygroundCounterChild',
   standalone: true,
-  imports: [ActionButton, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <view class="pg-row">
       <text testID="pg-counter-readout" class="info-text">{{

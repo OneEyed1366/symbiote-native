@@ -16,10 +16,8 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import {
   Animated,
   AnimatedView,
-  ButtonElement,
   PanResponder,
-  Text,
-  View,
+  SYMBIOTE_ELEMENTS,
 } from '@symbiote-native/angular';
 
 // static look compiled at build time by @symbiote-native/css-parser
@@ -35,7 +33,7 @@ const SCROLL_DURATION_MS = 180;
 @Component({
   selector: 'AnimatedParityDemo',
   standalone: true,
-  imports: [View, Text, ButtonElement, AnimatedView],
+  imports: [SYMBIOTE_ELEMENTS, AnimatedView],
   template: `
     <view class="section-nested">
       <text class="section-label"

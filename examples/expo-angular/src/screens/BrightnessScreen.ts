@@ -1,11 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import {
-  Platform,
-  SafeAreaViewElement,
-  ScrollViewElement,
-  Text,
-  View,
-} from '@symbiote-native/angular';
+import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   BrightnessMode,
   PermissionsService,
@@ -58,7 +52,7 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
 @Component({
   selector: 'BrightnessScreen',
   standalone: true,
-  imports: [ActionButton, SafeAreaViewElement, ScrollViewElement, Text, View],
+  imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
     <safe-area-view class="screen">
       <scroll-view
