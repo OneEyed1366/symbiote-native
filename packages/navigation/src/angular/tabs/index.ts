@@ -7,10 +7,15 @@
 // `@symbiote-native/angular`) for the tab-bar leaf, exactly like Stack bridges its header config.
 // Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints
 // ordinary `view`/`text` primitives via the shared render fn, so there is no
-// react-native-screens ViewConfig to register - Tab needs no `../register` import. Every tag this
-// template names (`View`, `symbiote-descriptor-outlet`) is a REAL imported Angular component (no
-// raw non-dashed native tag names the way stack.ts needs `NO_ERRORS_SCHEMA` for), so no loosened
-// schema is needed here at all.
+// react-native-screens ViewConfig to register - Tab needs no `../register` import.
+//
+// RAW NATIVE TAGS + NO_ERRORS_SCHEMA (see stack.ts's identical header note): `<view>` is a
+// non-dashed raw tag, and `CUSTOM_ELEMENTS_SCHEMA` only relaxes tags containing a "-" (confirmed
+// against `.vendors/angular/packages/compiler/src/schema/dom_element_schema_registry.ts`'s
+// `hasElement`) — it does NOT rescue this the way it does `symbiote-*`-prefixed selectors. The
+// previous `View` import (`ViewHost` re-exported under that alias) never actually matched `<view>`
+// here despite the identical selector — device-observed via `ngc`, not `tsc`/vitest — and was
+// removed as dead (ngc's own NG8113 flagged it unused).
 //
 // RESOLVED (see stack.ts's header, identical reasoning): `'Tab'` has an `ANCHOR_HOST_COMPONENTS`
 // entry in `adapters/angular/src/renderer.ts`, so a real device build paints `<Tab>` correctly as
@@ -21,6 +26,7 @@ import {
   Component,
   ContentChildren,
   Input,
+  NO_ERRORS_SCHEMA,
   QueryList,
   signal,
   untracked,
@@ -30,7 +36,7 @@ import {
 } from '@angular/core';
 import { NgComponentOutlet } from '@angular/common';
 import { dlog } from '@symbiote-native/engine';
-import { DescriptorOutlet, View } from '@symbiote-native/angular';
+import { DescriptorOutlet } from '@symbiote-native/angular';
 import type { IDescriptor } from '@symbiote-native/components';
 import {
   NAVIGATION_EVENT_BLUR,
@@ -66,12 +72,8 @@ let tabInstanceCounter = 0;
 @Component({
   selector: 'Tab',
   standalone: true,
-  imports: [
-    NgComponentOutlet,
-    NavigationScopeDirective,
-    DescriptorOutlet,
-    View,
-  ],
+  schemas: [NO_ERRORS_SCHEMA],
+  imports: [NgComponentOutlet, NavigationScopeDirective, DescriptorOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <view [style]="rootStyle">
