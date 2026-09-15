@@ -1,5 +1,11 @@
 # @symbiote-native/navigation
 
+## 4.0.1
+
+### Patch Changes
+
+- [`c56444e`](https://github.com/OneEyed1366/symbiote-native/commit/c56444e6205533bacc2ae2a83e242218fb88a38e) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Fix Angular AOT build failure in `Tab`/`Drawer`: raw `<view>` tags need `NO_ERRORS_SCHEMA`, not `CUSTOM_ELEMENTS_SCHEMA` (which only relaxes dashed tag names).
+
 ## 4.0.0
 
 ### Patch Changes
