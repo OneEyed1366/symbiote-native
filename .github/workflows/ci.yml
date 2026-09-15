@@ -7,8 +7,12 @@ on:
   # here is the actual fix, not a workaround in publish-canary/workflow_run.
   pull_request:
     branches: [master, develop]
+  # master is deliberately excluded: release.yml's own `checks` job already
+  # runs checks.yml on every push to master. Including master here duplicated
+  # the entire suite (incl. the ~8min bundle-isolation matrix) on every merge
+  # into master, racing both runs against the same tree-hash cache key.
   push:
-    branches: [master, develop]
+    branches: [develop]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
