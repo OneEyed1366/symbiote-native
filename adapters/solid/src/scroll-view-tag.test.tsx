@@ -223,3 +223,55 @@ describe('Solid scroll-view / horizontal-scroll-view tags', () => {
     expect(committed(CONTENT_VIEW).children).toHaveLength(1); // "after" only
   });
 });
+
+// RN parity: a ScrollView ref exposes scrollTo/scrollToEnd/flashScrollIndicators
+// (`.claude/rules/adapter-parity-audit.md`'s "imperative scroll handle" surface item). The
+// commands themselves are engine-level (`core/components/src/scroll-view-commands.ts`, already
+// tested there) — what's unproven for Solid specifically is that a `ref`-held `<scroll-view>`
+// hands back a node carrying them. Solid's own `components/view.test.tsx` only proves `measure`
+// (the generic host surface), not the ScrollView-specific commands.
+//
+// No Negative group: scrollTo/flashScrollIndicators take no input this adapter can reject.
+describe('Solid <scroll-view> imperative handle', () => {
+  async function mountScrollRef(): Promise<{
+    scrollTo: (options?: {
+      x?: number;
+      y?: number;
+      animated?: boolean;
+    }) => void;
+    flashScrollIndicators: () => void;
+  }> {
+    const [node, setNode] = createSignal<
+      | {
+          scrollTo: (options?: unknown) => void;
+          flashScrollIndicators: () => void;
+        }
+      | undefined
+    >();
+    mount(ROOT_TAG, () => <scroll-view ref={setNode} />);
+    await tick();
+    const handle = node();
+    if (handle === undefined)
+      throw new Error('ref never resolved to a host instance');
+    return handle;
+  }
+
+  it('dispatches scrollTo through the ref-held host instance', async () => {
+    const handle = await mountScrollRef();
+    handle.scrollTo({ x: 0, y: 42, animated: false });
+
+    expect(fabric.commands).toHaveLength(1);
+    expect(fabric.commands[0]?.commandName).toBe('scrollTo');
+    expect(fabric.commands[0]?.args).toEqual([0, 42, false]);
+    expect(fabric.commands[0]?.node.viewName).toBe(SCROLL_VIEW);
+  });
+
+  it('dispatches flashScrollIndicators through the same handle', async () => {
+    const handle = await mountScrollRef();
+    handle.flashScrollIndicators();
+
+    expect(fabric.commands).toHaveLength(1);
+    expect(fabric.commands[0]?.commandName).toBe('flashScrollIndicators');
+    expect(fabric.commands[0]?.args).toEqual([]);
+  });
+});

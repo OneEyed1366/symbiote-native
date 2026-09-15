@@ -479,4 +479,45 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
       createdAtMount,
     );
   });
+
+  // why: RN-parity sweep lesson — the "re-settles the opacity when disabled flips" case above
+  // proves the FADE reacts to `disabled`, not that a press while already disabled is gated at all.
+  // RN's own Button-itest fires a real touch for exactly this reason.
+  it('suppresses onPress from a real touch while disabled', async () => {
+    const { Parent, control } = await loadParent();
+    // `disabled` is driven by `control` in the parent template (see loadParent's header), not by
+    // the mount-time props object — a `disabled` passed there is immediately overwritten.
+    control.disabled = true;
+    let presses = 0;
+    mount(ROOT_TAG, Parent, {
+      testID: TARGET,
+      onPress: () => {
+        presses += 1;
+      },
+    });
+    await tick();
+    await tick();
+
+    const handle = responderHandle();
+    fabric.fireEvent(handle, TOUCH_START);
+    fabric.fireEvent(handle, TOUCH_END);
+    await flushFrames();
+    expect(presses).toBe(0);
+  });
+
+  // why: RN gives Pressable a ONE-leg focusable default (Pressable.js:258) and the Touchables a
+  // THREE-leg one (TouchableOpacity.js:336-340) — no adapter had this checked for Svelte before
+  // this sweep, on any of the three Touchable variants.
+  it('refuses focus while disabled, opt-in notwithstanding', async () => {
+    const { Parent, control } = await loadParent();
+    control.disabled = true;
+    mount(ROOT_TAG, Parent, {
+      testID: TARGET,
+      onPress: () => {},
+      focusable: true,
+    });
+    await tick();
+    await tick();
+    expect(responderNode().props.focusable).toBe(false);
+  });
 });

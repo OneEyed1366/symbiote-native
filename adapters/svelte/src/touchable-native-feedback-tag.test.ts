@@ -20,7 +20,7 @@ import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // SIDE-EFFECT IMPORT: the behavior is what clones the owner's props onto the child. An app reaches
 // it through the package barrel; a test importing the renderer directly does not.
@@ -87,10 +87,26 @@ function subtreeOf(label: string): ICommitted[] {
   return flatten(root.children);
 }
 
+/** Raw (unstripped) committed child, for its `instanceHandle` — `asCommitted` drops that field. */
+function rawChildOf(label: string): IFakeNode {
+  const rawFlatten = (nodes: readonly IFakeNode[]): IFakeNode[] =>
+    nodes.flatMap(node => [node, ...rawFlatten(node.children)]);
+  const root = rawFlatten(fabric.appRoot().children).find(
+    node => node.props.nativeID === label,
+  );
+  if (root === undefined) throw new Error(`no committed root ${label}`);
+  const [child] = root.children;
+  if (child === undefined) throw new Error(`root ${label} has no child`);
+  return child;
+}
+
 let nextRoot = 9_934;
 
-/** Compile a real `.svelte` source, mount it, settle. */
-async function mountSource(source: string): Promise<number> {
+/** Compile a real `.svelte` source, mount it with the given props, settle. */
+async function mountSource(
+  source: string,
+  props: Record<string, unknown> = {},
+): Promise<number> {
   const root = (nextRoot += 1);
   writeFileSync(
     PROBE_OUT,
@@ -101,7 +117,7 @@ async function mountSource(source: string): Promise<number> {
   const { default: Probe } = (await import(
     `file://${PROBE_OUT}?arm=${root}`
   )) as { default: Component };
-  mount(root, Probe, {});
+  mount(root, Probe, props);
   await settle();
   return root;
 }
@@ -146,6 +162,33 @@ describe('touchable-native-feedback as a tag', () => {
     expect(child.props.accessibilityLabel).toBe('Save');
     // :373 — the owner's `id` wins, overwriting the child's own.
     expect(child.props.nativeID).toBe('tnf');
+
+    unmount(root);
+    await settle();
+  });
+
+  // why: the clone case above proves the PROPS bridge; it does not prove a real touch on the child
+  // actually reaches the owner's `onPress` through Svelte's wiring — the press machine runs on the
+  // child (core/components/src/behaviors/touchable-native-feedback.test.ts), so a touch dispatched
+  // anywhere but there would silently prove nothing.
+  it('fires the owner’s onPress from a real touch on the cloned child', async () => {
+    let presses = 0;
+    const root = await mountSource(
+      [
+        '<script>let { onPress } = $props();</script>',
+        '<view id="root">',
+        '  <touchable-native-feedback id="tnf" onPress={onPress}>',
+        '    <view></view>',
+        '  </touchable-native-feedback>',
+        '</view>',
+      ].join('\n'),
+      { onPress: () => (presses += 1) },
+    );
+
+    const handle = rawChildOf('root').instanceHandle;
+    fabric.fireEvent(handle, 'topTouchStart', {});
+    fabric.fireEvent(handle, 'topTouchEnd', {});
+    expect(presses).toBe(1);
 
     unmount(root);
     await settle();

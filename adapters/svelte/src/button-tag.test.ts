@@ -75,6 +75,7 @@ interface ICommitted {
   readonly viewName: unknown;
   readonly props: Record<string, unknown>;
   readonly children: readonly ICommitted[];
+  readonly instanceHandle: unknown;
 }
 
 function asCommitted(value: unknown): ICommitted | undefined {
@@ -84,6 +85,7 @@ function asCommitted(value: unknown): ICommitted | undefined {
     viewName: value.viewName,
     props: value.props,
     children: children.flatMap(child => asCommitted(child) ?? []),
+    instanceHandle: value.instanceHandle,
   };
 }
 
@@ -103,8 +105,11 @@ function hostOf(label: string): ICommitted {
 
 let nextRoot = 9_960;
 
-/** Compile a real `.svelte` source, mount it, settle. */
-async function mountSource(source: string): Promise<number> {
+/** Compile a real `.svelte` source, mount it with the given props, settle. */
+async function mountSource(
+  source: string,
+  props: Record<string, unknown> = {},
+): Promise<number> {
   const root = (nextRoot += 1);
   writeFileSync(
     PROBE_OUT,
@@ -116,7 +121,7 @@ async function mountSource(source: string): Promise<number> {
   const { default: Probe } = (await import(
     `file://${PROBE_OUT}?arm=${root}`
   )) as { default: Component };
-  mount(root, Probe, {});
+  mount(root, Probe, props);
   await settle();
   return root;
 }
@@ -201,6 +206,25 @@ describe('Svelte: `button` as a tag', () => {
     const state = host.props.accessibilityState;
     expect(isRecord(state) && state.disabled).toBe(true);
     expect(host.children[0].children[0].props.color).toBe(DISABLED_GREY);
+
+    unmount(root);
+    await settle();
+  });
+
+  // why: RN's Button-itest.js — `disabled` must gate the press itself, not just the label colour
+  // (`prevents the button onPress callback from being called`). Styling proves the fold reached
+  // the accessibilityState; a real touch is the only thing that proves it reached the responder.
+  it('suppresses onPress from a real touch while disabled', async () => {
+    let presses = 0;
+    const root = await mountSource(
+      `<script>let { onPress } = $props();</script><button p={{ id: 'btn', title: 'Go', disabled: true, onPress }}></button>`,
+      { onPress: () => (presses += 1) },
+    );
+
+    const host = hostOf('btn');
+    fabric.fireEvent(host.instanceHandle, 'topTouchStart', {});
+    fabric.fireEvent(host.instanceHandle, 'topTouchEnd', {});
+    expect(presses).toBe(0);
 
     unmount(root);
     await settle();

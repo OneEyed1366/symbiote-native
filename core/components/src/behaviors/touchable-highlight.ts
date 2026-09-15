@@ -1,17 +1,22 @@
 // TouchableHighlight as an ENGINE-NODE behavior, so it can be an intrinsic tag instead of a
 // framework component (`.claude/rules/host-primitive-tier.md`, tier 2).
 //
-// ONE NODE, THE SAME SIMPLIFICATION EVERY WRAPPER ALREADY SHIPS. RN's own TouchableHighlight
-// renders a container View (the responder, the underlay backgroundColor, the whole accessibility
-// fold) and CLONES an extra opacity style onto its single child (TouchableHighlight.js:281-320,
-// `_createExtraStyles` + `cloneElement`) — closer to TouchableNativeFeedback's clone-onto-child
-// shape than to TouchableOpacity's true single node. Every wrapper (Svelte's own comment: "ITEM 7
-// IS DELIBERATELY NOT FIXED HERE... exactly as Solid and Angular decided") folds BOTH the underlay
-// and the child opacity onto the ONE node instead, because splitting them needs a child to target
-// and a framework component holding an opaque children snippet/slot cannot reach one safely. This
-// port keeps that already-shipped, already-cross-adapter simplification rather than reopening it —
-// `render-touchable-highlight.ts`'s own header says the shared layer "takes no position on where
-// they land", so this is a legitimate placement choice, not a new shortcut.
+// TWO NODES, MATCHING RN, FIXED 2026-09-15. RN's own TouchableHighlight renders a container View
+// (the responder, the underlay backgroundColor, the whole accessibility fold) and CLONES an extra
+// opacity style onto its single child (TouchableHighlight.js:281-320, `_createExtraStyles` +
+// `cloneElement`) — `TouchableHighlight-itest.js` shows it directly: shown state commits
+// `<rn-view backgroundColor=...><rn-view opacity=... /></rn-view>`, two nodes, not one.
+//
+// This USED to fold both onto the ONE node (every wrapper had independently made that call —
+// Svelte's own comment: "ITEM 7 IS DELIBERATELY NOT FIXED HERE... exactly as Solid and Angular
+// decided") — but that is a real, visible bug, not a placement choice: `resolveHighlightExtraStyles`
+// (`render-touchable-highlight.ts`) was RN-audited specifically to keep `underlay` and `child`
+// apart, and its own header names the exact symptom of merging them back — `opacity` on the SAME
+// node as `backgroundColor` fades the underlay itself, so `underlayColor: 'black'` paints grey, not
+// black. Verification-round-2 (2026-09-15) traced the contradiction between this file's old
+// rationale and that file's warning back to its source and fixed it here: the CHILD now gets the
+// opacity via `onChildInserted`, the same clone-onto-child seam `./touchable-native-feedback` uses,
+// while this node keeps only the underlay.
 //
 // WHAT IS SHARED AND WHAT IS NEW. The underlay show/hide state machine
 // (createHighlightUnderlayHandlers/createHighlightUnderlayRuntime, `../state/touchable`) is already
@@ -39,8 +44,10 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { resolveTouchableFocusable } from '../view/render-pressable';
+import { resolveButtonDisabled } from '../view/render-button';
 import {
   accessibleUnlessOptedOut,
+  asAccessibilityState,
   booleanOr,
   createPressBehavior,
   type IDisabledResolver,
@@ -52,9 +59,23 @@ import {
   hasTouchablePressHandler,
   type IHighlightUnderlayRuntime,
 } from '../state/touchable';
-import { resolveHighlightExtraStyles } from '../view/render-touchable-highlight';
+import {
+  resolveHighlightExtraStyles,
+  type ITouchableHighlightExtraStyles,
+} from '../view/render-touchable-highlight';
 
 export const TOUCHABLE_HIGHLIGHT_TAG = 'touchable-highlight';
+
+// TouchableHighlight.js:194-197 — `disabled ?? accessibilityState.disabled` (RN omits aria-disabled
+// here, unlike Opacity/Button/NativeFeedback — an upstream inconsistency this matches rather than
+// "fixes"). Without it, `accessibilityState={{disabled: true}}` alone greys the label but a press
+// still fires here.
+const touchableHighlightDisabled: IDisabledResolver = props =>
+  resolveButtonDisabled(
+    booleanOr(props.disabled),
+    undefined,
+    asAccessibilityState(props.accessibilityState),
+  );
 
 interface IHighlightState {
   shown: boolean;
@@ -66,12 +87,59 @@ interface IHighlightState {
 
 const states = new WeakMap<ISymbioteNode, IHighlightState>();
 
+// The child `cloneElement` targets, RN's `React.Children.only` — first child wins, matching
+// `./touchable-native-feedback`'s single-child assumption.
+const childOf = new WeakMap<ISymbioteNode, ISymbioteNode>();
+
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === 'number' ? value : fallback;
 }
 
 function stringOr(value: unknown, fallback: string | undefined): unknown {
   return typeof value === 'string' ? value : fallback;
+}
+
+// Shared by the owner's own fold (underlay) and the child's cloned fold (opacity) — one source for
+// whether either half should paint at all, so they can never disagree about `shown`.
+function computeExtra(
+  owner: ISymbioteNode,
+): ITouchableHighlightExtraStyles | undefined {
+  const state = states.get(owner);
+  if (state === undefined) return undefined;
+  const hasPressHandler = hasTouchablePressHandler({
+    onPress: appListenerFor(owner, 'press'),
+    onPressIn: appListenerFor(owner, 'pressIn'),
+    onPressOut: appListenerFor(owner, 'pressOut'),
+    onLongPress: appListenerFor(owner, 'longPress'),
+  });
+  return resolveHighlightExtraStyles({
+    shown: state.shown,
+    hasPressHandler,
+    underlayColor: stringOr(owner.props.underlayColor, undefined) as
+      string | undefined,
+    activeOpacity: numberOr(owner.props.activeOpacity, NaN) || undefined,
+  });
+}
+
+// The clone-onto-child half, mirroring `./touchable-native-feedback`'s `cloneFold` shape: the
+// child's own fold runs first, this only ADDS the active-opacity style on top.
+function childOpacityFold(
+  owner: ISymbioteNode,
+  inner: IPayloadFold | undefined,
+): IPayloadFold {
+  return props => {
+    const base = inner === undefined ? props : inner(props);
+    const extra = computeExtra(owner);
+    if (extra === undefined) return base;
+    return { ...base, style: [base.style, extra.child] };
+  };
+}
+
+function onChildInserted(owner: ISymbioteNode, child: ISymbioteNode): void {
+  if (childOf.get(owner) !== undefined) return;
+  childOf.set(owner, child);
+  child.payloadFold = childOpacityFold(owner, child.payloadFold);
+  markPropsDirty(child);
 }
 
 // Runs once per GESTURE, matching `./touchable-opacity`'s `refine` — the config it reads is
@@ -111,6 +179,11 @@ const refine: IPressConfigRefinement = (node, config) => {
         state.shown = shown;
         markPropsDirty(node);
         requestCommitFor(node);
+        const child = childOf.get(node);
+        if (child !== undefined) {
+          markPropsDirty(child);
+          requestCommitFor(child);
+        }
       },
       onShowUnderlay: () => {
         const onShowUnderlay = node.props.onShowUnderlay;
@@ -159,24 +232,9 @@ const foldPayload: IPayloadFold = props => {
 function tagFold(node: ISymbioteNode): IPayloadFold {
   return props => {
     const next = foldPayload(props);
-    const state = states.get(node);
-    const hasPressHandler =
-      appListenerFor(node, 'press') !== undefined ||
-      appListenerFor(node, 'pressIn') !== undefined ||
-      appListenerFor(node, 'pressOut') !== undefined ||
-      appListenerFor(node, 'longPress') !== undefined;
-    const extra =
-      state === undefined
-        ? undefined
-        : resolveHighlightExtraStyles({
-            shown: state.shown,
-            hasPressHandler,
-            underlayColor: stringOr(props.underlayColor, undefined) as
-              string | undefined,
-            activeOpacity: numberOr(props.activeOpacity, NaN) || undefined,
-          });
+    const extra = computeExtra(node);
     if (extra !== undefined) {
-      next.style = [props.style, extra.underlay, extra.child];
+      next.style = [props.style, extra.underlay];
     }
     next.focusable = resolveTouchableFocusable(
       booleanOr(props.focusable),
@@ -193,6 +251,11 @@ function onOwnedListenerChange(node: ISymbioteNode, name: string): void {
   if (name !== 'press') return;
   markPropsDirty(node);
   requestCommitFor(node);
+  const child = childOf.get(node);
+  if (child !== undefined) {
+    markPropsDirty(child);
+    requestCommitFor(child);
+  }
 }
 
 /**
@@ -216,6 +279,7 @@ export function createTouchableHighlightBehavior(
     },
     detach(node: ISymbioteNode): void {
       machine.detach(node);
+      childOf.delete(node);
       const state = states.get(node);
       if (state === undefined) return;
       for (const id of state.timers) clearTimeout(id);
@@ -227,7 +291,9 @@ export function createTouchableHighlightBehavior(
 
 // Idempotent: an adapter entry may be imported more than once in a bundle.
 export function registerTouchableHighlightBehavior(): void {
-  const touchable = createTouchableHighlightBehavior();
+  const touchable = createTouchableHighlightBehavior(
+    touchableHighlightDisabled,
+  );
   registerHostBehavior(TOUCHABLE_HIGHLIGHT_TAG, {
     ...touchable,
     // Only the TAG binds a per-node fold — see `./touchable-opacity`'s identical comment.
@@ -236,5 +302,6 @@ export function registerTouchableHighlightBehavior(): void {
       node.payloadFold = tagFold(node);
     },
     onOwnedListenerChange,
+    onChildInserted,
   });
 }

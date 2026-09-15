@@ -250,6 +250,25 @@ describe('renderImage — alt / accessibility fold (Positive)', () => {
   });
 });
 
+// why: RN's own Image-itest.js asserts blurRadius/capInsets by name ("provides blur radius for
+// image") — passthrough carries them mechanically, but nothing named the claim until now.
+describe('renderImage — blurRadius / capInsets passthrough (Positive)', () => {
+  it('forwards blurRadius onto the host image untouched', () => {
+    const descriptor = renderImage(
+      baseView({ source: 1, passthrough: { blurRadius: 5 } }),
+    );
+    expect(descriptor.props.blurRadius).toBe(5);
+  });
+
+  it('forwards capInsets onto the host image untouched', () => {
+    const capInsets = { top: 1, left: 2, bottom: 3, right: 4 };
+    const descriptor = renderImage(
+      baseView({ source: 1, passthrough: { capInsets } }),
+    );
+    expect(descriptor.props.capInsets).toEqual(capInsets);
+  });
+});
+
 describe('renderImage — secondary sources (Positive)', () => {
   it('resolves loadingIndicatorSource to a bare uri string, not the array shape', () => {
     const descriptor = renderImage(

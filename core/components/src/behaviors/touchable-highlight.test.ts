@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
 import {
+  appendChild,
   clearHostBehaviors,
   createElement,
   createSurface,
@@ -14,6 +15,7 @@ import {
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
+import { descriptorFor } from '../component-names';
 import {
   registerTouchableHighlightBehavior,
   TOUCHABLE_HIGHLIGHT_TAG,
@@ -26,12 +28,12 @@ import {
 const fabric = installFabric();
 let nextRootTag = 7300;
 
-// RN's TouchableHighlight is one View (the underlay + child both fold onto it here — see the
-// behavior file's own header for why, this port keeps the wrapper's already-shipped
-// single-node simplification). Built with the FABRIC name, matching every sibling test in this
-// file's family.
+// RN's TouchableHighlight is TWO views: the container (underlay backgroundColor) wrapping the
+// cloned child (activeOpacity) — `TouchableHighlight-itest.js`. Built with the FABRIC name,
+// matching every sibling test in this file's family.
 const TOUCHABLE_VIEW_NAME = 'RCTView';
 const TEST_ID = 'subject';
+const CHILD_TEST_ID = 'subject-child';
 const DELAY_PRESS_OUT = 100;
 
 const TOUCH: ISymbioteEvent = {
@@ -40,6 +42,16 @@ const TOUCH: ISymbioteEvent = {
 
 function makeTouchable(): ISymbioteNode {
   return createElement(TOUCHABLE_VIEW_NAME, false, TOUCHABLE_HIGHLIGHT_TAG);
+}
+
+// A real child, as RN requires (`React.Children.only`) — `onChildInserted` clones the active
+// opacity onto exactly this node, never the owner.
+function appendTestChild(owner: ISymbioteNode): ISymbioteNode {
+  const descriptor = descriptorFor('view');
+  const child = createElement(descriptor.component, descriptor.isText, 'view');
+  routeProp(child, 'testID', CHILD_TEST_ID);
+  appendChild(owner, child);
+  return child;
 }
 
 function mount(node: ISymbioteNode) {
@@ -244,38 +256,69 @@ describe('touchable-highlight host behavior', () => {
     expect(onPressOut).toHaveBeenCalledTimes(1);
   });
 
+  // TouchableHighlight.js:194-197 resolves `disabled ?? accessibilityState.disabled` for its OWN
+  // Pressability config (no `aria-disabled` fallback here — RN itself omits it for this one
+  // primitive, unlike Opacity/Button/NativeFeedback) — wired here for the first time.
+  it('suppresses the press from accessibilityState.disabled alone', async () => {
+    const onPress = vi.fn();
+    registerTouchableHighlightBehavior();
+    const node = makeTouchable();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'onPress', onPress);
+    routeProp(node, 'accessibilityState', { disabled: true });
+    mount(node);
+    await settle();
+
+    pressIn(node);
+    listenerOf(node, 'press')(TOUCH);
+    listenerOf(node, 'pressOut')(TOUCH);
+    await settle();
+
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
   // why: RN settles back to the CALLER's activeOpacity/underlayColor, not a hardcoded one —
   // TouchableHighlight.js's `_createExtraStyles` reads both off props with its own defaults.
-  it('applies a custom underlayColor and activeOpacity, and the wrapper defaults otherwise', async () => {
+  //
+  // STRUCTURAL: the underlay lands on the CONTAINER (this node), the opacity on the CHILD RN
+  // clones — never both on one node (that merge fades the underlay itself, see this behavior
+  // file's own header). Confirmed against `TouchableHighlight-itest.js`'s own two-node shape.
+  it('applies a custom underlayColor to the container and activeOpacity to the child', async () => {
     registerTouchableHighlightBehavior();
     const node = makeTouchable();
     routeProp(node, 'testID', TEST_ID);
     routeProp(node, 'onPress', () => {});
     routeProp(node, 'underlayColor', 'crimson');
     routeProp(node, 'activeOpacity', 0.5);
+    appendTestChild(node);
     mount(node);
     await settle();
 
     pressIn(node);
     await settle();
-    const props = committedPropsOf(TEST_ID);
-    expect(props.backgroundColor).toBe('crimson');
-    expect(props.opacity).toBe(0.5);
+    const owner = committedPropsOf(TEST_ID);
+    expect(owner.backgroundColor).toBe('crimson');
+    expect(owner.opacity).toBeUndefined();
+    expect(committedPropsOf(CHILD_TEST_ID).opacity).toBe(0.5);
   });
 
-  it('defaults to black at 0.85 opacity when unset', async () => {
+  it('defaults to black underlay on the container and 0.85 opacity on the child when unset', async () => {
     registerTouchableHighlightBehavior();
     const node = makeTouchable();
     routeProp(node, 'testID', TEST_ID);
     routeProp(node, 'onPress', () => {});
+    appendTestChild(node);
     mount(node);
     await settle();
 
     pressIn(node);
     await settle();
-    const props = committedPropsOf(TEST_ID);
-    expect(props.backgroundColor).toBe(DEFAULT_UNDERLAY_COLOR);
-    expect(props.opacity).toBe(DEFAULT_HIGHLIGHT_CHILD_OPACITY);
+    const owner = committedPropsOf(TEST_ID);
+    expect(owner.backgroundColor).toBe(DEFAULT_UNDERLAY_COLOR);
+    expect(owner.opacity).toBeUndefined();
+    expect(committedPropsOf(CHILD_TEST_ID).opacity).toBe(
+      DEFAULT_HIGHLIGHT_CHILD_OPACITY,
+    );
   });
 
   // TouchableHighlight.js's render: `focusable={this.props.focusable !== false &&
