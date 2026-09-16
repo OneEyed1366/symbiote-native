@@ -21,7 +21,15 @@
 //
 // RESOLVED (see stack.ts's header, identical reasoning): `'Drawer'` has an `ANCHOR_HOST_COMPONENTS`
 // entry in `adapters/angular/src/renderer.ts`, so a real device build paints `<Drawer>` correctly
-// as a nested tag. `View`/`AnimatedView`, imported below, were already anchor-hosted.
+// as a nested tag. `AnimatedView`, imported below, was already anchor-hosted.
+//
+// RAW NATIVE TAGS + NO_ERRORS_SCHEMA (see stack.ts's and tabs.ts's identical header note):
+// `<view>` is a non-dashed raw tag, and `CUSTOM_ELEMENTS_SCHEMA` only relaxes tags containing a
+// "-" (confirmed against `.vendors/angular/packages/compiler/src/schema/
+// dom_element_schema_registry.ts`'s `hasElement`). The previous `View` import (`ViewHost`
+// re-exported under that alias) never actually matched `<view>` here despite the identical
+// selector — device-observed via `ngc`, not `tsc`/vitest — and was removed as dead (ngc's own
+// NG8113 flagged it unused).
 //
 // DRAWER CONTENT PROJECTION: react/drawer.ts's `renderDrawerContent` is a render-PROP callback
 // (`(props) => ReactNode`) - per CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter>, a
@@ -37,6 +45,7 @@ import {
   ContentChild,
   ContentChildren,
   Input,
+  NO_ERRORS_SCHEMA,
   QueryList,
   TemplateRef,
   computed,
@@ -62,7 +71,6 @@ import {
   Animated,
   AnimatedView,
   SymbioteHostPropsDirective,
-  View,
   WindowDimensionsService,
 } from '@symbiote-native/angular';
 import type {
@@ -120,12 +128,12 @@ let drawerInstanceCounter = 0;
 @Component({
   selector: 'Drawer',
   standalone: true,
+  schemas: [NO_ERRORS_SCHEMA],
   imports: [
     NgComponentOutlet,
     NgTemplateOutlet,
     NavigationScopeDirective,
     SymbioteHostPropsDirective,
-    View,
     AnimatedView,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
