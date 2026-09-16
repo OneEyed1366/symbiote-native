@@ -15,8 +15,15 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMPONENT_DESCRIPTORS } from '@symbiote-native/components';
-import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  ANCHOR_COMPONENT,
+  parentOf,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: `register.ts` installs the host behaviors, whose `foldPayload` is the bare
 // path's only source for the folds a wrapper would otherwise apply.
 import './register';
@@ -228,19 +235,27 @@ describe('what ngtsc accepts once an element directive matches the tag', () => {
   });
 });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRoot = 8_900;
 
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
-}
+// A plain, pre-unmount SNAPSHOT — not a live `ILiveNode`. `mountTemplate` unmounts before
+// returning, and a gated event flag (`onLayout` and its five siblings) is cleared by the
+// listener's own teardown on unmount; a live `.payload` getter re-read afterward would see that
+// clear. `handle` stays live (structural links survive unmount, same as every other converted tag
+// suite in this batch), so `parentOf` still answers correctly.
+type ISnapshotNode = {
+  viewName: string;
+  payload: Record<string, unknown>;
+  handle: ISymbioteNode;
+};
 
 const MAX_SETTLE_TICKS = 20;
 async function flushUntilSettled(): Promise<void> {
   let previous = -1;
   for (let index = 0; index < MAX_SETTLE_TICKS; index += 1) {
     await new Promise(resolve => setTimeout(resolve, 0));
-    const current = fabric.counts.completeRoot;
+    const current = fabric.commits;
     if (current === previous && current > 0) return;
     previous = current;
   }
@@ -250,7 +265,7 @@ async function flushUntilSettled(): Promise<void> {
 async function mountTemplate(
   template: string,
   extraImports: readonly Type<unknown>[] = [],
-): Promise<{ all: IFakeNode[]; hits: number }> {
+): Promise<{ all: ISnapshotNode[]; hits: number }> {
   fabric.reset();
   nextRoot += 1;
   const root = nextRoot;
@@ -270,13 +285,20 @@ async function mountTemplate(
 
   mount(root, ElementFixture satisfies Type<unknown>);
   await flushUntilSettled();
-  const all = flatten(fabric.committed);
+  const walk = (node: ReturnType<typeof live.nodeOf>): ISnapshotNode[] => [
+    { viewName: node.viewName, payload: node.payload, handle: node.handle },
+    ...node.children.flatMap(walk),
+  ];
+  const all = walk(live.nodeOf(live.appRoot()));
   unmount(root);
   return { all, hits: 0 };
 }
 
-const propsOf = (all: IFakeNode[], testID: string): Record<string, unknown> =>
-  all.find(node => node.props.testID === testID)?.props ?? {};
+const propsOf = (
+  all: ISnapshotNode[],
+  testID: string,
+): Record<string, unknown> =>
+  all.find(node => node.payload.testID === testID)?.payload ?? {};
 
 describe('what the element directives commit', () => {
   beforeEach(() => fabric.reset());
@@ -333,7 +355,7 @@ describe('what the element directives commit', () => {
       const { all } = await mountTemplate(
         `<${tag} [testID]="'probe'"></${tag}>`,
       );
-      const node = all.find(candidate => candidate.props.testID === 'probe');
+      const node = all.find(candidate => candidate.payload.testID === 'probe');
       // A tag whose descriptor names the ANCHOR component commits NOTHING by design — RN's
       // TouchableNativeFeedback renders no view and clones onto its single child. Asserted as an
       // absence rather than skipped, so a tag that starts committing a real view goes red here.
@@ -347,9 +369,11 @@ describe('what the element directives commit', () => {
       // A COMPOSED primitive redirects every prop it does not keep — `testID` included — onto the
       // node its behavior built, exactly as RN's wrappers do (`ImageBackground.js:81` spreads
       // `...props` onto the inner Image, `ActivityIndicator.js:99` onto the spinner). So the probe
-      // may sit one level below the tag. ONE hop only: an ancestor walk would let any name pass,
-      // since the container root is an RCTView.
-      const parent = all.find(candidate => candidate.children.includes(node));
+      // may sit one level below the tag. ONE hop via `parentOf` — the engine's own answer, not a
+      // `children`-includes scan, which a live getter's fresh-array-per-read defeats.
+      const parentHandle =
+        node === undefined ? undefined : parentOf(node.handle);
+      const parent = all.find(candidate => candidate.handle === parentHandle);
       expect([node?.viewName, parent?.viewName]).toContain(
         COMPONENT_DESCRIPTORS[tag]?.component,
       );

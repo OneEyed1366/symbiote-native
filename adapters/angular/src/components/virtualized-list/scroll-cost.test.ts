@@ -12,7 +12,10 @@ import '@angular/compiler';
 import { writeFileSync } from 'node:fs';
 import { CUSTOM_ELEMENTS_SCHEMA, Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { readCommitProfile } from '@symbiote-native/engine';
 import {
   buildOffsets,
@@ -32,7 +35,7 @@ const ROOT_TAG = 985;
 const SCROLL_EVENT = 'topScroll';
 const SCROLL_BURST = 10;
 const ROW_COUNT = 5;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 const flush = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -60,7 +63,7 @@ async function fillToTarget(frames: IListDiagnosticFrame[]): Promise<void> {
 }
 
 function handleFor(testID: string): unknown {
-  const node = fabric.find((n: IFakeNode) => n.props.testID === testID);
+  const node = fabric.find((n: IAuthoredNode) => n.props.testID === testID);
   if (!node) throw new Error(`no node created with testID=${testID}`);
   return node.instanceHandle;
 }

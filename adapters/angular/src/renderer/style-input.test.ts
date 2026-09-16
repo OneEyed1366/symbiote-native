@@ -9,13 +9,18 @@
 import '@angular/compiler';
 import { CUSTOM_ELEMENTS_SCHEMA, Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 import { ViewElement } from '../elements';
 import { mount, unmount } from '../render';
 
 const ROOT_TAG = 934;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -30,28 +35,17 @@ class StyleInputHost {
   readonly style = [{ opacity: 0.5 }, { width: 12 }];
 }
 
-interface ICommitted {
-  props: Record<string, unknown>;
-  children: ICommitted[];
-}
-
-// Finds the NODE first and reads its style second: returning `props.style` from the walk makes
+// Finds the NODE first and reads its style second: returning the style from the walk makes
 // "found, but unstyled" indistinguishable from "not found", and both are failures worth telling
 // apart.
-function probeNode(): ICommitted {
-  const visit = (node: ICommitted): ICommitted | undefined => {
-    if (node.props.testID === 'probe') return node;
-    for (const child of node.children) {
-      const hit = visit(child);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  for (const root of fabric.committed) {
-    const hit = visit(root as unknown as ICommitted);
-    if (hit !== undefined) return hit;
-  }
-  throw new Error('no committed node carrying testID="probe"');
+function probeNode(): ILiveNode {
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === 'probe',
+  );
+  if (hit === undefined)
+    throw new Error('no committed node carrying testID="probe"');
+  return hit;
 }
 
 beforeEach(() => fabric.reset());
@@ -64,7 +58,7 @@ describe('[style] on a matched element', () => {
 
     // Style declarations are hoisted into the payload itself, so there is no `style` key to read
     // — the two array members landing flattened IS the proof the binding was routed as a style.
-    expect(probeNode().props).toEqual({
+    expect(probeNode().payload).toEqual({
       testID: 'probe',
       opacity: 0.5,
       width: 12,

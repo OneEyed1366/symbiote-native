@@ -3,7 +3,8 @@ import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   advanceMs,
-  installFabric,
+  installRecordingFabric,
+  payloadOf,
   waitForQuiet,
 } from '@symbiote-native/test-utils';
 import { flattenStyle } from '@symbiote-native/engine';
@@ -13,7 +14,7 @@ import { FlatList } from './index';
 import { VListItemDirective } from '../virtualized-list/directives';
 
 const ROOT_TAG = 905;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 interface IChip {
   id: string;
@@ -87,29 +88,16 @@ class ChipListHost {
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function findCommitted(
-  nodes: typeof fabric.committed,
-  predicate: (n: (typeof nodes)[number]) => boolean,
-): (typeof nodes)[number] | undefined {
-  for (const node of nodes) {
-    if (predicate(node)) return node;
-    const found = findCommitted(node.children, predicate);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
-
 describe('FlatList array-composed item style', () => {
   it('flattens to a plain object instead of crashing ɵɵstyleMap, and commits it', async () => {
     mount(ROOT_TAG, ChipListHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    const chip0 = findCommitted(
-      fabric.committed,
-      node => node.props.testID === 'chip-0',
-    );
-    expect(chip0?.props).toMatchObject({
+    const chip0 = fabric.find(node => node.props.testID === 'chip-0');
+    // The flattened style values are only top-level keys on the PAYLOAD — the raw authored
+    // `style` prop stays the array `flattenStyle` was asked to collapse into one object.
+    expect(chip0 && payloadOf(chip0.handle)).toMatchObject({
       height: 72,
       width: 64,
       backgroundColor: 'hsl(0, 70%, 50%)',
@@ -136,10 +124,10 @@ describe('FlatList array-composed item style', () => {
     // run, reading as free-running change detection. If CD genuinely free-ran, waitForQuiet never
     // settles and throws — the failure this test is here to catch.
     const settled = await waitForQuiet(
-      () => fabric.counts.completeRoot,
+      () => fabric.commits,
       'flat-list window commits',
     );
     await advanceMs();
-    expect(fabric.counts.completeRoot).toBe(settled);
+    expect(fabric.commits).toBe(settled);
   });
 });

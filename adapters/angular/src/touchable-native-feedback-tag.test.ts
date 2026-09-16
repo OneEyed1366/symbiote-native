@@ -18,7 +18,11 @@
 import '@angular/compiler';
 import { Component, type Type } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // SIDE-EFFECT IMPORT: the behavior is what clones the owner's props onto the child. An app reaches
 // it through the package barrel; a test importing the renderer directly does not.
@@ -28,7 +32,8 @@ import { mount, unmount } from './render';
 
 const ROOT_TAG = 9_933;
 const MAX_SETTLE_TICKS = 20;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -39,21 +44,22 @@ async function flushUntilSettled(): Promise<void> {
   let previous = -1;
   for (let index = 0; index < MAX_SETTLE_TICKS; index += 1) {
     await tick();
-    const current = fabric.counts.completeRoot;
+    const current = fabric.commits;
     if (current === previous && current > 0) return;
     previous = current;
   }
   throw new Error('the tree never settled');
 }
 
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
+function flatten(nodes: readonly ILiveNode[]): ILiveNode[] {
   return nodes.flatMap(node => [node, ...flatten(node.children)]);
 }
 
 /** Everything committed under the labelled root, the root itself excluded. */
-function subtreeOf(label: string): IFakeNode[] {
-  const root = flatten(fabric.appRoot().children).find(
-    node => node.props.nativeID === label,
+function subtreeOf(label: string): ILiveNode[] {
+  const root = live.findLive(
+    live.appRoot(),
+    node => node.payload.nativeID === label,
   );
   if (root === undefined) throw new Error(`no committed root ${label}`);
   return flatten(root.children);
@@ -105,7 +111,7 @@ describe('touchable-native-feedback as a tag', () => {
     );
 
     const [child] = subtreeOf('root');
-    expect(child.props).toMatchObject({
+    expect(child.payload).toMatchObject({
       accessibilityLabel: 'Save',
       // :373 — the owner's `id`/`nativeID`, not the child's.
       nativeID: 'tnf',

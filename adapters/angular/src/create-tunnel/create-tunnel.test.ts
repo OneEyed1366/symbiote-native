@@ -21,7 +21,11 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import type { ISymbioteNode } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 import { ViewHost, TextHost } from '../primitives';
@@ -30,7 +34,8 @@ import { createTunnel, TunnelInDirective, TunnelOut } from './index';
 const SOURCE_TAG = 920;
 const TARGET_TAG = 921;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 const settle = async (): Promise<void> => {
@@ -44,29 +49,41 @@ afterEach(() => {
   unmount(TARGET_TAG);
 });
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
+// TWO surfaces are open at once here, un-reset between them within a case — exactly the shape
+// `appRoot()` (a single box-none lookup) cannot answer (`.docs/mirror-elimination.md`, "`appRoot()`
+// is a trap in any file that opens a surface per case"). `findAll` over the CREATION log names
+// every box-none root this test mounted; walking from each covers both surfaces the way the
+// mirror's `committedAll` did (its own `committed`, singular, was last-write-wins across rootTags —
+// a `core/test-utils` limitation the live tree does not share).
+function appRoots(): ISymbioteNode[] {
+  return fabric
+    .findAll(node => node.props.pointerEvents === 'box-none')
+    .map(node => node.handle);
 }
 
-function findText(text: string): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committedAll, node => {
-    if (node.viewName === 'RCTRawText' && node.props.text === text)
-      found = node;
-  });
-  return found;
+function findText(text: string) {
+  for (const root of appRoots()) {
+    const found = live.findLive(
+      root,
+      node => node.viewName === 'RCTRawText' && node.payload.text === text,
+    );
+    if (found !== undefined) return found;
+  }
+  return undefined;
 }
 
 function allTexts(): string[] {
   const texts: string[] = [];
-  walk(fabric.committedAll, node => {
-    if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string') {
-      texts.push(node.props.text);
-    }
-  });
+  for (const root of appRoots()) {
+    live.walkLive(root, node => {
+      if (
+        node.viewName === 'RCTRawText' &&
+        typeof node.payload.text === 'string'
+      ) {
+        texts.push(node.payload.text);
+      }
+    });
+  }
   return texts;
 }
 
@@ -105,11 +122,9 @@ describe('createTunnel (Angular) — genuine cross-surface delivery', () => {
       // why: this is the entire reason createTunnel exists instead of createPortal — a target
       // in a surface that never shared a commit/mount call with the source must still receive
       // the content, proving the store (not a Fabric node reference) is what crosses surfaces.
-      // fake-fabric's `committed` is last-write-wins across rootTags (core/test-utils
-      // limitation, not the engine's), so after mounting B second it reflects B's own tree.
       expect(
         findText('ported across surfaces'),
-        'content is present in the LAST-committed tree (surface B)',
+        'content is present in surface B, a genuinely different mounted surface',
       ).toBeDefined();
     });
 

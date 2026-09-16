@@ -28,7 +28,8 @@
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { childrenOf } from '@symbiote-native/engine';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 // registerScrollViewBehavior() is what builds the content container the assertions below read.
 import '../../register';
 import { mount, unmount } from '../../render';
@@ -36,7 +37,7 @@ import { AnimatedScrollView } from './create-animated-component';
 
 const ROOT_TAG = 927;
 const OVERRIDE_ROOT_TAG = 928;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -83,16 +84,23 @@ describe('AnimatedScrollView', () => {
     await tick();
 
     const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
-    expect(scrollView?.children).toHaveLength(1);
-    expect(scrollView?.props.nestedScrollEnabled).toBe(true);
+    if (scrollView === undefined) throw new Error('no scroll view created');
+    // The AUTHORED tree, walked from the found handle via the engine's own child links — the
+    // recording host has no `.children` on a node (see its header).
+    const scrollChildren = childrenOf(scrollView.handle);
+    expect(scrollChildren).toHaveLength(1);
+    expect(payloadOf(scrollView.handle).nestedScrollEnabled).toBe(true);
 
-    const content = scrollView?.children[0];
-    expect(content?.viewName).toBe('RCTScrollContentView');
-    expect(content?.props.collapsable).toBe(false);
-    expect(content?.children.map(child => child.props.testID)).toEqual([
-      'a',
-      'b',
-    ]);
+    const contentNode = fabric.find(n => n.handle === scrollChildren[0]);
+    expect(contentNode?.viewName).toBe('RCTScrollContentView');
+    expect(contentNode?.props.collapsable).toBe(false);
+
+    const contentChildren = contentNode ? childrenOf(contentNode.handle) : [];
+    expect(
+      contentChildren.map(
+        child => fabric.find(n => n.handle === child)?.props.testID,
+      ),
+    ).toEqual(['a', 'b']);
   });
 
   // Regression test for a THIRD bug in this same bespoke-template class, this one iOS-only (the
@@ -109,8 +117,11 @@ describe('AnimatedScrollView', () => {
     await tick();
 
     const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
-    expect(scrollView?.props.overflow).toBe('scroll');
-    expect(scrollView?.props.flexDirection).toBe('column');
+    // The scroll-view base style is folded onto `props.style`, so the flat `overflow`/
+    // `flexDirection` keys only exist on the PAYLOAD.
+    const payload = scrollView && payloadOf(scrollView.handle);
+    expect(payload?.overflow).toBe('scroll');
+    expect(payload?.flexDirection).toBe('column');
   });
 
   // why: the default from bug #2 must be a DEFAULT, not a forced value — an app that
@@ -122,6 +133,8 @@ describe('AnimatedScrollView', () => {
     await tick();
 
     const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
-    expect(scrollView?.props.nestedScrollEnabled).toBe(false);
+    expect(scrollView && payloadOf(scrollView.handle).nestedScrollEnabled).toBe(
+      false,
+    );
   });
 });

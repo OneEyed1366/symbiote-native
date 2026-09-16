@@ -13,14 +13,18 @@ import '@angular/compiler';
 import { ApplicationRef, Component, inject } from '@angular/core';
 import type { OnDestroy } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 import './register';
 import { mount, unmount } from './render';
 import { SYMBIOTE_ELEMENTS } from './elements';
 
 const ROOT_TAG = 9481;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -87,26 +91,14 @@ function hostInstance(): ReadBackHost {
   return host;
 }
 
-interface ICommitted {
-  props: Record<string, unknown>;
-  children: ICommitted[];
-  instanceHandle: unknown;
-}
-
-function committed(testID: string): ICommitted {
-  const visit = (node: ICommitted): ICommitted | undefined => {
-    if (node.props.testID === testID) return node;
-    for (const child of node.children) {
-      const hit = visit(child);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  for (const root of fabric.committed) {
-    const hit = visit(root as unknown as ICommitted);
-    if (hit !== undefined) return hit;
-  }
-  throw new Error(`no committed node carrying testID="${testID}"`);
+function committed(testID: string) {
+  const node = live.findLive(
+    live.appRoot(),
+    candidate => candidate.payload.testID === testID,
+  );
+  if (node === undefined)
+    throw new Error(`no committed node carrying testID="${testID}"`);
+  return node;
 }
 
 const commandNames = (): string[] => fabric.commands.map(c => c.commandName);
@@ -133,7 +125,7 @@ describe('an engine behavior reads the app value back, not the pre-event one', (
     await settle();
 
     expect(commandNames()).not.toContain('setTextAndSelection');
-    expect(committed('flush-input').props.text).toBe('A');
+    expect(committed('flush-input').payload.text).toBe('A');
   });
 
   it('never snaps a switch back off after the app accepted the toggle', async () => {
@@ -146,7 +138,7 @@ describe('an engine behavior reads the app value back, not the pre-event one', (
     await settle();
 
     expect(commandNames()).not.toContain('setValue');
-    expect(committed('flush-switch').props.value).toBe(true);
+    expect(committed('flush-switch').payload.value).toBe(true);
   });
 
   it('never snaps a switch back when the handler came in as a prop', async () => {
@@ -163,7 +155,7 @@ describe('an engine behavior reads the app value back, not the pre-event one', (
     await settle();
 
     expect(commandNames()).not.toContain('setValue');
-    expect(committed('flush-switch-prop').props.value).toBe(true);
+    expect(committed('flush-switch-prop').payload.value).toBe(true);
   });
 
   it('never stops a refresh the app accepted', async () => {
@@ -178,7 +170,7 @@ describe('an engine behavior reads the app value back, not the pre-event one', (
     await settle();
 
     expect(commandNames()).not.toContain('setNativeRefreshing');
-    expect(committed('flush-refresh').props.refreshing).toBe(true);
+    expect(committed('flush-refresh').payload.refreshing).toBe(true);
   });
 
   // THE SAFETY PROPERTY, and the reason this is `ChangeDetectorRef.detectChanges()` rather than

@@ -10,14 +10,18 @@ import '@angular/compiler';
 import { CUSTOM_ELEMENTS_SCHEMA, Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isSymbioteNode, propOf } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 import '../register';
 import { mount, unmount } from '../render';
 import { SYMBIOTE_ELEMENTS } from '../elements';
 
 const ROOT_TAG = 948;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -79,26 +83,14 @@ function nodeProp(testID: string, name: string): unknown {
   return propOf(handle, name);
 }
 
-interface ICommitted {
-  props: Record<string, unknown>;
-  children: ICommitted[];
-  instanceHandle: unknown;
-}
-
-function committed(testID: string): ICommitted {
-  const visit = (node: ICommitted): ICommitted | undefined => {
-    if (node.props.testID === testID) return node;
-    for (const child of node.children) {
-      const hit = visit(child);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  for (const root of fabric.committed) {
-    const hit = visit(root as unknown as ICommitted);
-    if (hit !== undefined) return hit;
-  }
-  throw new Error(`no committed node carrying testID="${testID}"`);
+function committed(testID: string) {
+  const node = live.findLive(
+    live.appRoot(),
+    candidate => candidate.payload.testID === testID,
+  );
+  if (node === undefined)
+    throw new Error(`no committed node carrying testID="${testID}"`);
+  return node;
 }
 
 beforeEach(() => {

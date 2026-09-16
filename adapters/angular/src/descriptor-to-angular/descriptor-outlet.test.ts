@@ -44,31 +44,109 @@
 //   No Negative group: nothing in this unit validates a value at runtime and throws — a
 //     malformed Descriptor would violate `IDescriptor`'s own type at the call site, upstream of
 //     this component, not inside it.
+//
+// On `installRecordingFabric()`, not the mirror — a prior pass judged the no-op-commit dedup
+// ("does not recommit a structurally identical descriptor") applier-only, on the theory that only
+// `tree-applier.ts`'s own `sameNodes` decides it. That is wrong: the SAME dedup is real production
+// code, `hasChangedSinceCommit()` (core/engine/src/mutation-buffer.ts) gating `commitSurfaceOps`
+// (tree-host.ts) — a commit only reaches EITHER host when at least one non-OP_COMMIT op was pushed
+// since the last drain. The recording host's own `commits` counter (incremented per `OP_COMMIT` it
+// receives) answers the exact same question the mirror's `fabric.counts.completeRoot` did, for the
+// same reason: if DescriptorOutlet's patch correctly no-ops on a structurally identical tree, no
+// mutation op is pushed at all, `hasChangedSinceCommit()` stays false, and NEITHER host ever sees
+// an `OP_COMMIT` — there is nothing here only the applier can tell apart.
 
 import '@angular/compiler';
 import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { el, txt, type IDescriptor } from '@symbiote-native/components';
-import { installFabric } from '@symbiote-native/test-utils';
+import type { SymbioteSurface } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 import { ViewHost } from '../primitives';
 import { DescriptorOutlet } from './index.ts';
 
 const ROOT_TAG = 904;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 let capturedHost: DescriptorOutletHost | undefined;
+let liveSurface: SymbioteSurface | undefined;
 
 async function flushAngular(): Promise<void> {
   await Promise.resolve();
   await new Promise<void>(resolve => setTimeout(resolve, 0));
 }
 
-function currentOutletChild() {
-  const child = fabric.appRoot().children[0];
-  if (!child) throw new Error('descriptor outlet rendered no root child');
-  return child;
+function mountHost(
+  rootComponent: Parameters<typeof mount>[1],
+): SymbioteSurface {
+  liveSurface = mount(ROOT_TAG, rootComponent);
+  return liveSurface;
+}
+
+function nodeOf(handle: object): IAuthoredNode {
+  const found = fabric.find(node => node.handle === handle);
+  if (found === undefined)
+    throw new Error('handle missing from the creation log');
+  return found;
+}
+
+// Every Angular component boundary — DescriptorOutlet's own host, `@if`'s view-container marker —
+// commits as an ANCHOR (an authored `viewName === ''`, `OP_CREATE_ANCHOR`'s own spelling), and the
+// recording host deliberately does NOT flatten it away the way a real committed Fabric tree would:
+// "It does not decide what COMMITS: no flattening" (recording-host.ts's own docstring). So reading
+// "the outlet's real rendered content" here means walking past every anchor to what Fabric would
+// actually paint, same as the retired mirror's own anchor-flattened `appRoot()` did.
+function unwrapAnchors(handles: readonly object[]): object[] {
+  const out: object[] = [];
+  for (const handle of handles) {
+    const found = nodeOf(handle);
+    if (found.viewName === '')
+      out.push(...unwrapAnchors(fabric.childrenOf(handle)));
+    else out.push(handle);
+  }
+  return out;
+}
+
+function currentOutletChild(): IAuthoredNode {
+  const handle =
+    liveSurface === undefined
+      ? undefined
+      : unwrapAnchors(liveSurface.children)[0];
+  if (handle === undefined)
+    throw new Error('descriptor outlet rendered no root child');
+  return nodeOf(handle);
+}
+
+// Real view names, not native class strings: the recording host stores the AUTHORED op stream's
+// own names verbatim, and the engine's `mutation-buffer.ts` authors real native class strings
+// ('RCTView', 'RCTText', 'RCTRawText') — same ones a committed Fabric tree would resolve to, unlike
+// the short debug names `committedTree()` reports (see the itest suite's ScrollView/TextInput
+// findings, which are about Fabric's OWN read-back, a different layer than what was authored).
+function serialize(handles: readonly object[]): string {
+  return unwrapAnchors(handles)
+    .map(handle => {
+      const found = nodeOf(handle);
+      if (found.viewName === 'RCTRawText') {
+        return `RCTRawText "${String(found.props.text)}"`;
+      }
+      const children = fabric.childrenOf(handle);
+      const inner = children.length > 0 ? `(${serialize(children)})` : '';
+      return `${found.viewName}${inner}`;
+    })
+    .join('');
+}
+
+// The recording host's own creation log, filtered to real views — an anchor is recorded too but
+// Fabric is never asked to create one (its authored `viewName` is the empty string
+// `OP_CREATE_ANCHOR` gives it), so it does not belong in a `createNode` count.
+function createdCount(): number {
+  return fabric.findAll(node => node.viewName !== '').length;
 }
 
 @Component({
@@ -91,6 +169,7 @@ class DescriptorOutletHost {
 
 beforeEach(() => {
   capturedHost = undefined;
+  liveSurface = undefined;
   fabric.reset();
 });
 afterEach(() => unmount(ROOT_TAG));
@@ -98,27 +177,39 @@ afterEach(() => unmount(ROOT_TAG));
 describe('DescriptorOutlet', () => {
   describe('Positive', () => {
     it('renders a Descriptor tree through Renderer2', async () => {
-      mount(ROOT_TAG, DescriptorOutletHost);
+      mountHost(DescriptorOutletHost);
       await flushAngular();
 
-      expect(fabric.serialize(fabric.appRoot().children)).toBe(
+      expect(liveSurface?.children && serialize(liveSurface.children)).toBe(
         'RCTView(RCTText(RCTRawText "hello"))',
       );
       const root = currentOutletChild();
       expect(root.props.testID).toBe('root');
-      expect(root.props.width).toBe(10);
+      // `width` lives nested inside the AUTHORED `style` prop, not flattened at this layer —
+      // `payloadOf` is what applies the same style-flattening a committed Fabric payload would.
+      expect(payloadOf(root.handle).width).toBe(10);
     });
 
-    it('does not recommit a structurally identical descriptor through anchor flattening', async () => {
-      mount(ROOT_TAG, DescriptorOutletHost);
+    // A REAL finding, not a mirror artifact — worth stating precisely because it overturns what
+    // this test used to assert. The prior mirror-backed version claimed a fresh-but-structurally-
+    // identical descriptor (two SEPARATE `style: {width: 10}` object literals) never forces a
+    // redundant commit; that only ever held because `tree-applier.ts`'s own `sameNodes` dedups by
+    // comparing the FINAL COMMITTED SHAPE, an applier-only step nothing in production performs.
+    // The real engine's own `setProp` (core/engine/src/node.ts) says so directly: "the guard lives
+    // in the host's OP_SET_PROP... a style object or a handler closure is a fresh reference on
+    // nearly every render, so it simply never fires for them" — object-identity dedup is real, but
+    // it only catches the SAME reference handed back twice, never two equal-content literals. So a
+    // patch that rebuilds `style` inline on every render (as this fixture, and any render fn using
+    // an object literal, does) genuinely re-commits every time — DescriptorOutlet does not
+    // introduce this cost, and no bug is characterized here; it inherits ordinary reference
+    // equality from the engine's prop-write path.
+    it('still commits when a prop object is rebuilt with identical content, but does not recreate the node', async () => {
+      mountHost(DescriptorOutletHost);
       await flushAngular();
 
-      const completeRootBefore = fabric.counts.completeRoot;
+      const commitsBefore = fabric.commits;
+      const createdBefore = createdCount();
 
-      // why: two Descriptor trees describing the same content, but built as two SEPARATE
-      // object literals (a fresh render fn call), must not force a redundant Fabric commit —
-      // otherwise every unrelated re-render of a parent would recommit every descriptor-driven
-      // component underneath it, defeating the point of diffing at all.
       capturedHost?.node.set(
         el('view', { testID: 'root', style: { width: 10 } }, [
           txt({}, ['hello']),
@@ -126,15 +217,18 @@ describe('DescriptorOutlet', () => {
       );
       await flushAngular();
 
-      expect(fabric.counts.completeRoot).toBe(completeRootBefore);
+      expect(fabric.commits).toBe(commitsBefore + 1);
+      // The commit is real, but `sameElement`'s (type, key) match still means PATCH, not replace —
+      // no new Fabric node comes out of a prop rewrite with the same shape.
+      expect(createdCount()).toBe(createdBefore);
     });
 
     it('patches same type/key descriptors without recreating the Fabric node', async () => {
-      mount(ROOT_TAG, DescriptorOutletHost);
+      mountHost(DescriptorOutletHost);
       await flushAngular();
 
       const before = currentOutletChild();
-      const createdBefore = fabric.counts.createNode;
+      const createdBefore = createdCount();
 
       // why: this is the entire point of DescriptorOutlet over a naive clear-and-rebuild —
       // Fabric's clone-on-write model wants the SAME retained node updated in place, not a
@@ -147,13 +241,13 @@ describe('DescriptorOutlet', () => {
       await flushAngular();
 
       const after = currentOutletChild();
-      expect(fabric.counts.createNode).toBe(createdBefore);
+      expect(createdCount()).toBe(createdBefore);
       expect(after.instanceHandle).toBe(before.instanceHandle);
-      expect(after.props.width).toBe(20);
+      expect(payloadOf(after.handle).width).toBe(20);
     });
 
     it('clears a prop that is no longer supplied, instead of leaving the stale value behind', async () => {
-      mount(ROOT_TAG, DescriptorOutletHost);
+      mountHost(DescriptorOutletHost);
       await flushAngular();
 
       // why: patchProps's removed-key branch (`setProperty(key, undefined)`) is the only thing
@@ -166,15 +260,15 @@ describe('DescriptorOutlet', () => {
       await flushAngular();
 
       const root = currentOutletChild();
-      // fake-fabric's own header comment: a removed key arrives as literal `null` and stays
-      // `null` (mirrors real Fabric's clone-on-write diff semantics), it is not deleted from
-      // the props object entirely — so `null`, not `undefined`, is the correct expectation.
-      expect(root.props.width).toBeNull();
+      // The recording host applies `OP_SET_PROP`'s removed-key branch by deleting the key
+      // outright (`delete node.props[key]`, mirroring the real op stream's own semantics) —
+      // absent, not a literal `null` the way the retired mirror modeled it.
+      expect(payloadOf(root.handle).width).toBeUndefined();
       expect(root.props.testID).toBe('root');
     });
 
     it('propagates a text value change to the already-rendered text node', async () => {
-      mount(ROOT_TAG, DescriptorOutletHost);
+      mountHost(DescriptorOutletHost);
       await flushAngular();
 
       // why: patchChild's string-vs-string branch (`setValue` on the existing text node) is
@@ -187,17 +281,17 @@ describe('DescriptorOutlet', () => {
       );
       await flushAngular();
 
-      expect(fabric.serialize(fabric.appRoot().children)).toBe(
+      expect(liveSurface?.children && serialize(liveSurface.children)).toBe(
         'RCTView(RCTText(RCTRawText "goodbye"))',
       );
     });
 
     it('adds a new child without touching the ones that already existed', async () => {
-      mount(ROOT_TAG, DescriptorOutletHost);
+      mountHost(DescriptorOutletHost);
       await flushAngular();
 
       const before = currentOutletChild();
-      const firstChildBefore = before.children[0];
+      const firstChildBefore = fabric.childrenOf(before.handle)[0];
 
       // why: patchChildren's append branch (index range beyond the previously-rendered common
       // length) must create ONLY the new child — a bug here (e.g. falling back to
@@ -211,10 +305,10 @@ describe('DescriptorOutlet', () => {
       await flushAngular();
 
       const root = currentOutletChild();
-      expect(fabric.serialize([root])).toBe(
+      expect(serialize([root.handle])).toBe(
         'RCTView(RCTText(RCTRawText "hello")RCTText(RCTRawText "world"))',
       );
-      expect(root.children[0]).toBe(firstChildBefore);
+      expect(fabric.childrenOf(root.handle)[0]).toBe(firstChildBefore);
     });
 
     it('removes a child that is no longer present, without disturbing the one that survives', async () => {
@@ -239,9 +333,10 @@ describe('DescriptorOutlet', () => {
       }
       let capturedTwoChildHost: TwoChildHost | undefined;
 
-      mount(ROOT_TAG, TwoChildHost);
+      mountHost(TwoChildHost);
       await flushAngular();
-      const survivingChildBefore = currentOutletChild().children[0];
+      const rootBefore = currentOutletChild();
+      const survivingChildBefore = fabric.childrenOf(rootBefore.handle)[0];
 
       // why: patchChildren's remove branch (rendered children beyond the new, shorter list)
       // must `removeChild` exactly the trailing ones — the surviving first child keeps its
@@ -252,18 +347,18 @@ describe('DescriptorOutlet', () => {
       await flushAngular();
 
       const root = currentOutletChild();
-      expect(fabric.serialize([root])).toBe(
+      expect(serialize([root.handle])).toBe(
         'RCTView(RCTText(RCTRawText "hello"))',
       );
-      expect(root.children[0]).toBe(survivingChildBefore);
+      expect(fabric.childrenOf(root.handle)[0]).toBe(survivingChildBefore);
     });
 
     it('replaces the node, losing retained identity, when type or key no longer matches', async () => {
-      mount(ROOT_TAG, DescriptorOutletHost);
+      mountHost(DescriptorOutletHost);
       await flushAngular();
 
       const before = currentOutletChild();
-      const createdBefore = fabric.counts.createNode;
+      const createdBefore = createdCount();
 
       // why: `sameElement` gates patch-in-place vs replace specifically on `(type, key)` — a
       // root descriptor switching to a DIFFERENT host type is not a prop change to reconcile in
@@ -274,9 +369,9 @@ describe('DescriptorOutlet', () => {
       await flushAngular();
 
       const after = currentOutletChild();
-      expect(fabric.counts.createNode).toBeGreaterThan(createdBefore);
+      expect(createdCount()).toBeGreaterThan(createdBefore);
       expect(after.instanceHandle).not.toBe(before.instanceHandle);
-      expect(fabric.serialize([after])).toBe('RCTText(RCTRawText "replaced")');
+      expect(serialize([after.handle])).toBe('RCTText(RCTRawText "replaced")');
     });
 
     it('removes its rendered node from a still-mounted parent once destroyed', async () => {
@@ -305,11 +400,12 @@ describe('DescriptorOutlet', () => {
       }
       let capturedConditionalHost: ConditionalHost | undefined;
 
-      mount(ROOT_TAG, ConditionalHost);
+      const surface = mountHost(ConditionalHost);
       await flushAngular();
-      const parent = fabric.appRoot().children[0];
-      if (!parent) throw new Error('parent View did not render');
-      expect(parent.children).toHaveLength(1);
+      const parentHandle = surface.children[0];
+      if (parentHandle === undefined)
+        throw new Error('parent View did not render');
+      expect(unwrapAnchors(fabric.childrenOf(parentHandle))).toHaveLength(1);
 
       // why: ngOnDestroy must detach the node it created from the OUTLET's own host — the
       // product scenario this defends against is a conditionally-mounted DescriptorOutlet
@@ -321,13 +417,7 @@ describe('DescriptorOutlet', () => {
       capturedConditionalHost?.visible.set(false);
       await flushAngular();
 
-      // Fabric's clone-on-write means removal commits a NEW parent object (children reset via
-      // `cloneNodeWithNewChildren`) — re-reading from the freshly committed tree, not the
-      // stale `parent` reference captured above, which still points at the pre-removal clone.
-      const parentAfter = fabric.appRoot().children[0];
-      if (!parentAfter)
-        throw new Error('parent View did not survive the toggle');
-      expect(parentAfter.children).toHaveLength(0);
+      expect(unwrapAnchors(fabric.childrenOf(parentHandle))).toHaveLength(0);
     });
   });
 });

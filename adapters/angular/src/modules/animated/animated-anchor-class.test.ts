@@ -11,35 +11,27 @@
 // refresh even when this view is skipped, and the signal write is what then marks this view for
 // refresh.
 //
-// `fabric.find` only ever sees a node's FIRST-created props (createNode never re-runs on update),
-// so a style that lands after mount only shows up on the live clone in `fabric.committed`.
+// The recording host mutates a node's props IN PLACE (no clone-on-write), so `fabric.find`
+// reflects a style applied after mount just as well as one applied at creation. The
+// class-derived value itself still needs the PAYLOAD, not the raw props bag: a registered class
+// resolves onto `props.style` as the engine's `[classStyle, explicitStyle]` pair, and only
+// `payloadOf` (the engine's own `fabricProps`) flattens that into a top-level `backgroundColor`.
 
 import '@angular/compiler';
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
 import { AnimatedView } from './create-animated-component';
 
 const ROOT_TAG = 963;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 function committedProp(testID: string, prop: string): unknown {
-  const visit = (node: IFakeNode): IFakeNode | undefined => {
-    if (node.props.testID === testID) return node;
-    for (const child of node.children) {
-      const found = visit(child);
-      if (found) return found;
-    }
-    return undefined;
-  };
-  for (const root of fabric.committed) {
-    const found = visit(root);
-    if (found) return found.props[prop];
-  }
-  return undefined;
+  const node = fabric.find(n => n.props.testID === testID);
+  return node && payloadOf(node.handle)[prop];
 }
 
 let fixture: AnimatedAnchorFixture | undefined;

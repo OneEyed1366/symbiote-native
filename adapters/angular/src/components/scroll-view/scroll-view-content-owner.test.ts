@@ -11,11 +11,21 @@
 // satisfy `toBe(1)` on a count taken from an empty tree, so every case pins the owner count AND
 // that the app's own child is a DESCENDANT of the one content node
 // (`.claude/rules/adapter-parity-audit.md`, "Phrase a parity oracle as a CAPABILITY").
+
+// A RECORDING host, and the tree walked here is the AUTHORED one. The question is WHO EMITTED the
+// content node; `RCTScrollContentView` is a name the engine sends, and React Native's own
+// `componentNameByReactViewName` maps `ScrollContentView` to plain `View`, so the committed tree
+// cannot tell a content node from any other view by name at all.
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 // registerScrollViewBehavior() is the whole subject of this file.
 import '../../register';
@@ -23,27 +33,15 @@ import { mount, unmount } from '../../render';
 import { SymbioteHostPropsDirective } from '../../primitives';
 
 const ROOT_TAG = 91_032;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function collect(
-  nodes: readonly IFakeNode[],
-  match: (node: IFakeNode) => boolean,
-): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  for (const node of nodes) {
-    if (match(node)) found.push(node);
-    found.push(...collect(node.children, match));
-  }
-  return found;
-}
-
-function byViewName(name: string): IFakeNode[] {
-  return collect(fabric.committed, node => node.viewName === name);
+function byViewName(name: string): IAuthoredNode[] {
+  return fabric.findAll(node => node.viewName === name);
 }
 
 // iOS resolves BOTH axes to RCTScrollView / RCTScrollContentView (the horizontal split is an
@@ -51,16 +49,31 @@ function byViewName(name: string): IFakeNode[] {
 const SCROLL_VIEW = 'RCTScrollView';
 const CONTENT_VIEW = 'RCTScrollContentView';
 
+// Descends FROM the content node, which is the same claim stated forwards: the engine's structure
+// builder put the app's children INSIDE what it created.
+function countUnder(
+  handle: object,
+  match: (node: IAuthoredNode) => boolean,
+): number {
+  let found = 0;
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(node => node.handle === child);
+    if (recorded !== undefined && match(recorded)) found += 1;
+    found += countUnder(child, match);
+  }
+  return found;
+}
+
 function assertSingleContentNode(probeText: string): void {
   const owners = byViewName(SCROLL_VIEW);
   const contents = byViewName(CONTENT_VIEW);
-  expect(owners.length, 'exactly one scroll view committed').toBe(1);
-  expect(contents.length, 'exactly one content view committed').toBe(1);
-  const probes = collect(
-    contents[0].children,
+  expect(owners.length, 'exactly one scroll view created').toBe(1);
+  expect(contents.length, 'exactly one content view created').toBe(1);
+  const probes = countUnder(
+    contents[0].handle,
     node => node.props.text === probeText,
   );
-  expect(probes.length, `"${probeText}" sits under the content view`).toBe(1);
+  expect(probes, `"${probeText}" sits under the content view`).toBe(1);
 }
 
 @Component({
@@ -139,11 +152,9 @@ describe('the engine is the only builder of a ScrollView content node', () => {
     mount(ROOT_TAG, StickyFixture);
     await tick();
     assertSingleContentNode('sv-s');
-    expect(
-      collect(
-        fabric.committed,
-        node => node.props.zIndex === STICKY_HEADER_Z_INDEX,
-      ).length,
-    ).toBe(1);
+    const pinned = fabric.findAll(
+      node => payloadOf(node.handle).zIndex === STICKY_HEADER_Z_INDEX,
+    );
+    expect(pinned.length).toBe(1);
   });
 });

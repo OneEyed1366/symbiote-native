@@ -21,8 +21,12 @@ import {
 } from '@angular/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import { ANCHOR_COMPONENT } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
+import { ANCHOR_COMPONENT, parentOf } from '@symbiote-native/engine';
 import { COMPONENT_DESCRIPTORS } from '@symbiote-native/components';
 import { ViewElement } from './elements';
 // SIDE-EFFECT IMPORT. `register.ts` installs the host behaviors, and a behavior's `foldPayload` is
@@ -49,7 +53,8 @@ function isPrimitive(value: unknown): value is IPrimitiveSpec {
   return typeof intrinsic === 'string';
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -61,7 +66,7 @@ async function flushUntilSettled(): Promise<void> {
   let previous = -1;
   for (let index = 0; index < MAX_SETTLE_TICKS; index += 1) {
     await tick();
-    const current = fabric.counts.completeRoot;
+    const current = fabric.commits;
     if (current === previous && current > 0) return;
     previous = current;
   }
@@ -70,9 +75,9 @@ async function flushUntilSettled(): Promise<void> {
   );
 }
 
-// `fabric.committed` is the ROOT child set, not a flat list — a `find` across it alone sees only
-// the AppContainer and reports every probe below as absent.
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
+// Root included, the same shape `fabric.committed`'s flatten had — a `find` across children alone
+// would see only the AppContainer and report every probe below as absent.
+function flatten(nodes: readonly ILiveNode[]): ILiveNode[] {
   return nodes.flatMap(node => [node, ...flatten(node.children)]);
 }
 
@@ -85,25 +90,30 @@ function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
 // `ActivityIndicator.js:99` onto the spinner). So a row reading the probe's OWN view name reports a
 // composed primitive as committing the wrong native view.
 //
-// ONE hop, not an ancestor walk: widening it to the whole chain would let any name pass, since the
-// container root is an RCTView and most descriptors name one.
-function committedViewNames(
-  all: readonly IFakeNode[],
-  probe: IFakeNode | undefined,
-): string[] {
+// ONE hop via `parentOf` — the engine's own answer, not a `children`-includes scan (`children` is a
+// getter returning fresh `ILiveNode`s per read, so two calls never share a reference to `.includes`
+// against). Widening it to the whole ancestor chain would let any name pass, since the container
+// root is an RCTView and most descriptors name one.
+function committedViewNames(probe: ILiveNode | undefined): string[] {
   if (probe === undefined) return [];
-  const parent = all.find(candidate => candidate.children.includes(probe));
+  const parent = parentOf(probe.handle);
   return parent === undefined
     ? [probe.viewName]
-    : [probe.viewName, parent.viewName];
+    : [probe.viewName, live.nodeOf(parent).viewName];
 }
 
 let nextRoot = 8_600;
 
 interface IMounted {
-  node: IFakeNode | undefined;
-  all: IFakeNode[];
+  node: ILiveNode | undefined;
+  all: ILiveNode[];
   thrown: string;
+  // `node?.payload` snapshotted BEFORE `unmount()`, for the one thing unmount changes: `onLayout`
+  // and its five siblings are cleared by the listener's own teardown
+  // (`setEventListener(target, name, undefined)`), so `.payload` — a live getter — would re-run
+  // `propsOf` and see the clear too if read after `unmount()` returns. Structural props (`nativeID`,
+  // `testID`, `style`…) are unaffected; only a gated event flag needs the pre-unmount snapshot.
+  payload: Record<string, unknown> | undefined;
 }
 
 // A fixture per case, compiled at run time, so a case differs from its neighbour by exactly its
@@ -143,14 +153,23 @@ async function mountTemplate(
   } catch (error) {
     thrown = String(error);
   }
-  const all = flatten(fabric.committed);
-  const node = all.find(candidate => candidate.props.testID === 'probe');
+  // Angular can throw before the surface's own root ever committed (the `[style]` array-without-
+  // directive case below) — `appRoot()` then has nothing to find and throws, which the old mirror's
+  // `fabric.committed` (defaulted to `[]`) tolerated silently.
+  let all: ILiveNode[] = [];
+  try {
+    all = flatten([live.nodeOf(live.appRoot())]);
+  } catch {
+    // Nothing committed before the throw; `all`/`node` stay empty, same as the mirror's `[]`.
+  }
+  const node = all.find(candidate => candidate.payload.testID === 'probe');
+  const payload = node?.payload;
   try {
     unmount(root);
   } catch {
     // A fixture that threw on mount has nothing to tear down; the assertion reports the throw.
   }
-  return { node, all, thrown };
+  return { node, all, thrown, payload };
 }
 
 beforeEach(() => fabric.reset());
@@ -164,7 +183,7 @@ describe('a bare intrinsic tag, hand-written', () => {
     expect(node?.viewName).toBe('RCTView');
     // The alias is the renderer's, not a wrapper's — the composed `<view>` has no `id` @Input at
     // all, so this is the one fold the bare path has and the component path lacks.
-    expect(node?.props).toMatchObject({
+    expect(node?.payload).toMatchObject({
       nativeID: 'probe-id',
       testID: 'probe',
     });
@@ -178,24 +197,24 @@ describe('a bare intrinsic tag, hand-written', () => {
     expect(node?.viewName).toBe('RCTText');
     // RN's Text.js applies both unconditionally; without them a clamped Text cuts mid-word with no
     // ellipsis, on device only.
-    expect(node?.props).toMatchObject({
+    expect(node?.payload).toMatchObject({
       ellipsizeMode: 'tail',
       allowFontScaling: true,
     });
     expect(
-      all.find(candidate => candidate.viewName === 'RCTRawText')?.props,
+      all.find(candidate => candidate.viewName === 'RCTRawText')?.payload,
     ).toMatchObject({ text: 'hello' });
   });
 
   it('routes an (event) binding through to the engine, gate flag included', async () => {
-    const { node } = await mountTemplate(
+    const { payload } = await mountTemplate(
       `<view testID="probe" (layout)="hit()"></view>`,
       NO_ERRORS_SCHEMA,
     );
     // `onLayout` is one of the six events Fabric's C++ emits only when a BOOLEAN prop reaches the
     // payload, so the flag IS the observable: a listener that never set it is dead on device with
     // nothing red anywhere. Asserting the committed payload, not the listener map.
-    expect(node?.props.onLayout).toBe(true);
+    expect(payload?.onLayout).toBe(true);
   });
 
   it('attaches the host behavior, so a bare tag carries its folds', async () => {
@@ -206,12 +225,12 @@ describe('a bare intrinsic tag, hand-written', () => {
     // The behavior registry is keyed by the intrinsic TAG. A renderer that handed it the resolved
     // Fabric name instead would attach nothing and these defaults would silently vanish.
     expect(
-      all.find(node => node.props.testID === 'probe')?.props,
+      all.find(node => node.payload.testID === 'probe')?.payload,
     ).toMatchObject({
       submitBehavior: 'blurAndSubmit',
       underlineColorAndroid: 'transparent',
     });
-    expect(all.find(node => node.props.testID === 'sw')?.props.value).toBe(
+    expect(all.find(node => node.payload.testID === 'sw')?.payload.value).toBe(
       false,
     );
   });
@@ -261,14 +280,14 @@ describe('no intrinsic is swallowed by the anchor-host registry', () => {
   });
 
   it.each(paints)('<%s> paints its own native view', async tag => {
-    const { node, all } = await mountTemplate(
+    const { node } = await mountTemplate(
       `<${tag} testID="probe"></${tag}>`,
       NO_ERRORS_SCHEMA,
     );
     // An anchor commits nothing, so `node` would be undefined — a bare `toBe(undefined)` on the
     // viewName would pass for both an anchor and a wrong view.
     expect(node).toBeDefined();
-    expect(committedViewNames(all, node)).toContain(
+    expect(committedViewNames(node)).toContain(
       COMPONENT_DESCRIPTORS[tag]?.component,
     );
   });
@@ -316,17 +335,17 @@ describe('the hyphenated spelling an ngtsc-checked template can use', () => {
       // resolved to nothing would pass a bare `toBe` against a bare tag that also failed.
       expect(bare.node?.viewName).toBe(COMPONENT_DESCRIPTORS[tag]?.component);
       expect(aliased.node?.viewName).toBe(bare.node?.viewName);
-      expect(aliased.node?.props).toEqual(bare.node?.props);
+      expect(aliased.node?.payload).toEqual(bare.node?.payload);
     },
   );
 
   it('carries bound props and event gates through the alias too', async () => {
-    const { node } = await mountTemplate(
+    const { node, payload } = await mountTemplate(
       `<symbiote-view [id]="'probe-id'" [testID]="'probe'" (layout)="hit()"></symbiote-view>`,
       CUSTOM_ELEMENTS_SCHEMA,
     );
     expect(node?.viewName).toBe('RCTView');
-    expect(node?.props).toMatchObject({
+    expect(payload).toMatchObject({
       nativeID: 'probe-id',
       testID: 'probe',
       onLayout: true,
@@ -345,7 +364,7 @@ describe('[style] on a tag', () => {
     );
     // Unmatched, `[style]` compiles to ɵɵstyleMap -> one setStyle call per key; the renderer merges
     // them back into the single `style` prop RN wants. An object is the one shape that survives it.
-    expect(node?.props.opacity).toBe(1);
+    expect(node?.payload.opacity).toBe(1);
   });
 
   it('takes an ARRAY when the element directive matches', async () => {
@@ -355,7 +374,7 @@ describe('[style] on a tag', () => {
       [ViewElement],
     );
     expect(thrown).toBe('');
-    expect(node?.props).toMatchObject({ opacity: 1, margin: 2 });
+    expect(node?.payload).toMatchObject({ opacity: 1, margin: 2 });
   });
 
   // The control, and the reason `SymbioteElement` declares `style` at all: a declared input CLAIMS

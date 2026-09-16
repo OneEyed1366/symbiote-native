@@ -15,7 +15,11 @@
 import '@angular/compiler';
 import { Component, type Type } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { parentOf } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 // SIDE-EFFECT IMPORT: the behavior is what builds the spinner. An app reaches it through the
 // package barrel; a test importing the renderer directly does not.
@@ -25,7 +29,8 @@ import { mount, unmount } from './render';
 
 const ROOT_TAG = 9_976;
 const MAX_SETTLE_TICKS = 20;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // RN's iOS default (`ActivityIndicator.js:25`, GRAY) and its fixed box for the named large size.
 const IOS_DEFAULT_COLOR = '#999999';
@@ -40,33 +45,33 @@ async function flushUntilSettled(): Promise<void> {
   let previous = -1;
   for (let index = 0; index < MAX_SETTLE_TICKS; index += 1) {
     await tick();
-    const current = fabric.counts.completeRoot;
+    const current = fabric.commits;
     if (current === previous && current > 0) return;
     previous = current;
   }
   throw new Error('the tree never settled');
 }
 
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
-}
-
 // The centering host, found through its CHILD. `nativeID` is one of the props RN moves onto the
 // spinner, so a label-keyed lookup lands on the spinner and the host is its parent — which is also
-// the first thing this test asserts about the split.
-function hostOf(label: string): IFakeNode {
-  const committed = flatten(fabric.appRoot().children);
-  const spinner = committed.find(node => node.props.nativeID === label);
+// the first thing this test asserts about the split. `parentOf` is the engine's own answer, not a
+// `children`-includes scan: `children` is a getter returning fresh `ILiveNode`s each read, so two
+// calls never produce an object the first array could `.includes()`.
+function hostOf(label: string): ReturnType<typeof live.nodeOf> {
+  const spinner = live.findLive(
+    live.appRoot(),
+    node => node.payload.nativeID === label,
+  );
   if (spinner === undefined) throw new Error(`no committed spinner ${label}`);
-  const host = committed.find(node => node.children.includes(spinner));
+  const parent = parentOf(spinner.handle);
   // Unregistered, the label stays on the tag's own node and there is no parent under the root to
   // find — so this is where a missing `./register` lands, and the message says so rather than
   // reading as a broken locator.
-  if (host === undefined)
+  if (parent === undefined)
     throw new Error(
       `${label} committed no spinner under a host — is the behavior registered?`,
     );
-  return host;
+  return live.nodeOf(parent);
 }
 
 async function mountTemplate(template: string): Promise<void> {
@@ -96,7 +101,7 @@ describe('Angular: `activity-indicator` as a tag', () => {
     // only because the behavior built it, so this is what fails when `./register` is dropped.
     const host = hostOf('ind');
     expect(host.viewName).toBe('RCTView');
-    expect(host.props).toMatchObject({
+    expect(host.payload).toMatchObject({
       alignItems: 'center',
       justifyContent: 'center',
     });
@@ -106,7 +111,7 @@ describe('Angular: `activity-indicator` as a tag', () => {
 
     // RN maps a NAMED size to both the native enum and a fixed box; the defaults have no
     // destructure to come from on a tag, so the fold is what supplies them.
-    expect(host.children[0].props).toMatchObject({
+    expect(host.children[0].payload).toMatchObject({
       size: 'large',
       width: SIZE_LARGE_PX,
       height: SIZE_LARGE_PX,
@@ -125,8 +130,8 @@ describe('Angular: `activity-indicator` as a tag', () => {
     );
 
     const host = hostOf('ind');
-    expect(host.props.margin).toBe(4);
-    expect(Object.hasOwn(host.props, 'testID')).toBe(false);
-    expect(host.children[0].props.testID).toBe('spin');
+    expect(host.payload.margin).toBe(4);
+    expect(Object.hasOwn(host.payload, 'testID')).toBe(false);
+    expect(host.children[0].payload.testID).toBe('spin');
   });
 });

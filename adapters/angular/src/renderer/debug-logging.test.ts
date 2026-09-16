@@ -13,12 +13,12 @@ import '@angular/compiler';
 import { CUSTOM_ELEMENTS_SCHEMA, Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 
 const ROOT_TAG = 941;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

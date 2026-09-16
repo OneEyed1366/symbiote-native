@@ -63,6 +63,20 @@ export class TextHost extends SymbiotePrimitiveHost implements OnInit {
   }
 
   private applyTextDefaults(): void {
+    // NOTHING TO OVERRIDE, NOTHING TO WRITE. The renderer already SEEDS both defaults at
+    // `createElement` (`renderer/index.ts`, "seeding here therefore covers both the composed Text
+    // and a bare `text` tag") with exactly `resolveTextProps({})` — so when the caller supplied
+    // neither input, this would re-send the values that are already there.
+    //
+    // It was costing a write per text node per default: measured on a 1 000-row create,
+    // `ellipsizeMode` and `allowFontScaling` were each recorded 6 000 times for 3 000 text nodes,
+    // ~17% of everything the adapter emitted. The host turns the repeat away when it applies it,
+    // but the op is still built, buffered and carried across.
+    //
+    // The moment either input IS supplied, the pair must still be written in full: `resolveTextProps`
+    // resolves them together, and the seed is what an explicit `ellipsizeMode="clip"` overrides.
+    if (this.ellipsizeMode === undefined && this.allowFontScaling === undefined)
+      return;
     const resolved = resolveTextProps({
       ellipsizeMode: this.ellipsizeMode,
       allowFontScaling: this.allowFontScaling,

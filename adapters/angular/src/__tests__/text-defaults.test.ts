@@ -18,30 +18,25 @@ import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  installFabric,
+  installRecordingFabric,
   waitUntil,
-  type IFakeNode,
+  type IAuthoredNode,
 } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
 import { TextHost } from '../primitives';
 
 const ROOT_TAG = 984;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function committed(testID: string): IFakeNode | undefined {
-  const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node;
-      const found = walk(node.children);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  };
-  return walk(fabric.committed);
+// Both defaults are written as explicit `setProp` calls (`resolveTextProps` -> `setHostProp` /
+// `seedTextDefaults`), so they are AUTHORED props, not a payload-time fold — `.props` is the
+// right bag to read.
+function committed(testID: string): IAuthoredNode | undefined {
+  return fabric.find(node => node.props.testID === testID);
 }
 
 @Component({

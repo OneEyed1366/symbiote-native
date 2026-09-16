@@ -41,7 +41,7 @@
 //     all total over their inputs — a null resolver result or an empty prop bag both degrade to a
 //     no-op, never a throw). Positive is the only group.
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 import {
   AnimatedValue,
   createElement,
@@ -50,7 +50,7 @@ import {
 } from '@symbiote-native/engine';
 import { AnimatedLeafBinder } from './animated-leaf-binder';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 let nextRootTag = 9001;
 
 beforeEach(() => fabric.reset());
@@ -73,11 +73,14 @@ function uncommittedNode(): { node: ISymbioteNode; commit: () => void } {
   return { node, commit: () => surface.commit() };
 }
 
-// `appRoot()` unwraps RN's synthetic box-none AppContainer, which is ALSO an RCTView, so a
-// plain `fabric.find(viewName === 'RCTView')` would match it instead of the node under test.
-// Each test appends exactly one child, so the container's first (only) child is the real node.
-function fakeView(): ReturnType<typeof fabric.find> {
-  return fabric.appRoot().children[0];
+// The engine's own node identity is stable across a commit (no clone-on-write at the JS layer),
+// so the handle `createElement` returned is still the right one to read back — no tree search
+// needed, unlike the old mirror's clone-per-commit `IFakeNode`. `opacity` only ever lands as a
+// top-level key on the PAYLOAD: `setNativeProps` merges an animated style patch onto the node's
+// `style` prop, so the raw authored bag keeps it nested (`props.style.opacity`), and only
+// `payloadOf` (the engine's own `fabricProps`) flattens that.
+function opacityOf(node: ISymbioteNode): unknown {
+  return payloadOf(node).opacity;
 }
 
 describe('AnimatedLeafBinder', () => {
@@ -99,7 +102,7 @@ describe('AnimatedLeafBinder', () => {
       // The engine coalesces setNativeProps writes to the microtask boundary, so an animated
       // value reaches Fabric one tick after the drive (core/engine/src/commit.ts).
       await Promise.resolve();
-      expect(fakeView()?.props.opacity).toBe(0.4);
+      expect(opacityOf(node)).toBe(0.4);
     });
 
     // why: this is the async-commit-timing gotcha angular-adapter-change-detection §1
@@ -113,15 +116,18 @@ describe('AnimatedLeafBinder', () => {
       const opacity = new AnimatedValue(1);
 
       binder.reconcile({ style: { opacity } }, false);
-      // Not committed yet: the value graph exists, but no Fabric node to flush onto.
+      // Not committed yet: the value graph exists, but `setNativeProps` gates on a committed
+      // record (`committedRecordOf`) and no-ops until the surface actually commits — the node
+      // itself was already created (structural ops reach the host on the next read regardless of
+      // commit), so what proves "nothing to bind to yet" is the prop, not a node count.
       opacity.setValue(0.5);
-      expect(fabric.created).toHaveLength(0);
+      expect(opacityOf(node)).toBeUndefined();
 
       commit();
       // whenCommitted's post-commit retry binds the leaf now; a subsequent change flushes.
       opacity.setValue(0.7);
       await Promise.resolve();
-      expect(fakeView()?.props.opacity).toBe(0.7);
+      expect(opacityOf(node)).toBe(0.7);
     });
 
     // why: reconcile's own comment states WHY the order matters — a shared Value self-detaches
@@ -169,7 +175,7 @@ describe('AnimatedLeafBinder', () => {
       ).not.toThrow();
       opacity.setValue(0.4);
       // Nothing to bind to yet: no Fabric node was ever created, let alone flushed onto.
-      expect(fabric.created).toHaveLength(0);
+      expect(fabric.findAll(() => true)).toHaveLength(0);
     });
 
     // why: destroy()'s own doc comment claims this ("Safe to call even if reconcile() was never
@@ -197,7 +203,7 @@ describe('AnimatedLeafBinder', () => {
       // The pending whenCommitted bind was cancelled by destroy, so committing afterward
       // must not retroactively bind the (already-detached) leaf.
       opacity.setValue(0.9);
-      expect(fakeView()?.props.opacity).toBeUndefined();
+      expect(opacityOf(node)).toBeUndefined();
     });
   });
 });

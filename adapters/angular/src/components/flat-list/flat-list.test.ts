@@ -1,7 +1,10 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
 import { FlatList } from './index';
@@ -13,7 +16,8 @@ import {
 } from '../virtualized-list/directives';
 
 const ROOT_TAG = 904;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 interface IRow {
   id: string;
@@ -86,9 +90,11 @@ describe('FlatList', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    const texts = fabric.created
-      .filter(node => node.props.testID !== undefined)
-      .map(node => node.props.testID);
+    // The LIVE tree, not the creation log: a cell the list stamped and then recycled away would
+    // still answer the log, and "the footer is stamped" would pass after it stopped being there.
+    const texts = live
+      .findAllLive(live.appRoot(), node => node.payload.testID !== undefined)
+      .map(node => node.payload.testID);
 
     expect(texts).toContain('header');
     expect(texts).toContain('footer');
