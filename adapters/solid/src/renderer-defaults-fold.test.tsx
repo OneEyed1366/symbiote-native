@@ -10,7 +10,11 @@
 // the engine — all of which are on the table.
 import { createRequire } from 'node:module';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 const require_ = createRequire(import.meta.url);
@@ -44,7 +48,9 @@ function resolve(rule: IDefaultRule, authored: unknown): unknown {
 }
 
 const ROOT_TAG = 8_811;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// The payload is what an app can observe; the author's bag is not.
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve_ => setTimeout(resolve_, 0));
 
@@ -53,11 +59,11 @@ afterEach(() => unmount(ROOT_TAG));
 
 async function committedText(
   props: Record<string, unknown>,
-): Promise<IFakeNode> {
+): Promise<ILiveNode> {
   fabric.reset();
   mount(ROOT_TAG, () => <text {...props} />);
   await tick();
-  return fabric.appRoot().children[0];
+  return live.nodeOf(live.appRoot()).children[0];
 }
 
 describe('the renderer default folds against the shared spec', () => {

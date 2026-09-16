@@ -9,32 +9,28 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 9_488;
 const TEXT_VIEW = 'RCTText';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-// Reads fabric.committed, never fabric.created/find: a created node's props are frozen at its
-// first commit, so an update assertion off `created` passes forever (symbiote-engine-core §8).
+// The LIVE tree, never the recording: a created node's props are frozen at its first commit, so an
+// update assertion off the record passes forever (symbiote-engine-core §8).
 function committedTextProps(): Record<string, unknown> | undefined {
-  let found: Record<string, unknown> | undefined;
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (node.viewName === TEXT_VIEW && found === undefined)
-        found = node.props;
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return found;
+  return live.findLive(live.appRoot(), node => node.viewName === TEXT_VIEW)
+    ?.payload;
 }
 
 describe('a text tag carries RN’s Text defaults', () => {
@@ -116,8 +112,11 @@ describe('a text tag carries RN’s Text defaults', () => {
   it('does not seed a non-text node', async () => {
     mount(ROOT_TAG, () => <view testID="plain" />);
     await tick();
-    const view = fabric.committed.find(node => node.props.testID === 'plain');
-    expect(view?.props.ellipsizeMode).toBeUndefined();
-    expect(view?.props.allowFontScaling).toBeUndefined();
+    const view = live.findLive(
+      live.appRoot(),
+      node => node.payload.testID === 'plain',
+    );
+    expect(view?.payload.ellipsizeMode).toBeUndefined();
+    expect(view?.payload.allowFontScaling).toBeUndefined();
   });
 });

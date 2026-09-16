@@ -12,10 +12,14 @@
 // comparison measured nothing (`test-harness-false-greens.md` §12) and the absolute expectations
 // were always the whole oracle. Only the duplicate went.
 import { describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const TARGET = 'aria-parity';
 let nextRoot = 8300;
 
@@ -24,26 +28,23 @@ const flush = async (): Promise<void> => {
   await Promise.resolve();
 };
 
-function find(node: IFakeNode): IFakeNode | undefined {
-  if (node.props.testID === TARGET) return node;
-  for (const child of node.children) {
-    const hit = find(child);
-    if (hit !== undefined) return hit;
-  }
-  return undefined;
-}
-
+// Reset per case: every case opens its OWN surface, and `appRoot()` searches the creation log, so
+// without this it answers with the FIRST case's root for the rest of the file.
 async function committed(
   render: () => unknown,
 ): Promise<Record<string, unknown>> {
+  fabric.reset();
   const root = (nextRoot += 1);
   mount(root, render as never);
   await flush();
-  const hit = fabric.committed.map(find).find(n => n !== undefined);
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === TARGET,
+  );
   if (hit === undefined) throw new Error('nothing committed');
-  const props = { ...hit.props };
+  const payload = { ...hit.payload };
   unmount(root);
-  return props;
+  return payload;
 }
 
 describe('the aria fold reaches a Solid tag', () => {

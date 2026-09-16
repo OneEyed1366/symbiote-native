@@ -13,49 +13,53 @@
 // arm that cannot fail proves nothing, and without it a probe that always found no key would look
 // like a pass.
 import { describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 911;
 const TARGET = 'gate-probe';
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const flush = async (): Promise<void> => {
   await Promise.resolve();
   await Promise.resolve();
 };
 
-function find(node: IFakeNode): IFakeNode | undefined {
-  if (node.props.testID === TARGET) return node;
-  for (const child of node.children) {
-    const hit = find(child);
-    if (hit !== undefined) return hit;
-  }
-  return undefined;
+// Reset per case: every case opens its OWN surface, and `appRoot()` searches the creation log, so
+// without this it answers with the FIRST case's root for the rest of the file.
+function probe(): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), node => node.payload.testID === TARGET);
 }
 
 describe('an undefined-valued gated event on a tag', () => {
   it('reports the committed keys', async () => {
     const absent = undefined;
+    fabric.reset();
     mount(ROOT_TAG, () => <view onLayout={absent} testID={TARGET} />);
     await flush();
-    const hit = fabric.committed.map(find).find(n => n !== undefined);
+    const hit = probe();
     expect(hit, 'node not committed').toBeDefined();
     // surfaced through the assertion, not console.log — the CLI wrapper swallows test stdout
-    expect(Object.keys(hit?.props ?? {}).sort()).toEqual(['testID']);
+    expect(Object.keys(hit?.payload ?? {}).sort()).toEqual(['testID']);
     unmount(ROOT_TAG);
   });
 
   // Break-test: the arm above must be able to FAIL. A probe whose negative result would hold
   // regardless of the mechanism proves nothing (`verify-the-deciding-side`).
   it('lights the flag for a real handler', async () => {
+    fabric.reset();
     mount(ROOT_TAG + 1, () => <view onLayout={() => {}} testID={TARGET} />);
     await flush();
-    const hit = fabric.committed.map(find).find(n => n !== undefined);
-    expect(Object.keys(hit?.props ?? {}).sort()).toEqual([
+    const hit = probe();
+    expect(Object.keys(hit?.payload ?? {}).sort()).toEqual([
       'onLayout',
       'testID',
     ]);
-    expect(hit?.props.onLayout).toBe(true);
+    expect(hit?.payload.onLayout).toBe(true);
     unmount(ROOT_TAG + 1);
   });
 
@@ -64,12 +68,13 @@ describe('an undefined-valued gated event on a tag', () => {
   // conditional spread lowers to an always-present key whose value is undefined.
   it('commits no key for a plain undefined prop', async () => {
     const absent = undefined;
+    fabric.reset();
     mount(ROOT_TAG + 2, () => (
       <view nativeID={absent} backgroundColor={absent} testID={TARGET} />
     ));
     await flush();
-    const hit = fabric.committed.map(find).find(n => n !== undefined);
-    expect(Object.keys(hit?.props ?? {}).sort()).toEqual(['testID']);
+    const hit = probe();
+    expect(Object.keys(hit?.payload ?? {}).sort()).toEqual(['testID']);
     unmount(ROOT_TAG + 2);
   });
 });

@@ -13,37 +13,46 @@
 // (`renderer.ts`).
 import { describe, expect, it } from 'vitest';
 import { Show } from 'solid-js';
-import { installFabric } from '@symbiote-native/test-utils';
-import { censusRetainedTree } from '@symbiote-native/engine';
+import {
+  censusLive,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
-const fabric = installFabric();
+installRecordingFabric();
 
 const flush = async (): Promise<void> => {
   await Promise.resolve();
   await Promise.resolve();
 };
 
-/** Native creates, retained nodes and retained anchors for one mounted tree. */
+/** Native nodes, retained nodes and retained anchors for one mounted tree. */
 async function costOf(
   root: number,
   render: () => unknown,
-): Promise<{ created: number; retained: number; anchors: number }> {
-  const before = fabric.counts.createNode;
+): Promise<{ native: number; retained: number; anchors: number }> {
   const surface = mount(root, render as never);
   await flush();
-  const created = fabric.counts.createNode - before;
   // The SURFACE's top-level nodes, which are engine nodes. This used to hand `fabric.committed` in
-  // through a cast, and it read plausibly because a fake Fabric node and a retained node both had a
-  // `children` field — so the census walked the COMMITTED tree and reported it as the retained one.
-  // Which is the exact opposite of what this file is about: the committed tree cannot contain an
-  // anchor, by construction, so a placeholder in the retained tree was invisible to it. Caught when
-  // `node.children` was deleted and the cast started reading `undefined`
+  // through a cast, and it read plausibly because a stand-in Fabric node and a retained node both
+  // had a `children` field — so the census walked the COMMITTED tree and reported it as the
+  // retained one. Which is the exact opposite of what this file is about: the committed tree cannot
+  // contain an anchor, by construction, so a placeholder in the retained tree was invisible to it.
+  // Caught when `node.children` was deleted and the cast started reading `undefined`
   // (`.claude/rules/test-harness-false-greens.md` §11 — the harness built the subject wrong, and it
   // worked only because two unrelated shapes shared a field name).
-  const census = censusRetainedTree(surface.children);
+  //
+  // "Native" used to be a `createNode` CALL count off the stand-in. It is the non-anchor count now,
+  // and the swap is a strengthening rather than a translation: a call count is satisfied by a node
+  // that was created and then removed, while this asks what the tree still holds. Both readings are
+  // the engine's own — `isAnchor` is what the commit walk itself consults.
+  const census = censusLive(...surface.children);
   unmount(root);
-  return { created, retained: census.nodes, anchors: census.anchors };
+  return {
+    native: census.nonAnchors,
+    retained: census.nodes,
+    anchors: census.anchors,
+  };
 }
 
 describe('a falsy <Show> in a row', () => {
@@ -63,7 +72,7 @@ describe('a falsy <Show> in a row', () => {
     ));
 
     // The half the benchmark's acceptance check reads.
-    expect(withFalsyShow.created).toBe(plain.created);
+    expect(withFalsyShow.native).toBe(plain.native);
     // Asserted as an ANCHOR too, so a renderable node taking the position reads as a failure
     // rather than as the same count.
     expect(withFalsyShow.retained).toBe(plain.retained + 1);
@@ -88,7 +97,7 @@ describe('a falsy <Show> in a row', () => {
       </view>
     ));
 
-    expect(withTruthyShow.created).toBeGreaterThan(plain.created);
+    expect(withTruthyShow.native).toBeGreaterThan(plain.native);
     expect(withTruthyShow.retained).toBeGreaterThan(plain.retained);
   });
 });

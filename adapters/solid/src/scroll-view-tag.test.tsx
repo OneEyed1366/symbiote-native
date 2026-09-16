@@ -13,7 +13,11 @@
 import { createSignal, For } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: registerScrollViewBehavior builds the content node these tags commit under.
 import './register';
 import { mount, unmount } from './render';
@@ -22,7 +26,8 @@ const ROOT_TAG = 933;
 const SCROLL_VIEW = 'RCTScrollView';
 const CONTENT_VIEW = 'RCTScrollContentView';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -32,20 +37,11 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-function flatCommitted(): IFakeNode[] {
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return flat;
-}
-
-function committed(viewName: string): IFakeNode {
-  const found = flatCommitted().find(node => node.viewName === viewName);
+function committed(viewName: string): ILiveNode {
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.viewName === viewName,
+  );
   if (found === undefined) throw new Error(`no ${viewName} was committed`);
   return found;
 }
@@ -60,12 +56,12 @@ describe('Solid scroll-view / horizontal-scroll-view tags', () => {
     await tick();
 
     const scroll = committed(SCROLL_VIEW);
-    expect(scroll.props.testID).toBe('probe');
+    expect(scroll.payload.testID).toBe('probe');
     expect(scroll.children).toHaveLength(1);
     const content = scroll.children[0];
     expect(content?.viewName).toBe(CONTENT_VIEW);
-    expect(content?.props.collapsable).toBe(false);
-    expect(content?.children[0]?.props.testID).toBe('child');
+    expect(content?.payload.collapsable).toBe(false);
+    expect(content?.children[0]?.payload.testID).toBe('child');
   });
 
   it('routes a contentContainerStyle OBJECT onto the content node, not the scroll view', async () => {
@@ -80,11 +76,11 @@ describe('Solid scroll-view / horizontal-scroll-view tags', () => {
     await tick();
 
     const scroll = committed(SCROLL_VIEW);
-    expect(scroll.props.backgroundColor).toBe('blue');
-    expect(scroll.props.padding).toBeUndefined();
+    expect(scroll.payload.backgroundColor).toBe('blue');
+    expect(scroll.payload.padding).toBeUndefined();
     const content = scroll.children[0];
-    expect(content?.props.padding).toBe(8);
-    expect(content?.props.backgroundColor).toBeUndefined();
+    expect(content?.payload.padding).toBe(8);
+    expect(content?.payload.backgroundColor).toBeUndefined();
   });
 
   // The same string-resolves-through-the-shared-registry path `className`/`class` already gets —
@@ -105,7 +101,7 @@ describe('Solid scroll-view / horizontal-scroll-view tags', () => {
     await tick();
 
     const content = committed(SCROLL_VIEW).children[0];
-    expect(content?.props.padding).toBe(12);
+    expect(content?.payload.padding).toBe(12);
   });
 
   it('picks the row axis and the separate Android ViewManager tag for horizontal-scroll-view', async () => {
@@ -117,13 +113,13 @@ describe('Solid scroll-view / horizontal-scroll-view tags', () => {
     await tick();
 
     const scroll = committed(SCROLL_VIEW);
-    expect(scroll.props.horizontal).toBe(true);
+    expect(scroll.payload.horizontal).toBe(true);
     const content = scroll.children[0];
-    expect(content?.props.flexDirection).toBe('row');
+    expect(content?.payload.flexDirection).toBe('row');
   });
 
   // `onRefresh` is an OWNED listener (RefreshControl's own machine holds the slot), stashed rather
-  // than left as a readable `.props.onRefresh` — fire the native event the way Fabric would, same
+  // than left as a readable `.payload.onRefresh` — fire the native event the way Fabric would, same
   // pattern `virtualized-list.test.tsx` uses for its own scroll/layout events.
   it('places a refresh-control child before the content view and lets it drive onRefresh', async () => {
     let refreshed = 0;
@@ -179,7 +175,8 @@ describe('Solid scroll-view / horizontal-scroll-view tags', () => {
     ));
     await tick();
 
-    const contentViews = flatCommitted().filter(
+    const contentViews = live.findAllLive(
+      live.appRoot(),
       node => node.viewName === CONTENT_VIEW,
     );
     // One content node per scroll host — two scroll hosts, two content nodes, never a nested pair

@@ -12,10 +12,15 @@
 // the pressed node's own chain, and a sibling is what it would orphan.
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSignal } from 'solid-js';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const ROOT_TAG = 828;
 const BUTTON = 'first-press-button';
 const OUTPUT = 'first-press-output';
@@ -30,24 +35,15 @@ const flush = async (): Promise<void> => {
 
 afterEach(() => unmount(ROOT_TAG));
 
-function committed(testID: string): IFakeNode {
-  const walk = (node: IFakeNode): IFakeNode | undefined => {
-    if (node.props.testID === testID) return node;
-    for (const child of node.children) {
-      const hit = walk(child);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  for (const root of fabric.committed) {
-    const hit = walk(root);
-    if (hit !== undefined) return hit;
-  }
-  throw new Error(`no committed node with testID=${testID}`);
+function committed(testID: string): ILiveNode {
+  const node = live.findLive(live.appRoot(), n => n.payload.testID === testID);
+  if (node === undefined)
+    throw new Error(`no committed node with testID=${testID}`);
+  return node;
 }
 
-// Responder listeners hang off the CREATED node's instanceHandle; clone-on-write hands back a new
-// committed object on every update, so the committed node's handle is not the one they are on.
+// Responder listeners hang off the CREATED node's instanceHandle, which the recording host keeps
+// stable across updates — the creation-log lookup is still the right one to fire at.
 function press(): void {
   const created = fabric.find(n => n.props.testID === BUTTON);
   if (created === undefined) throw new Error('button was never created');
@@ -79,7 +75,7 @@ describe('a pressable tag on its first press', () => {
       </view>
     ));
     await flush();
-    expect(committed(OUTPUT).props.backgroundColor, 'before any press').toBe(
+    expect(committed(OUTPUT).payload.backgroundColor, 'before any press').toBe(
       '#000',
     );
 
@@ -89,23 +85,23 @@ describe('a pressable tag on its first press', () => {
     // coalesce, so there is no second commit for a targeted one to strip dirty flags from. An
     // adapter that produced TWO here is the one where the ordering hazard is real; measuring this
     // count is how to tell the two apart.
-    const commitsBefore = fabric.counts.completeRoot;
+    const commitsBefore = fabric.commits;
     press();
     await flush();
     expect(
-      fabric.counts.completeRoot - commitsBefore,
+      fabric.commits - commitsBefore,
       'the press and the state change coalesce into one commit',
     ).toBe(1);
     expect(calls, 'the callback itself fires — never in doubt').toBe(1);
     expect(
-      committed(OUTPUT).props.backgroundColor,
+      committed(OUTPUT).payload.backgroundColor,
       'FIRST press must reach the committed tree',
     ).toBe('#111');
 
     press();
     await flush();
     expect(
-      committed(OUTPUT).props.backgroundColor,
+      committed(OUTPUT).payload.backgroundColor,
       'and so must the second',
     ).toBe('#222');
   });

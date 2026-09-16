@@ -5,7 +5,11 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: the controlled-spinner handshake lives in the tag's behavior, and only this
 // module installs it. An app reaches it through the package barrel; a test importing render does not.
 import '../register';
@@ -16,29 +20,33 @@ import { mount, unmount } from '../render';
 const ROOT_TAG = 819;
 const REFRESH_CONTROL = 'PullToRefreshView';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function committedControl(): IFakeNode {
-  let found: IFakeNode | undefined;
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (found === undefined && node.viewName === REFRESH_CONTROL)
-        found = node;
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
+function committedControl(): ILiveNode {
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.viewName === REFRESH_CONTROL,
+  );
   if (found === undefined)
     throw new Error(`no ${REFRESH_CONTROL} was committed`);
   return found;
 }
 
-function createdControl(): IFakeNode {
+/**
+ * The control as the RECORDING holds it — two things only the record answers: `instanceHandle`,
+ * which an event has to be aimed at, and a key the record LOST, which is proof a clearing op was
+ * sent for it.
+ */
+function createdControl(): {
+  instanceHandle: unknown;
+  props: Readonly<Record<string, unknown>>;
+} {
   const node = fabric.find(entry => entry.viewName === REFRESH_CONTROL);
   if (node === undefined) throw new Error(`no ${REFRESH_CONTROL} was created`);
   return node;
@@ -52,7 +60,7 @@ describe('Solid RefreshControl on the engine', () => {
     it('emits the Fabric view name and forwards refreshing', async () => {
       mount(ROOT_TAG, () => <refresh-control refreshing />);
       await tick();
-      expect(committedControl().props.refreshing).toBe(true);
+      expect(committedControl().payload.refreshing).toBe(true);
     });
 
     // why: `onRefresh` is a ViewConfig EVENT, and routeProp decides that from the node's own config
@@ -71,7 +79,7 @@ describe('Solid RefreshControl on the engine', () => {
       ));
       await tick();
 
-      expect('onRefresh' in committedControl().props).toBe(false);
+      expect('onRefresh' in committedControl().payload).toBe(false);
       fabric.fireEvent(createdControl().instanceHandle, 'topRefresh');
       expect(refreshes).toBe(1);
     });
@@ -85,7 +93,7 @@ describe('Solid RefreshControl on the engine', () => {
       ));
       await tick();
 
-      const props = committedControl().props;
+      const props = committedControl().payload;
       expect(props.accessibilityLabel).toBe('reload');
       expect(props.accessibilityState).toEqual({ busy: true });
     });
@@ -102,13 +110,23 @@ describe('Solid RefreshControl on the engine', () => {
         <refresh-control refreshing={false} aria-label={label()} />
       ));
       await tick();
-      expect(committedControl().props.accessibilityLabel).toBe('reload');
+      expect(committedControl().payload.accessibilityLabel).toBe('reload');
 
       setLabel(undefined);
       await tick();
-      // An explicit `null` is what a DELETE looks like on the wire (the engine's diffProps
-      // convention); the failure this guards is the key staying at 'reload'.
-      expect(committedControl().props.accessibilityLabel).toBeNull();
+      // The failure this guards is the key staying at 'reload'.
+      //
+      // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
+      // default", held only inside the diff the stand-in merged. The engine's op stream says the
+      // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
+      expect(
+        Object.hasOwn(committedControl().payload, 'accessibilityLabel'),
+      ).toBe(false);
+      // …and the half that proves the engine ACTED: the record carried the label after the mount
+      // above, so its being gone from the record means a clearing op was sent for it.
+      expect(Object.hasOwn(createdControl().props, 'accessibilityLabel')).toBe(
+        false,
+      );
     });
 
     // why: the Android spinner props have no iOS counterpart, so RN forwards them raw and lets each
@@ -127,7 +145,7 @@ describe('Solid RefreshControl on the engine', () => {
       ));
       await tick();
 
-      const props = committedControl().props;
+      const props = committedControl().payload;
       expect(props.colors).toEqual(['#ff0000']);
       expect(props.progressBackgroundColor).toBe('#ffffff');
       expect(props.size).toBe('large');
@@ -145,7 +163,7 @@ describe('Solid RefreshControl on the engine', () => {
         </refresh-control>
       ));
       await tick();
-      expect(committedControl().children[0]?.props.testID).toBe('wrapped');
+      expect(committedControl().children[0]?.payload.testID).toBe('wrapped');
     });
   });
 

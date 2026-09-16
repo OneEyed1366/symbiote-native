@@ -8,7 +8,11 @@
 // the interesting part: slot 0 must re-resolve through `:active` while slot 1 keeps the authored
 // object.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 // The press machine is keyed by intrinsic tag and installed only by this module. Without it the tag
@@ -24,7 +28,8 @@ const TOUCH_END = 'topTouchEnd';
 const TOUCH_IDENTIFIER = 7;
 const TINT = '#dd0031';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const flush = async (): Promise<void> => {
   await Promise.resolve();
@@ -40,20 +45,11 @@ const releaseSettled = async (): Promise<void> => {
   await flush();
 };
 
-function findCommitted(): IFakeNode {
-  const walk = (node: IFakeNode): IFakeNode | undefined => {
-    if (node.props.testID === TARGET) return node;
-    for (const child of node.children) {
-      const hit = walk(child);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  for (const root of fabric.committed) {
-    const hit = walk(root);
-    if (hit !== undefined) return hit;
-  }
-  throw new Error(`no committed node with testID=${TARGET}`);
+function findCommitted(): ILiveNode {
+  const node = live.findLive(live.appRoot(), n => n.payload.testID === TARGET);
+  if (node === undefined)
+    throw new Error(`no committed node with testID=${TARGET}`);
+  return node;
 }
 
 function responderHandle(): unknown {
@@ -79,9 +75,8 @@ function touch(type: string): void {
 }
 
 beforeEach(() => {
-  // `fabric.committed` ACCUMULATES across cases, and `findCommitted` returns the first match — so
-  // without this the second case reads the first case's node and asserts against a tree that is no
-  // longer mounted. It cost one false red here before it was spotted.
+  // `live` reads the CURRENT tree, so no accumulation trap remains — the reset is still needed
+  // because `fabric.find` searches the creation log, which does accumulate across cases.
   fabric.reset();
   registerRules([
     {
@@ -116,21 +111,21 @@ describe('a pressable tag resolves :active', () => {
       </pressable>
     ));
     await flush();
-    expect(findCommitted().props.opacity, 'unpressed').toBe(1);
+    expect(findCommitted().payload.opacity, 'unpressed').toBe(1);
     // The control that makes the row above mean something: if the authored half never landed, an
     // opacity of 1 would also be what a node with no class at all commits.
-    expect(findCommitted().props.borderColor, 'authored style').toBe(TINT);
+    expect(findCommitted().payload.borderColor, 'authored style').toBe(TINT);
 
     touch(TOUCH_START);
     await flush();
-    expect(findCommitted().props.opacity, 'pressed').toBe(0.6);
-    expect(findCommitted().props.borderColor, 'authored survives press').toBe(
+    expect(findCommitted().payload.opacity, 'pressed').toBe(0.6);
+    expect(findCommitted().payload.borderColor, 'authored survives press').toBe(
       TINT,
     );
 
     touch(TOUCH_END);
     await releaseSettled();
-    expect(findCommitted().props.opacity, 'released').toBe(1);
+    expect(findCommitted().payload.opacity, 'released').toBe(1);
   });
 
   // The OTHER half of the surface: a functional `style={({pressed}) => …}` resolves to a resting
@@ -147,14 +142,14 @@ describe('a pressable tag resolves :active', () => {
       </pressable>
     ));
     await flush();
-    expect(findCommitted().props.opacity, 'resting').toBe(1);
+    expect(findCommitted().payload.opacity, 'resting').toBe(1);
 
     touch(TOUCH_START);
     await flush();
-    expect(findCommitted().props.opacity, 'pressed').toBe(0.4);
+    expect(findCommitted().payload.opacity, 'pressed').toBe(0.4);
 
     touch(TOUCH_END);
     await releaseSettled();
-    expect(findCommitted().props.opacity, 'released').toBe(1);
+    expect(findCommitted().payload.opacity, 'released').toBe(1);
   });
 });

@@ -1,7 +1,7 @@
 // `pressable` as a TAG, through Solid's own renderer — the suite that was
 // `components/pressable.test.tsx` while a component composed View. Drives REAL compiled Solid JSX
-// through the universal renderer into the fake Fabric slot, firing the raw touch primitives the
-// way native would (topTouchStart/Move/End on the responder node's instanceHandle).
+// through the universal renderer into the recording host, firing the raw touch primitives the way
+// native would (topTouchStart/Move/End on the responder node's instanceHandle).
 //
 // THE SUBJECT IS THE BARE TAG — there is no Pressable component any more. The press machine
 // itself (createPressHandlers/createPressRuntime — the long-press timer, the unstable_pressDelay
@@ -15,8 +15,9 @@
 // after mount still reaches the host" and "a static child subtree survives a press" are real,
 // silently-breakable claims about the SOLID renderer rather than tautologies.
 //
-// Pressable measures its responder rect on grant (RN's _measureResponderRegion); the shared
-// recorder has no `measure`, so a configurable one is grafted onto the live slot before any mount.
+// Pressable measures its responder rect on grant (RN's _measureResponderRegion); the recording
+// host's own `measure` is a permanent no-op, so a configurable one is grafted onto the host
+// directly before any mount.
 //
 // No Negative group: nothing here throws. `disabled` suppresses a press silently (a Positive
 // contract — it completes without error, the callback just never fires), it never rejects.
@@ -24,7 +25,11 @@
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: the press machine lives in the tag's behavior, and only this module installs
 // it. An app reaches it through the package barrel; a test importing render does not.
 import '../register';
@@ -44,10 +49,14 @@ const PRESS_DELAY_MS = 120;
 let measuredFrame:
   { width: number; height: number; pageX: number; pageY: number } | undefined;
 
-const fabric = installFabric();
-const slot = globalThis.nativeFabricUIManager;
-if (slot === undefined) throw new Error('fabric slot was not installed');
-slot.measure = (_node, callback) => {
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
+// `node.measure()` resolves through `treeHost().measure`, not the global Fabric slot — grafting
+// the slot (as `installFabric`'s fake host needed) is dead here, because the recording host
+// answers `measure` with its own permanent no-op that shadows it
+// (`.docs/mirror-elimination.md`, the `host-instance.test.ts` note on `measure`/`measureInWindow`/
+// `measureLayout`). Overriding the host's own method in place is what actually reaches the call.
+fabric.measure = (_node, callback) => {
   const frame = measuredFrame;
   if (frame === undefined) return;
   callback(0, 0, frame.width, frame.height, frame.pageX, frame.pageY);
@@ -78,7 +87,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 // The responder is the pressable tag's own RCTView, found by the testID every mount below sets —
 // the tree also carries the engine's synthetic box-none root.
-function createdTarget(): IFakeNode {
+function createdTarget(): { instanceHandle: unknown } {
   const node = fabric.find(n => n.props.testID === TARGET);
   if (node === undefined)
     throw new Error(`no node created with testID=${TARGET}`);
@@ -90,30 +99,18 @@ function responderHandle(): unknown {
 }
 
 function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  function walk(node: IFakeNode): IFakeNode | undefined {
-    if (predicate(node)) return node;
-    for (const child of node.children) {
-      const hit = walk(child);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  }
-  for (const root of fabric.committed) {
-    const hit = walk(root);
-    if (hit !== undefined) return hit;
-  }
-  return undefined;
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), predicate);
 }
 
-// `fabric.find` reads the immutable createNode snapshot, so anything asserted AFTER an update has
-// to come off the live committed tree instead (clone-on-write hands back a new object).
+// The live tree re-derives on every read, so anything asserted after an update is safe off it —
+// no more "frozen at first commit" caveat.
 function committedTargetProps(): Record<string, unknown> {
-  const node = findCommitted(n => n.props.testID === TARGET);
+  const node = findCommitted(n => n.payload.testID === TARGET);
   if (node === undefined)
     throw new Error(`no committed node with testID=${TARGET}`);
-  return node.props;
+  return node.payload;
 }
 
 function fire(handle: unknown, type: string): void {
@@ -519,10 +516,10 @@ describe('Solid Pressable on the engine', () => {
           n.props.nativeForegroundAndroid !== undefined,
       );
       expect(rippleCarrier).toBeUndefined();
-      const child = findCommitted(n => n.props.testID === 'ripple-child');
+      const child = findCommitted(n => n.payload.testID === 'ripple-child');
       expect(child, 'the child mounts unwrapped').toBeDefined();
       expect(
-        findCommitted(n => n.props.testID === TARGET)?.children,
+        findCommitted(n => n.payload.testID === TARGET)?.children,
       ).toHaveLength(1);
     });
 
@@ -625,7 +622,9 @@ describe('Solid Pressable on the engine', () => {
         </pressable>
       ));
       await flush();
-      const createdAtMount = fabric.counts.createNode;
+      const childAtMount = findCommitted(
+        n => n.payload.testID === 'static-child',
+      )?.handle;
 
       const handle = responderHandle();
       fire(handle, TOUCH_START);
@@ -633,9 +632,10 @@ describe('Solid Pressable on the engine', () => {
       fire(handle, TOUCH_END);
       await flush();
 
-      expect(fabric.counts.createNode, 'the child kept its identity').toBe(
-        createdAtMount,
-      );
+      expect(
+        findCommitted(n => n.payload.testID === 'static-child')?.handle,
+        'the child kept its identity',
+      ).toBe(childAtMount);
     });
 
     // why: `style` as a function of press state is the other half of the same contract, and it
@@ -650,16 +650,19 @@ describe('Solid Pressable on the engine', () => {
         />
       ));
       await flush();
-      const createdAtMount = fabric.counts.createNode;
+      const nodeAtMount = findCommitted(
+        n => n.payload.testID === TARGET,
+      )?.handle;
       expect(committedTargetProps().opacity).toBe(1);
 
       const handle = responderHandle();
       fire(handle, TOUCH_START);
       await flush();
       expect(committedTargetProps().opacity).toBe(0.5);
-      expect(fabric.counts.createNode, 'the responder kept its identity').toBe(
-        createdAtMount,
-      );
+      expect(
+        findCommitted(n => n.payload.testID === TARGET)?.handle,
+        'the responder kept its identity',
+      ).toBe(nodeAtMount);
 
       fire(handle, TOUCH_END);
       vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);

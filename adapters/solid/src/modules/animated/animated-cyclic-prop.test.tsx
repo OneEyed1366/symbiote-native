@@ -18,13 +18,19 @@
 // The three shapes below are the ones `examples/solid`'s Animated screens actually mount.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { PanResponder } from '@symbiote-native/engine';
 import { mount, unmount } from '../../render';
 import { Animated } from './index';
 
 const ROOT_TAG = 617;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// Animated writes through the engine's own prop path, so what an app can observe is the PAYLOAD.
+const live = createLiveTree(fabric);
 
 // The surface commits on a microtask (requestCommit), so every assertion waits one macrotask.
 const tick = (): Promise<void> =>
@@ -33,8 +39,8 @@ const tick = (): Promise<void> =>
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function appView(): IFakeNode {
-  return fabric.appRoot().children[0];
+function appView(): ILiveNode {
+  return live.nodeOf(live.appRoot()).children[0];
 }
 
 // Depth cap, so a runaway walk fails this test rather than hanging the runner the way the device
@@ -86,7 +92,7 @@ describe('Solid Animated: nothing cyclic reaches a prop write', () => {
       ));
       await tick();
 
-      expect(cyclicPath(appView().props)).toBeUndefined();
+      expect(cyclicPath(appView().payload)).toBeUndefined();
     });
 
     // why: the tracking follower — `toValue` is itself an Animated.Value, not a number, so the
@@ -104,7 +110,7 @@ describe('Solid Animated: nothing cyclic reaches a prop write', () => {
       ));
       await tick();
 
-      expect(cyclicPath(appView().props)).toBeUndefined();
+      expect(cyclicPath(appView().payload)).toBeUndefined();
     });
 
     // why: the collapsing header — an interpolation over a diffClamp, i.e. two derived graph
@@ -121,7 +127,7 @@ describe('Solid Animated: nothing cyclic reaches a prop write', () => {
       ));
       await tick();
 
-      expect(cyclicPath(appView().props)).toBeUndefined();
+      expect(cyclicPath(appView().payload)).toBeUndefined();
     });
 
     // why: a leaf only flushes through setNativeProps once a FRAME runs, and that path skips
@@ -142,7 +148,7 @@ describe('Solid Animated: nothing cyclic reaches a prop write', () => {
       scroll.setValue(24);
       await tick();
 
-      expect(cyclicPath(appView().props)).toBeUndefined();
+      expect(cyclicPath(appView().payload)).toBeUndefined();
     });
 
     // why: THE BUG. RN's babel preset annotates every JSX element with `__self` (the module
@@ -171,8 +177,8 @@ describe('Solid Animated: nothing cyclic reaches a prop write', () => {
       scroll.setValue(24);
       await tick();
 
-      expect(appView().props.__self).toBeUndefined();
-      expect(cyclicPath(appView().props)).toBeUndefined();
+      expect(appView().payload.__self).toBeUndefined();
+      expect(cyclicPath(appView().payload)).toBeUndefined();
     });
   });
 

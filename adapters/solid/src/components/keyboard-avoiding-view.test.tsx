@@ -1,5 +1,5 @@
 // Solid twin of adapters/react/src/components/keyboard-avoiding-view/keyboard-avoiding-view.test.tsx.
-// Drives REAL compiled Solid JSX through the universal renderer into the fake Fabric slot: every
+// Drives REAL compiled Solid JSX through the universal renderer into the recording host: every
 // `behavior` branch, the enabled / keyboardVerticalOffset gates, the subscription lifecycle, and the
 // malformed-payload degradation.
 //
@@ -14,12 +14,17 @@
 // rather than diffing one. So "a keyboard cycle must create nothing" and "a prop changed after mount
 // still lands" are real, silently-breakable claims here.
 //
-// Everything asserted after a second commit is read off `fabric.committed`, never `fabric.created`:
-// clone-on-write hands back new node objects, so the created snapshot would read as passing forever.
+// Everything asserted after a second commit is read off the LIVE tree, never off the recording:
+// clone-on-write hands back new node objects, so a snapshot read at creation would read as passing
+// forever.
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { KEYBOARD_EVENT } from '@symbiote-native/engine';
 import type { IKeyboardAvoidingBehavior } from '@symbiote-native/components';
 import type { JSX } from '../jsx-runtime';
@@ -106,7 +111,8 @@ const KEYBOARD_SCREEN_Y = SCREEN_HEIGHT - KEYBOARD_HEIGHT;
 const EXPECTED_INSET = FRAME_Y + SCREEN_HEIGHT - KEYBOARD_SCREEN_Y;
 const WRAPPER_FRAME = { x: 0, y: FRAME_Y, width: 400, height: SCREEN_HEIGHT };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -127,12 +133,13 @@ function App(props: IKeyboardAvoidingViewProps): JSX.Element {
   );
 }
 
-// The current committed wrapper (the outer RCTView KeyboardAvoidingView renders). Re-read after
-// every commit, since clone-on-write hands back new nodes.
-function currentWrapper(): IFakeNode {
-  const wrapper = fabric.appRoot().children[0];
+// The current LIVE wrapper (the outer RCTView KeyboardAvoidingView renders). Re-read after every
+// commit — `ILiveNode.children` is a getter, so a stale reference would not track an update anyway.
+function currentWrapper(): ILiveNode {
+  const wrapper = live.nodeOf(live.appRoot()).children[0];
   expect(wrapper, 'an RCTView wrapper sits under the root').toBeDefined();
-  expect(wrapper.viewName).toBe('RCTView');
+  expect(wrapper?.viewName).toBe('RCTView');
+  if (wrapper === undefined) throw new Error('unreachable: asserted above');
   return wrapper;
 }
 
@@ -166,16 +173,16 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       await tick();
 
       measureWrapper();
-      const before = currentWrapper().props.paddingBottom;
+      const before = currentWrapper().payload.paddingBottom;
       expect(before === undefined || before === 0).toBe(true);
 
       showKeyboard();
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
 
       hideKeyboard();
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(0);
+      expect(currentWrapper().payload.paddingBottom).toBe(0);
     });
 
     // why: 'position' is the only behavior that NESTS the children in an inner view pushed up by
@@ -188,12 +195,12 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
 
       const inner = currentWrapper().children[0];
       expect(inner, 'position mode nests an inner RCTView').toBeDefined();
-      expect(inner.viewName).toBe('RCTView');
-      expect(inner.props.bottom).toBe(0);
+      expect(inner?.viewName).toBe('RCTView');
+      expect(inner?.payload.bottom).toBe(0);
 
       showKeyboard();
       await tick();
-      expect(currentWrapper().children[0].props.bottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().children[0]?.payload.bottom).toBe(EXPECTED_INSET);
     });
 
     // why: 'height' shrinks the wrapper (height = initialHeight - inset, flex collapsed to 0) only
@@ -208,24 +215,26 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       // guard must hold the wrapper untouched rather than compute a bogus height.
       showKeyboard();
       await tick();
-      expect(currentWrapper().props.height).toBeUndefined();
+      expect(currentWrapper().payload.height).toBeUndefined();
 
       hideKeyboard();
       await tick();
       measureWrapper();
       showKeyboard();
       await tick();
-      expect(currentWrapper().props.height).toBe(
+      expect(currentWrapper().payload.height).toBe(
         SCREEN_HEIGHT - EXPECTED_INSET,
       );
-      expect(currentWrapper().props.flex).toBe(0);
+      expect(currentWrapper().payload.flex).toBe(0);
 
-      // Once removed, a previously-present prop clones through as an explicit `null` (the engine's
-      // native-removal signal), not `undefined` — the engine's contract, not this component's.
+      // Once removed, a previously-present prop is cleared with the engine's NO_VALUE op, which the
+      // recording obeys by deleting the key — ABSENT, not null (the literal null was the mirror's
+      // own clone-protocol spelling; see .docs/mirror-elimination.md, "RESOLVED: the onLayout ===
+      // null decision"). No stable authored predicate names this wrapper, so the payload half is the
+      // whole check here.
       hideKeyboard();
       await tick();
-      const height = currentWrapper().props.height;
-      expect(height === undefined || height === null).toBe(true);
+      expect(Object.hasOwn(currentWrapper().payload, 'height')).toBe(false);
     });
 
     // why: THE regression the previousInset fix exists for (RN's _relativeKeyboardHeight:100-105).
@@ -242,7 +251,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       showKeyboard();
       await tick();
       const shrunkHeight = SCREEN_HEIGHT - EXPECTED_INSET;
-      expect(currentWrapper().props.height).toBe(shrunkHeight);
+      expect(currentWrapper().payload.height).toBe(shrunkHeight);
 
       // The shrunk wrapper re-lays out: onLayout now reports the SHORTER frame, exactly as a device
       // does between two keyboard notifications.
@@ -252,10 +261,10 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       showKeyboard();
       await tick();
       expect(
-        currentWrapper().props.height,
+        currentWrapper().payload.height,
         'the inset must not shrink itself away',
       ).toBe(shrunkHeight);
-      expect(currentWrapper().props.flex).toBe(0);
+      expect(currentWrapper().payload.flex).toBe(0);
     });
 
     // why: SOLID-SPECIFIC, and the second prop the long-lived keyboard subscription reads. `behavior`
@@ -276,7 +285,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
 
       showKeyboard();
       await tick();
-      expect(currentWrapper().props.height).toBe(
+      expect(currentWrapper().payload.height).toBe(
         SCREEN_HEIGHT - EXPECTED_INSET,
       );
 
@@ -289,7 +298,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       await tick();
 
       expect(
-        currentWrapper().props.paddingBottom,
+        currentWrapper().payload.paddingBottom,
         'the inset must not accumulate',
       ).toBe(EXPECTED_INSET);
       expect(keyboardAdded, 'the behavior change must not add listeners').toBe(
@@ -306,9 +315,9 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       showKeyboard();
       await tick();
 
-      expect(currentWrapper().props.paddingBottom).toBeUndefined();
-      expect(currentWrapper().props.height).toBeUndefined();
-      expect(currentWrapper().props.flex).toBe(1);
+      expect(currentWrapper().payload.paddingBottom).toBeUndefined();
+      expect(currentWrapper().payload.height).toBeUndefined();
+      expect(currentWrapper().payload.flex).toBe(1);
     });
   });
 
@@ -322,7 +331,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       showKeyboard();
       await tick();
 
-      const padding = currentWrapper().props.paddingBottom;
+      const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
 
@@ -339,7 +348,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       showKeyboard();
       await tick();
 
-      expect(currentWrapper().props.paddingBottom).toBe(
+      expect(currentWrapper().payload.paddingBottom).toBe(
         EXPECTED_INSET + OFFSET,
       );
     });
@@ -359,7 +368,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
 
       showKeyboard();
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
 
       const NEXT_OFFSET = 25;
       setOffset(NEXT_OFFSET);
@@ -367,7 +376,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       showKeyboard();
       await tick();
 
-      expect(currentWrapper().props.paddingBottom).toBe(
+      expect(currentWrapper().payload.paddingBottom).toBe(
         EXPECTED_INSET + NEXT_OFFSET,
       );
       expect(keyboardAdded, 'the offset change must not add listeners').toBe(
@@ -387,12 +396,12 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
 
       showKeyboard();
       await tick();
-      const padding = currentWrapper().props.paddingBottom;
+      const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
 
       setEnabled(true);
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
     });
   });
 
@@ -409,7 +418,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
 
       showKeyboard(0);
       await tick();
-      const padding = currentWrapper().props.paddingBottom;
+      const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
 
@@ -423,7 +432,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
 
       showKeyboard(0);
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(
+      expect(currentWrapper().payload.paddingBottom).toBe(
         FRAME_Y + SCREEN_HEIGHT,
       );
     });
@@ -442,7 +451,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
 
       showKeyboard(0);
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(
+      expect(currentWrapper().payload.paddingBottom).toBe(
         FRAME_Y + SCREEN_HEIGHT,
       );
     });
@@ -483,7 +492,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       hub().emit(KEYBOARD_EVENT.willChangeFrame, staleFrame);
       hub().emit(KEYBOARD_EVENT.didShow, staleFrame);
       await tick();
-      const idle = currentWrapper().props.paddingBottom;
+      const idle = currentWrapper().payload.paddingBottom;
       expect(
         idle === undefined || idle === 0,
         'only willShow may move the inset',
@@ -491,20 +500,20 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
 
       showKeyboard();
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
 
       hub().emit(KEYBOARD_EVENT.didHide, {
         endCoordinates: { height: 0, screenY: SCREEN_HEIGHT },
       });
       await tick();
       expect(
-        currentWrapper().props.paddingBottom,
+        currentWrapper().payload.paddingBottom,
         'only willHide may clear the inset',
       ).toBe(EXPECTED_INSET);
 
       hideKeyboard();
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(0);
+      expect(currentWrapper().payload.paddingBottom).toBe(0);
     });
 
     // why: the subscription lives in the setup body, so it must be re-established per MOUNT — the
@@ -521,6 +530,10 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       mount(ROOT_TAG, () => <App behavior="padding" />);
       await tick();
       unmount(ROOT_TAG);
+      // `live.appRoot()` searches the CREATION log, which the first mount above is still in — a
+      // second surface with the same box-none marker would otherwise resolve to the FIRST one
+      // (.docs/mirror-elimination.md, "appRoot() needs a reset per ARM, not only per case").
+      fabric.reset();
 
       mount(ROOT_TAG, () => <App behavior="padding" />);
       await tick();
@@ -528,7 +541,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       showKeyboard();
       await tick();
 
-      expect(currentWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
     });
   });
 
@@ -540,31 +553,31 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
     // the very TextInput the user is typing into (.claude/rules/solid-descriptor-bridge.md §4, which
     // cost a real device bug in Pressable). Measured: writing the same branch as a plain
     // `renderContent()` helper instead — the shape Pressable uses, and the obvious refactor — fails
-    // this line at 6 created nodes against 4. The counter is the only headless trace of the focus
-    // loss; nothing else in this file moves.
+    // this line because the wrapper's identity moves. The handle is the only headless trace of the
+    // focus loss; nothing else in this file moves.
     it('creates no node across a full keyboard show/hide cycle', async () => {
       mount(ROOT_TAG, () => <App behavior="padding" />);
       await tick();
       measureWrapper();
-      const createdAtMount = fabric.counts.createNode;
+      const wrapperAtMount = currentWrapper().handle;
 
       showKeyboard();
       await tick();
       expect(
-        currentWrapper().props.paddingBottom,
+        currentWrapper().payload.paddingBottom,
         'the inset must still land',
       ).toBe(EXPECTED_INSET);
       expect(
-        fabric.counts.createNode,
+        currentWrapper().handle,
         'the show rebuilt the child subtree',
-      ).toBe(createdAtMount);
+      ).toBe(wrapperAtMount);
 
       hideKeyboard();
       await tick();
       expect(
-        fabric.counts.createNode,
+        currentWrapper().handle,
         'the hide rebuilt the child subtree',
-      ).toBe(createdAtMount);
+      ).toBe(wrapperAtMount);
     });
 
     // why: the 'position' branch is the structurally riskiest one — it holds the children one level
@@ -574,25 +587,25 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       mount(ROOT_TAG, () => <App behavior="position" />);
       await tick();
       measureWrapper();
-      const createdAtMount = fabric.counts.createNode;
+      const innerAtMount = currentWrapper().children[0]?.handle;
 
       showKeyboard();
       await tick();
       expect(
-        currentWrapper().children[0].props.bottom,
+        currentWrapper().children[0]?.payload.bottom,
         'the inset must still land',
       ).toBe(EXPECTED_INSET);
       expect(
-        fabric.counts.createNode,
+        currentWrapper().children[0]?.handle,
         'the show rebuilt the nested subtree',
-      ).toBe(createdAtMount);
+      ).toBe(innerAtMount);
 
       hideKeyboard();
       await tick();
       expect(
-        fabric.counts.createNode,
+        currentWrapper().children[0]?.handle,
         'the hide rebuilt the nested subtree',
-      ).toBe(createdAtMount);
+      ).toBe(innerAtMount);
     });
   });
 
@@ -615,8 +628,8 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       await tick();
 
       const wrapper = currentWrapper();
-      expect(wrapper.props.testID).toBe('kav');
-      expect(wrapper.props.accessibilityLabel).toBe('compose');
+      expect(wrapper.payload.testID).toBe('kav');
+      expect(wrapper.payload.accessibilityLabel).toBe('compose');
 
       measureWrapper();
       expect(layoutEvents, "the caller's onLayout still fires").toBe(1);
@@ -633,7 +646,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
 
       showKeyboard();
       await tick();
-      const padding = currentWrapper().props.paddingBottom;
+      const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
 
@@ -650,7 +663,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
         easing: 'keyboard',
       });
       await tick();
-      const padding = currentWrapper().props.paddingBottom;
+      const padding = currentWrapper().payload.paddingBottom;
       expect(padding === undefined || padding === 0).toBe(true);
     });
 
@@ -667,7 +680,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
       });
       showKeyboard();
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
     });
   });
 });

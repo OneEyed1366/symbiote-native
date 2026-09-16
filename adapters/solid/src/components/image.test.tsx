@@ -17,7 +17,11 @@ import {
   imageStatics,
   setImageSourceResolver,
 } from '@symbiote-native/components';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: the tag's fold lives in its behavior, and only this module installs it. An
 // app reaches it through the package barrel; a test importing the renderer directly does not.
 import '../register';
@@ -36,7 +40,8 @@ const ASSET_ID = 42;
 const RESOLVED_ASSET = { uri: 'asset://42', scale: 1, width: 10, height: 10 };
 const CLASS_OPACITY = 0.75;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -52,32 +57,35 @@ afterEach(() => {
   setImageSourceResolver(source => source);
 });
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-// Props on the CREATED node are frozen at first commit (clone-on-write hands back a new object),
-// so anything asserted after an update has to be read off the live committed tree.
-function committedImage(): IFakeNode {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.viewName === IMAGE_VIEW) found = node;
-  });
+// The RECORD holds a node as it was CREATED, so anything asserted after an update has to be read
+// off the live tree instead.
+function committedImage(): ILiveNode {
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.viewName === IMAGE_VIEW,
+  );
   if (found === undefined) throw new Error(`no ${IMAGE_VIEW} was committed`);
   return found;
 }
 
-function createdImage(): IFakeNode {
+/**
+ * The image as the RECORDING holds it.
+ *
+ * Two things only the record can answer. `instanceHandle` is what an event has to be aimed at. And
+ * a key the record LOST is proof the engine sent a clearing op for it — the live payload merely
+ * omitting a key cannot tell that apart from the key never having been set.
+ */
+function createdImage(): {
+  instanceHandle: unknown;
+  props: Readonly<Record<string, unknown>>;
+} {
   const node = fabric.find(n => n.viewName === IMAGE_VIEW);
   if (node === undefined) throw new Error(`no ${IMAGE_VIEW} was created`);
   return node;
 }
 
-function firstSource(node: IFakeNode): unknown {
-  const source = node.props.source;
+function firstSource(node: ILiveNode): unknown {
+  const source = node.payload.source;
   return Array.isArray(source) ? source[0] : undefined;
 }
 
@@ -90,7 +98,7 @@ describe('Solid Image on the engine', () => {
     it('mounts to a real RCTImageView', async () => {
       mount(ROOT_TAG, () => <image source={REMOTE} />);
       await tick();
-      expect(committedImage().props.source).toEqual([REMOTE]);
+      expect(committedImage().payload.source).toEqual([REMOTE]);
     });
 
     // why: proves an app's resolver actually reaches the render path through the Solid component,
@@ -111,7 +119,7 @@ describe('Solid Image on the engine', () => {
       ));
       await tick();
 
-      const props = committedImage().props;
+      const props = committedImage().payload;
       expect(firstSource(committedImage())).toEqual({
         uri: 'http://x/w.png',
         width: 20,
@@ -159,7 +167,7 @@ describe('Solid Image on the engine', () => {
       mount(ROOT_TAG, () => <image source={REMOTE} class="hero" />);
       await tick();
 
-      const props = committedImage().props;
+      const props = committedImage().payload;
       expect(props.opacity).toBe(CLASS_OPACITY);
       expect('class' in props).toBe(false);
     });
@@ -173,15 +181,18 @@ describe('Solid Image on the engine', () => {
       const [source, setSource] = createSignal(REMOTE);
       mount(ROOT_TAG, () => <image source={source()} />);
       await tick();
-      const createdAtMount = fabric.counts.createNode;
+      // Node IDENTITY rather than a creation count: what restarts the download and drops the
+      // decoded bitmap is the node being REPLACED, and a count is satisfied by a replacement that
+      // nets out even.
+      const hostAtMount = committedImage().handle;
       expect(firstSource(committedImage())).toEqual(REMOTE);
 
       setSource(OTHER_REMOTE);
       await tick();
 
       expect(firstSource(committedImage())).toEqual(OTHER_REMOTE);
-      expect(fabric.counts.createNode, 'the host node kept its identity').toBe(
-        createdAtMount,
+      expect(committedImage().handle, 'the host node kept its identity').toBe(
+        hostAtMount,
       );
     });
 
@@ -194,14 +205,23 @@ describe('Solid Image on the engine', () => {
       const [alt, setAlt] = createSignal<string | undefined>('a wombat');
       mount(ROOT_TAG, () => <image source={REMOTE} alt={alt()} />);
       await tick();
-      expect(committedImage().props.accessibilityLabel).toBe('a wombat');
-      expect(committedImage().props.accessible).toBe(true);
+      expect(committedImage().payload.accessibilityLabel).toBe('a wombat');
+      expect(committedImage().payload.accessible).toBe(true);
 
       setAlt(undefined);
       await tick();
 
-      expect(committedImage().props.accessibilityLabel).toBeNull();
-      expect(committedImage().props.accessible).toBeNull();
+      // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
+      // default", held only inside the diff the stand-in merged. The engine's op stream says the
+      // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
+      const payload = committedImage().payload;
+      expect(Object.hasOwn(payload, 'accessibilityLabel')).toBe(false);
+      expect(Object.hasOwn(payload, 'accessible')).toBe(false);
+      // …and the half that proves the engine ACTED rather than merely stopping: the record carried
+      // both keys after the mount above, so their being gone from it means a clearing op was sent.
+      const recorded = createdImage();
+      expect(Object.hasOwn(recorded.props, 'accessibilityLabel')).toBe(false);
+      expect(Object.hasOwn(recorded.props, 'accessible')).toBe(false);
     });
 
     // why: Object.assign(ImageComponent, imageStatics) must attach the SAME function references —

@@ -13,7 +13,11 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: the controlled handshake lives in the tag's behavior, and only this module
 // installs it. An app reaches it through the package barrel; a test importing render does not.
 import '../register';
@@ -28,7 +32,8 @@ const TRACK_OFF = '#767577';
 const THUMB = '#f5dd4b';
 const IOS_BACKGROUND = '#3e3e3e';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -44,29 +49,19 @@ afterEach(() => unmount(ROOT_TAG));
 // case below carries its own testID so the oracle names the node it is about.
 function commandsFor(testId: string): readonly string[] {
   return fabric.commands
-    .filter(command => command.node.props.testID === testId)
+    .filter(command => fabric.propsOf(command.handle).testID === testId)
     .map(command => `${command.commandName}:${JSON.stringify(command.args)}`);
 }
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-// The created node's props are frozen at first commit (clone-on-write hands back a new object), so
-// anything asserted after an update must be read off the live committed tree.
-function committedSwitch(): IFakeNode {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.viewName === SWITCH_VIEW) found = node;
-  });
+// The live tree re-derives on every read, so anything asserted after an update is safe off it —
+// no more "frozen at first commit" caveat.
+function committedSwitch(): ILiveNode {
+  const found = live.findLive(live.appRoot(), n => n.viewName === SWITCH_VIEW);
   if (found === undefined) throw new Error(`no ${SWITCH_VIEW} was committed`);
   return found;
 }
 
-function createdSwitch(): IFakeNode {
+function createdSwitch(): { instanceHandle: unknown } {
   const node = fabric.find(n => n.viewName === SWITCH_VIEW);
   if (node === undefined) throw new Error(`no ${SWITCH_VIEW} was created`);
   return node;
@@ -79,7 +74,7 @@ describe('Solid Switch on the engine', () => {
     it('emits the Fabric view name Switch and passes value through as a strict boolean', async () => {
       mount(ROOT_TAG, () => <switch value />);
       await tick();
-      expect(committedSwitch().props.value).toBe(true);
+      expect(committedSwitch().payload.value).toBe(true);
     });
 
     // why: RN sends `value === true` to native (Switch.js) — an absent `value` must fold to a real
@@ -87,7 +82,7 @@ describe('Solid Switch on the engine', () => {
     it('folds an undefined value to a strict false', async () => {
       mount(ROOT_TAG, () => <switch />);
       await tick();
-      expect(committedSwitch().props.value).toBe(false);
+      expect(committedSwitch().payload.value).toBe(false);
     });
 
     // why: trackColor/thumbColor/ios_backgroundColor are RN's public prop names, but native reads
@@ -107,14 +102,14 @@ describe('Solid Switch on the engine', () => {
       ));
       await tick();
 
-      const props = committedSwitch().props;
-      expect(props.onTintColor).toBe(TRACK_ON);
-      expect(props.tintColor).toBe(TRACK_OFF);
-      expect(props.thumbTintColor).toBe(THUMB);
-      expect(props.disabled).toBe(true);
+      const payload = committedSwitch().payload;
+      expect(payload.onTintColor).toBe(TRACK_ON);
+      expect(payload.tintColor).toBe(TRACK_OFF);
+      expect(payload.thumbTintColor).toBe(THUMB);
+      expect(payload.disabled).toBe(true);
       // ios_backgroundColor folds into the style, which the engine flattens onto the node, so
       // backgroundColor lands as a top-level committed prop.
-      expect(props.backgroundColor).toBe(IOS_BACKGROUND);
+      expect(payload.backgroundColor).toBe(IOS_BACKGROUND);
     });
 
     // why: native reads only `accessibility*`; the web aliases must be folded in JS before commit
@@ -127,9 +122,9 @@ describe('Solid Switch on the engine', () => {
       ));
       await tick();
 
-      const props = committedSwitch().props;
-      expect(props.accessibilityLabel).toBe('wifi');
-      expect(props.accessibilityState).toEqual({ disabled: true });
+      const payload = committedSwitch().payload;
+      expect(payload.accessibilityLabel).toBe('wifi');
+      expect(payload.accessibilityState).toEqual({ disabled: true });
     });
 
     // why: onValueChange hands the caller ONE event, with the derived boolean carried as
@@ -167,7 +162,7 @@ describe('Solid Switch on the engine', () => {
     it('never forwards onValueChange itself onto the native prop bag', async () => {
       mount(ROOT_TAG, () => <switch value={false} onValueChange={() => {}} />);
       await tick();
-      expect('onValueChange' in committedSwitch().props).toBe(false);
+      expect('onValueChange' in committedSwitch().payload).toBe(false);
     });
 
     // why: Solid runs a component body ONCE. Every prop read here sits inside an accessor precisely
@@ -177,15 +172,15 @@ describe('Solid Switch on the engine', () => {
       const [value, setValue] = createSignal(false);
       mount(ROOT_TAG, () => <switch value={value()} />);
       await tick();
-      const createdAtMount = fabric.counts.createNode;
-      expect(committedSwitch().props.value).toBe(false);
+      const hostAtMount = committedSwitch().handle;
+      expect(committedSwitch().payload.value).toBe(false);
 
       setValue(true);
       await tick();
 
-      expect(committedSwitch().props.value).toBe(true);
-      expect(fabric.counts.createNode, 'the host node kept its identity').toBe(
-        createdAtMount,
+      expect(committedSwitch().payload.value).toBe(true);
+      expect(committedSwitch().handle, 'the host node kept its identity').toBe(
+        hostAtMount,
       );
     });
 
@@ -241,7 +236,7 @@ describe('Solid Switch on the engine', () => {
       });
       await tick();
 
-      expect(committedSwitch().props.value).toBe(true);
+      expect(committedSwitch().payload.value).toBe(true);
       expect(commandsFor('accept-probe')).toEqual([]);
     });
   });

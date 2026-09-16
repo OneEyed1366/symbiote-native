@@ -12,7 +12,11 @@ import type {
   ISeparatorProps,
   IViewableItemsChangedInfo,
 } from '@symbiote-native/components';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import type { JSX } from '../../jsx-runtime';
 import { mount, unmount } from '../../render';
 import '../../register';
@@ -31,7 +35,8 @@ interface IItem {
   label: string;
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -59,43 +64,35 @@ const getItemLayout = (
   index,
 });
 
-function flatCommitted(): IFakeNode[] {
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return flat;
+// The total creation-log size — every node the engine has ever authored, whatever became of it
+// since. The direct replacement for the old mirror's `counts.createNode`: a claim that "nothing was
+// rebuilt" is a claim that this number held still across the update.
+function totalCreated(): number {
+  return fabric.findAll(() => true).length;
 }
 
 // The auto-generated row Views only. Filtered to RCTView on purpose: a HORIZONTAL scroll host and
 // its content container both carry flexDirection 'row' of their own, and counting those would make
 // the packing assertions read differently per axis.
-function rowWrappers(): IFakeNode[] {
-  return flatCommitted().filter(
-    node => node.viewName === 'RCTView' && node.props.flexDirection === 'row',
+function rowWrappers(): ILiveNode[] {
+  return live.findAllLive(
+    live.appRoot(),
+    node => node.viewName === 'RCTView' && node.payload.flexDirection === 'row',
   );
 }
 
-function committed(viewName: string): IFakeNode {
-  const found = flatCommitted().find(node => node.viewName === viewName);
+function committed(viewName: string): ILiveNode {
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.viewName === viewName,
+  );
   if (found === undefined) throw new Error(`no ${viewName} was committed`);
   return found;
 }
 
-// Every committed raw-text payload. Read off the COMMITTED tree, never `fabric.created`: a created
-// node's props are frozen at its first createNode, so asserting there would make every update test
-// pass forever.
+// Every committed raw-text payload, read off the LIVE tree in tree order.
 function committedLabels(): Set<string> {
-  const labels = new Set<string>();
-  for (const node of flatCommitted()) {
-    const text: unknown = node.props.text;
-    if (typeof text === 'string') labels.add(text);
-  }
-  return labels;
+  return new Set(live.texts(live.appRoot()));
 }
 
 // Mount, then hand the list its viewport through the scroll host's onLayout — until that lands, RN
@@ -178,7 +175,9 @@ describe('Solid FlatList on the engine', () => {
       const rows = rowWrappers();
       expect(rows.length, 'two rows of three, not six item cells').toBe(2);
       expect(rows[0]?.children.length).toBe(3);
-      expect(rows[0]?.children.every(cell => cell.props.flex === 1)).toBe(true);
+      expect(rows[0]?.children.every(cell => cell.payload.flex === 1)).toBe(
+        true,
+      );
 
       const labels = committedLabels();
       expect(labels.has('item-0')).toBe(true);
@@ -215,7 +214,7 @@ describe('Solid FlatList on the engine', () => {
 
       const rows = rowWrappers();
       expect(rows.length).toBe(2);
-      for (const row of rows) expect(row.props.columnGap).toBe(4);
+      for (const row of rows) expect(row.payload.columnGap).toBe(4);
     });
 
     // why: widening the prop to accept a string must stay ADDITIVE — a caller already passing a
@@ -236,7 +235,7 @@ describe('Solid FlatList on the engine', () => {
 
       const rows = rowWrappers();
       expect(rows.length).toBe(2);
-      for (const row of rows) expect(row.props.columnGap).toBe(8);
+      for (const row of rows) expect(row.payload.columnGap).toBe(8);
     });
 
     // why: RN's multi-column FlatList draws its divider BETWEEN ROWS, but the caller's separator is
@@ -357,7 +356,7 @@ describe('Solid FlatList on the engine', () => {
       ]);
       expect(fabric.commands[0]?.args).toEqual([0, 200, true]);
       expect(fabric.commands[1]?.args).toEqual([0, 0, false]);
-      expect(fabric.commands[0]?.node.viewName).toBe(SCROLL_VIEW);
+      expect(fabric.commands[0]?.viewName).toBe(SCROLL_VIEW);
     });
 
     // why: the handle is the same API in both branches — RN's numColumns changes what a cell holds,
@@ -383,7 +382,7 @@ describe('Solid FlatList on the engine', () => {
       list?.scrollToIndex({ index: 1, animated: false });
 
       expect(fabric.commands[0]?.args).toEqual([0, 50, false]);
-      expect(fabric.commands[0]?.node.viewName).toBe(SCROLL_VIEW);
+      expect(fabric.commands[0]?.viewName).toBe(SCROLL_VIEW);
     });
 
     // why: RN's FlatList forwards its accessibility surface to the underlying scroll view, so a
@@ -402,7 +401,7 @@ describe('Solid FlatList on the engine', () => {
       ));
       await settleViewport();
 
-      const scrollProps = committed(SCROLL_VIEW).props;
+      const scrollProps = committed(SCROLL_VIEW).payload;
       expect(scrollProps.testID).toBe('the-flat-list');
       expect(scrollProps.accessibilityLabel).toBe('Orders');
     });
@@ -425,7 +424,7 @@ describe('Solid FlatList on the engine', () => {
       ));
       await settleViewport();
 
-      const scrollProps = committed(SCROLL_VIEW).props;
+      const scrollProps = committed(SCROLL_VIEW).payload;
       for (const leaked of [
         'data',
         'numColumns',
@@ -456,8 +455,8 @@ describe('Solid FlatList on the engine', () => {
       ));
       await tick();
 
-      expect(committed(SCROLL_VIEW).props.horizontal).toBe(true);
-      expect(committed(CONTENT_VIEW).props.width).toBe(
+      expect(committed(SCROLL_VIEW).payload.horizontal).toBe(true);
+      expect(committed(CONTENT_VIEW).payload.width).toBe(
         ITEM_HEIGHT * ITEM_COUNT,
       );
     });
@@ -477,8 +476,8 @@ describe('Solid FlatList on the engine', () => {
       ));
       await tick();
 
-      const flipped = flatCommitted().filter(node =>
-        Array.isArray(node.props.transform),
+      const flipped = live.findAllLive(live.appRoot(), node =>
+        Array.isArray(node.payload.transform),
       );
       expect(flipped.some(node => node.viewName === SCROLL_VIEW)).toBe(true);
       expect(flipped.some(node => node.viewName === CONTENT_VIEW)).toBe(false);
@@ -507,7 +506,7 @@ describe('Solid FlatList on the engine', () => {
       expect(committed(SCROLL_VIEW).children[0]?.viewName).toBe(
         REFRESH_CONTROL,
       );
-      expect(committed(REFRESH_CONTROL).props.refreshing).toBe(true);
+      expect(committed(REFRESH_CONTROL).payload.refreshing).toBe(true);
     });
 
     // why: RN omits the RefreshControl entirely when onRefresh is unset — a list that always
@@ -524,8 +523,11 @@ describe('Solid FlatList on the engine', () => {
       await tick();
 
       expect(
-        flatCommitted().some(node => node.viewName === REFRESH_CONTROL),
-      ).toBe(false);
+        live.findAllLive(
+          live.appRoot(),
+          node => node.viewName === REFRESH_CONTROL,
+        ),
+      ).toHaveLength(0);
     });
 
     // why: onEndReached is the infinite-scroll hook, and RN gates it on the list actually reaching
@@ -704,7 +706,7 @@ describe('Solid FlatList on the engine', () => {
       ));
       await settleViewport();
 
-      const scrollProps = committed(SCROLL_VIEW).props;
+      const scrollProps = committed(SCROLL_VIEW).payload;
       expect(scrollProps.keyboardDismissMode).toBe('on-drag');
       expect(scrollProps.keyboardShouldPersistTaps).toBe('handled');
       expect(scrollProps.scrollEventThrottle).toBe(16);
@@ -712,7 +714,7 @@ describe('Solid FlatList on the engine', () => {
       expect(scrollProps.backgroundColor, 'the class resolved too').toBe(
         'papayawhip',
       );
-      expect(committed(CONTENT_VIEW).props.paddingBottom).toBe(24);
+      expect(committed(CONTENT_VIEW).payload.paddingBottom).toBe(24);
     });
 
     // why: onStartReached is onEndReached's top-edge twin, used for prepend-paging (a chat loading
@@ -822,9 +824,9 @@ describe('Solid FlatList on the engine', () => {
       await settleViewport();
 
       expect(
-        committed(SCROLL_VIEW).props.maintainVisibleContentPosition,
+        committed(SCROLL_VIEW).payload.maintainVisibleContentPosition,
       ).toEqual({ minIndexForVisible: 1 });
-      expect(committed(CONTENT_VIEW).props.collapsableChildren).toBe(false);
+      expect(committed(CONTENT_VIEW).payload.collapsableChildren).toBe(false);
     });
 
     // why: RN implements sticky list headers purely in JS — the flagged CELL is wrapped in the
@@ -844,18 +846,21 @@ describe('Solid FlatList on the engine', () => {
       await settleViewport();
 
       expect(
-        flatCommitted().filter(
-          node => node.props.zIndex === STICKY_HEADER_Z_INDEX,
+        live.findAllLive(
+          live.appRoot(),
+          node => node.payload.zIndex === STICKY_HEADER_Z_INDEX,
         ),
       ).toHaveLength(1);
-      expect('stickyHeaderIndices' in committed(SCROLL_VIEW).props).toBe(false);
+      expect('stickyHeaderIndices' in committed(SCROLL_VIEW).payload).toBe(
+        false,
+      );
     });
   });
 
   // Solid runs a component body ONCE and has no reconciler between what it returns and the host
   // nodes — `insert` REPLACES a subtree rather than diffing one — so "the screen updated" and "the
   // screen was not torn down in order to update" are two independent, silently-breakable claims.
-  // The node-creation counter is the only headless line between them
+  // The creation-log-length counter is the only headless line between them
   // (.claude/rules/solid-descriptor-bridge.md §4).
   describe('Reactivity — updates must be re-props, not rebuilds', () => {
     // why: RN's contract is that a row re-renders when its item changes. Inside a packed row that
@@ -879,7 +884,7 @@ describe('Solid FlatList on the engine', () => {
       ));
       await settleViewport();
       expect(committedLabels().has('item-0')).toBe(true);
-      const createdAtMount = fabric.counts.createNode;
+      const createdAtMount = totalCreated();
 
       // Same length, same row keys, fresh objects and new labels: nothing structural changed.
       setItems(makeItems(ITEM_COUNT, '-v2'));
@@ -894,7 +899,7 @@ describe('Solid FlatList on the engine', () => {
         'every column of every resident row, not just the first',
       ).toBe(true);
       expect(
-        fabric.counts.createNode,
+        totalCreated(),
         'and it did so without rebuilding the column subtree',
       ).toBe(createdAtMount);
     });
@@ -947,19 +952,18 @@ describe('Solid FlatList on the engine', () => {
       await settleViewport();
       const rowsAtMount = rowWrappers();
       expect(rowsAtMount.length).toBeGreaterThan(0);
-      for (const row of rowsAtMount) expect(row.props.columnGap).toBe(4);
-      const createdAtMount = fabric.counts.createNode;
+      for (const row of rowsAtMount) expect(row.payload.columnGap).toBe(4);
+      const createdAtMount = totalCreated();
 
       setGap(12);
       await tick();
 
       const rowsNow = rowWrappers();
       expect(rowsNow.length).toBe(rowsAtMount.length);
-      for (const row of rowsNow) expect(row.props.columnGap).toBe(12);
-      expect(
-        fabric.counts.createNode,
-        'the row views were re-propped, not rebuilt',
-      ).toBe(createdAtMount);
+      for (const row of rowsNow) expect(row.payload.columnGap).toBe(12);
+      expect(totalCreated(), 'the row views were re-propped, not rebuilt').toBe(
+        createdAtMount,
+      );
     });
   });
 
@@ -1005,7 +1009,7 @@ describe('Solid FlatList on the engine', () => {
       ));
       await tick();
 
-      expect(committed(SCROLL_VIEW).props.horizontal).toBe(true);
+      expect(committed(SCROLL_VIEW).payload.horizontal).toBe(true);
       // All four rows, because an unmeasured horizontal viewport does not bound the first batch the
       // way the vertical one does — a VirtualizedList property, not FlatList's; the point here is
       // only that the packing happened at all.
@@ -1030,7 +1034,7 @@ describe('Solid FlatList on the engine', () => {
       ));
       await tick();
       expect(rowWrappers().length).toBe(0);
-      const createdAtMount = fabric.counts.createNode;
+      const createdAtMount = totalCreated();
 
       setColumns(3);
       await tick();
@@ -1038,7 +1042,7 @@ describe('Solid FlatList on the engine', () => {
       expect(rowWrappers().length, 'the packed branch took over').toBe(2);
       expect(committedLabels().has('item-5')).toBe(true);
       expect(
-        fabric.counts.createNode,
+        totalCreated(),
         'a flip is a rebuild, not a re-prop',
       ).toBeGreaterThan(createdAtMount);
     });

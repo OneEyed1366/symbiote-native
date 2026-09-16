@@ -17,14 +17,20 @@
 // diff payloads rather than assert individual keys.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 import type { JSX } from './jsx-runtime';
 
 const WRAPPER_ROOT = 8_701;
 const TAG_ROOT = 8_702;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// The payload is what an app can observe; the author's bag is not.
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -35,8 +41,8 @@ afterEach(() => {
 });
 
 // The app's own view sits under the synthetic box-none AppContainer root.
-function appView(): IFakeNode {
-  return fabric.appRoot().children[0];
+function appView(): ILiveNode {
+  return live.nodeOf(live.appRoot()).children[0];
 }
 
 // Mounts one tree, waits for the microtask-coalesced commit, and takes the payload. Each arm gets
@@ -44,12 +50,12 @@ function appView(): IFakeNode {
 async function payloadOf(
   rootTag: number,
   tree: () => JSX.Element,
-): Promise<{ view: string; props: Record<string, unknown> }> {
+): Promise<{ view: string; payload: Record<string, unknown> }> {
   fabric.reset();
   mount(rootTag, tree);
   await tick();
   const node = appView();
-  return { view: node.viewName, props: { ...node.props } };
+  return { view: node.viewName, payload: { ...node.payload } };
 }
 
 function keysOf(props: Record<string, unknown>): string[] {
@@ -75,12 +81,12 @@ describe('a bare intrinsic commits the wrapper payload', () => {
     const tag = await payloadOf(TAG_ROOT, () => <view {...props} />);
 
     expect(tag.view).toBe(wrapper.view);
-    expect(keysOf(tag.props)).toEqual(keysOf(wrapper.props));
-    expect(tag.props).toEqual(wrapper.props);
+    expect(keysOf(tag.payload)).toEqual(keysOf(wrapper.payload));
+    expect(tag.payload).toEqual(wrapper.payload);
     // Pinned, not merely equal: two payloads that are both missing the fold would also be equal.
-    expect(wrapper.props.nativeID).toBe('hero');
-    expect(wrapper.props.id).toBeUndefined();
-    expect(wrapper.props.onLayout).toBe(true);
+    expect(wrapper.payload.nativeID).toBe('hero');
+    expect(wrapper.payload.id).toBeUndefined();
+    expect(wrapper.payload.onLayout).toBe(true);
   });
 
   it('View: no id and no nativeID leaves the SAME key set on both paths', async () => {
@@ -92,8 +98,8 @@ describe('a bare intrinsic commits the wrapper payload', () => {
     const wrapper = await payloadOf(WRAPPER_ROOT, () => <view {...props} />);
     const tag = await payloadOf(TAG_ROOT, () => <view {...props} />);
 
-    expect(keysOf(tag.props)).toEqual(keysOf(wrapper.props));
-    expect(keysOf(wrapper.props)).not.toContain('nativeID');
+    expect(keysOf(tag.payload)).toEqual(keysOf(wrapper.payload));
+    expect(keysOf(wrapper.payload)).not.toContain('nativeID');
   });
 
   it('Text: the two defaults reach the bare tag from the renderer', async () => {
@@ -103,10 +109,10 @@ describe('a bare intrinsic commits the wrapper payload', () => {
     const tag = await payloadOf(TAG_ROOT, () => <text {...props} />);
 
     expect(tag.view).toBe(wrapper.view);
-    expect(keysOf(tag.props)).toEqual(keysOf(wrapper.props));
-    expect(tag.props).toEqual(wrapper.props);
-    expect(wrapper.props.ellipsizeMode).toBe('tail');
-    expect(wrapper.props.allowFontScaling).toBe(true);
+    expect(keysOf(tag.payload)).toEqual(keysOf(wrapper.payload));
+    expect(tag.payload).toEqual(wrapper.payload);
+    expect(wrapper.payload.ellipsizeMode).toBe('tail');
+    expect(wrapper.payload.allowFontScaling).toBe(true);
   });
 
   it('Text: allowFontScaling={false} is the case a plain ?? would get wrong', async () => {
@@ -115,8 +121,8 @@ describe('a bare intrinsic commits the wrapper payload', () => {
     const wrapper = await payloadOf(WRAPPER_ROOT, () => <text {...props} />);
     const tag = await payloadOf(TAG_ROOT, () => <text {...props} />);
 
-    expect(tag.props).toEqual(wrapper.props);
-    expect(tag.props.allowFontScaling).toBe(false);
-    expect(tag.props.ellipsizeMode).toBe('clip');
+    expect(tag.payload).toEqual(wrapper.payload);
+    expect(tag.payload.allowFontScaling).toBe(false);
+    expect(tag.payload.ellipsizeMode).toBe('clip');
   });
 });

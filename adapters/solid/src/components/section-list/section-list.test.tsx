@@ -10,7 +10,11 @@
 // there.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
 import { mount, unmount } from '../../render';
 import '../../register';
@@ -44,38 +48,18 @@ const SECTIONS = [
   },
 ];
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function flatCommitted(): IFakeNode[] {
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return flat;
-}
-
-function committed(viewName: string): IFakeNode {
-  const found = flatCommitted().find(node => node.viewName === viewName);
+function committed(viewName: string): ILiveNode {
+  const found = live.findLive(live.appRoot(), n => n.viewName === viewName);
   if (found === undefined) throw new Error(`no ${viewName} was committed`);
   return found;
-}
-
-function committedTexts(): string[] {
-  const texts: string[] = [];
-  for (const node of flatCommitted()) {
-    const text: unknown = node.props.text;
-    if (typeof text === 'string') texts.push(text);
-  }
-  return texts;
 }
 
 async function settleViewport(): Promise<void> {
@@ -107,7 +91,7 @@ describe('Solid SectionList on the engine', () => {
       ));
       await settleViewport();
 
-      expect(committedTexts()).toEqual([
+      expect(live.texts(live.appRoot())).toEqual([
         'header:Section A',
         'row-a0',
         'row-a1',
@@ -178,12 +162,13 @@ describe('Solid SectionList on the engine', () => {
       ));
       await settleViewport();
 
-      const wrappers = flatCommitted().filter(
-        node => node.props.zIndex === STICKY_HEADER_Z_INDEX,
+      const wrappers = live.findAllLive(
+        live.appRoot(),
+        node => node.payload.zIndex === STICKY_HEADER_Z_INDEX,
       );
       expect(wrappers, 'one sticky wrapper per section header').toHaveLength(2);
 
-      const scroll = committed(SCROLL_VIEW).props;
+      const scroll = committed(SCROLL_VIEW).payload;
       expect(scroll.testID).toBe('the-section-list');
       expect(scroll.backgroundColor).toBe('red');
     });

@@ -20,7 +20,11 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { Keyboard, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
   buildTextInputHandle,
@@ -38,33 +42,25 @@ const MULTILINE_VIEW = 'RCTMultilineTextInputView';
 // RN's "leave the caret alone" sentinel, echoed by a controlled write with no explicit selection.
 const NO_SELECTION = -1;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-// The created node's props are frozen at first commit (clone-on-write hands back a new object), so
-// anything asserted after an update must be read off the live committed tree.
-function committedInput(viewName: string = SINGLELINE_VIEW): IFakeNode {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.viewName === viewName) found = node;
-  });
+// The live tree re-derives on every read, so anything asserted after an update is safe off it.
+function committedInput(viewName: string = SINGLELINE_VIEW): ILiveNode {
+  const found = live.findLive(live.appRoot(), n => n.viewName === viewName);
   if (found === undefined) throw new Error(`no ${viewName} was committed`);
   return found;
 }
 
 // The creation-time record, whose instanceHandle is what the slot dispatches events at.
-function createdInput(viewName: string = SINGLELINE_VIEW): IFakeNode {
+function createdInput(viewName: string = SINGLELINE_VIEW): {
+  instanceHandle: unknown;
+} {
   const node = fabric.find(n => n.viewName === viewName);
   if (node === undefined) throw new Error(`no ${viewName} was created`);
   return node;
@@ -90,10 +86,10 @@ describe('Solid TextInput on the engine', () => {
       mount(ROOT_TAG, () => <text-input value="hello" />);
       await tick();
 
-      const props = committedInput().props;
-      expect(props.text).toBe('hello');
-      expect(props.mostRecentEventCount).toBe(0);
-      expect('value' in props).toBe(false);
+      const payload = committedInput().payload;
+      expect(payload.text).toBe('hello');
+      expect(payload.mostRecentEventCount).toBe(0);
+      expect('value' in payload).toBe(false);
     });
 
     // why: `multiline` picks a DIFFERENT native view class, not a prop on the same one — getting it
@@ -101,7 +97,7 @@ describe('Solid TextInput on the engine', () => {
     it('renders the multiline intrinsic when multiline is set', async () => {
       mount(ROOT_TAG, () => <text-input-multiline value="two lines" />);
       await tick();
-      expect(committedInput(MULTILINE_VIEW).props.text).toBe('two lines');
+      expect(committedInput(MULTILINE_VIEW).payload.text).toBe('two lines');
     });
 
     // why: defaultValue is the uncontrolled seed — value wins when both are set (RN's foldText), so
@@ -109,7 +105,7 @@ describe('Solid TextInput on the engine', () => {
     it('falls back to defaultValue when value is absent', async () => {
       mount(ROOT_TAG, () => <text-input defaultValue="seed" />);
       await tick();
-      expect(committedInput().props.text).toBe('seed');
+      expect(committedInput().payload.text).toBe('seed');
     });
 
     // why: RN's own aliases are folded in JS and are INERT at the native layer — forwarding
@@ -126,17 +122,17 @@ describe('Solid TextInput on the engine', () => {
       ));
       await tick();
 
-      const props = committedInput().props;
-      expect(props.keyboardType).toBe('email-address');
-      expect(props.returnKeyType).toBe('send');
-      expect(props.editable).toBe(false);
+      const payload = committedInput().payload;
+      expect(payload.keyboardType).toBe('email-address');
+      expect(payload.returnKeyType).toBe('send');
+      expect(payload.editable).toBe(false);
       // One W3C token resolves BOTH platforms' native props; the inert one rides along.
-      expect(props.autoComplete).toBe('username');
-      expect(props.textContentType).toBe('username');
+      expect(payload.autoComplete).toBe('username');
+      expect(payload.textContentType).toBe('username');
       // RN hides Android's Material EditText bar by default (TextInput.js:908).
-      expect(props.underlineColorAndroid).toBe('transparent');
+      expect(payload.underlineColorAndroid).toBe('transparent');
       // Single-line with no explicit submitBehavior blurs on submit.
-      expect(props.submitBehavior).toBe('blurAndSubmit');
+      expect(payload.submitBehavior).toBe('blurAndSubmit');
     });
 
     // why: placeholder/secureTextEntry/maxLength/autoCapitalize and friends are real Fabric props
@@ -158,16 +154,16 @@ describe('Solid TextInput on the engine', () => {
       ));
       await tick();
 
-      const props = committedInput().props;
-      expect(props.placeholder).toBe('email');
-      expect(props.placeholderTextColor).toBe('#999');
-      expect(props.secureTextEntry).toBe(true);
-      expect(props.maxLength).toBe(12);
-      expect(props.autoCapitalize).toBe('none');
-      expect(props.autoCorrect).toBe(false);
-      expect(props.selectTextOnFocus).toBe(true);
-      expect(props.inputAccessoryViewID).toBe('bar');
-      expect(props.testID).toBe('field');
+      const payload = committedInput().payload;
+      expect(payload.placeholder).toBe('email');
+      expect(payload.placeholderTextColor).toBe('#999');
+      expect(payload.secureTextEntry).toBe(true);
+      expect(payload.maxLength).toBe(12);
+      expect(payload.autoCapitalize).toBe('none');
+      expect(payload.autoCorrect).toBe(false);
+      expect(payload.selectTextOnFocus).toBe(true);
+      expect(payload.inputAccessoryViewID).toBe('bar');
+      expect(payload.testID).toBe('field');
     });
 
     // why: native reads only `accessibility*`; the web aliases must be folded in JS before commit.
@@ -177,9 +173,9 @@ describe('Solid TextInput on the engine', () => {
       mount(ROOT_TAG, () => <text-input aria-label="email" aria-disabled />);
       await tick();
 
-      const props = committedInput().props;
-      expect(props.accessibilityLabel).toBe('email');
-      expect(props.accessibilityState).toEqual({ disabled: true });
+      const payload = committedInput().payload;
+      expect(payload.accessibilityLabel).toBe('email');
+      expect(payload.accessibilityState).toEqual({ disabled: true });
     });
 
     // why: RN's change payload carries the text and the native event counter; the callback hands
@@ -206,8 +202,8 @@ describe('Solid TextInput on the engine', () => {
 
       expect(seen).toBe('ab');
       expect(rawCount).toBe(1);
-      expect(committedInput().props.text).toBe('ab');
-      expect(committedInput().props.mostRecentEventCount).toBe(1);
+      expect(committedInput().payload.text).toBe('ab');
+      expect(committedInput().payload.mostRecentEventCount).toBe(1);
     });
 
     // why: a bare tag's props are reactive per-key writes, not a bag rebuilt from a component body
@@ -217,15 +213,15 @@ describe('Solid TextInput on the engine', () => {
       const [placeholder, setPlaceholder] = createSignal('before');
       mount(ROOT_TAG, () => <text-input placeholder={placeholder()} />);
       await tick();
-      const createdAtMount = fabric.counts.createNode;
-      expect(committedInput().props.placeholder).toBe('before');
+      const hostAtMount = committedInput().handle;
+      expect(committedInput().payload.placeholder).toBe('before');
 
       setPlaceholder('after');
       await tick();
 
-      expect(committedInput().props.placeholder).toBe('after');
-      expect(fabric.counts.createNode, 'the host node kept its identity').toBe(
-        createdAtMount,
+      expect(committedInput().payload.placeholder).toBe('after');
+      expect(committedInput().handle, 'the host node kept its identity').toBe(
+        hostAtMount,
       );
     });
 
@@ -272,7 +268,7 @@ describe('Solid TextInput on the engine', () => {
       type('ab', 1);
       await tick();
 
-      expect(committedInput().props.text).toBe('ab');
+      expect(committedInput().payload.text).toBe('ab');
       expect(fabric.commands).toHaveLength(0);
     });
 
@@ -295,7 +291,7 @@ describe('Solid TextInput on the engine', () => {
       setValue('b');
       await tick();
 
-      expect(committedInput().props.text).toBe('b');
+      expect(committedInput().payload.text).toBe('b');
       expect(fabric.commands).toHaveLength(1);
       expect(fabric.commands[0]?.args).toEqual([
         0,
@@ -384,7 +380,7 @@ describe('Solid TextInput on the engine', () => {
       ));
       await tick();
 
-      expect(committedInput().props.selection).toEqual({ start: 1, end: 3 });
+      expect(committedInput().payload.selection).toEqual({ start: 1, end: 3 });
 
       fabric.fireEvent(createdInput().instanceHandle, 'topSelectionChange', {
         selection: { start: 2, end: 2 },
@@ -456,10 +452,10 @@ describe('Solid TextInput on the engine', () => {
       ));
       await tick();
 
-      const props = committedInput().props;
-      expect('onValueChange' in props).toBe(false);
-      expect('defaultValue' in props).toBe(false);
-      expect('inputMode' in props).toBe(false);
+      const payload = committedInput().payload;
+      expect('onValueChange' in payload).toBe(false);
+      expect('defaultValue' in payload).toBe(false);
+      expect('inputMode' in payload).toBe(false);
     });
 
     // A runtime multiline flip is NOT covered: single- and multiline are different native views,

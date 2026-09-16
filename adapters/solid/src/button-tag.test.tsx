@@ -19,7 +19,11 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: the behavior is what builds the subtree. An app reaches it through the
 // package barrel; a test importing the renderer directly does not.
 import './register';
@@ -37,7 +41,8 @@ const LABEL_FONT_SIZE = 18;
 // itself — a different tap target and, on Android, a different background size.
 const LABEL_MARGIN = 8;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -81,25 +86,18 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'cancelAnimationFrame');
 });
 
-function committed(predicate: (node: IFakeNode) => boolean): IFakeNode {
-  let found: IFakeNode | undefined;
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (found === undefined && predicate(node)) found = node;
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
+function committed(predicate: (node: ILiveNode) => boolean): ILiveNode {
+  const found = live.findLive(live.appRoot(), predicate);
   if (found === undefined) throw new Error('no committed node matched');
   return found;
 }
 
 // The outer pressable — the node the responder and every forwarded native prop live on.
-function touchable(): IFakeNode {
-  return committed(node => node.props.testID === TEST_ID);
+function touchable(): ILiveNode {
+  return committed(node => node.payload.testID === TEST_ID);
 }
 
-function label(): IFakeNode {
+function label(): ILiveNode {
   return committed(node => node.viewName === 'RCTText');
 }
 
@@ -112,12 +110,12 @@ describe('Solid: `button` as a tag', () => {
       mount(ROOT_TAG, () => <button testID={TEST_ID} title={TITLE} />);
       await tick();
 
-      const labelProps = label().props;
+      const labelProps = label().payload;
       expect(labelProps.color).toBe(DEFAULT_BLUE);
       expect(labelProps.textAlign).toBe('center');
       expect(labelProps.fontSize).toBe(LABEL_FONT_SIZE);
       expect(labelProps.margin).toBe(LABEL_MARGIN);
-      expect(label().children[0].props.text).toBe(TITLE);
+      expect(label().children[0].payload.text).toBe(TITLE);
       // RN's FOUR nodes on iOS, in order and by view name — the host (TouchableOpacity's own
       // Animated.View, which the tag IS), the inner view carrying the Material look on Android and
       // nothing here, the Text, and the raw text. Three of them exist only because the behavior
@@ -143,8 +141,8 @@ describe('Solid: `button` as a tag', () => {
       ));
       await tick();
 
-      expect(label().props.color).toBe('#ff0000');
-      expect('color' in touchable().props).toBe(false);
+      expect(label().payload.color).toBe('#ff0000');
+      expect(Object.hasOwn(touchable().payload, 'color')).toBe(false);
     });
 
     // why: RN's fold makes `disabled` win over `color` — a disabled button must read as disabled
@@ -156,7 +154,7 @@ describe('Solid: `button` as a tag', () => {
       ));
       await tick();
 
-      expect(label().props.color).toBe(DISABLED_GREY);
+      expect(label().payload.color).toBe(DISABLED_GREY);
     });
 
     // why: RN's Button pins role=button and the disabled state AFTER the caller's own props, so a
@@ -182,7 +180,7 @@ describe('Solid: `button` as a tag', () => {
       ));
       await tick();
 
-      const props = touchable().props;
+      const props = touchable().payload;
       expect(props.accessibilityRole).toBe('button');
       expect(props.accessible).toBe(false);
       expect(props.accessibilityState).toEqual({ busy: true, disabled: true });
@@ -197,9 +195,9 @@ describe('Solid: `button` as a tag', () => {
       ));
       await tick();
 
-      const props = touchable().props;
+      const props = touchable().payload;
       expect(props.android_disableSound).toBe(true);
-      expect('touchSoundDisabled' in props).toBe(false);
+      expect(Object.hasOwn(props, 'touchSoundDisabled')).toBe(false);
     });
 
     // why: the TV-focus props are real Fabric props the touchable does not TYPE — they ride the
@@ -217,10 +215,10 @@ describe('Solid: `button` as a tag', () => {
       ));
       await tick();
 
-      const props = touchable().props;
+      const props = touchable().payload;
       expect(props.hasTVPreferredFocus).toBe(true);
       expect(props.nextFocusDown).toBe(NEXT_FOCUS_TAG);
-      expect('title' in props).toBe(false);
+      expect(Object.hasOwn(props, 'title')).toBe(false);
     });
 
     // why: onPress reaches the app through the responder path, not through the behavior. This is
@@ -262,15 +260,15 @@ describe('Solid: `button` as a tag', () => {
         <button testID={TEST_ID} title={TITLE} color={color()} />
       ));
       await tick();
-      const createdAtMount = fabric.counts.createNode;
-      expect(label().props.color).toBe('#ff0000');
+      const labelAtMount = label().handle;
+      expect(label().payload.color).toBe('#ff0000');
 
       setColor('#00ff00');
       await tick();
 
-      expect(label().props.color).toBe('#00ff00');
-      expect(fabric.counts.createNode, 'the label node kept its identity').toBe(
-        createdAtMount,
+      expect(label().payload.color).toBe('#00ff00');
+      expect(label().handle, 'the label node kept its identity').toBe(
+        labelAtMount,
       );
     });
   });

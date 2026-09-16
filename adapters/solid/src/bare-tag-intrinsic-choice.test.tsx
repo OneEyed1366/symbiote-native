@@ -12,7 +12,11 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'solid-js';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // The TextInput behavior is what folds `submitBehavior`, and it is installed only here. Without it
 // every payload below is bare and the assertions fail as if the engine were broken.
 import './register';
@@ -23,7 +27,8 @@ const { HOST_PRIMITIVES } = require_(
   '@symbiote-native/components/host-primitives',
 );
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRoot = 9_400;
 
 const flush = async (): Promise<void> => {
@@ -31,20 +36,14 @@ const flush = async (): Promise<void> => {
   await Promise.resolve();
 };
 
-function walk(node: IFakeNode, out: IFakeNode[]): IFakeNode[] {
-  out.push(node);
-  for (const child of node.children) walk(child, out);
-  return out;
-}
-
-async function committed(tree: Component): Promise<IFakeNode> {
+async function committed(tree: Component): Promise<ILiveNode> {
   const root = (nextRoot += 1);
   fabric.reset();
   mount(root, tree);
   await flush();
-  const last = fabric.committed[fabric.committed.length - 1];
-  const hit = (last === undefined ? [] : walk(last, [])).find(
-    node => node.props.testID === 'probe',
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === 'probe',
   );
   unmount(root);
   if (hit === undefined) throw new Error('nothing committed with testID=probe');
@@ -68,17 +67,17 @@ describe('the tag decides the text-input view, on a hand-written tag', () => {
 
     expect(node.viewName).toBe('RCTMultilineTextInputView');
     // The fold the seed exists for: single-line resolves this to 'blurAndSubmit'.
-    expect(node.props.submitBehavior).toBe('newline');
+    expect(node.payload.submitBehavior).toBe('newline');
   });
 
   it('folds the single-line tag as single-line', async () => {
     const node = await committed(() => <text-input testID="probe" />);
 
     expect(node.viewName).toBe('RCTSinglelineTextInputView');
-    expect(node.props.submitBehavior).toBe('blurAndSubmit');
+    expect(node.payload.submitBehavior).toBe('blurAndSubmit');
     // Not seeded on this tag: the wrapper's payload carries no `multiline` key either, and adding
     // one here would be a divergence in the opposite direction.
-    expect(Object.keys(node.props)).not.toContain('multiline');
+    expect(Object.keys(node.payload)).not.toContain('multiline');
   });
 
   it('refuses a multiline prop on the single-line tag', async () => {
@@ -101,7 +100,7 @@ describe('the tag decides the text-input view, on a hand-written tag', () => {
     ));
 
     expect(node.viewName).toBe('RCTMultilineTextInputView');
-    expect(node.props.submitBehavior).toBe('newline');
+    expect(node.payload.submitBehavior).toBe('newline');
   });
 
   // The spread is the shape a transform must REFUSE (`unreadableAttributeSet`) because it cannot

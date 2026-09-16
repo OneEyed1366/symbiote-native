@@ -19,33 +19,33 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 9_477;
 const RAW_TEXT = 'RCTRawText';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-// Every committed raw text's `text` prop, UNFILTERED — the point of this file is what the value
-// actually is, so a walker that kept only strings (jsx-runtime.test.tsx's) would hide the bug.
-// Reads `fabric.committed`, since a created node's props are frozen at its first commit
-// (symbiote-engine-core §8).
+// Every raw text's `text`, UNFILTERED and UNCOERCED — the point of this file is what the value
+// actually IS, so neither `live.texts()` (which stringifies) nor a walker that kept only strings
+// (jsx-runtime.test.tsx's) can be used here: both would hide the bug.
+//
+// The LIVE tree rather than the recording: a created node's props are frozen at its first commit,
+// so an update asserted off the record would pass forever (symbiote-engine-core §8).
 function committedText(): unknown[] {
-  const found: unknown[] = [];
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (node.viewName === RAW_TEXT) found.push(node.props.text);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return found;
+  return live
+    .findAllLive(live.appRoot(), node => node.viewName === RAW_TEXT)
+    .map(node => node.payload.text);
 }
 
 describe('text children reaching Fabric', () => {
@@ -61,7 +61,7 @@ describe('text children reaching Fabric', () => {
 
   // why: an expression emptying out is a normal reactive update. The node it leaves behind must not
   // be committed as an empty raw text — that is the same abort, reached with pure strings.
-  it('commits nothing for an expression that empties out', async () => {
+  it('empties the raw text in place rather than replacing the node', async () => {
     const [name, setName] = createSignal('Ada');
     mount(ROOT_TAG, () => <text>{name()} — hello</text>);
     await tick();
@@ -69,7 +69,13 @@ describe('text children reaching Fabric', () => {
 
     setName('');
     await tick();
-    expect(committedText()).toEqual([' — hello']);
+
+    // The node is still HERE, carrying an empty string — the adapter updates text in place, and
+    // that is the whole of its job. Dropping an empty fragment is the COMMIT's rule
+    // (`AttributedString::appendFragment`), so "nothing is painted" is asserted where a commit
+    // happens: `core/engine/cpp/tests/js/solid-adapter.itest.tsx`, "stops committing a raw text
+    // whose expression empties out", and statically in `text-nesting.itest.ts`.
+    expect(committedText()).toEqual(['', ' — hello']);
   });
 
   // why: the rule is "empty", never "blank". A space between two nested texts is what makes
