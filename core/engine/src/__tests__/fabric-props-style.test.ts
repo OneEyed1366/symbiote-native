@@ -12,17 +12,21 @@
 // but never runs is exactly the failure that happened, and only the identity assertion catches it.
 
 import { describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
+  clearGlobalStyles,
   createElement,
   propOf,
+  registerRules,
   routeProp,
   setProp,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { fabricProps } from '../fabric-props';
 
-installFabric();
+// A RECORDING host: `fabricProps` is the engine's own payload builder, and this file calls it
+// directly — there is no renderer in the question it asks.
+installRecordingFabric();
 
 const VIEW = 'RCTView';
 
@@ -40,14 +44,33 @@ describe('fabricProps style hoisting', () => {
   // why: the fact the dead memo hinged on. If routeProp ever starts leaving a bare object here,
   // the branch structure in addStyle is worth revisiting - but until then, an implementation that
   // only handles the object case handles nothing.
-  it('routeProp always leaves style as an ARRAY, never a bare object', () => {
+  //
+  // The assertion used to read "ALWAYS an array" and a class that matched no rule was one of its
+  // two cases. That is no longer true and the change was deliberate: a slot resolving to nothing
+  // now crosses as a DELETE rather than as `[{}, undefined]`, so such a node ends with no style key
+  // at all — the same state a node that was never styled has always had. The invariant addStyle
+  // actually rests on is untouched, because `undefined` is not a bare object either.
+  it('routeProp leaves style as an ARRAY whenever anything resolves', () => {
     const styled = createElement(VIEW);
     routeProp(styled, 'style', { flex: 1 });
     expect(Array.isArray(propOf(styled, 'style'))).toBe(true);
 
+    registerRules([
+      { tokens: ['card'], specificity: [0, 1, 0], order: 0, style: { gap: 2 } },
+    ]);
     const classed = createElement(VIEW);
     routeProp(classed, 'className', 'card');
     expect(Array.isArray(propOf(classed, 'style'))).toBe(true);
+    clearGlobalStyles();
+  });
+
+  // The other half of that change, stated rather than implied. A class nobody registered styles
+  // nothing, so there is nothing to publish — and `addStyle` never sees a bare object either way,
+  // which is the property the memo depends on.
+  it('leaves no style key at all when the class matches no rule', () => {
+    const unmatched = createElement(VIEW);
+    routeProp(unmatched, 'className', 'no-such-rule');
+    expect(propOf(unmatched, 'style')).toBeUndefined();
   });
 
   it('hoists a routed style onto the payload alongside top-level props', () => {

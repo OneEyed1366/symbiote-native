@@ -116,8 +116,54 @@ class Tree {
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
+  /**
+   * `nextSiblingOf(handle)` — the next entry in the parent's child list, anchors included.
+   *
+   * Its own call because the JS spelling was `parentOf` plus a whole `childrenOf`, which a keyed
+   * patch makes quadratic: 1 002 001 handles crossed on a 1 000-row Vue append.
+   */
+  facebook::jsi::Value nextSiblingOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
   /** `childrenOf(handle)` — in order, ANCHORS INCLUDED. */
   facebook::jsi::Value childrenOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /**
+   * `parentsOf(handles)` / `subtreesOf(roots)` — the batched twins of the two reads above, each
+   * answering for a whole list in ONE crossing.
+   *
+   * They are members rather than a JS loop because the teardown sweep is the one structural read
+   * whose size is the TREE's rather than one node's: it asks for every removed node's parent and
+   * then walks everything the removal took with it, which at a thousand rows was eleven thousand
+   * crossings inside the timed step.
+   *
+   * `subtreesOf` answers PRE-ORDER, each root followed by its descendants, concatenated in root
+   * order. Anchors included, exactly as `childrenOf` includes them.
+   */
+  facebook::jsi::Value parentsOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  facebook::jsi::Value subtreesOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+  /**
+   * `ancestorsOf(handle)` — the node and every ancestor above it, DEEPEST FIRST, in one crossing.
+   *
+   * The upward twin of `subtreesOf`, and it exists for the same reason the batched pair above does:
+   * a walk that asks per LEVEL pays a crossing per level. Event dispatch needs this chain for every
+   * event (capture reads it reversed, bubble forward) and the responder negotiation needs it again
+   * on every frame of every drag — measured at 18 crossings per event on a depth-8 chain before the
+   * two phases shared a walk, and 9 after.
+   *
+   * A SURFACE is included, exactly as `parentOf`'s answer includes one: stopping at a surface is
+   * `host-access.ts`'s job, and it reads the answer's `component` to do it.
+   */
+  facebook::jsi::Value ancestorsOf(
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
@@ -171,8 +217,8 @@ class Tree {
       size_t count);
 
   /**
-   * RN's own commit telemetry for ANY surface, read on demand — `{ layoutMs, textMs, layoutNodes,
-   * textMeasures }` for whichever commit produced that surface's current revision.
+   * RN's own commit telemetry for ANY surface, read on demand — `{ layoutMs, textMs, commitMs,
+   * layoutNodes, textMeasures }` for whichever commit produced that surface's current revision.
    *
    * It takes a surface id, so it can be pointed at a surface REACT drove — the only way to answer
    * whether a tree-wide text re-measure is ours or something a Fabric commit costs.

@@ -25,7 +25,7 @@
 
 import { bench, describe } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { fabricProps } from '../fabric-props';
 import {
   NO_VALUE,
@@ -89,10 +89,11 @@ function decode(batch: IMutationBatch): void {
   }
 }
 
-// `installFabric()` first, for the fake `nativeFabricUIManager` alone — `createSurface` installs the
-// event handler, which resolves the slot. It also installs the TypeScript applier as the tree host,
-// and the line after replaces that: this bench wants the ops, not a tree.
-installFabric();
+// `installRecordingFabric()` first, for the fake `nativeFabricUIManager` alone — `createSurface`
+// installs the event handler, which resolves the slot. It also installs a tree host, and the line
+// after replaces that: this bench wants the ops, not a tree, so which host it briefly is does not
+// matter — the DECODER below takes over before any benched code runs.
+installRecordingFabric();
 
 const DECODER = {
   applyOps: decode,
@@ -100,6 +101,9 @@ const DECODER = {
   committedRecordOf: () => undefined,
   parentOf: () => undefined,
   childrenOf: () => [],
+  nextSiblingOf: () => undefined,
+  parentsOf: () => [],
+  subtreesOf: () => [],
   census: () => ({ nodes: 0, texts: 0 }),
   dispatchCommand: () => {},
   sendAccessibilityEvent: () => {},

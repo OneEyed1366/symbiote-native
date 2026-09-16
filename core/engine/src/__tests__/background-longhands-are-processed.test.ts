@@ -13,11 +13,16 @@
 //     `auto`, so a single length yields `y: 'auto'`.
 //   - a bare `left` is a POSITION keyword pair, not a single axis: `{top: '50%', left: '0%'}`.
 
+// A RECORDING host, and the payload is read from `fabricProps` — the builder itself — rather than
+// off a committed tree. These ten processors run on the way INTO the payload, so the payload is
+// where the claim lives; a stand-in tree was only ever a place the payload had been written down.
+// Same route as `fabric-props-style.test.ts`, for the same reason.
 import { describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
-import { createElement, createSurface, routeProp } from '../index';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
+import { createElement, createSurface, propsOf, routeProp } from '../index';
+import { fabricProps } from '../fabric-props';
 
-const fabric = installFabric();
+installRecordingFabric();
 let nextRootTag = 8700;
 
 function commitStyle(style: Record<string, unknown>) {
@@ -26,11 +31,11 @@ function commitStyle(style: Record<string, unknown>) {
   routeProp(node, 'style', style);
   surface.appendChild(node);
   surface.commit();
-  return fabric.appRoot().children[0];
+  return fabricProps(node, propsOf(node));
 }
 
 function committedValue(key: string, css: string): unknown {
-  return commitStyle({ [key]: css }).props[key];
+  return commitStyle({ [key]: css })[key];
 }
 
 describe('the background longhands reach Fabric parsed, never as a CSS string', () => {
@@ -80,8 +85,6 @@ describe('the background longhands reach Fabric parsed, never as a CSS string', 
   // pins for the whole family.
   it('omits a backgroundSize RN refuses', () => {
     const committed = commitStyle({ experimental_backgroundSize: 'nonsense' });
-    expect(Object.hasOwn(committed.props, 'experimental_backgroundSize')).toBe(
-      false,
-    );
+    expect(Object.hasOwn(committed, 'experimental_backgroundSize')).toBe(false);
   });
 });

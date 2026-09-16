@@ -9,12 +9,15 @@
 // path, so scenarios are grouped "stripped" vs "preserved" rather than Positive/Negative.
 
 import { describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { createRecordingHost } from '@symbiote-native/test-utils';
+import { setTreeHost } from '../index';
 import { createElement, propOf, routeProp } from '../index';
 
 // A prop read is a read into the tree HOST, so without one installed every assertion below would
 // answer `undefined` — including the ones that must see a value.
-installFabric();
+// A RECORDING host rather than `installFabric()`: this file needs somewhere for a commit to go and
+// never reads a tree, so no second implementation of Fabric's rules belongs in its path.
+setTreeHost(createRecordingHost());
 
 describe('routeProp strips React JSX dev annotations (__self / __source)', () => {
   describe('stripped', () => {

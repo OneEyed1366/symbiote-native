@@ -2,7 +2,10 @@
 // A registry that matched nothing would make routeProp's class branch nearly free and the whole
 // measurement a report about a path that never ran.
 import { expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   createElement,
   createSurface,
@@ -10,7 +13,8 @@ import {
   routeProp,
 } from '../index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 it('the bench class strings resolve to real style', () => {
   registerRules([
@@ -26,6 +30,6 @@ it('the bench class strings resolve to real style', () => {
   routeProp(node, 'class', 'bench-row');
   surface.appendChild(node);
   surface.commit();
-  const committed = fabric.appRoot().children[0];
-  expect(committed.props).toMatchObject({ flexDirection: 'row', height: 44 });
+  const committed = live.nodeOf(node);
+  expect(committed.payload).toMatchObject({ flexDirection: 'row', height: 44 });
 });

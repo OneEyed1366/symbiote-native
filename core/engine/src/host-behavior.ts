@@ -27,7 +27,7 @@
 // `registerHostBehavior` emits a `dlog` precisely so `DEBUG=1` answers "did my registration run at
 // all" before anyone starts debugging the behavior itself.
 
-import { childrenOf, parentOf } from './host-access';
+import { parentsOf, subtreesOf } from './host-access';
 import { dlog } from './debug';
 import type { ISymbioteNode } from './node';
 
@@ -465,7 +465,15 @@ export function attachHostBehavior(node: ISymbioteNode, tag: string): void {
   }
   behavior.attach(node);
   if (behavior.attachAfterCommit !== undefined) awaitingCommit.add(node);
-  if (behavior.afterCommit !== undefined) committedEachTime.add(node);
+  if (behavior.afterCommit !== undefined) {
+    committedEachTime.add(node);
+    node.hasCommitHook = true;
+    // Armed from the start, so the commit that first lands this node gives it a beat. A freshly
+    // created node has had no prop written through `setProp` yet — `createRawText`'s text is an OP,
+    // not a field — so nothing else would arm it, and its behavior would wait for a write that a
+    // purely declarative mount never makes.
+    noteCommitHookNodeChanged(node);
+  }
 }
 
 // Nodes whose behavior declared `afterCommit`. Separate from `awaitingCommit` because the two have
@@ -497,6 +505,11 @@ export function runDeferredAttaches(
   for (const node of awaitingCommit) {
     if (!isCommitted(node)) continue;
     awaitingCommit.delete(node);
+    // The answer is worth recording, not just acting on. `runCommittedHooks` runs immediately after
+    // this and asks the SAME question about the SAME node, and `isCommitted` crosses the host
+    // boundary — so a node carrying both hooks paid two crossings for one fact on the commit that
+    // landed it. Two per `<text-input>` on a 1 000-row create, measured at the call site.
+    everCommitted.add(node);
     attached.get(node)?.attachAfterCommit?.(node);
   }
 }
@@ -517,15 +530,83 @@ export function runDeferredAttaches(
  * caller preserves it by calling this AFTER `runDeferredAttaches` on the changed path — the no-op
  * path has no setup to run, since a node with no Fabric tag has not committed at all.
  */
+/**
+ * Nodes with a recurring hook whose props were written since the last beat.
+ *
+ * THE POPULATION THE BEAT RUNS OVER, and narrowing it to this is the second half of F-66. The
+ * first half stopped the loop CROSSING to decide whether to run a hook; this stops it running the
+ * hook at all for a node that cannot have anything to do — and the hook BODY is where the rest of
+ * the cost was. TextInput's asks the host for its `value` to compare against its native mirror,
+ * which the work ledger measures at `propOf` × 1 000 per commit, in all four adapters.
+ *
+ * Sound because both behaviors that document why they need the beat need it for the same event, a
+ * prop written on their own node. `switch.ts` says so outright — "a check scheduled only from
+ * `onChange` never re-runs for a prop change with no preceding native event … `afterCommit` costs
+ * nothing extra (it fires only on a commit that already changed something)" — and TextInput's
+ * controlled handshake has two sources, the app moving `value` and the user typing, the second of
+ * which writes `mostRecentEventCount`. A fold that STRIPS a prop is covered too: the write
+ * happened, and it is the PAYLOAD that comes out byte-identical, which is the case this hook was
+ * split from `attachAfterCommit` for.
+ */
+const commitHookNodesChanged = new Set<ISymbioteNode>();
+
+/**
+ * Arm a node's recurring hook for the next commit.
+ *
+ * Called from `setProp` — gated there on `node.hasCommitHook`, a boolean field beside
+ * `hasAriaAlias` on the same hidden class, so a node without a recurring hook pays one load and
+ * one branch per write and never reaches this.
+ */
+export function noteCommitHookNodeChanged(node: ISymbioteNode): void {
+  commitHookNodesChanged.add(node);
+}
+
 export function runCommittedHooks(
   isCommitted: (node: ISymbioteNode) => boolean,
 ): void {
-  if (committedEachTime.size === 0) return;
-  for (const node of committedEachTime) {
-    if (!isCommitted(node)) continue;
+  if (commitHookNodesChanged.size === 0) return;
+  const changed = [...commitHookNodesChanged];
+  commitHookNodesChanged.clear();
+  for (const node of changed) {
+    // Still in the set, i.e. still mounted with its behavior attached: `detachOne` removes a node
+    // from `committedEachTime`, and a write that armed it before it was torn down must not reach a
+    // hook whose `detach` has already run.
+    if (!committedEachTime.has(node)) continue;
+    if (!everCommitted.has(node)) {
+      // ARMED BUT NOT YET COMMITTED — put it back. A node is armed when its behavior attaches,
+      // which is at `createElement`, before it is in anyone's tree; dropping it here would mean the
+      // commit that finally lands it never gives it a beat. This is the one place the narrowed
+      // population can lose a node, and it is why the set is cleared by REMOVAL of what ran rather
+      // than wholesale.
+      if (!isCommitted(node)) {
+        commitHookNodesChanged.add(node);
+        continue;
+      }
+      everCommitted.add(node);
+    }
     attached.get(node)?.afterCommit?.(node);
   }
 }
+
+// Nodes of `committedEachTime` that have reached Fabric at least once.
+//
+// ASKED ONCE PER NODE, not once per node per commit. `isCommitted` is `getNativeTag`, which is
+// `committedRecordOf` — a `flushOps()` and a CROSSING TO THE HOST. Before this, the loop above ran
+// over every mounted node whose behavior declared `afterCommit`, on every commit of ANY surface, so
+// a thousand-row list with a `<text-input>` per row paid a thousand crossings to select one row,
+// and paid them again on a commit that changed nothing at all. Measured at 550 for a 550-node set
+// (`__tests__/post-commit-hooks-are-not-the-tree.test.ts`).
+//
+// The cached answer is sound because within `committedEachTime` it is monotone: a node enters when
+// its behavior attaches, leaves in `detachOne` when it is torn down, and a live node that has been
+// committed keeps a Fabric record — a clone keeps the family. So the bit only ever goes TRUE for a
+// node still in the set, which is F-18's `mayHaveChildren` shape: a stale FALSE costs one more
+// crossing next commit, and a stale TRUE is impossible because leaving the set is what losing the
+// record means.
+//
+// A WeakSet rather than a node field: nothing outside this module has any business reading it, and
+// a node that leaves the tree takes its entry with it.
+const everCommitted = new WeakSet<ISymbioteNode>();
 
 // `removeChild` is NOT the destroy signal, and reading it as one is the bug this indirection
 // exists to avoid. Engine-side it looks like one — a reorder goes through `detach` inside
@@ -564,19 +645,38 @@ export function markDetachCandidate(node: ISymbioteNode): void {
 // `animated/host-binding.ts`) gets the same "did it really leave" answer this sweep exists to
 // compute. Passed in for the no-cycle reason `runDeferredAttaches`' predicate is: this module must
 // keep pointing one way, and Metro's `inlineRequires` makes that a live hazard rather than taste.
+/**
+ * Whether the sweep has anything to do — asked BEFORE its arguments are built.
+ *
+ * The sweep's own first line already returns on an empty candidate set, and that was not enough:
+ * its caller passes `surface.children`, which is a GETTER that crosses to the host, allocates the
+ * whole top-level list and filters it into a second array. On a surface holding four thousand rows
+ * that ran on every commit, including the ones with nothing to sweep, because an argument is
+ * evaluated before the guard inside the callee can decline. Same shape as the `dlog` arguments that
+ * cost Angular 5-10% while emitting nothing.
+ */
+export function hasDetachCandidates(): boolean {
+  return detachCandidates.size > 0;
+}
+
 export function sweepDetachedBehaviors(
   topLevel: readonly ISymbioteNode[],
   onDetached: (node: ISymbioteNode) => void,
 ): void {
   if (detachCandidates.size === 0) return;
+  // TWO crossings for the whole sweep, whatever it is sweeping — one for the parents, one for the
+  // subtrees. Asked per node instead, a Clear of a thousand rows spent eleven thousand
+  // (`ITreeHost.parentsOf` carries the measurement).
+  const candidates = [...detachCandidates];
+  const parents = parentsOf(candidates);
   // A surface's top-level nodes carry `parent === undefined` by design (surface.ts), and
   // `commitChildren` re-lists them without going through appendChild — so for those the parent
   // check alone would report a live node as gone.
+  const left = candidates.filter(
+    (node, at) => parents[at] === undefined && !topLevel.includes(node),
+  );
   const seen = new Set<ISymbioteNode>();
-  for (const node of detachCandidates) {
-    if (parentOf(node) !== undefined || topLevel.includes(node)) continue;
-    detachSubtree(node, seen, onDetached);
-  }
+  for (const node of subtreesOf(left)) detachOne(node, seen, onDetached);
   detachCandidates.clear();
 }
 
@@ -593,14 +693,21 @@ export function teardownSubtree(
   node: ISymbioteNode,
   onDetached: (node: ISymbioteNode) => void,
 ): void {
-  detachSubtree(node, new Set(), onDetached);
+  const seen = new Set<ISymbioteNode>();
+  for (const each of subtreesOf([node])) detachOne(each, seen, onDetached);
 }
 
 // `seen` guards the one overlap the candidate set can contain: a removed parent and a removed
 // descendant of it are both nominated, and without it the descendant is detached twice. `tornDown`
 // guards the same overlap ACROSS calls — a node the sweep already released and that `disposeRoot`
 // then walks again, which is the ordinary shape of an unmount after the framework emptied the tree.
-function detachSubtree(
+//
+// The subtree arrives FLAT, in one host read, instead of a `childrenOf` recursion. The recursion
+// stopped descending at an already-torn-down node where this skips it and carries on; the two agree
+// because both marks are whole-subtree — the sweep adds every descendant and `reattachSubtree`
+// removes every descendant — so a node in `tornDown` has its own descendants in it, and each of them
+// takes the same early return below.
+function detachOne(
   node: ISymbioteNode,
   seen: Set<ISymbioteNode>,
   onDetached: (node: ISymbioteNode) => void,
@@ -626,7 +733,6 @@ function detachSubtree(
   committedEachTime.delete(node);
   // The map, not the registry: by here only the Fabric name is left on the node.
   attached.get(node)?.detach(node);
-  for (const child of childrenOf(node)) detachSubtree(child, seen, onDetached);
 }
 
 // Re-arms a node the sweep tore down but that the framework put back. Called from appendChild and
@@ -637,7 +743,13 @@ export function reattachHostBehaviors(node: ISymbioteNode): void {
   reattachSubtree(node);
 }
 
-function reattachSubtree(node: ISymbioteNode): void {
+// Flat for the same reason the detach walk is, and with nothing to reconcile: this one always
+// descended into every child, whatever the node's own mark said.
+function reattachSubtree(root: ISymbioteNode): void {
+  for (const node of subtreesOf([root])) reattachOne(node);
+}
+
+function reattachOne(node: ISymbioteNode): void {
   if (tornDown.has(node)) {
     tornDown.delete(node);
     const behavior = attached.get(node);
@@ -647,9 +759,15 @@ function reattachSubtree(node: ISymbioteNode): void {
     // PAIR. Restore only one and a behavior that splits its setup across the two comes back
     // half-initialised, which is the failure this seam exists to prevent.
     if (behavior?.attachAfterCommit !== undefined) awaitingCommit.add(node);
-    if (behavior?.afterCommit !== undefined) committedEachTime.add(node);
+    if (behavior?.afterCommit !== undefined) {
+      committedEachTime.add(node);
+      node.hasCommitHook = true;
+      // A node coming back out of the park has not necessarily had a prop written since, and its
+      // mirror may have moved while it was away. Arm it once so the next commit gives it a beat —
+      // the narrowed population must not turn a RETURNING node into a silently skipped one.
+      noteCommitHookNodeChanged(node);
+    }
   }
-  for (const child of childrenOf(node)) reattachSubtree(child);
 }
 
 // Test-only. A registry is module state, so a suite that registers a behavior leaks it into every

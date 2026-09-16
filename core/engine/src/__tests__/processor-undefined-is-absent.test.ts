@@ -14,10 +14,16 @@
 // processed them afterwards.
 
 import { describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { createElement, createSurface, routeProp } from '../index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// A processor runs on the way INTO the payload, never onto the author's bag, so every read below
+// is `.payload`.
+const live = createLiveTree(fabric);
 let nextRootTag = 8600;
 
 function commitStyle(style: Record<string, unknown>) {
@@ -26,7 +32,9 @@ function commitStyle(style: Record<string, unknown>) {
   routeProp(node, 'style', style);
   surface.appendChild(node);
   surface.commit();
-  return fabric.appRoot().children[0];
+  // The node itself: this file builds its own surface per case and already holds what it
+  // committed, so there is nothing to search a root for.
+  return live.nodeOf(node);
 }
 
 describe('a processor that writes nothing leaves the key ABSENT', () => {
@@ -34,26 +42,26 @@ describe('a processor that writes nothing leaves the key ABSENT', () => {
   // centre origin; it must commit no transformOrigin at all.
   it('omits transformOrigin when the value is not an origin', () => {
     const committed = commitStyle({ transformOrigin: null });
-    expect(Object.hasOwn(committed.props, 'transformOrigin')).toBe(false);
+    expect(Object.hasOwn(committed.payload, 'transformOrigin')).toBe(false);
   });
 
   // why: an origin RN refuses (a horizontal keyword in the y slot) must not reach the payload as
   // an explicit undefined either.
   it('omits transformOrigin when RN refuses the string', () => {
     const committed = commitStyle({ transformOrigin: '50% left' });
-    expect(Object.hasOwn(committed.props, 'transformOrigin')).toBe(false);
+    expect(Object.hasOwn(committed.payload, 'transformOrigin')).toBe(false);
   });
 
   // why: the same gap through a different processor - proof this is a rule about refusal and not
   // one processor's quirk. RN drops a malformed ratio too.
   it('omits aspectRatio when the ratio is malformed', () => {
     const committed = commitStyle({ aspectRatio: '1/2/3' });
-    expect(Object.hasOwn(committed.props, 'aspectRatio')).toBe(false);
+    expect(Object.hasOwn(committed.payload, 'aspectRatio')).toBe(false);
   });
 
   // why: the control. Without it, a probe that matched nothing would report the same green.
   it('still writes a valid origin', () => {
     const committed = commitStyle({ transformOrigin: 'left top' });
-    expect(committed.props.transformOrigin).toEqual([0, 0, 0]);
+    expect(committed.payload.transformOrigin).toEqual([0, 0, 0]);
   });
 });

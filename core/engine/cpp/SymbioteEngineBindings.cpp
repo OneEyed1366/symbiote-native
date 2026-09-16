@@ -152,15 +152,19 @@ void installBindings(jsi::Runtime &runtime) {
   // The one member on a commit path.
   install("applyOps", 5, &Tree::applyOps);
 
-  // The five reads — two value, three structural — and the imperative six. All eleven take the same
-  // placeholder object `applyOps` attached the node to, and none is on a commit path: they run at
-  // gesture or lifecycle rate. `census` is deliberately absent; see `native-tree-host.ts`.
+  // The reads — value and structural — and the imperative six. All of them take the same placeholder
+  // object `applyOps` attached the node to, and none is on a commit path: they run at gesture or
+  // lifecycle rate. `census` is deliberately absent; see `native-tree-host.ts`.
   install("getProp", 2, &Tree::getProp);
   install("getProps", 1, &Tree::getProps);
   install("markPropsDirty", 1, &Tree::markPropsDirty);
   install("getViewName", 1, &Tree::getViewName);
   install("parentOf", 1, &Tree::parentOf);
   install("childrenOf", 1, &Tree::childrenOf);
+  install("nextSiblingOf", 1, &Tree::nextSiblingOf);
+  install("parentsOf", 1, &Tree::parentsOf);
+  install("subtreesOf", 1, &Tree::subtreesOf);
+  install("ancestorsOf", 1, &Tree::ancestorsOf);
   install("committedRecordOf", 1, &Tree::committedRecordOf);
 
   install("dispatchCommand", 3, &Tree::dispatchCommand);

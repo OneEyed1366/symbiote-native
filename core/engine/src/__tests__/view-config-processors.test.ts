@@ -16,7 +16,7 @@
 // that was missing.
 
 import { describe, expect, it, beforeEach } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   createElement,
   registerComponent,
@@ -26,7 +26,8 @@ import {
 } from '@symbiote-native/engine';
 import { fabricProps } from '../fabric-props';
 
-installFabric();
+// A RECORDING host: nothing here reads a committed tree.
+installRecordingFabric();
 
 // Not a real Fabric name on purpose: a built-in short-circuits the registry to EMPTY, so a case
 // written on `RCTView` would assert nothing.

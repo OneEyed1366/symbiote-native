@@ -6,7 +6,10 @@
 // `on*` name, so it misses `setEventListener`, lands in `setProp` as a function value, and
 // `fabricProps` drops function props — the node committed with NO style at all.
 import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   clearGlobalStyles,
   createElement,
@@ -17,7 +20,9 @@ import {
   type ISymbioteNode,
 } from '../index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// The payload is what ships; the author's bag is not. Every read below is `.payload`.
+const live = createLiveTree(fabric);
 let nextRootTag = 8600;
 
 function mount(node: ISymbioteNode) {
@@ -165,7 +170,7 @@ describe('runtime state-style resolution', () => {
       mount(node);
       // The style slot is HOISTED into the payload, so the resting half arrives as a top-level
       // `opacity` — and its presence is what says the callback resolved rather than being dropped.
-      const committed = fabric.appRoot().children[0].props;
+      const committed = live.nodeOf(node).payload;
       expect(committed.opacity).toBe(1);
       for (const value of Object.values(committed)) {
         expect(typeof value).not.toBe('function');

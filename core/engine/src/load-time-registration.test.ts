@@ -63,7 +63,11 @@ function collectSourceFiles(dir: string, out: string[]): void {
       // moving a `require()` down to a binding's first USE, so a module nothing names as a value
       // never evaluates. Neither a test nor a bench is ever in a bundle, so neither can be reached
       // by that mechanism at all. `.bench.ts` postdates the filter, which is why it was missing.
-      !full.includes('.bench.')
+      !full.includes('.bench.') &&
+      // Same reasoning again, for `core/engine/cpp/tests/js/*.itest.ts`: each one is its OWN
+      // esbuild entry point for the C++ test runner (`scripts/run-itests.mjs`), never a module
+      // Metro bundles into an app, so inlineRequires' lazy-getter hazard cannot reach it either.
+      !full.includes('.itest.')
     ) {
       out.push(full);
     }

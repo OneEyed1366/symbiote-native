@@ -17,6 +17,7 @@ import { isAriaAliasKey } from './accessibility-props';
 import {
   recordAppendChild,
   recordCreateAnchor,
+  noteHostSideChange,
   recordCreateElement,
   recordCreateRawText,
   recordInsertBefore,
@@ -28,6 +29,7 @@ import {
 import { isEventFor } from './view-config';
 import {
   canonicalClassName,
+  EMPTY_STYLE,
   isClassNameValue,
   resolveActiveClassName,
   resolveClassName,
@@ -43,6 +45,7 @@ import {
   notifyChildInserted,
   notifyOwnedListenerChange,
   notifyWrapChange,
+  noteCommitHookNodeChanged,
   ownsListener,
   reattachHostBehaviors,
   derivedNodesOf,
@@ -150,6 +153,18 @@ export interface ISymbioteNode {
   // returns its input by identity. Monotone, so no invalidation bug is expressible; the cost of a
   // stale `true` is one identity-returning call on a node that once had an alias.
   hasAriaAlias: boolean;
+  /**
+   * Whether this node's host behavior declared `afterCommit`.
+   *
+   * Read on every prop write, exactly as `hasAriaAlias` beside it is and for the same reason: the
+   * alternative is a Set lookup per write, on the hottest path in the engine. What it gates is the
+   * NARROWING of the post-commit beat — the hook runs for nodes whose props moved rather than for
+   * every mounted behavior, which is what took TextInput's `propOf` off every commit (F-67).
+   *
+   * Set once at `createElement`, by `attachHostBehavior`. Not sticky in the `hasAriaAlias` sense:
+   * it describes the behavior's shape, and a behavior is attached once and detached whole.
+   */
+  hasCommitHook: boolean;
   // The payload fold this node's host behavior supplied, or undefined for the ~all of them that
   // have none. Set once at `createElement`, never per write, and read by `fabricProps` at the one
   // point where the whole bag is known.
@@ -210,6 +225,20 @@ export interface ISymbioteNode {
   // A FIELD for the same reason `childHost` is one, and beside it in the constructor so the pair
   // costs no extra shape transition.
   wrapper: ISymbioteNode | undefined;
+
+  // Has this node EVER been named as the parent of a structural op.
+  //
+  // One bit, and deliberately not a child list: JS holds no tree, and this does not become one —
+  // it can say "certainly empty" and nothing else. False means no `appendChild` or `insertBefore`
+  // ever named this node, so its child list cannot be anything but empty and `childrenOf` may
+  // answer without asking the host. True means "ask", including after every child has been removed
+  // again; the bit never goes back down, which is the safe direction.
+  //
+  // It exists because a READ IS A BATCH BOUNDARY. Every read calls `flushOps`, so a question whose
+  // answer is empty still cuts the op stream into two crossings. Measured on solid's 1 000-row
+  // create: 2 000 child-list reads, every one of them returning ZERO handles, and 2 002 drains of a
+  // buffer that should have crossed once.
+  mayHaveChildren: boolean;
 
   // RN's ReactFabricHostComponent surface - what a template/function ref hands back and what
   // reanimated / gesture-handler / react-navigation reach through. Each resolves the node's
@@ -274,10 +303,12 @@ class SymbioteNode implements ISymbioteNode {
   declare readonly isText: boolean;
   declare listeners: Map<string, IListener> | undefined;
   declare hasAriaAlias: boolean;
+  declare hasCommitHook: boolean;
   declare styleParts: IClassStyleParts | undefined;
   declare payloadFold: IPayloadFold | undefined;
   declare childHost: ISymbioteNode | undefined;
   declare wrapper: ISymbioteNode | undefined;
+  declare mayHaveChildren: boolean;
 
   constructor(component: string, isText: boolean) {
     this[BRAND] = true;
@@ -291,6 +322,9 @@ class SymbioteNode implements ISymbioteNode {
     // Starts false, and that is COMPLETE rather than optimistic: a node is minted with no props at
     // all — `createRawText`'s text is an OP, not a field — so no aria key can arrive here.
     this.hasAriaAlias = false;
+    // Same hidden-class reason; `attachHostBehavior` raises it a few lines later for the rare node
+    // whose behavior declares the recurring hook.
+    this.hasCommitHook = false;
     this.styleParts = undefined;
     // Assigned here for the same hidden-class reason as `hasAriaAlias` above; `attachHostBehavior`
     // overwrites it a few lines later for the rare node that has a behavior.
@@ -300,6 +334,10 @@ class SymbioteNode implements ISymbioteNode {
     // to a few nodes after the fact.
     this.childHost = undefined;
     this.wrapper = undefined;
+    // Same hidden-class reason as the two above, and here it is the whole point: the fast path it
+    // guards is read on every `childrenOf`, so it must be a stable slot rather than a property that
+    // appears on some nodes later.
+    this.mayHaveChildren = false;
   }
 
   measure(callback: IMeasureOnSuccess): void {
@@ -633,6 +671,13 @@ export function writeProp(
   // so on a JSX adapter `__self` rode straight past the strip into the host. See
   // REACT_JSX_DEV_PROPS for what that costs on each platform.
   if (REACT_JSX_DEV_PROPS.has(key)) return;
+  // Arms the node's recurring post-commit hook, for the rare node that has one. HERE rather than in
+  // `setProp`, because this is where both paths meet: `setNativeProps` reaches the wire through
+  // this function and not through that one, and a hook armed only by the declarative path missed
+  // the imperative write entirely (`__tests__/after-commit-lifecycle.test.ts` said so). The field
+  // read is the same shape as `hasAriaAlias` and for the same reason — this is the hottest path in
+  // the engine, and a Set lookup per write is not something it can carry.
+  if (node.hasCommitHook) noteCommitHookNodeChanged(node);
   // Resolved on the way IN, for the same reason the strip above lives here: this is where both
   // paths meet. `boxShadow` / `filter` / `transform` and the four beside them are parsed in JS,
   // and the C++ payload builder has no JS — so a value resolved at payload-build time is resolved
@@ -689,6 +734,13 @@ export function functionPropsOf(
  */
 export function markPropsDirty(node: ISymbioteNode): void {
   flushOps();
+  // Announced to the buffer even though it writes no op: this is the one route that dirties a node
+  // without one, and a commit that cannot see it would skip itself as idle.
+  noteHostSideChange();
+  // The other way a node's payload is rebuilt, and the beat's population must cover both or a
+  // behavior whose payload is DERIVED — the sticky header's debounced translateY has no prop to
+  // write — would be armed by nothing.
+  if (node.hasCommitHook) noteCommitHookNodeChanged(node);
   treeHost()?.markPropsDirty(node);
 }
 
@@ -983,9 +1035,38 @@ function baseStyleOf(parts: IClassStyleParts): unknown {
 // Sound because `pushClassStyle` is the ONLY writer of `parts.published` — both routeProp branches
 // and setNodeHidden funnel through it — so a node that has published nothing holds `undefined` and
 // the first write can never be swallowed.
+// What a node publishes when NOTHING resolves — an unstyled node, or the benchmark row's
+// `style={isSelected ? {…} : undefined}` on the 999 rows that are not selected. Length 0 is the
+// marker and needs no second field: `pushClassStyle` never publishes an empty array otherwise, so
+// the state is unambiguous, and it is distinct from `undefined`, which means "nothing published
+// yet" and must never be turned away.
+const PUBLISHED_NOTHING: readonly unknown[] = Object.freeze([]);
+
+// A slot that contributes no keys to the payload: absent, or the registry's shared "this class
+// styles nothing" object. An IDENTITY compare rather than a key count — `Object.keys(x).length`
+// allocates an array, and this runs on every class and style write, ~14 000 times on one benchmark
+// create. That is the F-12 shape: an expensive guard in front of cheap work.
+function contributesNothing(slot: unknown): boolean {
+  return slot === undefined || slot === EMPTY_STYLE;
+}
+
+// Does this node have a style at all? Read through the same two resolvers as the publication, for
+// the reason the guard below states: guard and publication disagreeing is a silent wrong screen.
+function hasNothingToPublish(parts: IClassStyleParts): boolean {
+  return (
+    parts.hiddenStyle === undefined &&
+    contributesNothing(baseStyleOf(parts)) &&
+    contributesNothing(explicitStyleOf(parts))
+  );
+}
+
 function isAlreadyPublished(parts: IClassStyleParts): boolean {
   const published = parts.published;
   if (published === undefined) return false;
+  // The delete is already standing. Asked before the slot comparisons because an empty array would
+  // otherwise pass both of them on `undefined` and then fail the length check, republishing a
+  // delete the host already performed.
+  if (published.length === 0) return hasNothingToPublish(parts);
   // `baseStyleOf`, not `parts.classStyle` — the guard and the publication must read slot 0 the
   // same way or a press is turned away as already-published and silently does nothing on device
   // while the behavior fires correctly and nothing goes red.
@@ -1019,6 +1100,21 @@ function pushClassStyle(node: ISymbioteNode, parts: IClassStyleParts): void {
   // object/array class value, which resolves fresh every call — the same place the host's own
   // Object.is guard gives up on a style object, so no new asymmetry appears.
   if (isAlreadyPublished(parts)) return;
+  // NOTHING RESOLVED, so say nothing. The buffer spells an absent prop as `NO_VALUE` and the host
+  // then takes a path that costs it literally one branch — `if (props.get_ptr(key) == nullptr)
+  // break` — while `[undefined, undefined]` is a real value it must convert into a `folly::dynamic`
+  // array, store, and re-compare on every later commit. Both are behaviourally "no style": the
+  // payload builder flattens the pair of undefineds into no keys at all.
+  //
+  // This is NOT the naive skip the note above forbids, and the distinction is the same one the
+  // published marker makes. A restore after `setNativeProps` arrives here with `published` cleared
+  // to `undefined`, so it is never turned away — and when the authored style is nothing, restoring
+  // it means DELETING the slot the imperative write put there, which is what this emits.
+  if (hasNothingToPublish(parts)) {
+    parts.published = PUBLISHED_NOTHING;
+    setProp(node, 'style', undefined);
+    return;
+  }
   // The third slot is APPENDED ONLY WHILE HIDDEN. Writing a permanent three-element array would
   // change the style payload of every node in every app for a state almost none of them are ever
   // in — and this project spent a day removing per-frame allocations, so a slot that is undefined
@@ -1303,6 +1399,43 @@ function slotAnchorOf(host: ISymbioteNode): ISymbioteNode | undefined {
   return slot;
 }
 
+// ── the two structural recorders, and why nothing here calls the raw ones ───────────────────────
+//
+// `mayHaveChildren` is only sound if EVERY op that gives a node a child raises it. There are five
+// such call sites in this file and a sixth is a plausible future edit, so the bit is raised here
+// rather than at each of them: a site that forgets would make `childrenOf` answer "empty" for a node
+// that has children, which is a wrong ANSWER rather than a slow one. `node.ts` is the only module
+// that records a structural op, so these two are a complete funnel.
+
+/**
+ * Arm a parent's recurring post-commit hook for a STRUCTURAL change.
+ *
+ * A prop write is not the only thing a behavior can be waiting for, and the ScrollView sticky-header
+ * machine is the case that proves it: it drops a wrapper when the framework takes the wrapped child
+ * away, which writes no prop on the wrapper's owner at all. Narrowing the beat to prop writes alone
+ * left it holding a wrapper around nothing, and its own test said so — the third behavior needing
+ * the beat, and the only one whose source comment does not say why.
+ */
+function armCommitHookForChildChange(parent: ISymbioteNode): void {
+  if (parent.hasCommitHook) noteCommitHookNodeChanged(parent);
+}
+
+function recordAppendInto(parent: ISymbioteNode, child: ISymbioteNode): void {
+  parent.mayHaveChildren = true;
+  armCommitHookForChildChange(parent);
+  recordAppendChild(parent, child);
+}
+
+function recordInsertInto(
+  parent: ISymbioteNode,
+  child: ISymbioteNode,
+  beforeChild: ISymbioteNode,
+): void {
+  parent.mayHaveChildren = true;
+  armCommitHookForChildChange(parent);
+  recordInsertBefore(parent, child, beforeChild);
+}
+
 // What actually occupies this node's place in its parent's child list. See `ISymbioteNode.wrapper`:
 // a wrapped owner is what the adapter names and the wrapper is what the tree holds, so every
 // structural op takes the owner and moves the wrapper.
@@ -1325,9 +1458,9 @@ function wrapsOwner(owner: ISymbioteNode, child: ISymbioteNode): boolean {
   const holder = holderOf(owner);
   // Wrapper takes the owner's place first, then the owner moves under it — the host's own detach
   // on link is what unlinks the owner from `holder`, so no removal op is needed.
-  if (holder !== undefined) recordInsertBefore(holder, child, owner);
+  if (holder !== undefined) recordInsertInto(holder, child, owner);
   owner.wrapper = child;
-  recordAppendChild(child, owner);
+  recordAppendInto(child, owner);
   notifyWrapChange(owner, child);
   return true;
 }
@@ -1343,7 +1476,7 @@ function unwrapsOwner(owner: ISymbioteNode, child: ISymbioteNode): boolean {
     // stops hanging off it.
     recordRemoveChild(child, owner);
   } else {
-    recordInsertBefore(holder, owner, child);
+    recordInsertInto(holder, owner, child);
     recordRemoveChild(holder, child);
   }
   notifyWrapChange(owner, undefined);
@@ -1362,8 +1495,8 @@ export function appendChild(
   if (hasAnimatedBindings()) reattachAnimatedProps(child);
   const placed = placedNode(child);
   const anchor = slotAnchorOf(parent);
-  if (anchor === undefined) recordAppendChild(parent, placed);
-  else recordInsertBefore(parent, placed, anchor);
+  if (anchor === undefined) recordAppendInto(parent, placed);
+  else recordInsertInto(parent, placed, anchor);
   if (hasHostBehaviors()) notifyChildInserted(parent, placed);
 }
 
@@ -1387,8 +1520,8 @@ export function insertBefore(
     (beforeChild === null || beforeChild === undefined
       ? undefined
       : placedNode(beforeChild));
-  if (anchor === undefined) recordAppendChild(parent, placed);
-  else recordInsertBefore(parent, placed, anchor);
+  if (anchor === undefined) recordAppendInto(parent, placed);
+  else recordInsertInto(parent, placed, anchor);
   if (hasHostBehaviors()) notifyChildInserted(parent, placed);
 }
 
@@ -1416,6 +1549,11 @@ export function removeChild(
   // appended to, which is the OWNER, while the child actually lives in the slot.
   const parent = hostFor(requestedParent, child);
   if (hasHostBehaviors() || hasAnimatedBindings()) markDetachCandidate(child);
+  // BOTH, and the owner is the one that matters: a composed primitive's behavior lives on the node
+  // the adapter named, while `hostFor` redirects the mutation into its internal slot. Arming only
+  // the slot arms a node that has no behavior at all.
+  armCommitHookForChildChange(requestedParent);
+  armCommitHookForChildChange(parent);
   recordRemoveChild(parent, placedNode(child));
 }
 

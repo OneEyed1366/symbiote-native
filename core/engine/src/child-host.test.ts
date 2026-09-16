@@ -9,7 +9,10 @@
 // park/unpark case (rebuilding on re-attach duplicates the structure and swaps the slot's identity
 // out from under app children that still point at the old one).
 import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   appendChild,
   childrenOf,
@@ -23,7 +26,8 @@ import {
   type ISymbioteNode,
 } from './index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // JS holds no tree, so a child list is a read. `kidsOf` absorbs the optional slot at the call
 // sites that ask about one — `childrenOf` takes a node, not a maybe-node.
@@ -162,11 +166,7 @@ describe('what Fabric is asked to commit', () => {
     appendChild(root, owner);
     surface.commit();
 
-    const committed = fabric.find(node => node.viewName === OWNER);
-    expect(committed).toBeDefined();
-    expect(fabric.serialize([committed as never])).toBe(
-      `${OWNER}(${SLOT}(${CHILD}))`,
-    );
+    expect(live.serialize(owner)).toBe(`${OWNER}(${SLOT}(${CHILD}))`);
   });
 });
 

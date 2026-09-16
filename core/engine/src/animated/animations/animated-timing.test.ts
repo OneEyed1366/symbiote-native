@@ -18,9 +18,9 @@ import {
   timing,
 } from '@symbiote-native/engine';
 import type { IEndResult } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
-installFabric();
+installRecordingFabric();
 
 // Drivers read requestAnimationFrame / cancelAnimationFrame from the host at call time; Node has
 // neither, so install a ~16ms setTimeout shim.

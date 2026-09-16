@@ -19,6 +19,7 @@ import { childrenOf } from './host-access';
 import {
   runCommittedHooks,
   runDeferredAttaches,
+  hasDetachCandidates,
   sweepDetachedBehaviors,
   teardownSubtree,
 } from './host-behavior';
@@ -143,7 +144,11 @@ export class SymbioteSurface {
     // `removeChild` only NOMINATES — a framework spells a move as remove-then-reinsert, so tearing
     // down at the call would kill a machine that comes back in the same batch.
     flushOps();
-    sweepDetachedBehaviors(this.children, detachAnimatedProps);
+    // GUARDED AT THE CALL SITE, not inside the sweep — `this.children` is a host read that builds
+    // the whole top-level list, and it would run on every commit for a sweep that had nothing to do.
+    if (hasDetachCandidates()) {
+      sweepDetachedBehaviors(this.children, detachAnimatedProps);
+    }
     const owner = surfaces.get(this.rootTag);
     const superseded = owner !== undefined && owner !== this;
     commitSurfaceOps(

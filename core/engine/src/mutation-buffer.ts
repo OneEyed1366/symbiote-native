@@ -164,7 +164,19 @@ export type INativeTree = {
 // argument `edit-buffer.ts` made for not threading a surface through every mutation site, and the
 // same conclusion.
 
-let ops: number[] = [];
+// TYPED FROM THE START, because the alternative is to walk the whole thing once per commit.
+//
+// This was a `number[]` and `takeBatch` ended in `Int32Array.from(ops)`. Measured on a 1 000-row
+// create through the work ledger: **210 042 slots**, every one of them converted element by element
+// through the ITERATOR PROTOCOL on every commit. `new Int32Array(array)` is not the escape — it
+// takes the same path, checked rather than assumed (F-55). The escape is not building an Array.
+//
+// Capacity DOUBLES and is never given back: a commit that needed 210 042 slots once will need them
+// again, and re-growing from a small start would pay the same copies every commit for the memory of
+// a single benchmark row list.
+const INITIAL_OP_CAPACITY = 1_024;
+let ops = new Int32Array(INITIAL_OP_CAPACITY);
+let opCount = 0;
 let strings: string[] = [];
 let values: unknown[] = [];
 let instanceHandles: unknown[] = [];
@@ -216,8 +228,55 @@ function slotOf(handle: object): number {
   return handles.length - 1;
 }
 
+// Has anything changed the TREE since the last commit drained?
+//
+// NOT the same question as `hasPendingOps()`, and the difference is the whole reason this exists:
+// every structural READ calls `flushOps`, so a reconciler that navigates the tree it is building
+// empties the buffer many times between commits. `hasPendingOps()` then answers "no" for a surface
+// with a screen's worth of unpublished work. This survives the drain and is cleared only by a
+// commit, which is what "is there anything to publish" actually means.
+//
+// `OP_COMMIT` is excluded deliberately: recording a commit is not a change to the tree, and counting
+// it would make every commit look like it had work.
+let changedSinceCommit = false;
+
 function push(op: number, a = 0, b = 0, c = 0, d = 0, e = 0): void {
-  ops.push(op, a, b, c, d, e);
+  if (op !== OP_COMMIT) changedSinceCommit = true;
+  if (opCount + OP_STRIDE > ops.length) {
+    const grown = new Int32Array(ops.length * 2);
+    grown.set(ops);
+    ops = grown;
+  }
+  ops[opCount] = op;
+  ops[opCount + 1] = a;
+  ops[opCount + 2] = b;
+  ops[opCount + 3] = c;
+  ops[opCount + 4] = d;
+  ops[opCount + 5] = e;
+  opCount += OP_STRIDE;
+}
+
+/** Whether a commit would publish anything. See `changedSinceCommit`. */
+export function hasChangedSinceCommit(): boolean {
+  return changedSinceCommit;
+}
+
+/**
+ * Called by `commitSurfaceOps` once it has drained. Separate from `takeBatch` because a READ drains
+ * too, and a read is not a commit — clearing there would make the next commit believe its work had
+ * already been published.
+ */
+export function noteCommitDrained(): void {
+  changedSinceCommit = false;
+}
+
+/**
+ * The one dirtying route that writes no op: a behavior with a DERIVED payload asks the host to
+ * rebuild a node the buffer never named. Without this the commit that follows would look idle and
+ * be skipped, and the derived payload would sit unpublished until something unrelated changed.
+ */
+export function noteHostSideChange(): void {
+  changedSinceCommit = true;
 }
 
 export function recordCreateElement(
@@ -300,7 +359,7 @@ export function recordCommit(rootTag: number, surface: object): void {
 
 /** Whether anything is pending. The commit path asks before paying for a drain. */
 export function hasPendingOps(): boolean {
-  return ops.length > 0;
+  return opCount > 0;
 }
 
 /**
@@ -309,16 +368,21 @@ export function hasPendingOps(): boolean {
  * Fresh arrays rather than reused ones: the batch outlives this call on the native path (`applyOps`
  * reads `handles` while attaching state), and a recycled array would be mutated under it by the next
  * mutation the adapter makes.
+ *
+ * `slice` for the ops and not `subarray` for exactly that reason — a subarray would share the
+ * backing store the very next `push` writes into. It is a typed-array copy rather than the
+ * element-by-element iterator walk this used to be, and the ops buffer itself is KEPT so its
+ * capacity survives the drain.
  */
 export function takeBatch(): IMutationBatch {
   const batch: IMutationBatch = {
-    ops: Int32Array.from(ops),
+    ops: ops.slice(0, opCount),
     strings,
     values,
     instanceHandles,
     handles,
   };
-  ops = [];
+  opCount = 0;
   strings = [];
   values = [];
   instanceHandles = [];

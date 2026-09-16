@@ -122,6 +122,13 @@ export type INativeEngineBindings = {
   getViewName: (handle: object) => string;
   parentOf: (handle: object) => object | undefined;
   childrenOf: (handle: object) => readonly object[];
+  /** One entry, not the whole list — see `ITreeHost` for the quadratic it replaces. */
+  nextSiblingOf: (handle: object) => object | undefined;
+  /** The batched twins of `parentOf` / `childrenOf`. See `ITreeHost` for why the sweep needs them. */
+  parentsOf: (handles: readonly object[]) => readonly (object | undefined)[];
+  subtreesOf: (roots: readonly object[]) => readonly object[];
+  /** The upward twin, deepest first — one crossing for a chain the event path walks per event. */
+  ancestorsOf: (handle: object) => readonly object[];
   committedRecordOf: (handle: object) => ICommittedRecord | undefined;
   /**
    * The imperative six, taking the same placeholder object `applyOps` put the node on.
@@ -185,6 +192,8 @@ export type INativeEngineBindings = {
      */
     layoutMs: number;
     textMs: number;
+    /** The commit phase BEFORE layout — the clone-on-write tree walk, `materialize`'s own window. */
+    commitMs: number;
     layoutNodes: number;
     textMeasures: number;
   };
@@ -212,6 +221,10 @@ function isBindings(value: unknown): value is INativeEngineBindings {
   if (typeof value.getViewName !== 'function') return false;
   if (typeof value.parentOf !== 'function') return false;
   if (typeof value.childrenOf !== 'function') return false;
+  if (typeof value.nextSiblingOf !== 'function') return false;
+  if (typeof value.parentsOf !== 'function') return false;
+  if (typeof value.subtreesOf !== 'function') return false;
+  if (typeof value.ancestorsOf !== 'function') return false;
   if (typeof value.committedRecordOf !== 'function') return false;
   // The imperative six, checked by name for the same reason as the rest: a pod that has `applyOps`
   // but not these is an OLDER binary, and accepting it would leave `measure()` reaching a method

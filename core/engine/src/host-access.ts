@@ -46,6 +46,11 @@ import {
 } from './node';
 import type { SymbioteSurface } from './surface';
 
+// One frozen empty list rather than a fresh `[]`, because the fast path in `childrenOf` is the
+// common answer during a build: solid asks 2 000 times on a 1 000-row create and every answer is
+// this.
+const NO_CHILDREN: readonly ISymbioteNode[] = [];
+
 /**
  * The node's parent, or `undefined` for a node that sits directly under a surface.
  *
@@ -75,8 +80,70 @@ export function parentOf(node: ISymbioteNode): ISymbioteNode | undefined {
  * lookups, so a node it placed must be a node it can find.
  */
 export function childrenOf(node: ISymbioteNode): readonly ISymbioteNode[] {
+  // A READ IS A BATCH BOUNDARY, which is what makes this guard worth a field. `flushOps` below
+  // drains the buffer into the host, so a question whose answer is EMPTY still cuts the op stream
+  // in two and costs a crossing. Measured on solid's 1 000-row create: 2 000 child-list reads, every
+  // one returning zero handles, and 2 002 drains of a buffer that should have crossed twice.
+  //
+  // `mayHaveChildren` is raised by the two structural recorders in `node.ts` and never lowered, so
+  // FALSE is a certainty and TRUE only means "ask". See its declaration for why it is not a tree.
+  if (!node.mayHaveChildren) return NO_CHILDREN;
   flushOps();
   return treeHost()?.childrenOf(node).filter(isSymbioteNode) ?? [];
+}
+
+/**
+ * Every node's parent, positionally, in ONE crossing — `parentOf` for a list.
+ *
+ * Engine-internal, like `subtreesOf` below, and for the same reason: what a framework seam needs is
+ * the singular form, one step at a time. These two answer the question only TEARDOWN asks, and
+ * teardown is the one lifecycle event whose size is the tree's (see `ITreeHost`).
+ *
+ * A `SURFACE_COMPONENT` parent reads as `undefined` here exactly as it does in `parentOf`, so the
+ * two agree element for element.
+ */
+export function parentsOf(
+  nodes: readonly ISymbioteNode[],
+): readonly (ISymbioteNode | undefined)[] {
+  flushOps();
+  const parents = treeHost()?.parentsOf(nodes);
+  if (parents === undefined) return nodes.map(() => undefined);
+  return parents.map(parent => {
+    if (!isSymbioteNode(parent)) return undefined;
+    return parent.component === SURFACE_COMPONENT ? undefined : parent;
+  });
+}
+
+/** Each root and every descendant, pre-order, anchors included — all of it in ONE crossing. */
+export function subtreesOf(
+  roots: readonly ISymbioteNode[],
+): readonly ISymbioteNode[] {
+  flushOps();
+  return treeHost()?.subtreesOf(roots).filter(isSymbioteNode) ?? [];
+}
+
+/**
+ * The node and every ancestor above it, deepest first, in ONE crossing.
+ *
+ * `parentOf` per level is a crossing per level, and the event path needs this chain for every
+ * event — capture reads it reversed, bubble forward — plus again on every frame of a drag, for the
+ * responder's scope. Measured at 18 crossings per event on a depth-8 chain before the two phases
+ * shared a walk, 9 after, and 1 through here.
+ *
+ * Surfaces are dropped the same way `parentOf` drops them, by component, so a caller sees the same
+ * chain it would have built by walking.
+ */
+export function ancestorsOf(node: ISymbioteNode): readonly ISymbioteNode[] {
+  flushOps();
+  const chain = treeHost()?.ancestorsOf(node) ?? [];
+  const out: ISymbioteNode[] = [];
+  for (const each of chain) {
+    // The same runtime guard `parentOf` applies, for the same two reasons: the host stores handles
+    // as bare objects, and a surface ends the chain rather than appearing in it.
+    if (!isSymbioteNode(each) || each.component === SURFACE_COMPONENT) break;
+    out.push(each);
+  }
+  return out;
 }
 
 /** The first child, anchors included, or `undefined` for a leaf. */
@@ -95,14 +162,20 @@ export function nextSiblingOf(
   node: ISymbioteNode,
   surface?: SymbioteSurface,
 ): ISymbioteNode | undefined {
-  // One lookup held in a const rather than two calls plus a cast: `parentOf` is a host read now, so
-  // asking twice is two crossings, and the binding narrows without an `as`.
-  const parent = parentOf(node);
-  const siblings =
-    parent !== undefined ? childrenOf(parent) : surface?.children;
-  if (siblings === undefined) return undefined;
-  const index = siblings.indexOf(node);
-  return index < 0 ? undefined : siblings[index + 1];
+  // ONE host call, not `parentOf` plus a whole child list.
+  //
+  // The previous spelling built every sibling to read one of them, and a keyed patch calls this
+  // once per row: measured on vue, appending 1 000 rows to 1 000 standing crossed 1 002 001 handles
+  // and removing them 2 002 002 — quadratic in the list, with every handle a host object built,
+  // filtered and discarded. The host holds the list and can scan it in place.
+  //
+  // `surface` is no longer read and stays in the signature because three adapters pass it: a
+  // top-level node's parent IS the surface node in the host's tree, so the host answers that case
+  // without being told which surface. The old code needed it only because `parentOf` masks a
+  // surface parent to `undefined` and there was then nothing left to ask.
+  flushOps();
+  const sibling = treeHost()?.nextSiblingOf(node);
+  return isSymbioteNode(sibling) ? sibling : undefined;
 }
 
 /**

@@ -4,7 +4,7 @@
 // writable text node, and a view name that changes under a stable identity.
 
 import { describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
   createAnchor,
@@ -25,7 +25,9 @@ import {
 
 describe('engine host navigation', () => {
   it('reports the parent of a parented node and undefined for a top-level one', () => {
-    installFabric();
+    // A RECORDING host: host-access reads the AUTHORED tree — parent, siblings, children — which
+    // is what the ops say and what an adapter's own seam asks back. No commit rules are involved.
+    installRecordingFabric();
     const surface = createSurface(1);
     const parent = createElement('RCTView');
     const child = createElement('RCTView');
@@ -62,8 +64,10 @@ describe('engine host navigation', () => {
     expect(firstChildOf(only)).toBeUndefined();
   });
 
-  it('needs the surface to answer a top-level sibling, and says undefined without one', () => {
-    installFabric();
+  it('answers a top-level sibling with or without the surface', () => {
+    // A RECORDING host: host-access reads the AUTHORED tree — parent, siblings, children — which
+    // is what the ops say and what an adapter's own seam asks back. No commit rules are involved.
+    installRecordingFabric();
     const surface = createSurface(2);
     const first = createElement('RCTView');
     const second = createElement('RCTView');
@@ -71,10 +75,18 @@ describe('engine host navigation', () => {
     surface.appendChild(second);
 
     expect(nextSiblingOf(first, surface)).toBe(second);
-    // Without the surface there is no list to read: a top-level node has no parent, and the
-    // engine will not guess at an ambient one. An adapter with a single active surface passes it
-    // unconditionally; this is what it gets if it forgets.
-    expect(nextSiblingOf(first)).toBeUndefined();
+    // DELIBERATE CHANGE OF CONTRACT, recorded rather than quietly absorbed. This asserted
+    // `undefined` until `nextSiblingOf` became a host call, and its reason was that "a top-level
+    // node has no parent, and the engine will not guess at an ambient surface" — a miss rather than
+    // a guess for an adapter that forgot the argument.
+    //
+    // There is nothing left to guess. The surface is an ordinary node in the host's tree, so the
+    // host resolves the sibling through the node's REAL parent and the answer is right for the
+    // surface the node actually belongs to, not for an assumed one. Keeping the old contract would
+    // mean returning `undefined` where a sibling demonstrably exists, to punish a caller.
+    //
+    // `surface` stays in the signature because three adapters pass it.
+    expect(nextSiblingOf(first)).toBe(second);
   });
 
   it('separates a text CONTAINER from a writable raw-text node', () => {

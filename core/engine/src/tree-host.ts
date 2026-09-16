@@ -21,7 +21,9 @@ import type {
   IRootTag,
 } from './fabric';
 import {
+  hasChangedSinceCommit,
   hasPendingOps,
+  noteCommitDrained,
   recordCommit,
   takeBatch,
   type IMutationBatch,
@@ -31,7 +33,13 @@ import { takePropStats } from './node';
 
 /** What Fabric currently holds for one node — the three fields every imperative call is aimed at. */
 export type ICommittedRecord = {
-  handle: IFabricNode;
+  /**
+   * OPAQUE, and typed that way because it is: each host puts its own thing here — the native host a
+   * `ShadowNode`, a headless one whatever it committed — and the field's only contract is identity.
+   * It used to say `IFabricNode`, which promised a Fabric node from every host and was true of one.
+   * `IFabricNode` is a brand with no members, so nothing a caller could do with it is lost.
+   */
+  handle: object;
   tag: number;
   rootTag: IRootTag;
 };
@@ -76,10 +84,16 @@ export const EMPTY_CENSUS: ITreeCensus = {
 /**
  * Everything JS asks of the tree it no longer owns.
  *
- * Seven methods, and none of the six reads is on a commit path — they are per-node and run at
- * GESTURE or lifecycle rate (a host behavior seeing the props it reacts to, an app measuring a ref,
- * a framework seam navigating what it just built). That is what makes the crossing cost irrelevant:
- * ~10 reads per touch against the ~19 000 per commit this whole design exists to remove.
+ * No read here is on a commit path — they run at GESTURE or lifecycle rate (a host behavior seeing
+ * the props it reacts to, an app measuring a ref, a framework seam navigating what it just built).
+ * This comment used to conclude from that that the crossing cost was irrelevant, at "~10 reads per
+ * touch". Counted, it was 18 per EVENT and 19 per drag FRAME — 60 times a second for as long as a
+ * finger is down — because a gesture is not one touch and a walk that asks per level pays per
+ * level. Both are 1 now.
+ *
+ * `parentsOf`, `subtreesOf` and `ancestorsOf` are what that cost: each answers exactly what its
+ * singular twin answers, in ONE crossing, for the three walks whose size is the TREE's rather than
+ * a node's — teardown down, dispatch and responder negotiation up.
  */
 export type ITreeHost = {
   applyOps: (batch: IMutationBatch) => void;
@@ -94,6 +108,45 @@ export type ITreeHost = {
   committedRecordOf: (handle: object) => ICommittedRecord | undefined;
   parentOf: (handle: object) => object | undefined;
   childrenOf: (handle: object) => readonly object[];
+  // The next entry in the parent's child list — NOT `parentOf` plus `childrenOf` spelled in JS.
+  //
+  // It is its own member because the JS spelling is quadratic on the path that uses it. Vue's
+  // renderer names `nextSibling` once per row while patching a keyed list, and reading the whole
+  // sibling list to find one entry crossed 1 002 001 handles on a 1 000-row append — every one of
+  // them a host object built, filtered and thrown away. Here the host scans its own vector and one
+  // handle crosses.
+  //
+  // A SURFACE parent answers like any other: the surface is an ordinary node in the host's tree, so
+  // a top-level node's siblings are its children.
+  nextSiblingOf: (handle: object) => object | undefined;
+  // ── THE TWO BATCHED READS, AND WHY THEY TAKE A LIST ────────────────────────────────────────────
+  //
+  // Each answers exactly what its singular twin above answers, for many nodes in ONE crossing. They
+  // exist because the teardown sweep is the one read that is not at gesture rate: its size is the
+  // TREE's. Clearing a thousand rows asked `parentOf` a thousand times and then walked ten thousand
+  // nodes through `childrenOf`, so eleven thousand crossings and as many intermediate arrays landed
+  // inside the timed step. Measured on `examples/svelte`, iOS 26.5 Release, 1 000 rows: Clear
+  // 12.6 -> 74.5 ms and Replace 214.0 -> 282.2, while Remove of ONE row — ten nodes — did not move
+  // at all. The cost is per node WALKED, not per node removed, which is what named the sweep.
+  //
+  // Per-element semantics are the twins' unchanged, deliberately: this is a cost fix, and a sweep
+  // that tore down a different set of nodes than before would be a behaviour change wearing one.
+  parentsOf: (handles: readonly object[]) => readonly (object | undefined)[];
+  /** Each root and every descendant, PRE-ORDER, concatenated in root order. */
+  subtreesOf: (roots: readonly object[]) => readonly object[];
+  /**
+   * The node itself and every ancestor above it, DEEPEST FIRST.
+   *
+   * The upward twin of `subtreesOf`, and it exists for the same reason: a walk that asks per LEVEL
+   * pays a crossing per level. Event dispatch needs this chain for every event — capture reads it
+   * reversed, bubble reads it forward — and the responder negotiation needs it again on every frame
+   * of every drag. Measured before it existed: 18 crossings per event on a depth-8 chain, then 9
+   * once the two phases shared one walk, against the 1 an answer from here costs.
+   *
+   * A SURFACE is included, exactly as `parentOf`'s answer is — stopping at one is
+   * `host-access.ts`'s job, and it does it by reading the answer's `component`.
+   */
+  ancestorsOf: (handle: object) => readonly object[];
   census: (roots: readonly object[]) => ITreeCensus;
 
   // ── THE IMPERATIVE SIX ─────────────────────────────────────────────────────────────────────────
@@ -202,6 +255,22 @@ export function commitSurfaceOps(
   // The commit op is not recorded either, for the same reason: it would sit at the head of the next
   // batch, ahead of the creates it depends on.
   if (host === undefined) return;
+  // NOTHING TO PUBLISH — return before the host is asked to do anything.
+  //
+  // The host already declines `completeRoot` when the root child set comes back identical, but it
+  // decides that AFTER rebuilding the set: every child of the committed surface is visited to
+  // rediscover that none of them moved. Measured on the reference applier, a commit with nothing
+  // pending cost 0.0145 ms over 500 rows and 0.0822 over 4 000 — linear in the width of the surface,
+  // for a commit that publishes nothing.
+  //
+  // Who pays it: any frame where a framework re-ran an effect and produced no change, which for a
+  // reactive adapter is most frames.
+  //
+  // The post-commit hooks are NOT affected. `notifyCommitted`, `runPostCommitHooks`,
+  // `runDeferredAttaches` and the `afterCommit` drain all run in `surface.ts` AFTER this call and
+  // are deliberately not gated on the commit having made native calls — a fold that strips a prop
+  // makes its own commit byte-identical, and the hook reacting to that flip must still fire.
+  if (!hasChangedSinceCommit()) return;
   for (const [otherTag, otherSurface] of others) {
     recordCommit(otherTag, otherSurface);
   }
@@ -210,6 +279,7 @@ export function commitSurfaceOps(
   // would hand Fabric the dead surface's emptied tree over the live one's.
   if (rootTag !== undefined) recordCommit(rootTag, surface);
   host.applyOps(takeBatch());
+  noteCommitDrained();
 }
 
 // What the commit path cost on this host since the last read. Reading zeroes the accumulator, so a
@@ -243,6 +313,8 @@ export function readCommitProfile(): ICommitProfile {
 export type ISurfaceTelemetry = {
   layoutMs: number;
   textMs: number;
+  /** The commit phase BEFORE layout — the clone-on-write tree walk, `materialize`'s own window. */
+  commitMs: number;
   layoutNodes: number;
   textMeasures: number;
 };

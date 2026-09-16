@@ -17,7 +17,7 @@
 // how it was found the first time.
 
 import { describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   createElement,
   propOf,
@@ -25,7 +25,8 @@ import {
   setProp,
 } from '@symbiote-native/engine';
 
-installFabric();
+// A RECORDING host: this file asks what is written ON THE NODE, not what a renderer made of it.
+installRecordingFabric();
 
 const VIEW = 'RCTView';
 const GRADIENT = 'linear-gradient(to right, #2c4f7c, #76b3e1)';

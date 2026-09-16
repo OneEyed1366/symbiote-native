@@ -9,7 +9,10 @@
 // DEBUG-gated diagnostic instrumentation with no product-facing contract to assert.
 
 import { describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   appendChild,
   createAnchor,
@@ -32,7 +35,8 @@ import { createSurface } from './surface';
 
 // Every read below crosses into the tree host, so without one installed this file would assert
 // against an empty world and pass wherever it expects an absence.
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 9400;
 
 // The committed payload, which is what native reads — a listener map and a props bag are two
@@ -41,7 +45,7 @@ function committedPropsOf(node: ISymbioteNode): Record<string, unknown> {
   const surface = createSurface((nextRootTag += 1));
   surface.appendChild(node);
   surface.commit();
-  return fabric.appRoot().children[0].props;
+  return live.nodeOf(node).payload;
 }
 
 describe('isSymbioteEvent', () => {

@@ -7,7 +7,7 @@
 // SAME object as the unpressed style when no `:active` rule exists, because `isAlreadyPublished`
 // compares with Object.is and an equal-but-fresh object would dirty a node for nothing.
 import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   clearGlobalStyles,
   createElement,
@@ -19,7 +19,8 @@ import {
   type ISymbioteNode,
 } from '../index';
 
-installFabric();
+// A RECORDING host: nothing here reads a committed tree.
+installRecordingFabric();
 let nextRootTag = 7000;
 
 function mount(node: ISymbioteNode) {

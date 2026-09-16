@@ -8,13 +8,24 @@
 // `core/components/src/accessibility-props.test.ts` covers the fold's own rules in isolation,
 // including the two OPPOSITE precedence directions. This one covers the wiring: the sticky node
 // flag, the fold running inside `fabricProps`, and the aliases not surviving into the payload.
+//
+// A RECORDING host, and the payload is read from `fabricProps` — which this file's third paragraph
+// already names as where the fold runs. It used to be read off a stand-in tree instead, one
+// implementation further from the claim and no closer to Fabric. The commits stay: the gate is a
+// sticky flag raised on the commit path, so a test that never committed would not exercise it.
 import { describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
-import { createElement, createSurface, routeProp } from '../index';
+import { createElement, createSurface, propsOf, routeProp } from '../index';
+import { fabricProps } from '../fabric-props';
+import type { ISymbioteNode } from '../index';
 
-const fabric = installFabric();
+installRecordingFabric();
 let nextRootTag = 7600;
+
+function payloadOf(node: ISymbioteNode): Record<string, unknown> {
+  return fabricProps(node, propsOf(node));
+}
 
 function commitWith(props: Record<string, unknown>) {
   const surface = createSurface((nextRootTag += 1));
@@ -22,24 +33,24 @@ function commitWith(props: Record<string, unknown>) {
   for (const [key, value] of Object.entries(props)) routeProp(node, key, value);
   surface.appendChild(node);
   surface.commit();
-  return fabric.appRoot().children[0];
+  return payloadOf(node);
 }
 
 describe('the aria fold reaches the committed payload without a wrapper', () => {
   it('folds role into accessibilityRole and drops the alias', () => {
     const committed = commitWith({ role: 'heading' });
 
-    expect(committed.props.accessibilityRole).toBe('header');
+    expect(committed.accessibilityRole).toBe('header');
     // The alias must not survive: `fabricProps` copies every unknown key through, so a leftover
     // `role` rides to Fabric as a dead prop and shows up in the payload key count.
-    expect(Object.hasOwn(committed.props, 'role')).toBe(false);
+    expect(Object.hasOwn(committed, 'role')).toBe(false);
   });
 
   it('folds a scalar alias and blanks it', () => {
     const committed = commitWith({ 'aria-label': 'Close' });
 
-    expect(committed.props.accessibilityLabel).toBe('Close');
-    expect(Object.hasOwn(committed.props, 'aria-label')).toBe(false);
+    expect(committed.accessibilityLabel).toBe('Close');
+    expect(Object.hasOwn(committed, 'aria-label')).toBe(false);
   });
 
   // RULE ONE. For every scalar the EXPLICIT prop wins and the alias only fills a hole.
@@ -49,7 +60,7 @@ describe('the aria fold reaches the committed payload without a wrapper', () => 
       'aria-label': 'alias',
     });
 
-    expect(committed.props.accessibilityLabel).toBe('explicit');
+    expect(committed.accessibilityLabel).toBe('explicit');
   });
 
   // RULE TWO, and the reason the fold cannot be simplified: inside a composite the polarity
@@ -61,7 +72,7 @@ describe('the aria fold reaches the committed payload without a wrapper', () => 
       'aria-checked': true,
     });
 
-    expect(committed.props.accessibilityState).toEqual({
+    expect(committed.accessibilityState).toEqual({
       busy: true,
       checked: true,
       disabled: undefined,
@@ -75,9 +86,9 @@ describe('the aria fold reaches the committed payload without a wrapper', () => 
   it('leaves a node carrying no alias alone', () => {
     const committed = commitWith({ nativeID: 'plain', accessible: true });
 
-    expect(committed.props.nativeID).toBe('plain');
-    expect(committed.props.accessible).toBe(true);
-    expect(Object.hasOwn(committed.props, 'accessibilityRole')).toBe(false);
+    expect(committed.nativeID).toBe('plain');
+    expect(committed.accessible).toBe(true);
+    expect(Object.hasOwn(committed, 'accessibilityRole')).toBe(false);
   });
 
   // The gate is a STICKY flag on the node, and an alias written after the first commit has to
@@ -89,20 +100,21 @@ describe('the aria fold reaches the committed payload without a wrapper', () => 
     surface.appendChild(node);
     surface.commit();
 
-    // The control: the first commit is observed to have landed before the update means anything.
-    expect(fabric.appRoot().children[0].props.nativeID).toBe('later');
+    // The control: the first payload is observed to carry the node's own prop before the update
+    // means anything. Without it the assertions below could be reading an empty bag.
+    expect(payloadOf(node).nativeID).toBe('later');
 
     routeProp(node, 'aria-busy', true);
     surface.commit();
 
-    const committed = fabric.appRoot().children[0];
-    expect(committed.props.accessibilityState).toEqual({
+    const committed = payloadOf(node);
+    expect(committed.accessibilityState).toEqual({
       busy: true,
       checked: undefined,
       disabled: undefined,
       expanded: undefined,
       selected: undefined,
     });
-    expect(Object.hasOwn(committed.props, 'aria-busy')).toBe(false);
+    expect(Object.hasOwn(committed, 'aria-busy')).toBe(false);
   });
 });

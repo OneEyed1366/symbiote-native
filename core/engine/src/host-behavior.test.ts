@@ -4,7 +4,7 @@
 // framework may spell a MOVE as remove-then-reinsert. The reorder case below is the whole point —
 // it is green either way if you only assert "removeChild tears down".
 import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
   clearHostBehaviors,
@@ -21,7 +21,8 @@ import {
 // The seam: a node's children live in the HOST, not in a field (`host-access.ts`).
 import { childrenOf } from './host-access';
 
-installFabric();
+// A RECORDING host: nothing here reads a committed tree.
+installRecordingFabric();
 let nextRootTag = 9000;
 
 // A view DISTINCT from the plain containers below. Reusing 'RCTView' for both made the first

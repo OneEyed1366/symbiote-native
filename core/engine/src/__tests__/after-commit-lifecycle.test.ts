@@ -5,8 +5,27 @@
 // The subject is a SYNTHETIC behavior rather than TouchableOpacity's, deliberately. Its fold and
 // its hook are three lines each, so a red row here names the engine seam and not a primitive's
 // press machine — and neither case needs a fake clock, an Animated driver or a gesture.
+//
+// SPLIT (an earlier round): the prior "STAYS ON installFabric" verdict was a whole-file call for a
+// reason that only applied to ONE of the four cases. Three never read a value off the host at
+// all — three touch nothing but `seen`/`detached`, JS arrays the engine's own
+// `afterCommit`/`detach` hooks populate directly, and the first only checks a committed PROP KEY
+// SET via `payloadOf`, which runs the same `payloadFold` a real Fabric payload build runs
+// regardless of host.
+//
+// THE FOURTH — "runs when the only write is a targeted setNativeProps" — was moved out to
+// `after-commit-lifecycle-targeted.test.ts` on the theory that `setNativeProps` (imperative.ts)
+// reads `committedRecordOf(node).rootTag` to know which surface's queued commit to request, and
+// the recording host hardcoded every node's `rootTag` to the same `NO_TAG` sentinel it uses for a
+// native Fabric TAG. That conflated two different unknowns: `rootTag` is a JS-level surface
+// identifier the app chose (`createSurface(rootTag)`), present on the op stream from the start
+// (`OP_COMMIT`'s own slot `a`, `recordCommit(rootTag, surface)`) — nothing native about it, and
+// nothing this host needed to invent. Fixed in `recording-host.ts` (`committedSurfaceRootTags`,
+// keyed off the SAME `OP_COMMIT` the mirror already tracked commits from), and the fourth case
+// moved back in below.
+
 import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 import {
   clearHostBehaviors,
@@ -20,7 +39,7 @@ import {
   type ISymbioteNode,
 } from '../index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 let nextRootTag = 7900;
 
 // A tag whose Fabric name is an ordinary view, which is what every adapter passes — building the
@@ -66,7 +85,11 @@ describe('afterCommit and a payload the behavior itself made empty', () => {
     // commit, so the hook fires there whether or not the defect exists. Without this a broken
     // registration and a broken drain read the same.
     expect(seen, 'the hook is wired at all').toEqual([undefined]);
-    const beforeKeys = Object.keys(fabric.appRoot().children[0].props).sort();
+    // `payloadOf`, not `fabric.propsOf` — the AUTHORED prop bag always carries `machineOnly` (that
+    // is the entire point of the behavior's fold), so reading it would fail this for the wrong
+    // reason. `payloadOf` runs the same `payloadFold` a real Fabric payload build runs
+    // (`fabric-props.ts`), so it is the one read that answers "did this reach Fabric".
+    const beforeKeys = Object.keys(payloadOf(node)).sort();
 
     routeProp(node, MACHINE_ONLY, true);
     surface.commit();
@@ -74,7 +97,7 @@ describe('afterCommit and a payload the behavior itself made empty', () => {
     // The premise, asserted rather than assumed: this commit really did change nothing native, so
     // the row below is about the hook and not about a prop that quietly reached Fabric.
     expect(
-      Object.keys(fabric.appRoot().children[0].props).sort(),
+      Object.keys(payloadOf(node)).sort(),
       'the fold kept the payload byte-identical',
     ).toEqual(beforeKeys);
     expect(seen).toEqual([undefined, true]);

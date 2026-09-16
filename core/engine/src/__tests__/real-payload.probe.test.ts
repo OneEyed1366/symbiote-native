@@ -11,7 +11,10 @@
 
 import { expect, it } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 // By PATH, not by package name: `core/engine` does not depend on `core/css-parser` and must not
 // start to for a probe's sake. A relative import reaches the source without touching the manifest.
 import { compileCssToRules } from '../../../css-parser/src/index.ts';
@@ -30,7 +33,8 @@ import {
   routeProp,
 } from '../index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // The APP'S OWN stylesheet, compiled by the real parser. Re-typing the declarations by hand is how
 // the first two attempts at this measurement went wrong — once with an invented 5-key payload, once
@@ -101,20 +105,10 @@ it('captures the committed payloads of one benchmark row', () => {
   // together to price `ViewProps` against `ParagraphProps` and the text-input props. Without it the
   // bench can only measure the one descriptor it guessed.
   const viewNames: string[] = [];
-  const walk = (node: {
-    props: Record<string, unknown>;
-    children: unknown[];
-    viewName?: string;
-  }) => {
-    payloads.push(node.props);
-    viewNames.push(node.viewName ?? '');
-    for (const child of node.children) {
-      if (child !== null && typeof child === 'object' && 'props' in child) {
-        walk(Object(child));
-      }
-    }
-  };
-  for (const child of fabric.appRoot().children) walk(Object(child));
+  live.walkLive(live.appRoot(), node => {
+    payloads.push(node.payload);
+    viewNames.push(node.viewName);
+  });
 
   // OPT-IN, and never a relative default: a test that writes on every full-suite run drops a file
   // into whatever directory the run started from, and the reflex repair for that is a .gitignore

@@ -7,7 +7,10 @@
 // It replaces slot 1 (the EXPLICIT style), not slot 0: an authored `style` is what it stands in
 // for, so it must beat the class cascade exactly the way the authored style does.
 import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   clearGlobalStyles,
   createElement,
@@ -19,7 +22,9 @@ import {
   type ISymbioteNode,
 } from '../index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// The payload is what ships; the author's bag is not. Every read below is `.payload`.
+const live = createLiveTree(fabric);
 let nextRootTag = 7500;
 
 function mount(node: ISymbioteNode) {
@@ -106,6 +111,6 @@ describe('compiler-supplied pressed style variant', () => {
     routeProp(node, 'activeStyle', { opacity: 0.6 });
     mount(node);
 
-    expect('activeStyle' in fabric.appRoot().children[0].props).toBe(false);
+    expect('activeStyle' in live.nodeOf(node).payload).toBe(false);
   });
 });

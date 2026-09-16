@@ -10,7 +10,7 @@
 // whole regression. What is assertable is the routing itself, and the argument: an imperative call
 // hands the host the placeholder, and the host maps it to whatever its own side needs.
 import { describe, expect, it, vi } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import {
   createElement,
@@ -23,7 +23,7 @@ import {
 } from '../index';
 import { setTreeHost, treeHost, type ITreeHost } from '../tree-host';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 let nextRootTag = 9500;
 
 function mounted() {
@@ -40,7 +40,7 @@ function withSpiedHost(
 ) {
   const real = treeHost();
   if (real === undefined)
-    throw new Error('no host installed — installFabric() did not run');
+    throw new Error('no host installed — installRecordingFabric() did not run');
   const spies = {
     measure: vi.fn(),
     measureInWindow: vi.fn(),

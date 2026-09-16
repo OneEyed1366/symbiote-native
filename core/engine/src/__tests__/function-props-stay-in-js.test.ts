@@ -9,7 +9,7 @@
 // with no `routeProp` in front of it: an `Animated.View` spread with `panResponder.panHandlers`
 // hands `AnimatedProps.__getValue()` a bag of callbacks and it copies every key it holds.
 import { describe, expect, it, vi } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import {
   createElement,
@@ -20,7 +20,8 @@ import {
 } from '../index';
 import { flushOps, treeHost } from '../tree-host';
 
-installFabric();
+// A RECORDING host: the question is what stays in JS, which the op stream answers.
+installRecordingFabric();
 let nextRootTag = 9300;
 
 function mounted() {

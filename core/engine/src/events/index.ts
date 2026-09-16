@@ -6,7 +6,7 @@
 // invoking each ancestor's listener until one calls stopPropagation. Layout is a
 // direct event in RN and is delivered only to its own target.
 
-import { dlog } from '../debug';
+import { dlog, isDebug } from '../debug';
 import { runWrapped } from '../dispatch';
 import { getSlot } from '../fabric';
 import {
@@ -16,7 +16,7 @@ import {
   type ISymbioteNode,
 } from '../node';
 import { registeredNativeEvent } from '../registry';
-import { parentOf } from '../host-access';
+import { ancestorsOf, parentOf } from '../host-access';
 import { setIsJSResponder } from '../imperative';
 import {
   attachTouchHistory,
@@ -230,11 +230,14 @@ function callOwnListener(
 
 // The node chain from `from` up to the root, deepest first. The single allocation
 // the two-phase walk indexes both ways (capture reads it reversed).
+//
+// ONE CROSSING, not one per level. This used to climb `parentOf`, which crosses the host boundary
+// each step — 18 questions per event on a depth-8 chain, and again on every frame of every drag for
+// the responder's scope. The host holds the tree, so the chain is one answer it can give: the same
+// argument `parentsOf` / `subtreesOf` won for the teardown sweep (F-2) and `nextSiblingOf` for Vue's
+// quadratic (F-19).
 function pathToRoot(from: ISymbioteNode): ISymbioteNode[] {
-  const path: ISymbioteNode[] = [];
-  for (let node: ISymbioteNode | undefined = from; node; node = parentOf(node))
-    path.push(node);
-  return path;
+  return [...ancestorsOf(from)];
 }
 
 // Depth of a node below the root (root = 0). Aligns two nodes before the lockstep
@@ -321,10 +324,12 @@ function handOverNativeResponder(
   to: ISymbioteNode | undefined,
   blockNativeResponder: boolean,
 ): void {
-  dlog(
-    `setIsJSResponder from=${from === undefined ? 'none' : 'yes'} ` +
-      `to=${to === undefined ? 'none' : 'yes'} block=${blockNativeResponder}`,
-  );
+  if (isDebug()) {
+    dlog(
+      `setIsJSResponder from=${from === undefined ? 'none' : 'yes'} ` +
+        `to=${to === undefined ? 'none' : 'yes'} block=${blockNativeResponder}`,
+    );
+  }
   if (from !== undefined) setIsJSResponder(from, false, blockNativeResponder);
   if (to !== undefined) setIsJSResponder(to, true, blockNativeResponder);
 }
@@ -349,12 +354,35 @@ function negotiateResponder(
   // the responder) and skips the deepest node when it IS the responder (Responder-
   // EventPlugin.setResponderAndExtractTransfer). At touch start currentResponder is
   // cleared, so this collapses to the plain target->root start walk.
+  //
+  // ONE WALK, and the common case never needs a second. `pathToRoot` crosses the host boundary per
+  // level, and the previous shape paid `lowestCommonAncestor` — `depthOf(a)` plus `depthOf(b)` plus
+  // a lockstep climb — BEFORE walking again from the answer. Measured on a depth-8 chain: 19
+  // crossings per move, of which 18 were the ancestor search, on a path that runs 60 times a second
+  // for the whole of a drag (`__tests__/touch-crossing-cost.test.ts`).
+  //
+  // The scope RN computes is the lowest common ancestor of responder and target, and while a finger
+  // stays inside the view that claimed it — which is what a drag IS — the responder is an ANCESTOR
+  // of the target, so the LCA is the responder itself and it is already in the target's own path.
+  // An index lookup answers it with nothing crossed, and the scoped path is that path's suffix.
+  // The genuine cross-subtree case (the finger left the responder's subtree) still falls back to
+  // the full search, and it is a rare frame rather than every frame.
+  const targetPath = pathToRoot(target);
+  const heldAt =
+    currentResponder === undefined ? -1 : targetPath.indexOf(currentResponder);
   const from =
     currentResponder === undefined
       ? target
-      : lowestCommonAncestor(currentResponder, target);
+      : heldAt >= 0
+        ? currentResponder
+        : lowestCommonAncestor(currentResponder, target);
   if (!from) return;
-  const path = pathToRoot(from);
+  const path =
+    from === target
+      ? targetPath
+      : heldAt >= 0
+        ? targetPath.slice(heldAt)
+        : pathToRoot(from);
   const skip = from === currentResponder ? from : undefined;
   const wants =
     phase === 'start'
@@ -375,19 +403,22 @@ function negotiateResponder(
   // Every exit is logged: a negotiation that declines is indistinguishable from one that never
   // ran, and the two have opposite causes.
   if (!wants) {
-    dlog(
-      `responder ${phase}: nobody wants it (path=${path.length}${skip === undefined ? '' : ', one skipped'})`,
-    );
+    if (isDebug()) {
+      dlog(
+        `responder ${phase}: nobody wants it (path=${path.length}${skip === undefined ? '' : ', one skipped'})`,
+      );
+    }
     return;
   }
   if (wants === currentResponder) {
-    dlog(`responder ${phase}: ${wants.component} already holds it`);
+    if (isDebug())
+      dlog(`responder ${phase}: ${wants.component} already holds it`);
     return;
   }
 
   if (currentResponder === undefined) {
     currentResponder = wants;
-    dlog(`responder granted to ${wants.component}`);
+    if (isDebug()) dlog(`responder granted to ${wants.component}`);
     const granted = callOwnListener(wants, RESPONDER_GRANT, nativeEvent);
     handOverNativeResponder(undefined, wants, blocksNative(granted));
     return;
@@ -410,13 +441,17 @@ function negotiateResponder(
     // visible no-op event with no behavioral counterpart. We therefore fire grant
     // before terminate on the consent path (matching RN's grant<terminate ordering) and
     // omit it on reject; the consent OUTCOME is unchanged either way.
-    dlog(`responder transferred ${incumbent.component} -> ${wants.component}`);
+    if (isDebug())
+      dlog(
+        `responder transferred ${incumbent.component} -> ${wants.component}`,
+      );
     const granted = callOwnListener(wants, RESPONDER_GRANT, nativeEvent);
     callOwnListener(incumbent, RESPONDER_TERMINATE, nativeEvent);
     currentResponder = wants;
     handOverNativeResponder(incumbent, wants, blocksNative(granted));
   } else {
-    dlog(`responder takeover of ${incumbent.component} rejected`);
+    if (isDebug())
+      dlog(`responder takeover of ${incumbent.component} rejected`);
     callOwnListener(wants, RESPONDER_REJECT, nativeEvent);
   }
 }
@@ -430,9 +465,10 @@ export function installEventHandler(): void {
       if (!isSymbioteNode(instanceHandle)) return;
 
       if (topLevelType === TOUCH_START) {
-        dlog(
-          `event ${TOUCH_START} on ${isSymbioteNode(instanceHandle) ? instanceHandle.component : 'NON-NODE'}`,
-        );
+        // The ternary is gone with the gate: `isSymbioteNode(instanceHandle)` was re-asked here
+        // three lines after the early return above already proved it.
+        if (isDebug())
+          dlog(`event ${TOUCH_START} on ${instanceHandle.component}`);
         // Update the touch bank, then attach it so responder handlers (PanResponder)
         // read each touch's own previous->current delta; RN records before dispatch.
         recordTouchTrack('start', nativeEvent);
@@ -546,7 +582,8 @@ export function installEventHandler(): void {
             bubble(press.owner, PRESS_OUT, nativeEvent);
           }
           if (!hadActivePress) {
-            dlog(`event ${TOUCH_END} ignored (no matching start)`);
+            if (isDebug())
+              dlog(`event ${TOUCH_END} ignored (no matching start)`);
           } else if (completedPresses.length === 0) {
             dlog('press retained (another touch remains inside its owner)');
           }
@@ -604,14 +641,18 @@ export function installEventHandler(): void {
 
       const direct = DIRECT_EVENTS[topLevelType];
       if (direct !== undefined) {
-        dlog(`event ${topLevelType} -> ${direct} (direct)`);
+        if (isDebug()) {
+          dlog(`event ${topLevelType} -> ${direct} (direct)`);
+        }
         runWrapped(() => deliverDirect(instanceHandle, direct, nativeEvent));
         return;
       }
 
       const bubbling = BUBBLING_EVENTS[topLevelType];
       if (bubbling !== undefined) {
-        dlog(`event ${topLevelType} -> ${bubbling} (bubble)`);
+        if (isDebug()) {
+          dlog(`event ${topLevelType} -> ${bubbling} (bubble)`);
+        }
         runWrapped(() => bubble(instanceHandle, bubbling, nativeEvent));
         return;
       }
@@ -625,10 +666,12 @@ export function installEventHandler(): void {
         topLevelType,
       );
       if (registered !== undefined) {
-        const phase = registered.direct ? 'direct' : 'bubble';
-        dlog(
-          `event ${topLevelType} -> ${registered.listener} (${phase}, registered)`,
-        );
+        if (isDebug()) {
+          const phase = registered.direct ? 'direct' : 'bubble';
+          dlog(
+            `event ${topLevelType} -> ${registered.listener} (${phase}, registered)`,
+          );
+        }
         runWrapped(() =>
           registered.direct
             ? deliverDirect(instanceHandle, registered.listener, nativeEvent)
@@ -641,9 +684,11 @@ export function installEventHandler(): void {
       // config. A permanent diagnostic seam: if a native view fires something we drop
       // on the floor (an event the ViewConfig didn't surface, or a name mismatch),
       // this is where it shows up. Keeps "the handler silently did nothing" debuggable.
-      dlog(
-        `event ${topLevelType} UNMATCHED on ${instanceHandle.component} (dropped)`,
-      );
+      if (isDebug()) {
+        dlog(
+          `event ${topLevelType} UNMATCHED on ${instanceHandle.component} (dropped)`,
+        );
+      }
     },
   );
 }
@@ -694,7 +739,7 @@ function bubble(
       ? undefined
       : node.listeners?.get(captureName);
     if (listener) {
-      dlog(`event ${listenerName} capture on ${node.component}`);
+      if (isDebug()) dlog(`event ${listenerName} capture on ${node.component}`);
       listener({
         type: listenerName,
         target,
@@ -708,8 +753,13 @@ function bubble(
 
   // Bubble phase: target -> root, invoking each ancestor's plain listener. Anchors are
   // transparent here too, same reason (see the capture-phase comment above).
-  let node: ISymbioteNode | undefined = target;
-  while (node) {
+  //
+  // THE SAME ARRAY, read forward. This used to re-walk `parentOf` from the target, which is a
+  // CROSSING of the host boundary per level — so one event asked the host for its ancestors twice,
+  // measured at 18 questions on a depth-8 chain where 9 is the floor. The comment above already
+  // says the path is built once "without a second allocation"; the second WALK is the expensive
+  // half, and it was the one left in. Every touch and every frame of every drag pays it.
+  for (const node of path) {
     const listener = isAnchor(node)
       ? undefined
       : node.listeners?.get(listenerName);
@@ -724,7 +774,6 @@ function bubble(
       listener(event);
       if (stopped) return;
     }
-    node = parentOf(node);
   }
 }
 

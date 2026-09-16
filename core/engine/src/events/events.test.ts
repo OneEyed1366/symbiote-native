@@ -11,7 +11,7 @@
 // Negative (toThrow) group; every scenario below is Positive.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
   createElement,
@@ -27,7 +27,7 @@ import { registerComponent } from '../registry';
 // the handler without standing up a surface.
 import { installEventHandler } from './index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 installEventHandler();
 
 interface ITree {

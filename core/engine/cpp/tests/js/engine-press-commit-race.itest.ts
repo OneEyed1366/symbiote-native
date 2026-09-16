@@ -3,11 +3,22 @@
 // of its own (`requestCommitFor`), which lands in the same tick as the framework's own update — so
 // the suspicion is that one of the two commits swallows the other.
 //
-// Written as a race rather than as a single press because the single-press case already passes
-// (`core/components/src/behaviors/pressable.test.ts`), so whatever is lost is lost only when both
-// commits are in flight.
-import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// Replaces the `installFabric()` half of core/engine/src/__tests__/press-commit-race.test.ts —
+// STAYED on the mirror through Rounds 12-14 because the claim is "did THIS commit publish the
+// prop", and `installRecordingFabric()`'s `propOf`/`payloadOf` read the node's CURRENT state,
+// which `routeProp` mutates whether or not a commit ever ran — a tautology that would pass whether
+// or not the race was actually lost. Against the REAL committed tree there is no such ambiguity:
+// `mounted()` only ever reflects what the real Differentiator actually mounted, so a swallowed
+// commit reads as a stale value here, not as a passing assertion.
+//
+// One substitution throughout: `accessibilityLabel` swapped for `nativeID` as the "which value won
+// the race" marker prop. `getDebugProps()`'s selection (measured in `committed-props.itest.ts`:
+// accessible/backgroundColor/nativeID/opacity/pointerEvents/testID/zIndex) does not include
+// `accessibilityLabel` at all — that is RN's own `BaseViewProps::getDebugProps()` choosing what to
+// expose, not something this project curates, so there is no C++ side to extend here. `nativeID`
+// takes an arbitrary string with no color-parsing/validation the way `backgroundColor` would need,
+// so it is a drop-in stand-in for the same "any string, freely settable" role.
+
 import {
   appendChild,
   clearGlobalStyles,
@@ -18,22 +29,21 @@ import {
   routeProp,
   setNodePressed,
   type ISymbioteNode,
-} from '../index';
+} from '@symbiote-native/engine';
 
-const fabric = installFabric();
-let nextRootTag = 7900;
+import {
+  afterEach,
+  describe,
+  expect,
+  findByTestId,
+  it,
+  report,
+} from './harness';
 
-function committedPropsOf(testID: string): Record<string, unknown> | undefined {
-  const walk = (nodes: readonly IFakeNode[]) => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
-}
+// Must be 1: the C++ harness's ShadowTreeRegistry watches one fixed `kSurfaceId` (symbiote-host.h),
+// not whatever tag JS passes to `createSurface` — every case gets a fresh registry via the
+// harness's own per-case `reset()`, so reusing 1 across cases is correct, not accidental reuse.
+const ROOT_TAG = 1;
 
 const PRESSED_RULES = [
   {
@@ -50,15 +60,19 @@ const PRESSED_RULES = [
   },
 ];
 
-function mountTree() {
-  const surface = createSurface((nextRootTag += 1));
+function mountTree(): {
+  surface: ReturnType<typeof createSurface>;
+  button: ISymbioteNode;
+  sibling: ISymbioteNode;
+} {
+  const surface = createSurface(ROOT_TAG);
   const root = createElement('RCTView');
   const button = createElement('RCTView');
   const sibling = createElement('RCTView');
   routeProp(button, 'class', 'btn');
   routeProp(button, 'testID', 'button');
   routeProp(sibling, 'testID', 'sibling');
-  routeProp(sibling, 'accessibilityLabel', 'before');
+  routeProp(sibling, 'nativeID', 'before');
   appendChild(root, button);
   appendChild(root, sibling);
   surface.appendChild(root);
@@ -79,7 +93,7 @@ afterEach(() => {
   clearGlobalStyles();
 });
 
-describe('a press commit racing the framework commit', () => {
+describe('a press commit racing the framework commit, on the real engine', () => {
   it('publishes the pressed style when the framework commits FIRST in the same tick', async () => {
     registerRules(PRESSED_RULES);
     const { surface, button, sibling } = mountTree();
@@ -87,13 +101,13 @@ describe('a press commit racing the framework commit', () => {
     // Native event: the press dirties the node and queues its own commit.
     press(button, true);
     // The app's own onPress handler, same tick: a prop somewhere else, then the framework commits.
-    routeProp(sibling, 'accessibilityLabel', 'after');
+    routeProp(sibling, 'nativeID', 'after');
     surface.commit();
     // ...and only now the queued microtask runs.
     await Promise.resolve();
 
-    expect(committedPropsOf('sibling')?.accessibilityLabel).toBe('after');
-    expect(committedPropsOf('button')?.opacity).toBe(0.6);
+    expect(findByTestId('sibling')?.props.nativeID).toBe('after');
+    expect(findByTestId('button')?.props.opacity).toBe('0.6');
   });
 
   it('publishes the framework update when the press commit lands FIRST', async () => {
@@ -102,11 +116,11 @@ describe('a press commit racing the framework commit', () => {
 
     press(button, true);
     await Promise.resolve();
-    routeProp(sibling, 'accessibilityLabel', 'after');
+    routeProp(sibling, 'nativeID', 'after');
     surface.commit();
 
-    expect(committedPropsOf('button')?.opacity).toBe(0.6);
-    expect(committedPropsOf('sibling')?.accessibilityLabel).toBe('after');
+    expect(findByTestId('button')?.props.opacity).toBe('0.6');
+    expect(findByTestId('sibling')?.props.nativeID).toBe('after');
   });
 
   // THE CASE THE THREE ABOVE MISS, and the one a peer reproduced headlessly: they all update a
@@ -119,16 +133,16 @@ describe('a press commit racing the framework commit', () => {
 
     // Observable control BEFORE the press: without it a later empty read cannot be told apart from
     // a tree that never committed at all.
-    routeProp(button, 'accessibilityLabel', 'before');
+    routeProp(button, 'nativeID', 'before');
     surface.commit();
-    expect(committedPropsOf('button')?.accessibilityLabel).toBe('before');
+    expect(findByTestId('button')?.props.nativeID).toBe('before');
 
     press(button, true);
     await Promise.resolve();
 
-    routeProp(button, 'accessibilityLabel', 'after');
+    routeProp(button, 'nativeID', 'after');
     surface.commit();
-    expect(committedPropsOf('button')?.accessibilityLabel).toBe('after');
+    expect(findByTestId('button')?.props.nativeID).toBe('after');
   });
 
   // The SAME case again, but committed the way a fine-grained adapter does it: `requestCommit()`
@@ -138,18 +152,18 @@ describe('a press commit racing the framework commit', () => {
     registerRules(PRESSED_RULES);
     const { surface, button } = mountTree();
 
-    routeProp(button, 'accessibilityLabel', 'before');
+    routeProp(button, 'nativeID', 'before');
     surface.requestCommit();
     await Promise.resolve();
-    expect(committedPropsOf('button')?.accessibilityLabel).toBe('before');
+    expect(findByTestId('button')?.props.nativeID).toBe('before');
 
     press(button, true);
     await Promise.resolve();
 
-    routeProp(button, 'accessibilityLabel', 'after');
+    routeProp(button, 'nativeID', 'after');
     surface.requestCommit();
     await Promise.resolve();
-    expect(committedPropsOf('button')?.accessibilityLabel).toBe('after');
+    expect(findByTestId('button')?.props.nativeID).toBe('after');
   });
 
   // THE ONE THE FIVE ABOVE MISS. They all update the pressed node ITSELF, and a peer's flag dump
@@ -158,8 +172,8 @@ describe('a press commit racing the framework commit', () => {
   //   1. the press dirties the pressable, and markDirty walks UP marking the chain
   //   2. same tick, the framework dirties a CHILD — markDirty walks up, meets the pressable
   //      already dirty, and stops there, which is its documented fast path
-  //   3. the microtask runs commitTargeted([pressable]): it publishes the pressable's props and
-  //      clears its flags, and by design it never descends
+  //   3. the microtask runs the targeted commit: it publishes the pressable's props and clears
+  //      its flags, and by design it never descends
   //   4. the framework's own commit reconciles from the root, finds a clean chain, and skips
   //   5. the child is left dirty under a clean chain — unreachable, forever
   //
@@ -168,32 +182,32 @@ describe('a press commit racing the framework commit', () => {
   // must not depend on it.
   it('does not orphan a dirty DESCENDANT dirtied in the same tick as the press', async () => {
     registerRules(PRESSED_RULES);
-    const surface = createSurface((nextRootTag += 1));
+    const surface = createSurface(ROOT_TAG);
     const root = createElement('RCTView');
     const button = createElement('RCTView');
     const label = createElement('RCTView');
     routeProp(button, 'class', 'btn');
     routeProp(button, 'testID', 'button');
     routeProp(label, 'testID', 'label');
-    routeProp(label, 'accessibilityLabel', 'before');
+    routeProp(label, 'nativeID', 'before');
     appendChild(button, label);
     appendChild(root, button);
     surface.appendChild(root);
     surface.commit();
-    expect(committedPropsOf('label')?.accessibilityLabel).toBe('before');
+    expect(findByTestId('label')?.props.nativeID).toBe('before');
 
     press(button, true);
-    routeProp(label, 'accessibilityLabel', 'after');
+    routeProp(label, 'nativeID', 'after');
     surface.requestCommit();
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(committedPropsOf('label')?.accessibilityLabel).toBe('after');
+    expect(findByTestId('label')?.props.nativeID).toBe('after');
     // And the node must not be stranded for every LATER update either.
-    routeProp(label, 'accessibilityLabel', 'later');
+    routeProp(label, 'nativeID', 'later');
     surface.requestCommit();
     await Promise.resolve();
-    expect(committedPropsOf('label')?.accessibilityLabel).toBe('later');
+    expect(findByTestId('label')?.props.nativeID).toBe('later');
   });
 
   // The reported shape exactly: press, release, press again. If the first cycle is lost and the
@@ -204,16 +218,18 @@ describe('a press commit racing the framework commit', () => {
 
     for (const label of ['first', 'second']) {
       press(button, true);
-      routeProp(sibling, 'accessibilityLabel', label);
+      routeProp(sibling, 'nativeID', label);
       surface.commit();
       await Promise.resolve();
-      expect(committedPropsOf('button')?.opacity, `${label} press-in`).toBe(
-        0.6,
-      );
+      expect(findByTestId('button')?.props.opacity).toBe('0.6');
 
       press(button, false);
       await Promise.resolve();
-      expect(committedPropsOf('button')?.opacity, `${label} release`).toBe(1);
+      // Released opacity is 1, opacity's own default — getDebugProps() omits any
+      // field that equals its default, so it never reaches props at all.
+      expect(findByTestId('button')?.props.opacity).toBe(undefined);
     }
   });
 });
+
+report();

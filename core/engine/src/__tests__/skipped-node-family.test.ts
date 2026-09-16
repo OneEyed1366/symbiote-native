@@ -24,7 +24,7 @@
 // DO reconcile, so they receive `forceFreshFamily` like any other child.
 
 import { describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   appendChild,
   createElement,
@@ -38,7 +38,8 @@ import {
 // that — both arms threw a TypeError from inside reconcile rather than the Fabric error under test.
 import { TEXT_COMPONENT } from '../node';
 
-const fabric = installFabric();
+// A RECORDING host: nothing here reads a committed tree.
+const fabric = installRecordingFabric();
 
 describe('a skipped node does not carry a stale Fabric family back', () => {
   it('survives empty -> reparent-the-parent -> non-empty', () => {

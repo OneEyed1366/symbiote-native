@@ -11,7 +11,7 @@
 // it on a microtask), so the node has no handle yet. Every function either defers (`whenCommitted`)
 // or logs and returns — never throws.
 
-import { dlog } from './debug';
+import { dlog, isDebug } from './debug';
 import type {
   IFabricNode,
   IMeasureInWindowOnSuccess,
@@ -79,7 +79,19 @@ export function requestCommitFor(node: ISymbioteNode): void {
     dlog('requestCommitFor skipped: node not committed');
     return;
   }
-  pendingRoots.add(record.rootTag);
+  requestCommitForRoot(record.rootTag);
+}
+
+/**
+ * The same request, for a caller that already holds the node's record.
+ *
+ * `committedRecordOf` crosses the host boundary, and `setNativeProps` fetches the record two lines
+ * before it calls this — so asking again was two crossings for one fact, on the path an
+ * `AnimatedProps` leaf runs once per frame per animated node. Measured at 2 of the 3 crossings a
+ * frame made (`__tests__/animated-frame-cost.test.ts`).
+ */
+function requestCommitForRoot(rootTag: IRootTag): void {
+  pendingRoots.add(rootTag);
   if (!flushScheduled) {
     flushScheduled = true;
     queueMicrotask(flushNativeProps);
@@ -99,8 +111,14 @@ export function getNativeTag(node: ISymbioteNode): number | undefined {
   return committedRecordOf(node)?.tag;
 }
 
-/** The node's current Fabric handle, in kind identical to React's `stateNode.node`. */
-export function getNativeNode(node: ISymbioteNode): IFabricNode | undefined {
+/**
+ * The node's current native handle, in kind identical to React's `stateNode.node`.
+ *
+ * OPAQUE. Under the native host it is a `ShadowNode`, under a headless one whatever that host
+ * committed — see `ICommittedRecord.handle`. It used to be typed `IFabricNode`, a brand with no
+ * members, so a caller can do exactly as much with it as before.
+ */
+export function getNativeNode(node: ISymbioteNode): object | undefined {
   return committedRecordOf(node)?.handle;
 }
 
@@ -277,10 +295,19 @@ export function setNativeProps(
     writeProp(node, key, value);
   }
   if (merged.style !== undefined) clearPublishedStyle(node);
-  dlog(
-    `setNativeProps root=${record.rootTag} tag=${record.tag} keys=${Object.keys(partial)}`,
-  );
+  // GATED, and this is the one place in the engine where "per frame" is the right unit to worry
+  // about. An `AnimatedProps` leaf calls this once per frame per animated node, so the template
+  // string and the `Object.keys` array it builds are 60 allocations a second per node — times the
+  // list, for a list that animates its rows. F-61 dismissed 347 ungated arguments because none of
+  // them was on a path that repeats; this one is, and F-61 had it in its own in-loop list and
+  // priced it as "runs once".
+  if (isDebug()) {
+    dlog(
+      `setNativeProps root=${record.rootTag} tag=${record.tag} keys=${Object.keys(partial)}`,
+    );
+  }
   // Queued, not committed: every write made in this task publishes together at the microtask
-  // boundary.
-  requestCommitFor(node);
+  // boundary. With the record already in hand — asking for it again is a second crossing for a
+  // fact this function fetched four lines up.
+  requestCommitForRoot(record.rootTag);
 }

@@ -157,6 +157,25 @@ IArm run(void (*perturb)(YGNodeRef, const std::vector<YGNodeRef> &)) {
   return IArm{ms, measureCalls, countNewLayout(root)};
 }
 
+// APPEND — the step this stand was reopened for (2026-09-14). The tree is already laid out with
+// kRows rows when kRows MORE arrive at the end, which is exactly what `{#each}` does on the
+// benchmark's Append: a thousand rows join a thousand that are already measured and positioned.
+//
+// The number to read is `measures`. Six thousand means Yoga measured only the arrivals and the
+// standing rows kept their layout. TWELVE thousand means appending re-measures everything already
+// there — and since a device measurement costs 29.6 us, six thousand extra ones are ~178 ms, which
+// is the order of the gap this is chasing (Append is now Create + 125 ms, was + 18).
+std::vector<YGNodeRef> appendedLeaves;
+
+void appendRows(YGNodeRef root, const std::vector<YGNodeRef> &) {
+  appendedLeaves.clear();
+  appendedLeaves.reserve(static_cast<size_t>(kRows) * kMeasurablesPerRow);
+  const size_t standing = YGNodeGetChildCount(root);
+  for (int i = 0; i < kRows; i++) {
+    YGNodeInsertChild(root, makeRow(appendedLeaves), standing + static_cast<size_t>(i));
+  }
+}
+
 void dirtyNothing(YGNodeRef, const std::vector<YGNodeRef> &) {}
 
 void dirtyOneLeaf(YGNodeRef, const std::vector<YGNodeRef> &leaves) {
@@ -251,6 +270,7 @@ int main(int argc, char **argv) {
   std::printf("                   SELECT 2869 measures, 8477 recomputed, 117 ms layout, 2 clones\n\n");
 
   report("nothing dirty", run(dirtyNothing));
+  report("APPEND 1000 rows to 1000 standing", run(appendRows));
   report("ONE leaf dirty", run(dirtyOneLeaf));
   report("root children re-set", run(dirtyRootByResettingChildren));
   report("root style changed", run(dirtyRootByStyle));

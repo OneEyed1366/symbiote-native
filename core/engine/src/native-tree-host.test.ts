@@ -3,12 +3,12 @@
 // pending forever, and the screen is blank with nothing red anywhere — the exact failure shape this
 // file exists to make impossible to ship.
 //
-// The mirror property matters just as much headlessly: `installFabric()` puts the TypeScript applier
-// in, and ~5 500 tests are written against it, so a native host resolving afterwards must NOT take
-// the seam.
+// The same property matters just as much headlessly: whatever host a test installs first —
+// `installRecordingFabric()` for the vast majority of the suite — a native host resolving
+// afterwards must NOT take the seam.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   resetNativeEngine,
   SUPPORTED_NATIVE_VERSION,
@@ -73,6 +73,22 @@ function fakeBindings(version: number): {
       calls.push(['childrenOf', handle]);
       return [child];
     },
+    nextSiblingOf: handle => {
+      calls.push(['nextSiblingOf', handle]);
+      return undefined;
+    },
+    parentsOf: handles => {
+      calls.push(['parentsOf', handles]);
+      return handles.map(() => parent);
+    },
+    subtreesOf: roots => {
+      calls.push(['subtreesOf', roots]);
+      return [...roots, child];
+    },
+    ancestorsOf: handle => {
+      calls.push(['ancestorsOf', handle]);
+      return [handle, parent];
+    },
     committedRecordOf: handle => {
       calls.push(['committedRecordOf', handle]);
       return record;
@@ -102,8 +118,8 @@ afterEach(() => {
 
 describe('the native tree host', () => {
   it('is installed when the bindings resolve', () => {
-    installFabric();
-    // installFabric() puts the TypeScript applier in, and the precedence rule below is that an
+    installRecordingFabric();
+    // installRecordingFabric() puts a host in, and the precedence rule below is that an already
     // installed host wins — so this case has to start from an empty seam to be about anything.
     setTreeHost(undefined);
     installFakeBindings(fakeBindings(SUPPORTED_NATIVE_VERSION).bindings);
@@ -115,7 +131,7 @@ describe('the native tree host', () => {
   });
 
   it('is not installed when no native module resolves', () => {
-    installFabric();
+    installRecordingFabric();
     setTreeHost(undefined);
     resetNativeEngine();
 
@@ -129,7 +145,7 @@ describe('the native tree host', () => {
   // `Int32Array` of child ids where the tree batch sends a string table. Every name is present, so
   // the shape guard passes it and only the version branch can turn it away.
   it('refuses a binary one ABI behind, leaving the seam empty', () => {
-    installFabric();
+    installRecordingFabric();
     setTreeHost(undefined);
     installFakeBindings(fakeBindings(SUPPORTED_NATIVE_VERSION - 1).bindings);
 
@@ -139,18 +155,18 @@ describe('the native tree host', () => {
     expect(treeHost()).toBeUndefined();
   });
 
-  // PRECEDENCE, and the headless suite rests on it: the TypeScript applier `installFabric()` put in
-  // stays. Asserted by identity rather than by "a host is present", which is true either way.
+  // PRECEDENCE, and the headless suite rests on it: whatever host `installRecordingFabric()` put
+  // in stays. Asserted by identity rather than by "a host is present", which is true either way.
   it('never displaces a host that is already installed', () => {
-    const recorder = installFabric();
+    const recorder = installRecordingFabric();
     expect(recorder).toBeDefined();
-    const applier = treeHost();
+    const alreadyInstalled = treeHost();
     installFakeBindings(fakeBindings(SUPPORTED_NATIVE_VERSION).bindings);
 
     resetSlot();
     getSlot();
 
-    expect(treeHost()).toBe(applier);
+    expect(treeHost()).toBe(alreadyInstalled);
   });
 
   it('routes every read at the matching binding', () => {

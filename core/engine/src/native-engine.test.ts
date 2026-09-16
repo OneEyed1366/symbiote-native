@@ -9,7 +9,7 @@
 // (`<examples_vs_dot_examples>`), so "an older binary is installed" is a state that happens weekly.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   nativeEngine,
   resetNativeEngine,
@@ -37,6 +37,10 @@ function fakeBindings(version: number): INativeEngineBindings {
     getViewName: (): string => '',
     parentOf: (): object | undefined => undefined,
     childrenOf: (): readonly object[] => [],
+    nextSiblingOf: (): object | undefined => undefined,
+    parentsOf: (): readonly (object | undefined)[] => [],
+    subtreesOf: (): readonly object[] => [],
+    ancestorsOf: (): readonly object[] => [],
     committedRecordOf: (): undefined => undefined,
     dispatchCommand: (): void => {},
     sendAccessibilityEvent: (): void => {},
@@ -149,7 +153,8 @@ describe('native engine bindings', () => {
 
     expect(globalThis.__symbioteEngineNative).toBeUndefined();
 
-    installFabric();
+    // A RECORDING host: nothing here reads a committed tree.
+    installRecordingFabric();
     getSlot();
 
     // Snapshotted BEFORE `nativeEngine()` is called, because that call resolves the module itself —
