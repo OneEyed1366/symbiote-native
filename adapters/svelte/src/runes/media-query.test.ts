@@ -18,7 +18,7 @@ import {
   type IDimensionsPayload,
   type IEventSubscription,
 } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { createWidthQuery, orientation } from './media-query';
 
@@ -41,7 +41,7 @@ const TABLET_PORTRAIT: IDimensionsPayload = {
   window: { width: 834, height: 1_112, scale: 2, fontScale: 1 },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

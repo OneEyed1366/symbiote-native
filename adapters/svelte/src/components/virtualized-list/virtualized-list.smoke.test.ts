@@ -9,31 +9,20 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
-import type { IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  payloadOf,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // See scroll-view.smoke.test.ts: mounting through `../../render` skips `index.ts`, so the host
 // behaviors have to be named here.
 import '../../register';
 import { mount, unmount } from '../../render';
 
-// fabric.find() walks the CREATION log, which never reflects a later clone's props
-// (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must instead
-// walk the currently COMMITTED tree, same as activity-indicator.smoke.test.ts's findLive.
-function findLive(
-  node: IFakeNode,
-  predicate: (n: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  if (predicate(node)) return node;
-  for (const child of node.children) {
-    const found = findLive(child, predicate);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
-
 // Does this committed subtree carry a raw-text payload anywhere inside it? Asks WHERE a node sits
 // rather than merely whether it exists — placement is geometry for a separator.
-function carriesText(node: IFakeNode, text: string): boolean {
+function carriesText(node: ILiveNode, text: string): boolean {
   return (
     node.props.text === text ||
     node.children.some(child => carriesText(child, text))
@@ -42,14 +31,12 @@ function carriesText(node: IFakeNode, text: string): boolean {
 
 // The content container's DIRECT children — the level a spacer collapses, and the only level at
 // which "inside the cell" and "beside the cell" look different.
-function contentChildren(): IFakeNode[] {
-  for (const root of fabric.committed) {
-    const content = findLive(
-      root,
-      node => node.viewName === 'RCTScrollContentView',
-    );
-    if (content !== undefined) return content.children;
-  }
+function contentChildren(): ILiveNode[] {
+  const content = live.findLive(
+    live.appRoot(),
+    node => node.viewName === 'RCTScrollContentView',
+  );
+  if (content !== undefined) return content.children;
   throw new Error('no content container committed');
 }
 
@@ -71,7 +58,8 @@ const REFRESH_ROOT_OUT = join(__dirname, '.smoke-compiled-refresh-root.mjs');
 // of this file's fresh content (the same reason REFRESH_ROOT_OUT above is its own path).
 const STICKY_ROOT_OUT = join(__dirname, '.smoke-compiled-sticky-root.mjs');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -240,7 +228,8 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      const content = fabric.find(
+      const content = live.findLive(
+        live.appRoot(),
         node => node.viewName === 'RCTScrollContentView',
       );
       expect(content).toBeDefined();
@@ -262,7 +251,10 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       // Defaulted by the scroll tag's own behavior (`ownerFold`), not by this list — so what this
       // pins is that hand-authoring the intrinsic still gets the fold, exactly as an app's own
       // `<scroll-view>` does.
-      expect(scrollView?.props.nestedScrollEnabled).toBe(true);
+      // nestedScrollEnabled is a payload fold's output (ownerFold), not an authored prop.
+      expect(
+        scrollView && payloadOf(scrollView.handle).nestedScrollEnabled,
+      ).toBe(true);
     });
 
     // why: proves the window is REACTIVE to a real onLayout, not just correct at mount — the
@@ -292,7 +284,8 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      const content = fabric.find(
+      const content = live.findLive(
+        live.appRoot(),
         node => node.viewName === 'RCTScrollContentView',
       );
       expect(content).toBeDefined();
@@ -335,10 +328,10 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       await tick();
 
       // Gap 1: testID (IAccessibilityProps) actually reaches the committed scroll-view host node,
-      // not just the type surface — walk the LIVE tree, not fabric.find()'s creation log.
-      const scrollView = findLive(
-        fabric.appRoot(),
-        node => node.props.testID === 'virtualized-list-a11y',
+      // not just the type surface — walk the LIVE tree, not the recording's creation log.
+      const scrollView = live.findLive(
+        live.appRoot(),
+        node => node.payload.testID === 'virtualized-list-a11y',
       );
       expect(
         scrollView,
@@ -348,17 +341,17 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
 
       // Gap 2: onRefresh/refreshing produce a REAL refresh-control (PullToRefreshView) as a sibling
       // of the content container inside the scroll view (iOS sibling attachment) — not an inert prop.
-      const refresh = findLive(
-        fabric.appRoot(),
+      const refresh = live.findLive(
+        live.appRoot(),
         node => node.viewName === 'PullToRefreshView',
       );
       expect(
         refresh,
         'refresh-control painted PullToRefreshView',
       ).toBeDefined();
-      expect(refresh?.props.refreshing).toBe(true);
+      expect(refresh?.payload.refreshing).toBe(true);
       expect(
-        scrollView?.children.some(child => child.tag === refresh?.tag),
+        scrollView?.children.some(child => child.handle === refresh?.handle),
       ).toBe(true);
     });
 
@@ -395,14 +388,19 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
+      // zIndex travels through the style slot, so it only shows up in the flattened payload.
       const stickyHost = fabric.find(
-        node => node.viewName === 'RCTView' && node.props.zIndex === 10,
+        node =>
+          node.viewName === 'RCTView' && payloadOf(node.handle).zIndex === 10,
       );
       expect(
         stickyHost,
         'the flagged cell painted through the sticky-header behavior',
       ).toBeDefined();
-      expect(stickyHost?.props.collapsable).toBe(false);
+      // collapsable is also stickyFold's output, not an authored prop.
+      expect(stickyHost && payloadOf(stickyHost.handle).collapsable).toBe(
+        false,
+      );
     });
 
     // why: the exported imperative surface (scrollToOffset, scrollToIndex, scrollToItem,
@@ -441,7 +439,7 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       expect(fabric.commands).toHaveLength(1);
       expect(fabric.commands[0]?.commandName).toBe('scrollTo');
       expect(fabric.commands[0]?.args).toEqual([0, 240, false]);
-      expect(fabric.commands[0]?.node.viewName).toBe('RCTScrollView');
+      expect(fabric.commands[0]?.viewName).toBe('RCTScrollView');
     });
 
     // why: WHERE a separator sits, and WHAT decides to render it, are both geometry. RN renders

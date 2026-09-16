@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { installFabric, waitUntil } from '@symbiote-native/test-utils';
+import { installRecordingFabric, waitUntil } from '@symbiote-native/test-utils';
 import { childrenOf, propOf } from '@symbiote-native/engine';
 import './register';
 import { mount, unmount } from './render';
@@ -29,7 +29,7 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 const OUT = join(__dirname, '.smoke-compiled-press-commit.mjs');
 const ROOT_TAG = 9_711;
@@ -58,23 +58,15 @@ function pressedNode(): Record<string, unknown> {
   return handle;
 }
 
-/** What Fabric holds. */
+/**
+ * What actually reached the recording host through an emitted op — NOT the engine's own live
+ * prop value (that's `onEngineNode()`). `find` reads the AUTHORED bag, which only changes when
+ * `applyOps` sees an `OP_SET_PROP` for this node, so it lags exactly when a targeted commit skips
+ * emitting one — which is the whole defect this file pins.
+ */
 function committed(): unknown {
-  const walk = (nodes: readonly unknown[]): unknown => {
-    for (const node of nodes) {
-      if (!isRecord(node)) continue;
-      const props = node.props;
-      if (isRecord(props) && typeof props.testID === 'string')
-        return props.testID;
-      const children = node.children;
-      if (Array.isArray(children)) {
-        const hit = walk(children);
-        if (hit !== undefined) return hit;
-      }
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+  return fabric.find(node => typeof node.props.testID === 'string')?.props
+    .testID;
 }
 
 /** What the shim wrote onto the engine node, whether or not a commit carried it. */

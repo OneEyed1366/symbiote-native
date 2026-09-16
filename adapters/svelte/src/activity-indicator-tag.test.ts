@@ -18,7 +18,12 @@ import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import { parentOf } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // SIDE-EFFECT IMPORT: the behavior is what builds the spinner. An app reaches it through the
 // package barrel; a test importing the renderer directly does not.
@@ -30,7 +35,8 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // Named for this suite alone — two suites sharing a compiled artifact race under a full run
 // (`.claude/rules/smoke-compiled-artifact-collisions.md`).
@@ -56,45 +62,20 @@ const settle = async (): Promise<void> => {
   await tick();
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-interface ICommitted {
-  readonly viewName: unknown;
-  readonly props: Record<string, unknown>;
-  readonly children: readonly ICommitted[];
-}
-
-function asCommitted(value: unknown): ICommitted | undefined {
-  if (!isRecord(value) || !isRecord(value.props)) return undefined;
-  const children = Array.isArray(value.children) ? value.children : [];
-  return {
-    viewName: value.viewName,
-    props: value.props,
-    children: children.flatMap(child => asCommitted(child) ?? []),
-  };
-}
-
-function flatten(nodes: readonly ICommitted[]): ICommitted[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
-}
-
 /** The centering host, found through the spinner the label landed on. */
-function hostOf(label: string): ICommitted {
-  const committed = flatten(
-    fabric.appRoot().children.flatMap(node => asCommitted(node) ?? []),
-  );
-  const spinner = committed.find(node => node.props.nativeID === label);
+function hostOf(label: string): ILiveNode {
+  const root = live.appRoot();
+  const spinner = live.findLive(root, node => node.payload.nativeID === label);
   if (spinner === undefined) throw new Error(`no committed spinner ${label}`);
-  const host = committed.find(node => node.children.includes(spinner));
-  // Unregistered, the label stays on the tag's own node and there is no parent under the root to
-  // find — so this is where a missing `./register` lands, and the message says so rather than
-  // reading as a broken locator.
-  if (host === undefined)
+  const host = parentOf(spinner.handle);
+  // Unregistered, the label stays on the tag's own node and its parent is the app root — so this
+  // is where a missing `./register` lands, and the message says so rather than reading as a
+  // broken locator.
+  if (host === undefined || host === root)
     throw new Error(
       `${label} committed no spinner under a host — is the behavior registered?`,
     );
-  return host;
+  return live.nodeOf(host);
 }
 
 let nextRoot = 9_950;
@@ -135,7 +116,7 @@ describe('Svelte: `activity-indicator` as a tag', () => {
     // only because the behavior built it, so this is what fails when `./register` is dropped.
     const host = hostOf('ind');
     expect(host.viewName).toBe('RCTView');
-    expect(host.props).toMatchObject({
+    expect(host.payload).toMatchObject({
       alignItems: 'center',
       justifyContent: 'center',
     });
@@ -145,7 +126,7 @@ describe('Svelte: `activity-indicator` as a tag', () => {
 
     // RN maps a NAMED size to both the native enum and a fixed box; the defaults have no
     // destructure to come from on a tag, so the fold is what supplies them.
-    expect(host.children[0].props).toMatchObject({
+    expect(host.children[0].payload).toMatchObject({
       size: 'large',
       width: SIZE_LARGE_PX,
       height: SIZE_LARGE_PX,
@@ -167,9 +148,9 @@ describe('Svelte: `activity-indicator` as a tag', () => {
     );
 
     const host = hostOf('ind');
-    expect(host.props.margin).toBe(4);
-    expect(Object.hasOwn(host.props, 'accessibilityLabel')).toBe(false);
-    expect(host.children[0].props.accessibilityLabel).toBe('loading');
+    expect(host.payload.margin).toBe(4);
+    expect(Object.hasOwn(host.payload, 'accessibilityLabel')).toBe(false);
+    expect(host.children[0].payload.accessibilityLabel).toBe('loading');
 
     unmount(root);
     await settle();

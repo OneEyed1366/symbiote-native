@@ -9,7 +9,10 @@
 //    hard-coded to `null` and nothing failed.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   createSurface,
   disposeRoot,
@@ -27,7 +30,8 @@ if (globalThis.navigator === undefined) {
 
 const ROOT_TAG = 91_318;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -50,31 +54,15 @@ function liveRoot(): ShimElement {
   return createRootShimElement(surface);
 }
 
-// The LIVE committed tree, never `fabric.find()` — a search hit is the pre-clone node and would
-// report the original bag forever.
+// The LIVE tree, never the recording's own `find()` — a hit there is the node as it was CREATED
+// and would report the original bag forever.
 function committedPropsOf(testID: string): Record<string, unknown> {
-  const walk = (
-    nodes: ReadonlyArray<{
-      props: Record<string, unknown>;
-      children: ReadonlyArray<unknown>;
-    }>,
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const nested = node.children;
-      const hit = walk(
-        nested.filter(
-          (child): child is { props: Record<string, unknown>; children: [] } =>
-            typeof child === 'object' && child !== null,
-        ),
-      );
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
   if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
-  return hit;
+  return hit.payload;
 }
 
 describe('the shim prop bag', () => {

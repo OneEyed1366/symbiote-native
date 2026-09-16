@@ -29,7 +29,10 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import './register';
 import { mount, unmount } from './render';
 
@@ -38,7 +41,8 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 // Named for this suite alone: two suites sharing a compiled artifact race
 // (`.claude/rules/smoke-compiled-artifact-collisions.md`).
 const PROBE_OUT = join(__dirname, '.smoke-compiled-bare-tag-probe.mjs');
@@ -57,34 +61,21 @@ const settle = async (): Promise<void> => {
   await tick();
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-function committedProps(testID: string): Record<string, unknown> | undefined {
-  const walk = (
-    nodes: readonly unknown[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (!isRecord(node)) continue;
-      const props = node.props;
-      if (isRecord(props) && props.testID === testID) return props;
-      const children = node.children;
-      if (Array.isArray(children)) {
-        const hit = walk(children);
-        if (hit !== undefined) return hit;
-      }
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+function committedPayload(testID: string): Record<string, unknown> | undefined {
+  return live.findLive(live.appRoot(), node => node.payload.testID === testID)
+    ?.payload;
 }
 
-/** Mount, read, unmount — reading once several arms are live finds the wrong root. */
+/**
+ * Mount, read, unmount. The recording is cleared per arm because `appRoot()` searches the CREATION
+ * log — an earlier arm's surface is still in it, and would be found first.
+ */
 async function arm(
   source: string,
   rootTag: number,
   testID: string,
 ): Promise<Record<string, unknown> | undefined> {
+  fabric.reset();
   writeFileSync(
     PROBE_OUT,
     compile(source, { ...COMPILE_OPTIONS, filename: 'BareTag.svelte' }).js.code,
@@ -95,7 +86,7 @@ async function arm(
   )) as { default: Component };
   mount(rootTag, Probe, {});
   await settle();
-  const props = committedProps(testID);
+  const props = committedPayload(testID);
   unmount(rootTag);
   await settle();
   return props;

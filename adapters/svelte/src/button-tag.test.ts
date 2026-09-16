@@ -21,7 +21,11 @@ import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // SIDE-EFFECT IMPORT: the behavior is what builds the subtree and runs the press machine. An app
 // reaches it through the package barrel; a test importing the renderer directly does not.
@@ -33,7 +37,8 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // Named for this suite alone — two suites sharing a compiled artifact race under a full run
 // (`.claude/rules/smoke-compiled-artifact-collisions.md`).
@@ -71,34 +76,23 @@ const settle = async (): Promise<void> => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-interface ICommitted {
-  readonly viewName: unknown;
-  readonly props: Record<string, unknown>;
-  readonly children: readonly ICommitted[];
-}
-
-function asCommitted(value: unknown): ICommitted | undefined {
-  if (!isRecord(value) || !isRecord(value.props)) return undefined;
-  const children = Array.isArray(value.children) ? value.children : [];
-  return {
-    viewName: value.viewName,
-    props: value.props,
-    children: children.flatMap(child => asCommitted(child) ?? []),
-  };
-}
-
-function flatten(nodes: readonly ICommitted[]): ICommitted[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
-}
-
 /** The committed host, found by the `nativeID` its `id` folded into. */
-function hostOf(label: string): ICommitted {
-  const tree = fabric
-    .appRoot()
-    .children.flatMap(node => asCommitted(node) ?? []);
-  const host = flatten(tree).find(node => node.props.nativeID === label);
+function hostOf(label: string): ILiveNode {
+  const host = live.findLive(
+    live.appRoot(),
+    node => node.payload.nativeID === label,
+  );
   if (host === undefined) throw new Error(`no committed host ${label}`);
   return host;
+}
+
+/** Every descendant's view name, pre-order — the shape of what the behavior built. */
+function descendantNames(node: ILiveNode): string[] {
+  const names: string[] = [];
+  for (const child of node.children) {
+    live.walkLive(child.handle, one => names.push(one.viewName));
+  }
+  return names;
 }
 
 let nextRoot = 9_960;
@@ -168,22 +162,18 @@ describe('Svelte: `button` as a tag', () => {
     // the branch is the behavior's, not this adapter's.
     const host = hostOf('btn');
     expect(host.viewName).toBe('RCTView');
-    expect(host.props.accessibilityRole).toBe('button');
-    expect(flatten(host.children).map(node => node.viewName)).toEqual([
-      'RCTView',
-      'RCTText',
-      'RCTRawText',
-    ]);
+    expect(host.payload.accessibilityRole).toBe('button');
+    expect(descendantNames(host)).toEqual(['RCTView', 'RCTText', 'RCTRawText']);
 
     const [view] = host.children;
     const [text] = view.children;
-    expect(text.props.color).toBe(DEFAULT_BLUE);
-    expect(text.props.fontSize).toBe(LABEL_FONT_SIZE);
-    expect(text.props.margin).toBe(LABEL_MARGIN);
+    expect(text.payload.color).toBe(DEFAULT_BLUE);
+    expect(text.payload.fontSize).toBe(LABEL_FONT_SIZE);
+    expect(text.payload.margin).toBe(LABEL_MARGIN);
     // RN's Text.js defaults, which a hand-written host tag inherits from nothing — without them a
     // long label clips mid-word instead of ellipsising, on device only.
-    expect(text.props.ellipsizeMode).toBe('tail');
-    expect(text.children[0].props.text).toBe('Save');
+    expect(text.payload.ellipsizeMode).toBe('tail');
+    expect(text.children[0].payload.text).toBe('Save');
 
     unmount(root);
     await settle();
@@ -198,9 +188,9 @@ describe('Svelte: `button` as a tag', () => {
     );
 
     const host = hostOf('btn');
-    const state = host.props.accessibilityState;
+    const state = host.payload.accessibilityState;
     expect(isRecord(state) && state.disabled).toBe(true);
-    expect(host.children[0].children[0].props.color).toBe(DISABLED_GREY);
+    expect(host.children[0].children[0].payload.color).toBe(DISABLED_GREY);
 
     unmount(root);
     await settle();

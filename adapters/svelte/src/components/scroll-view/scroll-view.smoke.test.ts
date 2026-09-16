@@ -20,7 +20,11 @@ import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  payloadOf,
+} from '@symbiote-native/test-utils';
 // The adapter entry's side-effect module. Mounting through `../../render` skips `index.ts`, so a
 // test that wants the ScrollView host behavior — the content node, the RefreshControl claim, the
 // folds — has to name it the same way `index.ts` does.
@@ -48,7 +52,8 @@ const REFRESH_PARENT_OUT = join(
   '.smoke-compiled-scroll-refresh-parent.mjs',
 );
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -147,9 +152,12 @@ describe('the scroll-view tag (real compiled source)', () => {
         node => node.viewName === 'RCTScrollContentView',
       );
       expect(content, 'RCTScrollContentView was created').toBeDefined();
-      expect(content?.props.padding).toBe(8);
+      if (outer === undefined || content === undefined) return;
+      // padding/overflow travel through the style slot, so they only show up in the flattened
+      // payload — not the author's raw prop bag.
+      expect(payloadOf(content.handle).padding).toBe(8);
       // overflow:'scroll' is RN's base clip style on both axes (SCROLL_VIEW_BASE_VERTICAL).
-      expect(outer?.props.overflow).toBe('scroll');
+      expect(payloadOf(outer.handle).overflow).toBe('scroll');
     });
 
     // why: `bind:this` is the only way app code drives a scroll view imperatively (RN parity:
@@ -168,7 +176,7 @@ describe('the scroll-view tag (real compiled source)', () => {
       expect(fabric.commands).toHaveLength(1);
       expect(fabric.commands[0]?.commandName).toBe('scrollTo');
       expect(fabric.commands[0]?.args).toEqual([0, 42, false]);
-      expect(fabric.commands[0]?.node.viewName).toBe('RCTScrollView');
+      expect(fabric.commands[0]?.viewName).toBe('RCTScrollView');
     });
 
     // why: a second, independent command through the same accessor — proves the node carries the
@@ -241,21 +249,26 @@ describe('the scroll-view tag (real compiled source)', () => {
       await tick();
       await tick();
 
-      const outer = fabric.find(node => node.viewName === 'RCTScrollView');
+      const outer = live.findLive(
+        live.appRoot(),
+        node => node.viewName === 'RCTScrollView',
+      );
       expect(outer, 'RCTScrollView was created').toBeDefined();
-      const refresh = fabric.find(
+      const refresh = live.findLive(
+        live.appRoot(),
         node => node.viewName === 'PullToRefreshView',
       );
       expect(
         refresh,
         'refresh-control painted PullToRefreshView',
       ).toBeDefined();
-      expect(refresh?.props.refreshing).toBe(true);
-      expect(refresh?.props.tintColor).toBe('red');
-      // Sibling, not wrap: refresh-control is a CHILD of the scroll view (iOS mode), not its parent.
-      expect(outer?.children.some(child => child.tag === refresh?.tag)).toBe(
-        true,
-      );
+      expect(refresh?.payload.refreshing).toBe(true);
+      expect(refresh?.payload.tintColor).toBe('red');
+      // Sibling, not wrap: refresh-control is a CHILD of the scroll view (iOS mode), not its
+      // parent — compared by node identity, not by a tag number.
+      expect(
+        outer?.children.some(child => child.handle === refresh?.handle),
+      ).toBe(true);
     });
   });
 });

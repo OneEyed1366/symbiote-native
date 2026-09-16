@@ -20,14 +20,15 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import {
-  censusRetainedTree,
   dlog,
   parentOf,
-  isSymbioteNode,
   readCommitProfile,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  censusLive,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
 
@@ -51,7 +52,7 @@ const ANCHORS_PER_ROW = 4;
 // cleanup delete another's freshly written module (mount-pipeline.smoke.test.ts's note).
 const TMP_DIR = join(__dirname, '../build/__smoke__/anchor-flatten-cost');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 const flush = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -151,12 +152,9 @@ function drive(): IDriver {
 }
 
 function retainedRoot(): ISymbioteNode {
-  const seed = fabric.created.find(node => node.props.testID === 'list');
+  const seed = fabric.find(node => node.props.testID === 'list');
   if (seed === undefined) throw new Error('the list node was never created');
-  const handle: unknown = seed.instanceHandle;
-  if (!isSymbioteNode(handle))
-    throw new Error('the list node carries no retained handle');
-  let current: ISymbioteNode = handle;
+  let current: ISymbioteNode = seed.handle;
   let above = parentOf(current);
   while (above !== undefined) {
     current = above;
@@ -198,16 +196,13 @@ describe('svelte anchor flattening cost', () => {
     await flush();
     report('create');
 
-    const census = censusRetainedTree([retainedRoot()]);
+    const census = censusLive(retainedRoot());
     dlog(
       `ANCHOR-CENSUS ${JSON.stringify({
         adapter: 'svelte',
         nodes: census.nodes,
         anchors: census.anchors,
-        emptyRawTexts: census.emptyRawTexts,
-        renderable: census.renderable,
-        flattenSites: census.flattenWidths.length,
-        widest: census.flattenWidths.slice(0, 5),
+        nonAnchors: census.nonAnchors,
       })}`,
     );
 
@@ -236,7 +231,7 @@ describe('svelte anchor flattening cost', () => {
     // builds for svelte to attach to (createRootShimElement), which the other adapters have no
     // equivalent of.
     expect(
-      census.renderable,
+      census.nonAnchors,
       'the benchmark row must expand to nine native views',
     ).toBe(ROWS * NATIVE_VIEWS_PER_ROW + 2);
     // why: THE structural claim for Svelte, and the number that makes it the heaviest anchor user

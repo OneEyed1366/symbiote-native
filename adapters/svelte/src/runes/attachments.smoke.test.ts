@@ -15,7 +15,7 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { propOf } from '@symbiote-native/engine';
 import { createAttachmentKey } from 'svelte/attachments';
 import { mount, unmount } from '../render';
@@ -60,7 +60,7 @@ const COMPILE_OPTIONS = {
   css: 'external',
 } as const;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

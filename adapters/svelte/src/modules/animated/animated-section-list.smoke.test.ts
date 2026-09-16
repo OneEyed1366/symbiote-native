@@ -20,7 +20,11 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { AnimatedValue } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // See scroll-view.smoke.test.ts: mounting through the render entry skips `index.ts`, so the host
 // behaviors have to be named here.
 import '../../register';
@@ -57,7 +61,8 @@ const PARENT_OUT = join(
   '.smoke-compiled-animated-section-parent.mjs',
 );
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -107,22 +112,11 @@ function compileRewritten(
   writeFileSync(outPath, code);
 }
 
-// fabric.find() walks the CREATION log, which never reflects a later clone's props
-// (svelte-adapter-dom-shim skill §15) — a live-value assertion must walk the COMMITTED tree.
-function findLive(
-  node: IFakeNode,
-  predicate: (n: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  if (predicate(node)) return node;
-  for (const child of node.children) {
-    const found = findLive(child, predicate);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
-
-function liveScrollView(): IFakeNode {
-  const node = findLive(fabric.appRoot(), n => n.viewName === 'RCTScrollView');
+function liveScrollView(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTScrollView',
+  );
   if (node === undefined) throw new Error('no RCTScrollView committed');
   return node;
 }
@@ -220,7 +214,8 @@ describe('Animated.SectionList (real compiled source) (Positive)', () => {
       fabric.find(node => node.viewName === 'RCTScrollView'),
       'RCTScrollView came from the real SectionList chain, not a duplicate',
     ).toBeDefined();
-    const content = fabric.find(
+    const content = live.findLive(
+      live.appRoot(),
       node => node.viewName === 'RCTScrollContentView',
     );
     expect(content).toBeDefined();
@@ -241,7 +236,8 @@ describe('Animated.SectionList (real compiled source) (Positive)', () => {
     await tick();
     await tick();
 
-    expect(liveScrollView().props.opacity).toBe(0.45);
+    // opacity travels through the style slot, so it only shows up in the flattened payload.
+    expect(liveScrollView().payload.opacity).toBe(0.45);
   });
 
   // why: a per-frame write goes through the engine's own targeted setNativeProps commit, never a
@@ -276,6 +272,6 @@ describe('Animated.SectionList (real compiled source) (Positive)', () => {
     opacity.setValue(0.9);
     await tick();
 
-    expect(liveScrollView().props.opacity).toBe(0.9);
+    expect(liveScrollView().payload.opacity).toBe(0.9);
   });
 });

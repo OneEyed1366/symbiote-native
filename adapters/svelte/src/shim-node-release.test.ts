@@ -23,7 +23,7 @@ import { join } from 'node:path';
 import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
 if (globalThis.window === undefined)
@@ -36,7 +36,7 @@ const SMALL = 8;
 const LARGE = 40;
 const TMP_DIR = join(__dirname, '../build/__release__');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 const mountedRoots: number[] = [];
@@ -132,8 +132,8 @@ async function survivorsAfterShrink(
   // not merely the fake Fabric's own bookkeeping. Sampled on the row's `RCTText` — one per row, and
   // the innermost node that HAS a handle: a raw-text node is created by an opcode that carries no
   // instance handle, so it commits with none.
-  const handles = fabric.created
-    .filter(node => node.viewName === 'RCTText')
+  const handles = fabric
+    .findAll(node => node.viewName === 'RCTText')
     .map(node => node.instanceHandle)
     .filter(
       (handle): handle is object =>

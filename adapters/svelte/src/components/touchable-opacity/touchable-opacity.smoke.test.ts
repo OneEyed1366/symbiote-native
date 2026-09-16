@@ -27,9 +27,10 @@ import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import {
-  installFabric,
+  createLiveTree,
+  installRecordingFabric,
   waitUntil,
-  type IFakeNode,
+  type ILiveNode,
 } from '@symbiote-native/test-utils';
 // The press machine reaches a `pressable` TAG through the engine's behavior registry, so this
 // suite is pressing nothing without the registration.
@@ -64,7 +65,8 @@ const PARENT_OUT = join(
   '.smoke-compiled-touchable-opacity-parent.mjs',
 );
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // The drivers read requestAnimationFrame off the host at call time and THROW when it is absent
 // (core/engine/src/animated/animations/raf.ts). A setTimeout-backed clock advancing 16ms a frame
@@ -195,41 +197,26 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  function walk(node: IFakeNode): IFakeNode | undefined {
-    if (predicate(node)) return node;
-    for (const child of node.children) {
-      const hit = walk(child);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  }
-  return walk(fabric.appRoot());
-}
-
 // The responder is Pressable's own host view, identified by the testID every mount below sets.
-function responderNode(): IFakeNode {
-  const node = findCommitted(n => n.props.testID === TARGET);
+// Read LIVE, not off the recording's creation log: an Animated frame lands through
+// setNativeProps on the currently committed tree only (svelte-adapter-dom-shim §15).
+function responderNode(): ILiveNode {
+  const node = live.findLive(live.appRoot(), n => n.payload.testID === TARGET);
   if (node === undefined) throw new Error(`no committed node testID=${TARGET}`);
   return node;
 }
 
-// `fabric.find` walks the CREATION log, whose props never reflect a later clone — an Animated
-// frame lands through setNativeProps on the COMMITTED tree only (svelte-adapter-dom-shim §15).
 function responderHandle(): unknown {
-  const node = fabric.find(n => n.props.testID === TARGET);
-  if (node === undefined) throw new Error(`no node created testID=${TARGET}`);
-  return node.instanceHandle;
+  return responderNode().instanceHandle;
 }
 
 // The responder IS the feedback node. It used to be a child: this component built a `pressable`
 // around a faded `view`, where RN builds one `<Animated.View>` carrying both
 // (TouchableOpacity.js:302). The fade now lands on the same node the responder sits on, through the
-// engine's `touchable-opacity` behavior.
+// engine's `touchable-opacity` behavior. opacity/width travel through the style slot, so they only
+// show up in the flattened payload.
 function feedbackProps(): Record<string, unknown> {
-  return responderNode().props;
+  return responderNode().payload;
 }
 
 function asNumber(value: unknown, label: string): number {
@@ -464,19 +451,19 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     });
     await tick();
     await tick();
-    const createdAtMount = fabric.counts.createNode;
+    const nodeAtMount = responderNode().handle;
 
     const handle = responderHandle();
     fabric.fireEvent(handle, TOUCH_START);
     await flushFrames();
-    expect(fabric.counts.createNode, 'press-in rebuilt a subtree').toBe(
-      createdAtMount,
+    expect(responderNode().handle, 'press-in rebuilt a subtree').toBe(
+      nodeAtMount,
     );
 
     fabric.fireEvent(handle, TOUCH_END);
     await flushFrames();
-    expect(fabric.counts.createNode, 'release rebuilt a subtree').toBe(
-      createdAtMount,
+    expect(responderNode().handle, 'release rebuilt a subtree').toBe(
+      nodeAtMount,
     );
   });
 });

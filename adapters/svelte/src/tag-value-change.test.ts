@@ -21,7 +21,9 @@ import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { HOST_PRIMITIVES } from '@symbiote-native/components/host-primitives';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host: the node is found by the view name the OPS carry and the event is aimed at the
+// `instanceHandle` the ops named, which is what the engine's own handler resolves a target by.
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import './register';
 import { mount, unmount } from './render';
 
@@ -30,7 +32,7 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 const PROBE_OUT = join(__dirname, '.smoke-compiled-value-change-probe.mjs');
 const ROOT_TAG = 9_301;

@@ -13,7 +13,10 @@ import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import './register';
 import { mount, unmount } from './render';
 
@@ -22,7 +25,8 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const SRC_DIR = __dirname;
 const PROBE_OUT = join(SRC_DIR, '.smoke-compiled-aria-probe.mjs');
@@ -44,39 +48,29 @@ const settle = async (): Promise<void> => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-function committedProps(testID: string): Record<string, unknown> {
-  const walk = (
-    nodes: readonly unknown[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (!isRecord(node)) continue;
-      const props = node.props;
-      if (isRecord(props) && props.testID === testID) return props;
-      const children = node.children;
-      if (Array.isArray(children)) {
-        const hit = walk(children);
-        if (hit !== undefined) return hit;
-      }
-    }
-    return undefined;
-  };
-  const found = walk(fabric.appRoot().children);
+// The fold runs on the way into the payload, so the search key and the assertions both read it.
+function committedPayload(testID: string): Record<string, unknown> {
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
   if (found === undefined)
     throw new Error(`no committed node carries testID ${testID}`);
-  return found;
+  return found.payload;
 }
 
-// Mount AND read in one call. `fabric.appRoot()` is the CURRENT root, so mounting two arms and then
-// reading both finds only the last — the first version of this file did exactly that and threw `no
-// committed node carries testID …`, which is the harness failing loudly rather than an arm
-// disagreeing. Each arm is now read while it is the live tree.
+// Mount AND read in one call, with the recording cleared first. `appRoot()` searches the CREATION
+// log, so mounting two arms and then reading both finds the FIRST arm's surface for each — the
+// mirror-tree version of this file had the same trap from the other end (it kept only the LAST
+// root) and threw `no committed node carries testID …`. Each arm is read while it is the only tree.
 async function mountAndRead(
   source: string,
   rootTag: number,
   testID: string,
 ): Promise<Record<string, unknown>> {
+  fabric.reset();
   await mountSource(source, rootTag);
-  const props = committedProps(testID);
+  const props = committedPayload(testID);
   unmount(rootTag);
   return props;
 }

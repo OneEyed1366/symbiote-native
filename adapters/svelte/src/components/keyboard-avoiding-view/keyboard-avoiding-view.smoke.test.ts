@@ -32,7 +32,11 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -145,7 +149,8 @@ const WRAPPER_TEST_ID = 'kav-wrapper';
 
 // ---- harness ------------------------------------------------------------
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 const settle = async (rounds = 4): Promise<void> => {
@@ -217,25 +222,12 @@ async function mountKeyboardAvoidingView(props: object): Promise<void> {
   await settle();
 }
 
-// Walks the CURRENTLY COMMITTED tree: `fabric.find` walks the creation log, whose `.props` are
-// frozen at first commit (clone-on-write hands back a new object on every update).
-function findInCommittedTree(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  function walk(nodes: IFakeNode[]): IFakeNode | undefined {
-    for (const node of nodes) {
-      if (predicate(node)) return node;
-      const found = walk(node.children);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  }
-  return walk(fabric.appRoot().children);
-}
-
-function committedWrapper(): IFakeNode {
-  const node = findInCommittedTree(
-    candidate => candidate.props.testID === WRAPPER_TEST_ID,
+// Walks the tree as it stands NOW — paddingBottom/height/flex travel through the style slot, so
+// they only show up in the flattened payload, and only a live read reflects a later clone.
+function committedWrapper(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    candidate => candidate.payload.testID === WRAPPER_TEST_ID,
   );
   if (node === undefined)
     throw new Error('the KeyboardAvoidingView wrapper is not committed');
@@ -272,20 +264,20 @@ describe('KeyboardAvoidingView (real compiled index.svelte)', () => {
       await measure(FULL_FRAME);
 
       await emitKeyboard('keyboardDidShow');
-      expect(committedWrapper().props.paddingBottom).toBe(0);
+      expect(committedWrapper().payload.paddingBottom).toBe(0);
       await emitKeyboard('keyboardDidChangeFrame');
-      expect(committedWrapper().props.paddingBottom).toBe(0);
+      expect(committedWrapper().payload.paddingBottom).toBe(0);
       await emitKeyboard('keyboardWillChangeFrame');
-      expect(committedWrapper().props.paddingBottom).toBe(0);
+      expect(committedWrapper().payload.paddingBottom).toBe(0);
 
       await emitKeyboard(SHOW_EVENT);
-      expect(committedWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(committedWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
 
       // The keyboard finishing its dismissal animation must not be what lowers the view either.
       await emitKeyboard('keyboardDidHide');
-      expect(committedWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(committedWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
       await emitKeyboard(HIDE_EVENT);
-      expect(committedWrapper().props.paddingBottom).toBe(0);
+      expect(committedWrapper().payload.paddingBottom).toBe(0);
     });
 
     // why: TWO listeners per mount, never three, and both removed on unmount — a leak here means
@@ -322,19 +314,19 @@ describe('KeyboardAvoidingView (real compiled index.svelte)', () => {
       await measure(FULL_FRAME);
 
       await emitKeyboard(SHOW_EVENT);
-      expect(committedWrapper().props.height).toBe(
+      expect(committedWrapper().payload.height).toBe(
         SCREEN_HEIGHT - EXPECTED_INSET,
       );
-      expect(committedWrapper().props.flex).toBe(0);
+      expect(committedWrapper().payload.flex).toBe(0);
 
       // The shrunk wrapper re-measures itself, then the keyboard reports the same frame again.
       await measure(SHRUNK_FRAME);
       await emitKeyboard(SHOW_EVENT);
 
-      expect(committedWrapper().props.height).toBe(
+      expect(committedWrapper().payload.height).toBe(
         SCREEN_HEIGHT - EXPECTED_INSET,
       );
-      expect(committedWrapper().props.flex).toBe(0);
+      expect(committedWrapper().payload.flex).toBe(0);
     });
 
     // why: `behavior` carries the same staleness risk as `previousInset` — it is a prop read from
@@ -356,20 +348,20 @@ describe('KeyboardAvoidingView (real compiled index.svelte)', () => {
       await measure(FULL_FRAME);
 
       await emitKeyboard(SHOW_EVENT);
-      expect(committedWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(committedWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
 
       if (setBehavior === undefined)
         throw new Error('the parent never handed back its setter');
       setBehavior('height');
       await settle();
       // The already-applied inset now shrinks the wrapper, which re-measures itself.
-      expect(committedWrapper().props.height).toBe(
+      expect(committedWrapper().payload.height).toBe(
         SCREEN_HEIGHT - EXPECTED_INSET,
       );
       await measure(SHRUNK_FRAME);
 
       await emitKeyboard(SHOW_EVENT);
-      expect(committedWrapper().props.height).toBe(
+      expect(committedWrapper().payload.height).toBe(
         SCREEN_HEIGHT - EXPECTED_INSET,
       );
     });
@@ -384,7 +376,7 @@ describe('KeyboardAvoidingView (real compiled index.svelte)', () => {
       await measure(FULL_FRAME);
 
       await emitKeyboard(SHOW_EVENT, 0);
-      expect(committedWrapper().props.paddingBottom).toBe(0);
+      expect(committedWrapper().payload.paddingBottom).toBe(0);
     });
 
     // why: the boundary that proves the test above is about the SETTING and not about screenY=0
@@ -396,7 +388,7 @@ describe('KeyboardAvoidingView (real compiled index.svelte)', () => {
       await measure(FULL_FRAME);
 
       await emitKeyboard(SHOW_EVENT, 0);
-      expect(committedWrapper().props.paddingBottom).toBe(
+      expect(committedWrapper().payload.paddingBottom).toBe(
         FRAME_Y + SCREEN_HEIGHT,
       );
     });

@@ -9,27 +9,14 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
-import type { IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 // See scroll-view.smoke.test.ts: mounting through `../../render` skips `index.ts`, so the host
 // behaviors have to be named here.
 import '../../register';
 import { mount, unmount } from '../../render';
-
-// fabric.find() walks the CREATION log, which never reflects a later clone's props
-// (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must instead
-// walk the currently COMMITTED tree.
-function findLive(
-  node: IFakeNode,
-  predicate: (n: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  if (predicate(node)) return node;
-  for (const child of node.children) {
-    const found = findLive(child, predicate);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
 
 if (globalThis.window === undefined)
   Object.assign(globalThis, { window: globalThis });
@@ -61,7 +48,8 @@ const COLUMNS_ROOT_OUT = join(
   '.smoke-compiled-flat-columns-root.mjs',
 );
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -214,7 +202,8 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       await tick();
       await tick();
 
-      const content = fabric.find(
+      const content = live.findLive(
+        live.appRoot(),
         node => node.viewName === 'RCTScrollContentView',
       );
       expect(content).toBeDefined();
@@ -240,7 +229,8 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       await tick();
       await tick();
 
-      const content = fabric.find(
+      const content = live.findLive(
+        live.appRoot(),
         node => node.viewName === 'RCTScrollContentView',
       );
       expect(content, 'content container painted').toBeDefined();
@@ -253,10 +243,11 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       const paintedItems = new Set<string>();
       for (const cellWrapper of content.children) {
         // rowItem's own view (flexDirection: 'row'), one level inside VirtualizedList's
-        // per-row measure wrapper.
+        // per-row measure wrapper. flexDirection travels through the style slot, so it only
+        // shows up in the flattened payload, not the author's raw prop bag.
         const row = cellWrapper.children[0];
         expect(
-          row?.props.flexDirection,
+          row?.payload.flexDirection,
           'the row snippet painted flexDirection: row',
         ).toBe('row');
         for (const itemWrapper of row?.children ?? []) {
@@ -282,11 +273,11 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       await tick();
 
       // Gap 1: testID passed to <FlatList> reaches the committed RCTScrollView through the
-      // component-to-component forward onto <VirtualizedList> — walk the LIVE tree, not
-      // fabric.find()'s creation log.
-      const scrollView = findLive(
-        fabric.appRoot(),
-        node => node.props.testID === 'flat-list-a11y',
+      // component-to-component forward onto <VirtualizedList> — walk the LIVE tree, not the
+      // recording's creation log.
+      const scrollView = live.findLive(
+        live.appRoot(),
+        node => node.payload.testID === 'flat-list-a11y',
       );
       expect(
         scrollView,
@@ -296,17 +287,17 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
 
       // Gap 2: onRefresh/refreshing set on <FlatList> produce a real RefreshControl
       // (PullToRefreshView), attached as a sibling of the content container.
-      const refresh = findLive(
-        fabric.appRoot(),
+      const refresh = live.findLive(
+        live.appRoot(),
         node => node.viewName === 'PullToRefreshView',
       );
       expect(
         refresh,
         'refresh-control painted PullToRefreshView',
       ).toBeDefined();
-      expect(refresh?.props.refreshing).toBe(true);
+      expect(refresh?.payload.refreshing).toBe(true);
       expect(
-        scrollView?.children.some(child => child.tag === refresh?.tag),
+        scrollView?.children.some(child => child.handle === refresh?.handle),
       ).toBe(true);
     });
   });

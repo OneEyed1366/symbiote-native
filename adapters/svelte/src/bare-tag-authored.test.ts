@@ -28,12 +28,15 @@
 // `get_setters` finds a real prototype setter — which it does only because `customElements.get()`
 // returns something truthy. See those two files for the mechanism; the last two `it`s below are
 // what pin it.
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import {
   isSymbioteNode,
   propOf,
@@ -48,7 +51,14 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
+
+// Each `it` mounts its own surface under a fresh root tag with no shared reset in the original
+// suite — `installFabric`'s `appRoot()` tolerated that because `committed` only ever held the
+// live test's root. The recording host's creation log does not forget on its own, so `appRoot()`
+// (a `find` over that log) would keep answering with the FIRST surface ever created without this.
+beforeEach(() => fabric.reset());
 
 // Named for this suite alone — two suites sharing a compiled artifact race under a full run
 // (`.claude/rules/smoke-compiled-artifact-collisions.md`).
@@ -70,35 +80,19 @@ const settle = async (): Promise<void> => {
   await tick();
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
 // Every arm labels its node with `id`, which the primitive fold turns into `nativeID`, rather than
 // with `testID`. On a tag whose name is not also an SVG element the compiler lowercases even a
 // DYNAMIC attribute name, so `testID` arrives as `testid` and a testID-keyed locator silently finds
 // nothing — a missing node reads as a broken fix. `id` is already lowercase everywhere.
-function findByLabel(
-  nodes: readonly unknown[],
-  label: string,
-): Record<string, unknown> | undefined {
-  for (const node of nodes) {
-    if (!isRecord(node)) continue;
-    const props = node.props;
-    if (isRecord(props) && props.nativeID === label) return props;
-    const children = node.children;
-    if (Array.isArray(children)) {
-      const hit = findByLabel(children, label);
-      if (hit !== undefined) return hit;
-    }
-  }
-  return undefined;
-}
 
-/** The committed props of the labelled node. */
+/** The committed payload of the labelled node — what the engine would hand the renderer for it. */
 function committedProps(label: string): Record<string, unknown> {
-  const hit = findByLabel(fabric.appRoot().children, label);
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.props.nativeID === label,
+  );
   if (hit === undefined) throw new Error(`no committed node labelled ${label}`);
-  return hit;
+  return hit.payload;
 }
 
 /**

@@ -21,10 +21,9 @@ import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import {
-  expectCommittedProps,
-  installFabric,
+  createLiveTree,
+  installRecordingFabric,
   waitForQuiet,
-  type IFakeNode,
 } from '@symbiote-native/test-utils';
 import { HOST_PRIMITIVES } from '@symbiote-native/components/host-primitives';
 import { descriptorFor } from '@symbiote-native/components';
@@ -37,7 +36,8 @@ if (globalThis.window === undefined)
 if (globalThis.navigator === undefined)
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 const PROBE_TEST_ID = 'probe';
 const PROBE_ID = 'ident';
@@ -57,7 +57,7 @@ const COMPILE_OPTIONS = {
 // stops moving (`core/test-utils/src/wait-for.ts`).
 const settle = async (label: string): Promise<void> => {
   await waitForQuiet(
-    () => fabric.committed.length + fabric.created.length,
+    () => fabric.commits + fabric.findAll(() => true).length,
     label,
   );
 };
@@ -93,11 +93,39 @@ function childOf(tag: string): string {
     : '';
 }
 
+// Find the committed node carrying `testID` and require `expected`'s keys to be present with
+// those values. Extra keys are allowed: this asserts that a fold RAN, and pinning the whole
+// payload would turn every unrelated prop addition into a failure here instead of in the test
+// that owns it. Pass the value a fold PRODUCES, never the one the author wrote — an expectation
+// restating the input passes with the fold deleted, the same false green one level down.
+function expectFoldedProps(
+  payload: Record<string, unknown> | undefined,
+  testID: string,
+  expected: Record<string, unknown>,
+): string[] {
+  if (payload === undefined) {
+    return [
+      `no committed node carries testID "${testID}" — the mount did not flush, or the prop never reached the payload`,
+    ];
+  }
+  const differences: string[] = [];
+  for (const key of Object.keys(expected).sort()) {
+    const actual = JSON.stringify(payload[key]);
+    const wanted = JSON.stringify(expected[key]);
+    if (actual !== wanted) {
+      differences.push(
+        `${testID}: "${key}" is ${actual}, expected ${wanted} — the fold that produces it did not run on this path`,
+      );
+    }
+  }
+  return differences;
+}
+
 async function mountProbe(
   source: string,
   filename: string,
   rootTag: number,
-): Promise<IFakeNode[]> {
+): Promise<Record<string, unknown> | undefined> {
   writeFileSync(
     PROBE_OUT,
     compile(source, { ...COMPILE_OPTIONS, filename }).js.code,
@@ -111,10 +139,17 @@ async function mountProbe(
   mount(rootTag, Probe, {});
   await settle(`${filename} mount`);
 
-  const committed = fabric.committed.map(node => node);
+  // The clone-onto-child fold (touchable-native-feedback.ts's `cloneFold`) runs at PAYLOAD build
+  // time — it is a `payloadFold` on the child, not a write onto the child's raw props — so the
+  // search has to read the committed PAYLOAD, never the authored `.props` bag.
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === PROBE_TEST_ID,
+  );
+  const payload = found?.payload;
   unmount(rootTag);
   await settle(`${filename} unmount`);
-  return committed;
+  return payload;
 }
 
 afterAll(() => {
@@ -167,11 +202,11 @@ describe('a bare primitive tag commits the folds its spec declares', () => {
       );
 
       expect(
-        expectCommittedProps(attributes, PROBE_TEST_ID, expected).differences,
+        expectFoldedProps(attributes, PROBE_TEST_ID, expected),
         `${name}: attributes on the tag did not fold`,
       ).toEqual([]);
       expect(
-        expectCommittedProps(bag, PROBE_TEST_ID, expected).differences,
+        expectFoldedProps(bag, PROBE_TEST_ID, expected),
         `${name}: the prop bag did not fold`,
       ).toEqual([]);
     },
