@@ -16,7 +16,7 @@ import '@angular/compiler';
 import { Component, inject, type Signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/angular';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { BatteryLevelService } from './index';
 
 const addListenerMock = vi.fn();
@@ -31,7 +31,7 @@ vi.mock('../../../core', () => ({
 }));
 
 const ROOT_TAG = 971;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 

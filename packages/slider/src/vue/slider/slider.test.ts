@@ -14,7 +14,13 @@ import {
   unmount,
   setNativeViewConfigSource,
 } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// A RECORDING host. The leaf is found by the view name the OPS carry, and its props are read as the
+// PAYLOAD — which is what the wrapper's fold produces and what a native slider would be handed.
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { Slider } from '.';
 
 const ROOT_TAG = 311;
@@ -63,7 +69,7 @@ const RNC_SLIDER_VIEW_CONFIG = {
   },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 setNativeViewConfigSource(name =>
   name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined,
 );
@@ -74,10 +80,14 @@ const tick = (): Promise<void> =>
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function sliderNode(): IFakeNode {
+function sliderNode(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === SLIDER_VIEW);
   if (!node) throw new Error(`no ${SLIDER_VIEW} was created`);
   return node;
+}
+
+function sliderProps(): Record<string, unknown> {
+  return payloadOf(sliderNode().handle);
 }
 
 async function mountSlider(
@@ -105,7 +115,7 @@ describe('Vue Slider wrapper', () => {
         maximumValue: 1,
         step: 0.1,
       });
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.value).toBe(0.5);
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
@@ -118,7 +128,7 @@ describe('Vue Slider wrapper', () => {
       // why: an app that only sets `value` still needs a usable 0..1 default range and unbounded
       // limits — this is the library's documented default contract, ported verbatim.
       await mountSlider({ value: 0.3 });
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
       expect(props.step).toBe(0);
@@ -132,18 +142,18 @@ describe('Vue Slider wrapper', () => {
       // why: resolveSliderLowerLimit/UpperLimit only fall back to the sentinels when the caller
       // gave nothing — an explicit limit must reach the native node untouched.
       await mountSlider({ value: 0.5, lowerLimit: 0.2, upperLimit: 0.8 });
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.lowerLimit).toBe(0.2);
       expect(props.upperLimit).toBe(0.8);
     });
 
     it('sanitizes a falsy/NaN value to undefined (library passedValue quirk)', async () => {
       await mountSlider({ value: 0 });
-      expect(sliderNode().props.value).toBeUndefined();
+      expect(sliderProps().value).toBeUndefined();
       unmount(ROOT_TAG);
       fabric.reset();
       await mountSlider({ value: Number.NaN });
-      expect(sliderNode().props.value).toBeUndefined();
+      expect(sliderProps().value).toBeUndefined();
     });
 
     it('forwards tint props and runs them through the derived processor', async () => {
@@ -153,7 +163,7 @@ describe('Vue Slider wrapper', () => {
         maximumTrackTintColor: '#00ff00',
         thumbTintColor: '#0000ff',
       });
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.minimumTrackTintColor).toBe('processed(#ff0000)');
       expect(props.maximumTrackTintColor).toBe('processed(#00ff00)');
       expect(props.thumbTintColor).toBe('processed(#0000ff)');
@@ -195,7 +205,7 @@ describe('Vue Slider wrapper', () => {
 
     it('resolves disabled from accessibilityState when no explicit boolean', async () => {
       await mountSlider({ value: 0.2, accessibilityState: { disabled: true } });
-      expect(sliderNode().props.disabled).toBe(true);
+      expect(sliderProps().disabled).toBe(true);
     });
 
     it('an explicit disabled prop wins over accessibilityState.disabled', async () => {
@@ -207,8 +217,8 @@ describe('Vue Slider wrapper', () => {
         disabled: false,
         accessibilityState: { disabled: true },
       });
-      expect(sliderNode().props.disabled).toBe(false);
-      expect(sliderNode().props.accessibilityState).toEqual({
+      expect(sliderProps().disabled).toBe(false);
+      expect(sliderProps().accessibilityState).toEqual({
         disabled: false,
       });
     });
@@ -291,20 +301,20 @@ describe('Vue Slider wrapper', () => {
       // 'processed(...)' is the fake color processor from RNC_SLIDER_VIEW_CONFIG — the fold's own
       // job stops at picking 'transparent'; the value still runs through the same derived
       // processor every other tint does.
-      expect(sliderNode().props.thumbTintColor).toBe('processed(transparent)');
+      expect(sliderProps().thumbTintColor).toBe('processed(transparent)');
       // why: shouldPassNativeThumbImage's other half of the same contract — the marker draws its
       // own thumb image, so the native leaf must not ALSO receive one underneath it.
-      expect(sliderNode().props.thumbImage).toBeUndefined();
+      expect(sliderProps().thumbImage).toBeUndefined();
     });
 
     it('does NOT leak the JS onValueChange callback to the native node as a prop', async () => {
       await mountSlider({ value: 0.2, onValueChange: () => undefined });
-      expect(typeof sliderNode().props.onValueChange).not.toBe('function');
+      expect(typeof sliderProps().onValueChange).not.toBe('function');
     });
 
     it('accepts modelValue as an alias for value, never forwarding it to the native node', async () => {
       await mountSlider({ modelValue: 0.6 });
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.value).toBe(0.6);
       expect('modelValue' in props, 'modelValue must not reach Fabric').toBe(
         false,

@@ -14,7 +14,11 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import { Dimensions, mount, unmount } from '@symbiote-native/solid';
 import { Drawer } from './index';
 import type { IDrawerNavigatorHandle } from './index';
@@ -50,21 +54,34 @@ Object.assign(globalThis, {
   },
 });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const flush = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
+// OPENING AND CLOSING is the subject, so every walk below descends the LIVE child links from the
+// app root down. A recording keeps every node it ever saw created, so an overlay the drawer
+// unmounted would still be counted here — and one case asserts there is none.
+//
+// The AppContainer root is the same node `installFabric`'s `appRoot()` named: the engine creates it
+// with `pointerEvents: 'box-none'`, and that is an authored prop rather than anything derived.
+function appRoot(): ISymbioteNode {
+  const root = fabric.find(node => node.props.pointerEvents === 'box-none');
+  if (root === undefined) throw new Error('no AppContainer root was created');
+  return root.handle;
+}
+
 function findAll(
-  predicate: (node: IFakeNode) => boolean,
-  nodes: readonly IFakeNode[] = fabric.committed,
-): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  for (const node of nodes) {
-    if (predicate(node)) found.push(node);
-    found.push(...findAll(predicate, node.children));
+  predicate: (node: IAuthoredNode) => boolean,
+  handle: ISymbioteNode = appRoot(),
+): IAuthoredNode[] {
+  const found: IAuthoredNode[] = [];
+  for (const child of childrenOf(handle)) {
+    const recorded = fabric.find(one => one.handle === child);
+    if (recorded !== undefined && predicate(recorded)) found.push(recorded);
+    found.push(...findAll(predicate, child));
   }
   return found;
 }
@@ -77,7 +94,7 @@ const texts = (): string[] =>
 // The overlay is the only node in this tree whose pointerEvents is toggled between 'auto' and
 // 'none' - the engine's own root carries 'box-none', which is why this matches the two values
 // rather than the key's presence.
-const overlayNodes = (): IFakeNode[] =>
+const overlayNodes = (): IAuthoredNode[] =>
   findAll(
     node =>
       node.props.pointerEvents === 'auto' ||

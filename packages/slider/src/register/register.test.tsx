@@ -16,7 +16,13 @@ import {
   setColorProcessor,
   type ISymbioteEvent,
 } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+// A RECORDING host, as in the per-adapter slider tests: the leaf is found by the view name the OPS
+// carry, and its props are read as the PAYLOAD.
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 import './index';
 
 vi.mock(
@@ -41,12 +47,16 @@ const PROCESSED: Record<string, number> = {
 };
 const UNKNOWN_COLOR = 0;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
-function sliderNode(): IFakeNode {
+function sliderNode(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === SLIDER_VIEW);
   if (!node) throw new Error(`no ${SLIDER_VIEW} was created`);
   return node;
+}
+
+function sliderProps(): Record<string, unknown> {
+  return payloadOf(sliderNode().handle);
 }
 
 function numberFromEvent(event: ISymbioteEvent): number | undefined {
@@ -85,7 +95,7 @@ describe('RNCSlider package registration', () => {
         }),
       );
 
-      const props = sliderNode().props;
+      const props = sliderProps();
       expect(props.minimumTrackTintColor).toBe(0xffff0000);
       expect(props.maximumTrackTintColor).toBe(0xff00ff00);
       // Converted ONCE, though this key is claimed by both this package's processors and the

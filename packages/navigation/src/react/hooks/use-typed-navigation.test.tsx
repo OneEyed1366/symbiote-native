@@ -10,7 +10,7 @@ import {
   Dimensions,
 } from '@symbiote-native/react';
 import type { INativeViewConfig } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
 import type { INavigatorHandle } from '../stack';
 import { Tab } from '../tabs';
@@ -59,7 +59,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 // module-level singleton) - same fixture as drawer.test.tsx.
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 
 beforeEach(() => fabric.reset());

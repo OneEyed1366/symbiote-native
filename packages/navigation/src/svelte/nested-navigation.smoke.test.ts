@@ -4,11 +4,11 @@
 // its own mount is what useNavigation().getParent() walks back up.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 import { setNativeViewConfigSource } from '@symbiote-native/engine';
 import type { INativeViewConfig } from '@symbiote-native/engine';
-import { findLiveByTestId } from './fabric-tree.test-helper';
+import { createNavigationLiveTree } from './fabric-tree.test-helper';
 import {
   createSvelteHarness,
   loadComponent,
@@ -38,7 +38,8 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   },
 };
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const { appRoot, findLiveByTestId } = createNavigationLiveTree(fabric);
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -114,10 +115,9 @@ describe('nested navigation (Stack inside a Tab screen)', () => {
       // for its "inner" route, so a screen inside it must NOT inherit the Tab's "main" route.
       await mountNested();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'stack-host')?.props
-          ?.accessibilityLabel,
+        findLiveByTestId(appRoot(), 'stack-host')?.props?.accessibilityLabel,
       ).toBe('main');
-      const innerLabel = findLiveByTestId(fabric.appRoot(), 'inner')?.props
+      const innerLabel = findLiveByTestId(appRoot(), 'inner')?.props
         ?.accessibilityLabel;
       // The full label format (route|typeof-push|parent-kind) is asserted precisely by the next
       // test; this one only needs to prove the route name segment is "inner", not "main".
@@ -131,7 +131,7 @@ describe('nested navigation (Stack inside a Tab screen)', () => {
       // "some" ancestor object.
       await mountNested();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'inner')?.props?.accessibilityLabel,
+        findLiveByTestId(appRoot(), 'inner')?.props?.accessibilityLabel,
       ).toBe('inner|function|tab-parent');
     });
 
@@ -140,8 +140,8 @@ describe('nested navigation (Stack inside a Tab screen)', () => {
       // own `inner` marker must never leak into the Tab's registry - if it had, the tab bar would
       // carry a third item and `other` would not be the second one.
       await mountNested();
-      expect(findLiveByTestId(fabric.appRoot(), 'other')).toBeUndefined();
-      expect(findLiveByTestId(fabric.appRoot(), 'inner')).toBeDefined();
+      expect(findLiveByTestId(appRoot(), 'other')).toBeUndefined();
+      expect(findLiveByTestId(appRoot(), 'inner')).toBeDefined();
     });
   });
 });
