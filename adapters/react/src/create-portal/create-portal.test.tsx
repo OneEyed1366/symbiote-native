@@ -10,28 +10,22 @@ import {
   unmount,
   type IHostInstance,
 } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf } from '@symbiote-native/engine';
+import {
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 150;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-function findText(text: string): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.viewName === 'RCTRawText' && node.props.text === text)
-      found = node;
-  });
-  return found;
+function findText(text: string): IAuthoredNode | undefined {
+  return fabric.find(
+    node => node.viewName === 'RCTRawText' && node.props.text === text,
+  );
 }
 
 function App(): React.ReactElement {
@@ -64,32 +58,19 @@ describe('createPortal', () => {
     expect(sourceText, 'source Text was created').toBeDefined();
     if (sourceText === undefined) throw new Error('unreachable');
 
-    // Walk from the FRESH committed tree (not the stale `created` handles) to confirm parentage.
-    function isDescendantOf(root: IFakeNode, target: IFakeNode): boolean {
+    // Parentage read off the engine's own child links — a portal moves a node between parents,
+    // which is precisely a fact about the tree the engine holds.
+    function isDescendantOf(root: object, target: object): boolean {
       if (root === target) return true;
-      return root.children.some(child => isDescendantOf(child, target));
-    }
-    let overlayHostCommitted: IFakeNode | undefined;
-    let sourceTextCommitted: IFakeNode | undefined;
-    walk(fabric.committed, node => {
-      if (node.tag === overlayHost.tag) overlayHostCommitted = node;
-      if (node.tag === sourceText.tag) sourceTextCommitted = node;
-    });
-    expect(overlayHostCommitted).toBeDefined();
-    expect(sourceTextCommitted).toBeDefined();
-    if (
-      overlayHostCommitted === undefined ||
-      sourceTextCommitted === undefined
-    ) {
-      throw new Error('unreachable');
+      return childrenOf(root).some(child => isDescendantOf(child, target));
     }
 
     expect(
-      isDescendantOf(overlayHostCommitted, ported),
+      isDescendantOf(overlayHost.handle, ported.handle),
       'portal landed under the overlay host',
     ).toBe(true);
     expect(
-      isDescendantOf(sourceTextCommitted, ported),
+      isDescendantOf(sourceText.handle, ported.handle),
       'portal did NOT stay under its own JSX <text> parent',
     ).toBe(false);
   });

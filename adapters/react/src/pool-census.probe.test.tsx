@@ -36,15 +36,16 @@ import { afterEach, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { mount, unmount } from '@symbiote-native/react';
 import {
-  installFabric,
+  createLiveTree,
+  installRecordingFabric,
   waitUntil,
-  type IFakeNode,
 } from '@symbiote-native/test-utils';
 import { registerRules } from '@symbiote-native/engine';
 import { compileCssToRules } from '../../../core/css-parser/src/index.ts';
 
 const ROOT_TAG = 94_001;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 afterEach(() => unmount(ROOT_TAG));
 
 // The app's OWN stylesheets, through the real parser. Registering them by hand is the same move
@@ -78,16 +79,16 @@ it.runIf(process.env.SYMBIOTE_POOL_CENSUS !== undefined)(
     mount(ROOT_TAG, <StyleShowcaseScreen />);
     // React's commit is batched, so the tree is empty on the turn `mount` returns. A condition, not a
     // tick count — `wait-for.ts` records why.
-    await waitUntil(() => fabric.committedFor(ROOT_TAG).length > 0);
+    await waitUntil(() => fabric.commits > 0);
 
     const payloads: string[] = [];
-    const walk = (node: IFakeNode): void => {
+    live.walkLive(live.appRoot(), node => {
       // Key-order independent: two payloads with the same pairs in a different order are one cache
       // key, because `folly::dynamic::hash()` hashes a map and not an insertion order.
-      payloads.push(JSON.stringify(node.props, Object.keys(node.props).sort()));
-      for (const child of node.children) walk(child);
-    };
-    for (const node of fabric.committedFor(ROOT_TAG)) walk(node);
+      payloads.push(
+        JSON.stringify(node.payload, Object.keys(node.payload).sort()),
+      );
+    });
 
     // THE SENTINEL, asserted BEFORE the census so a dead harness cannot print a hit rate. A screen
     // this size commits hundreds of nodes; one node is the AppContainer alone, which is exactly what

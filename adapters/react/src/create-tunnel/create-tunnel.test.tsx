@@ -8,32 +8,34 @@
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTunnel, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
+import type { ISymbioteNode } from '@symbiote-native/engine';
 
 const SOURCE_TAG = 610;
 const TARGET_TAG = 611;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => fabric.reset());
 afterEach(() => {
   unmount(SOURCE_TAG);
   unmount(TARGET_TAG);
 });
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
+// The "target" View is never removed or replaced — a stable anchor to walk LIVE from. Searching
+// the recording for a raw-text node instead would still answer for text the source's unmount
+// already removed: the record remembers every node it ever saw created.
+function targetView(): ISymbioteNode {
+  const found = fabric.find(node => node.props.testID === 'target');
+  if (found === undefined) throw new Error('target View was never created');
+  return found.handle;
 }
 
-function findText(text: string): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committedAll, node => {
-    if (node.viewName === 'RCTRawText' && node.props.text === text)
-      found = node;
-  });
-  return found;
+function targetHasText(text: string): boolean {
+  return live.texts(targetView()).includes(text);
 }
 
 describe('createTunnel — genuine cross-surface delivery', () => {
@@ -61,13 +63,10 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     // tunnel on its OWN first render — no ref, no isSymbioteNode guard, no rootTag lookup.
     mount(TARGET_TAG, <TargetApp />);
 
-    // fake-fabric's `committed` is last-write-wins across rootTags (core/test-utils
-    // limitation, not the engine's), so after mounting B second, it reflects B's own tree.
-    const ported = findText('ported across surfaces');
     expect(
-      ported,
-      'content is present in the LAST-committed tree (surface B)',
-    ).toBeDefined();
+      targetHasText('ported across surfaces'),
+      "content is present in surface B's own committed tree",
+    ).toBe(true);
   });
 
   it('removes the content from the target once the source unmounts', () => {
@@ -91,18 +90,19 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     mount(SOURCE_TAG, <SourceApp />);
     mount(TARGET_TAG, <TargetApp />);
     expect(
-      findText('still here'),
+      targetHasText('still here'),
       'present while the source is mounted',
-    ).toBeDefined();
+    ).toBe(true);
 
     // Tearing down surface A unmounts <tunnel.In>, whose cleanup effect (items.delete +
     // notify) forces — via the SAME synchronous flush unmount() already does — a re-render
-    // of surface B's <tunnel.Out />, now with the item gone.
+    // of surface B's <tunnel.Out />, now with the item gone. A LIVE walk from the target is what
+    // actually proves removal — the recording remembers the old text node forever.
     unmount(SOURCE_TAG);
     expect(
-      findText('still here'),
+      targetHasText('still here'),
       'gone from surface B after the source unmounts',
-    ).toBeUndefined();
+    ).toBe(false);
   });
 
   it('exposes In/Out as components, not hooks — no ref/ISymbioteNode guard at all', () => {
@@ -159,9 +159,9 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     fabric.fireEvent(root.instanceHandle, 'topLayout', {});
 
     expect(
-      findText('same-tree toast'),
+      live.texts(root.handle).includes('same-tree toast'),
       'the toggle actually reached Out',
-    ).toBeDefined();
+    ).toBe(true);
     expect(
       renderCount - rendersAfterMount,
       'settles again after the toggle, no runaway loop',

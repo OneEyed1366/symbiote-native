@@ -19,22 +19,30 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 53;
 
 // Recorder owned by the app below; reset per test after fabric.reset().
 const contentSizes: Array<[number, number]> = [];
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
   contentSizes.length = 0;
 });
 afterEach(() => unmount(ROOT_TAG));
 
-function contentNode(): IFakeNode | undefined {
-  return fabric.find(node => node.viewName === 'RCTScrollContentView');
+function contentNode(): ILiveNode | undefined {
+  return live.findLive(
+    live.appRoot(),
+    node => node.viewName === 'RCTScrollContentView',
+  );
 }
 
 describe('React reaches the scroll view content-size and sticky seams', () => {
@@ -55,7 +63,7 @@ describe('React reaches the scroll view content-size and sticky seams', () => {
 
     const content = contentNode();
     expect(content, 'RCTScrollContentView was created').toBeDefined();
-    expect(content!.props.onLayout).toBe(true);
+    expect(content!.payload.onLayout).toBe(true);
 
     fabric.fireEvent(content!.instanceHandle, 'topLayout', {
       layout: { x: 0, y: 0, width: 320, height: 800 },
@@ -105,10 +113,10 @@ describe('React reaches the scroll view content-size and sticky seams', () => {
     // flattened header has nothing to animate. Asserted at CREATE, which is the only sticky state
     // this file owns: the translateY itself needs a measurement, and core's `sticky.test.ts`
     // drives that round trip.
-    expect(header.props.collapsable).toBe(false);
+    expect(header.payload.collapsable).toBe(false);
     expect(header.children[0]?.viewName).toBe('RCTText');
     // The unflagged sibling stays an ordinary, untouched content child.
-    expect(plain.props.testID).toBe('plain');
-    expect(plain.props.collapsable).toBeUndefined();
+    expect(plain.payload.testID).toBe('plain');
+    expect(plain.payload.collapsable).toBeUndefined();
   });
 });

@@ -1,8 +1,8 @@
 // Proves the TextInput primitive, the controlled-value / event-count handshake, over the
-// shared `installFabric()` harness — which records `dispatchCommand` calls, so the
-// purpose-built slot this file used to carry bought nothing and cost the TREE HOST that
-// harness installs alongside the slot (without one the engine's ops go nowhere and the
-// mount commits no node at all).
+// recording host — it records `dispatchCommand` calls natively, so the purpose-built slot
+// this file used to carry bought nothing and cost the TREE HOST the recording host installs
+// alongside itself (without one the engine's ops go nowhere and the mount commits no node
+// at all).
 // It checks the fold (value/defaultValue -> private `text` + mostRecentEventCount), the
 // the native change -> onValueChange derivation, the multiline intrinsic, a forced controlled write
 // that goes down as a setTextAndSelection command carrying the acknowledged event count,
@@ -27,12 +27,17 @@ import {
   type IHostInstance,
   type ITextInputHandle,
 } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // Not from the adapter barrel: every adapter reaches the handle builder in `components` directly,
 // and `tests/adapter-barrel-parity.test.ts` compares the re-exported sets.
 import { buildTextInputHandle } from '@symbiote-native/components';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const commands = fabric.commands;
 
 const SINGLELINE = 'RCTSinglelineTextInputView';
@@ -40,14 +45,14 @@ const MULTILINE = 'RCTMultilineTextInputView';
 const ACK_COUNT = 7;
 const ROOT_TAG = 300;
 
-function inputNode(viewName: string): IFakeNode {
-  const node = fabric.find(n => n.viewName === viewName);
+function inputNode(viewName: string): ILiveNode {
+  const node = live.findLive(live.appRoot(), n => n.viewName === viewName);
   expect(node, `a ${viewName} was created`).toBeDefined();
   return node!;
 }
 
 function fireChange(
-  node: IFakeNode,
+  node: ILiveNode,
   nativeEvent: Record<string, unknown>,
 ): void {
   fabric.fireEvent(node.instanceHandle, 'topChange', nativeEvent);
@@ -75,8 +80,8 @@ describe('<text-input>', () => {
     );
 
     const node = inputNode(SINGLELINE);
-    expect(node.props.text).toBe('hi');
-    expect(typeof node.props.mostRecentEventCount).toBe('number');
+    expect(node.payload.text).toBe('hi');
+    expect(typeof node.payload.mostRecentEventCount).toBe('number');
 
     fireChange(node, {
       text: 'hix',
@@ -120,14 +125,14 @@ describe('<text-input>', () => {
   // ('blurAndSubmit', RN's single-line default) rather than leaving the native prop undefined.
   it('folds an unset submitBehavior to blurAndSubmit on a single-line field', () => {
     mount(ROOT_TAG, <text-input value="x" />);
-    expect(inputNode(SINGLELINE).props.submitBehavior).toBe('blurAndSubmit');
+    expect(inputNode(SINGLELINE).payload.submitBehavior).toBe('blurAndSubmit');
   });
 
   // why: an explicit submitBehavior is the caller's own choice and must win outright over any
   // derived default — proves the fold doesn't override an explicit value with the legacy path.
   it('lets an explicit submitBehavior win over the derived default', () => {
     mount(ROOT_TAG, <text-input value="x" submitBehavior="submit" />);
-    expect(inputNode(SINGLELINE).props.submitBehavior).toBe('submit');
+    expect(inputNode(SINGLELINE).payload.submitBehavior).toBe('submit');
   });
 
   it('commands setTextAndSelection with the acked count on a divergent controlled write', () => {
@@ -198,13 +203,13 @@ describe('<text-input>', () => {
     );
 
     const node = inputNode(SINGLELINE);
-    expect(node.props.keyboardType).toBe('number-pad');
-    expect(node.props.returnKeyType).toBe('done');
-    expect(node.props.editable).toBe(false);
-    expect(node.props.cursorColor).toBe('#ff0000');
+    expect(node.payload.keyboardType).toBe('number-pad');
+    expect(node.payload.returnKeyType).toBe('done');
+    expect(node.payload.editable).toBe(false);
+    expect(node.payload.cursorColor).toBe('#ff0000');
     for (const raw of ['inputMode', 'enterKeyHint', 'readOnly']) {
       expect(
-        raw in node.props,
+        Object.hasOwn(node.payload, raw),
         `raw alias "${raw}" must not reach Fabric`,
       ).toBe(false);
     }
@@ -217,16 +222,16 @@ describe('<text-input>', () => {
     mount(ROOT_TAG, <text-input autoComplete="email" inputMode="text" />);
 
     const node = inputNode(SINGLELINE);
-    expect(node.props.autoComplete).toBe('email');
-    expect(node.props.textContentType).toBe('emailAddress');
-    expect(node.props.showSoftInputOnFocus).toBe(true);
+    expect(node.payload.autoComplete).toBe('email');
+    expect(node.payload.textContentType).toBe('emailAddress');
+    expect(node.payload.showSoftInputOnFocus).toBe(true);
   });
 
   // why: inputMode="none" is the W3C signal for "I render my own custom keyboard/picker" — the
   // system soft keyboard must NOT pop up over it, the opposite of every other inputMode value.
   it('derives showSoftInputOnFocus:false from inputMode="none"', () => {
     mount(ROOT_TAG, <text-input inputMode="none" />);
-    expect(inputNode(SINGLELINE).props.showSoftInputOnFocus).toBe(false);
+    expect(inputNode(SINGLELINE).payload.showSoftInputOnFocus).toBe(false);
   });
 
   // why: not every autoComplete token has a bespoke mapping table entry — an unrecognized-but-
@@ -235,15 +240,15 @@ describe('<text-input>', () => {
   it('passes an unmapped autoComplete token through with its iOS textContentType', () => {
     mount(ROOT_TAG, <text-input autoComplete="cc-name" />);
     const node = inputNode(SINGLELINE);
-    expect(node.props.autoComplete).toBe('cc-name');
-    expect(node.props.textContentType).toBe('creditCardName');
+    expect(node.payload.autoComplete).toBe('cc-name');
+    expect(node.payload.textContentType).toBe('creditCardName');
   });
 
   // why: RN's Material EditText paints a visible underline by default; every host silently
   // getting one uninvited would be a visual regression, so the default must actively suppress it.
   it('defaults underlineColorAndroid to transparent', () => {
     mount(ROOT_TAG, <text-input value="x" />);
-    expect(inputNode(SINGLELINE).props.underlineColorAndroid).toBe(
+    expect(inputNode(SINGLELINE).payload.underlineColorAndroid).toBe(
       'transparent',
     );
   });
@@ -252,7 +257,7 @@ describe('<text-input>', () => {
   // a designer who deliberately wants the underline back must be able to set it.
   it('lets an explicit underlineColorAndroid win', () => {
     mount(ROOT_TAG, <text-input value="x" underlineColorAndroid="#00ff00" />);
-    expect(inputNode(SINGLELINE).props.underlineColorAndroid).toBe('#00ff00');
+    expect(inputNode(SINGLELINE).payload.underlineColorAndroid).toBe('#00ff00');
   });
 
   // why: RN drives autoFocus in JS with an imperative `focus` command on mount (TextInput.js),

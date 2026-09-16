@@ -20,7 +20,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
 import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 110;
 const TOUCH_START = 'topTouchStart';
@@ -33,7 +36,8 @@ const TERMINATION_REQUEST = 'responderTerminationRequest';
 let measuredFrame:
   { width: number; height: number; pageX: number; pageY: number } | undefined;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const slot = globalThis.nativeFabricUIManager;
 if (slot === undefined) throw new Error('fabric slot was not installed');
 slot.measure = (_node, callback) => {
@@ -41,6 +45,11 @@ slot.measure = (_node, callback) => {
   if (frame === undefined) return;
   callback(0, 0, frame.width, frame.height, frame.pageX, frame.pageY);
 };
+// The recording host's own `measure` is a no-op stub (it never speaks to Fabric, so it invents
+// nothing) and would otherwise SHADOW the slot override above — the same gap that keeps
+// host-instance.test.ts on the mirror. Forward it to the slot here, exactly what the real commit
+// path does, so Pressable's responder-region measurement reaches the override.
+fabric.measure = (node, callback) => slot.measure(node, callback);
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -70,22 +79,15 @@ function responderHandle(testID?: string): unknown {
   return view.instanceHandle;
 }
 
-// The latest committed props of the responder View (re-read after each commit).
+// The latest committed props of the responder View (re-read after each commit — a live node's
+// payload is always the current one).
 function responderProps(): Record<string, unknown> {
-  function find(node: IFakeNode): IFakeNode | undefined {
-    if (node.viewName === 'RCTView' && node.props.pointerEvents !== 'box-none')
-      return node;
-    for (const child of node.children) {
-      const hit = find(child);
-      if (hit) return hit;
-    }
-    return undefined;
-  }
-  for (const root of fabric.committed) {
-    const hit = find(root);
-    if (hit) return hit.props;
-  }
-  throw new Error('no committed RCTView found');
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTView' && n.payload.pointerEvents !== 'box-none',
+  );
+  if (node === undefined) throw new Error('no committed RCTView found');
+  return node.payload;
 }
 
 function fire(handle: unknown, type: string): void {

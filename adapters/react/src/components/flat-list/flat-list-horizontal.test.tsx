@@ -6,7 +6,11 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 32;
 const ITEM_COUNT = 20;
@@ -42,15 +46,20 @@ function App(): ReactElement {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function findCreated(viewName: string): IFakeNode {
+function findCreated(viewName: string): IAuthoredNode {
   const node = fabric.find(n => n.viewName === viewName);
   expect(node, `${viewName} created`).toBeDefined();
   if (node === undefined) throw new Error(`unreachable: ${viewName} missing`);
   return node;
+}
+
+/** The PAYLOAD: `width` and `flexDirection` are style keys, flattened on the way into it. */
+function payloadFor(viewName: string): Record<string, unknown> {
+  return payloadOf(findCreated(viewName).handle);
 }
 
 // No Negative group: `horizontal` is a plain boolean prop with no guard clause — every value
@@ -60,17 +69,16 @@ describe('horizontal FlatList (Positive — no throwing path)', () => {
     // why: iOS decides the scroll axis from the native RCTScrollView's own `horizontal` prop,
     // so a dropped forward silently degrades a horizontal list back to vertical.
     mount(ROOT_TAG, createElement(App));
-    const scrollView = findCreated('RCTScrollView');
-    expect(scrollView.props.horizontal).toBe(true);
+    expect(payloadFor('RCTScrollView').horizontal).toBe(true);
   });
 
   it('pins the content view to the full row width as a row', () => {
     // why: the content view must be pinned to the full row width, not the frame width — else
     // the row never overflows and the native scroll view has nothing to scroll.
     mount(ROOT_TAG, createElement(App));
-    const content = findCreated('RCTScrollContentView');
-    expect(content.props.width).toBe(TOTAL_WIDTH);
-    expect(content.props.flexDirection).toBe('row');
+    const content = payloadFor('RCTScrollContentView');
+    expect(content.width).toBe(TOTAL_WIDTH);
+    expect(content.flexDirection).toBe('row');
   });
 
   it('registers an event handler that accepts a layout event', () => {

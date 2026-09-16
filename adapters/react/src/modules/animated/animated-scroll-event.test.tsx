@@ -1,8 +1,9 @@
 // React-driven test proving the canonical scroll-driven animation:
 //   onScroll={Animated.event([{nativeEvent:{contentOffset:{y: scrollY}}}])} on a bare
 //   `<scroll-view>`, with a child Animated.View whose translateY binds scrollY.
-// The shared fake Fabric slot keeps each view's real props so the committed transform is
-// observable. No simulator.
+// Reads the committed PAYLOAD off the live tree (createLiveTree over the recording host) — no
+// committed Fabric tag is involved, unlike the native-driver twin, so this needed no itest route.
+// No simulator.
 //
 // There is no `Animated.ScrollView` any more and nothing replaced it: the tag takes the handler
 // directly, and the engine binds it — `setEventListener` calls `bindAnimatedEvent` for any `on*`
@@ -13,40 +14,32 @@ import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, Animated } from '@symbiote-native/react';
 import { AnimatedValueXY } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const ROOT_TAG = 73;
 
-// Walk the committed tree to the first node of a given view name.
-function findByViewName(
-  nodes: IFakeNode[],
-  viewName: string,
-): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (node.viewName === viewName) return node;
-    const found = findByViewName(node.children, viewName);
-    if (found !== undefined) return found;
-  }
-  return undefined;
+// The committed PAYLOAD, not the authored bag — `transform` is a processed key `fabricProps`
+// resolves, not a raw prop the tag carries as-is.
+function findByViewName(viewName: string): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), n => n.viewName === viewName);
 }
 
-// Walk the committed tree to the first node carrying a `transform`.
-function findTransformView(nodes: IFakeNode[]): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (Reflect.get(node.props, 'transform') !== undefined) return node;
-    const found = findTransformView(node.children);
-    if (found !== undefined) return found;
-  }
-  return undefined;
+function findTransformView(): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), n => n.payload.transform !== undefined);
 }
 
 // translateY read off a committed view's transform.
-function committedTranslateY(node: IFakeNode): number {
-  const transform = Reflect.get(node.props, 'transform');
+function committedTranslateY(node: ILiveNode): number {
+  const transform = node.payload.transform;
   if (!Array.isArray(transform)) {
     throw new Error(
-      `expected a transform array, got ${JSON.stringify(node.props)}`,
+      `expected a transform array, got ${JSON.stringify(node.payload)}`,
     );
   }
   for (const entry of transform) {
@@ -84,10 +77,10 @@ describe('Animated scroll-driven animation', () => {
 
     // The tag committed its native scroll node — an `Animated.event` handler must not stop the
     // element being an ordinary scroll view.
-    expect(findByViewName(fabric.committed, 'RCTScrollView')).toBeDefined();
+    expect(findByViewName('RCTScrollView')).toBeDefined();
 
     // The bound view (the leaf RCTView carrying the transform) paints at the initial value.
-    const boundViewBefore = findTransformView(fabric.committed);
+    const boundViewBefore = findTransformView();
     expect(boundViewBefore).toBeDefined();
     expect(committedTranslateY(boundViewBefore!)).toBe(0);
 
@@ -97,7 +90,7 @@ describe('Animated scroll-driven animation', () => {
     // (core/engine/src/imperative.ts), same as the setValue path in animated-component.test.tsx.
     await Promise.resolve();
 
-    const boundViewAfter = findTransformView(fabric.committed);
+    const boundViewAfter = findTransformView();
     expect(boundViewAfter).toBeDefined();
     expect(committedTranslateY(boundViewAfter!)).toBe(88);
   });

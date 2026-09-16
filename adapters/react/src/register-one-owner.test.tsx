@@ -29,7 +29,7 @@ import {
   TOUCHABLE_HIGHLIGHT_TAG,
   TOUCHABLE_OPACITY_TAG,
 } from '@symbiote-native/components';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 733;
 
@@ -54,7 +54,7 @@ for (const tag of MARKED_TAGS) {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 beforeEach(() => {
   fabric.reset();

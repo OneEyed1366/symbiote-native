@@ -12,18 +12,32 @@
 //
 // Numbers are emitted through dlog (DEBUG=1 to read them), never asserted loosely: the assertions
 // below pin the two structural facts, and the log carries the profile a comparison run needs.
+//
+// The count comes from `censusLive`, NOT from the engine's `censusRetainedTree`, and the swap is
+// the point rather than a detail. `censusRetainedTree` delegates to `treeHost().census()` — which
+// the TypeScript applier answers truthfully and nothing else does. The native host returns zeroes
+// on purpose (census is deliberately off the ABI; `native-tree-host.ts` says why), so every one of
+// these numbers read on a device has always been a zero. A figure only the stand-in can produce is
+// a mirror measurement, whatever it is measuring.
+//
+// `censusLive` reads the engine's own child links and its own `isAnchor` instead, so the two
+// assertions below mean the same thing under every host. What it does NOT carry across is the
+// applier's `renderable` (which also subtracts empty raw texts — a COMMIT rule, settled in
+// `empty-raw-text.itest.ts`) and its `flattenWidths` (the commit walk's own bookkeeping). Neither
+// was ever asserted here; both were logged, and what they logged was the stand-in's work.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useState } from 'react';
 import {
-  censusRetainedTree,
   dlog,
   parentOf,
-  isSymbioteNode,
   readCommitProfile,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  censusLive,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
 
@@ -32,7 +46,7 @@ const ROWS = 1000;
 const NATIVE_VIEWS_PER_ROW = 9;
 const UPDATE_STRIDE = 10;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 const flush = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -98,16 +112,13 @@ function drive(): IDriver {
   return driver;
 }
 
-// The census needs the RETAINED tree, and the fake slot is a test's only handle on it: every
-// createNode carries its retained node as the instanceHandle, so one created node plus a walk up
-// the parent chain reaches the surface root.
+// The census needs the RETAINED tree. The recording names the node the app authored and hands back
+// the engine node itself, so one recorded node plus a walk up the parent chain reaches the surface
+// root — no unwrapping of an instanceHandle, and no guess about what the renderer did with it.
 function retainedRoot(): ISymbioteNode {
-  const seed = fabric.created.find(node => node.props.testID === 'list');
+  const seed = fabric.find(node => node.props.testID === 'list');
   if (seed === undefined) throw new Error('the list node was never created');
-  const handle: unknown = seed.instanceHandle;
-  if (!isSymbioteNode(handle))
-    throw new Error('the list node carries no retained handle');
-  let current: ISymbioteNode = handle;
+  let current: ISymbioteNode = seed.handle;
   let above = parentOf(current);
   while (above !== undefined) {
     current = above;
@@ -134,16 +145,13 @@ describe('react anchor flattening cost', () => {
     mount(ROOT_TAG, <List />);
     report('create');
 
-    const census = censusRetainedTree([retainedRoot()]);
+    const census = censusLive(retainedRoot());
     dlog(
       `ANCHOR-CENSUS ${JSON.stringify({
         adapter: 'react',
         nodes: census.nodes,
         anchors: census.anchors,
-        emptyRawTexts: census.emptyRawTexts,
-        renderable: census.renderable,
-        flattenSites: census.flattenWidths.length,
-        widest: census.flattenWidths.slice(0, 5),
+        nonAnchors: census.nonAnchors,
       })}`,
     );
 
@@ -170,7 +178,7 @@ describe('react anchor flattening cost', () => {
     // why: the row shape has to be the canary's, or every column below is measuring a different
     // list. Nine native views per row, plus the list node itself.
     expect(
-      census.renderable,
+      census.nonAnchors,
       'the benchmark row must expand to nine native views',
     ).toBe(ROWS * NATIVE_VIEWS_PER_ROW + 1);
     // why: THE structural claim. A React component is a function that returns children; it binds

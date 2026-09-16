@@ -11,7 +11,10 @@
 import { Component, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 214;
 const BOOM = 'render exploded';
@@ -35,7 +38,8 @@ class Boundary extends Component<
   }
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let consoleError: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
@@ -124,6 +128,6 @@ describe('Negative — a component throws during render', () => {
       </Boundary>,
     );
 
-    expect(fabric.appRoot().children).toHaveLength(1);
+    expect(live.nodeOf(live.appRoot()).children).toHaveLength(1);
   });
 });

@@ -10,7 +10,7 @@ import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, Animated } from '@symbiote-native/react';
 import { setDeviceEventSource } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 // ---- injected device-event source (the app's RN DeviceEventEmitter stand-in) ----
 
@@ -73,7 +73,7 @@ Object.assign(globalThis, {
   nativeModuleProxy: { NativeAnimatedTurboModule: fakeNativeAnimated },
 });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 const ROOT_TAG = 41;
 
 function callsOf(method: string): INativeCall[] {

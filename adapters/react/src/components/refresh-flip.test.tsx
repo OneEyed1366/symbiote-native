@@ -12,7 +12,11 @@
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 62;
 
@@ -29,18 +33,18 @@ function App(): ReactElement {
   );
 }
 
-// The flip produces a CLONE of the refresh node with new props, so walk the committed tree
-// (not `fabric.find`, which records only the originally created node).
-function findRefresh(nodes: IFakeNode[]): IFakeNode | undefined {
-  for (const node of nodes) {
-    if (node.viewName === 'PullToRefreshView') return node;
-    const found = findRefresh(node.children);
-    if (found) return found;
-  }
-  return undefined;
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
+
+// The flip produces a re-clone of the refresh node with new props, so this always re-reads the
+// LIVE tree (not the creation log, which would keep the original snapshot).
+function findRefresh(): ILiveNode | undefined {
+  return live.findLive(
+    live.appRoot(),
+    node => node.viewName === 'PullToRefreshView',
+  );
 }
 
-const fabric = installFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
@@ -52,14 +56,14 @@ describe('React <refresh-control> controlled flip on the engine (Positive — co
   it('propagates refreshing:false -> true to the committed node after topRefresh', () => {
     mount(ROOT_TAG, <App />);
 
-    const before = findRefresh(fabric.committed);
+    const before = findRefresh();
     expect(before, 'a PullToRefreshView committed at mount').toBeDefined();
-    expect(before?.props.refreshing).toBe(false);
+    expect(before?.payload.refreshing).toBe(false);
 
     // Native fires the pull gesture -> onRefresh -> setRefreshing(true).
     fabric.fireEvent(before!.instanceHandle, 'topRefresh', {});
 
-    const after = findRefresh(fabric.committed);
-    expect(after?.props.refreshing).toBe(true);
+    const after = findRefresh();
+    expect(after?.payload.refreshing).toBe(true);
   });
 });

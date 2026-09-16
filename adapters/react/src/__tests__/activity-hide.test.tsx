@@ -8,37 +8,33 @@
 import { Activity, useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 11;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-// Walk the LIVE tree from appRoot(). `fabric.find` searches every node ever created, and Fabric
-// clones a node on update — so after any prop change it hands back the pre-clone original and an
-// assertion on it silently tests the old value.
-function byTestId(id: string): Record<string, unknown> | undefined {
-  const walk = (
-    nodes: readonly { props: Record<string, unknown>; children: unknown[] }[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === id) return node.props;
-      const hit = walk(
-        node.children as { props: Record<string, unknown>; children: [] }[],
-      );
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+// The panel is never unmounted by Activity, only hidden, so it stays a LIVE descendant of the
+// root for the whole test — a residency check walks from there rather than trusting the creation
+// log, which would still answer for a node ten renders gone.
+function panelNode(): ILiveNode | undefined {
+  return live.findLive(
+    live.appRoot(),
+    n => n.props.testID === 'activity-panel',
+  );
 }
 
 // The engine flattens a style array into individual props at commit, so `display` arrives as a
-// top-level prop rather than inside a `style` object.
+// top-level PAYLOAD key rather than inside an authored `style` object.
 function panelProps(): Record<string, unknown> {
-  return byTestId('activity-panel') ?? {};
+  return panelNode()?.payload ?? {};
 }
 
 function Panel({ hidden }: { hidden: boolean }): ReactElement {
@@ -64,7 +60,7 @@ describe('Activity hides a subtree without unmounting it', () => {
   it('stops the subtree painting and lets it paint again', () => {
     mount(ROOT_TAG, <Host />);
 
-    expect(panelProps().display).toBeUndefined();
+    expect(Object.hasOwn(panelProps(), 'display')).toBe(false);
 
     const host = fabric.find(entry => entry.props.testID === 'activity-host');
     fabric.fireEvent(host?.instanceHandle, 'topTouchStart');
@@ -73,17 +69,15 @@ describe('Activity hides a subtree without unmounting it', () => {
     // Hidden, and STILL PRESENT — an unmount would satisfy "stops painting" while destroying the
     // state Activity exists to preserve, so the node has to survive the check.
     expect(panelProps().display).toBe('none');
-    expect(byTestId('activity-panel')).toBeDefined();
+    expect(panelNode()).toBeDefined();
 
     fabric.fireEvent(host?.instanceHandle, 'topTouchStart');
     fabric.fireEvent(host?.instanceHandle, 'topTouchEnd');
 
     // Unhiding CLEARS the flag rather than writing display:'flex' over it, and leaves the
-    // author's own style intact — that reversibility is why the slot lives in the engine.
-    // `null`, not absent: removing a prop on a Fabric clone means writing null, which is how the
-    // platform says "back to the default". Asserting `toBeUndefined()` here fails against a
-    // correctly-unhidden node.
-    expect(panelProps().display ?? null).toBeNull();
+    // author's own style intact — that reversibility is why the slot lives in the engine. A
+    // vanished prop is a missing PAYLOAD key, not a `null`/`undefined` value.
+    expect(Object.hasOwn(panelProps(), 'display')).toBe(false);
     expect(panelProps().backgroundColor).toBe('#24304a');
   });
 });

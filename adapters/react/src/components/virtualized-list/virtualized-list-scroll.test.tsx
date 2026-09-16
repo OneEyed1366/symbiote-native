@@ -14,35 +14,20 @@ import {
   unmount,
   type IFlatListHandle,
 } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
-
-interface ICommandCall {
-  name: string;
-  args: readonly unknown[];
-}
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 42;
 const ITEM_HEIGHT = 40;
 const DATA = Array.from({ length: 100 }, (_unused, index) => ({ id: index }));
 
 const listRef = createRef<IFlatListHandle>();
-const commands: ICommandCall[] = [];
 
-// The shared harness slot records createNode / completeRoot / events, but NOT view
-// commands: scrollTo rides `dispatchCommand`, which the engine destructures off the live
-// global slot on its first commit. So we graft a recording `dispatchCommand` onto the
-// installed slot before any mount, mirroring the per-file slot the smoke carried.
-const fabric = installFabric();
-const slot = globalThis.nativeFabricUIManager;
-if (slot === undefined) throw new Error('fabric slot was not installed');
-slot.dispatchCommand = (_node, name, args) => {
-  commands.push({ name, args });
-};
+// dispatchCommand is one of the engine's own imperative calls, recorded natively by the
+// recording host — no graft needed, unlike the old shared mirror slot.
+const fabric = installRecordingFabric();
+const commands = fabric.commands;
 
-beforeEach(() => {
-  fabric.reset();
-  commands.length = 0;
-});
+beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 function App(): ReactElement {
@@ -59,14 +44,14 @@ function App(): ReactElement {
   });
 }
 
-function scrollCommands(): ICommandCall[] {
-  return commands.filter(c => c.name === 'scrollTo');
+function scrollCommands() {
+  return commands.filter(c => c.commandName === 'scrollTo');
 }
 
 describe('VirtualizedList imperative scroll routes through the native scrollTo command', () => {
   it('an animated scroll dispatches the native scrollTo [x, y, true]', () => {
     mount(ROOT_TAG, <App />);
-    expect(fabric.committed.length, 'FlatList committed').toBeGreaterThan(0);
+    expect(fabric.commits, 'FlatList committed').toBeGreaterThan(0);
     expect(listRef.current, 'FlatList ref attached').not.toBeNull();
 
     listRef.current!.scrollToOffset({ offset: 200, animated: true });
@@ -89,7 +74,7 @@ describe('VirtualizedList imperative scroll routes through the native scrollTo c
     // reach the cumulative "two scrolls" state the smoke asserted, re-do the animated scroll
     // first, then the instant one.
     mount(ROOT_TAG, <App />);
-    expect(fabric.committed.length, 'FlatList committed').toBeGreaterThan(0);
+    expect(fabric.commits, 'FlatList committed').toBeGreaterThan(0);
     expect(listRef.current, 'FlatList ref attached').not.toBeNull();
 
     listRef.current!.scrollToOffset({ offset: 200, animated: true });

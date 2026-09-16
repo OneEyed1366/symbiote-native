@@ -8,11 +8,11 @@
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, PanResponder } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 170;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
@@ -61,10 +61,12 @@ describe('React PanResponder multitouch through the event layer', () => {
 
     mount(ROOT_TAG, <App />);
 
-    const viewNode = fabric.appRoot().children[0];
+    // The app's own View is the non-box-none RCTView (the box-none one is the AppContainer).
+    const viewNode = fabric.find(
+      n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+    );
     expect(viewNode, 'PanResponder View was committed').toBeDefined();
-    const handle = viewNode.instanceHandle;
-    const tag = viewNode.tag;
+    const handle = viewNode!.instanceHandle;
 
     const point = (
       identifier: number,
@@ -87,7 +89,7 @@ describe('React PanResponder multitouch through the event layer', () => {
       fabric.fireEvent(handle, type, {
         touches,
         changedTouches,
-        target: tag,
+        target: handle,
         timestamp,
       });
     };

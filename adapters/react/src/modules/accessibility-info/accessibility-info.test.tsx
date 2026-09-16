@@ -8,31 +8,13 @@
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, AccessibilityInfo } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 
-// ---- augment the shared slot to record sendAccessibilityEvent ------------
-// The shared harness models commit/clone but not the a11y event sink (unique to this suite), so we
-// add it onto the live slot the engine already drives.
-
-interface IAccessibilityCall {
-  node: IFakeNode;
-  eventType: string;
-}
-const a11yEvents: IAccessibilityCall[] = [];
-
-const fabric = installFabric();
-{
-  const slot: unknown = Reflect.get(globalThis, 'nativeFabricUIManager');
-  if (typeof slot !== 'object' || slot === null) {
-    throw new Error('installFabric did not install a slot');
-  }
-  Object.assign(slot, {
-    sendAccessibilityEvent(node: IFakeNode, eventType: string): void {
-      a11yEvents.push({ node, eventType });
-    },
-    dispatchCommand(): void {},
-  });
-}
+// The a11y event sink needed a hand-written slot override under the stand-in. The recording host
+// records it natively — `sendAccessibilityEvent` is one of the three imperative calls it keeps,
+// because each of them carries a request the ENGINE made rather than an answer a platform gave.
+const fabric = installRecordingFabric();
+const a11yEvents = fabric.accessibilityEvents;
 
 // ---- fake native-module + device-hub globals ----------------------------
 

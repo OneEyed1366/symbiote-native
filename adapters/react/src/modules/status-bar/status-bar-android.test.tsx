@@ -35,7 +35,10 @@ import {
   setColorProcessor,
   statusBarImperative,
 } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { StatusBar } from './index.android';
 
 const STATUS_BAR_HEIGHT = 24;
@@ -101,7 +104,8 @@ function App(): ReactElement {
   );
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
   recorded.length = 0;
@@ -136,8 +140,10 @@ describe('StatusBar (Android)', () => {
   it('drives setColor / setTranslucent / setStyle from component props', () => {
     mount(ROOT_TAG, <App />);
 
-    // StatusBar renders null, so the committed tree is just the app View.
-    expect(fabric.serialize(fabric.appRoot().children)).toBe('RCTView');
+    // StatusBar renders null, so the tree is just the app View.
+    const root = live.nodeOf(live.appRoot());
+    expect(root.children.map(child => child.viewName)).toEqual(['RCTView']);
+    expect(root.children[0].children, 'and it is empty').toHaveLength(0);
 
     const propColor = find('setColor');
     expect(propColor, 'setColor was called').toBeDefined();

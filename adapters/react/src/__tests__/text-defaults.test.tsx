@@ -13,18 +13,22 @@
 // this cause (2026-08-31).
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host, and every read is of the PAYLOAD — the defaults are seeded by the per-primitive
+// fold that runs inside `fabricProps`, so the payload is where "the default reached Fabric" is
+// visible at all. The file's own first `why:` already says it: Fabric reads the prop, not a JS
+// default.
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 241;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 function textNode(): Record<string, unknown> {
   const node = fabric.find(n => n.viewName === 'RCTText');
   expect(node, 'an RCTText was created').toBeDefined();
-  return node!.props;
+  return payloadOf(node!.handle);
 }
 
 describe('Text defaults reach Fabric', () => {
@@ -60,8 +64,9 @@ describe('Text defaults reach Fabric', () => {
       mount(ROOT_TAG, <view testID="probe" />);
       const view = fabric.find(n => n.props.testID === 'probe');
       expect(view, 'the probed View was created').toBeDefined();
-      expect('ellipsizeMode' in view!.props).toBe(false);
-      expect('allowFontScaling' in view!.props).toBe(false);
+      const payload = payloadOf(view!.handle);
+      expect('ellipsizeMode' in payload).toBe(false);
+      expect('allowFontScaling' in payload).toBe(false);
     });
   });
 

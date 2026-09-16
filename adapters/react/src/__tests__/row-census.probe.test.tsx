@@ -2,10 +2,14 @@
 // Not a regression test — deleted after the question it answers is answered.
 import { describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 909;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // Copied verbatim from examples/react/screens/BenchmarkScreen.tsx's BenchmarkRow.
 function Row(): React.ReactElement {
@@ -25,15 +29,9 @@ function Row(): React.ReactElement {
 
 function census(): string[] {
   const names: string[] = [];
-  const walk = (
-    nodes: readonly { viewName: string; children: readonly unknown[] }[],
-  ): void => {
-    for (const node of nodes) {
-      names.push(node.viewName);
-      walk(node.children as never);
-    }
-  };
-  walk(fabric.appRoot().children as never);
+  for (const child of live.nodeOf(live.appRoot()).children) {
+    live.walkLive(child.handle, node => names.push(node.viewName));
+  }
   return names;
 }
 

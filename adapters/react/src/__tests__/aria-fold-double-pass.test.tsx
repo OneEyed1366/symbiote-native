@@ -15,30 +15,36 @@
 // (`components/pressable/pressable.test.tsx`) set `accessibilityRole` DIRECTLY — through Button's
 // own mapping — so none of them travels the alias path at all. The whole adapter was green
 // throughout the move without exercising the thing that moved.
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 118;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
-function committed(testID: string): IFakeNode | undefined {
-  const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node;
-      const found = walk(node.children);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+// Both cases mount on the same tag, so the recording has to be cleared between them — otherwise
+// appRoot() finds the FIRST case's surface, which is still in the creation log.
+beforeEach(() => fabric.reset());
+
+// The fold runs on the way into the payload, so both the search key and the assertions read
+// `payload` rather than the author's bag.
+function foldedPayload(testID: string): Record<string, unknown> {
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
+  return hit?.payload ?? {};
 }
 
 describe('the aria fold survives running twice through React', () => {
   it('folds role and aria-label, and leaves no alias in the payload', () => {
     mount(ROOT_TAG, <view testID="folded" role="button" aria-label="close" />);
 
-    const props = committed('folded')?.props ?? {};
+    const props = foldedPayload('folded');
     expect(props.accessibilityRole).toBe('button');
     expect(props.accessibilityLabel).toBe('close');
     // Neither alias may survive. `fabricProps` copies unknown keys through verbatim, so a
@@ -63,7 +69,7 @@ describe('the aria fold survives running twice through React', () => {
 
     // Inside a composite the ALIAS wins per field — the opposite of the scalar rule above, and the
     // pair is what a "simplification" of the fold collapses.
-    const props = committed('composite')?.props ?? {};
+    const props = foldedPayload('composite');
     expect(props.accessibilityState).toEqual({
       busy: true,
       checked: true,

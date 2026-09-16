@@ -6,10 +6,9 @@
 // committed view's opacity, while the base style survives the per-frame diff. delayPressIn
 // defers onPressIn past touch-down. No simulator: a failure here is in JS.
 //
-// rAF is polyfilled (setTimeout-based) and the clone is made to MERGE the diff onto
-// existing props (real Fabric C++ behavior; the shared recorder replaces) so the base
-// width survives the opacity-only per-frame diff, installed before any mount because the
-// engine destructures slot methods off the global on its first commit.
+// rAF is polyfilled (setTimeout-based). The live tree's payload is recomputed from the node's
+// CURRENT authored props on every read, so the base width survives the opacity-only per-frame
+// diff with no clone-protocol mock needed at all — a per-frame `setProp` just updates one key.
 //
 // SCOPE: the shared press-timing/scheduling machine (computePressOutWait,
 // createTouchableFeedbackRuntime/Handlers, the underlay machine) is fully unit-tested in
@@ -23,7 +22,11 @@
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 120;
 const TOUCH_START = 'topTouchStart';
@@ -36,39 +39,15 @@ const DURATION_PROBE_MS = 20;
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
-function mergeProps(
-  previous: Record<string, unknown>,
-  patch: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged = { ...previous, ...patch };
-  for (const key of Object.keys(patch)) {
-    if (patch[key] === null) delete merged[key];
-  }
-  return merged;
-}
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const installed: unknown = globalThis.nativeFabricUIManager;
 if (!isRecord(installed)) throw new Error('fabric slot was not installed');
 
-installed.cloneNodeWithNewProps = (
-  node: IFakeNode,
-  patch: Record<string, unknown>,
-): IFakeNode => ({
-  ...node,
-  props: mergeProps(node.props, patch),
-});
-installed.cloneNodeWithNewChildrenAndProps = (
-  node: IFakeNode,
-  patch: Record<string, unknown>,
-): IFakeNode => ({
-  ...node,
-  props: mergeProps(node.props, patch),
-  children: [],
-});
 // Pressable measures its responder rect on grant (retention region); report a fixed frame.
 installed.measure = (
-  _node: IFakeNode,
+  _node: unknown,
   cb: (
     x: number,
     y: number,
@@ -142,8 +121,9 @@ afterEach(() => {
 
 // The responder is the Pressable's own RCTView, the first non-box-none RCTView created.
 function responderHandle(): unknown {
-  const view = fabric.find(
-    n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+  const view = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTView' && n.payload.pointerEvents !== 'box-none',
   );
   if (!view) throw new Error('no RCTView (Pressable responder) was created');
   return view.instanceHandle;
@@ -153,16 +133,14 @@ function responderHandle(): unknown {
 // RCTView (the inner Animated.View, child of the Pressable's responder View).
 function feedbackProps(): Record<string, unknown> {
   let found: Record<string, unknown> | undefined;
-  function walk(node: IFakeNode): void {
+  live.walkLive(live.appRoot(), node => {
     if (
       node.viewName === 'RCTView' &&
-      node.props.pointerEvents !== 'box-none'
+      node.payload.pointerEvents !== 'box-none'
     ) {
-      found = node.props;
+      found = node.payload;
     }
-    for (const child of node.children) walk(child);
-  }
-  for (const root of fabric.committed) walk(root);
+  });
   if (found === undefined) throw new Error('no committed RCTView found');
   return found;
 }
@@ -178,12 +156,13 @@ const settleUnderlay = (): Promise<void> =>
 // own child, and proving the child is UNTOUCHED is what the second one is for.
 function committedViews(): Record<string, unknown>[] {
   const found: Record<string, unknown>[] = [];
-  function walk(node: IFakeNode): void {
-    if (node.viewName === 'RCTView' && node.props.pointerEvents !== 'box-none')
-      found.push(node.props);
-    for (const child of node.children) walk(child);
-  }
-  for (const root of fabric.committed) walk(root);
+  live.walkLive(live.appRoot(), node => {
+    if (
+      node.viewName === 'RCTView' &&
+      node.payload.pointerEvents !== 'box-none'
+    )
+      found.push(node.payload);
+  });
   if (found.length < 2)
     throw new Error(
       `expected a container + a child RCTView, got ${found.length}`,
@@ -588,14 +567,14 @@ describe('React TouchableHighlight underlay feedback', () => {
 // Pressable, which owns that fold — so this pins the COMPOSITION, not a second implementation:
 // a variant that stopped forwarding `accessible` through its rest spread would go red here.
 describe('React Touchable* accessibility default', () => {
-  // The COMMITTED tree, not `fabric.find`: creation order is leaves-first (a parent is created with
-  // its children already in hand), so "the first RCTView that is not the surface root" is the
-  // touchable's own child, which carries none of the fold's props.
+  // The COMMITTED tree, not `live.findLive`: creation order is leaves-first (a parent is created
+  // with its children already in hand), so "the first RCTView that is not the surface root" is
+  // the touchable's own child, which carries none of the fold's props.
   function responderProps(): Record<string, unknown> {
-    const view = fabric.appRoot().children[0];
+    const view = live.nodeOf(live.appRoot()).children[0];
     if (!view)
       throw new Error('no RCTView (Pressable responder) was committed');
-    return view.props;
+    return view.payload;
   }
 
   const variants: [string, (child: ReactElement) => ReactElement][] = [
@@ -634,14 +613,14 @@ describe('React Touchable* accessibility default', () => {
 // Nothing computed it anywhere until 2026-09-09 — a disabled touchable stayed focusable, so a
 // keyboard or TV remote could land on a control that cannot be pressed.
 describe('React Touchable* focusable', () => {
-  // The COMMITTED tree, not `fabric.find`: creation order is leaves-first (a parent is created with
-  // its children already in hand), so "the first RCTView that is not the surface root" is the
-  // touchable's own child, which carries none of the fold's props.
+  // The COMMITTED tree, not `live.findLive`: creation order is leaves-first (a parent is created
+  // with its children already in hand), so "the first RCTView that is not the surface root" is
+  // the touchable's own child, which carries none of the fold's props.
   function responderProps(): Record<string, unknown> {
-    const view = fabric.appRoot().children[0];
+    const view = live.nodeOf(live.appRoot()).children[0];
     if (!view)
       throw new Error('no RCTView (Pressable responder) was committed');
-    return view.props;
+    return view.payload;
   }
 
   const variants: [string, (props: Record<string, unknown>) => ReactElement][] =

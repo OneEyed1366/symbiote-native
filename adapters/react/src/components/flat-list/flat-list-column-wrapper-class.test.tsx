@@ -7,10 +7,14 @@ import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { FlatList, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 33;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 
 interface IRow {
   id: number;
@@ -28,17 +32,14 @@ afterEach(() => {
   clearGlobalStyles();
 });
 
-function rowsWithFlexDirection(): IFakeNode[] {
-  const rows: IFakeNode[] = [];
-  const walk = (nodes: IFakeNode[]): void => {
-    for (const node of nodes) {
-      if (node.viewName === 'RCTView' && node.props.flexDirection === 'row')
-        rows.push(node);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  return rows;
+// `flexDirection` and `columnGap` are STYLE keys, so they live in the payload the engine builds,
+// not in the author's prop bag.
+function rowsWithFlexDirection(): IAuthoredNode[] {
+  return fabric.findAll(
+    node =>
+      node.viewName === 'RCTView' &&
+      payloadOf(node.handle).flexDirection === 'row',
+  );
 }
 
 // No Negative group: columnWrapperStyle accepts either a class-name string or a plain style
@@ -70,7 +71,7 @@ describe('React FlatList columnWrapperStyle class-name resolution (Positive)', (
 
     const rows = rowsWithFlexDirection();
     expect(rows.length, 'two flex-row rows for 4 items in 2 columns').toBe(2);
-    for (const row of rows) expect(row.props.columnGap).toBe(4);
+    for (const row of rows) expect(payloadOf(row.handle).columnGap).toBe(4);
   });
 
   it('still accepts a plain style object unchanged', () => {
@@ -91,6 +92,6 @@ describe('React FlatList columnWrapperStyle class-name resolution (Positive)', (
 
     const rows = rowsWithFlexDirection();
     expect(rows.length).toBe(2);
-    for (const row of rows) expect(row.props.columnGap).toBe(8);
+    for (const row of rows) expect(payloadOf(row.handle).columnGap).toBe(8);
   });
 });

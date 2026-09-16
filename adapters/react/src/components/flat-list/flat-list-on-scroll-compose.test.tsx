@@ -10,7 +10,11 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 31;
 const ITEM_HEIGHT = 40;
@@ -20,20 +24,14 @@ const DATA = Array.from({ length: 200 }, (_unused, index) => ({ id: index }));
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-// Collect the text content of every rendered row so we can tell which window is resident.
-function renderedRows(nodes: IFakeNode[]): string[] {
+// Collect the text content of every row currently resident under the app root, so we can tell
+// which window is resident.
+function renderedRows(): string[] {
   const rows: string[] = [];
-  for (const node of nodes) {
-    for (const child of node.children) {
-      if (
-        typeof child.props.text === 'string' &&
-        child.props.text.startsWith('row-')
-      ) {
-        rows.push(child.props.text);
-      }
-    }
-    rows.push(...renderedRows(node.children));
-  }
+  live.walkLive(live.appRoot(), node => {
+    const text = node.payload.text;
+    if (typeof text === 'string' && text.startsWith('row-')) rows.push(text);
+  });
   return rows;
 }
 
@@ -56,7 +54,8 @@ function App(): ReactElement {
   });
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => {
   fabric.reset();
   seenEvents.length = 0;
@@ -69,7 +68,7 @@ const scrollPayload = {
   layoutMeasurement: { width: 320, height: VIEWPORT },
 };
 
-function findScrollView(): IFakeNode {
+function findScrollView(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === 'RCTScrollView');
   expect(node, 'scroll view node found in committed tree').toBeDefined();
   if (node === undefined) throw new Error('unreachable: scroll view missing');
@@ -84,7 +83,7 @@ describe('FlatList user onScroll composes with internal windowing (Positive)', (
     // why: baseline — the later assertions are meaningless if the list never mounts a scroll
     // view to fire events against.
     mount(ROOT_TAG, <App />);
-    expect(fabric.committed.length).toBeGreaterThan(0);
+    expect(live.nodeOf(live.appRoot()).children.length).toBeGreaterThan(0);
     expect(findScrollView()).toBeDefined();
   });
 
@@ -122,11 +121,11 @@ describe('FlatList user onScroll composes with internal windowing (Positive)', (
     });
 
     // Rows resident before the deep scroll: top of the list.
-    const rowsBeforeScroll = renderedRows(fabric.committed);
+    const rowsBeforeScroll = renderedRows();
 
     fabric.fireEvent(scrollView.instanceHandle, 'topScroll', scrollPayload);
 
-    const rowsAfterScroll = renderedRows(fabric.committed);
+    const rowsAfterScroll = renderedRows();
     // Control: the pre-scroll window must NOT already contain the deep row, else the test
     // cannot distinguish windowing.
     expect(rowsBeforeScroll.includes('row-100')).toBe(false);

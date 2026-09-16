@@ -28,7 +28,11 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { VirtualizedSectionList, mount, unmount } from '@symbiote-native/react';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 interface IRow {
   id: number;
@@ -40,7 +44,8 @@ const SECTIONS = [
   { title: 'B', data: [{ id: 2 }, { id: 3 }] },
 ];
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
@@ -49,15 +54,24 @@ afterEach(() => unmount(ROOT_TAG));
 // measurement round trip, so a create-time `Array.isArray(transform)` reads 0 for a correct tree
 // and would also read "present" for a frozen pin (`test-harness-false-greens.md` §34). The pin's
 // motion is core's to prove; this file's question is which CHILDREN got marked.
-function stickyWrappers(): IFakeNode[] {
-  return fabric.created.filter(
-    n =>
-      n.props.collapsable === false &&
+//
+// The PAYLOAD, not the authored bag: `stickyFold` is a `IPayloadFold` run inside `fabricProps`, so
+// `collapsable` never lands as its own authored prop — it is visible only in what the engine would
+// hand the renderer.
+function stickyWrappers(): ILiveNode[] {
+  const found: ILiveNode[] = [];
+  live.walkLive(live.appRoot(), node => {
+    if (
+      node.payload.collapsable === false &&
       // The scroll view's own CONTENT node carries it too — Yoga must not flatten the box the
       // sticky pins are measured against. It is not a header, and the disabled case is what makes
       // that visible: one such node with zero sticky cells.
-      n.viewName !== 'RCTScrollContentView',
-  );
+      node.viewName !== 'RCTScrollContentView'
+    ) {
+      found.push(node);
+    }
+  });
+  return found;
 }
 
 function renderSection(props: {
@@ -89,7 +103,7 @@ describe('VirtualizedSectionList sticky section headers', () => {
     expect(wrappers.length, 'one sticky wrapper per section header').toBe(2);
     for (const wrapper of wrappers) {
       expect(
-        wrapper.props.collapsable,
+        wrapper.payload.collapsable,
         'sticky wrapper is collapsable:false',
       ).toBe(false);
     }

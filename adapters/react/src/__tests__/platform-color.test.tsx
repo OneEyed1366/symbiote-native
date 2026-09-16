@@ -15,7 +15,9 @@ import {
   unmount,
 } from '@symbiote-native/react';
 import { isOpaqueColorValue, setColorProcessor } from '@symbiote-native/engine';
-import { installFabric } from '@symbiote-native/test-utils';
+// A RECORDING host, and the read is of the PAYLOAD: the style colour becomes a top-level processed
+// value on the way into it, which is the seam this regression is about.
+import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 
 const STRING_SENTINEL = 0xff_00_00_ff;
 const ROOT_TAG = 260;
@@ -27,7 +29,7 @@ function App(): ReactElement {
   return <view style={{ backgroundColor: PlatformColor('labelColor') }} />;
 }
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
 beforeEach(() => {
   fabric.reset();
   seen = [];
@@ -74,11 +76,13 @@ describe('PlatformColor / DynamicColorIOS', () => {
     it('routes an opaque style color through the processor onto the committed node', () => {
       mount(ROOT_TAG, <App />);
 
-      const painted = fabric.find(n => n.props.backgroundColor !== undefined);
+      const painted = fabric.find(
+        n => payloadOf(n.handle).backgroundColor !== undefined,
+      );
       expect(painted, 'a node carries a backgroundColor').toBeDefined();
 
       // The committed prop is the processor's OUTPUT (the native dict), not the raw opaque object.
-      expect(painted!.props.backgroundColor).toEqual({
+      expect(payloadOf(painted!.handle).backgroundColor).toEqual({
         native: { semantic: ['labelColor'] },
       });
 
