@@ -19,7 +19,7 @@
 import { describe, expect, it, vi } from 'vitest';
 // Relative rather than by package name: `core/components` does not declare test-utils, matching
 // the sibling text-input and pressable suites.
-import { installFabric } from '../../../test-utils/src/index';
+import { installRecordingFabric } from '../../../test-utils/src/index';
 import {
   appListenerFor,
   createElement,
@@ -32,7 +32,8 @@ import {
 import { TEXT_INPUT_CALLBACK_NAMES } from '../state/text-input';
 import { registerTextInputBehavior, TEXT_INPUT_TAG } from './text-input';
 
-installFabric();
+// A RECORDING host: nothing here reads a committed tree.
+installRecordingFabric();
 registerTextInputBehavior();
 
 let nextRootTag = 7600;

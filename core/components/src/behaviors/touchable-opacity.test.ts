@@ -2,8 +2,11 @@
 // every other test green, so each gets a case: the app's own press callbacks must survive the
 // fade being spliced in front of them, the fade must beat the AUTHOR's own `opacity` in the
 // payload, and the fade must not become the style the next resting-opacity read sees.
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '../../../test-utils/src/index';
 import {
   clearHostBehaviors,
   createElement,
@@ -20,7 +23,8 @@ import {
 } from './touchable-opacity';
 import { DEFAULT_ACTIVE_OPACITY } from '../state/touchable';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 7100;
 
 // The JS driver reads requestAnimationFrame off the host at call time and Node has none. A ~16ms
@@ -73,22 +77,13 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-// The LIVE tree, never `fabric.find()`, which keeps every pre-clone node and would report the
-// node's own pre-fade self (`.claude/rules/test-harness-false-greens.md`).
 function committedPropsOf(testID: string): Record<string, unknown> {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
   if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
-  return hit;
+  return hit.payload;
 }
 
 // The ENGINE's order: `events/index.ts` bubbles PRESS_IN and only then negotiates the responder,
@@ -104,6 +99,12 @@ async function settle(): Promise<void> {
   await vi.advanceTimersByTimeAsync(400);
   await Promise.resolve();
 }
+
+beforeEach(() => {
+  // Every case opens its OWN surface, and `appRoot()` searches the CREATION log — without this it
+  // answers with an earlier case's root.
+  fabric.reset();
+});
 
 afterEach(() => {
   clearHostBehaviors();

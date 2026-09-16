@@ -17,15 +17,16 @@ vi.mock('@symbiote-native/engine', async () => {
   return { ...actual, Platform: { ...actual.Platform, OS: 'android' } };
 });
 
-const { installFabric } = await import('../../../test-utils/src/index');
-type IFakeNode = import('../../../test-utils/src/index').IFakeNode;
+const { createLiveTree, installRecordingFabric } =
+  await import('../../../test-utils/src/index');
 const { createElement, createSurface, routeProp } =
   await import('@symbiote-native/engine');
 const { registerPressableBehavior, PRESSABLE_TAG } =
   await import('./pressable');
 const { rippleProps } = await import('../state/pressable');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 registerPressableBehavior();
 
 let nextRootTag = 9800;
@@ -34,6 +35,9 @@ const TEST_ID = 'subject';
 function commitTag(
   props: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {
+  // Every case opens its own surface, and `appRoot()`/`findLive` search the creation log — without
+  // this a later case would match an earlier one's node.
+  fabric.reset();
   const node = createElement('RCTView', false, PRESSABLE_TAG);
   routeProp(node, 'testID', TEST_ID);
   for (const [key, value] of Object.entries(props)) routeProp(node, key, value);
@@ -41,19 +45,12 @@ function commitTag(
   surface.appendChild(node);
   surface.commit();
 
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const candidate of nodes) {
-      if (candidate.props.testID === TEST_ID) return candidate.props;
-      const hit = walk(candidate.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const found = walk(fabric.appRoot().children);
+  const found = live.findLive(
+    live.appRoot(),
+    candidate => candidate.payload.testID === TEST_ID,
+  );
   if (found === undefined) throw new Error('the subject never reached Fabric');
-  return found;
+  return found.payload;
 }
 
 describe('a pressable tag carries its own Android ripple', () => {

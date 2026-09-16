@@ -25,6 +25,7 @@ import {
   dispatchViewCommand,
   dlog,
   propOf,
+  propsOf,
   registerHostBehavior,
   requestCommitFor,
   setBehaviorListener,
@@ -63,6 +64,16 @@ interface IBehaviorState {
   // Mirrored from the focus/blur events. Native exposes no synchronous focus getter, and RN's own
   // TextInputState holds the same mirror for the same reason.
   isFocused: boolean;
+  /**
+   * Whether the mirror was seeded on THIS commit, so the beat that follows has nothing to compare.
+   *
+   * `attachAfterCommit` and `afterCommit` both run on the commit that lands the node, in that
+   * order, and the first seeds `lastNativeText` from the very `value` the second would read back.
+   * The comparison is therefore decided before it is made: a string `value` equals the mirror it
+   * just set, and a non-string one fails `shouldCommandText`'s own narrowing. So the first beat
+   * cannot command, and the read it makes to prove that is a host crossing per input per create.
+   */
+  isMirrorFreshlySeeded: boolean;
 }
 
 const states = new WeakMap<ISymbioteNode, IBehaviorState>();
@@ -72,7 +83,11 @@ function stateOf(node: ISymbioteNode): IBehaviorState | undefined {
 }
 
 function stringProp(node: ISymbioteNode, key: string): string | undefined {
-  const value = propOf(node, key);
+  return stringFrom(propOf(node, key));
+}
+
+/** The same narrowing, for a value already in hand — see `attachAfterCommit`'s single read. */
+function stringFrom(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
@@ -247,6 +262,7 @@ function attach(node: ISymbioteNode): void {
     mostRecentEventCount: INITIAL_EVENT_COUNT,
     lastNativeText: undefined,
     isFocused: false,
+    isMirrorFreshlySeeded: false,
   });
   // The mirror's seed has to reach the PAYLOAD too, not just this state object. The wrappers handed
   // the count over on every render, so an input committed the key at create; the behavior used to
@@ -266,12 +282,18 @@ function attach(node: ISymbioteNode): void {
 function attachAfterCommit(node: ISymbioteNode): void {
   const state = stateOf(node);
   if (state === undefined) return;
+  // ONE question, not three. `propOf` crosses the host boundary per call — `flushOps()` plus a JSI
+  // read — and this runs once per input on the commit that lands it, so three reads of the same
+  // bag were three crossings per `<text-input>` on every create. `propsOf` fetches it whole and
+  // hands back the host's own object when nothing is stashed, which is every node here.
+  const props = propsOf(node);
   state.lastNativeText = foldText(
-    stringProp(node, 'value'),
-    stringProp(node, 'defaultValue'),
+    stringFrom(props.value),
+    stringFrom(props.defaultValue),
   );
+  state.isMirrorFreshlySeeded = true;
 
-  if (propOf(node, 'autoFocus') !== true) return;
+  if (props.autoFocus !== true) return;
   // Driven in JS rather than as a native prop, exactly as RN does it
   // (TextInput.js:538 -> TextInputState.focusInput). The native command is idempotent if the input
   // is already focused.
@@ -285,6 +307,13 @@ function attachAfterCommit(node: ISymbioteNode): void {
 function afterCommit(node: ISymbioteNode): void {
   const state = stateOf(node);
   if (state === undefined) return;
+  // The seed ran on this same commit, so the comparison below is already decided — see
+  // `isMirrorFreshlySeeded`. Cleared here rather than in the seed, because this is the beat it
+  // covers and the next one must read for real.
+  if (state.isMirrorFreshlySeeded) {
+    state.isMirrorFreshlySeeded = false;
+    return;
+  }
 
   const value = stringProp(node, 'value');
   if (!shouldCommandText(state.lastNativeText, value)) return;

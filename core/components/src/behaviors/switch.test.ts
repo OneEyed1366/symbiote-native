@@ -4,7 +4,10 @@
 // have (a snap-back that never fires, a fold that leaves an authored alias in the payload) is
 // invisible on `node.props`.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '../../../test-utils/src/index';
 import {
   clearHostBehaviors,
   createElement,
@@ -17,7 +20,8 @@ import {
 import { registerSwitchBehavior, SWITCH_TAG } from './switch';
 import { descriptorFor } from '../component-names/index.ios';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 8000;
 
 // PRODUCTION SHAPE. An adapter resolves the intrinsic tag through `descriptorFor` and calls
@@ -61,20 +65,13 @@ function changeEvent(node: ISymbioteNode, value: boolean): ISymbioteEvent {
   };
 }
 
-// The LIVE tree, by testID — never `fabric.find()`, which searches `created` and hands back the
-// pre-clone node with its mount-time props (`test-harness-false-greens.md`).
+// The LIVE tree, by testID — never `fabric.find()`, which searches the creation log and hands back
+// the AUTHORED bag, not the committed payload (`test-harness-false-greens.md`). Reads `.payload`
+// (`fabricProps`'s output): `onTintColor`/`tintColor`/`thumbTintColor` are folds, never props the
+// app wrote.
 function committedPropsOf(testID: string): Record<string, unknown> | undefined {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+  return live.findLive(live.appRoot(), node => node.payload.testID === testID)
+    ?.payload;
 }
 
 function commandsNamed(

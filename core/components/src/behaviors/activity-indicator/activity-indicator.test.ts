@@ -20,9 +20,9 @@
 // that name — the Android claims are about the colour omission and the two native extras.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  expectCommittedProps,
-  installFabric,
-  type IFakeNode,
+  createLiveTree,
+  installRecordingFabric,
+  payloadOf,
 } from '../../../../test-utils/src/index';
 import {
   appendChild,
@@ -47,7 +47,8 @@ import {
   type IActivityIndicatorProps,
 } from './shared';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // The slot's props, asked of the host — JS holds no tree, and each call site has already
 // established that the slot exists.
@@ -87,40 +88,29 @@ afterEach(() => {
   fabric.reset();
 });
 
-function mount(build: (root: ISymbioteNode) => void): IFakeNode[] {
+// One node, the props written on it exactly as an app writes them on the tag. Nothing here names
+// the spinner — that is the behavior's job, and its absence is the test. Returns both handles
+// directly, so a caller reads `payloadOf(host)` / `payloadOf(spinner)` for the committed props —
+// no tree search needed, since `buildStructure` hands the spinner straight back as `childHost`.
+function mountTag(props: IActivityIndicatorProps): {
+  host: ISymbioteNode;
+  spinner: ISymbioteNode;
+} {
   const surface = createSurface((nextRootTag += 1));
   const root = createElement('RCTView');
   surface.appendChild(root);
-  build(root);
+  const host = createElement(HOST_VIEW, false, ACTIVITY_INDICATOR_TAG);
+  for (const key of Object.keys(props))
+    routeProp(host, key, Reflect.get(props, key));
+  appendChild(root, host);
+  const spinner = host.childHost;
+  expect(
+    spinner?.component,
+    'the behavior never built a spinner — is it registered?',
+  ).toBe(SPINNER_VIEW);
+  if (spinner === undefined) throw new Error('the host built no slot');
   surface.commit();
-  // Read out of `fabric.committed` rather than `fabric.find`, which searches `created` and so hands
-  // back a node's pre-clone self after any update.
-  const host =
-    fabric.committed[fabric.committed.length - 1]?.children[0]?.children[0];
-  if (host === undefined) throw new Error('the indicator never committed');
-  return [host];
-}
-
-// One node, the props written on it exactly as an app writes them on the tag. Nothing here names
-// the spinner — that is the behavior's job, and its absence is the test.
-function mountTag(props: IActivityIndicatorProps): IFakeNode[] {
-  return mount(root => {
-    const host = createElement(HOST_VIEW, false, ACTIVITY_INDICATOR_TAG);
-    for (const key of Object.keys(props))
-      routeProp(host, key, Reflect.get(props, key));
-    appendChild(root, host);
-    expect(
-      host.childHost?.component,
-      'the behavior never built a spinner — is it registered?',
-    ).toBe(SPINNER_VIEW);
-  });
-}
-
-function spinnerOf(tree: readonly IFakeNode[]): IFakeNode {
-  const spinner = tree[0]?.children[0];
-  if (spinner === undefined || spinner.viewName !== SPINNER_VIEW)
-    throw new Error(`no ${SPINNER_VIEW} committed under the host`);
-  return spinner;
+  return { host, spinner };
 }
 
 describe('the tag builds RN’s two-node structure', () => {
@@ -135,9 +125,9 @@ describe('the tag builds RN’s two-node structure', () => {
   });
 
   it('commits RCTView(spinner), the two nodes RN itself renders', () => {
-    const tree = mountTag({ testID: TEST_ID });
+    const { host } = mountTag({ testID: TEST_ID });
 
-    expect(fabric.serialize(tree)).toBe(`${HOST_VIEW}(${SPINNER_VIEW})`);
+    expect(live.serialize(host)).toBe(`${HOST_VIEW}(${SPINNER_VIEW})`);
   });
 
   it('moves everything but the host list OFF the host, RN’s own split', () => {
@@ -172,25 +162,27 @@ describe('the size fold, which is the whole reason `size` is not a native prop',
   ])(
     '$size maps to BOTH the native enum and the fixed box',
     ({ size, box }) => {
-      const spinner = spinnerOf(mountTag({ testID: TEST_ID, size }));
+      const { spinner } = mountTag({ testID: TEST_ID, size });
+      const payload = payloadOf(spinner);
 
-      expect(spinner.props.size).toBe(size);
-      expect(spinner.props).toMatchObject(box);
+      expect(payload.size).toBe(size);
+      expect(payload).toMatchObject(box);
     },
   );
 
   it('a NUMBER sizes through style only and sends no enum at all', () => {
-    const spinner = spinnerOf(mountTag({ testID: TEST_ID, size: 24 }));
+    const { spinner } = mountTag({ testID: TEST_ID, size: 24 });
+    const payload = payloadOf(spinner);
 
-    expect(spinner.props).toMatchObject({ width: 24, height: 24 });
-    expect(Object.hasOwn(spinner.props, 'size')).toBe(false);
+    expect(payload).toMatchObject({ width: 24, height: 24 });
+    expect(Object.hasOwn(payload, 'size')).toBe(false);
   });
 
   it('defaults to small when the app writes no size, as RN does', () => {
-    const spinner = spinnerOf(mountTag({ testID: TEST_ID }));
+    const payload = payloadOf(mountTag({ testID: TEST_ID }).spinner);
 
-    expect(spinner.props.size).toBe('small');
-    expect(spinner.props).toMatchObject(SIZE_SMALL_BOX);
+    expect(payload.size).toBe('small');
+    expect(payload).toMatchObject(SIZE_SMALL_BOX);
   });
 });
 
@@ -198,23 +190,23 @@ describe('the two defaults a tag has no destructure for', () => {
   beforeEach(registerIos);
 
   it('animating and hidesWhenStopped are true when unwritten', () => {
-    const spinner = spinnerOf(mountTag({ testID: TEST_ID }));
+    const payload = payloadOf(mountTag({ testID: TEST_ID }).spinner);
 
-    expect(spinner.props.animating).toBe(true);
-    expect(spinner.props.hidesWhenStopped).toBe(true);
+    expect(payload.animating).toBe(true);
+    expect(payload.hidesWhenStopped).toBe(true);
   });
 
   it('an explicit false still wins', () => {
-    const spinner = spinnerOf(
+    const payload = payloadOf(
       mountTag({
         testID: TEST_ID,
         animating: false,
         hidesWhenStopped: false,
-      }),
+      }).spinner,
     );
 
-    expect(spinner.props.animating).toBe(false);
-    expect(spinner.props.hidesWhenStopped).toBe(false);
+    expect(payload.animating).toBe(false);
+    expect(payload.hidesWhenStopped).toBe(false);
   });
 });
 
@@ -222,14 +214,15 @@ describe('the host keeps the centering style, and only that', () => {
   beforeEach(registerIos);
 
   it('composes RN styles.container UNDER the app style, so the app still wins', () => {
-    const tree = mountTag({
+    const { host, spinner } = mountTag({
       testID: TEST_ID,
       nativeID: 'native',
       // Collides with the container's own alignItems — the app must win.
       style: { alignItems: 'flex-start', margin: 4 },
     });
+    const hostPayload = payloadOf(host);
 
-    expect(tree[0]?.props).toMatchObject({
+    expect(hostPayload).toMatchObject({
       justifyContent: 'center',
       alignItems: 'flex-start',
       margin: 4,
@@ -237,16 +230,18 @@ describe('the host keeps the centering style, and only that', () => {
     // The two RN hands to the spinner instead (`ActivityIndicator.js:99`). Asserted as ABSENT here
     // rather than only as present there: a fold that lands a key on BOTH nodes reads correct from
     // the spinner's side alone.
-    expect(Object.hasOwn(tree[0]?.props ?? {}, 'testID')).toBe(false);
-    expect(Object.hasOwn(tree[0]?.props ?? {}, 'nativeID')).toBe(false);
-    expect(spinnerOf(tree).props).toMatchObject({
+    expect(Object.hasOwn(hostPayload, 'testID')).toBe(false);
+    expect(Object.hasOwn(hostPayload, 'nativeID')).toBe(false);
+    expect(payloadOf(spinner)).toMatchObject({
       testID: TEST_ID,
       nativeID: 'native',
     });
   });
 
   it('centres with no app style at all', () => {
-    expect(mountTag({ testID: TEST_ID })[0]?.props).toMatchObject(CENTERED);
+    expect(payloadOf(mountTag({ testID: TEST_ID }).host)).toMatchObject(
+      CENTERED,
+    );
   });
 
   // A class NAME is the only entry on the host list that is not RN's own: `routeProp`'s class
@@ -264,15 +259,16 @@ describe('the host keeps the centering style, and only that', () => {
           style: { backgroundColor: 'red' },
         },
       ]);
-      const tree = mountTag({ testID: TEST_ID, [spelling]: CARD_CLASS });
+      const { host, spinner } = mountTag({
+        testID: TEST_ID,
+        [spelling]: CARD_CLASS,
+      });
 
-      expect(tree[0]?.props).toMatchObject({
+      expect(payloadOf(host)).toMatchObject({
         backgroundColor: 'red',
         ...CENTERED,
       });
-      expect(Object.hasOwn(spinnerOf(tree).props, 'backgroundColor')).toBe(
-        false,
-      );
+      expect(Object.hasOwn(payloadOf(spinner), 'backgroundColor')).toBe(false);
     },
   );
 });
@@ -281,22 +277,22 @@ describe('the platform half: iOS', () => {
   beforeEach(registerIos);
 
   it("fills in RN's GRAY when the app names no colour", () => {
-    expect(spinnerOf(mountTag({ testID: TEST_ID })).props.color).toBe(
+    expect(payloadOf(mountTag({ testID: TEST_ID }).spinner).color).toBe(
       '#999999',
     );
   });
 
   it('an explicit colour wins over the default', () => {
     expect(
-      spinnerOf(mountTag({ testID: TEST_ID, color: '#ff0000' })).props.color,
+      payloadOf(mountTag({ testID: TEST_ID, color: '#ff0000' }).spinner).color,
     ).toBe('#ff0000');
   });
 
   it('sends no native extras — those are AndroidProgressBar requirements', () => {
-    const spinner = spinnerOf(mountTag({ testID: TEST_ID }));
+    const payload = payloadOf(mountTag({ testID: TEST_ID }).spinner);
 
-    expect(Object.hasOwn(spinner.props, 'styleAttr')).toBe(false);
-    expect(Object.hasOwn(spinner.props, 'indeterminate')).toBe(false);
+    expect(Object.hasOwn(payload, 'styleAttr')).toBe(false);
+    expect(Object.hasOwn(payload, 'indeterminate')).toBe(false);
   });
 });
 
@@ -304,30 +300,30 @@ describe('the platform half: Android', () => {
   beforeEach(registerAndroid);
 
   it('OMITS colour entirely on the theme default — a null is rejected by the colour parser', () => {
-    const spinner = spinnerOf(mountTag({ testID: TEST_ID }));
+    const payload = payloadOf(mountTag({ testID: TEST_ID }).spinner);
 
-    expect(Object.hasOwn(spinner.props, 'color')).toBe(false);
+    expect(Object.hasOwn(payload, 'color')).toBe(false);
   });
 
   it('an explicit colour still reaches the spinner', () => {
     expect(
-      spinnerOf(mountTag({ testID: TEST_ID, color: '#00ff00' })).props.color,
+      payloadOf(mountTag({ testID: TEST_ID, color: '#00ff00' }).spinner).color,
     ).toBe('#00ff00');
   });
 
   it('sends styleAttr and indeterminate, without which the view throws setStyle()', () => {
-    const spinner = spinnerOf(mountTag({ testID: TEST_ID }));
+    const payload = payloadOf(mountTag({ testID: TEST_ID }).spinner);
 
-    expect(spinner.props.styleAttr).toBe('Normal');
-    expect(spinner.props.indeterminate).toBe(true);
+    expect(payload.styleAttr).toBe('Normal');
+    expect(payload.indeterminate).toBe(true);
   });
 });
 
 // The payload oracle, case by case.
 //
-// TWO expectations rather than one, because the split RN makes is the thing under test:
-// `expectCommittedProps` finds the node carrying `testID`, and that node is the SPINNER. So the host
-// needs its own assertion, or a tree that put the centering style nowhere would still pass.
+// TWO expectations rather than one, because the split RN makes is the thing under test: the
+// payload naming `testID` is the SPINNER's. So the host needs its own assertion, or a tree that
+// put the centering style nowhere would still pass.
 describe('the tag commits RN’s payload on both of its nodes', () => {
   const CASES: Array<{
     name: string;
@@ -382,18 +378,17 @@ describe('the tag commits RN’s payload on both of its nodes', () => {
     beforeEach(register);
 
     it.each(CASES)('$name', ({ props, host, spinner }) => {
-      const tree = mountTag(props);
+      const mounted = mountTag(props);
 
       // The platform half is merged UNDER the case's own keys, so an explicit colour still wins —
       // the same precedence the fold applies.
-      expect(
-        expectCommittedProps(tree, TEST_ID, {
-          ...platformDefaults(values),
-          ...spinner,
-        }).differences,
-      ).toEqual([]);
-      expect(tree[0]?.props).toMatchObject(host);
-      expect(Object.hasOwn(tree[0]?.props ?? {}, 'testID')).toBe(false);
+      expect(payloadOf(mounted.spinner)).toMatchObject({
+        ...platformDefaults(values),
+        ...spinner,
+      });
+      const hostPayload = payloadOf(mounted.host);
+      expect(hostPayload).toMatchObject(host);
+      expect(Object.hasOwn(hostPayload, 'testID')).toBe(false);
     });
   });
 });

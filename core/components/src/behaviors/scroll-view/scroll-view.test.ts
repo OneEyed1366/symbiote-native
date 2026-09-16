@@ -11,8 +11,9 @@
 // engine becoming the single owner of the content node.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  installFabric,
-  type IFakeNode,
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
 } from '../../../../test-utils/src/index';
 import {
   appendChild,
@@ -41,7 +42,8 @@ import {
   SCROLL_VIEW_TAG,
 } from './index';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // The slot's props, asked of the host — JS holds no tree, and every call site here has already
 // established that the slot exists.
@@ -131,9 +133,9 @@ describe('app children reach Fabric under the content node', () => {
     appendChild(root, owner);
     surface.commit();
 
-    const committed = fabric.find(node => node.viewName === 'RCTScrollView');
+    // `owner`'s own handle, not a search — the file already holds it.
     const contentName = descriptorFor('scroll-content').component;
-    expect(fabric.serialize([committed as never])).toBe(
+    expect(live.serialize(owner)).toBe(
       `RCTScrollView(${contentName}(RCTImageView))`,
     );
   });
@@ -191,7 +193,7 @@ describe('style precedence, which is opposite on the two nodes', () => {
   function commitScroll(
     tag: string,
     props: Readonly<Record<string, unknown>>,
-  ): { owner: IFakeNode; slot: IFakeNode } {
+  ): { owner: ILiveNode; slot: ILiveNode } {
     const surface = createSurface((nextRootTag += 1));
     const root = createElement('RCTView');
     surface.appendChild(root);
@@ -200,8 +202,8 @@ describe('style precedence, which is opposite on the two nodes', () => {
     appendChild(root, node);
     surface.commit();
 
-    const owner = fabric.find(n => n.viewName === descriptorFor(tag).component);
-    if (owner === undefined) throw new Error('scroll node never committed');
+    // `node`'s own handle, not a search — the file already holds it.
+    const owner = live.nodeOf(node);
     const slot = owner.children[0];
     if (slot === undefined) throw new Error('content node never committed');
     return { owner, slot };
@@ -216,15 +218,15 @@ describe('style precedence, which is opposite on the two nodes', () => {
       contentContainerStyle: { padding: 12, flexDirection: 'column' },
     });
 
-    expect(owner.props.flexGrow).toBe(9);
-    expect(owner.props.backgroundColor).toBe('red');
+    expect(owner.payload.flexGrow).toBe(9);
+    expect(owner.payload.backgroundColor).toBe('red');
     // Untouched halves of the base still land.
-    expect(owner.props.flexDirection).toBe('row');
-    expect(owner.props.overflow).toBe('scroll');
+    expect(owner.payload.flexDirection).toBe('row');
+    expect(owner.payload.overflow).toBe('scroll');
 
-    expect(slot.props.padding).toBe(12);
-    expect(slot.props.flexDirection).toBe('row');
-    expect(slot.props.collapsable).toBe(false);
+    expect(slot.payload.padding).toBe(12);
+    expect(slot.payload.flexDirection).toBe('row');
+    expect(slot.payload.collapsable).toBe(false);
   });
 
   it('vertical: the base composes under the app style and the slot has no constant', () => {
@@ -234,27 +236,26 @@ describe('style precedence, which is opposite on the two nodes', () => {
     });
 
     // SCROLL_VIEW_BASE_VERTICAL says 'column'; the app said 'row' and wins.
-    expect(owner.props.flexDirection).toBe('row');
-    expect(owner.props.flexGrow).toBe(1);
+    expect(owner.payload.flexDirection).toBe('row');
+    expect(owner.payload.flexGrow).toBe(1);
 
-    expect(slot.props.padding).toBe(4);
+    expect(slot.payload.padding).toBe(4);
     // Nothing composes a direction onto a vertical content node — the wrapper's contentStyle for
     // vertical is `contentContainerStyle` alone.
-    expect(slot.props.flexDirection).toBeUndefined();
+    expect(slot.payload.flexDirection).toBeUndefined();
   });
 });
 
 // Mounts a scroll-view tag and hands back a re-commit, so a test can write a prop AFTER the
-// first commit and read what the second one published. Reads out of `fabric.committed` rather than
-// `fabric.find`, which searches `created` and so returns a node's own pre-clone self on any update
-// (`.claude/rules/test-harness-false-greens.md`).
+// first commit and read what the second one published. `node`'s own handle, not a search — the
+// caller already holds it, so there is nothing to look up and no creation-log staleness to guard.
 function mountScroll(
   tag: string,
   props: Readonly<Record<string, unknown>> = {},
 ): {
   node: ISymbioteNode;
   slot: ISymbioteNode;
-  commit: () => { owner: IFakeNode; slot: IFakeNode };
+  commit: () => { owner: ILiveNode; slot: ILiveNode };
 } {
   const surface = createSurface((nextRootTag += 1));
   const root = createElement('RCTView');
@@ -263,12 +264,11 @@ function mountScroll(
   for (const key of Object.keys(props)) routeProp(node, key, props[key]);
   appendChild(root, node);
 
-  const commit = (): { owner: IFakeNode; slot: IFakeNode } => {
+  const commit = (): { owner: ILiveNode; slot: ILiveNode } => {
     surface.commit();
-    const latest = fabric.committed[fabric.committed.length - 1];
-    const owner = latest?.children[0]?.children[0];
-    const slot = owner?.children[0];
-    if (owner === undefined || slot === undefined)
+    const owner = live.nodeOf(node);
+    const slot = owner.children[0];
+    if (slot === undefined)
       throw new Error('the scroll view never committed its two nodes');
     return { owner, slot };
   };
@@ -298,19 +298,21 @@ describe('decelerationRate reaches Fabric as a number', () => {
   // scroll would keep the native default with nothing red.
   it.each(['normal', 'fast'] as const)('resolves %s', word => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG, { decelerationRate: word });
-    expect(commit().owner.props.decelerationRate).toBe(
+    expect(commit().owner.payload.decelerationRate).toBe(
       resolveDecelerationRate(word),
     );
   });
 
   it('passes a numeric rate through untouched', () => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG, { decelerationRate: 0.5 });
-    expect(commit().owner.props.decelerationRate).toBe(0.5);
+    expect(commit().owner.payload.decelerationRate).toBe(0.5);
   });
 
   it('invents no rate when the app set none', () => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG);
-    expect(Object.hasOwn(commit().owner.props, 'decelerationRate')).toBe(false);
+    expect(Object.hasOwn(commit().owner.payload, 'decelerationRate')).toBe(
+      false,
+    );
   });
 });
 
@@ -321,7 +323,7 @@ describe('decelerationRate reaches Fabric as a number', () => {
 describe('the horizontal tag sets the C++ axis flag, not just the style', () => {
   it('writes horizontal on the horizontal tag', () => {
     const { commit } = mountScroll(HORIZONTAL_SCROLL_VIEW_TAG);
-    expect(commit().owner.props.horizontal).toBe(true);
+    expect(commit().owner.payload.horizontal).toBe(true);
   });
 
   // The negative half, and the case above is its control on the same fold: both tags go through
@@ -329,7 +331,7 @@ describe('the horizontal tag sets the C++ axis flag, not just the style', () => 
   // it nowhere would fail there.
   it('invents no key on the vertical tag, matching the wrapper', () => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG);
-    expect(Object.hasOwn(commit().owner.props, 'horizontal')).toBe(false);
+    expect(Object.hasOwn(commit().owner.payload, 'horizontal')).toBe(false);
   });
 });
 
@@ -342,7 +344,7 @@ describe('the horizontal tag sets the C++ axis flag, not just the style', () => 
 describe('the tag is the only axis input, as the prop is in RN', () => {
   it('eats an app-written horizontal on the vertical tag', () => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG, { horizontal: true });
-    expect(Object.hasOwn(commit().owner.props, 'horizontal')).toBe(false);
+    expect(Object.hasOwn(commit().owner.payload, 'horizontal')).toBe(false);
   });
 
   // The control: the same fold on the other tag must still write the flag, so a fold that deleted
@@ -351,7 +353,7 @@ describe('the tag is the only axis input, as the prop is in RN', () => {
     const { commit } = mountScroll(HORIZONTAL_SCROLL_VIEW_TAG, {
       horizontal: false,
     });
-    expect(commit().owner.props.horizontal).toBe(true);
+    expect(commit().owner.payload.horizontal).toBe(true);
   });
 });
 
@@ -367,16 +369,16 @@ describe('the bounce pair defaults from the axis, as RN derives it', () => {
   // would mean the same thing to native and one more prop key on every vertical scroll view.
   it('vertical: bounces vertically, and writes no horizontal key', () => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG);
-    expect(commit().owner.props.alwaysBounceVertical).toBe(true);
-    expect(Object.hasOwn(commit().owner.props, 'alwaysBounceHorizontal')).toBe(
-      false,
-    );
+    expect(commit().owner.payload.alwaysBounceVertical).toBe(true);
+    expect(
+      Object.hasOwn(commit().owner.payload, 'alwaysBounceHorizontal'),
+    ).toBe(false);
   });
 
   it('horizontal: bounces horizontally and not vertically', () => {
     const { commit } = mountScroll(HORIZONTAL_SCROLL_VIEW_TAG);
-    expect(commit().owner.props.alwaysBounceHorizontal).toBe(true);
-    expect(commit().owner.props.alwaysBounceVertical).toBe(false);
+    expect(commit().owner.payload.alwaysBounceHorizontal).toBe(true);
+    expect(commit().owner.payload.alwaysBounceVertical).toBe(false);
   });
 
   it('lets an explicit value win on both keys', () => {
@@ -384,8 +386,8 @@ describe('the bounce pair defaults from the axis, as RN derives it', () => {
       alwaysBounceHorizontal: true,
       alwaysBounceVertical: false,
     });
-    expect(commit().owner.props.alwaysBounceHorizontal).toBe(true);
-    expect(commit().owner.props.alwaysBounceVertical).toBe(false);
+    expect(commit().owner.payload.alwaysBounceHorizontal).toBe(true);
+    expect(commit().owner.payload.alwaysBounceVertical).toBe(false);
   });
 });
 
@@ -396,21 +398,21 @@ describe('the bounce pair defaults from the axis, as RN derives it', () => {
 describe('nested scrolling defaults on, as the wrapper leaves it', () => {
   it('defaults to true when the app set nothing', () => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG);
-    expect(commit().owner.props.nestedScrollEnabled).toBe(true);
+    expect(commit().owner.payload.nestedScrollEnabled).toBe(true);
   });
 
   it('honours an explicit false', () => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG, {
       nestedScrollEnabled: false,
     });
-    expect(commit().owner.props.nestedScrollEnabled).toBe(false);
+    expect(commit().owner.payload.nestedScrollEnabled).toBe(false);
   });
 });
 
 describe('collapsableChildren is derived from props that stay on the owner', () => {
   it('writes no key when neither anchor prop is set', () => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG);
-    expect(Object.hasOwn(commit().slot.props, 'collapsableChildren')).toBe(
+    expect(Object.hasOwn(commit().slot.payload, 'collapsableChildren')).toBe(
       false,
     );
   });
@@ -424,9 +426,9 @@ describe('collapsableChildren is derived from props that stay on the owner', () 
       const { owner, slot } = commit();
 
       // The prop itself is the scroll view's — only the DERIVED value crosses to the slot.
-      expect(owner.props[key]).toBeDefined();
-      expect(slot.props.collapsableChildren).toBe(false);
-      expect(Object.hasOwn(owner.props, 'collapsableChildren')).toBe(false);
+      expect(owner.payload[key]).toBeDefined();
+      expect(slot.payload.collapsableChildren).toBe(false);
+      expect(Object.hasOwn(owner.payload, 'collapsableChildren')).toBe(false);
     },
   );
 
@@ -435,21 +437,22 @@ describe('collapsableChildren is derived from props that stay on the owner', () 
   // declaration this second commit publishes nothing and the value is frozen at its mount answer.
   it('re-derives after a write that lands AFTER the first commit', () => {
     const { node, commit } = mountScroll(SCROLL_VIEW_TAG);
-    expect(Object.hasOwn(commit().slot.props, 'collapsableChildren')).toBe(
+    expect(Object.hasOwn(commit().slot.payload, 'collapsableChildren')).toBe(
       false,
     );
 
     routeProp(node, 'maintainVisibleContentPosition', {
       minIndexForVisible: 0,
     });
-    expect(commit().slot.props.collapsableChildren).toBe(false);
+    expect(commit().slot.payload.collapsableChildren).toBe(false);
   });
 
   // The other half of the same guard: a re-render writing the SAME value must not dirty the slot,
   // or every ScrollView render clones its content node. `setProp`'s identity guard is what stops
   // it, which is why the mark is read past it and not in `routeProp`.
-  // Asserted on the COMMITTED tree rather than on a dirty flag: JS holds neither the tree nor the
-  // mark now, and the flag was never the claim — "the slot re-published nothing" is.
+  // Asserted on node IDENTITY (the handle, not the live wrapper — `ILiveNode.children` is a getter
+  // and two separate reads of the same node are never `===`): "the slot re-published nothing" is
+  // read as "the same engine node came back", which is what a re-publish would have replaced.
   it('an unchanged rewrite publishes nothing', () => {
     const anchor = { minIndexForVisible: 0 };
     const { node, commit } = mountScroll(SCROLL_VIEW_TAG, {
@@ -459,7 +462,7 @@ describe('collapsableChildren is derived from props that stay on the owner', () 
 
     routeProp(node, 'maintainVisibleContentPosition', anchor);
     // The same OBJECT the host already holds: a re-published payload would be a different one.
-    expect(commit().slot).toBe(before);
+    expect(commit().slot.handle).toBe(before.handle);
   });
 });
 
@@ -468,7 +471,7 @@ describe('onContentSizeChange is synthesized from the content view layout', () =
     const { slot, commit } = mountScroll(SCROLL_VIEW_TAG);
     // `onLayout` is a GATED event: wiring it unconditionally would put the flag in every
     // ScrollView's payload and buy a native event nobody reads.
-    expect(Object.hasOwn(commit().slot.props, 'onLayout')).toBe(false);
+    expect(Object.hasOwn(commit().slot.payload, 'onLayout')).toBe(false);
     expect(slot.listeners?.get('layout')).toBeUndefined();
   });
 
@@ -481,7 +484,7 @@ describe('onContentSizeChange is synthesized from the content view layout', () =
     });
     // ONE commit. The wiring follows the LISTENER and is synchronous, so the gate flag is on the
     // slot before the first commit — the wrapper has no two-pass mount either.
-    expect(commit().slot.props.onLayout).toBe(true);
+    expect(commit().slot.payload.onLayout).toBe(true);
 
     const listener = slot.listeners?.get('layout');
     if (listener === undefined)
@@ -507,12 +510,21 @@ describe('onContentSizeChange is synthesized from the content view layout', () =
     const { node, slot, commit } = mountScroll(SCROLL_VIEW_TAG, {
       onContentSizeChange: () => {},
     });
-    expect(commit().slot.props.onLayout).toBe(true);
+    expect(commit().slot.payload.onLayout).toBe(true);
 
     routeProp(node, 'onContentSizeChange', undefined);
-    // NULL, not absent: Fabric has no prop removal, so `diffProps` sends an explicit null for a key
-    // that disappeared. Asserting absence here would be asserting a thing the platform cannot do.
-    expect(commit().slot.props.onLayout).toBeNull();
+    // ABSENT, not null. Fabric has no prop removal — the engine's op stream spells "clear" with
+    // NO_VALUE, and a host replaying that op deletes the key; `null` was only ever the old mirror's
+    // clone-protocol spelling (mirror-elimination.md, "RESOLVED: the onLayout === null decision").
+    expect(Object.hasOwn(commit().slot.payload, 'onLayout')).toBe(false);
+    // …and the record lost it too, proving a clearing op was sent rather than merely stopped.
+    // `slot` is the engine's own `childHost` handle, so there is nothing to search for.
+    expect(
+      Object.hasOwn(
+        fabric.find(n => n.handle === slot)?.props ?? {},
+        'onLayout',
+      ),
+    ).toBe(false);
     expect(slot.listeners?.get('layout')).toBeUndefined();
   });
 });
@@ -533,7 +545,7 @@ describe('a RefreshControl child is claimed by the owner', () => {
     appendChild(node, createElement('RCTImageView'));
 
     // RN's iOS branch renders `{refreshControl}{contentContainer}`, in that order.
-    expect(fabric.serialize([commit().owner as never])).toBe(
+    expect(live.serialize(commit().owner.handle)).toBe(
       `RCTScrollView(${REFRESH}${CONTENT}(RCTImageView))`,
     );
   });
@@ -544,7 +556,7 @@ describe('a RefreshControl child is claimed by the owner', () => {
     const { node, commit } = mountScroll(SCROLL_VIEW_TAG);
     appendChild(node, createElement('RCTImageView'));
 
-    expect(fabric.serialize([commit().owner as never])).toBe(
+    expect(live.serialize(commit().owner.handle)).toBe(
       `RCTScrollView(${CONTENT}(RCTImageView))`,
     );
   });
@@ -556,7 +568,7 @@ describe('a RefreshControl child is claimed by the owner', () => {
     appendChild(node, createElement('RCTImageView'));
     appendChild(node, refreshNode());
 
-    expect(fabric.serialize([commit().owner as never])).toBe(
+    expect(live.serialize(commit().owner.handle)).toBe(
       `RCTScrollView(${REFRESH}${CONTENT}(RCTImageView))`,
     );
   });
@@ -569,7 +581,7 @@ describe('a RefreshControl child is claimed by the owner', () => {
     appendChild(node, row);
     insertBefore(node, refreshNode(), row);
 
-    expect(fabric.serialize([commit().owner as never])).toBe(
+    expect(live.serialize(commit().owner.handle)).toBe(
       `RCTScrollView(${REFRESH}${CONTENT}(RCTImageView))`,
     );
   });
@@ -584,7 +596,7 @@ describe('a RefreshControl child is claimed by the owner', () => {
     commit();
 
     removeChild(node, refresh);
-    expect(fabric.serialize([commit().owner as never])).toBe(
+    expect(live.serialize(commit().owner.handle)).toBe(
       `RCTScrollView(${CONTENT}(RCTImageView))`,
     );
   });

@@ -2,8 +2,12 @@
 // used to run, and the press machine it composes. The two-node re-fold is only OBSERVABLE on
 // Android — `resolveButtonViewStyle` returns the same constant for every input off it — so it lives
 // in `button-android.test.ts`, beside its own Platform mock.
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '../../../test-utils/src/index';
 import {
   clearHostBehaviors,
   createElement,
@@ -16,7 +20,8 @@ import {
 import { registerButtonBehavior, BUTTON_TAG } from './button';
 import { foldHostBag } from '../fold-host-bag';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 7300;
 
 // The composed TouchableOpacity fade drives its frame loop off requestAnimationFrame, which Node
@@ -61,18 +66,13 @@ function mount(node: ISymbioteNode) {
   return surface;
 }
 
-// The LIVE tree, never `fabric.find()`, which keeps every pre-clone node and would report the
-// button's own pre-projection self (`.claude/rules/test-harness-false-greens.md`).
-function committedByTestId(testID: string): IFakeNode {
-  const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
+// The LIVE tree — `appRoot()` searches the CREATION log, so `fabric.reset()` runs per case
+// (`beforeEach` below) or a stale case's node would answer here instead.
+function committedByTestId(testID: string): ILiveNode {
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
   if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
   return hit;
 }
@@ -81,10 +81,10 @@ function committedByTestId(testID: string): IFakeNode {
 // they are reached through the button found BY testID, one hop at a time, with every view name
 // asserted. That is a claim about this primitive's own shape, not "the first RCTView in the tree".
 function subtreeOf(testID: string): {
-  host: IFakeNode;
-  view: IFakeNode;
-  text: IFakeNode;
-  label: IFakeNode | undefined;
+  host: ILiveNode;
+  view: ILiveNode;
+  text: ILiveNode;
+  label: ILiveNode | undefined;
 } {
   const host = committedByTestId(testID);
   expect(host.viewName).toBe('RCTView');
@@ -99,7 +99,7 @@ function subtreeOf(testID: string): {
   return { host, view, text, label };
 }
 
-function countNodes(node: IFakeNode): number {
+function countNodes(node: ILiveNode): number {
   return 1 + node.children.reduce((sum, kid) => sum + countNodes(kid), 0);
 }
 
@@ -127,6 +127,12 @@ async function settle(): Promise<void> {
   await Promise.resolve();
 }
 
+beforeEach(() => {
+  // `appRoot()` searches the CREATION log, and every case here opens its OWN surface — without
+  // this a case reuses the FIRST case's tree.
+  fabric.reset();
+});
+
 afterEach(() => {
   clearHostBehaviors();
   vi.useRealTimers();
@@ -143,15 +149,15 @@ describe('button host behavior', () => {
     await settle();
 
     const { text, label } = subtreeOf(TEST_ID);
-    expect(label?.props.text).toBe('Save');
+    expect(label?.payload.text).toBe('Save');
     // RN's Text.js defaults, which a hand-written host tag inherits from nothing. Without them a
     // long label clips mid-word instead of ellipsising, on device only.
-    expect(text.props.ellipsizeMode).toBe('tail');
-    expect(text.props.allowFontScaling).toBe(true);
+    expect(text.payload.ellipsizeMode).toBe('tail');
+    expect(text.payload.allowFontScaling).toBe(true);
     // `styles.text` flattened into the payload — RN spells the inset as a MARGIN, so the tap
     // target grows rather than the glyphs insetting.
-    expect(text.props.textAlign).toBe('center');
-    expect(text.props.margin).toBe(8);
+    expect(text.payload.textAlign).toBe('center');
+    expect(text.payload.margin).toBe(8);
   });
 
   it('keeps title and color off the payload and pins the button role', async () => {
@@ -167,13 +173,13 @@ describe('button host behavior', () => {
     const { host, text } = subtreeOf(TEST_ID);
     // Both are consumed by the behavior and declared by no ViewConfig: Fabric drops an unknown key
     // silently, so the strip is only ever visible here.
-    expect(host.props.title).toBeUndefined();
-    expect(host.props.color).toBeUndefined();
-    expect(host.props.accessibilityRole).toBe('button');
+    expect(host.payload.title).toBeUndefined();
+    expect(host.payload.color).toBeUndefined();
+    expect(host.payload.accessibilityRole).toBe('button');
     // RN's `accessible` split: Button forwards raw, the touchable underneath defaults it.
-    expect(host.props.accessible).toBe(true);
+    expect(host.payload.accessible).toBe(true);
     // On iOS `color` tints the LABEL, never the button (Button.js:318-324).
-    expect(text.props.color).toBe('#ff0000');
+    expect(text.payload.color).toBe('#ff0000');
   });
 
   it('re-maps touchSoundDisabled and hides descendants for importantForAccessibility="no"', async () => {
@@ -188,10 +194,10 @@ describe('button host behavior', () => {
     await settle();
 
     const { host } = subtreeOf(TEST_ID);
-    expect(host.props.android_disableSound).toBe(true);
-    expect(host.props.touchSoundDisabled).toBeUndefined();
+    expect(host.payload.android_disableSound).toBe(true);
+    expect(host.payload.touchSoundDisabled).toBeUndefined();
     // Button.js:356 — so the label inside cannot take focus separately from the button.
-    expect(host.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(host.payload.importantForAccessibility).toBe('no-hide-descendants');
   });
 
   it('greys the label from aria-disabled and merges accessibilityState', async () => {
@@ -206,11 +212,11 @@ describe('button host behavior', () => {
     await settle();
 
     const { host, text } = subtreeOf(TEST_ID);
-    expect(text.props.color).toBe('#cdcdcd');
+    expect(text.payload.color).toBe('#cdcdcd');
     // MERGES: RN keeps busy/checked/expanded/selected and overrides only `disabled`
     // (Button.js:333-338). Nothing in `button.ts` does this — the engine's aria fold and the press
     // fold compose to it, which is the whole reason Button owes no accessibilityState fold.
-    expect(host.props.accessibilityState).toMatchObject({
+    expect(host.payload.accessibilityState).toMatchObject({
       busy: true,
       disabled: true,
     });
@@ -224,21 +230,27 @@ describe('button host behavior', () => {
     routeProp(node, 'title', 'Save');
     const surface = mount(node);
     await settle();
-    expect(subtreeOf(TEST_ID).label?.props.text).toBe('Save');
+    expect(subtreeOf(TEST_ID).label?.payload.text).toBe('Save');
 
     routeProp(node, 'title', 'Send');
     surface.commit();
     await settle();
 
-    expect(subtreeOf(TEST_ID).label?.props.text).toBe('Send');
+    expect(subtreeOf(TEST_ID).label?.payload.text).toBe('Send');
   });
 
   // The raw text is the SLOT, so `title` reaches it through `routeProp` and lands in `props.text` —
   // which is what `isEmptyRawText` reads. That is the whole reason the label's fold runs over its
   // own props rather than over the owner's: a fold-only label would leave `props.text` at '' and
-  // the commit walk would drop the node before the fold ever ran, permanently. The mirror hazard is
-  // this case — an empty raw text committed to Fabric aborts inside its text walk.
-  it('commits no raw text for an empty title', async () => {
+  // the commit walk would drop the node before the fold ever ran, permanently.
+  //
+  // THE DROP ITSELF IS A REAL-FABRIC-COMMIT-ONLY RULE (`AttributedString::appendFragment` skips an
+  // empty fragment) — neither the recording host nor the live tree performs it, so the node this
+  // reads stays present with `text === ''` rather than vanishing. That half of the original claim
+  // ("nothing paints for an empty title") is therefore NOT verified here; it needs an itest against
+  // the real commit walk, which does not exist yet for this case. What IS verified: the label is
+  // updated in place and comes back once the title is non-empty again.
+  it('holds the raw text node empty for an empty title, and re-fills it', async () => {
     vi.useFakeTimers();
     registerButtonBehavior();
     const node = makeButton();
@@ -246,15 +258,15 @@ describe('button host behavior', () => {
     routeProp(node, 'title', '');
     const surface = mount(node);
     await settle();
-    expect(subtreeOf(TEST_ID).text.children).toHaveLength(0);
+    const empty = subtreeOf(TEST_ID);
+    expect(empty.text.children).toHaveLength(1);
+    expect(empty.label?.payload.text).toBe('');
 
-    // And it comes back: `renderableChildren` clears the dirty flag of a child it skips, so the
-    // write that fills the label has to reach the parent on its own.
     routeProp(node, 'title', 'Save');
     surface.commit();
     await settle();
 
-    expect(subtreeOf(TEST_ID).label?.props.text).toBe('Save');
+    expect(subtreeOf(TEST_ID).label?.payload.text).toBe('Save');
   });
 
   // The iOS half of the two-node claim: `color` tints the LABEL here and leaves the inner view at
@@ -269,13 +281,13 @@ describe('button host behavior', () => {
     routeProp(node, 'title', 'Save');
     const surface = mount(node);
     await settle();
-    expect(subtreeOf(TEST_ID).text.props.color).toBe('#007AFF');
+    expect(subtreeOf(TEST_ID).text.payload.color).toBe('#007AFF');
 
     routeProp(node, 'color', '#ff0000');
     surface.commit();
     await settle();
 
-    expect(subtreeOf(TEST_ID).text.props.color).toBe('#ff0000');
+    expect(subtreeOf(TEST_ID).text.payload.color).toBe('#ff0000');
   });
 
   it('runs the composed press machine', async () => {
@@ -308,7 +320,9 @@ describe('button host behavior', () => {
   // when nothing moved.
   //
   // Asserted as node IDENTITY in the committed tree, which is exactly "no clone was spent": a fresh
-  // but equal `accessibilityState` fails `setProp`'s guard, so all three folds DO re-run.
+  // but equal `accessibilityState` fails `setProp`'s guard, so all three folds DO re-run. Compared
+  // by HANDLE — `ILiveNode.children` is a getter that builds a fresh object per read, so `===` on
+  // two live nodes is always false.
   it('spends no clone when a re-render hands back an equal accessibilityState', async () => {
     vi.useFakeTimers();
     registerButtonBehavior();
@@ -326,9 +340,9 @@ describe('button host behavior', () => {
     await settle();
 
     const after = subtreeOf(TEST_ID);
-    expect(after.view).toBe(before.view);
-    expect(after.text).toBe(before.text);
-    expect(after.label).toBe(before.label);
+    expect(after.view.handle).toBe(before.view.handle);
+    expect(after.text.handle).toBe(before.text.handle);
+    expect(after.label?.handle).toBe(before.label?.handle);
   });
 
   // THE HEADLINE CLAIM, iOS half. TouchableOpacity WRAPS (TouchableOpacity.js:302,344), so the
@@ -370,10 +384,10 @@ describe('button host behavior', () => {
 
     expect(fabric.commands).toHaveLength(0);
     const { host } = subtreeOf(TEST_ID);
-    expect(Object.keys(host.props)).not.toContain('nativeBackgroundAndroid');
+    expect(Object.keys(host.payload)).not.toContain('nativeBackgroundAndroid');
     // TouchableOpacity's Animated.View carries `{opacity: anim}` from its first render, so a
     // resting button commits the key. Its absence would mean the Android touchable was composed.
-    expect(typeof host.props.opacity).toBe('number');
+    expect(typeof host.payload.opacity).toBe('number');
   });
 
   // TouchableOpacity.js:336 and TouchableNativeFeedback.js:369 hold the SAME expression, so this
@@ -388,18 +402,18 @@ describe('button host behavior', () => {
     const surface = mount(node);
     await settle();
     // No onPress yet: RN cannot focus a button that does nothing.
-    expect(subtreeOf(TEST_ID).host.props.focusable).toBe(false);
+    expect(subtreeOf(TEST_ID).host.payload.focusable).toBe(false);
 
     // A listener flip dirties no payload by itself, so this also pins `onOwnedListenerChange`.
     routeProp(node, 'onPress', () => {});
     surface.commit();
     await settle();
-    expect(subtreeOf(TEST_ID).host.props.focusable).toBe(true);
+    expect(subtreeOf(TEST_ID).host.payload.focusable).toBe(true);
 
     routeProp(node, 'disabled', true);
     surface.commit();
     await settle();
-    expect(subtreeOf(TEST_ID).host.props.focusable).toBe(false);
+    expect(subtreeOf(TEST_ID).host.payload.focusable).toBe(false);
   });
 
   // Button.js:337 resolves `props.disabled ?? aria-disabled ?? accessibilityState.disabled` and
@@ -491,20 +505,20 @@ describe('button host behavior', () => {
     routeProp(node, 'onPress', vi.fn());
     const surface = mount(node);
     await settle();
-    const resting = committedByTestId(TEST_ID).props.opacity;
+    const resting = committedByTestId(TEST_ID).payload.opacity;
 
     // Held down, not released — the fade is at its active value and stays there.
     listenerOf(node, 'pressIn')(TOUCH);
     listenerOf(node, 'startShouldSetResponder')(TOUCH);
     await settle();
-    const active = committedByTestId(TEST_ID).props.opacity;
+    const active = committedByTestId(TEST_ID).payload.opacity;
     expect(active).not.toBe(resting);
 
     routeProp(node, 'aria-disabled', true);
     surface.commit();
     await settle();
 
-    expect(committedByTestId(TEST_ID).props.opacity).toBe(resting);
+    expect(committedByTestId(TEST_ID).payload.opacity).toBe(resting);
   });
 
   // why: the measurement that decided `HOST_PRIMITIVES.Button.aliases`, kept as the guard.
@@ -537,10 +551,10 @@ describe('button host behavior', () => {
 
       const { host } = subtreeOf(TEST_ID);
       // RN gives `id` unconditional priority over `nativeID` (View.js:77-79).
-      expect(host.props.nativeID).toBe('from-id');
+      expect(host.payload.nativeID).toBe('from-id');
       // A raw `id` is a key no ViewConfig declares, so Fabric drops it and the label is lost with
       // nothing red — the strip is only ever visible here.
-      expect(host.props.id).toBeUndefined();
+      expect(host.payload.id).toBeUndefined();
       vi.useRealTimers();
     }
   });

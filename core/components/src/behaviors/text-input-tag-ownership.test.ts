@@ -13,15 +13,19 @@ import {
   createElement,
   hasHostBehaviors,
   routeProp,
+  setTreeHost,
 } from '@symbiote-native/engine';
 // Relative, not by package name: `core/components` does not declare test-utils, and the neighbour
 // suites in this folder import it the same way.
-import { installFabric } from '../../../test-utils/src/index';
+import { createRecordingHost } from '../../../test-utils/src/index';
 
 import { descriptorFor } from '../component-names';
 import { registerTextInputBehavior } from './text-input';
 
-installFabric();
+// A RECORDING host rather than `installFabric()`: this file needs somewhere for a commit to go and
+// never reads a tree, so there is no reason for a second implementation of Fabric's tree rules to
+// be in its path. Tree questions live in `core/engine/cpp/tests/js`, against the real renderer.
+setTreeHost(createRecordingHost());
 
 const SINGLELINE = 'text-input';
 const MULTILINE = 'text-input-multiline';

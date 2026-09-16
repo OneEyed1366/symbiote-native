@@ -15,7 +15,7 @@
 // behavior — so a primitive or an owned name added later joins this audit by existing. A
 // hand-written list is the failure this file exists to prevent, one level up.
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '../../../test-utils/src/index';
+import { installRecordingFabric } from '../../../test-utils/src/index';
 import {
   appListenerFor,
   clearHostBehaviors,
@@ -35,7 +35,8 @@ import { registerSwitchBehavior } from './switch';
 import { registerTextInputBehavior } from './text-input';
 import { registerTouchableNativeFeedbackBehavior } from './touchable-native-feedback';
 
-const fabric = installFabric();
+// A RECORDING host: nothing here reads a committed tree.
+const fabric = installRecordingFabric();
 
 function everySpecTag(): string[] {
   return Object.values(HOST_PRIMITIVES).flatMap(spec =>

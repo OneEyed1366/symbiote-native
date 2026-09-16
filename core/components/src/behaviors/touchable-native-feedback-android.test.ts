@@ -7,7 +7,11 @@
 // leave shared code on the iOS branch.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '../../../test-utils/src/index';
 
 vi.mock('@symbiote-native/engine', async () => {
   const actual = await vi.importActual<
@@ -49,7 +53,10 @@ const {
   TOUCHABLE_NATIVE_FEEDBACK_TAG,
 } = await import('./touchable-native-feedback');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// Anchors flatten here exactly as the commit walk flattens them, which is the whole point on this
+// file's subject: a touchable that commits NO VIEW is born with the anchor component.
+const live = createLiveTree(fabric);
 let nextRootTag = 7700;
 
 const ROOT_TEST_ID = 'root';
@@ -86,6 +93,7 @@ function mount(ownerProps: Readonly<Record<string, unknown>> = {}) {
   engineAppend(root, owner);
   engineAppend(owner, child);
   surface.commit();
+  currentRoot = root;
   return { root, owner, child, surface };
 }
 
@@ -96,16 +104,17 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-function subject(): IFakeNode {
-  const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === SUBJECT_TEST_ID) return node;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
+// Searched from THIS case's own root, never from `appRoot()`. Every case here opens a fresh
+// surface and the recording is never reset between them, so an app-root lookup would answer with
+// the FIRST case's tree for every case after it — green on case one and quietly wrong after.
+let currentRoot: ISymbioteNode | undefined;
+
+function subject(): ILiveNode {
+  if (currentRoot === undefined) throw new Error('nothing was mounted');
+  const hit = live.findLive(
+    currentRoot,
+    node => node.payload.testID === SUBJECT_TEST_ID,
+  );
   if (hit === undefined) throw new Error('no committed subject');
   return hit;
 }
@@ -129,7 +138,7 @@ describe('touchable-native-feedback host behavior on Android', () => {
     mount();
 
     const committed = subject();
-    expect(committed.props.nativeBackgroundAndroid).toEqual(
+    expect(committed.payload.nativeBackgroundAndroid).toEqual(
       SELECTABLE_BACKGROUND,
     );
     expect(Object.keys(committed.props)).not.toContain(
@@ -146,7 +155,7 @@ describe('touchable-native-feedback host behavior on Android', () => {
     });
 
     const committed = subject();
-    expect(committed.props.nativeForegroundAndroid).toEqual({
+    expect(committed.payload.nativeForegroundAndroid).toEqual({
       type: 'RippleAndroid',
       color: '#ff0000',
       borderless: true,
@@ -181,7 +190,7 @@ describe('touchable-native-feedback host behavior on Android', () => {
       'setPressed',
     ]);
     expect(fabric.commands[0].args).toEqual([12, 34]);
-    expect(fabric.commands[0].node).toBe(committed);
+    expect(fabric.commands[0].handle).toBe(committed.handle);
     expect(fabric.commands[1].args).toEqual([true]);
 
     fabric.commands.length = 0;

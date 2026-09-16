@@ -10,7 +10,11 @@
 // `OS: 'android'` leaves `render-button`'s module-load styles on the iOS branch and this suite
 // would pin a shape no Android build produces (`render-button-android.test.ts` says the same).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '../../../test-utils/src/index';
 
 vi.mock('@symbiote-native/engine', async () => {
   const actual = await vi.importActual<
@@ -43,7 +47,8 @@ type ISymbioteNode = import('@symbiote-native/engine').ISymbioteNode;
 const { registerButtonBehavior, BUTTON_TAG } = await import('./button');
 const { foldHostBag } = await import('../fold-host-bag');
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 7400;
 
 // The composed fade reads requestAnimationFrame off the host at call time and Node has none. Kept
@@ -106,25 +111,20 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-// The LIVE tree, never `fabric.find()`, which keeps every pre-clone node and would report the
-// button's own pre-projection self.
+// The LIVE tree, over the recording host — `appRoot()` searches the CREATION log, so `fabric.reset()`
+// runs per case (`beforeEach` below).
 //
 // THREE NODES, and every hop is asserted: the host IS the styled button view here, so a text node
 // found under an intermediate RCTView would mean the iOS shape leaked onto Android.
 function subtreeOf(testID: string): {
-  host: IFakeNode;
-  text: IFakeNode;
-  label: IFakeNode | undefined;
+  host: ILiveNode;
+  text: ILiveNode;
+  label: ILiveNode | undefined;
 } {
-  const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const host = walk(fabric.appRoot().children);
+  const host = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
   if (host === undefined) throw new Error(`no committed node testID=${testID}`);
   expect(host.viewName).toBe('RCTView');
   expect(host.children).toHaveLength(1);
@@ -135,7 +135,7 @@ function subtreeOf(testID: string): {
   return { host, text, label };
 }
 
-function countNodes(node: IFakeNode): number {
+function countNodes(node: ILiveNode): number {
   return 1 + node.children.reduce((sum, kid) => sum + countNodes(kid), 0);
 }
 
@@ -146,7 +146,7 @@ async function settle(): Promise<void> {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  fabric.commands.length = 0;
+  fabric.reset();
   registerButtonBehavior();
 });
 
@@ -165,7 +165,7 @@ describe('button host behavior on Android', () => {
 
     const { host, label } = subtreeOf(TEST_ID);
     expect(countNodes(host)).toBe(3);
-    expect(label?.props.text).toBe('SAVE'); // Button.js:352-353
+    expect(label?.payload.text).toBe('SAVE'); // Button.js:352-353
     expect(node.childHost).toBeDefined();
   });
 
@@ -175,10 +175,10 @@ describe('button host behavior on Android', () => {
 
     const { host, text } = subtreeOf(TEST_ID);
     // On iOS this lives one node down and is `{}`; here the host IS `<View style={buttonStyles}>`.
-    expect(host.props.backgroundColor).toBe(ANDROID_BLUE);
-    expect(host.props.elevation).toBe(4);
-    expect(host.props.borderRadius).toBe(2);
-    expect(text.props.color).toBe(ANDROID_TEXT);
+    expect(host.payload.backgroundColor).toBe(ANDROID_BLUE);
+    expect(host.payload.elevation).toBe(4);
+    expect(host.payload.borderRadius).toBe(2);
+    expect(text.payload.color).toBe(ANDROID_TEXT);
   });
 
   it('carries the selectable-background ripple and runs no opacity fade', async () => {
@@ -186,16 +186,15 @@ describe('button host behavior on Android', () => {
     await settle();
 
     const { host } = subtreeOf(TEST_ID);
-    expect(host.props.nativeBackgroundAndroid).toEqual(SELECTABLE_BACKGROUND);
+    expect(host.payload.nativeBackgroundAndroid).toEqual(SELECTABLE_BACKGROUND);
     // `useForeground` is not a Button prop, so the foreground slot is never the one TNF picks.
-    expect(Object.keys(host.props)).not.toContain('nativeForegroundAndroid');
+    expect(Object.keys(host.payload)).not.toContain('nativeForegroundAndroid');
     // `collapsable`, not `opacity`, and the difference was measured rather than assumed. Binding an
     // Animated value is what forces `collapsable: false` (touchable-opacity.ts's `attach`), and
     // that key survives; the fade's `opacity` does NOT reach the payload here at all, because the
     // Material fold below overwrites the whole style slot. So an `opacity` assertion would pass
-    // under a composed TouchableOpacity and prove nothing
-    // (`.claude/rules/test-harness-false-greens.md`).
-    expect(Object.keys(host.props)).not.toContain('collapsable');
+    // under a composed TouchableOpacity and prove nothing.
+    expect(Object.keys(host.payload)).not.toContain('collapsable');
   });
 
   // The Android half of the colour pair. Here `color` tints the BUTTON and leaves the label white;
@@ -204,17 +203,17 @@ describe('button host behavior on Android', () => {
   it('re-tints the host when color changes after mount', async () => {
     const { surface, node } = mountButton();
     await settle();
-    expect(subtreeOf(TEST_ID).host.props.backgroundColor).toBe(ANDROID_BLUE);
+    expect(subtreeOf(TEST_ID).host.payload.backgroundColor).toBe(ANDROID_BLUE);
 
     routeProp(node, 'color', '#ff0000');
     surface.commit();
     await settle();
 
     const after = subtreeOf(TEST_ID);
-    expect(after.host.props.backgroundColor).toBe('#ff0000');
+    expect(after.host.payload.backgroundColor).toBe('#ff0000');
     // …and the label keeps Android's own white, which is the half a one-hop mark would have lost.
-    expect(after.text.props.color).toBe(ANDROID_TEXT);
-    expect(after.host.props.color).toBeUndefined();
+    expect(after.text.payload.color).toBe(ANDROID_TEXT);
+    expect(after.host.payload.color).toBeUndefined();
   });
 
   it('greys both nodes when disabled changes after mount', async () => {
@@ -226,9 +225,11 @@ describe('button host behavior on Android', () => {
     await settle();
 
     const after = subtreeOf(TEST_ID);
-    expect(after.host.props.backgroundColor).toBe(ANDROID_DISABLED_BACKGROUND);
-    expect(after.host.props.elevation).toBe(0);
-    expect(after.text.props.color).toBe(ANDROID_DISABLED_TEXT);
+    expect(after.host.payload.backgroundColor).toBe(
+      ANDROID_DISABLED_BACKGROUND,
+    );
+    expect(after.host.payload.elevation).toBe(0);
+    expect(after.text.payload.color).toBe(ANDROID_DISABLED_TEXT);
   });
 
   // TouchableNativeFeedback.js:230-252. Without these the drawable is installed and never animates:
@@ -254,7 +255,7 @@ describe('button host behavior on Android', () => {
       'setPressed',
     ]);
     expect(fabric.commands[0].args).toEqual([12, 34]);
-    expect(fabric.commands[0].node).toBe(host);
+    expect(fabric.commands[0].handle).toBe(host.handle);
     expect(fabric.commands[1].args).toEqual([true]);
 
     fabric.commands.length = 0;
@@ -277,12 +278,12 @@ describe('button host behavior on Android', () => {
   it('focuses only while it has an onPress and is enabled', async () => {
     const { node, surface } = mountButton({ onPress: () => {} });
     await settle();
-    expect(subtreeOf(TEST_ID).host.props.focusable).toBe(true);
+    expect(subtreeOf(TEST_ID).host.payload.focusable).toBe(true);
 
     routeProp(node, 'disabled', true);
     surface.commit();
     await settle();
-    expect(subtreeOf(TEST_ID).host.props.focusable).toBe(false);
+    expect(subtreeOf(TEST_ID).host.payload.focusable).toBe(false);
   });
 
   // why: THE arm that made `HOST_PRIMITIVES.Button.aliases` necessary rather than inherited.
@@ -308,10 +309,10 @@ describe('button host behavior on Android', () => {
 
     const { host } = subtreeOf(TEST_ID);
     // RN gives `id` unconditional priority over `nativeID` (View.js:77-79).
-    expect(host.props.nativeID).toBe('from-id');
+    expect(host.payload.nativeID).toBe('from-id');
     // A raw `id` is a key no ViewConfig declares, so Fabric drops it and the label is lost with
     // nothing red — the strip is only ever visible here.
-    expect(host.props.id).toBeUndefined();
+    expect(host.payload.id).toBeUndefined();
   });
 
   // The control. Without a registration the tag is a bare view: no subtree, no ripple, no
@@ -321,17 +322,12 @@ describe('button host behavior on Android', () => {
     const { node } = mountButton();
     await settle();
 
-    const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
-      for (const candidate of nodes) {
-        if (candidate.props.testID === TEST_ID) return candidate;
-        const hit = walk(candidate.children);
-        if (hit !== undefined) return hit;
-      }
-      return undefined;
-    };
-    const host = walk(fabric.appRoot().children);
+    const host = live.findLive(
+      live.appRoot(),
+      n => n.payload.testID === TEST_ID,
+    );
     expect(host?.children).toHaveLength(0);
-    expect(host?.props.nativeBackgroundAndroid).toBeUndefined();
+    expect(host?.payload.nativeBackgroundAndroid).toBeUndefined();
     expect(node.listeners?.get('pressIn')).toBeUndefined();
   });
 });

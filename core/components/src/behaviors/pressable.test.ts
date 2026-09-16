@@ -2,11 +2,14 @@
 // that leaves every test green and every button dead on device, so both get their own case:
 // the machine must be built AFTER props exist (not at attach, where node.props is `{}`), and the
 // pressed state must reach the style registry rather than the framework.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Relative rather than by package name: `core/components` does not declare test-utils, and adding
 // a workspace devDependency would need a `pnpm install` across a tree other sessions are working
 // in. A test-only import path costs nobody anything.
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '../../../test-utils/src/index';
 import {
   appendChild,
   clearGlobalStyles,
@@ -23,7 +26,8 @@ import {
 } from '@symbiote-native/engine';
 import { PRESSABLE_TAG, registerPressableBehavior } from './pressable';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 5000;
 
 // A pressable resolves to a plain view — there is no native pressable component. Which is exactly
@@ -70,21 +74,13 @@ function classStyleOf(node: ISymbioteNode): unknown {
 }
 
 // By testID, never by viewName: the committed tree carries container nodes of the same view name,
-// and a pressable's is `RCTView` like everything else.
+// and a pressable's is `RCTView` like everything else. Reads the PAYLOAD (`fabricProps`'s output),
+// not the authored bag — `opacity`/`focusable` are folds, never props the app wrote.
 function committedPropsOf(
   testID: string,
 ): Readonly<Record<string, unknown>> | undefined {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Readonly<Record<string, unknown>> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+  return live.findLive(live.appRoot(), node => node.payload.testID === testID)
+    ?.payload;
 }
 
 const TOUCH: ISymbioteEvent = {
@@ -107,6 +103,12 @@ function press(node: ISymbioteNode): void {
 function touchWithoutClaiming(node: ISymbioteNode): void {
   listenerOf(node, 'pressIn')(TOUCH);
 }
+
+beforeEach(() => {
+  // Every case opens its OWN surface, and `appRoot()` searches the CREATION log, so without this
+  // it answers with an earlier case's root for every case after the first.
+  fabric.reset();
+});
 
 afterEach(() => {
   clearHostBehaviors();

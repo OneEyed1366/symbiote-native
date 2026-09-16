@@ -7,7 +7,11 @@
 // "commits no ripple" case below is what pins that rather than a second file.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '../../../test-utils/src/index';
 import {
   appendChild as engineAppend,
   insertBefore as engineInsertBefore,
@@ -27,7 +31,8 @@ import {
   TOUCHABLE_WITHOUT_FEEDBACK_TAG as TAG,
 } from './touchable-without-feedback';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 7800;
 
 const ROOT_TEST_ID = 'root';
@@ -85,21 +90,16 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-function findCommitted(testID: string): IFakeNode {
-  const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
+function findCommitted(testID: string): ILiveNode {
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
   if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
   return hit;
 }
 
-function countNodes(node: IFakeNode): number {
+function countNodes(node: ILiveNode): number {
   return 1 + node.children.reduce((sum, kid) => sum + countNodes(kid), 0);
 }
 
@@ -112,7 +112,10 @@ function pressIn(child: ISymbioteNode, at: ISymbioteEvent): void {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  fabric.commands.length = 0;
+  // `reset()` rather than clearing `commands` alone: every case opens its OWN surface, and
+  // `appRoot()` searches the CREATION log, so without this it answers with the first case's root
+  // for the rest of the file.
+  fabric.reset();
   registerTouchableWithoutFeedbackBehavior();
 });
 
@@ -132,7 +135,7 @@ describe('touchable-without-feedback host behavior', () => {
     const committedRoot = findCommitted(ROOT_TEST_ID);
     expect(committedRoot.children).toHaveLength(1);
     expect(committedRoot.children[0].viewName).toBe('RCTView');
-    expect(committedRoot.children[0].props.testID).toBe(SUBJECT_TEST_ID);
+    expect(committedRoot.children[0].payload.testID).toBe(SUBJECT_TEST_ID);
     expect(countNodes(committedRoot)).toBe(2);
   });
 
@@ -148,7 +151,7 @@ describe('touchable-without-feedback host behavior', () => {
 
     const committedRoot = findCommitted(ROOT_TEST_ID);
     expect(countNodes(committedRoot)).toBe(2);
-    expect(committedRoot.children[0].props.accessibilityLabel).toBe('Save');
+    expect(committedRoot.children[0].payload.accessibilityLabel).toBe('Save');
   });
 
   it('clones RN’s passthrough list onto the child and leaves the rest behind', () => {
@@ -174,15 +177,15 @@ describe('touchable-without-feedback host behavior', () => {
     surface.commit();
 
     const committed = findCommitted(SUBJECT_TEST_ID);
-    expect(committed.props.accessibilityLabel).toBe('Save');
-    expect(committed.props.accessibilityRole).toBe('button');
-    expect(committed.props.accessibilityHint).toBe('Saves the draft');
-    expect(committed.props.accessibilityIgnoresInvertColors).toBe(true);
-    expect(committed.props.hitSlop).toBe(8);
+    expect(committed.payload.accessibilityLabel).toBe('Save');
+    expect(committed.payload.accessibilityRole).toBe('button');
+    expect(committed.payload.accessibilityHint).toBe('Saves the draft');
+    expect(committed.payload.accessibilityIgnoresInvertColors).toBe(true);
+    expect(committed.payload.hitSlop).toBe(8);
     // The child's own props survive where the clone list does not name them.
-    expect(committed.props.backgroundColor).toBe('red');
+    expect(committed.payload.backgroundColor).toBe('red');
     for (const absent of ['hasTVPreferredFocus', 'nextFocusDown', 'opacity'])
-      expect(Object.keys(committed.props)).not.toContain(absent);
+      expect(Object.keys(committed.payload)).not.toContain(absent);
   });
 
   // THE SPLIT FROM TNF, and it is the whole reason this file is not a copy of its neighbour. RN's
@@ -195,7 +198,7 @@ describe('touchable-without-feedback host behavior', () => {
     surface.commit();
 
     const committed = findCommitted('mine');
-    expect(committed.props.testID).toBe('mine');
+    expect(committed.payload.testID).toBe('mine');
     expect(countNodes(findCommitted(ROOT_TEST_ID))).toBe(2);
   });
 
@@ -212,20 +215,20 @@ describe('touchable-without-feedback host behavior', () => {
     surface.commit();
 
     const committed = findCommitted(SUBJECT_TEST_ID);
-    expect(committed.props.accessible).toBe(true);
+    expect(committed.payload.accessible).toBe(true);
     // :275. RN's own passthrough loop then re-assigns a set `nativeID` OVER this, so upstream an
     // explicit `nativeID` wins; not reproduced, see the fold's comment — the spec's `ID_ALIAS`
     // makes the quirk depend on which adapter is driving.
-    expect(committed.props.nativeID).toBe('from-id');
+    expect(committed.payload.nativeID).toBe('from-id');
     // :263-266 — an onPress is present but `disabled` is true.
-    expect(committed.props.focusable).toBe(false);
+    expect(committed.payload.focusable).toBe(false);
     // :258-263 — the explicit `disabled` overrides, and the rest of the state survives.
-    expect(committed.props.accessibilityState).toEqual({
+    expect(committed.payload.accessibilityState).toEqual({
       busy: true,
       disabled: true,
     });
     // A machine-only prop must not ride into the payload as a key no ViewConfig declares.
-    expect(Object.keys(committed.props)).not.toContain('disabled');
+    expect(Object.keys(committed.payload)).not.toContain('disabled');
   });
 
   // Both arms, because the adapters disagree about WHERE they rename (React/Svelte per tag through
@@ -240,7 +243,7 @@ describe('touchable-without-feedback host behavior', () => {
       engineAppend(root, owner);
       engineAppend(owner, child);
       surface.commit();
-      expect(findCommitted(SUBJECT_TEST_ID).props.nativeID).toBe('from-id');
+      expect(findCommitted(SUBJECT_TEST_ID).payload.nativeID).toBe('from-id');
     }
   });
 
@@ -259,14 +262,14 @@ describe('touchable-without-feedback host behavior', () => {
     surface.commit();
 
     const committed = findCommitted(SUBJECT_TEST_ID);
-    expect(committed.props.accessibilityLabel).toBe('Close');
-    expect(committed.props.importantForAccessibility).toBe(
+    expect(committed.payload.accessibilityLabel).toBe('Close');
+    expect(committed.payload.importantForAccessibility).toBe(
       'no-hide-descendants',
     );
-    expect(committed.props.accessibilityElementsHidden).toBe(true);
-    expect(committed.props.accessibilityLiveRegion).toBe('none');
-    expect(committed.props.accessibilityValue).toEqual({ now: 4 });
-    expect(Object.keys(committed.props)).not.toContain('aria-label');
+    expect(committed.payload.accessibilityElementsHidden).toBe(true);
+    expect(committed.payload.accessibilityLiveRegion).toBe('none');
+    expect(committed.payload.accessibilityValue).toEqual({ now: 4 });
+    expect(Object.keys(committed.payload)).not.toContain('aria-label');
   });
 
   // The responder is the CHILD's, and it has to be: `bubble` (events/index.ts) skips anchors for
@@ -382,7 +385,7 @@ describe('touchable-without-feedback host behavior', () => {
     engineAppend(root, stranger);
     surface.commit();
     expect(
-      Object.keys(findCommitted(ROOT_TEST_ID).children[1].props),
+      Object.keys(findCommitted(ROOT_TEST_ID).children[1].payload),
     ).not.toContain('accessibilityLabel');
 
     engineRemove(root, stranger);
@@ -392,8 +395,8 @@ describe('touchable-without-feedback host behavior', () => {
 
     const committedRoot = findCommitted(ROOT_TEST_ID);
     expect(committedRoot.children).toHaveLength(1);
-    expect(committedRoot.children[0].props.backgroundColor).toBe('blue');
-    expect(committedRoot.children[0].props.accessibilityLabel).toBe('Save');
+    expect(committedRoot.children[0].payload.backgroundColor).toBe('blue');
+    expect(committedRoot.children[0].payload.accessibilityLabel).toBe('Save');
   });
 
   it('re-clones when an owner prop changes after mount', () => {
@@ -403,13 +406,13 @@ describe('touchable-without-feedback host behavior', () => {
     engineAppend(root, owner);
     engineAppend(owner, child);
     surface.commit();
-    expect(findCommitted(SUBJECT_TEST_ID).props.accessibilityLabel).toBe(
+    expect(findCommitted(SUBJECT_TEST_ID).payload.accessibilityLabel).toBe(
       'Before',
     );
 
     routeProp(owner, 'accessibilityLabel', 'After');
     surface.commit();
-    expect(findCommitted(SUBJECT_TEST_ID).props.accessibilityLabel).toBe(
+    expect(findCommitted(SUBJECT_TEST_ID).payload.accessibilityLabel).toBe(
       'After',
     );
   });
@@ -423,7 +426,7 @@ describe('touchable-without-feedback host behavior', () => {
     routeProp(owner, 'accessibilityLabel', 'Late');
     surface.commit();
 
-    expect(findCommitted(SUBJECT_TEST_ID).props.accessibilityLabel).toBe(
+    expect(findCommitted(SUBJECT_TEST_ID).payload.accessibilityLabel).toBe(
       'Late',
     );
   });
@@ -434,11 +437,11 @@ describe('touchable-without-feedback host behavior', () => {
     engineAppend(root, owner);
     engineAppend(owner, child);
     surface.commit();
-    expect(findCommitted(SUBJECT_TEST_ID).props.focusable).toBe(false);
+    expect(findCommitted(SUBJECT_TEST_ID).payload.focusable).toBe(false);
 
     routeProp(owner, 'onPress', () => {});
     surface.commit();
-    expect(findCommitted(SUBJECT_TEST_ID).props.focusable).toBe(true);
+    expect(findCommitted(SUBJECT_TEST_ID).payload.focusable).toBe(true);
   });
 
   // :151. A Fabric BOOLEAN-GATED event, so the flag must land on the CHILD — the only node with a
@@ -449,22 +452,29 @@ describe('touchable-without-feedback host behavior', () => {
     engineAppend(root, owner);
     engineAppend(owner, child);
     surface.commit();
-    expect(Object.keys(findCommitted(SUBJECT_TEST_ID).props)).not.toContain(
+    expect(Object.keys(findCommitted(SUBJECT_TEST_ID).payload)).not.toContain(
       'onLayout',
     );
 
     routeProp(owner, 'onLayout', onLayout);
     surface.commit();
-    expect(findCommitted(SUBJECT_TEST_ID).props.onLayout).toBe(true);
+    expect(findCommitted(SUBJECT_TEST_ID).payload.onLayout).toBe(true);
     listenerOf(child, 'layout')(touchAt(0, 0));
     expect(onLayout).toHaveBeenCalledTimes(1);
 
     routeProp(owner, 'onLayout', undefined);
     surface.commit();
-    // `null`, not absent: Fabric MERGES a clone's prop diff, so `diffProps` (commit.ts) spells a
-    // removed key as an explicit null and the committed record keeps it. The listener going with it
-    // is the half an app can observe.
-    expect(findCommitted(SUBJECT_TEST_ID).props.onLayout).toBeNull();
+    // ABSENT, not null, and the change of spelling is a correction rather than a weakening. The
+    // literal null was the CLONE PROTOCOL's way of saying "reset this to its default" — it existed
+    // only inside the diff the stand-in merged, and no other consumer ever saw it. The engine's op
+    // stream says the same thing with `NO_VALUE`, and a host replaying that op DELETES the key.
+    expect(
+      Object.hasOwn(findCommitted(SUBJECT_TEST_ID).payload, 'onLayout'),
+    ).toBe(false);
+    // The half that proves the engine ACTED rather than merely stopping: the record carried
+    // `onLayout` after the write above, so the key being gone from it means a clearing op was sent.
+    const recorded = fabric.find(node => node.props.testID === SUBJECT_TEST_ID);
+    expect(Object.hasOwn(recorded?.props ?? {}, 'onLayout')).toBe(false);
     expect(child.listeners?.get('layout')).toBeUndefined();
   });
 
@@ -505,7 +515,7 @@ describe('touchable-without-feedback host behavior', () => {
       'nativeForegroundAndroid',
       'background',
     ])
-      expect(Object.keys(committed.props)).not.toContain(absent);
+      expect(Object.keys(committed.payload)).not.toContain(absent);
 
     pressIn(child, touchAt(3, 3));
     listenerOf(child, 'pressOut')(touchAt(3, 3));
@@ -530,8 +540,8 @@ describe('touchable-without-feedback host behavior', () => {
 
     const committedRoot = findCommitted(ROOT_TEST_ID);
     expect(committedRoot.children).toHaveLength(1);
-    expect(committedRoot.children[0].props.backgroundColor).toBe('blue');
-    expect(committedRoot.children[0].props.accessibilityLabel).toBe('Hi');
+    expect(committedRoot.children[0].payload.backgroundColor).toBe('blue');
+    expect(committedRoot.children[0].payload.accessibilityLabel).toBe('Hi');
     expect(countNodes(committedRoot)).toBe(2);
   });
 
@@ -554,7 +564,7 @@ describe('touchable-without-feedback host behavior', () => {
     expect(countNodes(committedRoot)).toBe(2);
     const committed = committedRoot.children[0];
     for (const absent of ['accessibilityLabel', 'focusable', 'testID'])
-      expect(Object.keys(committed.props)).not.toContain(absent);
+      expect(Object.keys(committed.payload)).not.toContain(absent);
     expect(child.listeners?.get('pressIn')).toBeUndefined();
   });
 });

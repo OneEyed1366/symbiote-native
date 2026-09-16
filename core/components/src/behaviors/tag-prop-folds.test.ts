@@ -4,7 +4,10 @@
 // precisely that the raw prop sits on the node looking correct while the folded one never reaches
 // Fabric.
 import { describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '../../../test-utils/src/index';
 import {
   createElement,
   createSurface,
@@ -14,7 +17,10 @@ import {
 import { registerPressableBehavior, PRESSABLE_TAG } from './pressable';
 import { registerTextInputBehavior, TEXT_INPUT_TAG } from './text-input';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// `.payload` throughout: a fold runs on the way into what Fabric is handed, and the author's bag
+// deliberately keeps the aliases it folded from.
+const live = createLiveTree(fabric);
 registerPressableBehavior();
 registerTextInputBehavior();
 
@@ -39,17 +45,13 @@ function commitTag(
   surface.appendChild(node);
   surface.commit();
 
-  const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
-    for (const candidate of nodes) {
-      if (candidate.props.testID === TEST_ID) return candidate;
-      const hit = walk(candidate.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const found = walk(fabric.appRoot().children);
-  if (found === undefined) throw new Error('the subject never reached Fabric');
-  return found.props;
+  // The node itself, never an app-root lookup: every case here opens a fresh surface and the
+  // recording is never reset between them, so `appRoot()` would answer with the FIRST case's tree
+  // for every case after it — green on case one and quietly wrong after.
+  //
+  // `.payload` because the fold is what this file is about: it runs on the way INTO what Fabric is
+  // handed, and the author's bag deliberately still carries the aliases.
+  return live.nodeOf(node).payload;
 }
 
 describe('a text-input tag folds the W3C aliases', () => {

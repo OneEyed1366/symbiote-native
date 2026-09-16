@@ -3,8 +3,11 @@
 // too fast to see must still flash, and a cancelled gesture must not flash at all. Every case here
 // is a way that shape degrades silently to "looks like it works" if it is written as a naive
 // pressed-derived style instead.
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '../../../test-utils/src/index';
 import {
   clearHostBehaviors,
   createElement,
@@ -23,7 +26,8 @@ import {
   DEFAULT_UNDERLAY_COLOR,
 } from '../state/touchable';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 7300;
 
 // RN's TouchableHighlight is one View (the underlay + child both fold onto it here — see the
@@ -56,22 +60,13 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-// The LIVE tree, never `fabric.find()`, which keeps every pre-clone node
-// (`.claude/rules/test-harness-false-greens.md`).
 function committedPropsOf(testID: string): Record<string, unknown> {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === testID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  const hit = walk(fabric.appRoot().children);
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
   if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
-  return hit;
+  return hit.payload;
 }
 
 // Style is published through routeProp, which is synchronous.
@@ -83,6 +78,12 @@ function pressIn(node: ISymbioteNode): void {
   listenerOf(node, 'pressIn')(TOUCH);
   listenerOf(node, 'startShouldSetResponder')(TOUCH);
 }
+
+beforeEach(() => {
+  // Every case opens its OWN surface, and `appRoot()` searches the CREATION log — without this it
+  // answers with an earlier case's root.
+  fabric.reset();
+});
 
 afterEach(() => {
   clearHostBehaviors();
@@ -118,9 +119,11 @@ describe('touchable-highlight host behavior', () => {
     );
 
     await vi.advanceTimersByTimeAsync(DELAY_PRESS_OUT);
-    // A key present on the prior commit and absent from this one diffs to `null` — the engine's
-    // own unset marker (`commit.ts`: `if (!(key in next)) out[key] = null;`), not an omitted key.
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBeNull();
+    // The recomputed style simply carries no backgroundColor once hidden — absent, not a literal
+    // null. The before/after pair above already proves the transition; this is its resting state.
+    expect(Object.hasOwn(committedPropsOf(TEST_ID), 'backgroundColor')).toBe(
+      false,
+    );
   });
 
   // why: a gesture that never fires `press` (dragged off before release) armed no hide timer, so
@@ -144,7 +147,9 @@ describe('touchable-highlight host behavior', () => {
 
     listenerOf(node, 'pressOut')(TOUCH);
     await settle();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBeNull();
+    expect(Object.hasOwn(committedPropsOf(TEST_ID), 'backgroundColor')).toBe(
+      false,
+    );
   });
 
   // why: `handlePressIn` clears any pending hide first — a second tap landing during the hold

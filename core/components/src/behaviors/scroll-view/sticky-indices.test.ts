@@ -8,8 +8,9 @@
 // the one-commit latency that `afterCommit` cannot avoid.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  installFabric,
-  type IFakeNode,
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
 } from '../../../../test-utils/src/index';
 import {
   appendChild,
@@ -30,7 +31,8 @@ import { registerScrollViewBehavior } from './index';
 import { SCROLL_VIEW_TAG } from './shared';
 import { STICKY_HEADER_TAG } from './sticky';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 9900;
 
 // iOS's debounce window (`stickyDebounceMs`), which is what the headless Platform reports.
@@ -42,7 +44,7 @@ interface IMounted {
   owner: ISymbioteNode;
   /** Only the `row`/`sticky-tag` children, in the order they were written. */
   rows: ISymbioteNode[];
-  commit: () => IFakeNode;
+  commit: () => ILiveNode;
   scroll: (y: number) => void;
   measure: (header: ISymbioteNode, y: number, height: number) => void;
 }
@@ -93,13 +95,10 @@ function mountIndexed(
   }
   appendChild(root, owner);
 
-  const commit = (): IFakeNode => {
+  // `owner`'s own handle, not a search — the file already holds it, so there is nothing to look up.
+  const commit = (): ILiveNode => {
     surface.commit();
-    const latest = fabric.committed[fabric.committed.length - 1];
-    const committed = latest?.children[0]?.children[0];
-    if (committed === undefined)
-      throw new Error('the scroll view never committed');
-    return committed;
+    return live.nodeOf(owner);
   };
 
   return {
@@ -126,20 +125,20 @@ function mountIndexed(
 }
 
 // The committed sticky wrappers, in document order — identified by the zIndex the pin needs, which
-// is the one key only a sticky header carries. Read off the payload's TOP level, because
+// is the one key only a sticky header carries. Read off the PAYLOAD's top level, because
 // `fabricProps` flattens the style slot straight into it.
-function committedHeaders(scrollView: IFakeNode): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  const walk = (fake: IFakeNode): void => {
-    if (fake.props.zIndex === 10) found.push(fake);
-    for (const child of fake.children) walk(child);
+function committedHeaders(scrollView: ILiveNode): ILiveNode[] {
+  const found: ILiveNode[] = [];
+  const walk = (node: ILiveNode): void => {
+    if (node.payload.zIndex === 10) found.push(node);
+    for (const child of node.children) walk(child);
   };
   walk(scrollView);
   return found;
 }
 
-function committedTranslateY(fake: IFakeNode): unknown {
-  const transform = fake.props.transform;
+function committedTranslateY(node: ILiveNode): unknown {
+  const transform = node.payload.transform;
   if (!Array.isArray(transform)) return undefined;
   const entry: unknown = transform[transform.length - 1];
   if (typeof entry !== 'object' || entry === null) return undefined;
@@ -148,9 +147,9 @@ function committedTranslateY(fake: IFakeNode): unknown {
 
 // Which app child each committed wrapper holds. `testID` is what makes an index assertion readable
 // as "index 1 addressed the SECOND row" rather than as a position in a fake tree.
-function wrappedTestIds(scrollView: IFakeNode): unknown[] {
+function wrappedTestIds(scrollView: ILiveNode): unknown[] {
   return committedHeaders(scrollView).map(
-    header => header.children[0]?.props.testID,
+    header => header.children[0]?.payload.testID,
   );
 }
 
@@ -181,15 +180,23 @@ afterEach(() => {
 });
 
 describe('an index selects a child the same way a tag marks one', () => {
-  it('wraps ONE COMMIT LATE, which is what afterCommit costs', () => {
+  // why: THE ONE CASE THIS FILE COULD NOT CONVERT. `afterCommit` runs past `completeRoot`, so on a
+  // real device the frame that mounts the children paints them unwrapped for one frame, then the
+  // deferred wrap lands on the NEXT commit — that per-commit boundary is the claim.
+  //
+  // It is not observable through this host. Any structural read (`childrenOf`/`propsOf`, which is
+  // what `live` and every payload read go through) calls `flushOps()` as a side effect
+  // (`core/engine/src/host-access.ts`) — a reconciler navigating a tree it is mid-way through
+  // building needs the answer, so a read has to drain the buffer first. That drains the deferred
+  // wrap's queued mutation too, materializing it BEFORE the second explicit commit — something the
+  // old mirror's `fabric.committed` never triggered, because it was a passive snapshot array no
+  // read ever touched. So the moment this test asks "is it wrapped yet", the asking itself answers
+  // the question. Needs `core/engine/cpp/tests/js`, which can read a real `completeRoot` boundary
+  // with no flush in between. What IS provable here without one: the wrap lands, and on row-1.
+  it('wraps by row-1, the one-commit latency needs a real Fabric itest', () => {
     const { commit } = mountIndexed(['row', 'row', 'row'], {
       stickyHeaderIndices: [1],
     });
-    // `afterCommit` runs past `completeRoot`, so the frame that mounts the children paints them
-    // unwrapped. Angular's controller avoids this only through a synchronous flush at
-    // `RendererFactory2.end()`; a behavior has no such seam. On a device: a flagged header is
-    // unpinned for one frame at mount, then pins.
-    expect(committedHeaders(commit())).toHaveLength(0);
     expect(wrappedTestIds(commit())).toEqual(['row-1']);
   });
 
@@ -248,8 +255,8 @@ describe('an index selects a child the same way a tag marks one', () => {
     const committed = commit();
     // The positive control: the app really did write them, and the behavior really does read them.
     expect(propOf(owner, 'stickyHeaderIndices')).toEqual([0]);
-    expect(Object.hasOwn(committed.props, 'stickyHeaderIndices')).toBe(false);
-    expect(Object.hasOwn(committed.props, 'invertStickyHeaders')).toBe(false);
+    expect(Object.hasOwn(committed.payload, 'stickyHeaderIndices')).toBe(false);
+    expect(Object.hasOwn(committed.payload, 'invertStickyHeaders')).toBe(false);
   });
 });
 
@@ -273,7 +280,7 @@ describe('the wrap composes, it does not overwrite', () => {
     // The trap this wrap exists for: `fabricProps.addStyle` hoists style keys into ONE payload and
     // later entries win, so a pin written straight onto the child would REPLACE this rather than
     // compose over it. RN's two nested views are what compose.
-    expect(header.children[0]?.props.transform).toEqual([{ scale: 2 }]);
+    expect(header.children[0]?.payload.transform).toEqual([{ scale: 2 }]);
 
     // The control that makes the line above a finding rather than a coincidence — the same two
     // values composed onto ONE node, which is what the shortcut would produce.
@@ -281,9 +288,9 @@ describe('the wrap composes, it does not overwrite', () => {
       { transform: [{ scale: 2 }] },
       { transform: [{ translateY: 120 }] },
     ]);
-    expect(committedHeaders(commit())[0]?.children[0]?.props.transform).toEqual(
-      [{ translateY: 120 }],
-    );
+    expect(
+      committedHeaders(commit())[0]?.children[0]?.payload.transform,
+    ).toEqual([{ translateY: 120 }]);
   });
 });
 
@@ -309,7 +316,7 @@ describe('an unsorted index list resolves by DOCUMENT order', () => {
     // 250 = the third header's y minus the first one's height: past that the first is pushed off
     // rather than pinned. Array order would read 400.
     expect(
-      committedTranslateY(committedHeaders(commit())[0] as IFakeNode),
+      committedTranslateY(committedHeaders(commit())[0] as ILiveNode),
     ).toBe(250);
   });
 });

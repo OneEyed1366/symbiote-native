@@ -11,8 +11,9 @@
 // effects and the first with no framework above it — and the owner-side registration that feeds it.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  installFabric,
-  type IFakeNode,
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
 } from '../../../../test-utils/src/index';
 import {
   appendChild,
@@ -30,7 +31,8 @@ import { registerScrollViewBehavior } from './index';
 import { SCROLL_VIEW_TAG } from './shared';
 import { STICKY_HEADER_TAG } from './sticky';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 9800;
 
 // iOS's debounce window (`stickyDebounceMs`), which is what the headless Platform reports. The
@@ -44,7 +46,7 @@ function node(tag: string): ISymbioteNode {
 interface IMounted {
   owner: ISymbioteNode;
   headers: ISymbioteNode[];
-  commit: () => IFakeNode;
+  commit: () => ILiveNode;
   scroll: (y: number) => void;
   measure: (header: ISymbioteNode, y: number, height: number) => void;
 }
@@ -70,13 +72,10 @@ function mountSticky(
   }
   appendChild(root, owner);
 
-  const commit = (): IFakeNode => {
+  // `owner`'s own handle, not a search — the file already holds it, so there is nothing to look up.
+  const commit = (): ILiveNode => {
     surface.commit();
-    const latest = fabric.committed[fabric.committed.length - 1];
-    const committed = latest?.children[0]?.children[0];
-    if (committed === undefined)
-      throw new Error('the scroll view never committed');
-    return committed;
+    return live.nodeOf(owner);
   };
   commit();
 
@@ -112,19 +111,19 @@ function mountSticky(
 
 // The committed sticky wrappers, in document order. Identified by the zIndex the pin needs to
 // paint over the rows scrolling under it, which is the one key only a sticky header carries — and
-// read off the payload's TOP level, because `fabricProps` flattens the style slot straight into it.
-function committedHeaders(scrollView: IFakeNode): IFakeNode[] {
-  const found: IFakeNode[] = [];
-  const walk = (fake: IFakeNode): void => {
-    if (fake.props.zIndex === 10) found.push(fake);
-    for (const child of fake.children) walk(child);
+// read off the PAYLOAD's top level, because `fabricProps` flattens the style slot straight into it.
+function committedHeaders(scrollView: ILiveNode): ILiveNode[] {
+  const found: ILiveNode[] = [];
+  const walk = (node: ILiveNode): void => {
+    if (node.payload.zIndex === 10) found.push(node);
+    for (const child of node.children) walk(child);
   };
   walk(scrollView);
   return found;
 }
 
-function committedTranslateY(fake: IFakeNode): unknown {
-  const transform = fake.props.transform;
+function committedTranslateY(node: ILiveNode): unknown {
+  const transform = node.payload.transform;
   if (!Array.isArray(transform)) return undefined;
   const entry: unknown = transform[transform.length - 1];
   if (typeof entry !== 'object' || entry === null) return undefined;
@@ -149,7 +148,7 @@ describe('a sticky header child is what the index array could not be', () => {
     if (header === undefined) throw new Error('no sticky header committed');
     // Yoga flattens a view that only groups children, and a flattened header has no transform to
     // animate — RN's own sticky wrapper sets both for the same reason.
-    expect(header.props.collapsable).toBe(false);
+    expect(header.payload.collapsable).toBe(false);
     expect(header.children[0]?.viewName).toBe('RCTText');
   });
 
@@ -157,16 +156,28 @@ describe('a sticky header child is what the index array could not be', () => {
     const { owner, headers, commit } = mountSticky(1);
     // 16, not 1: the JS fallback is the only correct bootstrap here — a scroll value made native
     // up front stops cascading to the child listeners before the first tick reaches them.
-    expect(commit().props.scrollEventThrottle).toBe(16);
+    expect(commit().payload.scrollEventThrottle).toBe(16);
 
     removeChild(owner, headers[0] as ISymbioteNode);
-    // Fabric has no prop removal, so a key that disappears commits as an explicit null.
-    expect(commit().props.scrollEventThrottle).toBeNull();
+    // ABSENT, not null. Fabric has no prop removal — the engine's op stream spells "clear" with
+    // NO_VALUE, and a host replaying that op deletes the key; `null` was only ever the old mirror's
+    // clone-protocol spelling (`.claude/rules/…` — see mirror-elimination.md "RESOLVED: the
+    // onLayout === null decision").
+    expect(Object.hasOwn(commit().payload, 'scrollEventThrottle')).toBe(false);
+    // The half that proves the engine ACTED rather than merely stopping: the record carried
+    // `scrollEventThrottle` after the first commit above, so it being gone from the record means a
+    // clearing op was sent for it.
+    expect(
+      Object.hasOwn(
+        fabric.find(n => n.handle === owner)?.props ?? {},
+        'scrollEventThrottle',
+      ),
+    ).toBe(false);
   });
 
   it('leaves an app throttle alone', () => {
     const { commit } = mountSticky(1, { scrollEventThrottle: 8 });
-    expect(commit().props.scrollEventThrottle).toBe(8);
+    expect(commit().payload.scrollEventThrottle).toBe(8);
   });
 });
 
@@ -182,7 +193,7 @@ describe('the pin', () => {
     // was the first thing this row got wrong.
     vi.advanceTimersByTime(DEBOUNCE_MS);
     expect(
-      committedTranslateY(committedHeaders(commit())[0] as IFakeNode),
+      committedTranslateY(committedHeaders(commit())[0] as ILiveNode),
     ).toBe(120);
   });
 
@@ -196,7 +207,7 @@ describe('the pin', () => {
     // without it a header goes back to its resting place the next time the app touches its style.
     routeProp(headers[0] as ISymbioteNode, 'style', { opacity: 0.5 });
     expect(
-      committedTranslateY(committedHeaders(commit())[0] as IFakeNode),
+      committedTranslateY(committedHeaders(commit())[0] as ILiveNode),
     ).toBe(120);
   });
 
@@ -211,7 +222,7 @@ describe('the pin', () => {
     // pushed off rather than pinned. With no cross-talk it would read 400 — the header would ride
     // the offset forever, straight over its successor.
     expect(
-      committedTranslateY(committedHeaders(commit())[0] as IFakeNode),
+      committedTranslateY(committedHeaders(commit())[0] as ILiveNode),
     ).toBe(250);
   });
 });
@@ -245,11 +256,11 @@ describe('the owner keeps every listener it borrowed', () => {
   it('takes the owner layout only when an inverted pin needs it', () => {
     // `onLayout` is a gated event: the flag reaching a ScrollView that reads no layout is the
     // divergence this whole path exists to avoid.
-    expect(Object.hasOwn(mountSticky(1).commit().props, 'onLayout')).toBe(
+    expect(Object.hasOwn(mountSticky(1).commit().payload, 'onLayout')).toBe(
       false,
     );
     expect(
-      mountSticky(1, { invertStickyHeaders: true }).commit().props.onLayout,
+      mountSticky(1, { invertStickyHeaders: true }).commit().payload.onLayout,
     ).toBe(true);
   });
 
@@ -257,11 +268,16 @@ describe('the owner keeps every listener it borrowed', () => {
     const { owner, headers, commit } = mountSticky(1, {
       invertStickyHeaders: true,
     });
-    expect(commit().props.onLayout).toBe(true);
+    expect(commit().payload.onLayout).toBe(true);
     removeChild(owner, headers[0] as ISymbioteNode);
-    // A one-way installer would leave the gate flag standing on a ScrollView that reads no layout
-    // — the same divergence an unwired `onContentSizeChange` gets caught for.
-    expect(commit().props.onLayout).toBeNull();
+    // ABSENT, not null — same protocol correction as the throttle case above.
+    expect(Object.hasOwn(commit().payload, 'onLayout')).toBe(false);
+    expect(
+      Object.hasOwn(
+        fabric.find(n => n.handle === owner)?.props ?? {},
+        'onLayout',
+      ),
+    ).toBe(false);
     expect(owner.listeners?.get('layout')).toBeUndefined();
   });
 
@@ -276,7 +292,7 @@ describe('the owner keeps every listener it borrowed', () => {
     removeChild(owner, headers[0] as ISymbioteNode);
     // The sticky claim is gone and the app's is not — one resolver owns the slot, so neither claim
     // can uninstall the other's.
-    expect(commit().props.onLayout).toBe(true);
+    expect(commit().payload.onLayout).toBe(true);
     owner.listeners?.get('layout')?.({
       type: 'layout',
       target: owner,

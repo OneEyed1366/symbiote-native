@@ -18,10 +18,12 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
-import { installFabric } from '../../test-utils/src/index';
+import { installRecordingFabric } from '../../test-utils/src/index';
 import { buildScrollViewHandle } from './scroll-view-commands';
 
-const fabric = installFabric();
+// A RECORDING host: this file asserts on the COMMANDS the engine sent, which is the engine's own
+// output, and never on a committed tree. Nothing here needs Fabric's tree rules re-implemented.
+const fabric = installRecordingFabric();
 let nextRootTag = 9800;
 
 // A COMMITTED node, because every command resolves through the node's Fabric handle and no-ops
@@ -41,7 +43,7 @@ function scrollCommands(): Array<{
   args: readonly unknown[];
 }> {
   return fabric.commands
-    .filter(entry => entry.node.viewName === 'RCTScrollView')
+    .filter(entry => entry.viewName === 'RCTScrollView')
     .map(({ commandName, args }) => ({ commandName, args }));
 }
 

@@ -19,7 +19,10 @@
 // assertion keys off node ROLE — who is whose parent, in which order — never the native name, so
 // the substitution does not weaken them.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installFabric, type IFakeNode } from '../../../test-utils/src/index';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '../../../test-utils/src/index';
 import {
   appendChild,
   clearHostBehaviors,
@@ -40,7 +43,8 @@ import { registerScrollViewBehavior as registerIosScrollView } from './scroll-vi
 import { registerScrollViewBehavior as registerAndroidScrollView } from './scroll-view/index.android';
 import { SCROLL_VIEW_TAG } from './scroll-view/shared';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 let nextRootTag = 9700;
 
 // PRODUCTION SHAPE: an adapter resolves the intrinsic through `descriptorFor` and hands
@@ -99,7 +103,7 @@ describe('placement — chosen by the ScrollView, moved by the engine', () => {
   // refresh control is one of them. Nothing here knows which platform is registered.
   function mountScrollView(): {
     refresh: ISymbioteNode;
-    commit: () => IFakeNode;
+    commit: () => ISymbioteNode;
   } {
     const surface = createSurface((nextRootTag += 1));
     const root = createElement('RCTView');
@@ -113,13 +117,14 @@ describe('placement — chosen by the ScrollView, moved by the engine', () => {
     appendChild(root, scroll);
     return {
       refresh,
+      // `root`'s single committed child — the SCROLL node on iOS, where refresh stays inside it,
+      // and the REFRESH node on Android, which the engine moves to wrap the scroll view instead.
       commit: () => {
         surface.commit();
-        const latest = fabric.committed[fabric.committed.length - 1];
-        const app = latest?.children[0]?.children[0];
+        const app = live.nodeOf(root).children[0];
         if (app === undefined)
           throw new Error('nothing committed under the root');
-        return app;
+        return app.handle;
       },
     };
   }
@@ -128,7 +133,7 @@ describe('placement — chosen by the ScrollView, moved by the engine', () => {
     registerIosScrollView();
     const { commit } = mountScrollView();
 
-    expect(fabric.serialize([commit()])).toBe(
+    expect(live.serialize(commit())).toBe(
       `${SCROLL}(${REFRESH}${CONTENT}(RCTImageView))`,
     );
   });
@@ -137,7 +142,7 @@ describe('placement — chosen by the ScrollView, moved by the engine', () => {
     registerAndroidScrollView();
     const { commit } = mountScrollView();
 
-    expect(fabric.serialize([commit()])).toBe(
+    expect(live.serialize(commit())).toBe(
       `${REFRESH}(${SCROLL}(${CONTENT}(RCTImageView)))`,
     );
   });
@@ -153,9 +158,9 @@ describe('placement — chosen by the ScrollView, moved by the engine', () => {
     appendChild(root, makeRefresh());
     surface.commit();
 
-    const latest = fabric.committed[fabric.committed.length - 1];
-    const app = latest?.children[0]?.children[0];
-    expect(fabric.serialize([app!])).toBe(REFRESH);
+    const app = live.nodeOf(root).children[0];
+    if (app === undefined) throw new Error('nothing committed under the root');
+    expect(live.serialize(app.handle)).toBe(REFRESH);
   });
 });
 
