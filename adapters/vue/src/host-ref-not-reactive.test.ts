@@ -23,10 +23,14 @@
 
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { installFabric, waitUntil } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  waitUntil,
+} from '@symbiote-native/test-utils';
 import * as engine from '@symbiote-native/engine';
 import * as vueAdapter from '@symbiote-native/vue';
-import type { IFakeNode } from '@symbiote-native/test-utils';
+import type { ILiveNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 import * as runtimeHelpers from './runtime-helpers';
 import metroVueTransformer from '../metro-vue-transformer.cjs';
@@ -34,7 +38,8 @@ import metroVueTransformer from '../metro-vue-transformer.cjs';
 const ROOT_TAG = 899;
 const FLASH_COLOR = '#ff0000';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -66,18 +71,11 @@ const {
 }: { compileSfc: (src: string, filename: string) => Promise<string> } =
   metroVueTransformer;
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-function committed(testId: string): IFakeNode {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.props.testID === testId) found = node;
-  });
+function committed(testId: string): ILiveNode {
+  const found = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testId,
+  );
   expect(found, `"${testId}" is in the committed tree`).toBeDefined();
   if (found === undefined) throw new Error('unreachable');
   return found;
@@ -108,7 +106,7 @@ describe('useTemplateRef() target — not swept into Vue reactivity', () => {
     `;
     const code = await compileSfc(source, 'HostRefNotReactiveProbe.vue');
     mount(ROOT_TAG, evaluateCompiledSfc(code) as never);
-    await waitUntil(() => fabric.counts.completeRoot > 0, 'first commit');
+    await waitUntil(() => fabric.commits > 0, 'first commit');
 
     const btn = committed('flash-btn');
     fabric.fireEvent(btn.instanceHandle, 'topTouchStart');
@@ -116,7 +114,7 @@ describe('useTemplateRef() target — not swept into Vue reactivity', () => {
     await tick();
     await tick();
 
-    expect(committed('chip').props.backgroundColor).toBe(FLASH_COLOR);
+    expect(committed('chip').payload.backgroundColor).toBe(FLASH_COLOR);
 
     unmount(ROOT_TAG);
   });

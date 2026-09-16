@@ -15,18 +15,23 @@
 import { describe, expect, it } from 'vitest';
 import { defineComponent, h, type VNodeProps } from '@vue/runtime-core';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 // The press machine `pressable` reaches. An unregistered tag commits a bare view with the app's
 // props raw on it, which is a different tree than the one asserted below.
 import '../register';
 
 const ROOT_TAG = 7301;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 // The surface commits its own container view as the forest root, so the subject is the node under
-// it — index 1 in tree order, not index 0.
+// it, not the root itself.
 async function commit(
   type: unknown,
   props: Record<string, unknown>,
@@ -40,25 +45,17 @@ async function commit(
     }),
   );
   await tick();
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  const subject = flat[1];
+  const subject = live.nodeOf(live.appRoot()).children[0];
   if (subject === undefined) {
     throw new Error('nothing committed under the surface container');
   }
-  const props_ = { ...subject.props };
+  const payload = { ...subject.payload };
   unmount(ROOT_TAG);
-  return props_;
+  return payload;
 }
 
 // Every committed node as `viewName{sortedKeys}`, in tree order — for the primitive whose wrapper
-// is more than one node.
+// is more than one node. Root included: the first row is the surface's own container.
 async function subtree(
   type: unknown,
   props: Record<string, unknown>,
@@ -72,15 +69,11 @@ async function subtree(
   );
   await tick();
   const shape: string[] = [];
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      shape.push(
-        `${node.viewName}{${Object.keys(node.props).sort().join(',')}}`,
-      );
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
+  live.walkLive(live.appRoot(), (node: ILiveNode) => {
+    shape.push(
+      `${node.viewName}{${Object.keys(node.payload).sort().join(',')}}`,
+    );
+  });
   unmount(ROOT_TAG);
   return shape;
 }
@@ -111,7 +104,10 @@ describe('a bare tag commits what a wrapper used to', () => {
     });
 
     expect(tag).toEqual([
-      'RCTView{flex,pointerEvents}',
+      // `#surface` is the engine's own current name for the surface root (`componentOf`) — not
+      // what a real device commits it as (`RootView`), nor its creation-time name (`RCTView`), but
+      // it is the live tree's honest answer and incidental to what this case is actually pinning.
+      '#surface{flex,pointerEvents}',
       // `accessible` (Pressable.js:252) and `focusable` (Pressable.js:258) are RN's defaults, and
       // the behavior is the only thing that supplies them now.
       'RCTView{accessibilityLabel,accessible,focusable,testID}',

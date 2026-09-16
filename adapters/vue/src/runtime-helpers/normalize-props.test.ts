@@ -12,7 +12,10 @@ import { defineComponent, h, type Component } from '@vue/runtime-core';
 import * as engine from '@symbiote-native/engine';
 import * as vueAdapter from '@symbiote-native/vue';
 import { mount, unmount } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import * as runtimeHelpers from './index';
 import metroVueTransformer from '../../metro-vue-transformer.cjs';
 
@@ -21,7 +24,8 @@ const {
   compileSfc,
 }: { compileSfc: (s: string, f: string) => Promise<string> } =
   metroVueTransformer;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -85,18 +89,10 @@ async function commit(
   fabric.reset();
   mount(ROOT_TAG, defineComponent({ setup: () => () => h(evaluate(code)) }));
   await tick();
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
-  };
-  walk(fabric.committed);
-  const subject = flat[1];
+  const subject = live.nodeOf(live.appRoot()).children[0];
   if (subject === undefined)
     throw new Error('nothing committed under the container');
-  const props = { ...subject.props };
+  const props = { ...subject.payload };
   unmount(ROOT_TAG);
   return props;
 }

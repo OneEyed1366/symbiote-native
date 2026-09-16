@@ -12,15 +12,24 @@
 // SectionList's own flattening and sticky-header wiring is section-list.test.ts's unit - N/A here.
 //
 // No Negative group: a namespace member and its wrapper have no rejecting input.
+//
+// A RECORDING host — see animated-flat-list.test.ts for why the ref-binding case compares node
+// HANDLE identity rather than a tag: under this host every node's tag reads the same `NO_TAG`
+// sentinel, which would make a `getNativeTag(...) === getNativeTag(...)` comparison a tautology.
 
 import '../../components/section-list';
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, Animated } from '@symbiote-native/vue';
-import { getNativeTag } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const ROOT_TAG = 352;
 
 const tick = (): Promise<void> =>
@@ -37,39 +46,33 @@ const SECTIONS: ISectionShape[] = [
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
 function committedTexts(): string[] {
   const texts: string[] = [];
-  walk(fabric.committed, node => {
-    if (typeof node.props.text === 'string') texts.push(node.props.text);
+  live.walkLive(live.appRoot(), node => {
+    if (typeof node.payload.text === 'string') texts.push(node.payload.text);
   });
   return texts;
 }
 
-// Walks the COMMITTED tree, not `fabric.find` (which scans every node ever created): a per-frame
-// setNativeProps commits a CLONE, so the first-created node keeps its original props forever.
-function scrollView(): IFakeNode {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.viewName === 'RCTScrollView') found ??= node;
-  });
-  if (found === undefined) throw new Error('no RCTScrollView was committed');
-  return found;
+function scrollView(): ILiveNode {
+  const node = live.findLive(
+    live.appRoot(),
+    n => n.viewName === 'RCTScrollView',
+  );
+  if (node === undefined) throw new Error('no RCTScrollView was committed');
+  return node;
 }
 
-function scrollNodeOf(instance: unknown): unknown {
+function scrollNodeOf(instance: unknown): ISymbioteNode {
   if (instance === null || typeof instance !== 'object')
     throw new Error('ref captured no instance');
   const getScrollNode = Reflect.get(instance, 'getScrollNode');
   if (typeof getScrollNode !== 'function')
     throw new Error('exposed instance is not a list handle');
-  return getScrollNode.call(instance);
+  const node: unknown = getScrollNode.call(instance);
+  if (!isSymbioteNode(node))
+    throw new Error('getScrollNode did not resolve to an engine node');
+  return node;
 }
 
 function mountList(extra: Record<string, unknown>): Promise<void> {
@@ -104,7 +107,7 @@ describe('Vue Animated.SectionList', () => {
       expect(committedTexts()).toEqual(
         expect.arrayContaining(['header:A', 'row-a0', 'header:B', 'row-b0']),
       );
-      expect(scrollView().props.opacity).toBe(0.5);
+      expect(scrollView().payload.opacity).toBe(0.5);
     });
 
     it('binds the leaf to the host scroll node while exposing the list handle', async () => {
@@ -115,12 +118,12 @@ describe('Vue Animated.SectionList', () => {
       const listRef = ref<unknown>(null);
       await mountList({ ref: listRef, style: { opacity } });
 
-      expect(getNativeTag(scrollNodeOf(listRef.value))).toBe(scrollView().tag);
+      expect(scrollNodeOf(listRef.value)).toBe(scrollView().handle);
 
       opacity.setValue(0.4);
       // The engine coalesces setNativeProps writes to the microtask boundary.
       await Promise.resolve();
-      expect(scrollView().props.opacity).toBe(0.4);
+      expect(scrollView().payload.opacity).toBe(0.4);
     });
 
     it('memoizes the wrapper', () => {

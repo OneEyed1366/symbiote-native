@@ -24,12 +24,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '../render';
 // No primitive import: `view` and `text` are TAGS written directly below.
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 341;
 const VIEW = 'RCTView';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -39,34 +44,20 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-function committedView(): IFakeNode {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.viewName === VIEW) found = node;
-  });
+function committedView(): ILiveNode {
+  const found = live.findLive(live.appRoot(), node => node.viewName === VIEW);
   expect(found, `a ${VIEW} was committed`).toBeDefined();
   if (found === undefined) throw new Error('unreachable: View missing');
   return found;
 }
 
-// fabric.find() searches `created` — every node ever createNode'd, INCLUDING ones later removed
-// or superseded by a clone-on-write update — so it can't prove "currently in/out of the tree" or
-// "currently holds this text/prop". These tests need the LIVE committed tree instead.
+// fabric.find() searches the CREATION LOG — every node ever created, INCLUDING ones later
+// removed or superseded — so it can't prove "currently in/out of the tree" or "currently holds
+// this text/prop". These tests need the LIVE committed tree instead.
 function findCommitted(
-  predicate: (node: IFakeNode) => boolean,
-): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (found === undefined && predicate(node)) found = node;
-  });
-  return found;
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  return live.findLive(live.appRoot(), predicate);
 }
 
 describe('patchProp class/style merge', () => {
@@ -86,7 +77,7 @@ describe('patchProp class/style merge', () => {
       }),
     );
     await tick();
-    expect(committedView().props.color).toBe('red');
+    expect(committedView().payload.color).toBe('red');
   });
 
   it('lets an explicit :style win over a class-derived style, regardless of declaration order', async () => {
@@ -106,7 +97,7 @@ describe('patchProp class/style merge', () => {
       }),
     );
     await tick();
-    expect(committedView().props.color).toBe('blue');
+    expect(committedView().payload.color).toBe('blue');
   });
 
   it('leaves an explicit :style unaffected when there is no class', async () => {
@@ -117,7 +108,7 @@ describe('patchProp class/style merge', () => {
       }),
     );
     await tick();
-    expect(committedView().props.color).toBe('blue');
+    expect(committedView().payload.color).toBe('blue');
   });
 
   it('re-resolves and recommits when the class changes reactively', async () => {
@@ -143,11 +134,11 @@ describe('patchProp class/style merge', () => {
       }),
     );
     await tick();
-    expect(committedView().props.color).toBe('red');
+    expect(committedView().payload.color).toBe('red');
 
     className.value = 'bar';
     await tick();
-    expect(committedView().props.color).toBe('green');
+    expect(committedView().payload.color).toBe('green');
   });
 });
 
@@ -181,15 +172,15 @@ describe("createComment / createText('') — Fragment and v-if placeholder ancho
       }),
     );
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'toggle')).toBeUndefined();
+    expect(findCommitted(n => n.payload.nativeID === 'toggle')).toBeUndefined();
 
     visible.value = true;
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'toggle')).toBeDefined();
+    expect(findCommitted(n => n.payload.nativeID === 'toggle')).toBeDefined();
 
     visible.value = false;
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'toggle')).toBeUndefined();
+    expect(findCommitted(n => n.payload.nativeID === 'toggle')).toBeUndefined();
   });
 
   it('a multi-root (Fragment) setup commits every root without the Fragment boundary painting', async () => {
@@ -203,8 +194,8 @@ describe("createComment / createText('') — Fragment and v-if placeholder ancho
       }),
     );
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'a')).toBeDefined();
-    expect(findCommitted(n => n.props.nativeID === 'b')).toBeDefined();
+    expect(findCommitted(n => n.payload.nativeID === 'a')).toBeDefined();
+    expect(findCommitted(n => n.payload.nativeID === 'b')).toBeDefined();
   });
 });
 
@@ -222,7 +213,7 @@ describe('setElementText — <Text> content updates', () => {
     await tick();
     expect(
       findCommitted(
-        n => n.viewName === 'RCTRawText' && n.props.text === 'first',
+        n => n.viewName === 'RCTRawText' && n.payload.text === 'first',
       ),
     ).toBeDefined();
 
@@ -230,16 +221,16 @@ describe('setElementText — <Text> content updates', () => {
     await tick();
     expect(
       findCommitted(
-        n => n.viewName === 'RCTRawText' && n.props.text === 'second',
+        n => n.viewName === 'RCTRawText' && n.payload.text === 'second',
       ),
     ).toBeDefined();
-    expect(findCommitted(n => n.props.text === 'first')).toBeUndefined();
+    expect(findCommitted(n => n.payload.text === 'first')).toBeUndefined();
 
     label.value = 'third';
     await tick();
     expect(
       findCommitted(
-        n => n.viewName === 'RCTRawText' && n.props.text === 'third',
+        n => n.viewName === 'RCTRawText' && n.payload.text === 'third',
       ),
     ).toBeDefined();
   });
@@ -278,12 +269,12 @@ describe('remove and reorder', () => {
       }),
     );
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'child')).toBeDefined();
+    expect(findCommitted(n => n.payload.nativeID === 'child')).toBeDefined();
 
     show.value = false;
     await tick();
-    expect(findCommitted(n => n.props.nativeID === 'child')).toBeUndefined();
-    expect(findCommitted(n => n.props.nativeID === 'parent')).toBeDefined();
+    expect(findCommitted(n => n.payload.nativeID === 'child')).toBeUndefined();
+    expect(findCommitted(n => n.payload.nativeID === 'parent')).toBeDefined();
   });
 
   // why: a keyed v-for reorder drives Vue's patch algorithm to call `insert` with an anchor and
@@ -304,10 +295,10 @@ describe('remove and reorder', () => {
       }),
     );
     await tick();
-    const list = findCommitted(n => n.props.nativeID === 'list');
+    const list = findCommitted(n => n.payload.nativeID === 'list');
     expect(list, 'list root committed').toBeDefined();
     if (list === undefined) throw new Error('unreachable: list missing');
-    expect(list.children.map(c => c.props.nativeID)).toEqual([
+    expect(list.children.map(c => c.payload.nativeID)).toEqual([
       'item-a',
       'item-b',
       'item-c',
@@ -315,10 +306,10 @@ describe('remove and reorder', () => {
 
     order.value = ['c', 'a', 'b'];
     await tick();
-    const reordered = findCommitted(n => n.props.nativeID === 'list');
+    const reordered = findCommitted(n => n.payload.nativeID === 'list');
     if (reordered === undefined)
       throw new Error('unreachable: list missing after reorder');
-    expect(reordered.children.map(c => c.props.nativeID)).toEqual([
+    expect(reordered.children.map(c => c.payload.nativeID)).toEqual([
       'item-c',
       'item-a',
       'item-b',
@@ -331,8 +322,8 @@ describe('remove and reorder', () => {
 // kebab->camel attr fold (normalizeVueAttrs). Both failures are silent: a clipped line with no
 // ellipsis, and a prop that never reaches Fabric.
 describe('host primitives as intrinsic tags', () => {
-  const findByTestId = (id: string): IFakeNode | undefined =>
-    findCommitted(node => node.props.testID === id);
+  const findByTestId = (id: string): ILiveNode | undefined =>
+    findCommitted(node => node.payload.testID === id);
 
   const mountTemplate = async (render: () => unknown): Promise<void> => {
     mount(ROOT_TAG, defineComponent({ setup: () => render }));
@@ -341,7 +332,7 @@ describe('host primitives as intrinsic tags', () => {
 
   it("seeds RN's Text defaults on an intrinsic text", async () => {
     await mountTemplate(() => h('text', { testID: 'plain' }, ['hello']));
-    const props = findByTestId('plain')?.props;
+    const props = findByTestId('plain')?.payload;
     expect(props?.ellipsizeMode).toBe('tail');
     expect(props?.allowFontScaling).toBe(true);
   });
@@ -358,7 +349,7 @@ describe('host primitives as intrinsic tags', () => {
         ['hello'],
       ),
     );
-    const props = findByTestId('explicit')?.props;
+    const props = findByTestId('explicit')?.payload;
     expect(props?.ellipsizeMode).toBe('middle');
     expect(props?.allowFontScaling).toBe(false);
   });
@@ -378,7 +369,7 @@ describe('host primitives as intrinsic tags', () => {
         ['hello'],
       ),
     );
-    const props = findByTestId('undef')?.props;
+    const props = findByTestId('undef')?.payload;
     expect(props?.ellipsizeMode).toBe('tail');
     expect(props?.allowFontScaling).toBe(true);
   });
@@ -390,7 +381,7 @@ describe('host primitives as intrinsic tags', () => {
         'accessibility-label': 'close',
       }),
     );
-    const props = findByTestId('kebab')?.props;
+    const props = findByTestId('kebab')?.payload;
     expect(props?.accessibilityLabel).toBe('close');
   });
 
@@ -408,14 +399,14 @@ describe('host primitives as intrinsic tags', () => {
     await mountTemplate(() =>
       h('view', { testID: 'aria', 'aria-label': 'from-aria' }),
     );
-    const props = findByTestId('aria')?.props;
+    const props = findByTestId('aria')?.payload;
     expect(props?.accessibilityLabel).toBe('from-aria');
     expect(props).not.toHaveProperty('ariaLabel');
   });
 
   it('leaves a non-text node without text defaults', async () => {
     await mountTemplate(() => h('view', { testID: 'view' }));
-    const props = findByTestId('view')?.props;
+    const props = findByTestId('view')?.payload;
     expect(props?.ellipsizeMode).toBeUndefined();
     expect(props?.allowFontScaling).toBeUndefined();
   });
@@ -428,7 +419,7 @@ describe('host primitives as intrinsic tags', () => {
     await mountTemplate(() =>
       h('view', { testID: 'aliased', id: 'accessory-1' }),
     );
-    const props = findByTestId('aliased')?.props;
+    const props = findByTestId('aliased')?.payload;
     expect(props?.nativeID).toBe('accessory-1');
     expect(props?.id, 'the alias must not also reach Fabric').toBeUndefined();
   });
@@ -437,6 +428,6 @@ describe('host primitives as intrinsic tags', () => {
     await mountTemplate(() =>
       h('text', { testID: 'aliased-text', id: 'label-1' }, 'x'),
     );
-    expect(findByTestId('aliased-text')?.props.nativeID).toBe('label-1');
+    expect(findByTestId('aliased-text')?.payload.nativeID).toBe('label-1');
   });
 });

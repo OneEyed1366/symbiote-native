@@ -17,12 +17,20 @@
 // The fake __turboModuleProxy answers with a KeyboardObserver (whose observe-counters record the
 // subscribed event NAMES) and an AccessibilityManager whose cross-fade getter is switchable per
 // test; the fake RN$registerCallableModule captures the device hub so the test can play "native".
+//
+// A RECORDING host, read through the LIVE tree — every question here is "what does the wrapper
+// currently hold" (paddingBottom / height / flex, folded off style), so it reads the payload off
+// the CURRENT committed child, not the creation log.
 
 import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { KeyboardAvoidingView, mount, unmount } from '@symbiote-native/vue';
 import { Keyboard, KEYBOARD_EVENT } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 517;
 
@@ -105,7 +113,8 @@ const EXPECTED_INSET = FRAME_Y + SCREEN_HEIGHT - KEYBOARD_SCREEN_Y;
 // What 'height' mode shrinks the wrapper to, and therefore what its NEXT onLayout reports.
 const SHRUNK_HEIGHT = SCREEN_HEIGHT - EXPECTED_INSET;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -129,10 +138,9 @@ function mountKav(props: Record<string, unknown>): void {
   );
 }
 
-// The current committed wrapper (the outer RCTView KeyboardAvoidingView renders). Re-read after
-// every commit, since clone-on-write hands back new nodes.
-function currentWrapper(): IFakeNode {
-  const wrapper = fabric.appRoot().children[0];
+// The current committed wrapper (the outer RCTView KeyboardAvoidingView renders).
+function currentWrapper(): ILiveNode {
+  const wrapper = live.nodeOf(live.appRoot()).children[0];
   expect(wrapper, 'an RCTView wrapper sits under the root').toBeDefined();
   expect(wrapper.viewName).toBe('RCTView');
   return wrapper;
@@ -197,11 +205,11 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
 
       showKeyboard();
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
 
       hideKeyboard();
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(0);
+      expect(currentWrapper().payload.paddingBottom).toBe(0);
     });
 
     // why: Vue does NOT camelCase $attrs, so a template's `:keyboard-vertical-offset` arrives
@@ -216,7 +224,7 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
 
       showKeyboard();
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(
+      expect(currentWrapper().payload.paddingBottom).toBe(
         EXPECTED_INSET + OFFSET,
       );
     });
@@ -236,15 +244,15 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
 
       showKeyboard();
       await tick();
-      expect(currentWrapper().props.height).toBe(SHRUNK_HEIGHT);
-      expect(currentWrapper().props.flex).toBe(0);
+      expect(currentWrapper().payload.height).toBe(SHRUNK_HEIGHT);
+      expect(currentWrapper().payload.flex).toBe(0);
 
       // The shrunk wrapper lays out again and reports its NEW, shorter height.
       measureWrapper(SHRUNK_HEIGHT);
       showKeyboard();
       await tick();
       expect(
-        currentWrapper().props.height,
+        currentWrapper().payload.height,
         'the inset must stay put, not shrink again',
       ).toBe(SHRUNK_HEIGHT);
     });
@@ -272,12 +280,12 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
 
       showKeyboard();
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(EXPECTED_INSET);
+      expect(currentWrapper().payload.paddingBottom).toBe(EXPECTED_INSET);
 
       behavior.value = 'height';
       await tick();
       expect(
-        currentWrapper().props.height,
+        currentWrapper().payload.height,
         'the new behavior reaches the render',
       ).toBe(SHRUNK_HEIGHT);
 
@@ -286,7 +294,7 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
       showKeyboard();
       await tick();
       expect(
-        currentWrapper().props.height,
+        currentWrapper().payload.height,
         'the handler must read the CURRENT behavior',
       ).toBe(SHRUNK_HEIGHT);
       expect(
@@ -309,7 +317,7 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
 
       showKeyboard(0, SCREEN_HEIGHT);
       await tick();
-      const padding = currentWrapper().props.paddingBottom;
+      const padding = currentWrapper().payload.paddingBottom;
       expect(
         padding === undefined || padding === 0,
         `nothing lifted, got paddingBottom ${String(padding)}`,
@@ -325,7 +333,7 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
 
       showKeyboard(0, SCREEN_HEIGHT);
       await tick();
-      expect(currentWrapper().props.paddingBottom).toBe(SCREEN_HEIGHT);
+      expect(currentWrapper().payload.paddingBottom).toBe(SCREEN_HEIGHT);
     });
   });
 });

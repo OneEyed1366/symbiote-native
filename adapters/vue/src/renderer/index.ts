@@ -252,7 +252,7 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       return nextSiblingOf(node, surface) ?? null;
     },
 
-    patchProp(el, key, _prev, next, _namespace, parentComponent) {
+    patchProp(el, key, prev, next, _namespace, parentComponent) {
       if (isSurface(el)) return;
       // Kebab -> camel happens HERE, not only inside a component wrapper: the SFC transformer
       // lowers View/Text to their intrinsic tags (metro-vue-transformer.cjs), so those props
@@ -269,7 +269,30 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       // View becomes a listener; onTintColor on a Switch stays a prop), shared with React. The
       // class/style merge (explicit :style always winning, regardless of which of Vue's two
       // independent patchProp calls lands last) is centralized there too (core/engine/src/node.ts).
-      routeProp(el, name, routed);
+      //
+      // `value` REACHES HERE UNCHANGED, on every re-render, and that is upstream by design:
+      // `patchProps` excludes it from its own diff and then patches it on its own line
+      // (@vue/runtime-core 3.5.39 — `if (next !== prev && key !== "value")`, then
+      // `if ("value" in newProps)`). The reason is a DOM one: typing mutates `el.value` directly,
+      // so what Vue last SET is not what the element now HOLDS, and only the element can say.
+      // Upstream pairs it with a guard in the patcher, and that half we did not have — `patchDOMProp`
+      // writes only on a difference against the element's live value (@vue/runtime-dom,
+      // `if (oldValue !== newValue || !("_value" in el))`). So every `<text-input>` re-routed its
+      // value on every re-render of its parent: 1 000 writes and ~6 000 wire slots per relabel of
+      // the benchmark list, against solid's 0 for the identical tree.
+      //
+      // On `prev` rather than on the node's own prop: the divergence upstream protects against is
+      // not visible from here — native text lives on the far side and TextInput's behavior owns the
+      // mirror — and asking the host would cost a crossing per input per render to be told the
+      // declarative value, which is what `prev` already is.
+      //
+      // The COMMIT REQUEST still goes out, which is why this skips the route and does not return.
+      // The controlled handshake hangs off the commit beat, not off the write: `afterCommit` reads
+      // the node's own `value` against its native mirror. An idle commit is O(1) (F-12) and its
+      // post-commit hooks run whether or not the commit reached the host (F-7).
+      if (key !== 'value' || prev !== next) {
+        routeProp(el, name, routed);
+      }
       surface.requestCommit();
     },
 

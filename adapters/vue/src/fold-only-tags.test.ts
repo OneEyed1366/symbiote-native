@@ -20,13 +20,19 @@
 // machines those behaviors carry are `core/components`' own suites' subject.
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 import './register';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 9_976;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// A fold runs on the way into what Fabric is handed, so every read here is `.payload`.
+const live = createLiveTree(fabric);
 
 // Vue batches its commits on a microtask, so the tree is not there on the next line.
 const settle = async (): Promise<void> => {
@@ -34,14 +40,8 @@ const settle = async (): Promise<void> => {
   await new Promise(resolve => setTimeout(resolve, 0));
 };
 
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
-}
-
-function byTestId(id: string): IFakeNode {
-  const hit = flatten(fabric.appRoot().children).find(
-    node => node.props.testID === id,
-  );
+function byTestId(id: string): ILiveNode {
+  const hit = live.findLive(live.appRoot(), node => node.payload.testID === id);
   if (hit === undefined) throw new Error(`no committed node with testID ${id}`);
   return hit;
 }
@@ -70,10 +70,10 @@ describe('Vue: the fold-only tags commit what their wrappers used to', () => {
 
     const node = byTestId('sav');
     expect(node.viewName).toBe('SafeAreaView');
-    expect(node.props.nativeID).toBe('pane');
-    expect(Object.hasOwn(node.props, 'id')).toBe(false);
+    expect(node.payload.nativeID).toBe('pane');
+    expect(Object.hasOwn(node.payload, 'id')).toBe(false);
     // The wrapper called `resolveAccessibilityProps`; the engine's `fabricProps` does it now.
-    expect(node.props.accessibilityLabel).toBe('the pane');
+    expect(node.payload.accessibilityLabel).toBe('the pane');
   });
 
   it('input-accessory-view keeps its nativeID and background', async () => {
@@ -84,8 +84,8 @@ describe('Vue: the fold-only tags commit what their wrappers used to', () => {
     });
 
     const node = byTestId('acc');
-    expect(node.props.nativeID).toBe('bar');
-    expect(node.props.backgroundColor).toBe('#123456');
+    expect(node.payload.nativeID).toBe('bar');
+    expect(node.payload.backgroundColor).toBe('#123456');
   });
 
   it('refresh-control folds the id alias and takes a real refresh listener', async () => {
@@ -98,12 +98,12 @@ describe('Vue: the fold-only tags commit what their wrappers used to', () => {
     });
 
     const node = byTestId('rc');
-    expect(node.props.nativeID).toBe('puller');
-    expect(node.props.refreshing).toBe(false);
+    expect(node.payload.nativeID).toBe('puller');
+    expect(node.payload.refreshing).toBe(false);
     // The wrapper turned a host `onRefresh` into a typed `refresh` emit. On the tag the prop IS the
     // listener, so what has to be true is that the engine routed it as an EVENT rather than
     // dropping it as a function prop — `fabricProps` drops every function it is handed.
-    expect(Object.hasOwn(node.props, 'onRefresh')).toBe(false);
+    expect(Object.hasOwn(node.payload, 'onRefresh')).toBe(false);
   });
 
   it('image folds src and the width/height box into the style', async () => {
@@ -118,8 +118,8 @@ describe('Vue: the fold-only tags commit what their wrappers used to', () => {
     expect(node.viewName).toBe('RCTImageView');
     // `renderImage`'s job, now `registerImageBehavior`'s: `src` becomes the native source array and
     // width/height become style, neither of which survives as the raw prop it was written as.
-    expect(Array.isArray(node.props.source)).toBe(true);
-    expect(node.props.width).toBe(12);
-    expect(node.props.height).toBe(34);
+    expect(Array.isArray(node.payload.source)).toBe(true);
+    expect(node.payload.width).toBe(12);
+    expect(node.payload.height).toBe(34);
   });
 });

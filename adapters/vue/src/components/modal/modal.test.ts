@@ -19,7 +19,15 @@
 // No Negative group: Modal's public props have no throwing path — every runtime guard
 // (asBoolean/asString/asAnimationType/…) degrades an unrecognized value to `undefined`, it never
 // rejects.
-
+//
+// A RECORDING host. Locating a node uses `fabric.find` over the CREATION log, on purpose: the
+// last case below fires an event on a modal that may already have left the LIVE tree by the time
+// the native `topDismiss` arrives (the keep-alive is one render wide), and `fireEvent` targets an
+// `instanceHandle` regardless of current residency — the same thing a real device event would do.
+// Payload/child reads go through the engine's own `payloadOf`/`childrenOf` directly off that same
+// handle, which stays current (the engine mutates the node in place, it does not clone it), so no
+// live-tree walk is needed for those either. `createLiveTree` is used only where the CLAIM is
+// genuinely about current tree shape — the root's child count and the serialized shape.
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -28,26 +36,33 @@ import {
   unmount,
   type ISymbioteEvent,
 } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  payloadOf,
+  type IAuthoredNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 421;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function modalNode(): IFakeNode {
+function modalNode(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === 'ModalHostView');
   expect(node, 'a ModalHostView was created').toBeDefined();
   if (node === undefined) throw new Error('unreachable: ModalHostView missing');
   return node;
 }
 
-function containerNode(): IFakeNode {
-  const child = modalNode().children[0];
+function containerHandle(): ISymbioteNode {
+  const child = childrenOf(modalNode().handle)[0];
   if (child === undefined)
     throw new Error('ModalHostView has no container child');
   return child;
@@ -74,16 +89,18 @@ describe('Vue Modal on the engine', () => {
       mountModal({ visible: true });
       await tick();
 
-      expect(fabric.serialize(fabric.appRoot().children)).toBe(
-        'ModalHostView(RCTView(RCTView))',
-      );
+      const rootChildren = live.nodeOf(live.appRoot()).children;
+      const serialized = rootChildren
+        .map(c => live.serialize(c.handle))
+        .join('');
+      expect(serialized).toBe('ModalHostView(RCTView(RCTView))');
 
-      const host = modalNode();
-      expect(host.props.visible).toBe(true);
-      expect(host.props.animationType).toBe('none');
-      expect(host.props.position).toBe('absolute');
-      expect(host.props.presentationStyle).toBe('fullScreen');
-      expect(containerNode().props.backgroundColor).toBe('white');
+      const hostPayload = payloadOf(modalNode().handle);
+      expect(hostPayload.visible).toBe(true);
+      expect(hostPayload.animationType).toBe('none');
+      expect(hostPayload.position).toBe('absolute');
+      expect(hostPayload.presentationStyle).toBe('fullScreen');
+      expect(payloadOf(containerHandle()).backgroundColor).toBe('white');
     });
 
     it('commits no modal node when visible is false', async () => {
@@ -93,8 +110,10 @@ describe('Vue Modal on the engine', () => {
       await tick();
       // A surface always commits its own AppContainer root, so the question is what hangs UNDER
       // it: a modal that never became visible must contribute no child at all.
-      expect(fabric.appRoot().children.length).toBe(0);
-      expect(fabric.find(n => n.viewName === 'ModalHostView')).toBeUndefined();
+      expect(live.nodeOf(live.appRoot()).children.length).toBe(0);
+      expect(
+        live.findLive(live.appRoot(), n => n.viewName === 'ModalHostView'),
+      ).toBeUndefined();
     });
 
     it('routes topRequestClose to the requestClose emit', async () => {
@@ -145,8 +164,10 @@ describe('Vue Modal on the engine', () => {
         style: { backgroundColor: 'red' },
       });
       await tick();
-      expect(containerNode().props.backgroundColor).toBe('transparent');
-      expect(modalNode().props.presentationStyle).toBe('overFullScreen');
+      expect(payloadOf(containerHandle()).backgroundColor).toBe('transparent');
+      expect(payloadOf(modalNode().handle).presentationStyle).toBe(
+        'overFullScreen',
+      );
     });
 
     it('sets the container background from backdropColor on a non-transparent modal', async () => {
@@ -154,7 +175,9 @@ describe('Vue Modal on the engine', () => {
       // without going through `style`.
       mountModal({ visible: true, backdropColor: 'rebeccapurple' });
       await tick();
-      expect(containerNode().props.backgroundColor).toBe('rebeccapurple');
+      expect(payloadOf(containerHandle()).backgroundColor).toBe(
+        'rebeccapurple',
+      );
     });
 
     it('forwards platform props as NAMED host props', async () => {
@@ -170,12 +193,12 @@ describe('Vue Modal on the engine', () => {
         allowSwipeDismissal: true,
       });
       await tick();
-      const props = modalNode().props;
-      expect(props.supportedOrientations).toEqual(['portrait', 'landscape']);
-      expect(props.hardwareAccelerated).toBe(true);
-      expect(props.statusBarTranslucent).toBe(true);
-      expect(props.navigationBarTranslucent).toBe(true);
-      expect(props.allowSwipeDismissal).toBe(true);
+      const payload = payloadOf(modalNode().handle);
+      expect(payload.supportedOrientations).toEqual(['portrait', 'landscape']);
+      expect(payload.hardwareAccelerated).toBe(true);
+      expect(payload.statusBarTranslucent).toBe(true);
+      expect(payload.navigationBarTranslucent).toBe(true);
+      expect(payload.allowSwipeDismissal).toBe(true);
     });
 
     it('fires the dismiss emit only on the native topDismiss event, not on the hide transition', async () => {
@@ -203,14 +226,18 @@ describe('Vue Modal on the engine', () => {
       await tick();
       expect(dismissCount).toBe(0);
 
-      // Drive the native close: topRequestClose -> visible flips false. The keep-alive holds the
-      // node mounted, but NO dismiss emit fires from JS on this transition alone.
+      // Drive the native close: topRequestClose -> visible flips false. No dismiss emit fires from
+      // JS on this transition alone — the keep-alive's one extra render has already resolved by
+      // the next tick (the post-flush watch and the render it triggers both land inside it), so
+      // the node found below is the recorded one, not necessarily still in the live tree.
       fabric.fireEvent(modalNode().instanceHandle, 'topRequestClose', {});
       await tick();
       expect(dismissCount).toBe(0);
 
-      // The native exit animation completes -> Fabric emits topDismiss on the still-mounted host
-      // node -> dismiss fires exactly once.
+      // The native exit animation completes -> Fabric emits topDismiss on the recorded host node
+      // -> dismiss fires exactly once. The keep-alive frame is one render wide, so by now the node
+      // may already have left the LIVE tree; `fireEvent` targets the instanceHandle regardless of
+      // residency, same as a real device event racing the JS unmount would.
       fabric.fireEvent(modalNode().instanceHandle, 'topDismiss', {});
       await tick();
       expect(dismissCount).toBe(1);

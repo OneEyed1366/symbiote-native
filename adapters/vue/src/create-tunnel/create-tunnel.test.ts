@@ -5,46 +5,74 @@
 // is no shared node/ref here at all — the two apps below never touch each other's Fabric
 // tree directly, only a plain shared reactive Map.
 
-import { defineComponent, h, inject, provide, ref } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  inject,
+  provide,
+  ref,
+  type Component,
+} from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createTunnel, mount, unmount } from '@symbiote-native/vue';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createTunnel,
+  mount as mountSurface,
+  unmount,
+} from '@symbiote-native/vue';
+import type { IRootTag, SymbioteSurface } from '@symbiote-native/engine';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const SOURCE_TAG = 622;
 const TARGET_TAG = 623;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-beforeEach(() => fabric.reset());
+// Two INDEPENDENT surfaces mount in most cases here, and `live.appRoot()` (a single creation-log
+// lookup) cannot tell them apart — so every `mount()` call is tracked, and a search walks each
+// tracked surface's own children.
+let surfaces: SymbioteSurface[] = [];
+function mount(rootTag: IRootTag, component: Component): SymbioteSurface {
+  const surface = mountSurface(rootTag, component);
+  surfaces.push(surface);
+  return surface;
+}
+
+beforeEach(() => {
+  fabric.reset();
+  surfaces = [];
+});
 afterEach(() => {
   unmount(SOURCE_TAG);
   unmount(TARGET_TAG);
 });
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
+function findAcrossSurfaces(
+  predicate: (node: ILiveNode) => boolean,
+): ILiveNode | undefined {
+  for (const surface of surfaces) {
+    for (const child of surface.children) {
+      const found = live.findLive(child, predicate);
+      if (found !== undefined) return found;
+    }
   }
+  return undefined;
 }
 
-function findText(text: string): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committedAll, node => {
-    if (node.viewName === 'RCTRawText' && node.props.text === text)
-      found = node;
-  });
-  return found;
+function findText(text: string): ILiveNode | undefined {
+  return findAcrossSurfaces(
+    node => node.viewName === 'RCTRawText' && node.payload.text === text,
+  );
 }
 
-function findByTestId(testId: string): IFakeNode | undefined {
-  let found: IFakeNode | undefined;
-  walk(fabric.committedAll, node => {
-    if (node.props.testID === testId) found = node;
-  });
-  return found;
+function findByTestId(testId: string): ILiveNode | undefined {
+  return findAcrossSurfaces(node => node.payload.testID === testId);
 }
 
 // Positive only: createTunnel has no invalid-input/guard-clause path — `In`/`Out` take no props
@@ -70,13 +98,8 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     mount(TARGET_TAG, TargetApp);
     await tick();
 
-    // fake-fabric's `committed` is last-write-wins across rootTags (core/test-utils
-    // limitation, not the engine's), so after mounting B second, it reflects B's own tree.
     const ported = findText('ported across surfaces');
-    expect(
-      ported,
-      'content is present in the LAST-committed tree (surface B)',
-    ).toBeDefined();
+    expect(ported, 'content is present under surface B').toBeDefined();
   });
 
   it('removes the content from the target once the source unmounts', async () => {
@@ -161,7 +184,7 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     if (target === undefined) throw new Error('unreachable: target missing');
     // Each registration is an RCTText wrapping one RCTRawText child, not a bare RCTRawText —
     // read the raw text one level below each direct child to recover registration order.
-    const texts = target.children.map(cell => cell.children[0]?.props.text);
+    const texts = target.children.map(cell => cell.children[0]?.payload.text);
     expect(texts).toEqual(['first', 'second']);
   });
 
@@ -187,7 +210,7 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     expect(findText('same-surface')).toBeDefined();
     // A real render loop would keep re-committing every microtask; a handful of commits for one
     // mount + one reactive settle is the honest upper bound, not an exact implementation count.
-    expect(fabric.counts.completeRoot).toBeLessThan(5);
+    expect(fabric.commits).toBeLessThan(5);
   });
   // why: the exact inverse of the portal's provide/inject test
   // (../create-portal/create-portal.test.ts), and the reason the two mechanisms are not

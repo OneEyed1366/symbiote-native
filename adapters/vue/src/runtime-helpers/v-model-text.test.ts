@@ -31,13 +31,17 @@ import {
   propOf,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import { vModelText } from './index';
 
 const ROOT_TAG = 341;
 const TEST_ID = 'model-subject';
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 // A prop write from an event handler publishes on the microtask boundary; the render that follows
 // an app-state change is queued the same way.
 const tick = (): Promise<void> =>
@@ -52,20 +56,11 @@ afterEach(() => {
   clearHostBehaviors();
 });
 
-// The LIVE tree by testID, never `fabric.find()` — that searches `created` and hands back the
-// pre-clone node with its mount-time props, so every update assertion here would read stale.
+// The LIVE tree by testID, never `fabric.find()` — that searches the creation log and hands back
+// the pre-clone node with its mount-time props, so every update assertion here would read stale.
 function committedProps(): Record<string, unknown> | undefined {
-  const walk = (
-    nodes: readonly IFakeNode[],
-  ): Record<string, unknown> | undefined => {
-    for (const node of nodes) {
-      if (node.props.testID === TEST_ID) return node.props;
-      const hit = walk(node.children);
-      if (hit !== undefined) return hit;
-    }
-    return undefined;
-  };
-  return walk(fabric.appRoot().children);
+  return live.findLive(live.appRoot(), node => node.payload.testID === TEST_ID)
+    ?.payload;
 }
 
 interface IHarness {

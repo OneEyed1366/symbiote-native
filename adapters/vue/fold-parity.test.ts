@@ -36,9 +36,10 @@ import { mount, unmount } from '@symbiote-native/vue';
 // unregistered tag would commit a bare view with the raw props still on it.
 import './src/register';
 import {
-  installFabric,
+  createLiveTree,
+  installRecordingFabric,
   waitUntil,
-  type IFakeNode,
+  type ILiveNode,
 } from '@symbiote-native/test-utils';
 import * as runtimeHelpers from './src/runtime-helpers';
 import { defineComponent, h, nextTick, ref } from './src/runtime-helpers';
@@ -51,7 +52,8 @@ const {
   metroVueTransformer;
 
 const ROOT_TAG = 9911;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // The mutable prop the post-mount case drives. A module-level ref rather than a component-local
 // one so all three arms read the SAME source and the test can write it from outside.
@@ -124,17 +126,15 @@ export default defineComponent({ setup() { return () => ${body}; } });`,
   return evaluate(result?.code ?? '');
 }
 
-/** Every committed node's payload, in tree order, minus RN's synthetic AppContainer. */
+/** Every committed node's payload, in tree order, minus the surface's own box-none root. */
 function committedPayloads(): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      out.push(node.props);
-      walk(node.children);
-    }
+  const walk = (node: ILiveNode): void => {
+    out.push(node.payload);
+    for (const child of node.children) walk(child);
   };
-  walk(fabric.committed);
-  return out.slice(1);
+  for (const child of live.nodeOf(live.appRoot()).children) walk(child);
+  return out;
 }
 
 async function render(
@@ -143,7 +143,7 @@ async function render(
   fabric.reset();
   clearGlobalStyles();
   mount(ROOT_TAG, component);
-  await waitUntil(() => fabric.counts.completeRoot > 0, 'the Vue commit');
+  await waitUntil(() => fabric.commits > 0, 'the Vue commit');
   const payloads = committedPayloads();
   unmount(ROOT_TAG);
   return payloads;
@@ -335,7 +335,7 @@ describe('every Vue path folds id and the Text defaults identically', () => {
       fabric.reset();
       clearGlobalStyles();
       mount(ROOT_TAG, component);
-      await waitUntil(() => fabric.counts.completeRoot > 0, `${label} mount`);
+      await waitUntil(() => fabric.commits > 0, `${label} mount`);
       expect(committedPayloads(), `${label} on mount`).toEqual([
         { nativeID: 'before' },
       ]);

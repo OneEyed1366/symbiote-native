@@ -6,38 +6,34 @@
 // (surface.requestCommit()), so a bare setNativeProps call here would silently no-op on mount
 // without the whenCommitted guard. The directive's effect is always
 // a targeted follow-up clone on top of the render's own commit (setNativeProps re-commits, it
-// doesn't mutate in place), so assertions read the LATEST committed tree (`fabric.committed`),
-// not the original `createNode`'d node (`fabric.find`), which never reflects a later clone.
+// doesn't mutate in place), so assertions read the LIVE committed tree (`createLiveTree`'s
+// `.payload`, which reads the node's current state), not the CREATION-log lookup (`fabric.find`),
+// which never reflects a later clone.
 
 import { defineComponent, h, ref, withDirectives } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { useCssModule, vShow, withKeys, withModifiers } from './index';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 340;
 const VIEW = 'RCTView';
 const PADDING = 4;
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
-  for (const node of nodes) {
-    visit(node);
-    walk(node.children, visit);
-  }
-}
-
-function committedView(): IFakeNode {
-  let found: IFakeNode | undefined;
-  walk(fabric.committed, node => {
-    if (node.viewName === VIEW) found = node;
-  });
+function committedView(): ILiveNode {
+  const found = live.findLive(live.appRoot(), node => node.viewName === VIEW);
   expect(found, `a ${VIEW} was committed`).toBeDefined();
   if (found === undefined) throw new Error('unreachable: View missing');
   return found;
@@ -68,14 +64,14 @@ describe('vShow runtime-helpers shim', () => {
     mountShowable(false);
     await tick();
     const node = committedView();
-    expect(node.props.display).toBe('none');
-    expect(node.props.padding, 'other style props survive').toBe(PADDING);
+    expect(node.payload.display).toBe('none');
+    expect(node.payload.padding, 'other style props survive').toBe(PADDING);
   });
 
   it('leaves display unset when mounted visible', async () => {
     mountShowable(true);
     await tick();
-    expect(committedView().props.display).not.toBe('none');
+    expect(committedView().payload.display).not.toBe('none');
   });
 
   // why: setNativeProps merges a partial style object rather than replacing it — a directive that
@@ -93,19 +89,19 @@ describe('vShow runtime-helpers shim', () => {
       }),
     );
     await tick();
-    expect(committedView().props.display).not.toBe('none');
+    expect(committedView().payload.display).not.toBe('none');
 
     visible.value = false;
     await tick();
     let node = committedView();
-    expect(node.props.display).toBe('none');
-    expect(node.props.padding).toBe(PADDING);
+    expect(node.payload.display).toBe('none');
+    expect(node.payload.padding).toBe(PADDING);
 
     visible.value = true;
     await tick();
     node = committedView();
-    expect(node.props.display).not.toBe('none');
-    expect(node.props.padding).toBe(PADDING);
+    expect(node.payload.display).not.toBe('none');
+    expect(node.payload.padding).toBe(PADDING);
   });
 
   // why: applyShow explicitly cancels the PREVIOUS pending whenCommitted wait before scheduling a
@@ -128,7 +124,7 @@ describe('vShow runtime-helpers shim', () => {
     // microtask-coalesced commit are still pending at this point.
     visible.value = true;
     await tick();
-    expect(committedView().props.display).not.toBe('none');
+    expect(committedView().payload.display).not.toBe('none');
   });
 });
 

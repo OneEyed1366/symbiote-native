@@ -17,7 +17,11 @@
 // answer from the same spec entry this tag now has).
 import { defineComponent, h, type VNode } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // SIDE-EFFECT IMPORT: the behavior is what clones the owner's props onto the child. An app reaches
 // it through the package barrel; a test importing the renderer directly does not.
@@ -25,22 +29,26 @@ import './register';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 9_931;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// The tag commits NO view of its own, so its anchor flattens here exactly as the commit walk
+// flattens it — which is the claim this file makes.
+const live = createLiveTree(fabric);
 
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
+function flatten(root: ILiveNode): ILiveNode[] {
+  return root.children.flatMap(node => [node, ...flatten(node)]);
 }
 
 /** Everything committed under the labelled root, the root itself excluded. */
-function subtreeOf(label: string): IFakeNode[] {
-  const root = flatten(fabric.appRoot().children).find(
-    node => node.props.nativeID === label,
+function subtreeOf(label: string): ILiveNode[] {
+  const root = live.findLive(
+    live.appRoot(),
+    node => node.payload.nativeID === label,
   );
   if (root === undefined) throw new Error(`no committed root ${label}`);
-  return flatten(root.children);
+  return flatten(root);
 }
 
 async function mountTree(render: () => VNode): Promise<void> {
@@ -80,7 +88,7 @@ describe('touchable-native-feedback as a tag', () => {
     );
 
     const [child] = subtreeOf('root');
-    expect(child.props).toMatchObject({
+    expect(child.payload).toMatchObject({
       accessibilityLabel: 'Save',
       // :373 — the owner's `id`/`nativeID`, not the child's.
       nativeID: 'tnf',

@@ -10,7 +10,11 @@
 // (`.claude/rules/test-harness-false-greens.md` §14).
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+  type ILiveNode,
+} from '@symbiote-native/test-utils';
 
 // SIDE-EFFECT IMPORT: the behavior is what builds the subtree. An app reaches it through the
 // package barrel; a test importing the renderer directly does not.
@@ -18,7 +22,9 @@ import './register';
 import { mount, unmount } from './render';
 
 const ROOT_TAG = 9_973;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+// The behavior builds the subtree and folds `id` into `nativeID`, so every read here is `.payload`.
+const live = createLiveTree(fabric);
 
 // RN Button.js's iOS label look, owned by `buttonTextStyle` in @symbiote-native/components. MARGIN,
 // not padding (Button.js:409) — the label pushes the button's edges outward instead of insetting.
@@ -32,14 +38,16 @@ const settle = async (): Promise<void> => {
   await new Promise(resolve => setTimeout(resolve, 0));
 };
 
-function flatten(nodes: readonly IFakeNode[]): IFakeNode[] {
-  return nodes.flatMap(node => [node, ...flatten(node.children)]);
+// Every node under `root`, in tree order — the shape the view-name assertions below compare.
+function flatten(root: ILiveNode): ILiveNode[] {
+  return root.children.flatMap(node => [node, ...flatten(node)]);
 }
 
 /** The committed host, found by the `nativeID` its `id` folded into. */
-function hostOf(label: string): IFakeNode {
-  const host = flatten(fabric.appRoot().children).find(
-    node => node.props.nativeID === label,
+function hostOf(label: string): ILiveNode {
+  const host = live.findLive(
+    live.appRoot(),
+    node => node.payload.nativeID === label,
   );
   if (host === undefined) throw new Error(`no committed host ${label}`);
   return host;
@@ -68,20 +76,20 @@ describe('Vue: `button` as a tag', () => {
     // the branch is the behavior's, not this adapter's.
     const host = hostOf('btn');
     expect(host.viewName).toBe('RCTView');
-    expect(host.props.accessibilityRole).toBe('button');
-    expect(flatten(host.children).map(node => node.viewName)).toEqual([
+    expect(host.payload.accessibilityRole).toBe('button');
+    expect(flatten(host).map(node => node.viewName)).toEqual([
       'RCTView',
       'RCTText',
       'RCTRawText',
     ]);
 
     const text = host.children[0].children[0];
-    expect(text.props.color).toBe(DEFAULT_BLUE);
-    expect(text.props.margin).toBe(LABEL_MARGIN);
+    expect(text.payload.color).toBe(DEFAULT_BLUE);
+    expect(text.payload.margin).toBe(LABEL_MARGIN);
     // RN's Text.js defaults, which a hand-written host tag inherits from nothing — without them a
     // long label clips mid-word instead of ellipsising, on device only.
-    expect(text.props.ellipsizeMode).toBe('tail');
-    expect(text.children[0].props.text).toBe('Save');
+    expect(text.payload.ellipsizeMode).toBe('tail');
+    expect(text.children[0].payload.text).toBe('Save');
   });
 
   // why: `disabled` greys the label and wins over an explicit `color` (Button.js pushes the
@@ -95,7 +103,7 @@ describe('Vue: `button` as a tag', () => {
     });
 
     const host = hostOf('btn');
-    expect(host.props.accessibilityState).toMatchObject({ disabled: true });
-    expect(host.children[0].children[0].props.color).toBe(DISABLED_GREY);
+    expect(host.payload.accessibilityState).toMatchObject({ disabled: true });
+    expect(host.children[0].children[0].payload.color).toBe(DISABLED_GREY);
   });
 });

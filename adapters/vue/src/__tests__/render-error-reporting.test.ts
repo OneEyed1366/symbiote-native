@@ -16,7 +16,10 @@ import {
 } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, setAppConfigurator, unmount } from '@symbiote-native/vue';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 219;
 const BOOM = 'render exploded';
@@ -55,7 +58,8 @@ const LeakyBoundary = defineComponent({
   },
 });
 
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -158,7 +162,7 @@ describe('Negative — a component throws during render', () => {
     // render pass after the captured error flips the boundary's state.
     await tick();
 
-    expect(fabric.appRoot().children).toHaveLength(1);
+    expect(live.nodeOf(live.appRoot()).children).toHaveLength(1);
   });
 });
 

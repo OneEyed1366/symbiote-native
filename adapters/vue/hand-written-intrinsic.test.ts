@@ -20,9 +20,10 @@ import * as engine from '@symbiote-native/engine';
 import * as vueAdapter from '@symbiote-native/vue';
 import { mount, unmount } from '@symbiote-native/vue';
 import {
-  installFabric,
+  createLiveTree,
+  installRecordingFabric,
   waitForQuiet,
-  type IFakeNode,
+  type ILiveNode,
 } from '@symbiote-native/test-utils';
 import { descriptorFor } from '@symbiote-native/components';
 import * as runtimeHelpers from './src/runtime-helpers';
@@ -36,7 +37,8 @@ const {
   compileSfc,
 }: { compileSfc: (s: string, f: string) => Promise<string> } =
   metroVueTransformer;
-const fabric = installFabric();
+const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 
 // Derived from the shared tag set, never enumerated: a primitive that joins the spec joins this
 // suite by existing, which is the repair `.claude/rules/adapter-parity-audit.md` records for every
@@ -113,31 +115,22 @@ async function compileJsx(source: string): Promise<string> {
 const namesElement = (code: string, tag: string): boolean =>
   code.includes(`"${tag}"`) && !code.includes(`_resolveComponent("${tag}")`);
 
-function deepCount(nodes: readonly IFakeNode[]): number {
-  return nodes.reduce((total, node) => total + 1 + deepCount(node.children), 0);
-}
-
-async function mountArm(component: Component): Promise<readonly IFakeNode[]> {
+async function mountArm(component: Component): Promise<readonly ILiveNode[]> {
   fabric.reset();
   mount(ROOT_TAG, defineComponent({ setup: () => () => h(component) }));
-  await waitForQuiet(
-    () => deepCount(fabric.committed),
-    'the mount to stop committing',
-  );
-  const flat: IFakeNode[] = [];
-  const walk = (nodes: readonly IFakeNode[]): void => {
-    for (const node of nodes) {
-      flat.push(node);
-      walk(node.children);
-    }
+  await waitForQuiet(() => fabric.commits, 'the mount to stop committing');
+  const flat: ILiveNode[] = [];
+  const walk = (node: ILiveNode): void => {
+    flat.push(node);
+    for (const child of node.children) walk(child);
   };
-  walk(fabric.committed);
+  for (const child of live.nodeOf(live.appRoot()).children) walk(child);
   unmount(ROOT_TAG);
   return flat;
 }
 
-function subject(nodes: readonly IFakeNode[]): IFakeNode {
-  const found = nodes.find(node => node.props.testID === TEST_ID);
+function subject(nodes: readonly ILiveNode[]): ILiveNode {
+  const found = nodes.find(node => node.payload.testID === TEST_ID);
   if (found === undefined)
     throw new Error(
       `no committed node carries testID "${TEST_ID}" — the tag resolved to a component that ` +
@@ -223,9 +216,9 @@ describe('a hand-written element reaches the engine', () => {
     const node = subject(await mountArm(evaluate(await arm())));
 
     expect(node.viewName).toBe(descriptorFor('view').component);
-    expect(node.props.nativeID).toBe('pane');
-    expect(node.props.id).toBeUndefined();
-    expect(node.props.onLayout).toBe(true);
+    expect(node.payload.nativeID).toBe('pane');
+    expect(node.payload.id).toBeUndefined();
+    expect(node.payload.onLayout).toBe(true);
   });
 
   // The multiline pair is TWO native views, and with no transform left there is nothing to read a
@@ -294,6 +287,6 @@ describe('v-model on a hand-written element', () => {
       '/sfc-model-payload.vue',
     );
     const node = subject(await mountArm(evaluate(code)));
-    expect(node.props.text).toBe('a');
+    expect(node.payload.text).toBe('a');
   });
 });
