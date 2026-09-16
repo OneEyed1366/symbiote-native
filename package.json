@@ -42,7 +42,9 @@
     "release": "pnpm run build && changeset publish",
     "trust:publishers": "node scripts/trust-publishers.mjs",
     "test:vitest": "vitest run",
-    "test:node": "node scripts/run-node-tests.mjs"
+    "test:node": "node scripts/run-node-tests.mjs",
+    "test:cpp": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build && cmake --build core/engine/cpp/tests/build -j 8 && ctest --test-dir core/engine/cpp/tests/build --output-on-failure",
+    "test:itest": "pnpm run test:cpp && node scripts/run-itests.mjs"
   },
   "devDependencies": {
     "@babel/core": "catalog:",
@@ -52,6 +54,7 @@
     "@eslint/js": "catalog:",
     "@eslint/json": "catalog:",
     "babel-plugin-syntax-hermes-parser": "catalog:",
+    "esbuild": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-plugin-react-hooks": "catalog:",

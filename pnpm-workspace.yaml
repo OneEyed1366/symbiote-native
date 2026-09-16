@@ -137,6 +137,7 @@ catalog:
   '@changesets/cli': ^2.31.0
   '@changesets/changelog-github': ^1.0.0
   pkg-pr-new: ^0.0.75
+  esbuild: 0.28.1
   typescript: ~6.0.0
   vitest: ^4.1.9
   eslint: ^10.6.0
