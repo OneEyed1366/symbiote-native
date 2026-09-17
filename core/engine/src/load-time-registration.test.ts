@@ -32,7 +32,6 @@ import {
   mkdirSync,
   readdirSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -47,12 +46,24 @@ const SCANNED_ROOTS = ['core', 'adapters', 'packages'];
 // registerComposedComponent, registerShimDocumentFactory, setColorProcessor).
 const REGISTRATION_CALLEE = /^(register|set)[A-Z]/;
 
+// `withFileTypes`, and it is a RACE FIX rather than a tidy-up. This walks `adapters/`, and the
+// Svelte suites write a `.smoke-compiled-*.mjs` beside their own source and `rmSync` it in an
+// `afterAll` — dozens of them, by design
+// (`.claude/rules/smoke-compiled-artifact-collisions.md`). A separate `statSync` after `readdirSync`
+// leaves a window where one of those can vanish between the listing and the stat, and `statSync`
+// then throws ENOENT on an entry this function was going to discard for its extension anyway.
+//
+// The symptom is a guard that passes alone and fails in a full parallel run, with no assertion in
+// the message — which reads as flakiness and got dismissed as "a stale build" twice in one session
+// before anyone read the walk. Asking for the type in the SAME syscall closes the window instead of
+// catching the throw, so there is no window to reason about, and it is one syscall cheaper per entry.
 function collectSourceFiles(dir: string, out: string[]): void {
-  for (const entry of readdirSync(dir)) {
+  for (const dirent of readdirSync(dir, { withFileTypes: true })) {
+    const entry = dirent.name;
     if (entry === 'node_modules' || entry === 'build' || entry === 'build-ngc')
       continue;
     const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
+    if (dirent.isDirectory()) {
       collectSourceFiles(full, out);
     } else if (
       full.endsWith('.ts') &&
