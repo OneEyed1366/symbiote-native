@@ -141,8 +141,10 @@ describe('Solid: `button` as a tag', () => {
       ));
       await tick();
 
+      // The half this host can still answer, and the one that matters here: the tint reaches the
+      // LABEL. That it is absent from the touchable is the engine's strip (`foldButtonProps`), which
+      // the TypeScript `fabricProps` does not carry — `core/engine/cpp/tests/js/button-payload.itest.ts`.
       expect(label().payload.color).toBe('#ff0000');
-      expect(Object.hasOwn(touchable().payload, 'color')).toBe(false);
     });
 
     // why: RN's fold makes `disabled` win over `color` — a disabled button must read as disabled
@@ -168,35 +170,13 @@ describe('Solid: `button` as a tag', () => {
     // with the role rather than one at a time: this harness builds its payload through the
     // TypeScript `fabricProps`, which holds no copy of the pressable rule, so an assertion left
     // here would have gone green over a rule it cannot reach.
-    it('pins the button role over the caller', async () => {
-      mount(ROOT_TAG, () => (
-        <button
-          testID={TEST_ID}
-          title={TITLE}
-          disabled
-          accessibilityRole="link"
-          accessible={false}
-          accessibilityState={{ busy: true }}
-        />
-      ));
-      await tick();
-
-      expect(touchable().payload.accessibilityRole).toBe('button');
-    });
-
-    // why: touchSoundDisabled is Button's own spelling of the pressable's android_disableSound —
-    // it is RE-MAPPED, not forwarded, so a missed rename silently leaves the tap sound on and the
-    // unknown prop riding to Fabric.
-    it('re-maps touchSoundDisabled onto the pressable android_disableSound', async () => {
-      mount(ROOT_TAG, () => (
-        <button testID={TEST_ID} title={TITLE} touchSoundDisabled />
-      ));
-      await tick();
-
-      const props = touchable().payload;
-      expect(props.android_disableSound).toBe(true);
-      expect(Object.hasOwn(props, 'touchSoundDisabled')).toBe(false);
-    });
+    // The role pin and the `touchSoundDisabled` rename LEFT THIS FILE on 2026-09-18, following the
+    // pressable pair above and for the identical reason: both are `foldButtonProps` in the engine
+    // now, and this harness builds its payload through the TypeScript `fabricProps`, which holds no
+    // copy of the tag rules. Asserted on the committed payload in
+    // `core/engine/cpp/tests/js/button-payload.itest.ts`, including the strip of the raw
+    // `touchSoundDisabled` — a key no ViewConfig declares, so Fabric drops it in silence and a
+    // half-done rename looks exactly like a finished one.
 
     // why: the TV-focus props are real Fabric props the touchable does not TYPE — they ride the
     // spread untyped, so nothing but a committed-tree assertion can show they still arrive. `title`

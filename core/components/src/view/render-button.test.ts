@@ -9,7 +9,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   resolveButtonDisabled,
-  resolveButtonImportantForAccessibility,
   resolveButtonTextStyle,
   resolveButtonTitle,
   resolveButtonViewStyle,
@@ -64,12 +63,7 @@ describe('Button folds that do not vary by platform', () => {
     expect(resolveButtonDisabled(false, true, { disabled: true })).toBe(false);
   });
 
-  // Button.js:356 — the label inside must not take focus separately from the button holding it.
-  it('rewrites importantForAccessibility "no" and passes everything else', () => {
-    expect(resolveButtonImportantForAccessibility('no')).toBe(
-      'no-hide-descendants',
-    );
-    expect(resolveButtonImportantForAccessibility('yes')).toBe('yes');
-    expect(resolveButtonImportantForAccessibility(undefined)).toBeUndefined();
-  });
+  // `importantForAccessibility` left this file with the function it tested (2026-09-18): the rule is
+  // `foldButtonProps` in the engine now, and the resolver had no caller left but this case. Asserted
+  // against the committed payload in `core/engine/cpp/tests/js/button-payload.itest.ts`.
 });

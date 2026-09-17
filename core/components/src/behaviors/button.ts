@@ -126,9 +126,7 @@ import {
 import { descriptorFor } from '../component-names';
 import { resolveTextProps } from '../text-props';
 import {
-  BUTTON_ACCESSIBILITY_ROLE,
   resolveButtonDisabled,
-  resolveButtonImportantForAccessibility,
   resolveButtonTextStyle,
   resolveButtonTitle,
   resolveButtonViewStyle,
@@ -286,18 +284,10 @@ const touchable: Pick<
 function ownerFold(node: ISymbioteNode): IPayloadFold {
   return props => {
     const next: Record<string, unknown> = { ...props };
-    next.accessibilityRole = BUTTON_ACCESSIBILITY_ROLE;
-    // 'no' is the only value the resolver moves (Button.js:356), so checking for it IS the
-    // narrowing this bag needs — the shared resolver still owns what 'no' becomes.
-    if (next.importantForAccessibility === 'no')
-      next.importantForAccessibility =
-        resolveButtonImportantForAccessibility('no');
-    // Re-mapped, so the raw name must not also reach Fabric. Where the wrappers put it too — the
-    // pressable owns sound suppression (Button.js:377 hands `touchSoundDisabled` to the touchable).
-    if (Object.hasOwn(next, 'touchSoundDisabled')) {
-      next.android_disableSound = next.touchSoundDisabled;
-      delete next.touchSoundDisabled;
-    }
+    // `accessibilityRole`, the `importantForAccessibility` promotion, the `touchSoundDisabled`
+    // rename and the `color` strip all USED TO BE HERE and are `foldButtonProps` in
+    // `SymbioteFabricProps.cpp` now — every one of them a function of the tag and of nothing else.
+    // They run BEFORE this fold, which is the order the composition always had.
     // THE NODE, not the bag this fold was handed. The two agreed while the pressable rule ran
     // inside this function; they do not now that it runs before it, because the rule folds
     // `disabled` INTO `accessibilityState` and erases the raw key — so reading the bag would resolve
@@ -323,10 +313,6 @@ function ownerFold(node: ISymbioteNode): IPayloadFold {
       // :402). The dicts are the shared factories', never restated here.
       Object.assign(next, backgroundProps(selectableBackground(), false));
     }
-    // Read by the folds above and declared by no ViewConfig. A key Fabric does not know throws
-    // nothing, logs nothing and paints nothing, so the strip has to be here or it is never noticed.
-    // `title` needs none — `SLOT_PROPS` redirects it before it can land on this node.
-    delete next.color;
     return next;
   };
 }

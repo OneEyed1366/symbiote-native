@@ -799,6 +799,48 @@ const std::array<const char *, 6> kTouchableFeedbackKeys = {
 };
 
 /**
+ * Button's own platform half, over and above the touchable's (`Button.js:350-382`). It runs AFTER
+ * `foldPressableProps`, which is the order the JS composition always had.
+ *
+ * Four rules, and every one is a function of the tag alone:
+ *
+ *   accessibilityRole          pinned to "button" (`:372`), spelled as a literal on the element —
+ *                              not forwarded from the app, and there is no way to opt out
+ *   importantForAccessibility  "no" becomes "no-hide-descendants" (`:357-361`). Only that ONE value
+ *                              moves; the label lives inside the button, so plain "no" would leave
+ *                              the text separately reachable
+ *   touchSoundDisabled         re-spelled `android_disableSound` (`:377`)
+ *   color                      stripped
+ *
+ * THE TWO STRIPS ARE THE HALF NOTHING ELSE CAN CATCH. Neither `touchSoundDisabled` nor `color` is
+ * declared by any ViewConfig, so Fabric drops them without throwing, logging or painting
+ * differently — the rename and the removal look identical to a screen whether or not they happen.
+ *
+ * `color` is erased from the PAYLOAD and never from the node: Button's derived folds (the label's
+ * tint, the Android view style) read it off `propsOf(node)`, which this cannot reach. That
+ * separation is what makes the strip safe here and unsafe one layer up.
+ */
+dynamic foldButtonProps(const dynamic &props) {
+  dynamic out = props;
+  out["accessibilityRole"] = "button";
+
+  const dynamic *important = props.get_ptr("importantForAccessibility");
+  if (important != nullptr && important->isString() &&
+      important->asString() == "no") {
+    out["importantForAccessibility"] = "no-hide-descendants";
+  }
+
+  const dynamic *sound = props.get_ptr("touchSoundDisabled");
+  if (sound != nullptr) {
+    out["android_disableSound"] = *sound;
+    out.erase("touchSoundDisabled");
+  }
+
+  out.erase("color");
+  return out;
+}
+
+/**
  * `nativeID={this.props.id ?? this.props.nativeID}` — RN's W3C alias, spelled identically by every
  * component that accepts both (`View.js:77-79`, `TouchableOpacity.js:326`,
  * `TouchableHighlight.js:375`). The alias WINS when both are set and falls back when it is absent.
@@ -1287,6 +1329,9 @@ dynamic fabricProps(
   dynamic tagResolved;
   if (usesPressableRule(tagName)) {
     tagResolved = foldPressableProps(*bag, usesTouchableFeedbackRule(tagName));
+    // Button is a touchable PLUS something, exactly as RN builds it (`Button.js:283`), so its own
+    // rules layer over the touchable's rather than replacing them.
+    if (tagName == "button") tagResolved = foldButtonProps(tagResolved);
     bag = &tagResolved;
   } else if (tagName == "image") {
     tagResolved = foldImageProps(*bag);

@@ -55,8 +55,11 @@ const TEXT_MARGIN = 8;
 const IOS_FONT_SIZE = 18;
 const ANDROID_FONT_WEIGHT = '500';
 
-// RN's Button is accessibilityRole="button"; the role string is a native accessibility enum value.
-export const BUTTON_ACCESSIBILITY_ROLE = 'button';
+// `BUTTON_ACCESSIBILITY_ROLE` and `resolveButtonImportantForAccessibility` WERE HERE and are gone
+// (2026-09-18). Both are `foldButtonProps` in `SymbioteFabricProps.cpp` now, and neither had a
+// caller left afterwards — only its own unit test, which is the shape this project calls a mirror:
+// a JS copy of a rule that runs elsewhere, kept alive by the test that asserts it. It would have
+// stayed green forever while meaning nothing.
 
 // `styles.text` — the platform-invariant half plus the platform's own. RN spells the margin as
 // MARGIN, not padding: the label pushes the button's edges outward rather than insetting itself,
@@ -145,14 +148,4 @@ export function resolveButtonDisabled(
 ): boolean | undefined {
   if (disabled !== undefined) return disabled;
   return ariaDisabled ?? accessibilityState?.disabled;
-}
-
-/**
- * Button.js:356-359 — `'no'` becomes `'no-hide-descendants'`, so the label inside cannot take
- * focus separately from the button that contains it.
- */
-export function resolveButtonImportantForAccessibility(
-  value: IAccessibilityProps['importantForAccessibility'],
-): IAccessibilityProps['importantForAccessibility'] {
-  return value === 'no' ? 'no-hide-descendants' : value;
 }

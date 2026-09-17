@@ -213,7 +213,10 @@ describe('button host behavior on Android', () => {
     expect(after.host.payload.backgroundColor).toBe('#ff0000');
     // …and the label keeps Android's own white, which is the half a one-hop mark would have lost.
     expect(after.text.payload.color).toBe(ANDROID_TEXT);
-    expect(after.host.payload.color).toBeUndefined();
+    // That the raw `color` is absent from the HOST is the engine's strip (`foldButtonProps`), which
+    // this host's TypeScript `fabricProps` does not carry — asserted in
+    // `core/engine/cpp/tests/js/button-payload.itest.ts`. The re-tint above is the question here,
+    // and it is the one that proves the strip reaches the payload without touching the node.
   });
 
   it('greys both nodes when disabled changes after mount', async () => {

@@ -350,28 +350,21 @@ describe('React Pressable on the engine', () => {
   });
 
   // why: `button` is a TAG, so this is the arm that fails if the registration is dropped — an
-  // unregistered `button` commits a bare view with no role at all. `accessibilityRole` is the right
-  // observable for that now: it is Button's OWN fold and still JavaScript, where `accessible` and
-  // `accessibilityState` are the engine's composed pressable rule and are asserted in
-  // `core/engine/cpp/tests/js/pressable-payload.itest.ts` (which covers the `button` tag by name).
-  it('gives button role=button and passes its a11y label through', () => {
+  // unregistered `button` commits a bare view and nothing forwards the label.
+  //
+  // `accessibilityRole` USED TO BE THE OBSERVABLE HERE and no longer can be: the role joined
+  // `accessible` and `accessibilityState` in the engine on 2026-09-18 (`foldButtonProps`), and this
+  // harness builds its payload through the TypeScript `fabricProps`, which holds no copy of the tag
+  // rules. `accessibilityLabel` is a plain forward and is the right observable now — it proves the
+  // registration is live without asking about a rule this host cannot see.
+  // The role itself: `core/engine/cpp/tests/js/button-payload.itest.ts`.
+  it('gives button its a11y label through the registration', () => {
     mount(
       ROOT_TAG,
       <button title="OK" disabled accessibilityLabel="confirm" />,
     );
-    const props = responderProps();
-    expect(props.accessibilityRole).toBe('button');
-    expect(props.accessibilityLabel).toBe('confirm');
-  });
 
-  // why: an enabled button is still a button. Its `accessibilityState` half went to the itest with
-  // its disabled twin, and DELIBERATELY as a pair: an absence assertion left behind on a harness
-  // that can no longer produce the key would pass for the wrong reason forever — which is the exact
-  // shape of false green the text-input port was caught by one commit earlier.
-  it('keeps an enabled button role=button', () => {
-    mount(ROOT_TAG, <button title="Go" onPress={() => {}} />);
-
-    expect(responderProps().accessibilityRole).toBe('button');
+    expect(responderProps().accessibilityLabel).toBe('confirm');
   });
 
   // why: RN's finger tracking is not pixel-perfect — a small wobble while holding a tap must

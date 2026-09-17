@@ -171,35 +171,20 @@ describe('button host behavior', () => {
     await settle();
 
     const { host, text } = subtreeOf(TEST_ID);
-    // Both are consumed by the behavior and declared by no ViewConfig: Fabric drops an unknown key
-    // silently, so the strip is only ever visible here.
+    // `title` is redirected by `SLOT_PROPS` before it can land here, which is a REDIRECT and stays
+    // observable from this host. Its neighbour `color` is a strip and is not: that, the role, the
+    // `touchSoundDisabled` rename and the `importantForAccessibility` promotion are all
+    // `foldButtonProps` in the engine now, and this host builds its payload through the TypeScript
+    // `fabricProps`, which carries no copy of the tag rules. All four are asserted against the
+    // committed payload in `core/engine/cpp/tests/js/button-payload.itest.ts`.
+    //
+    // They moved as a GROUP with the two strips rather than one at a time. An absence assertion left
+    // on a harness that can no longer produce the key passes forever for the wrong reason — the
+    // false green the text-input port was caught by.
     expect(host.payload.title).toBeUndefined();
-    expect(host.payload.color).toBeUndefined();
-    expect(host.payload.accessibilityRole).toBe('button');
-    // RN's `accessible` split — Button forwards raw, the touchable underneath defaults it — is
-    // asserted in `core/engine/cpp/tests/js/touchable-payload.itest.ts` now, not here: the defaulting
-    // half is `foldPressableProps` in the engine, which this host's TypeScript `fabricProps` does not
-    // carry. What stays here is Button's OWN half, the strip and the role.
-    // On iOS `color` tints the LABEL, never the button (Button.js:318-324).
+    // On iOS `color` tints the LABEL, never the button (Button.js:318-324) — and THAT half is still
+    // this file's, because the label's fold reads `propsOf(node)` and never the stripped payload.
     expect(text.payload.color).toBe('#ff0000');
-  });
-
-  it('re-maps touchSoundDisabled and hides descendants for importantForAccessibility="no"', async () => {
-    vi.useFakeTimers();
-    registerButtonBehavior();
-    const node = makeButton();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'title', 'Save');
-    routeProp(node, 'touchSoundDisabled', true);
-    routeProp(node, 'importantForAccessibility', 'no');
-    mount(node);
-    await settle();
-
-    const { host } = subtreeOf(TEST_ID);
-    expect(host.payload.android_disableSound).toBe(true);
-    expect(host.payload.touchSoundDisabled).toBeUndefined();
-    // Button.js:356 — so the label inside cannot take focus separately from the button.
-    expect(host.payload.importantForAccessibility).toBe('no-hide-descendants');
   });
 
   it('greys the label from aria-disabled and merges accessibilityState', async () => {

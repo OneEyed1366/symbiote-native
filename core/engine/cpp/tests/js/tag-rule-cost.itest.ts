@@ -24,10 +24,15 @@
 // MEASURED on `build-release`, three consecutive runs, one sitting, a thousand nodes per commit:
 //
 //              native walk        js walk             per node   keys in the bag
-//   accessory  3.1  3.1  3.1 ms   13.9 13.8 13.7 ms   ~10.7 us   4
-//   pressable  3.8  3.7  5.6 ms   18.2 18.3 19.1 ms   ~14.1 us   4 + a 3-key style
-//   switch     4.7  4.8  5.0 ms   23.5 23.4 24.1 ms   ~18.8 us   6 + nested trackColor
-//   image      5.9  5.9  5.9 ms   27.7 27.7 27.9 ms   ~21.9 us   6 + what the rule builds
+//   accessory  3.1  3.1  3.3 ms   14.1 13.6 15.5 ms   ~11.2 us   4
+//   button     3.9  3.9  4.2 ms   16.3 15.1 16.9 ms   ~12.1 us   5 + a 2-key style
+//   pressable  3.7  3.8  3.7 ms   18.0 17.5 18.4 ms   ~14.2 us   4 + a 3-key style
+//   switch     4.9  4.9  4.8 ms   23.5 23.2 23.6 ms   ~18.6 us   6 + nested trackColor
+//   image      5.9  5.9  6.1 ms   27.8 26.9 29.5 ms   ~22.1 us   6 + what the rule builds
+//
+// `button`'s arm carries BOTH its rules — the pressable one its tag also gets, then its own — which
+// is why its JS twin composes the two folds rather than spelling only half. It still lands under
+// `pressable` on the per-node column, because that column is bag size and its bag is smaller.
 //
 // So each rule itself is 3-6 ms and the CROSSING is three to five times that. Same shape the
 // text-input port measured and the reason a fold's price is the TRIP and not the function: the bag
@@ -103,25 +108,27 @@ const PRESSABLE_MACHINE_KEYS = [
   'delayHoverOut',
 ];
 
+function pressableFoldInJs(
+  props: Readonly<Record<string, unknown>>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...props };
+  if (typeof props.disabled === 'boolean') {
+    const authored = props.accessibilityState;
+    const state: Record<string, unknown> =
+      authored !== null && typeof authored === 'object' ? { ...authored } : {};
+    state.disabled = props.disabled;
+    out.accessibilityState = state;
+  }
+  for (const key of PRESSABLE_MACHINE_KEYS) delete out[key];
+  out.accessible = props.accessible !== false;
+  out.focusable = props.focusable !== false;
+  return out;
+}
+
 registerHostBehavior('pressable-in-js', {
   attach(): void {},
   detach(): void {},
-  foldPayload(props: Readonly<Record<string, unknown>>) {
-    const out: Record<string, unknown> = { ...props };
-    if (typeof props.disabled === 'boolean') {
-      const authored = props.accessibilityState;
-      const state: Record<string, unknown> =
-        authored !== null && typeof authored === 'object'
-          ? { ...authored }
-          : {};
-      state.disabled = props.disabled;
-      out.accessibilityState = state;
-    }
-    for (const key of PRESSABLE_MACHINE_KEYS) delete out[key];
-    out.accessible = props.accessible !== false;
-    out.focusable = props.focusable !== false;
-    return out;
-  },
+  foldPayload: pressableFoldInJs,
 });
 
 const stringOf = (value: unknown): string | undefined =>
@@ -249,6 +256,46 @@ const INPUT_ACCESSORY_VIEW_PROPS = {
   backgroundColor: '#eeeeee',
   accessibilityLabel: 'toolbar',
   style: { paddingTop: 4, height: 44 },
+};
+
+// Button's own rules, over the pressable ones its tag also gets. Priced on a BARE tag rather than
+// through `registerButtonBehavior`, deliberately: that behavior builds three derived nodes, so a
+// real `<button>` pays FOUR crossings per commit (`button-payload.itest.ts`) and this file measures
+// ONE rule against ONE fold. Mixing the two would price the subtree, not the port.
+//
+// THE STUB IS NOT OPTIONAL, and finding that out is worth recording: a tag reaches C++ only through
+// `recordSetTag`, which `attachHostBehavior` emits. A node built with a tag NOBODY registered
+// carries an empty `tagName` in the host, so no tag rule fires — the first run of this arm measured
+// a native side doing nothing at all, and `expectSamePayload` is what caught it rather than a
+// suspiciously fast number.
+registerHostBehavior('button', { attach(): void {}, detach(): void {} });
+
+registerHostBehavior('button-in-js', {
+  attach(): void {},
+  detach(): void {},
+  foldPayload(props: Readonly<Record<string, unknown>>) {
+    // The pressable fold FIRST, because the native arm's tag gets both — `button` is served by
+    // `usesPressableRule` and then by `foldButtonProps`, in that order. An arm that applied only
+    // half would send a different bag, and `expectSamePayload` would refuse to time it.
+    const out: Record<string, unknown> = pressableFoldInJs(props);
+    out.accessibilityRole = 'button';
+    if (out.importantForAccessibility === 'no')
+      out.importantForAccessibility = 'no-hide-descendants';
+    if (Object.hasOwn(out, 'touchSoundDisabled')) {
+      out.android_disableSound = out.touchSoundDisabled;
+      delete out.touchSoundDisabled;
+    }
+    delete out.color;
+    return out;
+  },
+});
+
+const BUTTON_PROPS = {
+  color: '#ff0000',
+  touchSoundDisabled: true,
+  importantForAccessibility: 'no',
+  accessibilityLabel: 'save',
+  style: { paddingLeft: 8, height: 44 },
 };
 
 const SWITCH_PROPS = {
@@ -390,6 +437,10 @@ describe('what a ported tag rule costs on each side of the wire', () => {
 
   it('pays no trip into JS for a thousand images', () => {
     priced('image', 'RCTImageView', 'image', IMAGE_PROPS);
+  });
+
+  it('pays no trip into JS for a thousand buttons', () => {
+    priced('button', 'RCTView', 'button', BUTTON_PROPS);
   });
 
   it('pays no trip into JS for a thousand input accessory views', () => {

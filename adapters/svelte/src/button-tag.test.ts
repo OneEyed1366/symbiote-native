@@ -159,7 +159,9 @@ describe('Svelte: `button` as a tag', () => {
     // the branch is the behavior's, not this adapter's.
     const host = hostOf('btn');
     expect(host.viewName).toBe('RCTView');
-    expect(host.payload.accessibilityRole).toBe('button');
+    // The role is `foldButtonProps`'s in the engine now, which this host's TypeScript `fabricProps`
+    // does not carry — `core/engine/cpp/tests/js/button-payload.itest.ts`. This case is about the
+    // SUBTREE SHAPE either way.
     expect(descendantNames(host)).toEqual(['RCTView', 'RCTText', 'RCTRawText']);
 
     const [view] = host.children;
