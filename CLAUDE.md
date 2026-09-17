@@ -1990,12 +1990,24 @@ Three things fell out of it, all recorded rather than smoothed over:
   `underlineColorAndroid` and `decelerationRate` already carry, and a PROPERTY of porting a
   platform-split rule.
 
-**One mirror survives and is named in the source rather than left to be found.** `CLONED_PROPS` in
-`touchable-native-feedback.ts` is now a copy of `kNativeFeedbackClonedKeys`, kept because
-`SLOT_DERIVED` answers a DIFFERENT question — which owner writes must dirty the child — and the two
-must name the same keys or the clone goes stale on a prop one list forgot. Closing it means the
-engine dirtying a child whose parent carries a clone rule, which needs no list at all. That is the
-next step, not this one.
+**One mirror survived the port by a commit, and closing it made the code SHORTER rather than
+longer.** The clone lists stayed behind to feed `slotDerived` — which owner writes must dirty the
+child — so thirty names in JS had to agree with `kNativeFeedbackClonedKeys` and
+`kWithoutFeedbackWhenSetKeys` in C++, failing silently on the one prop a list forgot.
+
+`SLOT_DERIVED_ALL` replaced both lists, and it is the honest spelling rather than a shortcut: **a
+`cloneElement` owner never derived its slot from a NAMED set** — it re-clones on every render,
+whatever changed. Naming the keys was an optimisation, and one whose upkeep was a mirror. What it
+costs is a false dirty on an owner prop the clone does not carry, and for these two tags that is
+nearly empty: the owner is an anchor whose props reach Fabric nowhere else, so every name it holds is
+either cloned or consumed by the press machine.
+
+The guard is a case that a NAMED list gets wrong, not one it gets right: a late `hitSlop` write
+reaching the child. **Break-tested by reducing `SLOT_DERIVED` to `['accessibilityLabel']`** — which
+turned exactly that case red and left every other one in the file green, so it is the list it
+measures and not the port. A first attempt used `opacity` (a prop TNF does not clone) and the commit
+counter, and that one stayed GREEN under the reduced list: it was watching the wrong thing, and only
+running the break-test found out.
 
 And two dead JS legs went with the port: both clone-folds read `stringOr(source.id) ?? stringOr(
 source.nativeID)` where `source` is the owner's NODE props, which `routeProp` had already resolved
