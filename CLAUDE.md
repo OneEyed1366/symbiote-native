@@ -1413,6 +1413,35 @@ deficit against the direct arm is fibers, Vue's deficit against React is the fol
 is React's `ops` running 4 ms over the direct arm for byte-identical op counts, which at ~20% of a
 19 ms phase with allocation as the obvious suspect does not yet carry a hypothesis.
 
+### React's `Swap` anomaly is not the engine, and the benchmark row's `memo` is why the first probe missed
+
+`Swap` at 3.68x stock (35.3 against 9.6) is the largest unexplained loss in the device table and has
+stood unchanged through every re-measurement. `core/engine/cpp/tests/js/adapter-swap-cost.itest.tsx`
+exchanges two rows of a standing thousand through the React adapter, three ways:
+
+```
+ arm                  wall    engine    what the row hands React
+ swap (plain)         76.0     3.3      ten thousand rebuilt elements
+ hoisted              21.0     3.4      the same element objects, by identity
+ memo                 24.5     2.4      a thousand rebuilt wrappers, every body bailing out
+```
+
+**The engine is ruled out, and by assertion rather than by the clock:** all three arms report
+`created=0 cloned=2 reused=1000 targetedReplaces=1 setProps=0`, byte-identical to each other and to
+what `update-shapes-cost.itest.ts` gets with no reconciler at all (1.8 ms for the whole step). Not one
+prop write crosses. So ~22 ms of the comparable arm is React walking a thousand children to find the
+two that moved.
+
+**And the first arm was not the device's workload.** It read as the answer — 73% of a swap is the app
+rebuilding elements it throws away — and both benchmark screens wrap their row in `memo`
+(`examples/react/…:387`, `examples/bare-rn/…:395`), so neither pays it. Reading the OTHER side's
+screen is what turned a comparison into two workloads wearing one name; the 55 ms split is real but
+it is a fact about unmemoized lists, not about this row.
+
+What stays open is the half this fixture cannot reach: both sides run the SAME reconciler, so the
+9.6-vs-35.3 difference is what React does per fiber against a mutation-mode host config versus its
+own persistent-mode one. Answering it needs React's own Fabric renderer standing up in this harness.
+
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the
 reasoning that a `Map` lookup costs what converting a boolean costs. Booleans need no `Map` — there
