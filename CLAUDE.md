@@ -1681,15 +1681,16 @@ payloads asserted equal key by key before any millisecond is read):
 
 ```
              native walk   js walk    per node   the bag / what the rule does
- content        2.9         11.6        8.8 us   3 + a 2-key style / READS ITS PARENT
- imagebg        3.2         13.0        9.7 us   2 + a 3-key style / writes ONE key
- spinner        3.8         14.1       10.3 us   4, no style / the MOST work in the file
- accessory      3.4         14.5       11.1 us   4 / nothing at all
- button         3.9         16.7       12.5 us   5 + a 2-key style
- pressable      3.7         18.2       14.6 us   4 + a 3-key style
- scroll         4.3         19.5       15.3 us   4 + a 2-key style / the BIGGEST rule
- switch         4.9         24.2       19.2 us   6 + nested trackColor
- image          6.2         28.4       23.0 us   6 + what the rule BUILDS
+ content        2.8         11.1        8.6 us   3 + a 2-key style / READS ITS PARENT
+ imagebg        2.9         12.2        9.7 us   2 + a 3-key style / writes ONE key
+ spinner        3.8         14.6       10.7 us   4, no style / the MOST work in the file
+ accessory      3.4         14.8       11.4 us   4 / nothing at all
+ button         4.1         16.8       12.4 us   5 + a 2-key style
+ pressable      3.7         17.8       14.8 us   4 + a 3-key style
+ scroll         4.2         19.1       15.4 us   4 + a 2-key style / the BIGGEST rule
+ switch         4.8         23.9       19.6 us   6 + nested trackColor
+ image          5.9         27.6       22.9 us   6 + what the rule BUILDS
+ bgimage        7.5         36.9       30.6 us   6 + a 3-part style / TWO rules, READS ITS PARENT
 ```
 
 `scroll` is the fourth point on the experiment and the one that closes it: its rule is the biggest in
@@ -1726,16 +1727,30 @@ declarative, present at commit time. It still cannot read live JS state (`sticky
 in no bag), or anything a framework computes per render. That is the browser model's own line: a UA
 rule sees the tree, not the application's closures.
 
-**Reading a parent costs nothing measurable** — `content` has the CHEAPEST native walk of the nine
-rules in the cost table (2.9 ms) while being the only one that does it. A pointer hop on a tree
-already in memory, against a JS closure plus a crossing for as long as the fold lived on the far
-side.
+**Reading a parent costs nothing measurable** — `content` has the CHEAPEST native walk in the cost
+table (2.8 ms) while being the first rule that does it. A pointer hop on a tree already in memory,
+against a JS closure plus a crossing for as long as the fold lived on the far side.
 
-One failure mode is new and has its own case: a rule that reads its parent runs when THIS node is
-dirty, so a late write to the owner must mark the child dirty or the rule never re-reads it.
-`slotDerived` already named both props, so it worked — and it worked for the JS fold for the same
-reason, since that fold also only ran when its node was dirty. The seam did not change the
-requirement, but nothing said so out loud until it was asserted.
+**ImageBackground's inner image is the SECOND user, and the pair settles what `content` alone could
+not.** `content` reads its owner while doing almost nothing, so its cheapest-of-nine walk could have
+been the rule's smallness rather than the read's cheapness. `bgimage` puts the same read inside the
+most expensive rule in the file — its tag runs `foldImageProps` AND `foldImageBackgroundImageProps`,
+so it carries image's whole bag plus a three-part composed style, and it is the dearest row at
+30.6 us/node. Subtract the two native walks and the read isolates: **`bgimage` 7.5 minus `image` 5.9
+is ~1.4 us per node for the parent read plus the style it builds.** Cheap whatever surrounds it.
+
+That takes the primitive to **zero crossings on both nodes** — the owner shed its fold when the Smart
+Invert opt-out moved, and the image was the last one. It also needed a TAG of its own
+(`image-background-image`, served by `usesImageRule` as well), because a bare `<image>` must not get
+an absolute fill; and that tag needs its own registration carrying `resolvesImageSources`, since the
+flag is looked up by tag and without it an ImageBackground would commit the raw asset NUMBER.
+
+One failure mode is new and has its own case on both users: a rule that reads its parent runs when
+THIS node is dirty, so a late write to the owner must mark the child dirty or the rule never re-reads
+it — here the box would freeze at its first size while the background visibly resizes around it.
+`slotDerived` already named the props, so it worked, and it worked for the JS fold for the same
+reason. The seam did not change the requirement; nothing said so out loud until it was asserted.
+**Verified by breaking it** — commenting out `slotDerived` turns both re-derive cases red.
 
 ### A mirror that cannot be removed is made LOUD — the scroll base style, held by a test
 
