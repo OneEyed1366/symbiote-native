@@ -35,7 +35,7 @@ import {
   resolveClassName,
   type IClassNameValue,
 } from './style-registry';
-import { dlog } from './debug';
+import { dlog, isDebug } from './debug';
 import {
   appListenerFor,
   attachHostBehavior,
@@ -593,6 +593,20 @@ export function takePropStats(): { writes: number } {
   return snapshot;
 }
 
+// `<component>.<key>` -> write count, gated behind `isDebug()` (a Map lookup per write is not the
+// "log line per write" the comment above rules out, but it is still real cost on the hottest path,
+// so it only runs when someone asked). Answers F-79's own recommended next step — "instrument
+// recordSetProp call sites directly, not just before/after counts" — by naming exactly which
+// (view, key) pair an adapter comparison's aggregate delta is hiding, the same ledger shape F-75's
+// payload census already uses (`RCTView.accessible 2000`).
+let propKeyTally: Map<string, number> | undefined;
+
+export function takePropKeyTally(): ReadonlyMap<string, number> {
+  const snapshot = propKeyTally ?? new Map();
+  propKeyTally = undefined;
+  return snapshot;
+}
+
 // A pure prop set: no event inference. `onTintColor` is a Switch prop and reaches
 // Fabric like any other; the event-vs-prop decision is made by routeProp, never by
 // the key's name.
@@ -632,6 +646,11 @@ export function setProp(
     if (node.wrapper !== undefined) markPropsDirty(node.wrapper);
   }
   propStats.writes += 1;
+  if (isDebug()) {
+    propKeyTally ??= new Map();
+    const tallyKey = `${node.component}.${key}`;
+    propKeyTally.set(tallyKey, (propKeyTally.get(tallyKey) ?? 0) + 1);
+  }
   writeProp(node, key, value);
 }
 

@@ -30,6 +30,7 @@ export {
   isSymbioteEvent,
   RAW_TEXT_COMPONENT,
   debugNodeId,
+  takePropKeyTally,
 } from './node';
 // Host access — the DOM read half Fabric does not ship. Adapters route their seam's
 // parentNode/nextSibling/firstChild through these instead of reading a node's fields, which is
