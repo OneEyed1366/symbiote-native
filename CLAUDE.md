@@ -1373,10 +1373,26 @@ it.
 
 So the cost is not that a fold RUNS. It is that a fold's contract is **bag in, bag out**, so ~18 keys
 come back to express a change to about five. **A fold that returned a PATCH would leave `toJs` and
-`call` untouched and cut `fromJs` by the ratio of the bags — ~10 ms of the 18 measured here.** That
-is the fix, and it is named rather than made: ~14 fold sites across `core/components/src/behaviors/`
-share the contract, and dropping a key needs a marker the props bag has no room for (`null` already
-means "reset to the platform default"). It wants its own pass with the whole set in view.
+`call` untouched and cut `fromJs` by the ratio of the bags — ~10 ms of the 18 measured here.**
+
+**That was tried and pulled back the same hour, and the premise it rested on is worth not repeating.**
+The plan was to merge the patch over the bag and call it backwards-compatible, since a whole-bag
+return is a superset of the patch and merging a superset over its own base changes nothing — which
+would let the ~14 fold sites convert one at a time. False: **a fold expresses a REMOVAL by not
+putting the key back**, so replacing is load-bearing. Merge, and every stripped key returns. Button's
+`ownerFold` strips `title` and `color`, `pressable` strips `MACHINE_ONLY_KEYS`, `text-input` strips
+`ALIAS_ONLY_KEYS` — and a grep for `delete` finds only the last two, because the first drops them by
+omission. The button tests caught it in one run. There is no safe subset to convert first.
+
+The obvious removal channel is closed too: `jsi::dynamicFromValue` maps JS `null` AND JS `undefined`
+onto the same `folly::dynamic` nullptr, so no value a key can hold distinguishes "drop this" from
+"reset this to the platform default", and the second is a real instruction Fabric reads.
+
+So the contract has to carry removal SEPARATELY — a two-slot return (`{ set, omit }`, unambiguous
+through the conversion and cheap) or a static per-component omit list, which two of the three
+strippers already have and Button does not. Whichever it is, **it lands in one commit across every
+site**: a mixed contract silently drops props. Full record, and the assertions that pin why replacing
+is load-bearing: `core/engine/src/__tests__/payload-fold-merge.test.ts`.
 
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the

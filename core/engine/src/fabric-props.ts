@@ -275,6 +275,12 @@ export function fabricProps(
   // The behavior's own fold, keyed on the TAG — the two folds above are keyed on the resolved
   // component name, which several tags share (`pressable` and a plain `view` are both `RCTView`),
   // so neither could carry a per-primitive fold. See IPayloadFold.
+  //
+  // THE FOLD'S RETURN REPLACES THE BAG, and it costs more than it looks — see
+  // `payload-fold-merge.test.ts` for the measurement and for why the obvious fix does not fit yet.
+  // Briefly: every fold returns `{ ...props, ...whatItChanged }`, and on device reading that back is
+  // `jsi::dynamicFromValue`, 13.3 ms of a 17.8 ms fold phase against 1.6 ms to send the bag out and
+  // 1.6 ms to run the fold.
   const behaviorFolded =
     node.payloadFold !== undefined
       ? node.payloadFold(aliasFolded)

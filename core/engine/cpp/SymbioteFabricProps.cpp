@@ -498,6 +498,13 @@ dynamic fabricProps(
   // (`fabric-props.ts`: aria -> payloadFold -> value). The order is not cosmetic: the aria fold
   // writes `accessibilityState` from `aria-disabled`, and Pressable's fold then resolves that
   // against its own `disabled`. Swapped, whichever ran second would silently win.
+  // The fold's return REPLACES the bag, which is what makes a removal expressible at all — a fold
+  // drops a key by not putting it back. That is also what makes it expensive: every fold returns
+  // `{ ...props, ...whatItChanged }`, and reading the result back here is `jsi::dynamicFromValue`,
+  // a `getPropertyNames` plus a `getString` and a `std::string` allocation per key. Measured at
+  // 13.3 ms of a 17.8 ms fold phase, against 1.6 ms to send the bag out and 1.6 ms to run the fold.
+  // `core/engine/src/__tests__/payload-fold-merge.test.ts` holds the numbers and why merging a patch
+  // instead — the obvious cut — does not fit yet.
   dynamic behaviorFolded;
   if (fold) {
     behaviorFolded = fold(*bag);
