@@ -86,6 +86,144 @@ describe('react own Fabric renderer in the headless harness', () => {
     );
     expect(result.loaded).toBe(true);
   });
+
+  // why: the renderer resolves a host element's type through `ReactNativeViewConfigRegistry.get`, so
+  // a stock arm cannot render one view until `RCTView` is registered. The config has to be RN's OWN
+  // rather than a hand-written stand-in: it carries `validAttributes`, which is what
+  // `createAttributePayload` reads to decide the payload, so an invented one would produce a
+  // different payload and the comparison would be measuring the stand-in. This repo has a standing
+  // rule about exactly that shape of error.
+  //
+  // ── THIS IS A KNOWN-GAP MARKER, AND IT IS MEANT TO FAIL WHEN THE GAP CLOSES ────────────────────
+  //
+  // It asserts `registered === false`, which is not a requirement — it is the state of the harness.
+  // Someone who adds platform-extension resolution will see this go red, and the `detail` line is
+  // their handover.
+  //
+  // THE CHAIN, each link measured by satisfying the previous one and reading the next throw. Every
+  // step took one line, and every line is in this test rather than the shared runner because it is a
+  // fact about the stock arm:
+  //
+  //   1. `Can't find variable: global`                     -> runner prelude, `global = globalThis`
+  //   2. `__fbBatchedBridgeConfig is not set`               -> an EMPTY bridge, so `NativeModules`
+  //                                                           can evaluate and every lookup misses
+  //   3. `getEnforcing('SourceCode') could not be found`    -> a turbomodule proxy answering to any
+  //                                                           name; chasing them one at a time does
+  //                                                           not converge
+  //   4. `Cannot destructure property 'screen'`             -> `getConstants()` returning a screen
+  //                                                           shape, since `{}` is not inert
+  //   5. `Platform_default.select is undefined`             -> THE WALL, and it is not a fake:
+  //
+  // `Libraries/Utilities/Platform.js` is a compatibility shim whose entire body is
+  // `import Platform from './Platform'; export default Platform;` — it relies on METRO resolving
+  // `./Platform` to `Platform.ios.js`. esbuild has no platform extensions, so it resolves the file to
+  // itself, the cycle yields `undefined`, and `BridgelessUIManager` dies on `Platform.select`.
+  //
+  // Closing it means teaching the runner `.ios.js` before `.js` for paths under `react-native` —
+  // scoped there deliberately, because widening `resolveExtensions` globally would change how OUR
+  // own sources resolve, and the project's folder-as-module layout already settled that question.
+  //
+  // What is NOT in the way, having been budgeted for and then not needed: Flow (the runner strips
+  // it), and `ReactNativePrivateInterface` (all twelve of the renderer's uses resolved).
+  it('stops at platform-extension resolution, and nothing earlier', () => {
+    let detail: string;
+    let registered = false;
+    try {
+      // BRIDGELESS, and it is the correct mode rather than a way around the error. `ViewNative-
+      // Component` asks `NativeComponentRegistry.get`, whose branch is `native: !global.RN$Bridgeless`
+      // — with the bridge it calls `getNativeComponentAttributes` and dies on "__fbBatchedBridge-
+      // Config is not set"; without it, it builds the config from the STATIC one the module already
+      // carries in JS. Bridgeless is what a real RN 0.86 app runs, so the static path is also the one
+      // a device would take, which is what keeps the baseline honest.
+      //
+      // Set HERE and not in the runner prelude: it is a fact about the stock arm, and the engine's
+      // own code reads globals of this family. A harness-wide flag would change every other itest.
+      (globalThis as Record<string, unknown>).RN$Bridgeless = true;
+      // AN EMPTY BRIDGE, which is not the same as no bridge. `NativeModules.js` throws
+      // "__fbBatchedBridgeConfig is not set" from its MODULE scope, so the module cannot even
+      // evaluate — and `TurboModuleRegistry.requireModule` reaches it for every miss, including the
+      // one `NativeReactNativeFeatureFlags` takes at import time. An empty `remoteModuleConfig`
+      // lets it initialise with no modules, every lookup misses cleanly, and the feature flags fall
+      // back to their JS defaults. Set before the first require below, because both modules read
+      // these globals at module scope.
+      (globalThis as Record<string, unknown>).__fbBatchedBridgeConfig = {
+        remoteModuleConfig: [],
+      };
+      // A TURBOMODULE THAT ANSWERS TO ANY NAME. Chasing the misses one at a time does not converge:
+      // importing one component module reaches `getEnforcing('SourceCode')`, and behind it sit the
+      // rest of RN's specs, each throwing the moment the previous is satisfied.
+      //
+      // Permissive by design, and the trap that carries is already written down — a fake that
+      // resolves any name means module-NAME correctness can never be proven headlessly
+      // (`<native_module_name_is_platform_specific>`). It does not apply to what this arm is for: a
+      // payload built from a static JS view config never asks a native module anything, so nothing
+      // measured here depends on a name being right.
+      //
+      // `getConstants` is singled out because a bare `{}` is not inert: `Dimensions` destructures
+      // `screen` out of what `DeviceInfo` returns and dies on the miss. One screen shape satisfies
+      // every consumer of it, and no measurement here reads a pixel.
+      const screen = {
+        width: 390,
+        height: 844,
+        scale: 3,
+        fontScale: 1,
+      };
+      const constants = {
+        Dimensions: { window: screen, screen },
+        isIPhoneX_deprecated: false,
+      };
+      const anyTurboModule = new Proxy(
+        {},
+        {
+          get: (_target, name) =>
+            name === 'getConstants' ? () => constants : () => ({}),
+        },
+      );
+      (globalThis as Record<string, unknown>).__turboModuleProxy = () =>
+        anyTurboModule;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const registry: unknown = require('react-native/Libraries/Renderer/shims/ReactNativeViewConfigRegistry');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('react-native/Libraries/Components/View/ViewNativeComponent');
+      if (typeof registry !== 'object' || registry === null) {
+        detail = `registry resolved to ${typeof registry}`;
+      } else {
+        const get: unknown = (registry as Record<string, unknown>).get;
+        if (typeof get !== 'function') {
+          detail = 'registry has no get()';
+        } else {
+          const config: unknown = get('RCTView');
+          const attributes =
+            typeof config === 'object' && config !== null
+              ? (config as Record<string, unknown>).validAttributes
+              : undefined;
+          registered = typeof attributes === 'object' && attributes !== null;
+          detail = registered
+            ? `${Object.keys(attributes as object).length} validAttributes`
+            : `config resolved to ${typeof config}`;
+        }
+      }
+    } catch (error) {
+      // The STACK, not just the message: "__fbBatchedBridgeConfig is not set" is thrown from three
+      // unrelated depths in RN and the message alone cannot say whether it came from importing the
+      // module or from asking the registry — which is the difference between a one-line flag and the
+      // whole TurboModule floor.
+      const stack = error instanceof Error ? (error.stack ?? '') : '';
+      detail = `${error instanceof Error ? error.message : String(error)} | ${stack
+        .split('\n')
+        .slice(0, 6)
+        .join(' <- ')}`;
+    }
+    print(
+      `DEBUG RCTView view config: registered=${String(registered)} :: ${detail}`,
+    );
+    // Deliberately asserting the GAP. Red here means someone taught the runner platform extensions
+    // and a stock arm is now buildable — update this file, do not silence it.
+    expect(registered).toBe(false);
+    // And it must still stop where the header says. A different message means the chain moved and
+    // the handover above is stale, which is worse than the gap itself.
+    expect(detail.includes('Platform_default.select')).toBe(true);
+  });
 });
 
 report();

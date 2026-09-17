@@ -1466,7 +1466,30 @@ renderer's uses resolved. **This is also the RN-port backlog's "step 0", which t
 as never tried** — it is now tried, in the itest runner rather than in `vitest.config.ts`, and the
 answer is that RN's Flow is not what blocks importing it.
 
-Still not done: RENDERING. A surface needs view configs registered and a root tag the binding knows.
+**Rendering is not done, and the remaining chain is measured rather than guessed.** The renderer
+resolves a host element through `ReactNativeViewConfigRegistry.get`, so a stock arm needs RN's OWN
+view config for `RCTView` — a hand-written stand-in would carry different `validAttributes` and the
+comparison would be measuring the stand-in. Reaching the real one went five steps, each found by
+satisfying the previous and reading the next throw:
+
+```
+1. Can't find variable: global                  runner prelude, global = globalThis        DONE
+2. __fbBatchedBridgeConfig is not set           an EMPTY bridge, so NativeModules can      DONE
+                                                evaluate and every lookup misses cleanly
+3. getEnforcing('SourceCode') not found         a turbomodule proxy answering to any name  DONE
+4. Cannot destructure property 'screen'         getConstants() returning a screen shape    DONE
+5. Platform_default.select is undefined         THE WALL                                   OPEN
+```
+
+Step 5 is not a fake: `Libraries/Utilities/Platform.js` is a compatibility shim whose whole body is
+`import Platform from './Platform'; export default Platform;`, relying on **Metro** resolving
+`./Platform` to `Platform.ios.js`. esbuild has no platform extensions, so it resolves the file to
+itself, the cycle yields `undefined`, and `BridgelessUIManager` dies on `Platform.select`. Closing it
+means teaching the runner `.ios.js` before `.js` **scoped to `react-native`** — widening
+`resolveExtensions` globally would change how our own sources resolve.
+
+The probe asserts the gap (`registered === false`, stopping at that exact message), so it goes RED
+when someone closes it rather than sitting silent.
 
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the

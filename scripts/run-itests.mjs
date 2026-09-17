@@ -41,6 +41,13 @@ const require_ = createRequire(import.meta.url);
  * it is what keeps a test deterministic instead of racing a wall clock.
  */
 const PLATFORM_PRELUDE = `
+// JSC has no \`global\`; Node and Hermes both do, and React Native's source spells it that way —
+// \`ReactNativeViewConfigRegistry\` and its neighbours reach \`global.__fbBatchedBridge\` and friends.
+// Without it, importing a real RN component module dies on "Can't find variable: global", which
+// reads as a missing native module and is not one.
+if (typeof global === "undefined") {
+  globalThis.global = globalThis;
+}
 if (typeof queueMicrotask !== "function") {
   globalThis.queueMicrotask = function (task) { Promise.resolve().then(task); };
 }
