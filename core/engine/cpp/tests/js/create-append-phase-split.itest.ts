@@ -195,6 +195,8 @@ const shapes: {
   layoutMs: number;
 }[] = [];
 
+const onParent: { width: number; wall: number }[] = [];
+
 function pad(text: string, width: number): string {
   return text.padStart(width);
 }
@@ -400,6 +402,37 @@ describe('where a create and an append spend themselves, end to end', () => {
     expect(shapes.length).toBe(SHAPES.length);
   });
 
+  // why: `materialize`'s update branch has two exits and the child list decides which. A change that
+  // clones a CHILD leaves `childrenHeld` false, so the parent is cloned WITH its whole child list —
+  // and that file's own comment says what Fabric then does with it: "`fragment.children` is read as a
+  // flag three times inside the clone... it forces `updateYogaChildren()`, which calls
+  // `adoptYogaChild` per child, and a child already owned by its previous parent's yoga node is
+  // CLONED and swapped in by `replaceChild`... So a props-only change on a parent of a thousand rows
+  // re-clones all thousand, every commit, forever." A change to the PARENT'S OWN props leaves
+  // `childrenHeld` true and hands `childrenPlaceholder()` instead, so `updateYogaChildren` never
+  // runs. Same tree, same width, same one prop — only which node it lands on differs. If the parent
+  // arm is flat in width and the child arm is not, the comment's mechanism is the measured one.
+  it('changes one prop on the LIST itself instead of on a row', () => {
+    for (const width of SELECT_WIDTHS) {
+      openList();
+      for (let id = 0; id < width; id += 1) appendChild(listOf(), buildRow(id));
+      flushOps();
+      surfaceOf().commit();
+      mounted();
+
+      const startedAt = performance.now();
+      routeProp(listOf(), 'style', {
+        flexDirection: 'column',
+        backgroundColor: '#101010',
+      });
+      flushOps();
+      surfaceOf().commit();
+      onParent.push({ width, wall: since(startedAt) });
+      mounted();
+    }
+    expect(onParent.length).toBe(SELECT_WIDTHS.length);
+  });
+
   it('reports the split and the per-phase curve', () => {
     for (const line of [
       ...table('CREATE', created),
@@ -428,6 +461,17 @@ describe('where a create and an append spend themselves, end to end', () => {
       }),
       '',
       `five identical selects on one standing 1 000: ${repeated.map(one => one.toFixed(1)).join('  ')} ms`,
+      '',
+      'THE SAME ONE PROP, on the LIST itself — children held, no re-adoption',
+      pad('width', 8) + pad('wall', 8) + pad('vs on a row', 14),
+      ...onParent.map((one, at) => {
+        const onRow = selected[at]?.wall ?? 0;
+        return (
+          pad(String(one.width), 8) +
+          pad(one.wall.toFixed(1), 8) +
+          pad(`${(onRow / Math.max(one.wall, 0.5)).toFixed(0)}x`, 14)
+        );
+      }),
       '',
       'ONE prop on ONE row, 20 000 nodes throughout — only the LIST WIDTH changes',
       pad('rows', 8) +
@@ -521,10 +565,34 @@ report();
 // This is the shape a real list has: `BenchmarkScreen`'s own step is 1 000-2 000 flat rows under one
 // parent, and every commit that touches any one of them pays it again.
 //
+// **AND THE MECHANISM IS THE ONE `materialize` ALREADY DOCUMENTS.** Its update branch has two exits
+// and the child list picks one. A change that clones a CHILD leaves `childrenHeld` false and the
+// parent is cloned WITH its whole child list; a change to the PARENT'S OWN props leaves it true and
+// hands `ShadowNodeFragment::childrenPlaceholder()` instead. Same tree, same width, same single prop
+// — only which node it lands on differs:
+//
+//   width   on a ROW   on the LIST itself
+//     250        3.0                  1.0
+//     500        9.0                  1.0
+//    1000       30.0                  0.0
+//    2000      106.0                  2.0
+//
+// The parent arm is FLAT in width and the child arm is superlinear. That is the comment's own claim,
+// measured: "`fragment.children` is read as a flag three times inside the clone... it forces
+// `updateYogaChildren()`, which calls `adoptYogaChild` per child, and a child already owned by its
+// previous parent's yoga node is CLONED and swapped in by `replaceChild`... So a props-only change on
+// a parent of a thousand rows re-clones all thousand, every commit, forever." `replaceChild` scans to
+// find the child it replaces, so W clones each paying an O(W) scan is the O(W^1.75) measured above.
+//
+// **The path built to avoid exactly this is `canReplaceInPlace`, and it returns false
+// unconditionally** (SymbioteTree.cpp, disabled 2026-09-15 for a fuzzer-confirmed correctness
+// reason). So this is not a missing optimisation on a fast path — it is the standing cost of that
+// path being off, and F-65's "500x" was measuring its absence from the other side.
+//
 // WHAT THIS DOES NOT ESTABLISH. JSC is not Hermes and a Mac is not a phone, so no millisecond here
-// transfers to a device — the CURVE and the SPLIT are what carry. And "inside `materialize`/the
-// child-set build for a wide parent" is as far as four JS-side arms can localize it; which line is
-// superlinear needs a C++ timer, and the candidates worth timing first are the `ChildSet` copy into
-// `node.committedChildren`, the `IOwnerTally` per materialised parent, and RN's own
-// `YogaLayoutableShadowNode::updateYogaChildren` on a wide list — the last of which F-80 exonerated
-// in a container-only bench that never built a real committed tree.
+// transfers to a device — the CURVE and the SPLIT are what carry. The two arms locate the cost at
+// "handing a whole child list to `cloneNode`" and no finer; splitting `updateYogaChildren`'s
+// re-adoption from `replaceChild`'s scan needs a C++ timer. Note F-80 exonerated that scan in
+// `bench/sibling-scan.cpp`, a container-only bench that never built a real committed tree — the same
+// gap F-78 records for F-17's Yoga-only chunking benchmark, and an exoneration from a harness that
+// cannot reach the path is not an exoneration.
