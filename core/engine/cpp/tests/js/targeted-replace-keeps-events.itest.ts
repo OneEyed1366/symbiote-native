@@ -31,6 +31,7 @@
 import {
   appendChild,
   createElement,
+  createRawText,
   createSurface,
   getNativeTag,
   readSurfaceTelemetry,
@@ -67,6 +68,7 @@ const TOUCH = {
 };
 
 let rows: ISymbioteNode[] = [];
+let labels: ISymbioteNode[] = [];
 let surface: ReturnType<typeof createSurface> | undefined;
 
 function build(): void {
@@ -76,6 +78,7 @@ function build(): void {
   surface.appendChild(list);
 
   rows = [];
+  labels = [];
   for (let id = 0; id < ROWS; id += 1) {
     const row = createElement('RCTView');
     routeProp(row, 'style', ROW_STYLE);
@@ -83,6 +86,18 @@ function build(): void {
     // The listener is what makes this node a real event TARGET; the interceptor below is what counts
     // arrivals, so the body has nothing to do.
     setEventListener(row, 'onTouchStart', () => {});
+
+    // A REAL SUBTREE under every row, not a leaf. The disabling comment's failure is that our record
+    // of a parent's children "can be stale at any depth", and a leaf row has no depth to be stale
+    // at: `cloneChildInPlace` needs a laid-out child to clone in place before anything can go wrong.
+    // Text is also what every reported symptom is made of.
+    const label = createElement('RCTText');
+    routeProp(label, 'nativeID', `label-${id}`);
+    const text = createRawText(`row ${id}`);
+    appendChild(label, text);
+    appendChild(row, label);
+    labels.push(text);
+
     appendChild(list, row);
     rows.push(row);
   }
@@ -131,19 +146,17 @@ function surfaceOf(): ReturnType<typeof createSurface> {
   return surface;
 }
 
+type IMounted = {
+  tag: number;
+  props: Record<string, string>;
+  children: IMounted[];
+};
+
 /** The mounted view carrying this `nativeID`, wherever the differ put it. */
-function mountedRow(id: number): { tag: number } | undefined {
-  const found: { tag: number }[] = [];
-  const walk = (view: {
-    tag: number;
-    props: Record<string, string>;
-    children: {
-      tag: number;
-      props: Record<string, string>;
-      children: never[];
-    }[];
-  }): void => {
-    if (view.props.nativeID === `row-${id}`) found.push({ tag: view.tag });
+function mountedRow(id: number): IMounted | undefined {
+  const found: IMounted[] = [];
+  const walk = (view: IMounted): void => {
+    if (view.props.nativeID === `row-${id}`) found.push(view);
     for (const child of view.children) walk(child);
   };
   walk(mounted());
@@ -156,6 +169,8 @@ type IProbe = {
   tagBefore: number | undefined;
   tagAfter: number | undefined;
   tagTouched: number | undefined;
+  colourBefore: string | undefined;
+  colourAfter: string | undefined;
   arrivalsUntouched: number;
   arrivalsTouched: number;
 };
@@ -174,6 +189,8 @@ async function probe(): Promise<IProbe> {
   // then the targeted replace is not what this test is measuring. It read zero once already.
   const arrivalsBeforeChange = await tap(UNTOUCHED);
 
+  const colourBefore = mountedRow(TOUCHED)?.props.backgroundColor;
+
   readSurfaceTelemetry(ROOT_TAG);
   routeProp(rows[TOUCHED], 'style', {
     ...ROW_STYLE,
@@ -189,6 +206,14 @@ async function probe(): Promise<IProbe> {
     tagBefore,
     tagAfter: getNativeTag(rows[UNTOUCHED]),
     tagTouched: getNativeTag(rows[TOUCHED]),
+    colourBefore,
+    // THE QUESTION THE DEVICE ACTUALLY ASKED. Every reported symptom — a slider label stuck at 50%
+    // while its thumb moves, `dx 0 dy 0` under a live drag, benchmark counters frozen at zero — is
+    // text that should have changed and did not. `ShadowNode::replaceChild` ends in
+    // `react_native_assert(false && "Child to replace was not found.")`, which is NOTHING in a
+    // Release build: it returns having replaced nothing and the mutation is dropped in silence.
+    // Tags and events surviving says nothing about whether the new VALUE landed.
+    colourAfter: mountedRow(TOUCHED)?.props.backgroundColor,
     arrivalsUntouched: await tap(UNTOUCHED),
     arrivalsTouched: await tap(TOUCHED),
   };
@@ -206,6 +231,9 @@ describe('a targeted replace leaves its untouched siblings addressable', () => {
     print(
       `DEBUG taps landed: untouched=${one.arrivalsUntouched} touched=${one.arrivalsTouched}`,
     );
+    print(
+      `DEBUG backgroundColor before=${String(one.colourBefore)} after=${String(one.colourAfter)}`,
+    );
 
     // why: the control. A fixture that cannot deliver a tap on an untouched tree reports the same
     // zero a real regression does, and this file already produced that false alarm once.
@@ -220,6 +248,103 @@ describe('a targeted replace leaves its untouched siblings addressable', () => {
     // nothing, so the listener the engine registered has to keep firing.
     expect(one.arrivalsUntouched).toBe(1);
     expect(one.arrivalsTouched).toBe(1);
+    // why: the device symptom is a value that never paints. A commit the targeted path dropped looks
+    // exactly like this — same tree, same tags, same events, stale prop.
+    expect(one.colourAfter !== one.colourBefore).toBe(true);
+  });
+
+  // why: ONE change proves nothing about the failure this path was disabled for. Its own comment
+  // says the damage shows up on the commit AFTER: "the child list `adoptLandedChildren` recorded at
+  // commit time then names nodes that are no longer there ... and the NEXT commit's
+  // `ShadowNode::replaceChild` cannot find the child it was asked to replace". A stale record needs a
+  // second visit to bite, and every device symptom is a value that stopped following its state — a
+  // screen mutates the same tree dozens of times, not once.
+  it('lands every value across a run of changes, not just the first', async () => {
+    build();
+
+    const colours = ['#f5a524', '#3a2c10', '#1d4ed8', '#047857', '#b91c1c'];
+    const misses: string[] = [];
+    let replaced = 0;
+
+    readSurfaceTelemetry(ROOT_TAG);
+    for (let round = 0; round < colours.length; round += 1) {
+      // A DIFFERENT row each round, because the record that can go stale is the parent's and a
+      // single row would keep re-dirtying the same slot.
+      const row = (round * 7 + 3) % ROWS;
+      routeProp(rows[row], 'style', {
+        ...ROW_STYLE,
+        backgroundColor: colours[round],
+      });
+      surfaceOf().commit();
+      mounted();
+      replaced += readSurfaceTelemetry(ROOT_TAG)?.targetedReplaces ?? 0;
+
+      const landed = mountedRow(row)?.props.backgroundColor;
+      const wanted = colours[round].toLowerCase();
+      // `getDebugProps` prints a parsed colour, so compare on the channels rather than the spelling.
+      const matches = landed !== undefined && landed.startsWith('rgba(');
+      if (!matches) misses.push(`round ${round} row ${row}: ${String(landed)}`);
+      print(
+        `DEBUG round ${round} row ${row} wanted ${wanted} landed ${String(landed)}`,
+      );
+    }
+
+    print(`DEBUG targetedReplaces total=${replaced} misses=${misses.length}`);
+    expect(replaced > 0).toBe(true);
+    expect(misses.length).toBe(0);
+  });
+
+  // why: the two cases above never make Fabric SUBSTITUTE anything, so they cannot reach the failure
+  // this path was disabled for. `replacementsAreLayoutClean` only lets the targeted path run when no
+  // replacement moves layout — but the disabling comment's own words are that "the layout pass
+  // substitutes on every commit, not only on ours". A commit that DOES move layout runs
+  // `YogaLayoutableShadowNode::cloneChildInPlace`, which swaps clones into a standing parent behind
+  // our record. The poison is planted by that commit and collected by the NEXT targeted one.
+  //
+  // So: alternate. A layout-affecting change, then a layout-neutral change on a different row, and
+  // ask whether the second one's value ever reaches the screen.
+  it('lands values when layout-moving and layout-neutral changes alternate', async () => {
+    build();
+
+    const misses: string[] = [];
+    let replaced = 0;
+    readSurfaceTelemetry(ROOT_TAG);
+
+    for (let round = 0; round < 6; round += 1) {
+      // MOVES LAYOUT: a height change dirties this row and sends the layout pass through the list,
+      // which is what makes Fabric clone standing children in place.
+      const tall = (round * 5 + 1) % ROWS;
+      routeProp(rows[tall], 'style', { ...ROW_STYLE, height: 40 + round });
+      surfaceOf().commit();
+      mounted();
+
+      // LAYOUT-NEUTRAL, on a different row: the shape the targeted path accepts.
+      const tinted = (round * 5 + 8) % ROWS;
+      const colour = `rgb(${10 + round * 7}, 20, 30)`;
+      routeProp(rows[tinted], 'style', {
+        ...ROW_STYLE,
+        backgroundColor: colour,
+      });
+      surfaceOf().commit();
+      mounted();
+      replaced += readSurfaceTelemetry(ROOT_TAG)?.targetedReplaces ?? 0;
+
+      const landed = mountedRow(tinted)?.props.backgroundColor;
+      const wanted = `rgba(${10 + round * 7}, 20, 30, 1)`;
+      if (landed !== wanted) {
+        misses.push(
+          `round ${round} row ${tinted}: ${String(landed)} != ${wanted}`,
+        );
+      }
+      print(
+        `DEBUG round ${round} tall=${tall} tinted=${tinted} landed=${String(landed)} wanted=${wanted}`,
+      );
+    }
+
+    print(`DEBUG targetedReplaces total=${replaced} misses=${misses.length}`);
+    for (const miss of misses) print(`DEBUG MISS ${miss}`);
+    expect(replaced > 0).toBe(true);
+    expect(misses.length).toBe(0);
   });
 });
 
