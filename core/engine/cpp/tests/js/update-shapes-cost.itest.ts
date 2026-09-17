@@ -151,8 +151,23 @@ describe('what an update costs, by shape', () => {
         `DEBUG ${name.padEnd(9)} created=${telemetry.nodesCreated} ` +
           `cloned=${telemetry.nodesCloned} reused=${telemetry.nodesReused} ` +
           `targetedReplaces=${telemetry.targetedReplaces} ` +
-          `diffProps=${telemetry.diffPropsMs.toFixed(1)} props=${telemetry.propsMs.toFixed(1)}`,
+          `diffProps=${telemetry.diffPropsMs.toFixed(1)} props=${telemetry.propsMs.toFixed(1)} ` +
+          // THE WASTE COUNTERS, on the UPDATE shapes, which is where a real app lives. A
+          // `writesOfUnchanged` is a prop that crossed into the host and converted to a
+          // `folly::dynamic` before anything could see it equalled what the node already held; an
+          // `absentDeletes` is a clear of a key that was not there, which leaves before the
+          // conversion and is the cheap kind. Both are ADAPTER-generated — the engine driven
+          // directly emits neither, which is what makes a non-zero here worth chasing.
+          `unchanged=${telemetry.writesOfUnchanged} absentDeletes=${telemetry.deletesOfAbsent}`,
       );
+      // THE CONTROL, asserted on every shape rather than printed. This file drives the engine's own
+      // mutation API with no reconciler above it, so it writes exactly what it means to — and that is
+      // what makes a non-zero counter on an ADAPTER's arm attributable to the adapter rather than to
+      // the engine. Vue's create arm read `unchanged=6000` against this zero, which is how
+      // `seedTextDefaults` was found and priced.
+      expect(telemetry.writesOfUnchanged).toBe(0);
+      expect(telemetry.deletesOfAbsent).toBe(0);
+
       return {
         targetedReplaces: telemetry.targetedReplaces,
         wall: fill + apply + commit,

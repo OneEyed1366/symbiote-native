@@ -1645,6 +1645,12 @@ writes are the same ones, six thousand seed ops simply stopped being emitted for
 Wall moved 121-130 → 116.6, which is at the edge of this fixture's spread and carries no verdict on
 its own; the counter does.
 
+**The counter is now a guard, not just a readout.** `update-shapes-cost.itest.ts` drives the engine's
+own mutation API with no reconciler above it and asserts `writesOfUnchanged === 0` and
+`deletesOfAbsent === 0` on every shape — select, partial, swap, remove, append, clear. That zero is
+what makes a non-zero on an ADAPTER's arm attributable to the adapter rather than to the engine,
+which is exactly how the seed was found and priced.
+
 Two things that came with it. The adapters keep their clear-back-to-`undefined` path (a framework
 that clears a prop it set must get the default BACK, and that is off the create path by its own
 comment) — only the create-time seed is gone. And two tests had to move from `.props` to the
