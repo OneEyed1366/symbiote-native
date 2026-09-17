@@ -37,10 +37,12 @@ import {
   readSurfaceTelemetry,
   routeProp,
   setEventListener,
+  setText,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
 import {
+  committedTexts,
   describe,
   dispatchEvent,
   expect,
@@ -338,6 +340,62 @@ describe('a targeted replace leaves its untouched siblings addressable', () => {
       }
       print(
         `DEBUG round ${round} tall=${tall} tinted=${tinted} landed=${String(landed)} wanted=${wanted}`,
+      );
+    }
+
+    print(`DEBUG targetedReplaces total=${replaced} misses=${misses.length}`);
+    for (const miss of misses) print(`DEBUG MISS ${miss}`);
+    expect(replaced > 0).toBe(true);
+    expect(misses.length).toBe(0);
+  });
+
+  // why: every reported device symptom is TEXT that stopped following its state — a slider label
+  // stuck at 50%, `dx 0 dy 0` under a live drag, counters frozen at zero. Text is not an ordinary
+  // prop in Fabric: `ParagraphShadowNode` carries STATE and writes it during LAYOUT
+  // (`updateStateIfNeeded<ParagraphState>` -> `setStateData`, ParagraphShadowNode.cpp:336). We call
+  // `completeSurface` with `enableStateReconciliation: true`, so a node whose state moved is cloned
+  // by `progressState` INSIDE the commit — the third name in the disabling comment's own list, beside
+  // `updateMountedFlag` and the differ, and the one nothing has ever tested.
+  //
+  // The cases above only ever changed a VIEW's props, so no state ever moved and `progressState` had
+  // nothing to do. This one changes the text itself, round after round, and asks the only question
+  // the device actually asked: does what I wrote end up on the screen.
+  it('lands every text change while the targeted path is running', async () => {
+    build();
+
+    const misses: string[] = [];
+    let replaced = 0;
+    readSurfaceTelemetry(ROOT_TAG);
+
+    for (let round = 0; round < 8; round += 1) {
+      const row = (round * 3 + 2) % ROWS;
+      const wanted = `updated ${round} on ${row}`;
+      setText(labels[row], wanted);
+
+      // A layout-neutral tint on ANOTHER row in the SAME commit, so the list parent carries both a
+      // state-moving child and a targeted-replaceable one — which is what a real screen does on
+      // every frame and what none of the cases above combined.
+      const tinted = (round * 3 + 9) % ROWS;
+      routeProp(rows[tinted], 'style', {
+        ...ROW_STYLE,
+        backgroundColor: `rgb(${5 + round * 9}, 40, 50)`,
+      });
+
+      surfaceOf().commit();
+      mounted();
+      replaced += readSurfaceTelemetry(ROOT_TAG)?.targetedReplaces ?? 0;
+
+      const texts = committedTexts();
+      if (!texts.includes(wanted)) {
+        misses.push(`round ${round}: "${wanted}" never reached the screen`);
+      }
+      const tint = mountedRow(tinted)?.props.backgroundColor;
+      const wantedTint = `rgba(${5 + round * 9}, 40, 50, 1)`;
+      if (tint !== wantedTint) {
+        misses.push(`round ${round}: tint ${String(tint)} != ${wantedTint}`);
+      }
+      print(
+        `DEBUG round ${round} text="${wanted}" present=${String(texts.includes(wanted))} tint=${String(tint)}`,
       );
     }
 
