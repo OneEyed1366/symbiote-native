@@ -153,14 +153,17 @@ describe('what a scroll view sends native', () => {
     expect(payload.invertStickyHeaders).toBe(undefined);
   });
 
-  // why: THE PRICE. The owner sheds its fold entirely on iOS — everything it did was a tag rule. The
-  // remaining trip is its CONTENT node's, whose `collapsableChildren` is derived from props that stay
-  // on the owner, so no per-node rule can reach it. Pinned so the day that one moves too, this number
-  // has to be edited deliberately.
-  it('pays one trip for the pair, and it is the content node’s', () => {
+  // why: THE PRICE, and it is ZERO for the whole primitive as of 2026-09-18 — both nodes.
+  //
+  // This assertion read `1` for one iteration, with a comment saying the content node's fold could
+  // never move because "no per-node rule can reach" the owner it derives from. That was wrong about
+  // the engine rather than about the fold: the tree lives in C++, so a rule reads its parent through
+  // `ownerProps` (`scroll-content-payload.itest.ts`). Pinning the number is what made the claim
+  // testable — the day it became false, this went red instead of quietly staying true.
+  it('costs no trip into JS for either of its nodes', () => {
     const one = vertical({});
     print(`DEBUG scroll-view folds=${one.folds}`);
-    expect(one.folds).toBe(1);
+    expect(one.folds).toBe(0);
   });
 });
 

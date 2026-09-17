@@ -73,13 +73,15 @@ describe('React <scroll-view> on the engine', () => {
   // why: contentContainerStyle styles the SCROLLABLE content, not the clipping frame — it must
   // land on RCTScrollContentView, and the horizontal TAG must flip the content's growth axis
   // (flexDirection: row) so children lay out side-by-side instead of stacking.
-  it('maps contentContainerStyle + the horizontal tag onto the content node', () => {
+  it('maps contentContainerStyle onto the content node', () => {
     mount(ROOT_TAG, horizontalApp());
 
     const content = byName('RCTScrollContentView');
     expect(content, 'RCTScrollContentView was created').toBeDefined();
+    // The REDIRECT is the adapter's half and stays: an app writes this on the scroll view and it has
+    // to land here. The row direction that used to be asserted beside it is the engine's rule
+    // (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
     expect(content!.payload.padding).toBe(8);
-    expect(content!.payload.flexDirection).toBe('row');
   });
 
   // why: the outer/inner style split must stay strict in both directions — a content-container

@@ -113,12 +113,13 @@ describe('Solid scroll-view / horizontal-scroll-view tags', () => {
     await tick();
 
     const scroll = committed(SCROLL_VIEW);
-    // The axis FLAG is `foldScrollViewProps` in the engine and unreachable from this host
-    // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`). What this adapter decides — and
-    // what this case is named for — is which TAG it renders, and the row-styled content node under
-    // it is that decision made visible.
-    const content = scroll.children[0];
-    expect(content?.payload.flexDirection).toBe('row');
+    // Both the axis flag and the content node's row style are engine rules now
+    // (`scroll-view-payload.itest.ts`, `scroll-content-payload.itest.ts`), and under this host the
+    // iOS name table maps BOTH axes onto `RCTScrollView` / `RCTScrollContentView` — so no observable
+    // here distinguishes the axis, and the Android ViewManager half of this case's name was never
+    // reachable from a vitest run either. What survives is that the tag reached its behavior at all:
+    // an unregistered or misspelled tag builds no content node under the scroller.
+    expect(scroll.children[0]).toBeDefined();
   });
 
   // `onRefresh` is an OWNED listener (RefreshControl's own machine holds the slot), stashed rather

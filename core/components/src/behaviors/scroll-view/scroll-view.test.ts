@@ -206,21 +206,22 @@ describe('style precedence, which is opposite on the two nodes', () => {
     return { owner, slot };
   }
 
-  // THE OWNER'S HALF OF THIS PAIR LEFT THIS FILE on 2026-09-18 — the base style composition is
-  // `foldScrollViewProps` in the engine now, and this host builds its payload through the TypeScript
-  // `fabricProps`, which carries no copy of the tag rules. Asserted on the committed payload in
-  // `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`. What stays is the SLOT's half, whose
-  // fold is still JS because `collapsableChildren` is derived from props that live on the OWNER.
-  it('horizontal: the row constant wins on the slot', () => {
+  // BOTH HALVES OF THIS PAIR HAVE NOW LEFT — the owner's base style on 2026-09-18 and the slot's row
+  // constant the same day, once `fabricProps` gained `ownerProps` and the content rule could move
+  // too (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`). This host builds its payload
+  // through the TypeScript `fabricProps`, which carries no copy of the tag rules.
+  //
+  // What survives here is the ROUTING, which is the half that was always this file's: an app writes
+  // `contentContainerStyle` on the OWNER and it has to arrive on the SLOT, which no rule does — the
+  // behavior's `slotProps` redirect does, in JS, before any payload exists.
+  it('routes contentContainerStyle onto the slot', () => {
     const { slot } = commitScroll(HORIZONTAL_SCROLL_VIEW_TAG, {
       style: { flexGrow: 9, backgroundColor: 'red' },
-      // Collides with the fold's flexDirection: 'row' — the CONSTANT must win, because the
-      // wrapper writes `[contentContainerStyle, {flexDirection:'row'}]`.
       contentContainerStyle: { padding: 12, flexDirection: 'column' },
     });
 
     expect(slot.payload.padding).toBe(12);
-    expect(slot.payload.flexDirection).toBe('row');
+    // Seeded by `buildStructure` with `setProp`, not by any rule, so it is still visible here.
     expect(slot.payload.collapsable).toBe(false);
   });
 
@@ -331,35 +332,38 @@ describe('collapsableChildren is derived from props that stay on the owner', () 
     );
   });
 
+  // `collapsableChildren` ITSELF is the engine's rule now and unreachable from this host — it reads
+  // the two props off the OWNER through `ownerProps`
+  // (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`). Both names stay on the scroll view,
+  // which is routing and is still this file's:
   it.each(['maintainVisibleContentPosition', 'snapToAlignment'])(
-    '%s lands on the OWNER and turns off flattening on the SLOT',
+    '%s stays on the OWNER rather than travelling to the slot',
     key => {
       const { commit } = mountScroll(SCROLL_VIEW_TAG, {
         [key]: key === 'snapToAlignment' ? 'start' : { minIndexForVisible: 0 },
       });
       const { owner, slot } = commit();
 
-      // The prop itself is the scroll view's — only the DERIVED value crosses to the slot.
       expect(owner.payload[key]).toBeDefined();
-      expect(slot.payload.collapsableChildren).toBe(false);
-      expect(Object.hasOwn(owner.payload, 'collapsableChildren')).toBe(false);
+      expect(slot.payload[key]).toBeUndefined();
     },
   );
 
-  // The reason `slotDerived` exists. `markPropsDirty` bubbles UP, so an owner write reaches every
-  // ancestor and never the slot, and `reconcile` skips a subtree whose root is clean — without the
-  // declaration this second commit publishes nothing and the value is frozen at its mount answer.
-  it('re-derives after a write that lands AFTER the first commit', () => {
-    const { node, commit } = mountScroll(SCROLL_VIEW_TAG);
-    expect(Object.hasOwn(commit().slot.payload, 'collapsableChildren')).toBe(
-      false,
-    );
-
-    routeProp(node, 'maintainVisibleContentPosition', {
-      minIndexForVisible: 0,
-    });
-    expect(commit().slot.payload.collapsableChildren).toBe(false);
-  });
+  // THE REASON `slotDerived` EXISTS, and it is now the more important half rather than the
+  // incidental one. `markPropsDirty` bubbles UP, so an owner write reaches every ancestor and never
+  // the slot, and `reconcile` skips a subtree whose root is clean — so without the declaration the
+  // slot never re-commits and the rule, wherever it lives, never re-reads the owner.
+  //
+  // THE POSITIVE HALF IS ASSERTED IN THE ITEST, not here, and that is a real limit of this host
+  // rather than a preference. The only observable a late owner write produces is the DERIVED value
+  // on the slot's payload, which is the engine's rule now; re-publication itself is invisible, since
+  // the engine node keeps its identity across commits and only its `committedProps` change. An
+  // assertion on `.handle` was written here first and failed for exactly that reason.
+  //
+  // `core/engine/cpp/tests/js/scroll-content-payload.itest.ts` drives the whole path — commit, write
+  // `snapToAlignment` on the owner, commit again, read `collapsableChildren` — which is stronger
+  // evidence than any proxy available here. What stays below is the NEGATIVE half, whose observable
+  // (nothing was republished) this host can still see.
 
   // The other half of the same guard: a re-render writing the SAME value must not dirty the slot,
   // or every ScrollView render clones its content node. `setProp`'s identity guard is what stops

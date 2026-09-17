@@ -48,10 +48,28 @@ using IPayloadFold = std::function<folly::dynamic(const folly::dynamic &)>;
  * would either miss every pressable or fire on every view. `<text-input>` is the case that hid
  * this — its view name happens to name it uniquely, so the first port needed no tag at all.
  */
+/**
+ * `ownerProps` is the PARENT node's props, or nullptr at a root.
+ *
+ * WHY A RULE MAY READ ITS PARENT AT ALL, when the whole point of a tag rule is that it is a function
+ * of one node's own bag. Several of RN's component bodies build a node whose props are DERIVED from
+ * the node above it — ScrollView's content view takes `collapsableChildren` from the scroller's
+ * `maintainVisibleContentPosition`, ImageBackground's image takes its size from the wrapper's style.
+ * In the wrapper world that was ordinary: one `render()` saw both. Split into per-node rules it looks
+ * impossible, and this argument is why it is not: the TREE LIVES IN C++ NOW, so a node already knows
+ * its parent and reading it costs a pointer hop rather than a JS closure and a crossing.
+ *
+ * It does NOT make everything portable, and the boundary is the same one as before: a rule may read
+ * the parent's PROPS, which are declarative and present at commit time. It still cannot read live JS
+ * state (`stickyFold`'s `translateY`), an owned LISTENER (`focusable`'s `onPress !== undefined`,
+ * which lives in the stash and not in any bag), or anything a framework computes per render. Those
+ * stay JS folds.
+ */
 folly::dynamic fabricProps(
     const std::string &component,
     const std::string &tagName,
     const folly::dynamic &props,
-    const IPayloadFold &fold = {});
+    const IPayloadFold &fold = {},
+    const folly::dynamic *ownerProps = nullptr);
 
 } // namespace symbiote

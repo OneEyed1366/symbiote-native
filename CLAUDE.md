@@ -1681,14 +1681,15 @@ payloads asserted equal key by key before any millisecond is read):
 
 ```
              native walk   js walk    per node   the bag / what the rule does
- imagebg        3.0         12.2        9.5 us   2 + a 3-key style / writes ONE key
- spinner        3.7         14.1       10.3 us   4, no style / the MOST work in the file
- accessory      3.1         14.3       11.1 us   4 / nothing at all
- button         3.9         17.0       12.0 us   5 + a 2-key style
- pressable      3.8         18.7       14.9 us   4 + a 3-key style
- scroll         4.2         19.3       15.4 us   4 + a 2-key style / the BIGGEST rule
- switch         4.8         24.0       19.0 us   6 + nested trackColor
- image          6.1         28.1       22.1 us   6 + what the rule BUILDS
+ content        2.9         11.6        8.8 us   3 + a 2-key style / READS ITS PARENT
+ imagebg        3.2         13.0        9.7 us   2 + a 3-key style / writes ONE key
+ spinner        3.8         14.1       10.3 us   4, no style / the MOST work in the file
+ accessory      3.4         14.5       11.1 us   4 / nothing at all
+ button         3.9         16.7       12.5 us   5 + a 2-key style
+ pressable      3.7         18.2       14.6 us   4 + a 3-key style
+ scroll         4.3         19.5       15.3 us   4 + a 2-key style / the BIGGEST rule
+ switch         4.9         24.2       19.2 us   6 + nested trackColor
+ image          6.2         28.4       23.0 us   6 + what the rule BUILDS
 ```
 
 `scroll` is the fourth point on the experiment and the one that closes it: its rule is the biggest in
@@ -1705,6 +1706,36 @@ So the cost model for a fold is **bag in, bag out, body free** — the column or
 marshalled, with the dearest row dear because its rule CREATES keys that then travel back. Two
 consequences worth keeping: a trivial fold over a large bag is the worst value available, and
 DELETING a fold that does nothing is worth as much as porting one that does a lot.
+
+### A rule may read its PARENT — `ownerProps`, and "a per-node rule cannot reach another node" was wrong
+
+Three iterations of this migration recorded that ScrollView's content fold, ImageBackground's image
+fold and the two clone-folds must stay in JS because "a per-node rule cannot reach another node".
+That was true of the JS FOLD shape and false of the engine: **the tree lives in C++, so a node
+already knows its parent.** `fabricProps` now takes `ownerProps` from `node.parent`, and a rule that
+is DERIVED from the node above reads it there.
+
+ScrollView's content rule is the first user, which takes the whole primitive to **zero crossings on
+both nodes**. Its two halves are why it was the right one: the row direction is a constant of the
+content node's OWN tag (portable all along), and `collapsableChildren` comes from
+`maintainVisibleContentPosition` / `snapToAlignment`, which stay on the scroller.
+
+**The boundary did not move, only the reading of it.** A rule may read the parent's PROPS —
+declarative, present at commit time. It still cannot read live JS state (`stickyFold`'s
+`translateY`), an owned LISTENER (`focusable`'s `onPress !== undefined`, which lives in the stash and
+in no bag), or anything a framework computes per render. That is the browser model's own line: a UA
+rule sees the tree, not the application's closures.
+
+**Reading a parent costs nothing measurable** — `content` has the CHEAPEST native walk of the nine
+rules in the cost table (2.9 ms) while being the only one that does it. A pointer hop on a tree
+already in memory, against a JS closure plus a crossing for as long as the fold lived on the far
+side.
+
+One failure mode is new and has its own case: a rule that reads its parent runs when THIS node is
+dirty, so a late write to the owner must mark the child dirty or the rule never re-reads it.
+`slotDerived` already named both props, so it worked — and it worked for the JS fold for the same
+reason, since that fold also only ran when its node was dirty. The seam did not change the
+requirement, but nothing said so out loud until it was asserted.
 
 ### A mirror that cannot be removed is made LOUD — the scroll base style, held by a test
 

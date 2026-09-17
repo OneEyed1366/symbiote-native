@@ -66,22 +66,22 @@ function payloadFor(viewName: string): Record<string, unknown> {
 // it accepts is valid, so there is no reject path to assert against.
 describe('horizontal FlatList (Positive — no throwing path)', () => {
   it('reaches the horizontal scroll tag, which is what carries the axis', () => {
-    // why: the axis flag itself is `foldScrollViewProps` in the engine
-    // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`) and this host carries no copy of the
-    // tag rules — but WHICH TAG the list picks is this adapter's own decision, and a list that chose
-    // the vertical tag would silently scroll the wrong way. The committed content view is the tell:
-    // only the horizontal tag builds a row-styled content node.
+    // why: both the axis flag and the content node's row style are engine rules now
+    // (`scroll-view-payload.itest.ts`, `scroll-content-payload.itest.ts`), and under this host the
+    // iOS name table maps BOTH axes to `RCTScrollView`/`RCTScrollContentView` — so nothing visible
+    // here distinguishes the axis at all. What a list still owes is the two-node scroll structure:
+    // reach no behavior and there is no content view to pin a width to, which the next case does.
     mount(ROOT_TAG, createElement(App));
-    expect(payloadFor('RCTScrollContentView').flexDirection).toBe('row');
+    expect(payloadFor('RCTScrollContentView')).toBeDefined();
   });
 
   it('pins the content view to the full row width as a row', () => {
     // why: the content view must be pinned to the full row width, not the frame width — else
     // the row never overflows and the native scroll view has nothing to scroll.
     mount(ROOT_TAG, createElement(App));
-    const content = payloadFor('RCTScrollContentView');
-    expect(content.width).toBe(TOTAL_WIDTH);
-    expect(content.flexDirection).toBe('row');
+    // The WIDTH is the list's own arithmetic and stays here; the row direction beside it is the
+    // engine's rule (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
+    expect(payloadFor('RCTScrollContentView').width).toBe(TOTAL_WIDTH);
   });
 
   it('registers an event handler that accepts a layout event', () => {

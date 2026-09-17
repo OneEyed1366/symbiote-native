@@ -24,14 +24,22 @@
 // MEASURED on `build-release`, three consecutive runs, one sitting, a thousand nodes per commit:
 //
 //              native walk        js walk             per node   keys in the bag / what the rule does
-//   imagebg    3.0  3.0  3.4 ms   12.2 12.6 13.2 ms    ~9.5 us   2 + a 3-key style / writes ONE key
-//   spinner    3.7  3.7  4.1 ms   14.1 13.9 14.4 ms   ~10.3 us   4, no style / the MOST work here
-//   accessory  3.4  3.1  3.1 ms   15.0 14.3 13.6 ms   ~11.1 us   4 / nothing at all
-//   button     3.9  3.8  3.9 ms   17.0 15.5 15.2 ms   ~12.0 us   5 + a 2-key style
-//   pressable  3.9  3.8  3.8 ms   18.7 18.9 18.5 ms   ~14.9 us   4 + a 3-key style
-//   scroll     4.2  4.2  4.7 ms   19.3 19.3 20.6 ms   ~15.4 us   4 + a 2-key style / the BIGGEST rule
-//   switch     4.8  5.0  4.8 ms   24.0 24.1 23.6 ms   ~19.0 us   6 + nested trackColor
-//   image      6.1  6.0  5.9 ms   28.1 28.1 28.0 ms   ~22.1 us   6 + what the rule BUILDS
+//   content    2.9  2.9  2.9 ms   11.6 11.6 12.1 ms    ~8.8 us   3 + a 2-key style / READS ITS PARENT
+//   imagebg    3.3  3.2  3.1 ms   13.0 13.2 12.5 ms    ~9.7 us   2 + a 3-key style / writes ONE key
+//   spinner    3.9  3.8  3.8 ms   14.1 14.1 13.9 ms   ~10.3 us   4, no style / the MOST work here
+//   accessory  3.4  3.4  3.3 ms   14.4 14.5 14.6 ms   ~11.1 us   4 / nothing at all
+//   button     3.9  4.1  3.9 ms   16.7 16.9 16.0 ms   ~12.5 us   5 + a 2-key style
+//   pressable  3.8  3.7  3.7 ms   18.2 18.0 19.0 ms   ~14.6 us   4 + a 3-key style
+//   scroll     4.3  4.3  4.4 ms   19.5 20.1 19.3 ms   ~15.3 us   4 + a 2-key style / the BIGGEST rule
+//   switch     5.0  4.9  4.9 ms   24.8 23.5 24.2 ms   ~19.2 us   6 + nested trackColor
+//   image      6.2  6.0  6.3 ms   28.4 28.4 30.8 ms   ~23.0 us   6 + what the rule BUILDS
+//
+// `content` IS THE CHEAPEST NATIVE WALK OF THE NINE and it is the only rule that reads the node
+// ABOVE it, which is the answer to the question the `ownerProps` seam had to earn: reading a parent
+// costs nothing measurable. It is a pointer hop on a tree that is already in memory here — the same
+// question cost a JS closure and a crossing for as long as the fold lived on the other side. That is
+// the whole case for the seam, and it is why a rule being "derived from its owner" stopped being a
+// reason to leave it in JS.
 //
 // `scroll` is the fourth point on that experiment and the one that closes it. Its rule is the
 // BIGGEST in the file — compose a base style, default a flag, strip the axis, resolve an asymmetric
@@ -342,6 +350,38 @@ registerHostBehavior('scroll-view-in-js', {
 // node per scroll view, and this file prices ONE rule against ONE fold, not a subtree.
 registerHostBehavior('scroll-view', { attach(): void {}, detach(): void {} });
 
+// THE FIRST RULE HERE THAT READS ITS PARENT, and the reason it is priced beside the others rather
+// than trusted: `ownerProps` is a pointer hop in C++ and a whole JS closure plus a crossing in the
+// arm it replaced, so the two sides are not comparable in the way the other rows are. What the row
+// answers is the only question that matters for the seam — does reading the parent cost anything
+// measurable against a rule that does not.
+//
+// The JS twin reads the owner through a closure, which is what `contentFold` did.
+let jsOwnerProps: Readonly<Record<string, unknown>> = {};
+
+registerHostBehavior('scroll-content-in-js', {
+  attach(): void {},
+  detach(): void {},
+  foldPayload(props: Readonly<Record<string, unknown>>) {
+    const preserves =
+      jsOwnerProps.maintainVisibleContentPosition !== undefined ||
+      jsOwnerProps.snapToAlignment !== undefined;
+    if (!preserves) return props;
+    return { ...props, collapsableChildren: false };
+  },
+});
+
+registerHostBehavior('scroll-content', {
+  attach(): void {},
+  detach(): void {},
+});
+
+const SCROLL_CONTENT_PROPS = {
+  collapsable: false,
+  testID: 'content',
+  style: { padding: 8, gap: 4 },
+};
+
 const SCROLL_VIEW_PROPS = {
   decelerationRate: 'fast',
   stickyHeaderIndices: [0],
@@ -432,9 +472,15 @@ function buildList(
   view: string,
   tag: string,
   props: Record<string, unknown>,
+  // Props for the CONTAINER every row hangs off, which is the parent a rule reads through
+  // `ownerProps`. Empty for every arm but `content`, whose whole subject is that read — and without
+  // it that arm would measure a rule taking its early-out, i.e. nothing.
+  ownerProps: Record<string, unknown> = {},
 ): IArm {
   const surface = createSurface(rootTag);
   const container: ISymbioteNode = createElement('RCTView', false, 'view');
+  for (const [name, value] of Object.entries(ownerProps))
+    setProp(container, name, value);
   // The SURFACE takes its child through its own method — it is not an engine node, so the free
   // `appendChild` would name a slot this batch never created.
   surface.appendChild(container);
@@ -498,10 +544,11 @@ function bestArm(
   view: string,
   tag: string,
   props: Record<string, unknown>,
+  ownerProps: Record<string, unknown> = {},
 ): IArm {
   let best: IArm | undefined;
   for (let run = 0; run < SAMPLES; run += 1) {
-    const arm = buildList((nextRootTag += 1), view, tag, props);
+    const arm = buildList((nextRootTag += 1), view, tag, props, ownerProps);
     if (best === undefined || arm.walk < best.walk) best = arm;
   }
   if (best === undefined) throw new Error('no sample was taken');
@@ -513,9 +560,13 @@ function priced(
   view: string,
   tag: string,
   props: Record<string, unknown>,
+  ownerProps: Record<string, unknown> = {},
 ): void {
-  const native = bestArm(view, tag, props);
-  const js = bestArm(view, `${tag}-in-js`, props);
+  // The JS arm reads its owner through a CLOSURE, which is what the fold it replaces did, so the
+  // value has to be handed to it out of band — there is no parent for it to consult.
+  jsOwnerProps = ownerProps;
+  const native = bestArm(view, tag, props, ownerProps);
+  const js = bestArm(view, `${tag}-in-js`, props, ownerProps);
 
   expectSamePayload(native, js);
   print(
@@ -542,6 +593,18 @@ describe('what a ported tag rule costs on each side of the wire', () => {
 
   it('pays no trip into JS for a thousand images', () => {
     priced('image', 'RCTImageView', 'image', IMAGE_PROPS);
+  });
+
+  it('pays no trip into JS for a thousand scroll content nodes', () => {
+    priced(
+      'content',
+      'RCTScrollContentView',
+      'scroll-content',
+      SCROLL_CONTENT_PROPS,
+      {
+        snapToAlignment: 'center',
+      },
+    );
   });
 
   it('pays no trip into JS for a thousand scroll views', () => {

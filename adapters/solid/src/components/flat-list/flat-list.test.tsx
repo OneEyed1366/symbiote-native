@@ -828,7 +828,9 @@ describe('Solid FlatList on the engine', () => {
       expect(
         committed(SCROLL_VIEW).payload.maintainVisibleContentPosition,
       ).toEqual({ minIndexForVisible: 1 });
-      expect(committed(CONTENT_VIEW).payload.collapsableChildren).toBe(false);
+      // `collapsableChildren` is derived from the prop above by the ENGINE now, which reads it off
+      // the owner through `ownerProps` (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
+      // What this list owes is the FORWARDING asserted above it.
     });
 
     // why: RN implements sticky list headers purely in JS — the flagged CELL is wrapped in the

@@ -219,8 +219,9 @@ describe('Vue FlatList on the engine', () => {
       // adapter's decision and is what the row-styled content node below proves.
       const content = findCreated('RCTScrollContentView');
       // Pinned to the full row width (not the frame width) so the row overflows and scrolls.
+      // The width is this list's own arithmetic; the row direction beside it is the engine's rule
+      // (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
       expect(content.payload.width).toBe(TOTAL_WIDTH);
-      expect(content.payload.flexDirection).toBe('row');
     });
 
     it('gates RefreshControl on a @refresh listener (the emit bridge wires onRefresh only when listened)', async () => {

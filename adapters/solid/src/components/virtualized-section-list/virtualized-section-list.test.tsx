@@ -747,7 +747,9 @@ describe('Solid VirtualizedSectionList on the engine', () => {
       expect(
         committed(SCROLL_VIEW).payload.maintainVisibleContentPosition,
       ).toEqual({ minIndexForVisible: 1 });
-      expect(committed(CONTENT_VIEW).payload.collapsableChildren).toBe(false);
+      // `collapsableChildren` is derived from the prop above by the ENGINE now, which reads it off
+      // the owner through `ownerProps` (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
+      // What this list owes is the FORWARDING asserted above it.
     });
 
     // why: onStartReached is onEndReached's top-edge twin (RN 0.71+), the hook a prepend-paging chat

@@ -72,6 +72,27 @@ type IClear = {
 };
 
 /** Build a standing list, then time removing every row of it. */
+// BEST OF N, for the reason `child-list-scaling.itest.ts` spells out: timing noise is one-sided — it
+// only ever ADDS — so the smallest of several runs is the closest reading to the work itself. The
+// ratio below is two ~4 ms readings divided, which makes it far more sensitive to one slow sample
+// than to the regression it guards against, and it went red once in a full 71-process suite run
+// while passing alone.
+//
+// Each sample builds and tears down its own thousand rows, so no two share a tree.
+const SAMPLES = 4;
+
+function bestClear(): IClear {
+  let best: IClear | undefined;
+  for (let run = 0; run < SAMPLES; run += 1) {
+    const sample = timeClear();
+    const total = sample.fill + sample.apply + sample.commit;
+    if (best === undefined || total < best.fill + best.apply + best.commit)
+      best = sample;
+  }
+  if (best === undefined) throw new Error('no sample was taken');
+  return best;
+}
+
 function timeClear(): IClear {
   const surface = createSurface(ROOT_TAG);
   const list = createElement('RCTView');
@@ -116,7 +137,7 @@ let withoutBehaviors: ReturnType<typeof timeClear> | undefined;
 describe('tearing down a thousand rows', () => {
   // why: the baseline every other file in this directory has been measuring without saying so.
   it('costs this much while the engine believes no behavior exists', () => {
-    withoutBehaviors = timeClear();
+    withoutBehaviors = bestClear();
     const { fill, apply, commit } = withoutBehaviors;
     print(
       `DEBUG clear gate OFF  fill=${fill.toFixed(2)} apply=${apply.toFixed(2)} ` +
@@ -137,7 +158,7 @@ describe('tearing down a thousand rows', () => {
       detach: () => {},
     });
 
-    const measured = timeClear();
+    const measured = bestClear();
     if (withoutBehaviors === undefined) {
       throw new Error('the gate-off case did not run');
     }
@@ -152,6 +173,13 @@ describe('tearing down a thousand rows', () => {
 
     // Before the gate was narrowed this read 3.2x and 4.4 ms of it was the sweep. 1.5x leaves room
     // for the run-to-run spread of a 2 ms step without leaving room for the sweep coming back.
+    //
+    // BOTH SIDES ARE BEST-OF-N (see `timeClear`'s caller below), which this needed and did not have:
+    // it is a RATIO of two ~4 ms wall-clock readings, so a single slow sample on either side moves it
+    // far more than the thing it is guarding against. It went red once in a 71-process suite run and
+    // passed alone — the same shape `child-list-scaling.itest.ts` was fixed for, and the same fix:
+    // timing noise is one-sided, so the MINIMUM of several runs is the closest reading to the work.
+    // Widening the bound instead would have bought quiet by making the guard weaker.
     expect(after < before * 1.5).toBe(true);
   });
 
@@ -165,7 +193,7 @@ describe('tearing down a thousand rows', () => {
       detach: () => {},
     });
 
-    const measured = timeClear();
+    const measured = bestClear();
     const total = measured.fill + measured.apply + measured.commit;
     print(
       `DEBUG clear ATTACHED  fill=${measured.fill.toFixed(2)} ` +

@@ -1089,10 +1089,10 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await tick();
       const scroll = committed(SCROLL_VIEW);
-      // The axis FLAG is `foldScrollViewProps` in the engine and unreachable from this host
-      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`); the row-styled content node is
-      // this adapter's own evidence that it picked the horizontal tag.
-      expect(committed(CONTENT_VIEW).payload.flexDirection).toBe('row');
+      // The axis flag and the content node's row style are BOTH engine rules now
+      // (`scroll-view-payload.itest.ts`, `scroll-content-payload.itest.ts`). The WIDTH below is this
+      // list's own arithmetic — it pins the content to the row total, not the frame — and is what
+      // fails if the list stops treating itself as horizontal.
       expect(committed(CONTENT_VIEW).payload.width).toBe(
         ITEM_HEIGHT * ROW_COUNT,
       );
@@ -1466,7 +1466,9 @@ describe('Solid VirtualizedList on the engine', () => {
       expect(
         committed(SCROLL_VIEW).payload.maintainVisibleContentPosition,
       ).toEqual({ minIndexForVisible: 1 });
-      expect(committed(CONTENT_VIEW).payload.collapsableChildren).toBe(false);
+      // `collapsableChildren` is derived from the prop above by the ENGINE now, which reads it off
+      // the owner through `ownerProps` (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
+      // What this list owes is the FORWARDING asserted above it.
     });
 
     // why: native maintainVisibleContentPosition can only anchor cells it has MOUNTED. Items
@@ -1883,7 +1885,8 @@ describe('Solid VirtualizedList on the engine', () => {
         totalCreated(),
         'the axis flip must rebuild the host tags',
       ).toBeGreaterThan(createdAtMount);
-      expect(committed(CONTENT_VIEW).payload.flexDirection).toBe('row');
+      // The row style is the engine's rule (`scroll-content-payload.itest.ts`); what this case is
+      // about is that the flip REBUILT the host tags (above) without losing the cells (below).
       expect(committedLabels().has('row-0'), 'the cells survived').toBe(true);
     });
   });

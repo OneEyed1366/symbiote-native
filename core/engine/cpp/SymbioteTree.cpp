@@ -1189,7 +1189,15 @@ std::shared_ptr<const react::ShadowNode> materialize(
     if (fold) walkCost_.foldsFound += 1;
 
     startedAt = ISteadyClock::now();
-    folly::dynamic payload = fabricProps(node.viewName, node.tagName, node.props, fold);
+    // The parent's props, for the rules that are DERIVED from the node above (ScrollView's content
+    // view takes `collapsableChildren` from the scroller). A pointer hop, because the tree is here —
+    // the same question cost a JS closure and a crossing while the fold lived on the other side.
+    folly::dynamic payload = fabricProps(
+        node.viewName,
+        node.tagName,
+        node.props,
+        fold,
+        node.parent == nullptr ? nullptr : &node.parent->props);
     walkCost_.propsNs += nanosSince(startedAt);
     // The payload is needed TWICE and only one of those needs a copy. `RawProps` takes its
     // `folly::dynamic` BY VALUE (`RawProps.h:65`) and consumes it, so Fabric's half is a copy no
@@ -1235,7 +1243,12 @@ std::shared_ptr<const react::ShadowNode> materialize(
       if (fold) walkCost_.foldsFound += 1;
 
       startedAt = ISteadyClock::now();
-      next = fabricProps(node.viewName, node.tagName, node.props, fold);
+      next = fabricProps(
+          node.viewName,
+          node.tagName,
+          node.props,
+          fold,
+          node.parent == nullptr ? nullptr : &node.parent->props);
       walkCost_.propsNs += nanosSince(startedAt);
       startedAt = ISteadyClock::now();
       payload = diffProps(node.committedProps, next);

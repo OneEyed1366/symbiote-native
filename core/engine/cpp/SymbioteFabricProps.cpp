@@ -884,6 +884,49 @@ dynamic foldScrollViewProps(const dynamic &props, bool isHorizontal) {
 }
 
 /**
+ * ScrollView's CONTENT node — the first rule here that reads the node ABOVE it.
+ *
+ * Two halves from two places. The row direction is a constant of this node's OWN tag
+ * (`horizontal-scroll-content`), composed OVER the app's `contentContainerStyle` because that is the
+ * order RN writes it in (`[contentContainerStyle, {flexDirection:'row'}]`) — the opposite precedence
+ * from the owner's base style, and deliberately so.
+ *
+ * `collapsableChildren` is the half that needed `ownerProps`: both names that decide it stay on the
+ * SCROLLER, and the node that must stop collapsing is this one. A Yoga-collapsed content view takes
+ * the scroll metrics with it, and an anchored scroll needs its children to keep their identity.
+ *
+ * PRESENCE decides, not truthiness — `snapToAlignment: 'start'` and an empty
+ * `maintainVisibleContentPosition` are both real requests. And the key is written ONLY when false,
+ * matching every wrapper: RN sends `collapsableChildren={!preserveChildren}`, so an explicit `true`
+ * is the native default and one more key on every scroll view that ever renders.
+ */
+dynamic foldScrollContentProps(
+    const dynamic &props,
+    bool isHorizontal,
+    const dynamic *ownerProps) {
+  const bool preserves = ownerProps != nullptr &&
+      (ownerProps->get_ptr("maintainVisibleContentPosition") != nullptr ||
+       ownerProps->get_ptr("snapToAlignment") != nullptr);
+
+  // The identity return the reference fold had: a vertical content view under a scroller that
+  // anchors nothing has nothing to add, which is the common case and the one worth not copying for.
+  if (!isHorizontal && !preserves) return props;
+
+  dynamic out = props;
+  if (isHorizontal) {
+    dynamic row = dynamic::object();
+    row["flexDirection"] = "row";
+    dynamic composed = dynamic::array();
+    const dynamic *authored = props.get_ptr("style");
+    if (authored != nullptr) composed.push_back(*authored);
+    composed.push_back(std::move(row));
+    out["style"] = std::move(composed);
+  }
+  if (preserves) out["collapsableChildren"] = false;
+  return out;
+}
+
+/**
  * ImageBackground's wrapper (`ImageBackground.js:75`), and the whole rule is one key.
  *
  * iOS's Smart Invert inverts colours for accessibility, and a PHOTOGRAPH is exactly what must not be
@@ -1482,7 +1525,8 @@ dynamic fabricProps(
     const std::string &component,
     const std::string &tagName,
     const dynamic &props,
-    const IPayloadFold &fold) {
+    const IPayloadFold &fold,
+    const dynamic *ownerProps) {
   if (component == kRawTextComponent) {
     dynamic out = dynamic::object();
     const dynamic *text = props.get_ptr("text");
@@ -1532,6 +1576,11 @@ dynamic fabricProps(
   } else if (tagName == "scroll-view" || tagName == "horizontal-scroll-view") {
     tagResolved =
         foldScrollViewProps(*bag, tagName == "horizontal-scroll-view");
+    bag = &tagResolved;
+  } else if (
+      tagName == "scroll-content" || tagName == "horizontal-scroll-content") {
+    tagResolved = foldScrollContentProps(
+        *bag, tagName == "horizontal-scroll-content", ownerProps);
     bag = &tagResolved;
   } else if (tagName == "image-background") {
     tagResolved = foldImageBackgroundProps(*bag);

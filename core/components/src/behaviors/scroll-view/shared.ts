@@ -73,11 +73,9 @@ import {
   setEventListener,
   type IClaimMode,
   type IHostBehavior,
-  type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
   type IViewStyle,
-  propOf,
   setProp,
 } from '@symbiote-native/engine';
 
@@ -85,7 +83,6 @@ import { descriptorFor } from '../../component-names';
 import type { ISymbioteIntrinsic } from '../../component-names/shared';
 import {
   didContentSizeChange,
-  preservesContentChildren,
   readLayoutDimension,
   SCROLL_VIEW_BASE_HORIZONTAL,
   SCROLL_VIEW_BASE_VERTICAL,
@@ -154,37 +151,24 @@ export const REFRESH_CONTROL = descriptorFor('refresh-control').component;
 // way `foldSwitchProps` can. That leaves the Android half outside headless reach — the same gap
 // already recorded for `android_ripple`, and the only part of this rule a test here cannot see.
 
-// The SLOT's fold. Two halves with different sources, which is why it takes the owner:
+// THE SLOT'S FOLD IS GONE (2026-09-18) — `foldScrollContentProps` in `SymbioteFabricProps.cpp`.
+// Its two halves came from different places and the second is why it took until now:
 //
 //   rowStyle             a CONSTANT, horizontal only, composed OVER the app's contentContainerStyle
-//                        (the wrapper writes `[contentContainerStyle, {flexDirection:'row'}]`)
-//   collapsableChildren  DERIVED from props that stay on the OWNER, so it is read back off it
+//                        — a function of the content node's OWN tag, portable from the start
+//   collapsableChildren  DERIVED from `maintainVisibleContentPosition` / `snapToAlignment`, which
+//                        stay on the OWNER
 //
-// Written only when false, matching every wrapper — RN sends `collapsableChildren={!preserveChildren}`
-// and therefore an explicit `true`, which is the native default anyway.
-function contentFold(
-  owner: ISymbioteNode,
-  rowStyle: IViewStyle | undefined,
-): IPayloadFold {
-  return props => {
-    const preserve = preservesContentChildren(
-      propOf(owner, 'maintainVisibleContentPosition'),
-      propOf(owner, 'snapToAlignment'),
-    );
-    // The identity return IPayloadFold's contract asks for: a vertical content view with neither
-    // prop set has nothing to add, which is the common case.
-    if (rowStyle === undefined && !preserve) return props;
-    const next: Record<string, unknown> = { ...props };
-    if (rowStyle !== undefined) next.style = [props.style, rowStyle];
-    if (preserve) next.collapsableChildren = false;
-    return next;
-  };
-}
+// "A per-node rule cannot reach another node" is what this file used to say, and it was a fact about
+// the JS FOLD rather than about the engine: the tree lives in C++, so a node knows its parent and
+// `fabricProps` now takes `ownerProps` from it. Contract:
+// `core/engine/cpp/tests/js/scroll-content-payload.itest.ts`.
 
-function buildContent(
-  contentIntrinsic: ISymbioteIntrinsic,
-  rowStyle: IViewStyle | undefined,
-) {
+// `rowStyle` USED TO BE A PARAMETER HERE and is not one any more: the content node's row direction
+// is decided in the engine from that node's OWN tag (`horizontal-scroll-content`), so this builder
+// no longer needs to know the axis to build it. `scrollBehavior` still derives `horizontal` from the
+// row style for the things that DO still need it in JS.
+function buildContent(contentIntrinsic: ISymbioteIntrinsic) {
   return (node: ISymbioteNode): ISymbioteNode => {
     const descriptor = descriptorFor(contentIntrinsic);
     const content = createElement(
@@ -196,7 +180,6 @@ function buildContent(
     // collapse a view that only groups children, and a collapsed content node takes the scroll
     // metrics with it.
     setProp(content, 'collapsable', false);
-    content.payloadFold = contentFold(node, rowStyle);
     // Lands directly on the owner, because `node.childHost` is still undefined here: the engine
     // assigns it from what this returns. That ordering is why `buildStructure` RETURNS the slot
     // instead of setting the field itself — a behavior that set it first would redirect its own
@@ -313,7 +296,7 @@ function scrollBehavior(
     slotDerived: [...SLOT_DERIVED, ...(platform.slotDerived ?? [])],
     claimedChildren: { [REFRESH_CONTROL]: platform.claimMode },
     onWrapChange: platform.onWrapChange?.(base, horizontal),
-    buildStructure: buildContent(contentIntrinsic, rowStyle),
+    buildStructure: buildContent(contentIntrinsic),
     // The scroll dispatcher is installed here and never conditionally: it is what drives the
     // sticky AnimatedValue, and a header can register long after this node was created. It costs a
     // forward per scroll event on a ScrollView with no sticky child, which is what RN pays too.
@@ -358,6 +341,15 @@ export function registerScrollViewBehaviors(platform: IScrollPlatform): void {
       platform,
     ),
   );
+  // REGISTRATIONS WITH NO RUNTIME, and they are what hand the content tags to the host. A tag
+  // crosses only through `recordSetTag`, which `attachHostBehavior` emits, so a tag with no behavior
+  // registered carries an EMPTY `tagName` in C++ and no rule can fire for it. These two nodes are
+  // built by `buildStructure` and named by no app, which is exactly the shape that trap has.
+  //
+  // Same reasoning as `activity-indicator-spinner`'s stub: a registration is how this codebase says
+  // a tag HAS platform semantics, which is the claim being made.
+  for (const contentTag of ['scroll-content', 'horizontal-scroll-content'])
+    registerHostBehavior(contentTag, { attach() {}, detach() {} });
   // With the scroll views, never on its own: a sticky header is meaningless without an owner to
   // find, and registering the pair together is what makes "did the registration run" one question
   // rather than two.
