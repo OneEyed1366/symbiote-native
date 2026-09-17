@@ -15,6 +15,7 @@
 
 #include "symbiote-host.h"
 
+#include <chrono>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -210,6 +211,23 @@ void install(Host &host) {
          }
          return jsi::Value::undefined();
        });
+
+  // A REAL monotonic clock, in fractional milliseconds.
+  //
+  // The runner's prelude used to define `performance.now()` off `Date.now()`, which is whole
+  // milliseconds — fine for a phase measured in tens of them, useless for splitting one. Measured
+  // 2026-09-17: the JS `fill` phase of a 10 001-node create is ~25 ms, and no sub-phase of it could
+  // be told apart at 1 ms granularity, so every question about where that 25 ms goes had to be
+  // answered by rewriting the fixture into separate bulk passes.
+  //
+  // `steady_clock` rather than `system_clock` for the same reason `TelemetryClock` is: a wall clock
+  // can step backwards and produce a negative duration.
+  bind("now", 0, [](jsi::Runtime &, const jsi::Value &, const jsi::Value *, size_t) {
+    static const auto origin = std::chrono::steady_clock::now();
+    return jsi::Value(std::chrono::duration<double, std::milli>(
+                          std::chrono::steady_clock::now() - origin)
+                          .count());
+  });
 
   runtime.global().setProperty(runtime, "__symbioteTester", tester);
 }

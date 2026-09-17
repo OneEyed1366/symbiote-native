@@ -155,7 +155,10 @@ using ChildSet = std::vector<std::shared_ptr<const react::ShadowNode>>;
 // Whether this node's JS handle carries a `payloadFold`, once anything has looked.
 enum class FoldProbe : uint8_t { unknown, absent, present };
 
-struct Node {
+// `jsi::NativeState` so a node can be attached to its JS placeholder without a wrapper object — see
+// the note above `nodeFrom`. The base is empty apart from a virtual destructor, so the only cost is
+// the vtable pointer, against one heap allocation per node saved.
+struct Node : jsi::NativeState {
   int32_t kind = kKindElement;
   bool isText = false;
   // As the adapter authored it. `committedViewName` below is what was actually sent, which differs
@@ -266,10 +269,17 @@ struct Node {
   }
 };
 
-struct NodeState : jsi::NativeState {
-  explicit NodeState(NodePtr value) : node(std::move(value)) {}
-  NodePtr node;
-};
+// A node IS its own native state — there is no wrapper.
+//
+// There used to be a `NodeState : jsi::NativeState` holding a `NodePtr`, which cost one
+// `make_shared` per created node: 10 002 allocations on a 1 000-row create, every one of them
+// existing only to be a second pointer to something already heap-allocated. Measured on
+// `build-release`, `setNativeState` alone swung 1.2-8.5 ms across runs of the same fixture — the
+// spread being the allocator and the collector, which is what an extra allocation per node buys.
+//
+// `Node` declares the inheritance instead (see the struct). The only thing the wrapper gave was a
+// distinct type for `dynamic_pointer_cast` to fail on when a handle carries somebody else's state,
+// and casting to `Node` fails exactly as well.
 
 /**
  * The node a placeholder owns.
@@ -283,11 +293,11 @@ NodePtr nodeFrom(jsi::Runtime &runtime, const jsi::Object &handle, const char *w
     throw jsi::JSError(
         runtime, std::string(what) + ": names a node this batch never created");
   }
-  auto state = std::dynamic_pointer_cast<NodeState>(handle.getNativeState(runtime));
-  if (state == nullptr) {
+  auto node = std::dynamic_pointer_cast<Node>(handle.getNativeState(runtime));
+  if (node == nullptr) {
     throw jsi::JSError(runtime, std::string(what) + ": handle carries foreign native state");
   }
-  return state->node;
+  return node;
 }
 
 /**
@@ -1252,7 +1262,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
     // re-derived from anything the ops carry.
     node->handle.emplace(runtime, object);
     const auto stateStartedAt = ISteadyClock::now();
-    object.setNativeState(runtime, std::make_shared<NodeState>(node));
+    object.setNativeState(runtime, node);
     walkCost_.nativeStateNs += nanosSince(stateStartedAt);
     bySlot[at] = std::move(node);
     walkCost_.publishNs += nanosSince(publishStartedAt);

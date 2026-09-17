@@ -72,13 +72,21 @@ if (typeof globalThis.__symbioteFlushTimers !== "function") {
 // React Native's own InitializeCore sets both: \`window\` IS the global there, and \`navigator.product\`
 // is the string every library uses to detect React Native. Svelte's DOM shim reads them at module
 // scope, so their absence is a hard failure rather than a degraded path.
-// RN's InitializeCore installs a \`performance\` with a real monotonic clock. Nothing here asserts on
-// time — the harness is deliberately count-based — so a millisecond clock off \`Date.now\` is the
-// honest minimum: Angular's profiler calls \`performance.now()\` on its first mount and stops dead
-// without one.
+// RN's InitializeCore installs a \`performance\` with a real monotonic clock, and Angular's profiler
+// calls \`performance.now()\` on its first mount and stops dead without one.
+//
+// The tester binds a \`steady_clock\` in fractional milliseconds, so use it. The \`Date.now\` fallback
+// below is WHOLE milliseconds and stays only for a host that predates the binding — at that
+// granularity a phase of a few ms reads as 0 or as double its size, which is how a sub-phase split
+// of the JS fill was impossible to take until the clock landed.
 if (typeof globalThis.performance === "undefined") {
-  const started = Date.now();
-  globalThis.performance = { now: function () { return Date.now() - started; } };
+  const tester = globalThis.__symbioteTester;
+  if (tester !== undefined && typeof tester.now === "function") {
+    globalThis.performance = { now: function () { return tester.now(); } };
+  } else {
+    const started = Date.now();
+    globalThis.performance = { now: function () { return Date.now() - started; } };
+  }
 }
 if (typeof globalThis.window === "undefined") globalThis.window = globalThis;
 if (typeof globalThis.navigator === "undefined") {
