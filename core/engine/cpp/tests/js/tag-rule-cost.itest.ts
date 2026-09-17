@@ -498,9 +498,41 @@ registerHostBehavior('button-in-js', {
       delete out.touchSoundDisabled;
     }
     delete out.color;
+    // Button's THREE-LEG `focusable`, over the one-leg answer the pressable fold above just wrote —
+    // the layering the real rule does, and the reason `usesTouchableFocusableRule` excludes `button`.
+    //
+    // The middle leg is `onPress !== undefined`, and this fixture wires no handler: `buildList`
+    // writes props with `setProp` and a listener reaches the engine only through the event routing
+    // in `routeProp`. So the native arm's `hasPressListener` is false here and the twin has to say
+    // the same, or `expectSamePayload` refuses to time the pair — which is exactly what it did when
+    // the rule moved and this twin still expressed the old one.
+    out.focusable =
+      out.focusable !== false &&
+      HAS_PRESS_LISTENER_IN_FIXTURE &&
+      buttonDisabledInJs(props) !== true;
     return out;
   },
 });
+
+// Named rather than inlined as `false`, so the expression above reads as the RULE and this reads as
+// the fixture's own fact. A `false` sitting in the middle of a boolean chain is indistinguishable
+// from a rule that always answers false.
+const HAS_PRESS_LISTENER_IN_FIXTURE = false;
+
+// `props.disabled ?? aria-disabled ?? accessibilityState.disabled` (`Button.js:331,337`), off the
+// AUTHORED bag — by the time the folds above have run, `disabled` has been erased into
+// `accessibilityState` and the precedence would collapse.
+function buttonDisabledInJs(
+  props: Readonly<Record<string, unknown>>,
+): boolean | undefined {
+  if (typeof props.disabled === 'boolean') return props.disabled;
+  if (typeof props['aria-disabled'] === 'boolean')
+    return props['aria-disabled'];
+  const state = props.accessibilityState;
+  if (typeof state !== 'object' || state === null) return undefined;
+  const disabled = Reflect.get(state, 'disabled');
+  return typeof disabled === 'boolean' ? disabled : undefined;
+}
 
 const BUTTON_PROPS = {
   color: '#ff0000',

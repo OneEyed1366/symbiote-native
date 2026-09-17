@@ -286,18 +286,14 @@ describe('button host behavior on Android', () => {
     await settle();
   });
 
-  // TouchableNativeFeedback.js:369 / TouchableOpacity.js:336 — the same expression on both
-  // platforms, so `button.test.ts` asserts the identical pair.
-  it('focuses only while it has an onPress and is enabled', async () => {
-    const { node, surface } = mountButton({ onPress: () => {} });
-    await settle();
-    expect(subtreeOf(TEST_ID).host.payload.focusable).toBe(true);
-
-    routeProp(node, 'disabled', true);
-    surface.commit();
-    await settle();
-    expect(subtreeOf(TEST_ID).host.payload.focusable).toBe(false);
-  });
+  // `focusable` LEFT ON 2026-09-18 — `foldButtonProps` in `SymbioteFabricProps.cpp` — and this
+  // harness carries no copy of the tag rules. The pair is the `whether a button is a focus stop`
+  // block in `core/engine/cpp/tests/js/button-payload.itest.ts`.
+  //
+  // THE OWNER'S FOLD SURVIVES ON THIS PLATFORM AND ONLY THIS ONE, which is the part worth keeping
+  // here rather than only in the iOS twin: Android still needs the view style and the ripple
+  // background, so `buildStructure` binds a fold behind `IS_ANDROID`. Off Android it binds none at
+  // all. The cases below are what hold that half.
 
   // why: THE arm that made `HOST_PRIMITIVES.Button.aliases` necessary rather than inherited.
   //

@@ -109,7 +109,6 @@
 import {
   addDerivedNode,
   appendChild,
-  appListenerFor,
   createElement,
   createRawText,
   markPropsDirty,
@@ -134,7 +133,6 @@ import {
   backgroundProps,
   selectableBackground,
 } from '../view/render-touchable-native-feedback';
-import { resolveTouchableFocusable } from '../view/render-pressable';
 import {
   booleanOr,
   createPressBehavior,
@@ -293,6 +291,20 @@ const touchable: Pick<
  * a field nothing assigns any more is a whole rule that vanishes silently the day the field is
  * removed, which is exactly how it would have gone unnoticed here.
  */
+// `focusable` LEFT THIS FOLD ON 2026-09-18, and with it the whole fold off Android.
+//
+// It was the last thing here that ran on both platforms, and it stayed because its middle leg is
+// `onPress !== undefined` — an owned listener, stashed in JS. That bit crosses now
+// (`OP_SET_OWNED_LISTENER`), and Button's three-way `disabled` was only ever three PROPS, so
+// `foldButtonProps` resolves the expression itself. It reads the AUTHORED bag rather than the folded
+// one, which is the same Trap A correction this fold carried as `projectionOf(propsOf(node))`.
+//
+// So off Android there is nothing left and no fold is bound at all. On Android the view style and
+// the ripple background survive — `resolveButtonViewStyle` is a theme computation and
+// `backgroundProps` builds a native config object, neither of which is a prop rewrite.
+//
+// Contract: the `whether a button is a focus stop` block in
+// `core/engine/cpp/tests/js/button-payload.itest.ts`.
 function ownerFold(node: ISymbioteNode): IPayloadFold {
   return props => {
     const next: Record<string, unknown> = { ...props };
@@ -307,24 +319,14 @@ function ownerFold(node: ISymbioteNode): IPayloadFold {
     // wherever the two disagree. `propsOf(owner)` is already what both derived children read, so
     // this also makes the three projections one answer instead of two.
     const { color, disabled } = projectionOf(propsOf(node));
-    // TouchableOpacity.js:336 and TouchableNativeFeedback.js:369 — the SAME expression, so the tag
-    // owes it on both platforms. `onPress` is an owned name, so it is in the stash and never in
-    // `props`; a flip of it dirties nothing by itself, which `onOwnedListenerChange` answers.
-    next.focusable = resolveTouchableFocusable(
-      booleanOr(props.focusable),
-      appListenerFor(node, 'press') !== undefined,
-      disabled,
-    );
-    if (IS_ANDROID) {
-      // TNF renders no view, it CLONES onto Button's `<View style={buttonStyles}>`
-      // (TouchableNativeFeedback.js:339), so this host IS that view. Overwritten rather than merged
-      // because RN's Button declares no `style` prop at all — there is nothing to compose with.
-      next.style = resolveButtonViewStyle(color, disabled);
-      // Button passes no `background` and no `useForeground`, so TNF resolves the theme's
-      // selectable background onto the background slot (TouchableNativeFeedback.js:343-348,
-      // :402). The dicts are the shared factories', never restated here.
-      Object.assign(next, backgroundProps(selectableBackground(), false));
-    }
+    // TNF renders no view, it CLONES onto Button's `<View style={buttonStyles}>`
+    // (TouchableNativeFeedback.js:339), so this host IS that view. Overwritten rather than merged
+    // because RN's Button declares no `style` prop at all — there is nothing to compose with.
+    next.style = resolveButtonViewStyle(color, disabled);
+    // Button passes no `background` and no `useForeground`, so TNF resolves the theme's
+    // selectable background onto the background slot (TouchableNativeFeedback.js:343-348,
+    // :402). The dicts are the shared factories', never restated here.
+    Object.assign(next, backgroundProps(selectableBackground(), false));
     return next;
   };
 }
@@ -379,9 +381,13 @@ function buildStructure(node: ISymbioteNode): ISymbioteNode {
     // setting the field itself.
     appendChild(node, view);
   }
-  // See the header: the owner's fold needs its own node, and this runs after
-  // `attachHostBehavior` has already written `behavior.foldPayload` into the field.
-  node.payloadFold = ownerFold(node);
+  // ANDROID ONLY since 2026-09-18. See the header: the owner's fold needs its own node, and this
+  // runs after `attachHostBehavior` has already written `behavior.foldPayload` into the field.
+  //
+  // Off Android nothing is bound at all, which is the point — a fold with an empty body still costs
+  // a full JSI round trip per commit, so leaving one that returns its input is the worst value
+  // available (`input-accessory-view`, and Button's own `viewFold` a commit ago).
+  if (IS_ANDROID) node.payloadFold = ownerFold(node);
   return label;
 }
 

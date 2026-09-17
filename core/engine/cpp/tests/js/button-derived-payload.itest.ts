@@ -150,23 +150,22 @@ describe('what a button’s derived nodes send native', () => {
     expect(Object.keys(commit({}).label)).toEqual(['text']);
   });
 
-  // why: THE PRICE, and the number is not the one this port predicted. A button was recorded at
-  // FOUR crossings per commit — one per node it builds plus its own — and `button-payload.itest.ts`
-  // called it the most expensive primitive we ship. Measured here it is FIVE for a single mounted
-  // button, and three after; the fold count is per SURFACE over the commits a button actually
-  // performs, and its touchable's `afterCommit` settle re-commits it. So "one fold per node" was
-  // never the right model, exactly as `touchable-focusable-payload.itest.ts` found 5 where one node
-  // suggested 1.
+  // why: THE PRICE, and the number it started from was wrong in a way the measurement had to
+  // correct. This file recorded FOUR crossings, one per node the behavior builds. Driven through
+  // `routeProp` a single mounted button measured FIVE, because the fold counter is per SURFACE over
+  // the commits a button actually performs and its touchable's `afterCommit` settle re-commits it —
+  // the same reason one touchable reads 5 rather than 1. "One fold per node" was never the model.
   //
-  // What IS exact is the delta: two folds were removed and two crossings went with them, one each.
+  // Five to three when the view's fold was deleted and the label's became a tag rule; three to ONE
+  // when the owner's went off Android, which was worth two by itself for the re-commit reason above.
   //
-  // The two that remain are the two that genuinely read another node: the owner's fold, whose
-  // `focusable` leg is an owned listener, and the text's, which needs the BUTTON's `color` and
-  // `disabled` while its parent is the VIEW — a grandparent, which `ownerProps` does not reach.
-  it('costs three crossings now instead of five', () => {
+  // The one that remains is the text's, and it is the only fold left in this primitive: it needs the
+  // BUTTON's `color` and `disabled` while its parent is the VIEW — a GRANDPARENT, which `ownerProps`
+  // does not reach. That is the next seam and it is not built.
+  it('costs one crossing now instead of five', () => {
     const tree = commit({});
     print(`DEBUG button-derived folds=${tree.folds}`);
-    expect(tree.folds).toBe(3);
+    expect(tree.folds).toBe(1);
   });
 });
 

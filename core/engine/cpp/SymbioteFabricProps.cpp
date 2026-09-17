@@ -1155,9 +1155,49 @@ dynamic foldButtonLabel(const dynamic &props) {
 #endif
 }
 
-dynamic foldButtonProps(const dynamic &props) {
+/**
+ * Button's own `disabled`, which is three questions where a plain touchable asks one:
+ * `props.disabled ?? aria-disabled ?? accessibilityState.disabled` (`Button.js:331,337`).
+ *
+ * `??` and not `||`, which is the whole precedence: an EXPLICIT `disabled: false` beats an
+ * `aria-disabled` that says otherwise, because the app's direct answer outranks the accessibility
+ * hint. Presence decides at every step, so `false` is a real answer and stops the chain.
+ *
+ * Read off the AUTHORED bag, never off a folded one — see `foldButtonProps`.
+ */
+std::optional<bool> buttonDisabled(const dynamic &authored) {
+  const std::optional<bool> direct = boolAt(authored, "disabled");
+  if (direct.has_value()) return direct;
+  const std::optional<bool> aria = boolAt(authored, "aria-disabled");
+  if (aria.has_value()) return aria;
+  const dynamic *state = authored.get_ptr("accessibilityState");
+  if (state == nullptr || !state->isObject()) return std::nullopt;
+  return boolAt(*state, "disabled");
+}
+
+/**
+ * `authored` is `fabricProps`' own input — the bag BEFORE the aria fold, the id alias and the
+ * pressable rule — and passing it is not a convenience.
+ *
+ * By the time this runs, `foldPressableProps` has folded `disabled` into `accessibilityState` and
+ * ERASED the raw key, and `foldAriaProps` has folded `aria-disabled` into the same place. So the bag
+ * this fold is handed can no longer tell an explicit `disabled: false` from an absent one, and the
+ * `??` precedence above would collapse to whatever `accessibilityState` ended up holding. That is
+ * Trap A, and it is the same correction the JS fold carried before the port, spelled
+ * `projectionOf(propsOf(node))` for exactly this reason.
+ */
+dynamic foldButtonProps(
+    const dynamic &props,
+    const dynamic &authored,
+    bool hasPressListener) {
   dynamic out = props;
   out["accessibilityRole"] = "button";
+
+  // The touchable's three-leg `focusable`, over the one-leg answer `foldPressableProps` just wrote.
+  // `usesTouchableFocusableRule` excludes `button` so that this can be the layer that decides it —
+  // the same order the JS composition had, where the owner's fold ran after the touchable's.
+  out["focusable"] = boolAt(props, "focusable").value_or(true) &&
+      hasPressListener && !buttonDisabled(authored).value_or(false);
 
   const dynamic *important = props.get_ptr("importantForAccessibility");
   if (important != nullptr && important->isString() &&
@@ -1692,7 +1732,8 @@ dynamic fabricProps(
         hasPressListener);
     // Button is a touchable PLUS something, exactly as RN builds it (`Button.js:283`), so its own
     // rules layer over the touchable's rather than replacing them.
-    if (tagName == "button") tagResolved = foldButtonProps(tagResolved);
+    if (tagName == "button")
+      tagResolved = foldButtonProps(tagResolved, props, hasPressListener);
     bag = &tagResolved;
   } else if (tagName == "image" || tagName == "image-background-image") {
     tagResolved = foldImageProps(*bag);

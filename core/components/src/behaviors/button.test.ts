@@ -377,31 +377,18 @@ describe('button host behavior', () => {
     expect(typeof host.payload.opacity).toBe('number');
   });
 
-  // TouchableOpacity.js:336 and TouchableNativeFeedback.js:369 hold the SAME expression, so this
-  // pair is asserted identically on both platforms. Nothing in `core/components` emitted
-  // `focusable` on any path before — not a wrapper, not the press behavior.
-  it('focuses only while it has an onPress and is enabled', async () => {
-    vi.useFakeTimers();
-    registerButtonBehavior();
-    const node = makeButton();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'title', 'Save');
-    const surface = mount(node);
-    await settle();
-    // No onPress yet: RN cannot focus a button that does nothing.
-    expect(subtreeOf(TEST_ID).host.payload.focusable).toBe(false);
-
-    // A listener flip dirties no payload by itself, so this also pins `onOwnedListenerChange`.
-    routeProp(node, 'onPress', () => {});
-    surface.commit();
-    await settle();
-    expect(subtreeOf(TEST_ID).host.payload.focusable).toBe(true);
-
-    routeProp(node, 'disabled', true);
-    surface.commit();
-    await settle();
-    expect(subtreeOf(TEST_ID).host.payload.focusable).toBe(false);
-  });
+  // `focusable` LEFT ON 2026-09-18, and it took the whole owner fold with it off Android — this tag
+  // now binds no `payloadFold` at all on iOS.
+  //
+  // It is `foldButtonProps` in `SymbioteFabricProps.cpp`, and this harness builds its payload
+  // through the TypeScript `fabricProps`, which deliberately carries no copy of the tag rules. The
+  // three-legged form and its `props.disabled ?? aria-disabled ?? accessibilityState.disabled`
+  // precedence are the `whether a button is a focus stop` block in
+  // `core/engine/cpp/tests/js/button-payload.itest.ts`, including the late-wiring flip this case
+  // used to pin.
+  //
+  // What kept it in JS was the middle leg, `onPress !== undefined`: an owned name, stashed here and
+  // never a prop. The EXISTENCE crosses now as one bit while the callback does not.
 
   // Button.js:337 resolves `props.disabled ?? aria-disabled ?? accessibilityState.disabled` and
   // passes the ANSWER down to the touchable, so on a Button — unlike a bare Pressable — either
