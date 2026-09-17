@@ -642,9 +642,81 @@ porting ANY further RN module by hand.**
 > - **update-shaped rows IMPROVED** — `Select` and its neighbours, everywhere
 >
 > So the buffer architecture did not pay off where it was expected to, and the gains it does show are
-> framework-level rather than architectural. The exact figures are NOT recorded here yet: they were
-> posted as screenshots and never transcribed, which is the whole reason this banner exists rather
-> than a corrected table.
+> framework-level rather than architectural.
+>
+> ### The provisional replacement — THE WHOLE BENCHMARK SCREEN, headless (2026-09-17)
+>
+> The eight device steps, in the device's order, with the device's constants, driven through all six
+> renderers. One file per arm, one process per arm, one ten-node row, the census asserted by absolute
+> count on EVERY step before any millisecond is read. `pnpm run bench:itest`, one clean sitting:
+>
+> ```
+>               stock   react     vue   solid  svelte  angular      ratio = ours / stock
+> Create         91.6   115.2   143.6   107.7   124.3    265.2      1.26 1.57 1.18 1.36 2.90
+> Replace       102.0   118.8   162.4   115.2   137.0    301.8      1.16 1.59 1.13 1.34 2.96
+> Partial        11.7     9.2    12.0     7.8     9.9     11.3      0.79 1.03 0.67 0.85 0.97
+> Select         13.0    13.5    11.1    14.3    12.3     14.8      1.04 0.85 1.10 0.95 1.14
+> Swap           16.0    23.5     4.2     4.5     5.4      7.3      1.47 0.26 0.28 0.34 0.46
+> Remove         18.7     4.5     3.5     4.0     4.7      7.2      0.24 0.19 0.21 0.25 0.39
+> Append        125.4   116.9   149.1   117.3   136.4    283.8      0.93 1.19 0.94 1.09 2.26
+> Clear           9.0    10.9    35.4   394.9    21.4     43.6      1.21 3.93 43.9 2.38 4.84
+> ```
+>
+> The fixtures are `core/engine/cpp/tests/js/{stock,react,vue,solid,svelte,angular}-suite.itest.*`,
+> all six driven by one `bench-suite.ts` that owns the state machine, the steps and the oracle. A
+> seventh arm — the engine's own mutation API with no reconciler above it — is not here;
+> `update-shapes-cost.itest.ts` is that floor and it is unchanged.
+>
+> **This confirms the device report, and sharpens it.** The old table had Solid 0.76x, Svelte 0.80x
+> and Vue 0.89x on Create — all UNDER stock. Here **every adapter is over stock on both create-shaped
+> rows**, while `Swap` and `Remove` are 3-5x WINS for everyone but React. That is exactly the split
+> the device screenshots showed: create-shaped regressed, update-shaped improved.
+>
+> **`Append` is the one create-shaped row that did not regress**, and it separates the two costs: the
+> row count is identical to `Create`'s but the list already stands, so the four lighter adapters land
+> at 0.93-1.19x where `Create` puts them at 1.18-1.57x. Stock pays more for appending than for
+> creating (125.4 against 91.6) and we pay the same for both.
+>
+> **`Solid`'s `Clear` at 394.9 ms is the largest single anomaly this project has measured and it is
+> NOT the engine.** The engine's own halves read `walk=0.3 apply=13.3` — 3% of the wall — with
+> `created=0 cloned=2`. Reproduced four times across two different state spellings (394.9 / 395.1 /
+> 399.1 / 415.9), so it is not noise and not the store. Everything else clears in 9-44 ms.
+> `adapters/solid/src/renderer.ts`'s `getParentNode` comment already records "an increasingly slow
+> Clear on the benchmark screen" as a bug that path once had; this is the next thing to chase.
+>
+> WHAT THIS TABLE IS, said plainly so nobody reads it as the device's: JavaScriptCore rather than
+> Hermes, the native side a test host rather than a real Fabric pipeline, and no app-level Babel
+> lowering applied by the runner — the arms are written as intrinsic TAGS, which is the lowered shape,
+> but an SFC's static-prop hoisting and patch flags are not modelled. It is a sound comparison of the
+> six columns AGAINST EACH OTHER, taken on one ruler in one sitting. Treat a ratio against stock as
+> indicative and re-measure on device before publishing one.
+>
+> **THE SPELLING OF STATE MOVED TWO COLUMNS MORE THAN ANY ENGINE CHANGE HAS**, which is the finding
+> that came free with building this. Every arm replaces the whole list on every step, so the reactive
+> primitive has to be a SHALLOW one, and the device screens all spell it that way:
+>
+> ```
+>  arm     wrong spelling          right one            what it cost
+>  svelte  $state (deep proxy)     $state.raw           create 160.8 -> 124.3, and a flat ~20 ms on
+>                                                       EVERY mutation step (select 30.1 -> 12.3)
+>  solid   createSignal, replaced  createStore +        partial 16.7 -> 7.8, and `created` 1000 -> 0:
+>          wholesale               reconcile({key:'id'}) `<For>` was rebuilding every row it re-keyed
+> ```
+>
+> Both were measured, not reasoned about, and both are app-author mistakes rather than adapter ones —
+> but they are the mistakes a real developer makes, and they dwarf everything in the perf chapter
+> below. Vue's arm uses `shallowRef` and Angular's a `signal` over the same replaced object for the
+> same reason.
+>
+> Three provenance notes that belong with the census. The adapter arms commit ONE more `View` than
+> stock (the container `createSurface` puts under the RootView; stock's `render` mounts straight into
+> the root) and Svelte commits TWO more (its DOM shim's own root wrapper, `createRootShimElement`) —
+> named rather than fitted, and asserted on every step. The Angular row needs
+> `registerComposedComponent('BenchRow')` or its component host falls through to a raw `createNode`
+> and the row commits ELEVEN nodes; on device a Babel plugin injects that call, the itest runner does
+> not run it. And `setProps` differs per adapter for one identical tree — vue/solid 10 000,
+> react 12 000, svelte/angular 13 000 — which by the benchmark screen's own rule is work the ADAPTER
+> generates, not a cost of the platform. That is the cheapest open lead on this page.
 >
 > **What this invalidates, concretely.** Any cross-check of a headless measurement against a device
 > figure taken from this chapter is comparing two different engines. The `Swap` work below does
