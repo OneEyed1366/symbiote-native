@@ -304,18 +304,12 @@ describe('touchable-highlight host behavior', () => {
     expect(committedPropsOf(TEST_ID).focusable).toBe(false);
   });
 
-  it('folds id to nativeID', async () => {
-    registerTouchableHighlightBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'id', 'ident');
-    mount(node);
-    await settle();
-
-    const props = committedPropsOf(TEST_ID);
-    expect(props.nativeID).toBe('ident');
-    expect(props.id).toBeUndefined();
-  });
+  // `id -> nativeID`, `accessible !== false` and the `disabled -> accessibilityState` merge this
+  // file never covered all live in the engine now (`foldIdAlias` / `foldPressableProps`,
+  // `SymbioteFabricProps.cpp`), and this host builds its payloads through the TypeScript
+  // `fabricProps`, which carries no copy of them. Asserting them here would fail for the right
+  // reason today and pass for the wrong one the moment someone mirrored the rule back into JS.
+  // Contract: `core/engine/cpp/tests/js/touchable-payload.itest.ts`.
 
   // The control: without a registration nothing writes an underlay at all, so the assertions above
   // cannot be satisfied by some unrelated default.

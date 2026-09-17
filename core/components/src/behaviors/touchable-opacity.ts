@@ -41,7 +41,6 @@ import {
 } from '@symbiote-native/engine';
 import { resolveTouchableFocusable } from '../view/render-pressable';
 import {
-  accessibleUnlessOptedOut,
   booleanOr,
   createPressBehavior,
   type IDisabledResolver,
@@ -162,28 +161,6 @@ const refine: IPressConfigRefinement = (node, config) => {
   };
 };
 
-// The `id -> nativeID` alias every primitive's spec entry declares, applied here because
-// `HOST_PRIMITIVES` deliberately withholds this primitive's entry until the other adapters'
-// wrappers collapse to one node (the note at its Pressable neighbour says why). A raw `id` is a key
-// no ViewConfig declares, so Fabric drops it and the nativeID is lost on device with nothing red.
-//
-// Unconditional priority when both are set, matching RN (`View.js:77-79`) and `foldHostBag`.
-// The press machine's own half of this used to be the first line here (`press.foldPayload(props)`)
-// and is now the engine's — `foldPressableProps` in `SymbioteFabricProps.cpp` names
-// `touchable-opacity` among the tags it serves, and it runs BEFORE this fold, which is the order
-// the composition always had. Nothing was dropped and nothing is duplicated.
-const foldPayload: IPayloadFold = props => {
-  const next: Record<string, unknown> = { ...props };
-  // TouchableOpacity.js:303. The tag is this primitive's only path, so unlike `pressable` there is
-  // no wrapper for it to disagree with.
-  next.accessible = accessibleUnlessOptedOut(props);
-  if (Object.hasOwn(next, 'id')) {
-    next.nativeID = next.id;
-    delete next.id;
-  }
-  return next;
-};
-
 /**
  * The behavior as PARTS, so a tag that is a TouchableOpacity plus something — `button`, which RN
  * builds as exactly that (Button.js:283) — composes the fade instead of re-implementing it.
@@ -199,7 +176,6 @@ export function createTouchableOpacityBehavior(
   const machine = createPressBehavior(refine, disabledOf);
   return {
     ...machine,
-    foldPayload,
     attach(node: ISymbioteNode): void {
       const state: IFeedbackState = {
         opacity: new AnimatedValue(RESTING_OPACITY),
@@ -257,10 +233,13 @@ export function createTouchableOpacityBehavior(
   };
 }
 
-// `focusable` is NOT in `foldPayload` above, because its middle leg — `onPress !== undefined`
-// (TouchableOpacity.js:338) — is an OWNED name and therefore lives in the stash, which a props-only
-// fold cannot reach. `./button` composes this behavior and resolves its own; the tag resolves it
-// here, over the node.
+// `focusable` IS THE ONLY THING LEFT IN JS for this tag, because its middle leg — `onPress !==
+// undefined` (TouchableOpacity.js:338) — is an OWNED name and therefore lives in the stash, which a
+// props-only fold cannot reach. `./button` composes this behavior and resolves its own; the tag
+// resolves it here, over the node. Everything else this fold used to do — `accessible !== false`,
+// the `id -> nativeID` alias, the `disabled -> accessibilityState` merge, the strip of the six props
+// the feedback machine consumes — is the engine's now (`foldPressableProps` and `foldIdAlias` in
+// `SymbioteFabricProps.cpp`), which runs BEFORE this fold, the order the composition always had.
 //
 // `disabled` COMES OFF THE NODE, not off the bag, and that is not a style choice: the engine's
 // pressable rule runs ahead of this fold and strips `disabled` from what it hands over, so reading
@@ -269,7 +248,7 @@ export function createTouchableOpacityBehavior(
 // props. Anything a JS fold needs AFTER a tag rule has stripped it has to be read from the node.
 function tagFold(node: ISymbioteNode): IPayloadFold {
   return props => {
-    const next = foldPayload(props);
+    const next: Record<string, unknown> = { ...props };
     next.focusable = resolveTouchableFocusable(
       booleanOr(props.focusable),
       appListenerFor(node, 'press') !== undefined,

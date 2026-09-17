@@ -25,7 +25,6 @@ import { mount, unmount } from '@symbiote-native/react';
 import {
   createLiveTree,
   installRecordingFabric,
-  type ILiveNode,
 } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 120;
@@ -588,10 +587,17 @@ describe('React Touchable* accessibility default', () => {
     ],
   ];
 
+  // THE DEFAULT IS NOT ASSERTED HERE any more, and that is deliberate: `accessible !== false` is
+  // `foldPressableProps` in the engine now (`SymbioteFabricProps.cpp`), while this host builds its
+  // payloads through the TypeScript `fabricProps`, which carries no copy of the tag rules. Proven in
+  // `core/engine/cpp/tests/js/touchable-payload.itest.ts` for both touchables.
+  //
+  // What stays here is the case this adapter can still answer — the OPT-OUT, which is an authored
+  // prop travelling through React's own composition rather than a rule. `variants` still drives it.
   for (const [name, render] of variants) {
-    it(`${name} marks its responder accessible by default`, () => {
+    it(`${name} commits its responder at all`, () => {
       mount(ROOT_TAG, render(<view />));
-      expect(responderProps().accessible).toBe(true);
+      expect(responderProps()).not.toBe(undefined);
     });
   }
 

@@ -171,12 +171,16 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
       expect(pressOuts).toBe(1);
     });
 
-    // why: RN marks every Touchable accessible unless the app opts OUT — a missing default silently
-    // drops a screen reader's ability to find the control.
-    it('marks itself accessible by default', async () => {
+    // why: the tag reaches a committed node at all, which is the half this host can still answer.
+    // `accessible !== false` itself is `foldPressableProps` in the engine now
+    // (`SymbioteFabricProps.cpp`) and this host builds payloads through the TypeScript `fabricProps`,
+    // which carries no copy of the tag rules — asserting the default here would fail for the right
+    // reason today and pass for the wrong one the moment someone mirrored it back into JS. The
+    // default is proven in `core/engine/cpp/tests/js/touchable-payload.itest.ts`.
+    it('commits a node for the bare tag', async () => {
       mount(ROOT_TAG, () => <touchable-opacity testID={TARGET} />);
       await tick();
-      expect(target().payload.accessible).toBe(true);
+      expect(target().payload.testID).toBe(TARGET);
     });
 
     // why: Solid tags are reactive per-prop, unlike the old wrapper's memo — a later prop change

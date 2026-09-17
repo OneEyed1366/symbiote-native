@@ -766,7 +766,61 @@ dynamic foldTextInputAliases(const dynamic &props, bool isMultiline) {
  */
 bool usesPressableRule(const std::string &tagName) {
   return tagName == "pressable" || tagName == "touchable-opacity" ||
+      tagName == "touchable-highlight" || tagName == "button";
+}
+
+/**
+ * The three tags built on the TOUCHABLE feedback machine rather than on bare Pressable. They take a
+ * second strip, below — `pressable` does not, because none of these names is one of its props.
+ *
+ * `button` is here because it composes TouchableOpacity (`Button.js:283`), so it inherits the same
+ * consumed set even though an app rarely spells those props on it.
+ */
+bool usesTouchableFeedbackRule(const std::string &tagName) {
+  return tagName == "touchable-opacity" || tagName == "touchable-highlight" ||
       tagName == "button";
+}
+
+/**
+ * What the feedback machine CONSUMES. RN forwards none of them to the View it renders — read the
+ * prop lists at `TouchableOpacity.js:302-345` and `TouchableHighlight.js:336-378`: every name they
+ * pass is spelled out, and not one of these is among them.
+ *
+ * Two are FUNCTIONS. A callback reaching a native prop bag is not a cosmetic leak; it is a value no
+ * ViewConfig declares, crossing for a view that will never call it.
+ */
+const std::array<const char *, 6> kTouchableFeedbackKeys = {
+    "activeOpacity",
+    "underlayColor",
+    "onShowUnderlay",
+    "onHideUnderlay",
+    "delayPressIn",
+    "delayPressOut",
+};
+
+/**
+ * `nativeID={this.props.id ?? this.props.nativeID}` — RN's W3C alias, spelled identically by every
+ * component that accepts both (`View.js:77-79`, `TouchableOpacity.js:326`,
+ * `TouchableHighlight.js:375`). The alias WINS when both are set and falls back when it is absent.
+ *
+ * WHY IT IS SAFE TO APPLY TO EVERY TAG, which is the question that kept it in five separate JS
+ * folds: `tagName` is written only by `attachHostBehavior`, so it is non-empty ONLY for our own
+ * primitives. A third-party native view — one that might legitimately declare its own `id`
+ * attribute — never carries a tag and never reaches this. The rule's blast radius is exactly the
+ * set of tags we define.
+ *
+ * Idempotent, and that is what lets it coexist with the adapters that still alias on their way in:
+ * a bag already carrying `nativeID` and no `id` is returned untouched.
+ */
+dynamic foldIdAlias(const dynamic &props) {
+  dynamic out = props;
+  const dynamic *id = props.get_ptr("id");
+  // `??`, so a null `id` falls through to an authored `nativeID` rather than erasing it. The raw key
+  // leaves either way — no ViewConfig declares `id`, so Fabric would drop it and the nativeID would
+  // be lost on device with nothing red in any suite.
+  if (id != nullptr && !id->isNull()) out["nativeID"] = *id;
+  out.erase("id");
+  return out;
 }
 
 /**
@@ -841,7 +895,7 @@ void applyAndroidRipple(dynamic &out, const dynamic &config) {
  *         answer down as `focusable`, which `!== false` leaves alone — that is how the two compose
  *         without either knowing about the other.
  */
-dynamic foldPressableProps(const dynamic &props) {
+dynamic foldPressableProps(const dynamic &props, bool isTouchableFeedback) {
   dynamic out = props;
 
   // Read BEFORE the machine keys are erased, and `!= null` rather than truthiness: an explicit
@@ -863,6 +917,9 @@ dynamic foldPressableProps(const dynamic &props) {
 #endif
 
   for (const char *key : kPressableMachineKeys) out.erase(key);
+  if (isTouchableFeedback) {
+    for (const char *key : kTouchableFeedbackKeys) out.erase(key);
+  }
 
   out["accessible"] = boolAt(props, "accessible").value_or(true);
   out["focusable"] = boolAt(props, "focusable").value_or(true);
@@ -1218,9 +1275,18 @@ dynamic fabricProps(
   // fold and before anything else, because that order is load-bearing and always was: the aria fold
   // writes `accessibilityState` from `aria-disabled`, and this resolves that against `disabled`.
   // Swapped, whichever ran second would silently win.
+  // The `id` alias first, and for EVERY tag rather than for a list of them — see `foldIdAlias` for
+  // why a rule keyed on "carries a tag at all" cannot reach a third-party view. Guarded on presence
+  // so a bag with no `id`, which is nearly all of them, is not copied.
+  dynamic idResolved;
+  if (bag->get_ptr("id") != nullptr && !tagName.empty()) {
+    idResolved = foldIdAlias(*bag);
+    bag = &idResolved;
+  }
+
   dynamic tagResolved;
   if (usesPressableRule(tagName)) {
-    tagResolved = foldPressableProps(*bag);
+    tagResolved = foldPressableProps(*bag, usesTouchableFeedbackRule(tagName));
     bag = &tagResolved;
   } else if (tagName == "image") {
     tagResolved = foldImageProps(*bag);

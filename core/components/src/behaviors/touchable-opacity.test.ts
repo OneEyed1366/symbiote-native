@@ -173,21 +173,12 @@ describe('touchable-opacity host behavior', () => {
     expect(getExplicitStyle(node)).toBe(authored);
   });
 
-  // The fold the spec would carry if this primitive had an entry there. A raw `id` is a key no
-  // ViewConfig declares — Fabric drops it, the nativeID is lost, and nothing is red.
-  it('folds id to nativeID', async () => {
-    vi.useFakeTimers();
-    registerTouchableOpacityBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'id', 'ident');
-    mount(node);
-    await settle();
-
-    const props = committedPropsOf(TEST_ID);
-    expect(props.nativeID).toBe('ident');
-    expect(props.id).toBeUndefined();
-  });
+  // `id -> nativeID` and `accessible !== false` USED TO BE ASSERTED HERE and are not any more, which
+  // is a move rather than a loss: both are the engine's rules now (`foldIdAlias` /
+  // `foldPressableProps`, `SymbioteFabricProps.cpp`) and this host builds its payloads through the
+  // TypeScript `fabricProps`, which deliberately carries no copy of them. An assertion left here
+  // would fail for the right reason today and, once someone "fixed" it by mirroring the rule in JS,
+  // pass forever for the wrong one. Contract: `core/engine/cpp/tests/js/touchable-payload.itest.ts`.
 
   // TouchableOpacity.js:336-340 — three legs, and every one of them is a silent accessibility
   // regression when it is missing: a disabled or handler-less control that stays focusable can be

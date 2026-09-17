@@ -485,7 +485,6 @@ export {
 } from './behaviors/image-background';
 
 export {
-  foldInputAccessoryViewPayload,
   INPUT_ACCESSORY_VIEW_TAG,
   registerInputAccessoryViewBehavior,
 } from './behaviors/input-accessory-view';

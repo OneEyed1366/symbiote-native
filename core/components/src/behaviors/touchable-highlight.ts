@@ -41,7 +41,6 @@ import {
 } from '@symbiote-native/engine';
 import { resolveTouchableFocusable } from '../view/render-pressable';
 import {
-  accessibleUnlessOptedOut,
   booleanOr,
   createPressBehavior,
   type IDisabledResolver,
@@ -71,8 +70,8 @@ function numberOr(value: unknown, fallback: number): number {
   return typeof value === 'number' ? value : fallback;
 }
 
-function stringOr(value: unknown, fallback: string | undefined): unknown {
-  return typeof value === 'string' ? value : fallback;
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
 }
 
 // Runs once per GESTURE, matching `./touchable-opacity`'s `refine` — the config it reads is
@@ -144,21 +143,20 @@ const refine: IPressConfigRefinement = (node, config) => {
   };
 };
 
-// `id -> nativeID`, the same fold `foldHostBag` applies from the spec. Inline rather than read off
-// `HOST_PRIMITIVES`, matching `./touchable-opacity` — this primitive has no spec entry.
-const foldPayload: IPayloadFold = props => {
-  const next: Record<string, unknown> = { ...props };
-  if (Object.hasOwn(next, 'id')) {
-    next.nativeID = next.id;
-    delete next.id;
-  }
-  next.accessible = accessibleUnlessOptedOut(props);
-  return next;
-};
-
+// THE UNDERLAY IS ALL THAT IS LEFT IN JS, and it is here because it is built from LIVE PRESS STATE
+// — `shown` flips inside a gesture, which no props-only rule can see. The platform half of this tag
+// is the engine's (`foldPressableProps` and `foldIdAlias`, `SymbioteFabricProps.cpp`): `accessible
+// !== false`, the `id -> nativeID` alias, and the `disabled -> accessibilityState` merge this file
+// never did at all (`TouchableHighlight.js:311-319` — a disabled highlight announced itself to a
+// screen reader as enabled until 2026-09-18).
+//
+// `underlayColor` AND `activeOpacity` COME OFF THE NODE, not off the bag, and that is load-bearing:
+// the engine's rule strips both before handing this fold its props, because RN forwards neither to
+// the View it renders. Read from the bag they would both be `undefined` here and the underlay would
+// silently lose its colour while every payload assertion still passed.
 function tagFold(node: ISymbioteNode): IPayloadFold {
   return props => {
-    const next = foldPayload(props);
+    const next: Record<string, unknown> = { ...props };
     const state = states.get(node);
     const hasPressHandler =
       appListenerFor(node, 'press') !== undefined ||
@@ -171,9 +169,9 @@ function tagFold(node: ISymbioteNode): IPayloadFold {
         : resolveHighlightExtraStyles({
             shown: state.shown,
             hasPressHandler,
-            underlayColor: stringOr(props.underlayColor, undefined) as
-              string | undefined,
-            activeOpacity: numberOr(props.activeOpacity, NaN) || undefined,
+            underlayColor: stringOrUndefined(propOf(node, 'underlayColor')),
+            activeOpacity:
+              numberOr(propOf(node, 'activeOpacity'), NaN) || undefined,
           });
     if (extra !== undefined) {
       next.style = [props.style, extra.underlay, extra.child];
@@ -205,7 +203,6 @@ export function createTouchableHighlightBehavior(
   const machine = createPressBehavior(refine, disabledOf);
   return {
     ...machine,
-    foldPayload,
     attach(node: ISymbioteNode): void {
       states.set(node, {
         shown: false,

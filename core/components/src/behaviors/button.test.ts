@@ -176,8 +176,10 @@ describe('button host behavior', () => {
     expect(host.payload.title).toBeUndefined();
     expect(host.payload.color).toBeUndefined();
     expect(host.payload.accessibilityRole).toBe('button');
-    // RN's `accessible` split: Button forwards raw, the touchable underneath defaults it.
-    expect(host.payload.accessible).toBe(true);
+    // RN's `accessible` split — Button forwards raw, the touchable underneath defaults it — is
+    // asserted in `core/engine/cpp/tests/js/touchable-payload.itest.ts` now, not here: the defaulting
+    // half is `foldPressableProps` in the engine, which this host's TypeScript `fabricProps` does not
+    // carry. What stays here is Button's OWN half, the strip and the role.
     // On iOS `color` tints the LABEL, never the button (Button.js:318-324).
     expect(text.payload.color).toBe('#ff0000');
   });
@@ -532,9 +534,15 @@ describe('button host behavior', () => {
   // The arm that made the entry NECESSARY is on Android, where the touchable is the bare press
   // machine and folds nothing — see `button-android.test.ts`. iOS passes either way, which is
   // exactly why declining the entry looked free.
+  //
+  // ONE ARM LEFT, and dropping the other is the point rather than a concession. The alias is
+  // `foldIdAlias` in the engine now, applied to every tagged node, and this host builds its payloads
+  // through the TypeScript `fabricProps`, which carries no copy — so the RAW arm can no longer be
+  // asked here and is asked in `core/engine/cpp/tests/js/touchable-payload.itest.ts` instead. What
+  // survives is the half that is still JS: `foldHostBag` renaming on the way in, and the engine
+  // finding nothing left to do afterwards. That is the composition this test existed for.
   it('folds `id` the same whichever layer renamed it', async () => {
     for (const props of [
-      { id: 'from-id', nativeID: 'losing-value' },
       foldHostBag(BUTTON_TAG, { id: 'from-id', nativeID: 'losing-value' }),
     ]) {
       vi.useFakeTimers();

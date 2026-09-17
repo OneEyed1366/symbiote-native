@@ -253,7 +253,7 @@ const labelFold: IPayloadFold = props => ({
 // one caller became two.
 const touchable: Pick<
   IHostBehavior,
-  'attach' | 'detach' | 'foldPayload' | 'ownedListeners' | 'afterCommit'
+  'attach' | 'detach' | 'ownedListeners' | 'afterCommit'
 > = IS_ANDROID
   ? createPressBehavior(nativeFeedbackRefinement, buttonDisabled)
   : createTouchableOpacityBehavior(buttonDisabled);
@@ -271,20 +271,21 @@ const touchable: Pick<
  *                       `props.disabled ?? aria ?? state.disabled` — the same value, with
  *                       busy/checked/expanded/selected preserved, without a Button-specific fold.
  *
- * ON ANDROID THE TOUCHABLE'S HALF IS NO LONGER A FUNCTION AT ALL, and the absence is the design
- * rather than a gap: `createPressBehavior` has no `foldPayload` any more, because the pressable
- * rule moved into the engine (`foldPressableProps`, `SymbioteFabricProps.cpp`), which names `button`
- * among the tags it serves on Android. So the same work happens, one layer down and before this
- * fold runs — the order is unchanged, the trip into JS is gone. On iOS `touchable` is still
- * TouchableOpacity's behavior and its fold is still JS, so the branch below stays live there.
+ * THE TOUCHABLE'S HALF IS NO LONGER A FUNCTION ON EITHER PLATFORM, and the absence is the design
+ * rather than a gap: neither `createPressBehavior` nor `createTouchableOpacityBehavior` has a
+ * `foldPayload` any more, because both rules moved into the engine (`foldPressableProps` and
+ * `foldIdAlias`, `SymbioteFabricProps.cpp`), which names `button` among the tags it serves. So the
+ * same work happens, one layer down and before this fold runs — the order is unchanged, the trip
+ * into JS is gone.
+ *
+ * The composition used to be spelled `touchable.foldPayload === undefined ? props : ...`, and that
+ * shape is deleted rather than left standing at its `undefined` branch: a conditional call through
+ * a field nothing assigns any more is a whole rule that vanishes silently the day the field is
+ * removed, which is exactly how it would have gone unnoticed here.
  */
 function ownerFold(node: ISymbioteNode): IPayloadFold {
   return props => {
-    const next: Record<string, unknown> = {
-      ...(touchable.foldPayload === undefined
-        ? props
-        : touchable.foldPayload(props)),
-    };
+    const next: Record<string, unknown> = { ...props };
     next.accessibilityRole = BUTTON_ACCESSIBILITY_ROLE;
     // 'no' is the only value the resolver moves (Button.js:356), so checking for it IS the
     // narrowing this bag needs — the shared resolver still owns what 'no' becomes.
