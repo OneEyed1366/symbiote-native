@@ -1835,9 +1835,19 @@ jsi::Value Tree::readSurfaceTelemetry(
       .getShadowTreeRegistry()
       .visit(surfaceId, [&](const react::ShadowTree &shadowTree) {
         const react::TransactionTelemetry telemetry = shadowTree.getCurrentRevision().telemetry;
-        layoutMs = millisBetween(telemetry.getLayoutStartTime(), telemetry.getLayoutEndTime());
-        textMs =
-            std::chrono::duration<double, std::milli>(telemetry.getTextMeasureTime()).count();
+        layoutNodes = telemetry.getAffectedLayoutNodesCount();
+        // GATED ON WORK HAVING HAPPENED, because the getter is not safe to ask otherwise:
+        // `getLayoutStartTime()` is `react_native_assert(layoutStartTime_ != kTelemetry-
+        // UndefinedTimePoint)` and a commit that dirtied no layout never stamps it. `millisBetween`
+        // below handles the undefined sentinel, but it only ever sees it in a build where the assert
+        // is compiled out — so in Debug this aborted the process instead. Found by the first itest to
+        // commit a layout-neutral change, which is exactly the commit shape the targeted-replace path
+        // is FOR, so the diagnostic was unusable precisely where it is most interesting.
+        if (layoutNodes > 0) {
+          layoutMs = millisBetween(telemetry.getLayoutStartTime(), telemetry.getLayoutEndTime());
+          textMs =
+              std::chrono::duration<double, std::milli>(telemetry.getTextMeasureTime()).count();
+        }
         // `ShadowTree::commit`'s own window, and **`materialize` IS NOT IN IT.** This comment used to
         // say it was, and three rounds of investigation (F-80, F-81, F-82) read the number that way
         // and concluded the native pipeline was small. `materialize` runs in `kOpCommit` BEFORE
@@ -1846,7 +1856,6 @@ jsi::Value Tree::readSurfaceTelemetry(
         // time `applyOps` from JS and subtract these two — see
         // `core/engine/cpp/tests/js/create-append-phase-split.itest.ts`.
         commitMs = millisBetween(telemetry.getCommitStartTime(), telemetry.getCommitEndTime());
-        layoutNodes = telemetry.getAffectedLayoutNodesCount();
         textMeasures = telemetry.getNumberOfTextMeasurements();
       });
   result.setProperty(runtime, "layoutMs", jsi::Value(layoutMs));
