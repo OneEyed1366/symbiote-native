@@ -1681,14 +1681,20 @@ payloads asserted equal key by key before any millisecond is read):
 
 ```
              native walk   js walk    per node   the bag / what the rule does
- imagebg        3.0         13.0        9.4 us   2 + a 3-key style / writes ONE key
- spinner        3.7         13.6       10.1 us   4, no style / the MOST work in the file
- accessory      3.1         14.0       10.8 us   4 / nothing at all
- button         3.9         16.7       11.8 us   5 + a 2-key style
- pressable      3.7         18.1       14.4 us   4 + a 3-key style
- switch         4.7         23.5       18.8 us   6 + nested trackColor
- image          5.9         27.8       21.7 us   6 + what the rule BUILDS
+ imagebg        3.0         12.2        9.5 us   2 + a 3-key style / writes ONE key
+ spinner        3.7         14.1       10.3 us   4, no style / the MOST work in the file
+ accessory      3.1         14.3       11.1 us   4 / nothing at all
+ button         3.9         17.0       12.0 us   5 + a 2-key style
+ pressable      3.8         18.7       14.9 us   4 + a 3-key style
+ scroll         4.2         19.3       15.4 us   4 + a 2-key style / the BIGGEST rule
+ switch         4.8         24.0       19.0 us   6 + nested trackColor
+ image          6.1         28.1       22.1 us   6 + what the rule BUILDS
 ```
+
+`scroll` is the fourth point on the experiment and the one that closes it: its rule is the biggest in
+the file — compose a base style, default a flag, strip the axis, resolve an asymmetric pair, erase two
+keys, map a word to a friction constant — and it lands mid-table beside `pressable`, whose rule does
+far less over a bag of the same size.
 
 **The top three rows are a deliberate experiment, not three ports that happened to be cheap.** Their
 rules do, in order: almost nothing (one key written), the most work in the file (builds a style
@@ -1700,30 +1706,54 @@ marshalled, with the dearest row dear because its rule CREATES keys that then tr
 consequences worth keeping: a trivial fold over a large bag is the worst value available, and
 DELETING a fold that does nothing is worth as much as porting one that does a lot.
 
-### ScrollView's owner fold is portable and is NOT ported — the blocker is a missing C++ log
+### The engine can WARN now — `SymbioteDebug.h`, and it was ScrollView's blocker
 
-`ownerFold` (`behaviors/scroll-view/shared.ts`) is a pure function of the node's own bag,
-parameterised only by the axis, which the TAG already decides (`scroll-view` vs
-`horizontal-scroll-view`) — so it is a tag rule by every criterion this port uses. Three things stop
-it being a half-hour job, and they are recorded rather than discovered again:
+Until 2026-09-18 the only channel out of `core/engine/cpp` was `throw jsi::JSError`: a rule could
+CRASH or stay SILENT, nothing between. That is a gap the moment the commit path, the payload builder
+and every tag rule live there, because `<keep_logs_gate_behind_DEBUG>` asks new code to log at its
+seam as a matter of course — unsatisfiable on that side of the wire.
 
-1. **It carries a developer warning.** A `horizontal` prop written on the vertical tag is ignored, and
-   the fold `dlog`s where to write it instead. **There is no logging facility in `core/engine/cpp` at
-   all** — no `dlog`, no `LOG`, nothing. Moving the rule as-is deletes the warning, and
-   `<keep_logs_gate_behind_DEBUG>` says logs are only ever added. The warning wants a WRITE-time home
-   (the pattern `image-source-write.ts` set), but JS does not retain a node's tag — `createElement`'s
-   own comment says the tag is looked up once and not stored.
-2. **`decelerationRate` is `Platform.select`'d** and on iOS BOTH tags are `RCTScrollView`, so the
-   component name cannot distinguish iOS-vertical from Android-vertical. That branch needs `#ifdef`,
-   which puts its Android half outside headless reach — the same gap already recorded for
-   `android_ripple`.
-3. **Android's wrap path composes over it.** `wrappedOwnerFold` calls `ownerFold` and then replaces
-   `style`; once the rule runs first, that JS fold's `props.style` is the COMPOSED array rather than
-   the authored one, so it has to start reading `propOf(owner, 'style')` — Trap A again, the same
-   correction the touchables and Button needed.
+It became concrete rather than tidy when ScrollView's rule came up for porting: it carries a
+developer WARNING (a `horizontal` prop written on the vertical tag is ignored), so moving it as
+written would have DELETED a diagnostic, which the same rule forbids.
 
-None of the three is a reason not to do it; together they make it its own change rather than a
-tail-end of this one.
+```
+SYMBIOTE_DLOG(expr)     guards BEFORE evaluating, so building the message is free when off
+symbiote::debugLog      "[symbiote] …" to stderr, and RETAINED while the switch is on
+takeNativeDebugLog()    drains them in JS — what makes a log assertable instead of merely visible
+setNativeDebug(bool)    the later toggle; `installBindings` already read DEBUG=1 / __SYMBIOTE_DEBUG__
+```
+
+**The macro is the contract, not the function.** C++ has exactly the trap `debug.ts`'s header
+describes for JS — an argument is evaluated at the call site — so a bare `debugLog("x " + y)` on the
+per-node commit path pays its concatenation with nothing listening. `SYMBIOTE_DLOG` tests the flag
+first, which makes the cheap thing the DEFAULT instead of a rule every call site must remember.
+
+**The lines are retained because a diagnostic nobody can assert on is one that rots.** That is what
+turns "the engine warned about that" into a test (`native-debug-log.itest.ts`) rather than a human
+noticing a line scroll past. Retention costs nothing while the switch is off, because nothing is
+called at all.
+
+With that in place ScrollView's `ownerFold` moved whole: the base style composition,
+`nestedScrollEnabled`, the `horizontal` strip, the asymmetric bounce pair, the two ViewConfig-less
+strips and `decelerationRate`. Two consequences worth keeping:
+
+- **`decelerationRate`'s constants are `#ifdef ANDROID`**, because on iOS BOTH scroll tags resolve to
+  `RCTScrollView` — a component name cannot tell iOS-vertical from Android-vertical the way it tells
+  `Switch` from `AndroidSwitch`. Android's pair is outside headless reach, like `android_ripple`.
+- **Android's wrap path stopped delegating.** `wrappedOwnerFold` used to call `ownerFold` and then
+  replace `style`; it now does only the split, and reads `propOf(owner, 'style')` because the engine's
+  rule has already replaced the bag's `style` with `[base, authored]` — Trap A, the same correction
+  the touchables and Button needed. A whole CLASS of bug went with it: the wrap used to swap the
+  owner's fold out, so anything the ordinary fold did had to be repeated in the wrapped copy, and
+  `decelerationRate` once was not — it reached Fabric as the string `'fast'` on every Android
+  ScrollView carrying a RefreshControl. A rule that runs off the TAG cannot be swapped out.
+
+This was the largest test migration of the port — 27 vitest cases across 12 files — and most of them
+had a deliberate negative CONTROL beside them ("invents no key on the vertical tag", "honours an
+explicit false", "lets an explicit value win"). **Every one of those controls went on passing after
+the rule left**, because an absent key and an untouched passthrough are exactly what a harness with
+no rule produces. They moved as pairs: a control only controls beside the thing it controls.
 
 `input-accessory-view`'s fold took the bag apart and reassembled it unchanged, so the port DELETED
 it rather than moving it — and it still cost 10.7 us per node to have had. Read down the column and
