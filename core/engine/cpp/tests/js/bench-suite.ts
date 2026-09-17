@@ -88,6 +88,17 @@ export type IBenchTelemetry = {
   readonly setProps: number;
   readonly writesOfUnchanged: number;
   readonly foldsFound: number;
+  /** `applyOps`' own split — see `APPLY SPLIT` below for why it is read on create-shaped steps. */
+  readonly decodeMs: number;
+  readonly setPropMs: number;
+  readonly propConvertMs: number;
+  readonly stringDecodeMs: number;
+  readonly structureMs: number;
+  readonly publishMs: number;
+  readonly nodesDecoded: number;
+  readonly valueEntries: number;
+  readonly valueConversions: number;
+  readonly applyCalls: number;
 };
 
 export type IBenchDriver = {
@@ -144,6 +155,30 @@ const STEP_ORDER = [
 
 type IStep = (typeof STEP_ORDER)[number];
 
+/**
+ * `applyOps`' own split, on the two steps that build ten thousand nodes.
+ *
+ * WHY IT IS HERE and not left to a one-off probe: the first full run of this suite put `apply` at
+ * 45 ms for React and 106 ms for Angular on a byte-identical tree — same `created`, same
+ * `nodesDecoded`, and Angular writing 13 000 props against Svelte's 13 000 for 60 ms. A phase that
+ * doubles between two adapters driving one buffer is the buffer's cost to explain, so the split has
+ * to be on the standing instrument rather than reconstructed later.
+ *
+ * `applyCalls` is the field that separates the two candidate stories — more VALUES against the same
+ * values in more BATCHES, since the string and value tables intern per batch.
+ */
+function applySplitLine(arm: string, telemetry: IBenchTelemetry): string {
+  const ms = (value: number): string => value.toFixed(1);
+  return (
+    `DEBUG ${arm.padEnd(7)} APPLY SPLIT decode=${ms(telemetry.decodeMs)} ` +
+    `setProp=${ms(telemetry.setPropMs)} convert=${ms(telemetry.propConvertMs)} ` +
+    `strings=${ms(telemetry.stringDecodeMs)} structure=${ms(telemetry.structureMs)} ` +
+    `publish=${ms(telemetry.publishMs)} :: decoded=${telemetry.nodesDecoded} ` +
+    `values=${telemetry.valueEntries} converted=${telemetry.valueConversions} ` +
+    `batches=${telemetry.applyCalls}`
+  );
+}
+
 function telemetryLine(
   driver: IBenchDriver,
   step: IStep,
@@ -151,6 +186,9 @@ function telemetryLine(
 ): string {
   const arm = driver.name;
   const telemetry = driver.readTelemetry?.();
+  if (telemetry !== undefined && (step === 'create' || step === 'append')) {
+    print(applySplitLine(arm, telemetry));
+  }
   const ms = (value: number | undefined): string => (value ?? 0).toFixed(1);
   return (
     `DEBUG ${arm.padEnd(7)} ${step.padEnd(7)} wall=${wall.toFixed(1).padStart(6)} ` +
