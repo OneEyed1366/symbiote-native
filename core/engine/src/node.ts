@@ -40,6 +40,7 @@ import {
   appListenerFor,
   attachHostBehavior,
   claimModeFor,
+  hasAttachedBehaviors,
   hasHostBehaviors,
   markDetachCandidate,
   notifyChildInserted,
@@ -1698,7 +1699,8 @@ export function removeChild(
   // A wrap claim leaving: the owner takes its own place back and stays in the tree. Nominated for
   // teardown like any other removed node, because the wrapper IS leaving.
   if (unwrapsOwner(requestedParent, child)) {
-    if (hasHostBehaviors() || hasAnimatedBindings()) markDetachCandidate(child);
+    if (hasAttachedBehaviors() || hasAnimatedBindings())
+      markDetachCandidate(child);
     return;
   }
   // A slot that IS the child being removed stops being one. Only a behavior that adopts an APP
@@ -1711,7 +1713,12 @@ export function removeChild(
   // Redirected for the same reason the two inserts are: the adapter removes from the node it
   // appended to, which is the OWNER, while the child actually lives in the slot.
   const parent = hostFor(requestedParent, child);
-  if (hasHostBehaviors() || hasAnimatedBindings()) markDetachCandidate(child);
+  // `hasAttachedBehaviors`, NOT `hasHostBehaviors`: the second is on from module load in every app,
+  // because registering `Pressable` as a TYPE arms it. Nominating a candidate makes the commit sweep
+  // cross every removed node into JS — 10 000 handles on a 1 000-row clear, measured at 3.2x the
+  // whole teardown — and none of it can matter before a behavior has actually attached to something.
+  if (hasAttachedBehaviors() || hasAnimatedBindings())
+    markDetachCandidate(child);
   // BOTH, and the owner is the one that matters: a composed primitive's behavior lives on the node
   // the adapter named, while `hostFor` redirects the mutation into its internal slot. Arming only
   // the slot arms a node that has no behavior at all.

@@ -293,6 +293,9 @@ const attached = new WeakMap<ISymbioteNode, IHostBehavior>();
 // ~1 000 calls on one benchmark row set), so neither may pay a Set insert for a feature no app
 // uses yet. While this is false both paths cost one boolean read, the same discipline as `isDebug`.
 let hasBehaviors = false;
+// See `hasAttachedBehaviors`. A behavior TYPE existing and a behavior being ON a node are different
+// questions, and the teardown sweep was asking the first one.
+let hasAttached = false;
 
 export function registerHostBehavior(
   component: string,
@@ -315,6 +318,30 @@ export function hostBehaviorFor(tag: string): IHostBehavior | undefined {
 
 export function hasHostBehaviors(): boolean {
   return hasBehaviors;
+}
+
+/**
+ * Has a behavior ever ATTACHED to a node, as opposed to a behavior TYPE having been registered?
+ *
+ * `hasBehaviors` answers the second, and it is on from module load in every app: registering
+ * `Pressable` arms it whether or not one is ever mounted. It gates `createElement`'s attach probe
+ * correctly — a node has to be offered to the registry to find out. It gates the TEARDOWN SWEEP
+ * wrongly, and that is expensive: the sweep crosses every removed node into JS, which on a
+ * 1 000-row clear is ten thousand handles. Measured on `build-release`
+ * (`teardown-sweep-cost.itest.ts`): 1.8 ms with the sweep off against 6.3 ms with it on, i.e. 3.2x,
+ * all of it inside the commit. `Clear` is the one row where stock React Native beats every adapter.
+ *
+ * Nothing the sweep does can matter before the first attach, and the four collections say so:
+ * `attached` is written only by `attachHostBehavior`; `awaitingCommit` and `committedEachTime` are
+ * written only inside a `behavior.` branch; `parked` only by `detachAnimatedProps`, which has its
+ * own gate. The one remaining effect is marking `tornDown`, which exists so a later re-insert knows
+ * to re-arm — and there is nothing to re-arm.
+ *
+ * MONOTONE, deliberately: it turns on and never off, so it needs no accounting on a `WeakMap` that
+ * has no size and no destructor. Being late is the only way it can be wrong, and it cannot be late.
+ */
+export function hasAttachedBehaviors(): boolean {
+  return hasAttached;
 }
 
 // What an owner prop is called on the slot, or undefined when it belongs to the owner after all.
@@ -454,6 +481,7 @@ export function attachHostBehavior(node: ISymbioteNode, tag: string): void {
   const behavior = behaviors.get(tag);
   if (behavior === undefined) return;
   attached.set(node, behavior);
+  hasAttached = true;
   // A field rather than a lookup at payload-build time: `fabricProps` runs per node per commit and
   // must not pay a Map probe to discover that almost nothing has a fold.
   node.payloadFold = behavior.foldPayload;
@@ -675,8 +703,7 @@ export function sweepDetachedBehaviors(
   const left = candidates.filter(
     (node, at) => parents[at] === undefined && !topLevel.includes(node),
   );
-  const seen = new Set<ISymbioteNode>();
-  for (const node of subtreesOf(left)) detachOne(node, seen, onDetached);
+  for (const node of subtreesOf(left)) detachOne(node, onDetached);
   detachCandidates.clear();
 }
 
@@ -693,14 +720,26 @@ export function teardownSubtree(
   node: ISymbioteNode,
   onDetached: (node: ISymbioteNode) => void,
 ): void {
-  const seen = new Set<ISymbioteNode>();
-  for (const each of subtreesOf([node])) detachOne(each, seen, onDetached);
+  for (const each of subtreesOf([node])) detachOne(each, onDetached);
 }
 
-// `seen` guards the one overlap the candidate set can contain: a removed parent and a removed
-// descendant of it are both nominated, and without it the descendant is detached twice. `tornDown`
-// guards the same overlap ACROSS calls — a node the sweep already released and that `disposeRoot`
-// then walks again, which is the ordinary shape of an unmount after the framework emptied the tree.
+// `tornDown` guards BOTH overlaps, and it used to be helped by a per-call `seen` Set that guarded
+// only the first of them:
+//
+//   within one call    a removed parent and a removed descendant are both nominated, so the
+//                      descendant arrives twice
+//   across calls       a node the sweep released and that `disposeRoot` then walks again, the
+//                      ordinary shape of an unmount after the framework emptied the tree
+//
+// `seen` was redundant for the first: `tornDown.add(node)` runs unconditionally two lines below the
+// guard, in the same call, so a second arrival takes the same early return. The only behaviour it
+// changed was after a THROWING `onDetached`, where the node would be retried — and a sweep that
+// threw half way has already left the tree in a state no retry repairs.
+//
+// It cost a Set allocation and two hash operations per node, against a teardown that visits every
+// removed node: 10 000 of them on a 1 000-row clear. Removing it is a simplification and NOT a
+// speed-up — measured on `build-release`, the sweep stayed at 4.4-4.6 ms either way
+// (`teardown-sweep-cost.itest.ts`). Whatever holds that time is not the bookkeeping per node.
 //
 // The subtree arrives FLAT, in one host read, instead of a `childrenOf` recursion. The recursion
 // stopped descending at an already-torn-down node where this skips it and carries on; the two agree
@@ -709,11 +748,9 @@ export function teardownSubtree(
 // takes the same early return below.
 function detachOne(
   node: ISymbioteNode,
-  seen: Set<ISymbioteNode>,
   onDetached: (node: ISymbioteNode) => void,
 ): void {
-  if (seen.has(node) || tornDown.has(node)) return;
-  seen.add(node);
+  if (tornDown.has(node)) return;
   onDetached(node);
   // Marked whether or not THIS node carries a behavior: the mark is what tells a later insert to
   // walk, and the node re-inserted is usually a plain container whose DESCENDANT holds the
@@ -778,4 +815,5 @@ export function clearHostBehaviors(): void {
   awaitingCommit.clear();
   committedEachTime.clear();
   hasBehaviors = false;
+  hasAttached = false;
 }

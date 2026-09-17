@@ -1349,6 +1349,32 @@ Per removal it went 0.45 → 1.07 us as the list grew, and is now flat at ~0.25 
 fallback) and a detach nulls that slot instead of erasing; every reader of `children` calls
 `compactChildren` first, which is one branch on a dense vector and one linear pass on a churned one.
 
+**And the bigger half of `Clear` was a GATE asking the wrong question.** `removeChild` nominates a
+teardown candidate when `hasHostBehaviors()`, which is true as soon as a behavior TYPE is
+registered — and `@symbiote-native/components` registers `Pressable` at module load, in every app,
+before a node exists. The commit sweep then crosses EVERY removed node into JS: ten thousand handles
+to clear a thousand rows, whether or not the screen holds a single Pressable.
+
+The gate now asks `hasAttachedBehaviors()` — has a behavior ever attached to a node — which is
+monotone, needs no accounting on a `WeakMap` with no size, and can only ever be late. Nothing the
+sweep does can matter before the first attach: `attached` is written only by `attachHostBehavior`,
+`awaitingCommit` and `committedEachTime` only inside a `behavior.` branch, `parked` only by
+`detachAnimatedProps` (which has its own gate). Measured with
+`core/engine/cpp/tests/js/teardown-sweep-cost.itest.ts`:
+
+```
+clearing 1 000 rows (10 000 nodes)          before   after
+no behavior type registered anywhere          1.98    1.98
+a type registered, attached to nothing        6.23    1.96     3.2x -> 1.0x
+a behavior attached to one node per row       9.23    9.23     unchanged, and correctly so
+```
+
+The third row is what a screen with Pressables still pays, and it is recorded rather than fixed: the
+sweep visits every removed node by design, because `tornDown` must mark the whole subtree for a later
+re-insert to know it has to re-arm. Its cost is the CROSSING, not the bookkeeping — removing the
+redundant per-call `seen` Set (`tornDown.add` two lines below the guard already dedupes within a
+call) changed nothing measurable, 4.4-4.6 ms either way.
+
 **`insertBefore` is still quadratic and that is recorded, not fixed.** Finding the anchor is O(1) now
 through its hint; the `std::vector::insert` that follows shifts the tail, which is the container's
 problem and not the search's. An intrusive doubly-linked list would make insert, remove AND
