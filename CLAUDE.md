@@ -1618,6 +1618,29 @@ committed tree is wrong, so that arm's own commit differs (`fabric=9.2 layout=8.
 Only the lower bound on React's share survives it — do not quote 6.6 as ours without an arm that
 keeps the tree correct.
 
+**And a direct counter has now confirmed the seed and priced it — pointing the opposite way from the
+device figure that prompted the instrument.** `writesOfUnchanged` counts the `setProp` ops that leave
+AFTER the JSI -> `folly::dynamic` conversion because the node already holds that value, so the
+crossing was paid for nothing. It was added to chase the device benchmark's `WRITES 17037/16000` on
+REACT. On this fixture's row:
+
+```
+ engine  unchanged=0        react  unchanged=0        vue  unchanged=6000
+```
+
+Six thousand is 3 000 text nodes times two, i.e. `seedTextDefaults` exactly: the renderer writes
+`ellipsizeMode` and `allowFontScaling` on every text node at `createElement`, the app then authors
+the same two, and each one crosses, converts and is dropped. **6 000 wasted crossings per 1 000-row
+create**, on Vue, Angular and Solid alike (all three seed; React folds instead). The device's React
+figure is about the device's row, which authors props the fold already supplies — do not conflate
+them.
+
+The fix is NOT another `payloadFold`: one costs ~17 us per node per commit, which is worse than what
+it would save. RN's text defaults are the PLATFORM's semantics rather than any adapter's, so they
+belong in the payload builder beside the component-keyed folds already there (`foldTextInputValue`,
+in both `SymbioteFabricProps.cpp` and `fabric-props.ts`), with `seedTextDefaults` deleted from the
+three adapters. Not done.
+
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the
 reasoning that a `Map` lookup costs what converting a boolean costs. Booleans need no `Map` — there

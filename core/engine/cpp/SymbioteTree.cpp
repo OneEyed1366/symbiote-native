@@ -649,6 +649,13 @@ struct IWalkCost {
   double foldToJsNs = 0;
   double foldCallNs = 0;
   double foldFromJsNs = 0;
+  // The two `kOpSetProp` early exits, counted apart because they are not the same kind of waste.
+  // A delete of an ABSENT key leaves before the value conversion and costs a hash lookup. A write of
+  // an UNCHANGED value leaves after it, so the adapter has already paid the JSI -> `folly::dynamic`
+  // crossing for a value that changes nothing — which is the expensive one, and the one the device
+  // benchmark's `WRITES n/m` second figure has been reporting for React alone.
+  size_t deletesOfAbsent = 0;
+  size_t writesOfUnchanged = 0;
   double rawPropsNs = 0;
   double createNs = 0;
   double appendNs = 0;
@@ -1591,14 +1598,20 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
           // An absent key is not a key holding null: deleting one that is not there changes nothing,
           // while deleting one that is there changes what the next `diffProps` sends, since a
           // vanished key has to go out as an explicit null.
-          if (node->props.get_ptr(key) == nullptr) break;
+          if (node->props.get_ptr(key) == nullptr) {
+            walkCost_.deletesOfAbsent += 1;
+            break;
+          }
           node->props.erase(key);
         } else {
           const auto &value = valueAt(ops[at + 3], [&] {
             return "prop \"" + key + "\" on <" + node->viewName + ">";
           });
           const auto *existing = node->props.get_ptr(key);
-          if (existing != nullptr && *existing == value) break;
+          if (existing != nullptr && *existing == value) {
+            walkCost_.writesOfUnchanged += 1;
+            break;
+          }
           // A COPY, where this used to move: the entry is shared by every node the same object was
           // handed to, so it has to survive this op. One `folly::dynamic` copy against one JS ->
           // dynamic conversion, and the conversion is the JSI crossing.
@@ -2216,6 +2229,14 @@ jsi::Value Tree::readSurfaceTelemetry(
   result.setProperty(runtime, "setPropMs", millis(walkCost_.setPropNs));
   result.setProperty(runtime, "propConvertMs", millis(walkCost_.propConvertNs));
   result.setProperty(runtime, "setProps", jsi::Value(static_cast<double>(walkCost_.setProps)));
+  result.setProperty(
+      runtime,
+      "deletesOfAbsent",
+      jsi::Value(static_cast<double>(walkCost_.deletesOfAbsent)));
+  result.setProperty(
+      runtime,
+      "writesOfUnchanged",
+      jsi::Value(static_cast<double>(walkCost_.writesOfUnchanged)));
   result.setProperty(
       runtime, "valueEntries", jsi::Value(static_cast<double>(walkCost_.valueEntries)));
   result.setProperty(

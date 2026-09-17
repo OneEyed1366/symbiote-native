@@ -158,6 +158,28 @@ type ITelemetry = ReturnType<typeof readSurfaceTelemetry>;
  * Vue's deficit against React is the fold.** React's `ops` running 4 ms over the direct arm for
  * byte-identical op counts (`decoded` and `conversions` match exactly) is the one residue, and at
  * ~20% of a 19 ms phase with allocation as the obvious suspect it is not worth a hypothesis yet.
+ *
+ * THE WASTE COUNTERS THEN SAID SOMETHING NOBODY EXPECTED, and it is the opposite way round:
+ *
+ *   engine  unchanged=0        react  unchanged=0        vue  unchanged=6000
+ *
+ * They were added to chase the device benchmark's `WRITES 17037/16000` on REACT. On this row React
+ * writes nothing unchanged and Vue writes six thousand — which is 3 000 text nodes times two, i.e.
+ * `seedTextDefaults` exactly. The renderer puts `ellipsizeMode` and `allowFontScaling` on every text
+ * node at `createElement`; the app then authors the same two values, and each one crosses, converts
+ * to a `folly::dynamic`, and is dropped for equalling what is already there.
+ *
+ * So the diagnostic bisect further up this file — which named the seed from the VALUE TABLE growing —
+ * is now confirmed by a direct counter and priced: **6 000 wasted crossings per 1 000-row create.**
+ *
+ * The device's React figure is about the device's row, not this one, and the two must not be
+ * conflated: that row authors props the fold already supplies, this one does not.
+ *
+ * The fix is not another `payloadFold` — one of those costs ~17 us per node per commit, which is
+ * worse than what it would save. RN's text defaults are the PLATFORM's semantics rather than any
+ * adapter's, so they belong in the payload builder next to the component-keyed folds that are
+ * already there (`foldTextInputValue` in `SymbioteFabricProps.cpp`, and its twin in
+ * `fabric-props.ts`), with `seedTextDefaults` deleted from Vue, Angular and Solid.
  */
 function printApplySplit(label: string, telemetry: ITelemetry): void {
   const at = (value: number | undefined): string => (value ?? 0).toFixed(1);
@@ -169,7 +191,14 @@ function printApplySplit(label: string, telemetry: ITelemetry): void {
       `convert=${at(telemetry?.propConvertMs)} strings=${at(telemetry?.stringDecodeMs)} ` +
       `structure=${at(telemetry?.structureMs)} publish=${at(telemetry?.publishMs)} ` +
       `handles=${at(telemetry?.instanceHandleMs)} ` +
-      `decoded=${telemetry?.nodesDecoded ?? 0} conversions=${telemetry?.valueConversions ?? 0}`,
+      `decoded=${telemetry?.nodesDecoded ?? 0} conversions=${telemetry?.valueConversions ?? 0} ` +
+      // THE WASTE COUNTERS, and the reason they are on this line rather than a note: a `setProp` that
+      // changes nothing still crossed. `writesOfUnchanged` is the expensive kind — it leaves after the
+      // JSI -> `folly::dynamic` conversion, so the adapter paid the crossing for a value the node
+      // already held. The device benchmark has reported this for React alone (`WRITES 17037/16000`
+      // against solid 15001/0 and angular 17002/0) and nobody has read it here.
+      `unchanged=${telemetry?.writesOfUnchanged ?? 0} ` +
+      `absentDeletes=${telemetry?.deletesOfAbsent ?? 0}`,
   );
 }
 

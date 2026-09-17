@@ -395,6 +395,16 @@ export type ISurfaceTelemetry = {
   propConvertMs: number;
   setProps: number;
   /**
+   * The two `setProp` ops that changed nothing, counted apart because they are not the same waste.
+   *
+   * `deletesOfAbsent` leaves before the value conversion and costs a hash lookup. `writesOfUnchanged`
+   * leaves AFTER it, so the adapter has already paid the JSI -> `folly::dynamic` crossing for a value
+   * that changes nothing — that is the expensive one, and it is what the device benchmark's
+   * `WRITES n/m` second figure reports.
+   */
+  deletesOfAbsent: number;
+  writesOfUnchanged: number;
+  /**
    * How well the buffer's value interning worked: entries in the batch's value table, and how many
    * of them an op actually reached and converted.
    *

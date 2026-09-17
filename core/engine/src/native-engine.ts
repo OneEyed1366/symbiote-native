@@ -228,6 +228,8 @@ export type INativeEngineBindings = {
     setPropMs: number;
     propConvertMs: number;
     setProps: number;
+    deletesOfAbsent: number;
+    writesOfUnchanged: number;
     valueEntries: number;
     valueConversions: number;
     applyMs: number;
