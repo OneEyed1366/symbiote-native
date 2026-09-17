@@ -762,6 +762,50 @@ porting ANY further RN module by hand.**
 > platform-split rule: a compile-time branch is only testable in a build that compiles it. Closing it
 > means an Android arm of the test host, not a mock.
 >
+> ### The THIRD port — `switch` — and the first whose authored names are ALL invented (2026-09-18)
+>
+> `trackColor`, `thumbColor` and `ios_backgroundColor` are not Fabric props at any point. RN's Switch
+> view declares `onTintColor`/`tintColor` on iOS and `trackColorFor*`/`trackTintColor` on Android,
+> plus `thumbTintColor` on both — and `ios_backgroundColor` is not a prop at all, it is a STYLE
+> (`Switch.js:266-276`: a background plus a 16pt radius so the pill shows through the track). A
+> wrapper body took those per-platform NAMES from an adapter-supplied table; a tag has no adapter to
+> ask. `foldSwitchProps` in `SymbioteFabricProps.cpp` now, keyed off the tag; `switch.ts` keeps the
+> snap-back machine and no fold.
+>
+> **THE TWO RULES ARE NOW PRICED ON ONE RULER**, in one file, one process, one sitting —
+> `tag-rule-cost.itest.ts`, which replaced `pressable-fold-cost.itest.ts`. Each rule runs on BOTH
+> arms and the payloads are asserted equal key by key before any millisecond is read, so the only
+> difference left is the crossing. `build-release`, three consecutive runs, 1 000 nodes per commit:
+>
+> ```
+>             native walk          js walk             per node
+>  pressable  4.0  4.0  3.9 ms     19.0 18.8 18.8 ms   ~14.9 us    folds 0 against 1000
+>  switch     4.8  4.5  4.4 ms     21.7 20.6 20.4 ms   ~16.3 us    folds 0 against 1000
+> ```
+>
+> The pressable row read 5.6/28.6 when measured alone on a busier machine. Both are real and neither
+> is the other's before/after — that is exactly why they were re-measured together.
+>
+> **THREE DIVERGENCES FROM RN FELL OUT OF READING `Switch.js` TO PORT IT, and none was fixed here.**
+> A port is a MOVE; folding a correctness change into it would make the measurement and any future
+> regression unattributable. Each is pinned as characterization in `switch-payload.itest.ts` with an
+> open question:
+>
+> - `accessibilityRole` defaults to `'switch'` in RN on both platforms (`Switch.js:255,293`). We
+>   emit nothing, so a screen reader announces ours as a plain view — the same class of silent gap
+>   `accessible`/`focusable` were on Pressable before 2026-09-09.
+> - iOS composes `{alignSelf: 'flex-start'}` UNDER the app's style (`:266`), so a stock Switch does
+>   not stretch to its container's cross axis. Ours does.
+> - Android's native names are `on` and `enabled` (`:240-241`), not `value` and `disabled`, and
+>   `_disabled` resolves through `accessibilityState.disabled` first. We send `value`/`disabled` on
+>   both platforms. Unobservable from this build — every assertion here is the iOS branch — which is
+>   precisely why it is written down instead of left to a device.
+>
+> **AND ONE HAZARD CLOSED BY CONSTRUCTION.** The adapters used to pin that `onTintColor` reaches
+> Fabric as a PROP rather than being mistaken for a listener, because `routeProp` asks the Switch
+> ViewConfig instead of guessing from the `on` prefix. The engine writes that name straight into the
+> payload now, so `routeProp` never sees it; the only name it sees is `trackColor`.
+>
 > **This confirms the device report, and sharpens it.** The old table had Solid 0.76x, Svelte 0.80x
 > and Vue 0.89x on Create — all UNDER stock. Here **every adapter is over stock on both create-shaped
 > rows**, while `Swap` and `Remove` are 3-5x WINS for everyone but React. That is exactly the split
