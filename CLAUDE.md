@@ -1680,20 +1680,50 @@ Four tag rules priced on one ruler, `build-release`, three runs, a thousand node
 payloads asserted equal key by key before any millisecond is read):
 
 ```
-             native walk   js walk    per node   the bag
- spinner        3.6         13.4        9.7 us   4 keys, no style in — AND ITS RULE DOES THE MOST
- accessory      3.2         14.6       10.9 us   4 keys — AND ITS FOLD DID NOTHING
- button         3.9         16.6       11.8 us   5 keys + a 2-key style
- pressable      3.7         18.0       14.6 us   4 keys + a 3-key style
- switch         4.8         23.6       18.7 us   6 keys + nested trackColor
- image          5.8         27.7       21.9 us   6 keys + what the rule BUILDS
+             native walk   js walk    per node   the bag / what the rule does
+ imagebg        3.0         13.0        9.4 us   2 + a 3-key style / writes ONE key
+ spinner        3.7         13.6       10.1 us   4, no style / the MOST work in the file
+ accessory      3.1         14.0       10.8 us   4 / nothing at all
+ button         3.9         16.7       11.8 us   5 + a 2-key style
+ pressable      3.7         18.1       14.4 us   4 + a 3-key style
+ switch         4.7         23.5       18.8 us   6 + nested trackColor
+ image          5.9         27.8       21.7 us   6 + what the rule BUILDS
 ```
 
-The two ends of that table are the same claim run as an experiment: the **cheapest** row's rule does
-the **most** work (builds a style object, resolves a size two ways, writes two defaults, picks a
-colour) and is cheapest only because its bag arrives with no `style` key, while the dearest one is
-dear because its rule CREATES keys that then have to travel back. Price is what gets marshalled, not
-what gets computed.
+**The top three rows are a deliberate experiment, not three ports that happened to be cheap.** Their
+rules do, in order: almost nothing (one key written), the most work in the file (builds a style
+object, resolves a size two ways, writes two defaults, picks a colour), and literally nothing at all.
+They land within 1.4 us of each other.
+
+So the cost model for a fold is **bag in, bag out, body free** — the column orders by what has to be
+marshalled, with the dearest row dear because its rule CREATES keys that then travel back. Two
+consequences worth keeping: a trivial fold over a large bag is the worst value available, and
+DELETING a fold that does nothing is worth as much as porting one that does a lot.
+
+### ScrollView's owner fold is portable and is NOT ported — the blocker is a missing C++ log
+
+`ownerFold` (`behaviors/scroll-view/shared.ts`) is a pure function of the node's own bag,
+parameterised only by the axis, which the TAG already decides (`scroll-view` vs
+`horizontal-scroll-view`) — so it is a tag rule by every criterion this port uses. Three things stop
+it being a half-hour job, and they are recorded rather than discovered again:
+
+1. **It carries a developer warning.** A `horizontal` prop written on the vertical tag is ignored, and
+   the fold `dlog`s where to write it instead. **There is no logging facility in `core/engine/cpp` at
+   all** — no `dlog`, no `LOG`, nothing. Moving the rule as-is deletes the warning, and
+   `<keep_logs_gate_behind_DEBUG>` says logs are only ever added. The warning wants a WRITE-time home
+   (the pattern `image-source-write.ts` set), but JS does not retain a node's tag — `createElement`'s
+   own comment says the tag is looked up once and not stored.
+2. **`decelerationRate` is `Platform.select`'d** and on iOS BOTH tags are `RCTScrollView`, so the
+   component name cannot distinguish iOS-vertical from Android-vertical. That branch needs `#ifdef`,
+   which puts its Android half outside headless reach — the same gap already recorded for
+   `android_ripple`.
+3. **Android's wrap path composes over it.** `wrappedOwnerFold` calls `ownerFold` and then replaces
+   `style`; once the rule runs first, that JS fold's `props.style` is the COMPOSED array rather than
+   the authored one, so it has to start reading `propOf(owner, 'style')` — Trap A again, the same
+   correction the touchables and Button needed.
+
+None of the three is a reason not to do it; together they make it its own change rather than a
+tail-end of this one.
 
 `input-accessory-view`'s fold took the bag apart and reassembled it unchanged, so the port DELETED
 it rather than moving it — and it still cost 10.7 us per node to have had. Read down the column and
