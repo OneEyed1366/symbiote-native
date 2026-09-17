@@ -159,6 +159,36 @@ const FLOW_STRIP = require_.resolve('@babel/plugin-transform-flow-strip-types');
 const RN_SOURCE =
   /\/node_modules\/(react-native|@react-native\/[^/]+)\/.*\.jsx?$/;
 
+/**
+ * `ReactNativePrivateInitializeCore` is RN's app bootstrap, and nothing headless wants it to run.
+ *
+ * React's own Fabric renderer (`ReactFabric-prod.js`) requires it for its side effects on line 16,
+ * and it pulls in LogBox, the DevTools hook and RN's whole component tree behind it — which reaches
+ * `.png` imports and a dev-only module that does not resolve, so a bundle that merely MENTIONS the
+ * stock renderer fails with dozens of errors naming files nobody asked for. What it installs is
+ * global polyfills, error reporting and dev tooling; a measurement that ran them would be measuring
+ * them.
+ *
+ * Emptied rather than resolved, so the renderer can be imported for an A/B against our own without
+ * dragging an app bootstrap into every itest bundle. Stubbing a module no other itest imports costs
+ * the rest of the suite nothing.
+ */
+const RN_INITIALIZE_CORE = /ReactNativePrivateInitializeCore(\.js)?$/;
+
+const stubReactNativeBootstrap = {
+  name: 'stub-react-native-initialize-core',
+  setup(build) {
+    build.onResolve({ filter: RN_INITIALIZE_CORE }, ({ path: request }) => ({
+      path: request,
+      namespace: 'rn-initialize-core-stub',
+    }));
+    build.onLoad(
+      { filter: /.*/, namespace: 'rn-initialize-core-stub' },
+      () => ({ contents: 'export {};', loader: 'js' }),
+    );
+  },
+};
+
 const reactNativeFlow = {
   name: 'strip-flow-from-react-native',
   setup(build) {
@@ -169,7 +199,12 @@ const reactNativeFlow = {
         configFile: false,
         plugins: [[HERMES_SYNTAX, { parseLangTypes: 'flow' }], FLOW_STRIP],
       });
-      return { contents: out?.code ?? '', loader: 'js' };
+      // `jsx`, not `js`: stripping Flow leaves JSX untouched, and React Native writes JSX in `.js`
+      // files (`VirtualizedList.js`, `AnimatedScrollView.js`, …). Reaching one under the `js` loader
+      // is 75 copies of "The JSX syntax extension is not currently enabled" — which reads as a Flow
+      // problem and is not one. A `.js` file with no JSX parses identically either way, so this is
+      // strictly wider.
+      return { contents: out?.code ?? '', loader: 'jsx' };
     });
   },
 };
@@ -479,6 +514,7 @@ try {
         solidJsx,
         svelteComponents,
         vueSfc,
+        stubReactNativeBootstrap,
         reactNativeFlow,
       ],
       logLevel: 'silent',

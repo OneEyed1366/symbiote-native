@@ -1442,6 +1442,32 @@ What stays open is the half this fixture cannot reach: both sides run the SAME r
 9.6-vs-35.3 difference is what React does per fiber against a mutation-mode host config versus its
 own persistent-mode one. Answering it needs React's own Fabric renderer standing up in this harness.
 
+### React's own Fabric renderer LOADS headlessly — a stock baseline is now a build-out, not a question
+
+Every stock comparison in this file is taken on a device because nothing here could run the other
+side. `core/engine/cpp/tests/js/stock-renderer-probe.itest.tsx` settles the feasibility:
+`ReactFabric-prod.js` imports and exposes `render` / `stopSurface` / `dispatchCommand`, and the
+`nativeFabricUIManager` it drives is the same binding `raw-fabric-vs-engine.itest.ts` already uses.
+
+**Neither wall was the expected one, and Flow was not a wall at all** — the itest runner already
+strips it with Hermes' own parser. What actually failed:
+
+1. 75x `The JSX syntax extension is not currently enabled`. Stripping Flow leaves JSX alone, and RN
+   writes JSX in `.js` files that the loader handed esbuild as `js`. It reads as a Flow failure and
+   is not one. Fixed by returning the `jsx` loader — strictly wider, since a `.js` file with no JSX
+   parses identically either way.
+2. Unresolvable dev modules and `.png` imports from LogBox, all behind
+   `ReactNativePrivateInitializeCore` — RN's app bootstrap, required by the renderer on line 16 for
+   its side effects. Stubbed to empty in the runner; a measurement that ran an app bootstrap would be
+   measuring the bootstrap.
+
+`ReactNativePrivateInterface`, the thing that was budgeted for, needed no stub: all twelve of the
+renderer's uses resolved. **This is also the RN-port backlog's "step 0", which that section records
+as never tried** — it is now tried, in the itest runner rather than in `vitest.config.ts`, and the
+answer is that RN's Flow is not what blocks importing it.
+
+Still not done: RENDERING. A surface needs view configs registered and a root tag the binding knows.
+
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the
 reasoning that a `Map` lookup costs what converting a boolean costs. Booleans need no `Map` — there
