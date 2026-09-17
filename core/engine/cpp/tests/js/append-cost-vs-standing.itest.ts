@@ -25,6 +25,7 @@ import {
 import { describe, expect, it, mounted, print, report } from './harness';
 
 const APPEND_ROWS = 200;
+const SMALL_APPEND_ROWS = 10;
 
 function buildRow(id: number): ISymbioteNode {
   const row = createElement('RCTView');
@@ -42,8 +43,12 @@ function commitMsNow(rootTag: number): number {
 }
 
 // Builds `standing` rows, commits once (untimed — this file only measures the APPEND that follows),
-// then appends `APPEND_ROWS` more and returns that second commit's real commitMs.
-function appendArm(rootTag: number, standing: number): number {
+// then appends `appended` more and returns that second commit's real commitMs.
+function appendArm(
+  rootTag: number,
+  standing: number,
+  appended: number,
+): number {
   const surface = createSurface(rootTag);
   const list = createElement('RCTView');
   routeProp(list, 'testID', 'list');
@@ -53,7 +58,7 @@ function appendArm(rootTag: number, standing: number): number {
   mounted();
   commitMsNow(rootTag); // discarded — this is the CREATE commit, not what this file measures
 
-  for (let id = standing; id < standing + APPEND_ROWS; id += 1)
+  for (let id = standing; id < standing + appended; id += 1)
     appendChild(list, buildRow(id));
   surface.commit();
   mounted();
@@ -64,12 +69,13 @@ function appendArm(rootTag: number, standing: number): number {
 // process (allocator/static-init warmup) never lands on whichever standing width runs first —
 // same discipline as `engine-chunking-adoption.itest.ts`'s `warmup`.
 function warmup(rootTag: number): void {
-  appendArm(rootTag, 200);
+  appendArm(rootTag, 200, APPEND_ROWS);
 }
 
 let ms500 = -1;
 let ms2000 = -1;
 let ms8000 = -1;
+let ms8000Small = -1;
 
 describe('append commit cost against a growing standing sibling count', () => {
   it('warms up the process', () => {
@@ -78,26 +84,37 @@ describe('append commit cost against a growing standing sibling count', () => {
   });
 
   it('appends 200 rows onto 500 standing', () => {
-    ms500 = appendArm(1, 500);
+    ms500 = appendArm(1, 500, APPEND_ROWS);
     expect(ms500 >= 0).toBe(true);
   });
 
   it('appends 200 rows onto 2 000 standing', () => {
-    ms2000 = appendArm(1, 2000);
+    ms2000 = appendArm(1, 2000, APPEND_ROWS);
     expect(ms2000 >= 0).toBe(true);
   });
 
   it('appends 200 rows onto 8 000 standing', () => {
-    ms8000 = appendArm(1, 8000);
+    ms8000 = appendArm(1, 8000, APPEND_ROWS);
     expect(ms8000 >= 0).toBe(true);
   });
 
-  it('reports the per-appended-row cost at each width', () => {
-    const perRow = (ms: number): string => (ms / APPEND_ROWS).toFixed(4);
+  // Separates the two effects a single width/count sweep cannot: holding `standing` FIXED at the
+  // largest width and shrinking `appended` 200 -> 10 isolates how much of ms8000 is the O(standing)
+  // walk baseline (present even for a tiny append) vs. a per-NEW-row marginal cost on top of it.
+  it('appends only 10 rows onto the SAME 8 000 standing (isolates the walk baseline)', () => {
+    ms8000Small = appendArm(1, 8000, SMALL_APPEND_ROWS);
+    expect(ms8000Small >= 0).toBe(true);
+  });
+
+  it('reports the per-appended-row cost at each width, and the baseline/marginal split', () => {
+    const perRow = (ms: number, count: number): string =>
+      (ms / count).toFixed(4);
     print(
-      `DEBUG standing=500 commitMs=${ms500} perRow=${perRow(ms500)}ms | ` +
-        `standing=2000 commitMs=${ms2000} perRow=${perRow(ms2000)}ms | ` +
-        `standing=8000 commitMs=${ms8000} perRow=${perRow(ms8000)}ms`,
+      `DEBUG standing=500 commitMs=${ms500} perRow=${perRow(ms500, APPEND_ROWS)}ms | ` +
+        `standing=2000 commitMs=${ms2000} perRow=${perRow(ms2000, APPEND_ROWS)}ms | ` +
+        `standing=8000 commitMs=${ms8000} perRow=${perRow(ms8000, APPEND_ROWS)}ms | ` +
+        `standing=8000 appended=10 commitMs=${ms8000Small} | ` +
+        `marginal-per-row(8000..200 vs 10)=${((ms8000 - ms8000Small) / (APPEND_ROWS - SMALL_APPEND_ROWS)).toFixed(4)}ms`,
     );
     expect(true).toBe(true);
   });
@@ -107,18 +124,36 @@ report();
 
 // ── ANSWER, measured (2026-09-17) ───────────────────────────────────────────────────────────────
 //
-// DEBUG standing=500  commitMs=2.14  perRow=0.0107ms
-// DEBUG standing=2000 commitMs=5.68  perRow=0.0284ms   (4x standing -> 2.65x per-row)
-// DEBUG standing=8000 commitMs=19.47 perRow=0.0974ms   (4x standing -> 3.43x per-row)
+// DEBUG standing=500  commitMs=2.09  perRow=0.0104ms
+// DEBUG standing=2000 commitMs=5.90  perRow=0.0295ms   (4x standing -> 2.83x per-row)
+// DEBUG standing=8000 commitMs=19.24 perRow=0.0962ms   (4x standing -> 3.26x per-row)
+// DEBUG standing=8000, appended=10   commitMs=17.80
+// marginal per row beyond 10, at standing=8000: (19.24 - 17.80) / (200 - 10) = 0.0076 ms
 //
-// Appending the SAME 200 rows costs 9x more per row at 8 000 standing than at 500 — real signal,
-// with `standing` the only variable held. And it is NOT the container-only cost F-80's
-// `sibling-scan.cpp` measured: that bench's arm I (materialize-shaped, but container-only) predicted
-// ~29 us for a WHOLE 4 000-sibling walk; this file measures ~97 us PER ROW at a comparable 8 000
-// width, three orders of magnitude more. `commitMs` is stamped strictly BEFORE layout
-// (`getCommitStartTime`/`getCommitEndTime`, `SymbioteTree.cpp:1765` — "every createNode/cloneNode/
-// appendChild `materialize` calls happens inside this window, not layout's"), so this is not Yoga
-// flexbox repositioning bleeding in; it is `materialize`'s own walk.
+// CORRECTED FRAMING from this file's first pass, which read "9x more per row at 8 000 standing" as
+// appending itself getting more expensive. The added `appended=10` control settles it: at the SAME
+// standing=8000, appending only 10 rows STILL costs 17.80 ms — 92% of the 200-row arm's 19.24 ms.
+// So the "per row" number above is not a per-row cost at all; it is a near-FIXED walk baseline
+// (dominated by `standing`, present even for a 10-row append) divided by an unrelated row count.
+// The real, isolated per-NEW-row marginal cost is only ~7.6 us — the walk baseline is what scales
+// with `standing`, not the cost of each new row. This is the SAME shape F-80's `sibling-scan.cpp`
+// arms H/I already established (a parent rebuilds its WHOLE child set on any change, so the cost is
+// O(children at commit time) regardless of how many actually changed) — this file's contribution is
+// confirming it on the REAL engine, where the constant factor is far bigger than the container-only
+// model predicted, not a new "gets worse per append" mechanism.
+//
+// It still matters for a framework that commits PER ROW rather than batching (Svelte's `{#each}`
+// reactive pattern is the suspected shape, `sibling-scan.cpp`'s own original motivation): N separate
+// single-row commits against a growing list each pay that list's CURRENT O(standing) walk baseline,
+// and summing O(standing) over `standing` incremental commits is exactly the O(n²) aggregate F-78's
+// device regression looks like. This file cannot tell whether Svelte's real commit pattern is
+// batched or incremental — that is the next thing to check, not assumed here.
+//
+// `commitMs` is stamped strictly BEFORE layout (`getCommitStartTime`/`getCommitEndTime`,
+// `SymbioteTree.cpp:1765` — "every createNode/cloneNode/appendChild `materialize` calls happens
+// inside this window, not layout's"), so none of this is Yoga flexbox repositioning bleeding in; it
+// is `materialize`'s own walk, confirmed real on the compiled Fabric/JSI path — three orders of
+// magnitude bigger than `sibling-scan.cpp`'s container-only arm I predicted for a comparable width.
 //
 // The mechanism the container bench could not see: appending to `list` dirties `list` itself (its
 // child set changed), so `list`'s OWN `appendRenderable` rebuilds a FRESH `ChildSet` over ALL of
@@ -136,8 +171,13 @@ report();
 // children vs a run replacing 1 in 6 with the long TextInput name) is the next thing to run, not a
 // conclusion this file is entitled to draw yet.
 //
-// Real candidate for F-78's still-open Svelte Append mystery either way: extrapolated to 1 000
-// appended rows onto an ~8 000-standing list (a plausible width partway through Append's benchmark
-// row), the observed per-row rate predicts ~97 ms — squarely inside the 107-147 ms device gap this
-// investigation chain has been chasing since F-78. NOT YET fixed, and the exact sub-mechanism is
-// NOT YET isolated. Full writeup: `.docs/tree-inefficiency-findings.md`, F-81.
+// Real candidate for F-78's still-open Svelte Append mystery, but the extrapolation has to go
+// through the CORRECTED framing above, not the naive per-row one this file started with: it is
+// `standing`-sized commits, repeated, that would reach 107-147 ms — not one big append. If the
+// benchmark row's real Append genuinely fires ~1 000 separate small commits against a list growing
+// past 8 000 (unconfirmed — the next thing to check, not assumed), summing this file's ~17-19 ms
+// per-commit walk baseline over even a fraction of that many commits reaches the device gap easily.
+// A single 1 000-row commit onto 8 000 standing, by contrast, only adds ~1 000 x 7.6 us ≈ 7.6 ms of
+// marginal cost on top of ONE walk baseline — nowhere near 107 ms on its own. NOT YET fixed, the
+// commit-batching question is NOT YET checked, and the exact sub-mechanism inside the walk baseline
+// is NOT YET isolated. Full writeup: `.docs/tree-inefficiency-findings.md`, F-81.
