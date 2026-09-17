@@ -679,6 +679,11 @@ TEST_P(TreeFuzzTest, committedShapeMatchesTheOracleThroughAnOpProgram) {
 
 // 300 programs cost about a second. The budget is deliberate: this runs on every `test:cpp`, so it
 // has to be cheap enough that nobody is tempted to skip it.
+// 300 in CI, for a suite that has to stay under a second. The targeted-replace path was brought back
+// on 2026-09-17 against a ONE-OFF run of 5 000 of these programs — all green, with the fast path
+// taken 14 683 times across them, counted rather than assumed. Widen the range here to repeat it;
+// 5 000 costs ~18 s. Counting the hits matters as much as the green: this suite passed for eighteen
+// months with that path disabled, so "no failures" says nothing on its own about whether it ran.
 INSTANTIATE_TEST_SUITE_P(Seeds, TreeFuzzTest, ::testing::Range<uint64_t>(1, 301));
 
 } // namespace
