@@ -2017,10 +2017,40 @@ Android the fold survives for the view style and the ripple background — a the
 native config object, neither a prop rewrite — so `buildStructure` binds it behind `IS_ANDROID` and
 binds nothing otherwise.
 
-What remains is ONE fold, the text's, which needs the BUTTON's `color`/`disabled` while its parent is
-the VIEW — **a grandparent, which `ownerProps` does not reach.** That is the next seam and it is not
-built. The browser-shaped version of it is an ancestor query rather than a second parent pointer,
-since what the rule actually wants is "the nearest ancestor that is a button".
+**And then the last one went, so off Android a `<Button>` binds NO fold on any of its four nodes —
+zero trips into JS, down from five.** The label text's style needed the BUTTON's `color` and
+`disabled` while its parent is the wrapping view, so `ownerProps` could not reach it.
+
+**The seam is an ANCESTOR QUERY, not a second parent pointer**, and that choice is the reusable part.
+"Two up" would encode one platform's tree shape into a rule: the button is this node's grandparent on
+iOS (`button -> view -> text`) and its PARENT on Android, where TNF clones onto the button itself.
+"The nearest ancestor that is a button" is true on both — it is a CSS ancestor selector, which is
+what a browser would use for exactly this.
+
+`IAncestorLookup` is a function pointer plus a context, not a `std::function`: this is the per-node
+commit path and a `std::function` would allocate for every node whether or not any rule asks. The
+WALK belongs to `SymbioteTree`, which owns `Node`; the choice of tag belongs to the rule. Costs
+nothing measurable — the tag-rule ruler is unmoved (`content` 2.8, `pressable` 3.7, `button` 3.8-4.0).
+
+**This was the largest test migration of the whole port — 25 cases across 8 files**, and the split is
+worth reading before the next one. Each case divided into a half this harness can still see and a
+half it cannot:
+
+```
+kept here    the subtree SHAPE, the Text defaults (real props written at build time),
+             the accessibilityState merge, Solid's node IDENTITY across a reactive update
+moved        every style assertion, to `button-derived-payload.itest.ts`
+deleted      the unit tests of `resolveButtonTextStyle`, which no longer exists
+```
+
+One case MOVED rather than being deleted and it is the important one: the re-tint after a late
+`color` write pins that `addDerivedNode` extends `slotDerived`'s mark past the slot to the text.
+That is not fold content — it is the failure mode an ancestor-reading rule introduces, since
+`markPropsDirty` bubbles UP and nothing would reach the label otherwise. **Verified by breaking it**:
+commenting out `addDerivedNode(node, text)` turns it red.
+
+`resolveButtonTextStyle`, `buttonTextStyle` and seven colour constants were deleted with it — the
+orphan shape again, and the label's constants now live only in C++.
 
 **One coverage gap went with the port and is recorded rather than hidden.** `foldButtonLabel`'s
 uppercase arm is `#ifdef ANDROID`, because a raw text commits as `RCTRawText` on both platforms and
@@ -2035,7 +2065,7 @@ Android. Judged a cosmetic difference on one platform against dragging ICU into 
 `resolveButtonTitle` was deleted with it — no caller left but its own two unit tests, which is the
 orphan shape this migration keeps turning up.
 
-### A `<Button>` cost FOUR crossings per commit — SUPERSEDED, it is one, see above
+### A `<Button>` cost FOUR crossings per commit — SUPERSEDED, it is ZERO, see above
 
 Pinned in `core/engine/cpp/tests/js/button-payload.itest.ts`: one JS fold per node the behavior
 builds — the owner, the iOS wrapper view, the text, and the raw label. At the per-node figures above
