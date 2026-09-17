@@ -652,15 +652,50 @@ porting ANY further RN module by hand.**
 >
 > ```
 >               stock   react     vue   solid  svelte  angular      ratio = ours / stock
-> Create         91.6   115.2   143.6   107.7   124.3    265.2      1.26 1.57 1.18 1.36 2.90
-> Replace       102.0   118.8   162.4   115.2   137.0    301.8      1.16 1.59 1.13 1.34 2.96
-> Partial        11.7     9.2    12.0     7.8     9.9     11.3      0.79 1.03 0.67 0.85 0.97
-> Select         13.0    13.5    11.1    14.3    12.3     14.8      1.04 0.85 1.10 0.95 1.14
-> Swap           16.0    23.5     4.2     4.5     5.4      7.3      1.47 0.26 0.28 0.34 0.46
-> Remove         18.7     4.5     3.5     4.0     4.7      7.2      0.24 0.19 0.21 0.25 0.39
-> Append        125.4   116.9   149.1   117.3   136.4    283.8      0.93 1.19 0.94 1.09 2.26
-> Clear           9.0    10.9    35.4   394.9    21.4     43.6      1.21 3.93 43.9 2.38 4.84
+> Create         93.4   114.4   131.7    99.9   114.9    253.9      1.22 1.41 1.07 1.23 2.72
+> Replace       101.5   117.2   152.8   110.9   127.1    283.2      1.15 1.51 1.09 1.25 2.79
+> Partial        11.3    10.4    12.3     7.3     8.2     10.2      0.92 1.09 0.65 0.73 0.90
+> Select         12.9    13.8    12.9    15.4    11.8     19.3      1.07 1.00 1.19 0.91 1.50
+> Swap           15.5    22.4     5.1     5.5     5.0      8.3      1.45 0.33 0.35 0.32 0.54
+> Remove         16.8     4.1     4.5     8.2     4.4      8.0      0.24 0.27 0.49 0.26 0.48
+> Append        122.5   117.0   142.0   105.9   121.1    271.3      0.96 1.16 0.86 0.99 2.21
+> Clear          10.0    11.1    41.0   409.1    19.1     44.1      1.11 4.10 40.9 1.91 4.41
 > ```
+>
+> **The first behavior port is in these numbers** (2026-09-17). `text-input`'s prop resolution — the
+> W3C aliases onto RN's own names — moved out of a JS `payloadFold` and into the engine
+> (`foldTextInputAliases`, `SymbioteFabricProps.cpp`). The signature is exact and the control is
+> React, which never had the fold:
+>
+> ```
+>  arm      walk before   after    folds     create before -> after
+>  react       26.8        26.8      0 -> 0   115.2 -> 114.4    the control, flat
+>  vue         41.3        26.4   1000 -> 0   143.6 -> 131.7
+>  solid       41.0        26.8   1000 -> 0   107.7 ->  99.9
+>  svelte      42.2        26.5   1000 -> 0   124.3 -> 114.9
+>  angular     41.9        26.0   1000 -> 0   265.2 -> 253.9
+> ```
+>
+> Every adapter's walk converged on React's, which is what "the fold was the whole difference" looks
+> like when it is true. Solid is now 1.07x of stock on `Create`.
+>
+> WHY IT COULD MOVE, and the criterion is the browser's rather than "is it expressible as data":
+> mapping `inputMode` onto `keyboardType` is what Blink does for `<input>` — a property of the
+> PLATFORM, not of any app, framework or component instance. The machine stayed in JS (the
+> controlled-value handshake, the event-count acknowledgement, autofocus) because it runs at gesture
+> rate and calls back into app code, which is where a browser keeps it too.
+>
+> **NO TWIN**, and that is what the port is for: `fabric-props.ts` did not get a copy. The contract is
+> `core/engine/cpp/tests/js/text-input-payload.itest.ts`, which reads the payload the commit actually
+> sent through `committedPayloadOf` — the harness read added the same day, without which this rule
+> would have been unverifiable in its new home. Seventeen assertions across six vitest files moved
+> there; one of them, React's `submitBehavior="submit"` case, would have gone GREEN on an unfolded bag
+> and is the reason a passing test is not proof that its rule still runs.
+>
+> The JS that went with it: `ALIAS_ONLY_KEYS`, two narrowing helpers, and the per-tag closure the two
+> registrations needed — `text-input` and `text-input-multiline` now share one behavior object,
+> because `multiline` was the only thing they did not share and the engine reads it off the component
+> name instead.
 >
 > The fixtures are `core/engine/cpp/tests/js/{stock,react,vue,solid,svelte,angular}-suite.itest.*`,
 > all six driven by one `bench-suite.ts` that owns the state machine, the steps and the oracle. A
