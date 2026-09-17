@@ -1722,10 +1722,12 @@ content node's OWN tag (portable all along), and `collapsableChildren` comes fro
 `maintainVisibleContentPosition` / `snapToAlignment`, which stay on the scroller.
 
 **The boundary did not move, only the reading of it.** A rule may read the parent's PROPS —
-declarative, present at commit time. It still cannot read live JS state (`stickyFold`'s
-`translateY`), an owned LISTENER (`focusable`'s `onPress !== undefined`, which lives in the stash and
-in no bag), or anything a framework computes per render. That is the browser model's own line: a UA
-rule sees the tree, not the application's closures.
+declarative, present at commit time. It cannot read live JS state (`stickyFold`'s `translateY`) or
+anything a framework computes per render. That is the browser model's own line: a UA rule sees the
+tree, not the application's closures.
+
+**This list used to carry a third entry — an owned LISTENER — and it was wrong.** See the section
+below: a listener is two facts wearing one word, and only one of them is the application's.
 
 **Reading a parent costs nothing measurable** — `content` has the CHEAPEST native walk in the cost
 table (2.8 ms) while being the first rule that does it. A pointer hop on a tree already in memory,
@@ -1751,6 +1753,66 @@ it — here the box would freeze at its first size while the background visibly 
 `slotDerived` already named the props, so it worked, and it worked for the JS fold for the same
 reason. The seam did not change the requirement; nothing said so out loud until it was asserted.
 **Verified by breaking it** — commenting out `slotDerived` turns both re-derive cases red.
+
+### A listener's EXISTENCE is the platform's; only its BODY is the app's — `OP_SET_OWNED_LISTENER`
+
+`focusable` on a touchable is `focusable !== false && onPress !== undefined && !disabled`
+(`TouchableOpacity.js:336-339`). Two legs are ordinary props. The middle one is an app callback, and
+on one of our tags `onPress` never becomes a prop at all — `setEventListener` diverts a name the
+behavior OWNS into a JS stash, because `node.listeners` is single-slot and the behavior's own
+dispatcher holds it. So this one key kept a per-node fold alive on `touchable-opacity` and
+`touchable-highlight` after every other rule had moved, and three places in this repo recorded it as
+unportable.
+
+**The browser settles it, not taste.** A UA computes focusability itself, and it can, because
+`addEventListener` is the UA's own API: the browser knows which of its elements carry a click
+handler while the handler's body stays the page's. Same split here — one bit crosses per flip as
+`OP_SET_OWNED_LISTENER`, the closure never leaves JS, and `foldPressableProps` resolves the whole
+expression off the node.
+
+**A FLIP IS A MOUNT-TIME EVENT**, which is what makes the op affordable: the engine already refuses
+to notify on listener IDENTITY (a framework hands a fresh closure nearly every render), so this
+fires when a handler appears or disappears and at no other time. Against a fold charged on every
+commit its node was dirty in — and `touchable-focusable-payload.itest.ts` measured `foldsFound` **5**
+for a SINGLE mounted touchable, not 1, because the opacity settle re-commits the node before it
+comes to rest. So the saving is ~5 trips per touchable at mount.
+
+The tag-rule ruler is unmoved by it (`pressable` native walk 3.6-3.7 ms against 3.7-3.9 before),
+which is the expected answer for an op that runs at mount and not in the walk.
+
+**Scope, stated because it is not all three touchables.** `touchable-opacity` is at ZERO folds.
+`touchable-highlight` keeps one for its UNDERLAY, which is built from live press state (`shown` flips
+inside a gesture) and is the genuine unportable article. `button` keeps its own: it resolves
+`disabled` three ways (`props.disabled ?? aria ?? accessibilityState.disabled`, `Button.js:331,337`)
+through the projection its derived children share, and folds an Android view style and ripple
+regardless — so moving only its `focusable` would duplicate that precedence and buy back no crossing.
+
+**The general form, and it is the reusable half: "JS holds it" is not the same claim as "only JS can
+compute it."** The first is a wiring question and wiring is cheap. The second is the real boundary.
+Every remaining "cannot be ported" note is worth re-reading against that distinction.
+
+### The port found a shipping accessibility bug, and the JS harness could not have
+
+A disabled `<touchable-highlight>` committed `focusable: true` — reachable from a keyboard and a TV
+remote, announced as a focus stop, doing nothing when activated. Reproduced on unmodified HEAD,
+before a line of the port had landed, by writing the contract itest first.
+
+Cause is Trap A, the one this file already records: a tag rule runs BEFORE the JS fold, so a fold
+reading a key the rule STRIPS reads it gone. `foldPressableProps` erases `disabled`;
+`touchable-opacity`'s fold had been corrected to read the NODE and `touchable-highlight`'s had not.
+Two copies of one expression, and one of them drifted.
+
+**What makes it worth a section is WHY it survived: its vitest case asserted exactly this and
+PASSED.** That harness builds payloads through the TypeScript `fabricProps`, which deliberately
+carries no copy of the tag rules — so there was no pressable rule to strip `disabled`, the key was
+still in the bag, and the expression resolved correctly there and nowhere else.
+
+So the property that makes the JS harness correct — **it holds no mirror** — is the same property
+that blinds it to a rule-ORDERING bug. A fold that reads a key an engine rule removes is invisible to
+every test on that side. Only the committed payload can see it, which means the itest is not merely
+the better place for these assertions; for this class of bug it is the ONLY place. Read that together
+with the false-green rule already on this page: an assertion can be in the wrong harness and green
+for years.
 
 ### A mirror that cannot be removed is made LOUD — the scroll base style, held by a test
 
