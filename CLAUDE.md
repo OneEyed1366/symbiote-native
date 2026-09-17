@@ -702,6 +702,66 @@ porting ANY further RN module by hand.**
 > seventh arm — the engine's own mutation API with no reconciler above it — is not here;
 > `update-shapes-cost.itest.ts` is that floor and it is unchanged.
 >
+> ### The SECOND port — `pressable` — and the wire slot it needed (2026-09-17)
+>
+> `disabled` folding into `accessibilityState`, `accessible`/`focusable` defaulting on, the Android
+> ripple config, and the nine machine-only props being kept out of a payload no ViewConfig declares:
+> all of it is `foldPressableProps` in `SymbioteFabricProps.cpp` now, and `pressable.ts` keeps no
+> `foldPayload`. Same criterion as text-input — `Pressable.js` does this for every Pressable in every
+> app, so it is the platform's and not any app's.
+>
+> **IT COULD NOT MOVE THE WAY TEXT-INPUT DID, and that is the reusable part.** That rule keys off the
+> Fabric view name, which already crossed: `RCTSinglelineTextInputView` names nothing else. A
+> pressable commits as `RCTView` — byte-identical to a plain view — so nothing on the native side
+> could tell them apart. The missing fact was the TAG, which JS knew at `createElement` and kept.
+>
+> So the tag crosses now, once, as `OP_SET_TAG`, emitted from `attachHostBehavior` for the nodes a
+> behavior actually attached to and no others. That is the browser's arrangement rather than a
+> workaround: an element knows what tag it is, and its user-agent behavior follows from that rather
+> than from whatever view its layout engine allocated. **Every remaining behavior port rides on this**
+> — it is what makes a tag-keyed rule possible at all.
+>
+> **THE RULE SERVES THREE TAGS, because three tags ARE a pressable in RN's own terms**:
+> `pressable`, `touchable-opacity` (a pressable plus a fade), and `button` (a touchable plus a label —
+> `TouchableOpacity` on iOS, `TouchableNativeFeedback` on Android, `Button.js:283`). All three
+> composed the same JS function before it moved; `usesPressableRule` is the record of that.
+> `touchable-highlight` is deliberately absent and always was — its behavior REPLACES the fold rather
+> than composing it, so it has never carried the machine-key strip. That is a gap in it, not here.
+>
+> **THE EIGHT-STEP SUITE CANNOT SHOW THIS PORT, and quoting it would be quoting nothing.** Those arms'
+> row is the device row with its two `<Pressable>`s spelled as plain `view`s, so `folds` reads 0 on
+> every arm whether or not the rule moved. The A/B is `pressable-fold-cost.itest.ts` instead — one
+> process, one tree, two tags: `pressable` (the rule in C++) against a tag registered in that file
+> with a `payloadFold` doing the identical work, with the two payloads asserted EQUAL key by key
+> before any millisecond is read. `build-release`, three consecutive runs, 1 000 pressables:
+>
+> ```
+>  native walk   5.6  5.7  5.8 ms    folds=0
+>  js     walk  28.6 28.4 28.3 ms    folds=1000      ~22.7 us per node per commit
+> ```
+>
+> The rule is ~5.7 ms; the CROSSING was ~23 ms, four times the work it carried. Same shape as
+> text-input's ~17 us on a smaller bag, and the reason a fold's price is the trip and not the function.
+>
+> **TWO TRAPS THE PORT SET, and they generalise to every port after it.** A tag rule runs BEFORE the
+> JS fold, so a JS fold that reads a key the rule STRIPS now reads it gone: `touchable-opacity`'s
+> `focusable` and `button`'s `projectionOf` both read `disabled` out of the bag, and both would have
+> resolved every disabled control as focusable — a focus-order bug visible on a TV remote and in no
+> test that reads props. Both now read the NODE. **Anything a JS fold needs after a tag rule has
+> stripped it must come from `propsOf(node)`, not from the bag.**
+>
+> And the composition was load-bearing in a way the type system did not protect: `button`'s owner fold
+> called `touchable.foldPayload?.(props)` through an `undefined` check, so deleting the function would
+> have silently dropped Button's whole accessibility half with every test still green.
+>
+> **ONE COVERAGE GAP, recorded rather than hidden.** The ripple's Android branch is `#ifdef ANDROID`
+> and this host is not Android, so `nativeBackgroundAndroid`'s shape is now asserted nowhere headless.
+> `core/components/src/behaviors/ripple-android.test.ts` used to do it by mocking `Platform.OS`; what
+> it mocked was a JS function that no longer exists. The same already applies to text-input's
+> `underlineColorAndroid` and its `search` keyboard split, which makes it a PROPERTY of porting a
+> platform-split rule: a compile-time branch is only testable in a build that compiles it. Closing it
+> means an Android arm of the test host, not a mock.
+>
 > **This confirms the device report, and sharpens it.** The old table had Solid 0.76x, Svelte 0.80x
 > and Vue 0.89x on Create — all UNDER stock. Here **every adapter is over stock on both create-shaped
 > rows**, while `Swap` and `Remove` are 3-5x WINS for everyone but React. That is exactly the split
