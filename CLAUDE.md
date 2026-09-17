@@ -1535,6 +1535,30 @@ into a root tag of its own — the careful-looking choice, since the raw arm kee
 ours — committed into a surface nothing can read, and reported `RootView()` empty while `render` came
 back perfectly clean.
 
+### The headline metric, headless, on one ruler — and it lands on the device ratio
+
+`core/engine/cpp/tests/js/stock-create-cost.itest.tsx` builds the same ten-node row a thousand times
+through `ReactFabric-prod`. Census asserted by absolute count first (`View=3001 Paragraph=3000
+RawText=3000 TextInput=1000`), then the clock:
+
+```
+ stock              85.9
+ engine directly    67.3    0.78x
+ our React          90.8    1.06x
+ our Vue           109.4    1.27x     still carrying the 17 ms text-input fold
+```
+
+**The device says React 264.7 against stock 257.3, i.e. 1.03x; headless says 1.06x.** So the harness
+reproduces the device ratio on the number everyone reads first, which is what a baseline is for — a
+create-path change can now be judged before a simulator ever runs.
+
+Read Vue's column with care: this fixture drives raw tags through `h()`, while the device's Vue is an
+SFC with compile-time lowering and static-prop hoisting, so 1.27x here and 0.89x there are not the
+same workload. What IS comparable is that its fold is still on the books.
+
+And React's 90.8 is down from the ~120 this same fixture reported an hour earlier — that is the
+development-React fix above paying out, at roughly a quarter of the arm.
+
 ### And the `Swap` anomaly reproduces headlessly: 2.42x, against 3.68x on device
 
 `core/engine/cpp/tests/js/stock-swap-cost.itest.tsx` builds the same thousand memoized rows through
