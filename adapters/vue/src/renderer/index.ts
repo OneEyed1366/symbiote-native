@@ -58,9 +58,12 @@ const TEXT_DEFAULTS: ReadonlyMap<string, unknown> = new Map<string, unknown>([
   ['allowFontScaling', true],
 ]);
 
-function seedTextDefaults(node: ISymbioteNode): void {
-  for (const [key, value] of TEXT_DEFAULTS) setProp(node, key, value);
-}
+// THE SEED IS GONE, and the defaults now come from the payload builder
+// (`applyTextDefaults` in `core/engine/src/fabric-props.ts`, and its twin in
+// `SymbioteFabricProps.cpp`). Writing them as props cost a crossing each time the app authored the
+// same value: measured at 6 000 wasted writes per 1 000-row create with the `writesOfUnchanged`
+// counter, against zero for React, which folds instead. `TEXT_DEFAULTS` stays for `textDefaultFor`
+// below, which is the clear-back-to-undefined path and not the create path.
 
 // RN's `id` is the modern W3C-named alias for `nativeID` — View.js copies it over
 // (`processedProps.nativeID = id`), so the two name ONE native prop. React folds it in its
@@ -144,7 +147,6 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       // resolved Fabric name (`RCTView`). This is the one place that holds both, so a primitive
       // whose machine lives on the engine node can be matched at all.
       const node = createElement(descriptor.component, descriptor.isText, type);
-      if (descriptor.isText) seedTextDefaults(node);
       // The imperative public-instance API (measure / setNativeProps / focus / …) is already on
       // the node's prototype, so a template/function ref to a host element exposes it exactly
       // like React's getPublicInstance and toPublicInstance is the identity. The ref must keep

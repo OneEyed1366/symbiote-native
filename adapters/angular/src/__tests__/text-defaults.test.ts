@@ -22,6 +22,7 @@ import {
   waitUntil,
   type IAuthoredNode,
 } from '@symbiote-native/test-utils';
+import { fabricProps, propsOf } from '@symbiote-native/engine';
 
 import { mount, unmount } from '../render';
 import { TextHost } from '../primitives';
@@ -32,11 +33,24 @@ const fabric = installRecordingFabric();
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-// Both defaults are written as explicit `setProp` calls (`resolveTextProps` -> `setHostProp` /
-// `seedTextDefaults`), so they are AUTHORED props, not a payload-time fold — `.props` is the
-// right bag to read.
+// THE PAYLOAD, not the ops bag. `seedTextDefaults` used to write both keys as real `setProp` calls,
+// which made `.props` the right place to read; the rule moved into the payload builder
+// (`applyTextDefaults`, `core/engine/src/fabric-props.ts`) because writing them cost a crossing every
+// time the app authored the same value — 6 000 per 1 000-row create, measured with
+// `writesOfUnchanged`. The recording host's `props` is "as the ops named it", so it can no longer see
+// them; `fabricProps` off the engine node is what native actually receives.
+//
+// The `@Input()` guarantee this file exists for is UNCHANGED and is still worth asserting here: a
+// pass-through host binding cannot tell an absent prop from an authored one, so Angular has to
+// declare both as real inputs for the "never overwrites the caller" case below to hold.
 function committed(testID: string): IAuthoredNode | undefined {
   return fabric.find(node => node.props.testID === testID);
+}
+
+function payloadOf(testID: string): Record<string, unknown> {
+  const node = committed(testID);
+  if (node === undefined) throw new Error(`no committed node ${testID}`);
+  return fabricProps(node.handle, propsOf(node.handle));
 }
 
 @Component({
@@ -94,10 +108,9 @@ describe('Angular Text RN defaults', () => {
       'plain Text commits',
     );
 
-    const node = committed('plain');
-    expect(node).toBeDefined();
-    expect(node?.props.ellipsizeMode).toBe('tail');
-    expect(node?.props.allowFontScaling).toBe(true);
+    const payload = payloadOf('plain');
+    expect(payload.ellipsizeMode).toBe('tail');
+    expect(payload.allowFontScaling).toBe(true);
   });
 
   it('never overwrites a value the caller supplied', async () => {
@@ -107,12 +120,11 @@ describe('Angular Text RN defaults', () => {
       'explicit Text commits',
     );
 
-    const node = committed('explicit');
-    expect(node).toBeDefined();
+    const payload = payloadOf('explicit');
     // 'clip' is a real RN mode, not an absent value — re-defaulting it to 'tail' would be a
     // silent behaviour change for anyone who deliberately turned the ellipsis off.
-    expect(node?.props.ellipsizeMode).toBe('clip');
-    expect(node?.props.allowFontScaling).toBe(false);
+    expect(payload.ellipsizeMode).toBe('clip');
+    expect(payload.allowFontScaling).toBe(false);
   });
 
   it('applies the same defaults to a text tag with no component behind it', async () => {
@@ -122,11 +134,10 @@ describe('Angular Text RN defaults', () => {
       'the bare text commits',
     );
 
-    const node = committed('bare');
-    expect(node).toBeDefined();
+    const payload = payloadOf('bare');
     // Six of these — two keys on each of a benchmark row's three Text nodes — are the entire
     // prop-key gap that made Angular's column incomparable to every other adapter's.
-    expect(node?.props.ellipsizeMode).toBe('tail');
-    expect(node?.props.allowFontScaling).toBe(true);
+    expect(payload.ellipsizeMode).toBe('tail');
+    expect(payload.allowFontScaling).toBe(true);
   });
 });

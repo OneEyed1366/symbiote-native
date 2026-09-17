@@ -205,6 +205,28 @@ function addStyle(out: Record<string, unknown>, style: unknown): void {
 const SINGLELINE_TEXT_INPUT = 'RCTSinglelineTextInputView';
 const MULTILINE_TEXT_INPUT = 'RCTMultilineTextInputView';
 
+// RN's two Text defaults (`Text.js:289` and `:291`), applied HERE so no adapter has to write them as
+// props. Three of them used to (`seedTextDefaults` in Vue, Angular and Solid): both keys landed on
+// every text node at `createElement`, the app then authored the same values, and each write crossed
+// into the host, converted to a `folly::dynamic` and was dropped for equalling what was there —
+// 6 000 wasted crossings per 1 000-row create, measured with `writesOfUnchanged`.
+//
+// The component NAME, not `node.isText`: a raw-text node is text too and takes neither of these.
+// `RCTVirtualText` is not listed because a nested `<Text>` reaches the builder under its AUTHORED
+// component, which the commit walk rewrites only afterwards — see `fabricProps`' caller.
+const TEXT_COMPONENT = 'RCTText';
+
+/** The rule, stated once: a fallback, never an override, and only a literal `false` opts out. */
+function applyTextDefaults(
+  props: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...props,
+    ellipsizeMode: props.ellipsizeMode ?? 'tail',
+    allowFontScaling: props.allowFontScaling !== false,
+  };
+}
+
 function foldTextInputValue(
   props: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -285,11 +307,16 @@ export function fabricProps(
     node.payloadFold !== undefined
       ? node.payloadFold(aliasFolded)
       : aliasFolded;
-  const props =
+  const valueFolded =
     node.component === SINGLELINE_TEXT_INPUT ||
     node.component === MULTILINE_TEXT_INPUT
       ? foldTextInputValue(behaviorFolded)
       : behaviorFolded;
+  // LAST of the component-keyed folds, so an adapter's own fold still gets to set either key and win.
+  const props =
+    node.component === TEXT_COMPONENT
+      ? applyTextDefaults(valueFolded)
+      : valueFolded;
   // Hoisted out of the loop: one cached lookup per node per commit, not one per key.
   const alreadyProcessed = configProcessedKeys(node.component);
   for (const key of Object.keys(props)) {

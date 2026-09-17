@@ -57,6 +57,8 @@ namespace {
 //   encodes `undefined` as `NO_VALUE`, which ERASES the key, so no such value ever arrives.
 
 constexpr const char *kRawTextComponent = "RCTRawText";
+// RN's two Text defaults live on THIS component and not on raw text — see `applyTextDefaults`.
+constexpr const char *kTextComponent = "RCTText";
 constexpr const char *kSinglelineTextInput = "RCTSinglelineTextInputView";
 constexpr const char *kMultilineTextInput = "RCTMultilineTextInputView";
 
@@ -516,6 +518,31 @@ dynamic fabricProps(
       (bag->get_ptr("value") != nullptr || bag->get_ptr("defaultValue") != nullptr)) {
     valueFolded = foldTextInputValue(*bag);
     bag = &valueFolded;
+  }
+
+  // RN's two Text defaults (`Text.js:289` and `:291`), applied here so no adapter has to write them
+  // as props. Three of them used to (`seedTextDefaults` in Vue, Angular and Solid): both keys landed
+  // on every text node at `createElement`, the app then authored the same values, and each write
+  // crossed into this host, converted to a `folly::dynamic` and was dropped for equalling what was
+  // already there — 6 000 wasted crossings per 1 000-row create, measured with `writesOfUnchanged`.
+  //
+  // LAST of the component-keyed folds, so a behavior's own fold still gets to set either key and win.
+  // A fallback and never an override, and `!= false` rather than "is missing": RN treats an explicit
+  // `undefined` and an absent prop alike, and only a literal `false` opts out. The twin of this rule
+  // is `applyTextDefaults` in `core/engine/src/fabric-props.ts`, and
+  // `core/engine/src/__tests__/text-payload-defaults.test.ts` is what keeps the two copies honest.
+  dynamic textDefaulted;
+  if (component == kTextComponent) {
+    textDefaulted = *bag;
+    const dynamic *ellipsize = textDefaulted.get_ptr("ellipsizeMode");
+    if (ellipsize == nullptr || ellipsize->isNull()) {
+      textDefaulted["ellipsizeMode"] = "tail";
+    }
+    const dynamic *scaling = textDefaulted.get_ptr("allowFontScaling");
+    const bool optedOut =
+        scaling != nullptr && scaling->isBool() && scaling->getBool() == false;
+    textDefaulted["allowFontScaling"] = !optedOut;
+    bag = &textDefaulted;
   }
 
   const dynamic &folded = *bag;

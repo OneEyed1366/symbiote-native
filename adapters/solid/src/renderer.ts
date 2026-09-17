@@ -158,10 +158,11 @@ const TEXT_FOLDS: ReadonlyMap<string, ITextFold> = new Map<string, ITextFold>([
   ['allowFontScaling', value => value !== false],
 ]);
 
-function seedTextDefaults(node: ISymbioteNode): void {
-  for (const [key, fold] of TEXT_FOLDS)
-    setEngineProp(node, key, fold(undefined));
-}
+// THE SEED IS GONE — the defaults come from the payload builder now (`applyTextDefaults` in
+// `core/engine/src/fabric-props.ts` and its twin in `SymbioteFabricProps.cpp`). Writing them as props
+// cost a crossing every time the app authored the same value: 6 000 per 1 000-row create, measured
+// with `writesOfUnchanged`. `TEXT_FOLDS` stays for the clear-back-to-undefined path below, which is
+// off the create path.
 
 // Seeding at CREATE is not enough, and the gap is device-only. A framework that clears a prop it
 // set earlier hands us an explicit `undefined` at PATCH time, and the default has to come BACK
@@ -247,7 +248,6 @@ const nodeOps: RendererOptions<IHostNode> = {
       descriptor.isText,
       tag,
     );
-    if (descriptor.isText) seedTextDefaults(node);
     // Only the multiline tag is seeded: writing `multiline: false` on the single-line one would add
     // a key the wrapper's payload does not carry, i.e. a divergence in the other direction.
     if (tag === TEXT_INPUT_MULTILINE_TAG)

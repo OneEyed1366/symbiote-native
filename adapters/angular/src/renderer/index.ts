@@ -78,10 +78,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // `foldHostBag('text', {})` on an EMPTY bag folds every default with no authored value to
 // override it (the alias loop has nothing to fold — `id` is only rewritten when present), which is
 // exactly the seed this function needs.
-function seedTextDefaults(node: ISymbioteNode): void {
-  const seeded = foldHostBag('text', {});
-  for (const [key, value] of Object.entries(seeded)) setProp(node, key, value);
-}
+// THE SEED IS GONE — the defaults come from the payload builder now (`applyTextDefaults` in
+// `core/engine/src/fabric-props.ts` and its twin in `SymbioteFabricProps.cpp`). Writing them as props
+// cost a crossing every time the app authored the same value: 6 000 per 1 000-row create, measured
+// with `writesOfUnchanged`. The clear-back-to-undefined path below stays — it is off the create path
+// and costs nothing on the common one.
 
 // An explicit `undefined` must NOT clear one of those defaults — RN treats a missing prop and an
 // explicit undefined alike, and only a literal `false` opts allowFontScaling out. Reached only
@@ -267,7 +268,6 @@ export class SymbioteRenderer implements Renderer2 {
       descriptor.isText,
       engineName,
     );
-    if (descriptor.isText) seedTextDefaults(node);
     if (isDebug()) {
       dlog(`angular createElement ${name} -> ${descriptor.component}`);
     }

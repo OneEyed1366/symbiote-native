@@ -1635,11 +1635,23 @@ create**, on Vue, Angular and Solid alike (all three seed; React folds instead).
 figure is about the device's row, which authors props the fold already supplies — do not conflate
 them.
 
-The fix is NOT another `payloadFold`: one costs ~17 us per node per commit, which is worse than what
-it would save. RN's text defaults are the PLATFORM's semantics rather than any adapter's, so they
-belong in the payload builder beside the component-keyed folds already there (`foldTextInputValue`,
-in both `SymbioteFabricProps.cpp` and `fabric-props.ts`), with `seedTextDefaults` deleted from the
-three adapters. Not done.
+**Fixed the same day, and NOT with another `payloadFold`** — one of those costs ~17 us per node per
+commit, worse than what it saves. RN's text defaults are the PLATFORM's semantics rather than any
+adapter's, so the rule now lives in the payload builder beside the component-keyed folds already
+there: `applyTextDefaults` in `core/engine/src/fabric-props.ts` and its twin in
+`SymbioteFabricProps.cpp`, with `seedTextDefaults` deleted from Vue, Angular and Solid.
+`writesOfUnchanged` on Vue's arm went **6 000 → 0**, and `setProps` held at 13 003 — the accepted
+writes are the same ones, six thousand seed ops simply stopped being emitted for the app to overwrite.
+Wall moved 121-130 → 116.6, which is at the edge of this fixture's spread and carries no verdict on
+its own; the counter does.
+
+Two things that came with it. The adapters keep their clear-back-to-`undefined` path (a framework
+that clears a prop it set must get the default BACK, and that is off the create path by its own
+comment) — only the create-time seed is gone. And two tests had to move from `.props` to the
+PAYLOAD, which is what they were always trying to assert: `adapters/solid/src/
+renderer-defaults-fold.test.tsx` said so in its own header ("survives … being lifted into the
+engine"), and `adapters/angular/src/__tests__/text-defaults.test.ts` read the recording host, whose
+`props` is "as the ops named it" and therefore cannot see a payload-time rule at all.
 
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the

@@ -89,7 +89,13 @@ describe('the renderer default folds against the shared spec', () => {
         const node = await committedText(
           authored === undefined ? {} : { [key]: authored },
         );
-        expect(node.props[key], `${key}={${String(authored)}}`).toEqual(
+        // `.payload`, not `.props`, which is what this file's header said it was asserting all
+        // along. The two agreed while the RENDERER seeded the defaults as authored props; they part
+        // company now that the rule lives in the payload builder (`applyTextDefaults`,
+        // `core/engine/src/fabric-props.ts`), and the payload is the side that decides what native
+        // sees. Reading `.props` here would now assert that the adapter still writes them, which is
+        // exactly the work this change removed.
+        expect(node.payload[key], `${key}={${String(authored)}}`).toEqual(
           resolve(rule, authored),
         );
       }
