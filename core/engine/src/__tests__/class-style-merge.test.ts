@@ -6,9 +6,11 @@
 // class-derived one, regardless of which prop is set first or last.
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { installRecordingFabric } from '@symbiote-native/test-utils';
 import {
   clearGlobalStyles,
   createElement,
+  createSurface,
   flattenStyle,
   getExplicitStyle,
   getPublishedStyle,
@@ -159,5 +161,26 @@ describe('routeProp class/className + style merge', () => {
     expect(flattenStyle(getPublishedStyle(node))).toEqual({
       backgroundColor: 'blue',
     });
+  });
+
+  // why (F-22, `.docs/tree-inefficiency-findings.md`): a class that matches NO rule and no
+  // explicit `style` prop means the authored style is genuinely absent — `pushClassStyle` must
+  // spell that as `setProp(node, 'style', undefined)`, the wire's own NO_VALUE/delete encoding
+  // (`mutation-buffer.ts`), not as a real `[undefined, undefined]` array. Both are "no style" once
+  // the payload builder flattens them, but only the former costs the host nothing — the array
+  // must be converted to a `folly::dynamic`, stored, and diffed on every later commit for real
+  // work that produces zero visible props. Wire-level, not `getPublishedStyle` (which reads the
+  // resolved slots, not what was actually sent) — a recording host is what can tell an omitted
+  // key apart from a key present with an `[undefined, undefined]` value.
+  it('publishes no wire value at all when the class matches nothing and style is absent', () => {
+    const fabric = installRecordingFabric();
+    const surface = createSurface(88_001);
+    const node = createElement('RCTView');
+
+    routeProp(node, 'class', 'does-not-match-any-registered-rule');
+    surface.appendChild(node);
+    surface.commit();
+
+    expect(fabric.propOf(node, 'style')).toBeUndefined();
   });
 });
