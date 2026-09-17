@@ -779,27 +779,64 @@ porting ANY further RN module by hand.**
 >
 > ```
 >             native walk          js walk             per node
->  pressable  4.0  4.0  3.9 ms     19.0 18.8 18.8 ms   ~14.9 us    folds 0 against 1000
->  switch     4.8  4.5  4.4 ms     21.7 20.6 20.4 ms   ~16.3 us    folds 0 against 1000
+>  pressable  4.7  3.9  4.1 ms     18.9 18.5 18.7 ms   ~14.5 us    folds 0 against 1000
+>  switch     5.1  5.1  5.7 ms     23.9 24.3 24.4 ms   ~18.9 us    folds 0 against 1000
 > ```
 >
 > The pressable row read 5.6/28.6 when measured alone on a busier machine. Both are real and neither
 > is the other's before/after — that is exactly why they were re-measured together.
 >
-> **THREE DIVERGENCES FROM RN FELL OUT OF READING `Switch.js` TO PORT IT, and none was fixed here.**
-> A port is a MOVE; folding a correctness change into it would make the measurement and any future
-> regression unattributable. Each is pinned as characterization in `switch-payload.itest.ts` with an
-> open question:
+> ### A small-ms scaling test needs BEST-OF-N, not one sample (2026-09-18)
 >
-> - `accessibilityRole` defaults to `'switch'` in RN on both platforms (`Switch.js:255,293`). We
->   emit nothing, so a screen reader announces ours as a plain view — the same class of silent gap
->   `accessible`/`focusable` were on Pressable before 2026-09-09.
-> - iOS composes `{alignSelf: 'flex-start'}` UNDER the app's style (`:266`), so a stock Switch does
->   not stretch to its container's cross axis. Ours does.
-> - Android's native names are `on` and `enabled` (`:240-241`), not `value` and `disabled`, and
->   `_disabled` resolves through `accessibilityState.disabled` first. We send `value`/`disabled` on
->   both platforms. Unobservable from this build — every assertion here is the iOS branch — which is
->   precisely why it is written down instead of left to a device.
+> `child-list-scaling.itest.ts` reads a doubling FACTOR rather than a millisecond, which is the right
+> instrument for a complexity claim — and it was failing intermittently under the full suite while
+> passing in isolation, twice costing a false alarm on a test with no defect.
+>
+> The cause is scale plus parallelism: a 1 000-wide clear is ~0.45 ms on the assert build, and the
+> runner spawns a process per test file (62 of them), so a sample can be descheduled for longer than
+> the thing being measured. **Timing noise is one-sided — it only ever ADDS — so the MINIMUM of
+> several runs is the closest reading to the work itself, while a mean carries every interruption
+> into the ratio.** Five samples per width, a fresh list for each (a cleared list has nothing left to
+> remove, and re-timing the same one reports a beautifully flat curve for the wrong reason). Bounds
+> unchanged; only the sampling. The insert row went from a spread to a dead-flat 3.77x.
+>
+> **THREE DIVERGENCES FROM RN FELL OUT OF READING `Switch.js` TO PORT IT, and all three are now
+> FIXED — in the commit AFTER the port, so the move and the correction each have their own before and
+> after.** A port is a MOVE; folding a correctness change into it makes the measurement and any
+> future regression unattributable.
+>
+> - `accessibilityRole` defaults to `'switch'` on both platforms (`Switch.js:255,293`). We emitted
+>   nothing, so a screen reader announced our switch as a plain view — the same class of silent gap
+>   `accessible`/`focusable` were on Pressable before 2026-09-09. `??`, so an app that calls it a
+>   checkbox keeps its answer.
+> - iOS composes `{alignSelf: 'flex-start'}` UNDER the app's style (`:266`), so a stock Switch keeps
+>   its intrinsic width. Ours stretched. UNDER is the whole of it — `alignSelf: 'stretch'` still
+>   wins — and the composition is iOS's alone: `:263-281` is the `else` branch, so Android's style is
+>   the app's untouched and `ios_backgroundColor` is not read there at all.
+> - Android's native component is a DIFFERENT one with different prop names — `on` and `enabled`
+>   (`:240-243`), never `value`/`disabled` — `_disabled` falls back to `accessibilityState.disabled`
+>   and is written back into it (`:232-238`), and the iOS colour names are destructured OUT (`:230`).
+>   We sent the iOS names on both platforms, so an Android switch painted from nothing and could not
+>   be disabled.
+>
+> **AND THE ANDROID HALF IS TESTABLE HEADLESSLY, because the branch is the VIEW NAME rather than
+> `#ifdef ANDROID`.** `Switch` and `AndroidSwitch` are genuinely two Fabric components with two prop
+> surfaces, and the name is already on the wire — so `foldSwitchProps` reads it and a test can ask
+> for either. That is strictly better than a compile-time branch and it is the shape to prefer
+> wherever a platform difference has a name: the ripple in `foldPressableProps` stays `#ifdef`
+> precisely because it has no such tell, an `android_ripple` sitting on an ordinary `RCTView`.
+>
+> **The A/B guard earned its keep the same hour.** `expectSamePayload` refuses to time two arms that
+> send different bags, so the corrected rule turned `tag-rule-cost.itest.ts` red the moment it landed
+> — a measurement that would otherwise have compared the new rule against the old one and called the
+> difference a speed-up.
+>
+> **One latent C++ bug came out of it, found by needing two values at once.** `boolAt` returned a
+> `const bool *` into a single `static thread_local` slot, so any two results held simultaneously
+> aliased — the second read rewrote the first. Nothing had ever needed two, so nothing was wrong;
+> Android's `disabled` beside `accessibilityState.disabled` is the first caller that does, and it
+> would have resolved every switch through whichever was read last. It returns `std::optional<bool>`
+> now, and all five call sites moved with it.
 >
 > **AND ONE HAZARD CLOSED BY CONSTRUCTION.** The adapters used to pin that `onTintColor` reaches
 > Fabric as a PROP rather than being mistaken for a listener, because `routeProp` asks the Switch
