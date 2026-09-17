@@ -276,7 +276,7 @@ export type IFoldedTextInputProps = {
   selectionColor: string | undefined;
   cursorColor: string | undefined;
   selectionHandleColor: string | undefined;
-  underlineColorAndroid: string;
+  underlineColorAndroid: string | undefined;
   autoComplete: string | undefined;
   textContentType: string | undefined;
   showSoftInputOnFocus: boolean | undefined;
@@ -287,15 +287,17 @@ export type IFoldedTextInputProps = {
 // editable (inverted), the cursor/selection-handle colors default from selectionColor, the W3C
 // autoComplete token folds to the per-platform native prop (an explicit textContentType still
 // wins), inputMode forces softInput visibility, and underlineColorAndroid defaults to
-// 'transparent' to hide the Material EditText bar.
+// 'transparent' ON ANDROID ONLY to hide the Material EditText bar — omitted (`undefined`) on
+// every other platform, matching stock RN's own filtered payload (F-76).
 export function resolveTextInputProps(
   input: ITextInputFoldInput,
+  os: IPlatformOSType = Platform.OS,
 ): IFoldedTextInputProps {
   const folded = foldAutoComplete(input.autoComplete);
   return {
     keyboardType:
       input.inputMode !== undefined
-        ? keyboardTypeForInputMode(input.inputMode, Platform.OS)
+        ? keyboardTypeForInputMode(input.inputMode, os)
         : input.keyboardType,
     returnKeyType:
       input.enterKeyHint !== undefined
@@ -316,10 +318,17 @@ export function resolveTextInputProps(
       input.selectionHandleColor !== undefined
         ? input.selectionHandleColor
         : input.selectionColor,
+    // Android-only (F-76, `.docs/tree-inefficiency-findings.md`): iOS's `RCTSinglelineTextInputView`
+    // ViewConfig does not declare this prop at all — RN's own `ReactNativeAttributePayload.create`
+    // filters it against `validAttributes` and it never leaves JS on that platform. We have no such
+    // filter, so defaulting it unconditionally sent a key every iOS view silently dropped: one wire
+    // slot, one interned string, one hashed RawProps entry, per TextInput, for nothing.
     underlineColorAndroid:
       input.underlineColorAndroid !== undefined
         ? input.underlineColorAndroid
-        : 'transparent',
+        : os === 'android'
+          ? 'transparent'
+          : undefined,
     autoComplete: folded.autoComplete,
     textContentType:
       input.textContentType !== undefined

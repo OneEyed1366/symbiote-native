@@ -312,15 +312,24 @@ describe('resolveTextInputProps (Positive — the precedence rules, RN TextInput
 
   // why: without this default Android's Material EditText paints its own underline bar under every
   // input, which no other platform has and no app asked for.
-  it('hides the Android underline by default', () => {
-    expect(resolveTextInputProps(foldInput()).underlineColorAndroid).toBe(
-      'transparent',
-    );
+  it('hides the Android underline by default, on Android', () => {
+    expect(
+      resolveTextInputProps(foldInput(), 'android').underlineColorAndroid,
+    ).toBe('transparent');
   });
 
-  it('lets an explicit underlineColorAndroid win', () => {
+  // why (F-76): iOS's ViewConfig does not declare this prop at all — stock RN's own payload
+  // builder filters it before it ever leaves JS on that platform, so sending it there is a wire
+  // slot, an interned string and a hashed RawProps entry the native view can never read.
+  it('omits the underline color off Android, where no view declares it', () => {
     expect(
-      resolveTextInputProps(foldInput({ underlineColorAndroid: 'red' }))
+      resolveTextInputProps(foldInput(), 'ios').underlineColorAndroid,
+    ).toBeUndefined();
+  });
+
+  it('lets an explicit underlineColorAndroid win, on any platform', () => {
+    expect(
+      resolveTextInputProps(foldInput({ underlineColorAndroid: 'red' }), 'ios')
         .underlineColorAndroid,
     ).toBe('red');
   });

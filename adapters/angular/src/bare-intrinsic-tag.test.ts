@@ -224,12 +224,13 @@ describe('a bare intrinsic tag, hand-written', () => {
     );
     // The behavior registry is keyed by the intrinsic TAG. A renderer that handed it the resolved
     // Fabric name instead would attach nothing and these defaults would silently vanish.
-    expect(
-      all.find(node => node.payload.testID === 'probe')?.payload,
-    ).toMatchObject({
-      submitBehavior: 'blurAndSubmit',
-      underlineColorAndroid: 'transparent',
-    });
+    const probePayload = all.find(
+      node => node.payload.testID === 'probe',
+    )?.payload;
+    expect(probePayload).toMatchObject({ submitBehavior: 'blurAndSubmit' });
+    // F-76: Android-only default, headless resolves iOS — see `resolveTextInputProps`'s own tests
+    // for the Android branch.
+    expect(probePayload?.underlineColorAndroid).toBeUndefined();
     expect(all.find(node => node.payload.testID === 'sw')?.payload.value).toBe(
       false,
     );

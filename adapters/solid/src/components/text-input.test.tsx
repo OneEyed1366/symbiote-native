@@ -129,8 +129,10 @@ describe('Solid TextInput on the engine', () => {
       // One W3C token resolves BOTH platforms' native props; the inert one rides along.
       expect(payload.autoComplete).toBe('username');
       expect(payload.textContentType).toBe('username');
-      // RN hides Android's Material EditText bar by default (TextInput.js:908).
-      expect(payload.underlineColorAndroid).toBe('transparent');
+      // F-76: Android-only default. RN's own payload builder filters this key out on iOS
+      // (`RCTTextInputViewConfig.js` never declares it), so it must not be here either —
+      // `resolveTextInputProps`'s own tests price the Android branch directly.
+      expect(payload.underlineColorAndroid).toBeUndefined();
       // Single-line with no explicit submitBehavior blurs on submit.
       expect(payload.submitBehavior).toBe('blurAndSubmit');
     });

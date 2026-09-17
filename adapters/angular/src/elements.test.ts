@@ -332,8 +332,10 @@ describe('what the element directives commit', () => {
     );
     expect(propsOf(all, 'probe')).toMatchObject({
       submitBehavior: 'blurAndSubmit',
-      underlineColorAndroid: 'transparent',
     });
+    // F-76: Android-only default, headless resolves iOS — see `resolveTextInputProps`'s own tests
+    // for the Android branch.
+    expect(propsOf(all, 'probe').underlineColorAndroid).toBeUndefined();
     expect(propsOf(all, 'sw').value).toBe(false);
   });
 

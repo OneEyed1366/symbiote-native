@@ -85,9 +85,10 @@ describe('a text-input tag folds the W3C aliases', () => {
   it('carries the defaults the wrapper carries', () => {
     const props = commitTag(TEXT_INPUT_VIEW, TEXT_INPUT_TAG, {});
 
-    // Hides the Material EditText bar; absent, every Android input grows a line under it.
-    expect(props.underlineColorAndroid).toBe('transparent');
     expect(props.submitBehavior).toBe('blurAndSubmit');
+    // F-76: Android-only default (headless resolves iOS, where no ViewConfig declares this key —
+    // `resolveTextInputProps`'s own tests price the Android branch directly).
+    expect(props.underlineColorAndroid).toBeUndefined();
   });
 });
 

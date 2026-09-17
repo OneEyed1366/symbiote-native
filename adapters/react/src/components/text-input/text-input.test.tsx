@@ -244,13 +244,13 @@ describe('<text-input>', () => {
     expect(node.payload.textContentType).toBe('creditCardName');
   });
 
-  // why: RN's Material EditText paints a visible underline by default; every host silently
-  // getting one uninvited would be a visual regression, so the default must actively suppress it.
-  it('defaults underlineColorAndroid to transparent', () => {
+  // why (F-76): Android-only. iOS's `RCTTextInputViewConfig` never declares this prop, and stock
+  // RN's own payload builder filters it out there (`ReactNativeAttributePayload.create` drops any
+  // key `validAttributes` doesn't declare) — so sending it on iOS was a wire slot for nothing.
+  // Headless resolves iOS; `resolveTextInputProps`'s own tests price the Android branch directly.
+  it('omits underlineColorAndroid off Android, where no view declares it', () => {
     mount(ROOT_TAG, <text-input value="x" />);
-    expect(inputNode(SINGLELINE).payload.underlineColorAndroid).toBe(
-      'transparent',
-    );
+    expect(inputNode(SINGLELINE).payload.underlineColorAndroid).toBeUndefined();
   });
 
   // why: the transparent default above must not be hardcoded past an explicit caller choice —

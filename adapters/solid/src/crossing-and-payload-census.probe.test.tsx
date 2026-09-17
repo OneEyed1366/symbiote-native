@@ -219,10 +219,17 @@ describe('what one benchmark row actually commits', () => {
 
   // WHAT THE BEHAVIORS SEED, pinned against the reference rather than against yesterday's output.
   //
-  // RN's own JS emits every one of these UNCONDITIONALLY and cross-platform: `Pressable.js:252,258`
-  // (`accessible: accessible !== false`, `focusable: focusable !== false`) and `TextInput.js:907`
-  // (`underlineColorAndroid = 'transparent'`) — so `underlineColorAndroid` on iOS is not ours to
-  // trim, it is RN's.
+  // RN's own JS emits `accessible`/`focusable` UNCONDITIONALLY and cross-platform
+  // (`Pressable.js:252,258` — `accessible: accessible !== false`, `focusable: focusable !== false`)
+  // — those two are RN's, not ours to trim.
+  //
+  // `underlineColorAndroid` is NOT one of these, and this line used to say it was (F-76,
+  // `.docs/tree-inefficiency-findings.md`). `TextInput.js:908` does default it to `'transparent'`
+  // unconditionally, but only at the REACT PROPS layer — `ReactNativeAttributePayload.create`
+  // (`addNestedProperty`, same file) drops any key `validAttributes` doesn't declare, and iOS's
+  // `RCTTextInputViewConfig.js` never declares `underlineColorAndroid` (only
+  // `AndroidTextInputNativeComponent.js` does). So stock RN's own payload omits it on iOS; sending
+  // it there was ours to trim, and now we do (`resolveTextInputProps`, `os === 'android'`).
   //
   // Stylesheet-independent on purpose: a CSS edit must not move this test, because what it pins is
   // the FOLD, not the row's look. `payloadOf`, not the authored bag — the fold is the claim.
@@ -268,12 +275,7 @@ describe('what one benchmark row actually commits', () => {
           'width',
         ],
       ),
-    ).toEqual([
-      'mostRecentEventCount',
-      'submitBehavior',
-      'text',
-      'underlineColorAndroid',
-    ]);
+    ).toEqual(['mostRecentEventCount', 'submitBehavior', 'text']);
     unmount(ROOT_TAG + 21);
   });
 });
