@@ -60,6 +60,9 @@ namespace {
 constexpr const char *kRawTextComponent = "RCTRawText";
 // RN's two Text defaults live on THIS component and not on raw text — see `applyTextDefaults`.
 constexpr const char *kTextComponent = "RCTText";
+// Android's switch is its OWN Fabric component with its own prop names (`on`/`enabled` rather than
+// `value`/`disabled`), which is what lets `foldSwitchProps` branch on the name instead of `#ifdef`.
+constexpr const char *kAndroidSwitchComponent = "AndroidSwitch";
 constexpr const char *kSinglelineTextInput = "RCTSinglelineTextInputView";
 constexpr const char *kMultilineTextInput = "RCTMultilineTextInputView";
 
@@ -591,13 +594,19 @@ const std::string *stringAt(const dynamic &props, const char *key) {
   return &found->getString();
 }
 
-/** The bool a key holds, or null when it is absent or is not a bool. */
-const bool *boolAt(const dynamic &props, const char *key) {
+/**
+ * The bool a key holds, or nothing when it is absent or is not a bool.
+ *
+ * A VALUE, and it has to be. This returned `const bool *` into a single `static thread_local` slot
+ * until 2026-09-18, which meant any two results held at once silently aliased — the second read
+ * rewrote the first. Nothing had two live at a time, so nothing was wrong; the Android switch rule
+ * is the first caller that needs `disabled` and `accessibilityState.disabled` side by side, and it
+ * would have resolved every switch through whichever was read last.
+ */
+std::optional<bool> boolAt(const dynamic &props, const char *key) {
   const dynamic *found = props.get_ptr(key);
-  if (found == nullptr || !found->isBool()) return nullptr;
-  static thread_local bool held = false;
-  held = found->getBool();
-  return &held;
+  if (found == nullptr || !found->isBool()) return std::nullopt;
+  return found->getBool();
 }
 
 /** A safe lookup: the mapped token, or null when the map has no entry. The caller owns the fallback. */
@@ -617,16 +626,16 @@ const std::string *mappedToken(
  */
 std::string foldSubmitBehavior(
     const std::string *submitBehavior,
-    const bool *blurOnSubmit,
+    std::optional<bool> blurOnSubmit,
     bool isMultiline) {
   if (submitBehavior != nullptr) {
     if (!isMultiline && *submitBehavior == "newline") return "blurAndSubmit";
     return *submitBehavior;
   }
   if (isMultiline) {
-    return blurOnSubmit != nullptr && *blurOnSubmit ? "blurAndSubmit" : "newline";
+    return blurOnSubmit.value_or(false) ? "blurAndSubmit" : "newline";
   }
-  return blurOnSubmit != nullptr && !*blurOnSubmit ? "submit" : "blurAndSubmit";
+  return blurOnSubmit.has_value() && !*blurOnSubmit ? "submit" : "blurAndSubmit";
 }
 
 /**
@@ -663,8 +672,8 @@ dynamic foldTextInputAliases(const dynamic &props, bool isMultiline) {
 
   // The web spelling is the NEGATION of the native one. Getting it backwards makes every read-only
   // field editable, silently.
-  const bool *readOnly = boolAt(props, "readOnly");
-  if (readOnly != nullptr && out.get_ptr("editable") == nullptr) {
+  const std::optional<bool> readOnly = boolAt(props, "readOnly");
+  if (readOnly.has_value() && out.get_ptr("editable") == nullptr) {
     out["editable"] = !*readOnly;
   }
 
@@ -786,14 +795,13 @@ void applyAndroidRipple(dynamic &out, const dynamic &config) {
   background["type"] = "RippleAndroid";
   const std::string *color = stringAt(config, "color");
   background["color"] = color != nullptr ? dynamic(*color) : dynamic(nullptr);
-  const bool *borderless = boolAt(config, "borderless");
-  background["borderless"] = borderless != nullptr && *borderless;
+  background["borderless"] = boolAt(config, "borderless").value_or(false);
   const dynamic *radius = config.get_ptr("radius");
   if (radius != nullptr && radius->isNumber()) background["rippleRadius"] = *radius;
 
-  const bool *foreground = boolAt(config, "foreground");
-  out[foreground != nullptr && *foreground ? "nativeForegroundAndroid"
-                                           : "nativeBackgroundAndroid"] = std::move(background);
+  out[boolAt(config, "foreground").value_or(false) ? "nativeForegroundAndroid"
+                                                  : "nativeBackgroundAndroid"] =
+      std::move(background);
 }
 #endif
 
@@ -818,8 +826,8 @@ dynamic foldPressableProps(const dynamic &props) {
 
   // Read BEFORE the machine keys are erased, and `!= null` rather than truthiness: an explicit
   // `disabled: false` is a real announcement, so it is presence and not value that decides.
-  const bool *disabled = boolAt(props, "disabled");
-  if (disabled != nullptr) {
+  const std::optional<bool> disabled = boolAt(props, "disabled");
+  if (disabled.has_value()) {
     const dynamic *authored = props.get_ptr("accessibilityState");
     dynamic state =
         authored != nullptr && authored->isObject() ? *authored : dynamic::object();
@@ -836,10 +844,8 @@ dynamic foldPressableProps(const dynamic &props) {
 
   for (const char *key : kPressableMachineKeys) out.erase(key);
 
-  const bool *accessible = boolAt(props, "accessible");
-  out["accessible"] = accessible == nullptr || *accessible;
-  const bool *focusable = boolAt(props, "focusable");
-  out["focusable"] = focusable == nullptr || *focusable;
+  out["accessible"] = boolAt(props, "accessible").value_or(true);
+  out["focusable"] = boolAt(props, "focusable").value_or(true);
   return out;
 }
 
@@ -860,18 +866,12 @@ constexpr double kIosSwitchBackgroundRadius = 16;
  * WRITES ONLY WHAT IT RESOLVES: an absent authored colour leaves its native name unset rather than
  * writing a null, which is what the payload builder would otherwise send as an explicit reset.
  */
-dynamic foldSwitchProps(const dynamic &props) {
+dynamic foldSwitchProps(const dynamic &props, bool isAndroidSwitch) {
   dynamic out = props;
 
-  // `value === true`, not a passthrough (`Switch.js:280`): the native prop is a boolean, and an
+  // `value === true`, not a passthrough (`Switch.js:242,280`): the native prop is a boolean, and an
   // authored `undefined` must read as OFF. An uncontrolled switch painting ON is the worse failure.
-  const bool *value = boolAt(props, "value");
-  const bool isOn = value != nullptr && *value;
-  out["value"] = isOn;
-
-  const bool *disabled = boolAt(props, "disabled");
-  if (disabled == nullptr) out.erase("disabled");
-  else out["disabled"] = *disabled;
+  const bool isOn = boolAt(props, "value").value_or(false);
 
   const dynamic *trackColor = props.get_ptr("trackColor");
   const std::string *trackFalse = nullptr;
@@ -881,35 +881,89 @@ dynamic foldSwitchProps(const dynamic &props) {
     trackTrue = stringAt(*trackColor, "true");
   }
 
-#ifdef ANDROID
-  if (trackFalse != nullptr) out["trackColorForFalse"] = *trackFalse;
-  if (trackTrue != nullptr) out["trackColorForTrue"] = *trackTrue;
-  const std::string *tint = isOn ? trackTrue : trackFalse;
-  if (tint != nullptr) out["trackTintColor"] = *tint;
-#else
-  if (trackTrue != nullptr) out["onTintColor"] = *trackTrue;
-  if (trackFalse != nullptr) out["tintColor"] = *trackFalse;
-#endif
+  const std::optional<bool> disabled = boolAt(props, "disabled");
+
+  if (isAndroidSwitch) {
+    // A DIFFERENT NATIVE COMPONENT WITH A DIFFERENT PROP SURFACE (`Switch.js:240-249`), which is
+    // why the branch reads the view name rather than a compile-time macro: `AndroidSwitch` declares
+    // `on` and `enabled`, and knows neither `value` nor `disabled`. Sending the iOS names here
+    // painted an Android switch from nothing and left it impossible to disable.
+    out["on"] = isOn;
+    out.erase("value");
+
+    // `:232` — the a11y state is the FALLBACK for `disabled`, so an app that only spells
+    // `accessibilityState.disabled` still gets a switch it cannot toggle.
+    const dynamic *authoredState = props.get_ptr("accessibilityState");
+    const std::optional<bool> stateDisabled =
+        authoredState != nullptr && authoredState->isObject()
+        ? boolAt(*authoredState, "disabled")
+        : std::nullopt;
+    const bool isDisabled = disabled.value_or(stateDisabled.value_or(false));
+    out["enabled"] = !isDisabled;
+    out.erase("disabled");
+
+    // `:235-238` — the resolved answer is written BACK, so the screen reader and the view agree.
+    // Merged rather than replaced: an authored `busy` survives.
+    if (stateDisabled != isDisabled) {
+      dynamic state = authoredState != nullptr && authoredState->isObject()
+          ? *authoredState
+          : dynamic::object();
+      state["disabled"] = isDisabled;
+      out["accessibilityState"] = std::move(state);
+    }
+
+    if (trackFalse != nullptr) out["trackColorForFalse"] = *trackFalse;
+    if (trackTrue != nullptr) out["trackColorForTrue"] = *trackTrue;
+    const std::string *tint = isOn ? trackTrue : trackFalse;
+    if (tint != nullptr) out["trackTintColor"] = *tint;
+    // `:230` destructures the iOS colour names out of what reaches this view. They are keys it does
+    // not declare.
+    out.erase("onTintColor");
+    out.erase("tintColor");
+  } else {
+    out["value"] = isOn;
+    if (disabled.has_value()) out["disabled"] = *disabled;
+    else out.erase("disabled");
+
+    if (trackTrue != nullptr) out["onTintColor"] = *trackTrue;
+    if (trackFalse != nullptr) out["tintColor"] = *trackFalse;
+
+    // THE iOS STYLE COMPOSITION, and it is iOS's alone — `:266-276` is the `else` branch, so
+    // Android's style is the app's untouched and `ios_backgroundColor` is not read there at all.
+    //
+    // The slot takes an ARRAY, which `addStyle` flattens in order, so this reproduces RN's nested
+    // `StyleSheet.compose` exactly: `alignSelf` UNDER the app's style (an app that writes
+    // `alignSelf: 'stretch'` still wins), the pill OVER it.
+    const dynamic *authoredStyle = props.get_ptr("style");
+    const std::string *iosBackground = stringAt(props, "ios_backgroundColor");
+    dynamic composed = dynamic::array();
+    dynamic intrinsic = dynamic::object();
+    // `:267` — a stock iOS switch keeps its intrinsic width instead of stretching to its
+    // container's cross axis. Omitting it made every one of ours stretch.
+    intrinsic["alignSelf"] = "flex-start";
+    composed.push_back(std::move(intrinsic));
+    if (authoredStyle != nullptr) composed.push_back(*authoredStyle);
+    if (iosBackground != nullptr) {
+      dynamic pill = dynamic::object();
+      pill["backgroundColor"] = *iosBackground;
+      pill["borderRadius"] = kIosSwitchBackgroundRadius;
+      composed.push_back(std::move(pill));
+    }
+    out["style"] = std::move(composed);
+  }
+
+  // `:255,293` — both platforms, and a `??` rather than an override: an app that calls its switch a
+  // checkbox keeps its own answer. Without this a screen reader announces the control as a plain
+  // view, with nothing visual to notice.
+  if (out.get_ptr("accessibilityRole") == nullptr) {
+    out["accessibilityRole"] = "switch";
+  }
 
   const std::string *thumbColor = stringAt(props, "thumbColor");
   if (thumbColor != nullptr) out["thumbTintColor"] = *thumbColor;
 
-  // The style slot takes an ARRAY, which `addStyle` flattens in order — so the authored style keeps
-  // its precedence and the pill is layered over it, exactly as `StyleSheet.compose` does upstream.
-  const std::string *iosBackground = stringAt(props, "ios_backgroundColor");
-  if (iosBackground != nullptr) {
-    dynamic pill = dynamic::object();
-    pill["backgroundColor"] = *iosBackground;
-    pill["borderRadius"] = kIosSwitchBackgroundRadius;
-    dynamic composed = dynamic::array();
-    const dynamic *authored = props.get_ptr("style");
-    if (authored != nullptr) composed.push_back(*authored);
-    composed.push_back(std::move(pill));
-    out["style"] = std::move(composed);
-  }
-
-  // None of the three is a native prop, and leaving one in the payload is how a reader concludes the
-  // rule ran when it did not.
+  // None of the three authored names is a native prop, and leaving one in the payload is how a
+  // reader concludes the rule ran when it did not.
   out.erase("trackColor");
   out.erase("thumbColor");
   out.erase("ios_backgroundColor");
@@ -955,7 +1009,10 @@ dynamic fabricProps(
     tagResolved = foldPressableProps(*bag);
     bag = &tagResolved;
   } else if (tagName == "switch") {
-    tagResolved = foldSwitchProps(*bag);
+    // The COMPONENT decides the platform half, not a compile-time macro: `Switch` and
+    // `AndroidSwitch` are two native components with two prop surfaces, and the name is already
+    // here. It also makes both halves reachable from one test build.
+    tagResolved = foldSwitchProps(*bag, component == kAndroidSwitchComponent);
     bag = &tagResolved;
   }
 

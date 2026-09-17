@@ -27,10 +27,15 @@ import {
 import { describe, expect, it, mounted, print, report } from './harness';
 
 const ROOT_TAG = 1;
-// The iOS Fabric name, which is what the headless `component-names` table resolves to. Android
-// spells it `AndroidSwitch`, and that difference is the reason the rule below has a platform branch
-// at all.
+// THE PLATFORM BRANCH IS THE VIEW NAME, not a compile-time macro, and that is what makes both
+// halves of this file possible. A switch commits as `Switch` on iOS and `AndroidSwitch` on
+// Android — genuinely two native components with two prop surfaces — and the name is already on
+// the wire. So the rule reads it, and a test can ask for either.
+//
+// The ripple in `foldPressableProps` is `#ifdef ANDROID` precisely because it has no such tell: an
+// `android_ripple` sits on an `RCTView` like any other view's props do.
 const SWITCH_VIEW = 'Switch';
+const ANDROID_SWITCH_VIEW = 'AndroidSwitch';
 
 registerSwitchBehavior();
 
@@ -39,9 +44,9 @@ type ICommitted = {
   readonly folds: number;
 };
 
-function commit(props: Record<string, unknown>): ICommitted {
+function commitTo(view: string, props: Record<string, unknown>): ICommitted {
   const surface = createSurface(ROOT_TAG);
-  const node: ISymbioteNode = createElement(SWITCH_VIEW, false, 'switch');
+  const node: ISymbioteNode = createElement(view, false, 'switch');
   for (const [name, value] of Object.entries(props)) setProp(node, name, value);
   surface.appendChild(node);
   surface.commit();
@@ -51,6 +56,11 @@ function commit(props: Record<string, unknown>): ICommitted {
   if (payload === undefined) throw new Error('the switch committed no payload');
   return { payload, folds: readSurfaceTelemetry(ROOT_TAG)?.foldsFound ?? 0 };
 }
+
+const commit = (props: Record<string, unknown>): ICommitted =>
+  commitTo(SWITCH_VIEW, props);
+const commitAndroid = (props: Record<string, unknown>): ICommitted =>
+  commitTo(ANDROID_SWITCH_VIEW, props);
 
 describe('what a switch sends native, resolved by the engine', () => {
   // why: THE PRICE. Every case below would pass with the rule still in a JS closure; this is the
@@ -139,31 +149,106 @@ describe('what a switch sends native, resolved by the engine', () => {
     expect(payload.borderRadius).toBe(undefined);
   });
 
-  // THREE DIVERGENCES FROM RN, FOUND BY READING `Switch.js` WHILE PORTING AND NOT FIXED HERE.
-  // The port is a MOVE — same rule, new house — so that a measurement and a regression both stay
-  // attributable to it. Each of these is a separate change with its own before/after.
-  //
-  //   [characterization — behavior not confirmed]
-  //   QUESTION: `accessibilityRole` defaults to `'switch'` in RN on BOTH platforms
-  //   (`Switch.js:293` and `:255`, `props.accessibilityRole ?? 'switch'`). We emit nothing, so a
-  //   screen reader announces our switch as a plain view. Same class of silent a11y gap that
-  //   `accessible`/`focusable` were on Pressable before 2026-09-09.
-  //
-  //   [characterization — behavior not confirmed]
-  //   QUESTION: iOS composes `{alignSelf: 'flex-start'}` UNDER the app's style (`Switch.js:266`),
-  //   so a stock Switch does not stretch to its container's cross-axis. We omit it, so ours does.
-  //
-  //   [characterization — behavior not confirmed]
-  //   QUESTION: Android's native prop names are `on` and `enabled` (`Switch.js:240-241`), not
-  //   `value` and `disabled`; and `_disabled` there resolves through `accessibilityState.disabled`
-  //   first. We send `value`/`disabled` on both platforms. Unobservable from this build — the
-  //   assertions above are the iOS branch — which is exactly why it is written down rather than
-  //   left to a device.
-  it('pins the three RN divergences this port did NOT change', () => {
-    const payload = commit({ value: true, style: { margin: 4 } }).payload;
+  // why: `Switch.js:255` and `:293` — `accessibilityRole={props.accessibilityRole ?? 'switch'}`, on
+  // BOTH platforms. Without it a screen reader announces the control as a plain view, with nothing
+  // visual to notice: the same silent class of gap `accessible`/`focusable` were on Pressable until
+  // 2026-09-09. Found by reading `Switch.js` to port the rule; fixed in its own commit AFTER the
+  // port, so the move and the correction each have their own before and after.
+  it('announces itself as a switch, unless the app says otherwise', () => {
+    expect(commit({ value: true }).payload.accessibilityRole).toBe('switch');
+    expect(commitAndroid({ value: true }).payload.accessibilityRole).toBe(
+      'switch',
+    );
+    // `??`, not an override: an app that calls it a checkbox keeps its answer.
+    expect(
+      commit({ value: true, accessibilityRole: 'checkbox' }).payload
+        .accessibilityRole,
+    ).toBe('checkbox');
+  });
 
-    expect(payload.accessibilityRole).toBe(undefined);
+  // why: `Switch.js:266` composes `{alignSelf: 'flex-start'}` UNDER the app's style, so a stock iOS
+  // Switch keeps its intrinsic width instead of stretching to its container's cross axis. Ours
+  // stretched. UNDER is the whole of it — an app that writes `alignSelf: 'stretch'` must still win.
+  it('keeps an iOS switch from stretching, without overriding the app', () => {
+    expect(commit({ value: true }).payload.alignSelf).toBe('flex-start');
+    expect(
+      commit({ value: true, style: { alignSelf: 'stretch' } }).payload
+        .alignSelf,
+    ).toBe('stretch');
+  });
+
+  // why: the iOS composition is iOS's. `Switch.js:263-281` is the `else` branch — Android's `style`
+  // is the app's, untouched, and `ios_backgroundColor` is not read there at all.
+  it('composes neither the pill nor alignSelf on Android', () => {
+    const payload = commitAndroid({
+      value: true,
+      style: { margin: 4 },
+      ios_backgroundColor: '#123456',
+    }).payload;
+
+    expect(payload.margin).toBe(4);
     expect(payload.alignSelf).toBe(undefined);
+    expect(payload.backgroundColor).toBe(undefined);
+    expect(payload.ios_backgroundColor).toBe(undefined);
+  });
+
+  // why: Android's native component is a DIFFERENT component with different prop names —
+  // `Switch.js:240-243` sends `on` and `enabled`, never `value`/`disabled`. We sent the iOS names on
+  // both platforms, so an Android switch painted from nothing and could not be disabled.
+  it('sends Android its own prop names', () => {
+    const payload = commitAndroid({ value: true, disabled: true }).payload;
+
+    expect(payload.on).toBe(true);
+    expect(payload.enabled).toBe(false);
+    expect(payload.value).toBe(undefined);
+    expect(payload.disabled).toBe(undefined);
+  });
+
+  // why: `Switch.js:232` — `disabled != null ? disabled : accessibilityState?.disabled`. The a11y
+  // state is the FALLBACK, so an app that only spells `accessibilityState.disabled` still gets a
+  // switch that cannot be toggled, and an explicit `disabled` still wins over it.
+  it('resolves Android s enabled through the a11y state when disabled is unset', () => {
+    expect(
+      commitAndroid({ accessibilityState: { disabled: true } }).payload.enabled,
+    ).toBe(false);
+    expect(
+      commitAndroid({ disabled: false, accessibilityState: { disabled: true } })
+        .payload.enabled,
+    ).toBe(true);
+  });
+
+  // why: `Switch.js:235-238` writes the resolved answer BACK into the a11y state, so the screen
+  // reader and the view agree. It merges rather than replaces — an authored `busy` survives.
+  it('folds Android s resolved disabled back into the a11y state', () => {
+    const state = commitAndroid({
+      disabled: true,
+      accessibilityState: { busy: true },
+    }).payload.accessibilityState;
+
+    if (state === null || typeof state !== 'object') {
+      throw new Error('the android switch sent no accessibilityState');
+    }
+    const fields: Record<string, unknown> = { ...state };
+    expect(fields.busy).toBe(true);
+    expect(fields.disabled).toBe(true);
+  });
+
+  // why: `Switch.js:230` destructures `onTintColor`/`tintColor` OUT of what reaches the Android
+  // view. They are iOS names; forwarding them is a key that component does not declare.
+  it('does not forward the iOS colour names to the Android view', () => {
+    const payload = commitAndroid({
+      value: true,
+      onTintColor: '#00ff00',
+      tintColor: '#ff0000',
+      trackColor: { false: '#767577', true: '#81b0ff' },
+    }).payload;
+
+    expect(payload.onTintColor).toBe(undefined);
+    expect(payload.tintColor).toBe(undefined);
+    expect(payload.trackColorForTrue).toBe(0xff_81_b0_ff);
+    expect(payload.trackColorForFalse).toBe(0xff_76_75_77);
+    // `Switch.js:248` — the active track follows the value.
+    expect(payload.trackTintColor).toBe(0xff_81_b0_ff);
   });
 
   // why: THE CONTROL. Every absence assertion above would be satisfied by a payload with no rule at

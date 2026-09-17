@@ -24,8 +24,8 @@
 // MEASURED on `build-release`, three consecutive runs, one sitting, a thousand nodes per commit:
 //
 //              native walk          js walk              per node
-//   pressable  4.0  4.0  3.9 ms     19.0 18.8 18.8 ms    ~14.9 us      folds 0 against 1000
-//   switch     4.8  4.5  4.4 ms     21.7 20.6 20.4 ms    ~16.3 us      folds 0 against 1000
+//   pressable  4.7  3.9  4.1 ms     18.9 18.5 18.7 ms    ~14.5 us      folds 0 against 1000
+//   switch     5.1  5.1  5.7 ms     23.9 24.3 24.4 ms    ~18.9 us      folds 0 against 1000
 //
 // So each rule itself is ~4-5 ms and the CROSSING was ~15-17 ms — three to four times the work it
 // was carrying. That is the same shape the text-input port measured (~17 us) and the reason a
@@ -59,7 +59,13 @@ const ROWS = 1_000;
 registerPressableBehavior();
 registerSwitchBehavior();
 
-// ── the JS arms: each rule as its behavior carried it immediately before the port ────────────────
+// ── the JS arms: the same rule, written on the other side of the wire ────────────────────────────
+//
+// These started as verbatim copies of what each behavior carried immediately before its port, and
+// the switch arm is no longer that — its rule was CORRECTED after the move (RN's
+// `accessibilityRole` default and the iOS `alignSelf` composition, `Switch.js:255,266`). The arm
+// was updated to match, which is the point rather than a chore: `expectSamePayload` refuses to time
+// two arms that send different bags, so the guard caught the divergence the moment it appeared.
 
 const PRESSABLE_MACHINE_KEYS = [
   'android_ripple',
@@ -114,10 +120,16 @@ registerHostBehavior('switch-in-js', {
       onTintColor: stringOf(bag.true),
       tintColor: stringOf(bag.false),
       thumbTintColor: stringOf(props.thumbColor),
-      style:
-        background === undefined
-          ? props.style
-          : [props.style, { backgroundColor: background, borderRadius: 16 }],
+      accessibilityRole: props.accessibilityRole ?? 'switch',
+      // `alignSelf` UNDER the app's style, the pill OVER it — RN's nested `StyleSheet.compose`
+      // (`Switch.js:266`). The iOS arm only; this fixture commits a `Switch`.
+      style: [
+        { alignSelf: 'flex-start' },
+        props.style,
+        ...(background === undefined
+          ? []
+          : [{ backgroundColor: background, borderRadius: 16 }]),
+      ],
     };
     delete out.trackColor;
     delete out.thumbColor;
