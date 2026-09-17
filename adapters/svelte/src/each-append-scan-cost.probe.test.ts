@@ -10,16 +10,18 @@
 // shape F-80 already exonerated for the engine's `OP_INSERT_BEFORE` (`std::find` over `siblings`,
 // too small to matter). Svelte's own reconciler was doing the identical scan a second time, one
 // layer up: BenchmarkScreen's real `{#each rows as row (row.id)}` is a KEYED block, and a new
-// tail item is inserted via `newRow.before(ref)` — `parent.insertBefore(newRow, ref)` — where
-// `ref` is the block's own closing boundary anchor, sitting a small constant distance from the
-// true end of `children` (one extra trailing anchor from the component's own root fragment, in
-// the measured shape). Confirmed on real compiled output: appending 1 000 rows onto 1 000
-// standing cost 1 502 500 `indexOf` comparisons — one O(n) scan per row, O(n²) aggregate — and
-// the per-call average tracked `standing` almost exactly at two widths apart by 20x (302.5 @
-// standing=200, 4 102.5 @ standing=4 000). Fixed by `indexNearEnd`: a bounded backward scan finds
-// a ref that close to the end in O(1), falling back to the full scan (still correct, unchanged)
-// only when it isn't. This file is now the regression guard for that fix, not just the probe that
-// found it.
+// tail item — whether appended OR built for the first time — is inserted via `newRow.before(ref)`
+// — `parent.insertBefore(newRow, ref)` — where `ref` is the block's own closing boundary anchor,
+// sitting a small constant distance from the true end of `children` (one extra trailing anchor
+// from the component's own root fragment, in the measured shape). Confirmed on real compiled
+// output: appending 1 000 rows onto 1 000 standing cost 1 502 500 `indexOf` comparisons — one
+// O(n) scan per row, O(n²) aggregate — and the per-call average tracked `standing` almost exactly
+// at two widths apart by 20x (302.5 @ standing=200, 4 102.5 @ standing=4 000). The INITIAL build
+// pays the identical mechanism (every row is two MORE ref-based inserts, not push), so this is not
+// only an Append cost — it is a candidate for F-44's Create and Replace regressions too. Fixed by
+// `indexNearEnd`: a bounded backward scan finds a ref that close to the end in O(1), falling back
+// to the full scan (still correct, unchanged) only when it isn't. This file is now the regression
+// guard for that fix, for both mount and append, not just the probe that found it.
 import { afterEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -103,12 +105,25 @@ describe('Svelte keyed {#each} append: shim-level indexOf scan cost', () => {
     const appended = 200;
 
     it(`appends ${String(appended)} rows onto ${String(standing)} standing`, async () => {
+      const { takeShimScanStats } = await import('./dom-shim/shim-node');
       const App = await compileApp(rootTag);
       mount(rootTag, App, { rows: buildRows(0, standing) });
       await settle();
 
-      const { takeShimScanStats } = await import('./dom-shim/shim-node');
-      takeShimScanStats(); // discard mount's own cost — this test prices only the append
+      // The INITIAL build pays the identical mechanism: every row's `<view><text>` pair is two
+      // MORE ref-based inserts against the same trailing each-block anchor (confirmed by a
+      // throwaway counter on `insertOne` during development — standing=200 -> 402 ref-inserts,
+      // standing=4000 -> 8002, i.e. 2*standing+2, none of them `ref === null`). Pre-fix this was
+      // the SAME O(n^2) shape as the append case, just building the whole list from empty rather
+      // than growing it — a real candidate for F-44's still-open Create +40 ms and Replace +54 ms
+      // regressions, not only Append. Asserting it here, not just discarding it, is what proves
+      // the fix's reach.
+      const mountStats = takeShimScanStats();
+      expect(
+        mountStats.calls,
+        'mount itself never falls back to the full scan',
+      ).toBe(0);
+      expect(mountStats.scanned).toBe(0);
 
       const appendRows = (
         globalThis as { __appendRows?: (more: unknown) => void }
