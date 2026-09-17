@@ -287,6 +287,53 @@ describe('what a keyed swap costs above the engine', () => {
   // that this screen hands React the row elements it already had instead of rebuilding them. Whatever
   // the two arms differ by is element construction, which is the app's; whatever is left in THIS one
   // is what a keyed move costs above the engine, which is ours to explain against stock's 9.6 ms.
+  // why: the shape a real app produces far more often than a swap — a parent's state moves, the
+  // subtree re-renders, and every child writes back exactly what it already had. The plain screen has
+  // no `memo`, so all thousand rows really do re-render and really do write.
+  //
+  // The question is what reaches the host. `routeProp`'s `isSameShallowStyle` guard already refuses a
+  // rebuilt-but-equal STYLE in JS (`CLAUDE.md`, "A re-render that changes nothing is free now"), but
+  // nothing had ever counted what still crosses on the other keys. `writesOfUnchanged` can now say
+  // it, and the engine-direct fixture asserts zero, so a non-zero here is the ADAPTER's.
+  it('re-renders a thousand unmemoized rows that change nothing', () => {
+    const surface = mount(ROOT_TAG, h(Screen));
+    flushTimers();
+    surface.commit();
+    mounted();
+    readSurfaceTelemetry(ROOT_TAG);
+
+    const same: number[] = [];
+    for (let id = 0; id < ROWS; id += 1) same.push(id);
+
+    if (setOrder === undefined) throw new Error('the screen never rendered');
+    const startedAt = performance.now();
+    setOrder(same);
+    flushTimers();
+    surface.commit();
+    const wall = performance.now() - startedAt;
+    mounted();
+
+    const telemetry = readSurfaceTelemetry(ROOT_TAG);
+    print(
+      `DEBUG no-op   wall=${wall.toFixed(1)} ` +
+        `setProps=${telemetry?.setProps ?? 0} ` +
+        `unchanged=${telemetry?.writesOfUnchanged ?? 0} ` +
+        `absentDeletes=${telemetry?.deletesOfAbsent ?? 0} ` +
+        `cloned=${telemetry?.nodesCloned ?? 0} created=${telemetry?.nodesCreated ?? 0}`,
+    );
+
+    // Nothing changed, so nothing may be created — the oracle that says this measured a re-render
+    // rather than a rebuild.
+    expect(telemetry?.nodesCreated ?? 0).toBe(0);
+    // AND NOTHING CROSSES AT ALL. React diffs props itself and never reaches `commitUpdate` when they
+    // compare equal, so the engine is not asked to refuse anything — there is no waste here to
+    // remove, which is worth pinning rather than re-measuring. A regression that made the adapter
+    // write unconditionally would show up as a thousand-odd `unchanged` and nothing else would catch
+    // it: the tree, the payload and the wall clock would all look the same.
+    expect(telemetry?.setProps ?? 0).toBe(0);
+    expect(telemetry?.writesOfUnchanged ?? 0).toBe(0);
+  });
+
   it('exchanges the same two rows without rebuilding their elements', () => {
     const surface = mount(ROOT_TAG, h(HoistedScreen));
     flushTimers();

@@ -1651,6 +1651,14 @@ own mutation API with no reconciler above it and asserts `writesOfUnchanged === 
 what makes a non-zero on an ADAPTER's arm attributable to the adapter rather than to the engine,
 which is exactly how the seed was found and priced.
 
+**Pointed at the commonest shape a real app makes, it found nothing — and that is the useful answer.**
+A parent's state moves and a thousand UNMEMOIZED rows re-render, writing back exactly what they
+already had (`adapter-swap-cost.itest.tsx`, the no-op arm): `setProps=0 unchanged=0 cloned=0`. React
+diffs props itself and never reaches `commitUpdate` when they compare equal, so **nothing crosses the
+boundary at all** — the whole 27.3 ms is React re-rendering a thousand rows the app chose not to
+memoize. Both counts are asserted, because a regression that made the adapter write unconditionally
+would leave the tree, the payload and the wall clock looking identical.
+
 Two things that came with it. The adapters keep their clear-back-to-`undefined` path (a framework
 that clears a prop it set must get the default BACK, and that is off the create path by its own
 comment) — only the create-time seed is gone. And two tests had to move from `.props` to the
