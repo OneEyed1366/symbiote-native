@@ -1369,11 +1369,27 @@ a type registered, attached to nothing        6.23    1.96     3.2x -> 1.0x
 a behavior attached to one node per row       9.23    9.23     unchanged, and correctly so
 ```
 
-The third row is what a screen with Pressables still pays, and it is recorded rather than fixed: the
-sweep visits every removed node by design, because `tornDown` must mark the whole subtree for a later
-re-insert to know it has to re-arm. Its cost is the CROSSING, not the bookkeeping — removing the
-redundant per-call `seen` Set (`tornDown.add` two lines below the guard already dedupes within a
-call) changed nothing measurable, 4.4-4.6 ms either way.
+The third row is what a screen with Pressables still pays, and it is recorded rather than fixed.
+Split from the inside (`hostReadMs` on `readSurfaceTelemetry`, added for this question):
+
+```
+a 5.2 ms sweep over 10 000 removed nodes
+  subtreesOf, the crossing        1.70 ms   0.17 us per handle   32%
+  the JS loop above it            3.53 ms                        68%
+```
+
+**Two fixes were ruled out by that split rather than by taste, and the reasons are worth keeping.**
+Moving the torn-down mark into C++ so no handle crosses buys at most the 1.7 ms and costs a crossing
+per INSERT — `reattachHostBehaviors` runs ~9 000 times on a benchmark create, where today it is a
+`WeakSet` miss. And marking only the detach ROOTS instead of whole subtrees would cut the sweep to a
+tenth, but it is unsound: a framework that removes a parent and then re-inserts one of its CHILDREN
+elsewhere would find that child unmarked and its behavior never re-armed. `detachOne`'s own comment
+records an earlier narrowing that failed for the neighbouring reason.
+
+What is left is a 10 000-iteration JS loop doing about five operations each, with no fat item in it.
+Removing the redundant per-call `seen` Set (`tornDown.add` two lines below the guard already dedupes
+within a call) changed nothing measurable — 4.4-4.6 ms either way — and the `.filter(isSymbioteNode)`
+on the result is the type NARROWING, not a defensive check, so it cannot go without an `as`.
 
 **`insertBefore` is still quadratic and that is recorded, not fixed.** Finding the anchor is O(1) now
 through its hint; the `std::vector::insert` that follows shifts the tail, which is the container's

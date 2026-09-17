@@ -24,6 +24,7 @@ import {
   createElement,
   createRawText,
   createSurface,
+  readSurfaceTelemetry,
   registerHostBehavior,
   removeChild,
   routeProp,
@@ -62,8 +63,16 @@ function buildRow(id: number): ISymbioteNode {
   return row;
 }
 
+type IClear = {
+  fill: number;
+  apply: number;
+  commit: number;
+  hostReadMs: number;
+  hostReadHandles: number;
+};
+
 /** Build a standing list, then time removing every row of it. */
-function timeClear(): { fill: number; apply: number; commit: number } {
+function timeClear(): IClear {
   const surface = createSurface(ROOT_TAG);
   const list = createElement('RCTView');
   routeProp(list, 'style', { flex: 1 });
@@ -77,6 +86,8 @@ function timeClear(): { fill: number; apply: number; commit: number } {
   flushOps();
   surface.commit();
   mounted();
+  // Drained, so the host-read counters below describe the TEARDOWN and not the build.
+  readSurfaceTelemetry(ROOT_TAG);
 
   let startedAt = performance.now();
   for (const row of rows) removeChild(list, row);
@@ -90,7 +101,14 @@ function timeClear(): { fill: number; apply: number; commit: number } {
   surface.commit();
   const commit = performance.now() - startedAt;
   mounted();
-  return { fill, apply, commit };
+  const telemetry = readSurfaceTelemetry(ROOT_TAG);
+  return {
+    fill,
+    apply,
+    commit,
+    hostReadMs: telemetry?.hostReadMs ?? 0,
+    hostReadHandles: telemetry?.hostReadHandles ?? 0,
+  };
 }
 
 let withoutBehaviors: ReturnType<typeof timeClear> | undefined;
@@ -153,6 +171,14 @@ describe('tearing down a thousand rows', () => {
       `DEBUG clear ATTACHED  fill=${measured.fill.toFixed(2)} ` +
         `apply=${measured.apply.toFixed(2)} commit=${measured.commit.toFixed(2)} ` +
         `total=${total.toFixed(2)} ms over ${ROWS * NODES_PER_ROW} torn-down nodes`,
+    );
+    // THE SPLIT that decides what to do next: `subtreesOf` is the crossing, everything else in the
+    // commit delta is the JS loop above it.
+    print(
+      `DEBUG clear ATTACHED  subtreesOf=${measured.hostReadMs.toFixed(2)} ms ` +
+        `for ${measured.hostReadHandles} handles ` +
+        `(${((measured.hostReadMs * 1000) / Math.max(measured.hostReadHandles, 1)).toFixed(2)} us each), ` +
+        `rest of the sweep=${(measured.commit - measured.hostReadMs).toFixed(2)} ms`,
     );
     expect(total > 0).toBe(true);
   });

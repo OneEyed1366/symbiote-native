@@ -13,12 +13,19 @@
 // immediately still leaves the `erase` shifting the tail, so removing from EITHER end is quadratic,
 // just in a different half of the work.
 //
-// THE MEASUREMENT IS A RATIO OF RATIOS, which is what makes it a shape rather than a timing: run the
-// same step at N and at 2N and read the factor. Linear work doubles. Quadratic work quadruples.
-// Nothing here asserts a millisecond, and the Debug-vs-optimized distinction that has bitten this
-// file's neighbours cannot reach an exponent — but run it on `build-release` anyway
-// (`pnpm run bench:itest`), because the assert build has quadratics of its own
-// (`raw-fabric-vs-engine.itest.ts`).
+// THE MEASUREMENT IS A SHAPE, NOT A TIMING: run the same step at N, 2N and 4N and read the cost of
+// ONE operation. Linear work holds it flat; quadratic work grows it with the list.
+//
+// Per-OPERATION rather than the ratio of the totals, and the difference is not cosmetic. The first
+// version compared total to total and asserted the factor stayed under 3 against a true value of 2 —
+// on a base measurement of half a millisecond, where a 0.1 ms hiccup moves the factor by 20%. It
+// flaked once in the ordinary suite within an hour of being written. Dividing by the count first
+// removes that amplification: the same runs read 0.50 / 0.51 / 0.47 us, and a quadratic reads
+// 0.45 / 0.63 / 1.07.
+//
+// Both builds agree on the shape, which is the point of measuring one — but run it on
+// `build-release` (`pnpm run bench:itest`) for the absolute numbers, because the assert build has
+// quadratics of its own (`raw-fabric-vs-engine.itest.ts`).
 
 import {
   appendChild,
@@ -76,26 +83,26 @@ describe('a child list under structural churn', () => {
   // list rather than the removals, an app's teardown gets worse the longer its list is — which is
   // exactly backwards from what a user expects of "close the screen".
   it('removes every child in time proportional to the list, not its square', () => {
-    const measured: number[] = [];
+    const perRemoval: number[] = [];
     for (const width of WIDTHS) {
       const { list, children } = openList(width);
       const apply = timeApply(() => {
         for (const child of children) removeChild(list, child);
       });
-      measured.push(apply);
+      perRemoval.push((apply * 1000) / width);
       print(
         `DEBUG clear ${String(width).padStart(4)} apply=${apply.toFixed(2)} ms ` +
           `(${((apply * 1000) / width).toFixed(2)} us per removal)`,
       );
     }
 
-    // Doubling the list doubles linear work and quadruples quadratic work. 3.0 sits far enough from
-    // both to name one without reading a millisecond.
-    const factors = [measured[1] / measured[0], measured[2] / measured[1]];
+    // Across a 4x widening: flat for linear work, ~4x for quadratic. 2.0 separates them with room
+    // on both sides.
+    const growth = perRemoval[2] / perRemoval[0];
     print(
-      `DEBUG clear doubling factors: ${factors.map(one => one.toFixed(2)).join(', ')}`,
+      `DEBUG clear per-removal growth over a 4x widening: ${growth.toFixed(2)}x`,
     );
-    for (const factor of factors) expect(factor < 3).toBe(true);
+    expect(growth < 2).toBe(true);
   });
 
   // [characterization — behavior not confirmed]
@@ -119,7 +126,7 @@ describe('a child list under structural churn', () => {
   // The bound below is loose on purpose — it is a tripwire for a REGRESSION (a fifth power, an
   // accidental scan added on top), not an assertion that quadratic is right.
   it('reorders a keyed list quadratically, which is the container and not the search', () => {
-    const measured: number[] = [];
+    const perInsert: number[] = [];
     for (const width of WIDTHS) {
       const { list, children } = openList(width);
       // Move the tail half to the front, one at a time, anchored on the current head. Each insert
@@ -130,19 +137,21 @@ describe('a child list under structural churn', () => {
           insertBefore(list, children[at], children[0]);
         }
       });
-      measured.push(apply);
+      perInsert.push((apply * 2000) / width);
       print(
         `DEBUG insert ${String(width).padStart(4)} apply=${apply.toFixed(2)} ms ` +
           `(${((apply * 2000) / width).toFixed(2)} us per insert)`,
       );
     }
 
-    const factors = [measured[1] / measured[0], measured[2] / measured[1]];
+    const growth = perInsert[2] / perInsert[0];
     print(
-      `DEBUG insert doubling factors: ${factors.map(one => one.toFixed(2)).join(', ')} ` +
+      `DEBUG insert per-insert growth over a 4x widening: ${growth.toFixed(2)}x ` +
         `[characterization — quadratic is what it does, not what it should do]`,
     );
-    for (const factor of factors) expect(factor < 6).toBe(true);
+    // A TRIPWIRE, not a target: ~4x is the vector shift and is expected. Anything past 8 would be a
+    // scan added back on top of it, which is the regression this file exists to catch.
+    expect(growth < 8).toBe(true);
   });
 });
 

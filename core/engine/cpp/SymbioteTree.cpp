@@ -670,6 +670,13 @@ struct IWalkCost {
   double applyNs = 0;
   double stringDecodeNs = 0;
   double structureNs = 0;
+  // The BATCHED HOST READS, which are not on a commit path and are timed anyway: the teardown sweep
+  // calls `subtreesOf` once per commit that removed anything, and it hands back a handle for every
+  // node in every removed subtree — 10 000 of them on a 1 000-row clear, which is the row stock
+  // React Native wins. Knowing whether that time is the crossing or the JS loop above it is the
+  // difference between moving the mark into C++ and leaving it alone.
+  double hostReadNs = 0;
+  size_t hostReadHandles = 0;
   // Inside `structureNs`: promoting a node's WEAK handle reference to a strong one when it acquires
   // a parent. One `jsi::WeakObject::lock` plus one `jsi::Object` per node, i.e. real JSI work on an
   // op that otherwise touches nothing but our own vectors.
@@ -1855,6 +1862,7 @@ jsi::Value Tree::subtreesOf(jsi::Runtime &runtime, const jsi::Value *arguments, 
   if (count < 1) {
     throw jsi::JSError(runtime, "symbiote engine: expected subtreesOf(roots)");
   }
+  const auto readStartedAt = ISteadyClock::now();
   auto roots = arguments[0].asObject(runtime).asArray(runtime);
   const size_t length = roots.size(runtime);
 
@@ -1874,6 +1882,8 @@ jsi::Value Tree::subtreesOf(jsi::Runtime &runtime, const jsi::Value *arguments, 
   for (size_t at = 0; at < flat.size(); at += 1) {
     out.setValueAtIndex(runtime, at, std::move(flat[at]));
   }
+  walkCost_.hostReadNs += nanosSince(readStartedAt);
+  walkCost_.hostReadHandles += flat.size();
   return out;
 }
 
@@ -2168,6 +2178,9 @@ jsi::Value Tree::readSurfaceTelemetry(
   result.setProperty(runtime, "stringDecodeMs", millis(walkCost_.stringDecodeNs));
   result.setProperty(runtime, "structureMs", millis(walkCost_.structureNs));
   result.setProperty(runtime, "holdHandleMs", millis(walkCost_.holdHandleNs));
+  result.setProperty(runtime, "hostReadMs", millis(walkCost_.hostReadNs));
+  result.setProperty(
+      runtime, "hostReadHandles", jsi::Value(static_cast<double>(walkCost_.hostReadHandles)));
   walkCost_ = IWalkCost{};
   return result;
 }

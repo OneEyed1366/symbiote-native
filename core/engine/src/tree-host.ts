@@ -399,6 +399,15 @@ export type ISurfaceTelemetry = {
   structureMs: number;
   /** Inside `structureMs`: promoting a node's weak handle reference to a strong one. */
   holdHandleMs: number;
+  /**
+   * `subtreesOf` — the batched host read the teardown sweep makes, and how many handles it returned.
+   *
+   * Not on a commit path and timed anyway: it hands JS a handle for every node in every removed
+   * subtree, which on a 1 000-row clear is ten thousand. Whether that time is the crossing or the JS
+   * loop above it decides whether the torn-down mark is worth moving into C++.
+   */
+  hostReadMs: number;
+  hostReadHandles: number;
 };
 
 /**

@@ -229,6 +229,8 @@ export type INativeEngineBindings = {
     stringDecodeMs: number;
     structureMs: number;
     holdHandleMs: number;
+    hostReadMs: number;
+    hostReadHandles: number;
   };
 };
 
