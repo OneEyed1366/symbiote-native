@@ -64,7 +64,7 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Vue: `activity-indicator` as a tag', () => {
-  it('commits RN’s two-node tree and folds the size onto the spinner', async () => {
+  it('commits RN’s two-node tree from the tag alone', async () => {
     await mountTag({ nativeID: 'ind', size: 'large' });
 
     // The host is the centering view and the spinner is the only child — the second node exists

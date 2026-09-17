@@ -88,7 +88,7 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Angular: `activity-indicator` as a tag', () => {
-  it('commits RN’s two-node tree and folds the size onto the spinner', async () => {
+  it('commits RN’s two-node tree from the tag alone', async () => {
     await mountTemplate(
       `<activity-indicator id="ind" size="large"></activity-indicator>`,
     );

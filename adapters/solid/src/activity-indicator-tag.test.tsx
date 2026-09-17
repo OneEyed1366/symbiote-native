@@ -58,7 +58,7 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Solid: `activity-indicator` as a tag', () => {
-  it('commits RN’s two-node tree and folds the size onto the spinner', async () => {
+  it('commits RN’s two-node tree from the tag alone', async () => {
     mount(ROOT_TAG, () => <activity-indicator nativeID="ind" size="large" />);
     await tick();
 

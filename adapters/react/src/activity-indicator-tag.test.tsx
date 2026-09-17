@@ -50,7 +50,7 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('React: `activity-indicator` as a tag', () => {
-  it('commits RN’s two-node tree and folds the size onto the spinner', () => {
+  it('commits RN’s two-node tree from the tag alone', () => {
     mount(
       ROOT_TAG,
       createElement('activity-indicator', { nativeID: 'ind', size: 'large' }),

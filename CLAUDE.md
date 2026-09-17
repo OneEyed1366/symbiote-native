@@ -1681,12 +1681,19 @@ payloads asserted equal key by key before any millisecond is read):
 
 ```
              native walk   js walk    per node   the bag
- accessory      3.1         14.1       11.2 us   4 keys — AND ITS FOLD DID NOTHING
- button         3.9         16.3       12.1 us   5 keys + a 2-key style
- pressable      3.8         18.0       14.2 us   4 keys + a 3-key style
- switch         4.9         23.5       18.6 us   6 keys + nested trackColor
- image          5.9         27.8       22.1 us   6 keys + what the rule BUILDS
+ spinner        3.6         13.4        9.7 us   4 keys, no style in — AND ITS RULE DOES THE MOST
+ accessory      3.2         14.6       10.9 us   4 keys — AND ITS FOLD DID NOTHING
+ button         3.9         16.6       11.8 us   5 keys + a 2-key style
+ pressable      3.7         18.0       14.6 us   4 keys + a 3-key style
+ switch         4.8         23.6       18.7 us   6 keys + nested trackColor
+ image          5.8         27.7       21.9 us   6 keys + what the rule BUILDS
 ```
+
+The two ends of that table are the same claim run as an experiment: the **cheapest** row's rule does
+the **most** work (builds a style object, resolves a size two ways, writes two defaults, picks a
+colour) and is cheapest only because its bag arrives with no `style` key, while the dearest one is
+dear because its rule CREATES keys that then have to travel back. Price is what gets marshalled, not
+what gets computed.
 
 `input-accessory-view`'s fold took the bag apart and reassembled it unchanged, so the port DELETED
 it rather than moving it — and it still cost 10.7 us per node to have had. Read down the column and
@@ -1711,6 +1718,32 @@ registered carries an EMPTY `tagName`, so no rule fires.** `recordSetTag` is emi
 and measured a native side doing no work at all; what caught it was `expectSamePayload` refusing to
 time two arms that disagree, not a suspiciously good number. Any bare-tag fixture needs a stub
 behavior registered or it measures nothing.
+
+### A derived node's tag never reached C++ — and ActivityIndicator is the first primitive at ZERO folds
+
+`recordSetTag` is emitted by `attachHostBehavior` and by nothing else, so a tag crosses only when JS
+has a BEHAVIOR registered for it. ActivityIndicator's spinner is built by its owner's
+`buildStructure` and named by no app: it had a tag, had platform semantics, and carried an empty
+`tagName` in the host, so no rule could fire for it however the rule was written.
+
+The fix is a **registration with no runtime** — `registerHostBehavior('activity-indicator-spinner',
+{attach(){}, detach(){}})`. That is not a trick to smuggle a tag across: a registration is how this
+codebase declares a tag HAS platform semantics, which is exactly the claim being made. Emitting the
+tag from `createElement` for every node was the alternative and stays rejected for the reason
+`attachHostBehavior` already gives — an app's own `<div>`-equivalent would pay an intern and an op to
+name something the host has no rule for.
+
+With that, **both** of the primitive's folds moved (`foldActivityIndicatorProps`,
+`foldActivityIndicatorSpinnerProps`) and it is the first two-node primitive to reach **zero crossings
+per commit** rather than merely moving work out of one. Every other port so far left a JS fold
+standing for the half that reads a node, an owner or live state.
+
+Four JS constants went with them (the two size boxes, the default size, the centering style) and a
+whole vitest file lost most of its cases — **including ones that were still GREEN**. "OMITS colour
+entirely on the theme default" passed after the port for the wrong reason: the key is absent because
+no rule ran at all, not because Android's half omitted it. An absence assertion on a harness that can
+no longer produce the key passes forever and means nothing, so cases whose subject was a fold move as
+a GROUP with their positive twins, not one failing case at a time.
 
 ### A `<Button>` costs FOUR crossings per commit — the most expensive primitive we ship
 
