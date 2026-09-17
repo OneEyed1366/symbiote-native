@@ -63,17 +63,31 @@ describe('the mutation buffer interns the values it is handed', () => {
     expect(takeBatch().values.length).toBe(1);
   });
 
-  // why: numbers and booleans are deliberately NOT interned, and this pins that decision rather than
-  // leaving it to look like an oversight. A Map lookup costs about what converting a number costs, so
-  // there is nothing to win — and `Map` keys compare by SameValueZero, which would quietly fold `-0`
-  // into `0` and `NaN` into itself. Cheap to convert, so not worth a semantics question.
-  it('leaves numbers and booleans alone', () => {
-    recordSetProp(handle(), 'flex', 1);
-    recordSetProp(handle(), 'flex', 1);
-    recordSetProp(handle(), 'collapsable', true);
-    recordSetProp(handle(), 'collapsable', true);
+  // why: a boolean prop repeats harder than any object — three adapters seed `allowFontScaling: true`
+  // on every text node they create, so a screen of 3 000 of them wrote 3 000 entries for one of two
+  // possible values. It needs no `Map` and raises no equality question: there are exactly two
+  // booleans, so a dedicated slot each is a branch rather than a hash.
+  it('gives one entry to each boolean, however often it repeats', () => {
+    for (let at = 0; at < 4; at += 1) {
+      recordSetProp(handle(), 'allowFontScaling', true);
+      recordSetProp(handle(), 'collapsable', false);
+    }
 
-    expect(takeBatch().values.length).toBe(4);
+    const batch = takeBatch();
+    expect(batch.values.length).toBe(2);
+    expect(batch.values).toContain(true);
+    expect(batch.values).toContain(false);
+  });
+
+  // why: numbers stay un-interned, and this pins that as a decision rather than an oversight. `Map`
+  // keys compare by SameValueZero, which folds `-0` into `0` and `NaN` into itself — a semantics
+  // question not worth opening for a value that converts for about what the lookup costs. Booleans
+  // avoid it entirely because they are matched by a branch, not by a table.
+  it('leaves numbers alone', () => {
+    recordSetProp(handle(), 'flex', 1);
+    recordSetProp(handle(), 'flex', 1);
+
+    expect(takeBatch().values.length).toBe(2);
   });
 
   // why: the ops have to keep naming the right entry. Interning that reused an index for a DIFFERENT
@@ -108,5 +122,17 @@ describe('the mutation buffer interns the values it is handed', () => {
     const second = takeBatch();
     expect(second.values.length).toBe(1);
     expect(second.values[0]).toBe(style);
+  });
+
+  // why: the boolean slots are two plain variables rather than an entry in a table that gets cleared,
+  // so they are the one part of the intern state a drain can forget by omission. Forgotten, batch two
+  // addresses batch one's array — a wrong value on a real node, silently.
+  it('forgets the boolean slots too', () => {
+    recordSetProp(handle(), 'allowFontScaling', true);
+    takeBatch();
+
+    recordSetProp(handle(), 'allowFontScaling', true);
+    const second = takeBatch();
+    expect(second.values).toEqual([true]);
   });
 });

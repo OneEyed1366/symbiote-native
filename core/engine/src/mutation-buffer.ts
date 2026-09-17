@@ -192,6 +192,12 @@ const slots = new Map<object, number>();
 // 12 005 `setProp` ops spent 20-29 ms converting inside a 35 ms `applyOps`.
 const valueIds = new Map<unknown, number>();
 
+// Booleans skip that table entirely — see `internValue`. Two slots, reset with the batch alongside
+// everything else the tables hold.
+const NOT_INTERNED = -1;
+let trueId = NOT_INTERNED;
+let falseId = NOT_INTERNED;
+
 function intern(text: string): number {
   const existing = stringIds.get(text);
   if (existing !== undefined) return existing;
@@ -203,11 +209,20 @@ function intern(text: string): number {
 /**
  * The index the ops address this value by — deduplicated when it is worth deduplicating.
  *
- * OBJECTS, FUNCTIONS AND STRINGS ONLY. Those are the ones that repeat (one `StyleSheet.create`
- * object per screen, `ellipsizeMode: 'tail'` on every text node) and the ones whose conversion costs
- * something. A number or a boolean converts for about what the `Map` lookup would cost, so there is
- * nothing to win — and `Map` keys compare by SameValueZero, which folds `-0` into `0` and `NaN` into
- * itself. Cheap to convert is not worth a semantics question.
+ * Objects, functions and strings go through the `Map`: they are the ones that repeat (one
+ * `StyleSheet.create` object per screen, `ellipsizeMode: 'tail'` on every text node) and the ones
+ * whose conversion costs something.
+ *
+ * BOOLEANS ARE FOLDED WITHOUT THE MAP, because there are two of them. A dedicated slot each is a
+ * branch rather than a hash, so the argument that once excluded them — a lookup costs what the
+ * conversion costs — does not reach this shape. And the conversion was never the whole cost:
+ * `values` is a JSI array the host reads entry by entry, so a duplicate is a crossing whatever it
+ * holds. Measured on the create fixture, three adapters seed `allowFontScaling: true` at
+ * `createElement`, which alone wrote one entry per text node on the screen.
+ *
+ * NUMBERS STAY OUT. They would need the `Map`, whose keys compare by SameValueZero — that folds
+ * `-0` into `0` and `NaN` into itself, and a value this cheap to convert is not worth opening the
+ * question for.
  *
  * Identity, never structural equality: comparing deeply would make the buffer's cost depend on the
  * size of what it is handed, which is the opposite of the point.
@@ -217,19 +232,31 @@ function intern(text: string): number {
  * state whether they shared an index or not.
  */
 function internValue(value: unknown): number {
+  if (value === true) {
+    if (trueId === NOT_INTERNED) trueId = pushValue(value);
+    return trueId;
+  }
+  if (value === false) {
+    if (falseId === NOT_INTERNED) falseId = pushValue(value);
+    return falseId;
+  }
+
   const kind = typeof value;
   const isWorthInterning =
     kind === 'string' ||
     kind === 'function' ||
     (kind === 'object' && value !== null);
-  if (!isWorthInterning) {
-    values.push(value);
-    return values.length - 1;
-  }
+  if (!isWorthInterning) return pushValue(value);
+
   const existing = valueIds.get(value);
   if (existing !== undefined) return existing;
+  const id = pushValue(value);
+  valueIds.set(value, id);
+  return id;
+}
+
+function pushValue(value: unknown): number {
   values.push(value);
-  valueIds.set(value, values.length - 1);
   return values.length - 1;
 }
 
@@ -427,6 +454,8 @@ export function takeBatch(): IMutationBatch {
   stringIds.clear();
   slots.clear();
   valueIds.clear();
+  trueId = NOT_INTERNED;
+  falseId = NOT_INTERNED;
   return batch;
 }
 
