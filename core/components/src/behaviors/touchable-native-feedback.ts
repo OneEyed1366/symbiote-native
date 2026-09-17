@@ -56,7 +56,7 @@
 // TouchableNativeFeedback with two responders.
 
 import {
-  ARIA_ALIAS_KEYS,
+  SLOT_DERIVED_ALL,
   appListenerFor,
   dispatchViewCommand,
   markPropsDirty,
@@ -81,61 +81,20 @@ export const TOUCHABLE_NATIVE_FEEDBACK_TAG = 'touchable-native-feedback';
 // Read once, like `./button`'s: the platform cannot change under a running app.
 const IS_ANDROID = Platform.OS === 'android';
 
-// TouchableNativeFeedback.js:349-390, verbatim and in RN's own order. A CLOSED list, not a
-// passthrough: RN clones exactly these and nothing else, so a prop it does not name stays behind.
-// `accessibilityState`, `accessible`, `focusable` and `nativeID` are cloned too and are computed by
-// the rule; `onLayout` and `onAccessibilityAction` are cloned as LISTENERS and forwarded by
-// `FORWARDED_LISTENERS`.
+// WHAT THE OWNER'S WRITES DIRTY, and it is EVERY name rather than a list of thirty.
 //
-// IT IS A MIRROR OF `kNativeFeedbackClonedKeys` AND IT IS RECORDED AS ONE. The clone itself moved to
-// C++ on 2026-09-18; what survives here is `SLOT_DERIVED`, which answers a DIFFERENT question —
-// which owner writes must dirty the child — and the two must name the same keys or the clone goes
-// stale on a prop the list forgot. Closing it properly means the engine dirtying a child whose
-// parent carries a clone rule, which needs no list at all; until that lands this is the one place
-// the port did not reach.
-const CLONED_PROPS: readonly string[] = [
-  'accessibilityHint',
-  'accessibilityLanguage',
-  'accessibilityLabel',
-  'accessibilityRole',
-  'accessibilityActions',
-  'accessibilityValue',
-  'importantForAccessibility',
-  'accessibilityViewIsModal',
-  'accessibilityLiveRegion',
-  'accessibilityElementsHidden',
-  'hasTVPreferredFocus',
-  'hitSlop',
-  'nextFocusDown',
-  'nextFocusForward',
-  'nextFocusLeft',
-  'nextFocusRight',
-  'nextFocusUp',
-  'testID',
-];
-
-// Owner props the cloned payload is COMPUTED from, on top of the verbatim list above. `focusable`
-// also derives from the `press` LISTENER, which is not a prop and is handled by
-// `onOwnedListenerChange` — a listener flip dirties no payload by itself.
-const DERIVED_FROM: readonly string[] = [
-  'background',
-  'useForeground',
-  'accessible',
-  'accessibilityState',
-  'disabled',
-  'focusable',
-  'id',
-  'nativeID',
-];
-
-// Every owner name the child's payload reads. Without it the clone is correct at mount and frozen
-// forever after: `markPropsDirty` bubbles UP, so an owner write never reaches the child on its own.
-// The aria half comes off the engine's own list rather than a second copy of it.
-const SLOT_DERIVED: readonly string[] = [
-  ...CLONED_PROPS,
-  ...DERIVED_FROM,
-  ...ARIA_ALIAS_KEYS,
-];
+// RN's clone list (`TouchableNativeFeedback.js:349-390`) lived here until 2026-09-18 as
+// `CLONED_PROPS` + `DERIVED_FROM` + `ARIA_ALIAS_KEYS`, feeding `slotDerived`. The clone itself is
+// `foldCloneOntoChild` in `SymbioteFabricProps.cpp`, so the list had stopped being the rule and
+// become a MIRROR of `kNativeFeedbackClonedKeys` — two lists that must agree, failing silently (the
+// clone goes stale on the one prop a list forgot) when they drift.
+//
+// `SLOT_DERIVED_ALL` is both the honest spelling and the cheaper one to keep: a `cloneElement` owner
+// re-clones on every render whatever changed, so it never derived its slot from a NAMED set in the
+// first place. The cost is a false dirty on an owner prop the clone does not carry, and for this tag
+// that is nearly empty — its owner is an anchor whose props reach Fabric nowhere else, so every name
+// it holds is either cloned or consumed by the press machine.
+const SLOT_DERIVED: readonly string[] = [SLOT_DERIVED_ALL];
 
 // The two RN clones as EVENTS rather than props (:386-387). Owned, so the app's callback stashes on
 // the owner and a trampoline installed on the child reads it at dispatch time — which keeps a fresh

@@ -37,7 +37,7 @@
 // its own `pressable` would put two press machines on one tree.
 
 import {
-  ARIA_ALIAS_KEYS,
+  SLOT_DERIVED_ALL,
   appListenerFor,
   markPropsDirty,
   registerHostBehavior,
@@ -63,61 +63,19 @@ import {
 
 export const TOUCHABLE_WITHOUT_FEEDBACK_TAG = 'touchable-without-feedback';
 
-// TouchableWithoutFeedback.js:130-153, RN's own order, minus two groups that are NOT props here:
-// the four `on*` names (forwarded as LISTENERS by `FORWARDED_LISTENERS`) and the five raw `aria-*`
-// entries. RN passes those raw because its TWF folds no aria itself and leaves the child View to do
-// it; we fold the owner's bag before the clone runs, so `aria-valuemax` has already become
-// `accessibilityValue` and `aria-modal` `accessibilityViewIsModal` by this point.
+// WHAT THE OWNER'S WRITES DIRTY, and it is EVERY name rather than a list of thirty.
 //
-// COPIED ONLY WHEN SET (:281), which is the split from TNF's unconditional clone.
-const CLONED_WHEN_SET: readonly string[] = [
-  'accessibilityActions',
-  'accessibilityHint',
-  'accessibilityLanguage',
-  'accessibilityIgnoresInvertColors',
-  'accessibilityLabel',
-  'accessibilityRole',
-  'accessibilityValue',
-  'accessibilityViewIsModal',
-  'hitSlop',
-  'testID',
-];
-
-// :253-276, assigned whatever their value — including `undefined`, which clears the child's, the
-// same `cloneElement` semantics TNF relies on. Three of them (`accessibilityElementsHidden`,
-// `accessibilityLiveRegion`, `importantForAccessibility`) are in RN's passthrough list TOO, and the
-// later conditional copy can only re-assign the same value the aria fold already resolved — so they
-// belong here, not above.
-const CLONED_ALWAYS: readonly string[] = [
-  'accessibilityElementsHidden',
-  'accessibilityLiveRegion',
-  'importantForAccessibility',
-];
-
-// Owner props the four COMPUTED clones read, on top of the two lists above. `focusable` also
-// derives from the `press` LISTENER, which is not a prop — see `onOwnedListenerChange`.
-const DERIVED_FROM: readonly string[] = [
-  'accessible',
-  'accessibilityState',
-  'disabled',
-  'focusable',
-  'id',
-  'nativeID',
-  // Not cloned at all: they configure the scheduler, which reads them live at gesture start. Listed
-  // so a mid-mount change still dirties the child and the next commit re-reads them.
-  'delayPressIn',
-  'delayPressOut',
-  'minPressDuration',
-];
-
-// Every owner name the child's payload reads. Without it the clone is correct at mount and frozen
-// forever after: `markPropsDirty` bubbles UP, so an owner write never reaches the child on its own.
-const SLOT_DERIVED: readonly string[] = [
-  ...CLONED_WHEN_SET,
-  ...CLONED_ALWAYS,
-  ...DERIVED_FROM,
-  ...ARIA_ALIAS_KEYS,
-];
+// RN's two clone lists (`TouchableWithoutFeedback.js:130-153` when-set, `:253-276` always) lived
+// here until 2026-09-18, feeding `slotDerived` alongside the six computed names and the three
+// scheduler ones. The clone is `foldCloneOntoChild` in `SymbioteFabricProps.cpp` now, which turned
+// the list from the RULE into a MIRROR of `kWithoutFeedbackWhenSetKeys` +
+// `kWithoutFeedbackAlwaysKeys` — two lists that must agree, failing silently when they drift.
+//
+// See `touchable-native-feedback.ts` for the same note and what the wildcard costs. The three
+// scheduler names (`delayPressIn`, `delayPressOut`, `minPressDuration`) were the one entry here that
+// was NEVER about the clone — they configure the press machine, which reads them live at gesture
+// start — and a wildcard covers them for free where a list had to remember them.
+const SLOT_DERIVED: readonly string[] = [SLOT_DERIVED_ALL];
 
 // :148-153. Owned, so the app's callback stashes on the owner and a trampoline on the child reads it
 // at dispatch time. `layout` and `accessibilityAction` are Fabric BOOLEAN-GATED events

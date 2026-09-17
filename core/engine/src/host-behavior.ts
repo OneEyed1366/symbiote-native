@@ -132,6 +132,18 @@ export interface IHostBehavior {
   // a re-render writing the same value dirties nothing — the guard is what keeps this off the hot
   // path in practice, and `node.childHost` turns away every node that has no slot before the
   // registry is touched at all.
+  //
+  // `SLOT_DERIVED_ALL` is the fourth case and the two clone-primitives are why it exists. A
+  // `cloneElement` owner does not derive its slot from a LIST of names — it re-clones on every
+  // render, whatever changed — so naming the keys is an optimisation, and one that has to stay
+  // exactly in step with a rule living in `SymbioteFabricProps.cpp`. Two lists that must agree, with
+  // a silent failure mode (the clone goes stale on the one prop a list forgot) is the mirror shape
+  // this project deletes on sight, and here the honest spelling is also the cheaper one to keep.
+  //
+  // It costs a false dirty on an owner prop the clone does not carry. For these two tags that is
+  // nearly empty: the owner is an ANCHOR whose props reach Fabric nowhere else, so every name it
+  // holds is either cloned or consumed by the press machine, and the machine's four are written once
+  // at mount rather than per render.
   readonly slotDerived?: readonly string[];
   // Children the owner takes out of the ordinary flow, by FABRIC component name, and what it does
   // with each.
@@ -447,10 +459,21 @@ export function claimModeFor(
   return attached.get(node)?.claimedChildren?.[component];
 }
 
+/**
+ * Every owner key feeds the slot. The spelling for a `cloneElement` primitive, whose slot is not
+ * derived from a named set at all — see `IHostBehavior.slotDerived`.
+ *
+ * A sentinel in the SAME array rather than a second field, so `slotDerivesFrom` stays one lookup and
+ * a behavior that wants both spellings cannot express a contradiction.
+ */
+export const SLOT_DERIVED_ALL = '*';
+
 // Does this owner key feed the slot's payload? See `slotDerived`. Same `node.childHost` gate as
 // above keeps the WeakMap probe off every node that has no slot.
 export function slotDerivesFrom(node: ISymbioteNode, key: string): boolean {
-  return attached.get(node)?.slotDerived?.includes(key) === true;
+  const names = attached.get(node)?.slotDerived;
+  if (names === undefined) return false;
+  return names.includes(SLOT_DERIVED_ALL) || names.includes(key);
 }
 
 // The app's listeners for names a behavior owns, per node. Not on the node: this exists only for

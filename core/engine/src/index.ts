@@ -489,6 +489,7 @@ export {
   clearHostBehaviors,
   appListenerFor,
   addDerivedNode,
+  SLOT_DERIVED_ALL,
 } from './host-behavior';
 // `IPayloadFold` rides along because a behavior that BUILDS a node owns what that node carries: a
 // composed primitive assigns a fold to its own slot (`behaviors/scroll-view.ts`), and the owner's

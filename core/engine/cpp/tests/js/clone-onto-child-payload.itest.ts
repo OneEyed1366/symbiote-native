@@ -248,6 +248,35 @@ describe('what the owner clones onto its child', () => {
     expect(committedPayloadOf(child)?.accessibilityLabel).toBe('After');
   });
 
+  // why: THE WILDCARD IS LIVE, asked with a key no clone list names. `slotDerived` held thirty names
+  // until 2026-09-18 and they had become a mirror of the C++ rule's own arrays; it is
+  // `SLOT_DERIVED_ALL` now, which is what a `cloneElement` owner actually means — it re-clones on
+  // every render, whatever changed.
+  //
+  // `hitSlop` is the probe rather than `accessibilityLabel`, and that is the whole point: a NAMED
+  // list makes every key its own question, and the one it forgets fails silently. Break-tested by
+  // reducing `SLOT_DERIVED` to `['accessibilityLabel']`, which turned this red and left every other
+  // case in the file green.
+  it('dirties the child on a late write of any cloned key', () => {
+    const surface = createSurface(ROOT_TAG);
+    const owner: ISymbioteNode = createElement(
+      '#anchor',
+      false,
+      'touchable-native-feedback',
+    );
+    const child: ISymbioteNode = createElement('RCTView', false, 'view');
+    appendChild(owner, child);
+    surface.appendChild(owner);
+    surface.commit();
+    mounted();
+
+    routeProp(owner, 'hitSlop', 8);
+    surface.commit();
+    mounted();
+
+    expect(committedPayloadOf(child)?.hitSlop).toBe(8);
+  });
+
   // why: the LISTENER half of the same thing, and it needs its own case because a listener flip
   // changes no prop — `onOwnedListenerChange` is the only thing that can dirty the child for it.
   // Without that the bit crosses, the rule would read it, and the rule never runs.
