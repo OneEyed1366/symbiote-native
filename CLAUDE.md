@@ -786,7 +786,73 @@ porting ANY further RN module by hand.**
 > The pressable row read 5.6/28.6 when measured alone on a busier machine. Both are real and neither
 > is the other's before/after — that is exactly why they were re-measured together.
 >
-> ### A small-ms scaling test needs BEST-OF-N, not one sample (2026-09-18)
+> ### The FOURTH port — `image` — and the first rule that does NOT move whole (2026-09-18)
+
+`srcSet` > `src` > `source` precedence, the W3C header decoration (`crossOrigin`/`referrerPolicy`),
+the `width`/`height` fold into style, `alt` becoming `accessibilityLabel` + `accessible`,
+`resizeMode`/`tintColor` falling back to style keys, `loadingIndicatorSource` plucked down to a bare
+uri: all of it is `foldImageProps` in `SymbioteFabricProps.cpp` now, contract in
+`image-payload.itest.ts`.
+
+**ONE STEP COULD NOT CROSS, and naming why is the reusable part.** `resolveAssetSource` turns the
+number `require('./logo.png')` returns into a `{uri, width, height, scale}` by asking METRO'S ASSET
+REGISTRY — a JS table populated at bundle time. There is no such table in C++ and there should not
+be: it belongs to the bundler, not to the platform.
+
+So the lookup moved EARLIER instead of across. `routeProp` resolves the three source props on the
+way IN (`core/engine/src/image-source-write.ts`), which is the seam and the argument
+`structured-style.ts` already established for `boxShadow`/`filter`/`transform`: **a value resolved
+at payload-build time is resolved HEADLESS ONLY**, because the C++ builder has no JS to call, and
+the device then commits the raw input for Fabric to drop in silence. By commit time the bag holds
+resolved sources and the rest of the rule is pure. **This is the pattern for every remaining port
+whose rule touches something only JS knows.**
+
+It is gated on the NODE (`resolvesImageSources`, declared by the behavior, one boolean read per
+write beside `hasCommitHook`) rather than on the key, because the resolution normalises to Image's
+ARRAY shape and a `WebView` or a third-party video view spells `source` too.
+
+**NO TWIN, and this is the port that had to earn it.** `mapImageProps` had a second caller — Angular's
+`<Image>`, whose typed `@Input()`s meant it folded in a component body rather than writing props on
+a tag. `renderImage` is a GATHER now: it flattens the typed view back into the bag an app would have
+authored and names the `image` tag, and the engine folds once for every adapter. Six helpers went
+with the rule (`normalizeSource`, `headersFromAliases`, `expandSrcSet`, `resolveSourceArray`,
+`readStyleString`, `readSourceUri`), and `render-image.test.ts` went from ~70 fold assertions to
+four about what `renderImage` still decides.
+
+**`image-background` now BUILDS ITS INNER IMAGE WITH THE TAG, which is the reverse of what it did.**
+It used to withhold the tag so the node would not get Image's `payloadFold` — a single slot it
+needed for its own derived style — and call the mapping by hand. The mapping is reached off the tag
+now, so the tag is how that node gets a platform half at all, and the JS slot is free for the
+COMPOSITION, which is where the browser model wants it. `registerImageBackgroundBehavior` calls
+`registerImageBehavior` as a result: a real dependency, declared rather than assumed, and the kind
+that would otherwise surface first on a device.
+
+**Two things fall out of it, both recorded rather than smoothed over.** A style `resizeMode` beats
+the PROP, where RN's `??` says the opposite — and the fold is not why: `fabricProps` writes the
+top-level keys and THEN hoists the style over them, so the `??` is dead for exactly the two keys
+that can appear in both places. Pre-existing, survives the port unchanged because the hoist order is
+the payload builder's rather than the rule's, pinned as characterization. And the inner image's own
+`width`/`height` props now beat the proxied box size where RN nests it the other way — left that
+way deliberately (RN's own comment calls its nesting a "Temporary Workaround", an explicit prop
+winning over an inherited box is the less surprising reading, and reproducing it would need either a
+JS copy of the rule or a per-node fold-ORDER knob in the payload builder).
+
+**All three ported rules, on one ruler** — `tag-rule-cost.itest.ts`, one process, one sitting, each
+rule run on BOTH arms with the payloads asserted equal key by key first, best-of-4 per arm:
+
+```
+            native walk          js walk             per node
+ pressable  4.1  4.3  4.3 ms     20.6 21.6 23.1 ms   ~17 us
+ switch     5.6  5.5  6.0 ms     27.1 38.4 28.8 ms   ~26 us
+ image      6.9  7.3  7.8 ms     32.2 38.2 33.3 ms   ~27 us
+```
+
+The crossing was four to five times the rule in every case, and **the bigger the bag the worse the
+ratio** — which is why image, whose rule touches the most keys, was the most expensive to have had
+in JS. Read the native column as a measurement and the JS column as a floor: a JS fold allocates, so
+its cost carries GC that best-of-N cannot suppress.
+
+### A small-ms scaling test needs BEST-OF-N, not one sample (2026-09-18)
 >
 > `child-list-scaling.itest.ts` reads a doubling FACTOR rather than a millisecond, which is the right
 > instrument for a complexity claim — and it was failing intermittently under the full suite while
