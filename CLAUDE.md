@@ -1681,10 +1681,11 @@ payloads asserted equal key by key before any millisecond is read):
 
 ```
              native walk   js walk    per node   the bag
- accessory      3.1         13.8       10.7 us   4 keys — AND ITS FOLD DID NOTHING
- pressable      3.8         18.2       14.1 us   4 keys + a 3-key style
- switch         4.7         23.5       18.8 us   6 keys + nested trackColor
- image          5.9         27.7       21.9 us   6 keys + what the rule BUILDS
+ accessory      3.1         14.1       11.2 us   4 keys — AND ITS FOLD DID NOTHING
+ button         3.9         16.3       12.1 us   5 keys + a 2-key style
+ pressable      3.8         18.0       14.2 us   4 keys + a 3-key style
+ switch         4.9         23.5       18.6 us   6 keys + nested trackColor
+ image          5.9         27.8       22.1 us   6 keys + what the rule BUILDS
 ```
 
 `input-accessory-view`'s fold took the bag apart and reassembled it unchanged, so the port DELETED
@@ -1703,6 +1704,33 @@ view that declares none of them.
 copies. It cannot reach a third-party view — that was the objection that kept it duplicated — because
 `tagName` is written only by `attachHostBehavior`, so it is non-empty for our own primitives and
 nothing else.
+
+**The corollary bit the measurement before it bit anything else: a node built with a tag NOBODY
+registered carries an EMPTY `tagName`, so no rule fires.** `recordSetTag` is emitted by
+`attachHostBehavior` and by nothing else. The new `button` arm was written without a registration
+and measured a native side doing no work at all; what caught it was `expectSamePayload` refusing to
+time two arms that disagree, not a suspiciously good number. Any bare-tag fixture needs a stub
+behavior registered or it measures nothing.
+
+### A `<Button>` costs FOUR crossings per commit — the most expensive primitive we ship
+
+Pinned in `core/engine/cpp/tests/js/button-payload.itest.ts`: one JS fold per node the behavior
+builds — the owner, the iOS wrapper view, the text, and the raw label. At the per-node figures above
+that is ~50 us per button per commit, so a screen holding fifty of them pays about 3 ms of pure
+marshalling every commit they are dirty in.
+
+Porting Button's own rules (`accessibilityRole`, the `importantForAccessibility` promotion, the
+`touchSoundDisabled` rename, the `color` strip) did NOT move that count and the test says so: what
+moved is the work inside the owner's trip. The owner's fold survives for `focusable` (an owned
+listener, invisible to a props-only rule) and the Android view style; the other three hang on DERIVED
+nodes, and a raw text carries no tag at all, so there is nothing for a tag-keyed rule to key on.
+**Eliminating those three is the largest single crossing win left in the engine, and it needs a seam
+that does not exist yet** — derived nodes have no tag.
+
+Two JS functions were deleted outright rather than left behind: `BUTTON_ACCESSIBILITY_ROLE` and
+`resolveButtonImportantForAccessibility` had no caller after the port except their own unit test.
+That is the mirror shape to watch for — a JS copy of a rule that runs elsewhere, kept alive by the
+test asserting it, green forever and meaning nothing.
 
 ### A `payloadFold` costs ~17 us per node PER COMMIT, and it is billed inside the C++ walk
 
