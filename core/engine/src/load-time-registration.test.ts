@@ -85,10 +85,36 @@ function collectSourceFiles(dir: string, out: string[]): void {
   }
 }
 
+// THE SECOND WINDOW, and this one cannot be closed the way the first was — only NAMED.
+//
+// `withFileTypes` removed the listing/stat race below by asking one syscall for both answers. There
+// is no such move here: the walk lists a path and this reads it, and nothing makes those atomic. A
+// `.ts` under `adapters/` or `packages/` that vanishes in between throws ENOENT out of a test whose
+// subject is module shape, with no assertion in the message — the exact signature the first race
+// wore, and the reason it was dismissed as a stale build twice in one session.
+//
+// So this does not CATCH the race, it labels it. Swallowing the file would be worse than the throw:
+// a skipped module is a finding that silently stops being reported, and this guard exists for a bug
+// class no behavioural test can see. Rethrowing with the path costs nothing and means the next
+// occurrence arrives already diagnosed instead of being read as flakiness again.
+//
+// Observed once on 2026-09-18 and not reproduced in nine consecutive full runs afterwards, message
+// uncaptured — so whether it IS this window is unproven. That is what the label is for.
 function parse(file: string): ts.SourceFile {
+  let text: string;
+  try {
+    text = readFileSync(file, 'utf8');
+  } catch (cause) {
+    throw new Error(
+      `${relative(REPO_ROOT, file)} was listed by the walk and could not be read. ` +
+        `If this is ENOENT it is a race against a test writing and deleting files under a ` +
+        `scanned root, not a finding about that file — rerun it alone to tell them apart.`,
+      { cause },
+    );
+  }
   return ts.createSourceFile(
     file,
-    readFileSync(file, 'utf8'),
+    text,
     ts.ScriptTarget.ESNext,
     /* setParentNodes */ true,
   );

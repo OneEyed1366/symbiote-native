@@ -1782,9 +1782,22 @@ entry the walk was about to discard for its extension anyway.
 Fixed with `readdirSync(dir, { withFileTypes: true })`: the type comes from the SAME syscall, so the
 window does not exist rather than being caught. One syscall cheaper per entry, too.
 
+**AND IT FIRED AGAIN THE NEXT DAY, so read "fixed" as "that window is closed" rather than "the test
+is settled".** Once on 2026-09-18, in a full run, then NINE consecutive clean full runs afterwards —
+and the message was not captured, so whether it is the same cause is unproven. Chasing it further by
+guessing is the thing this section warns against.
+
+What was done instead is narrower and is the reusable half: `parse()`'s `readFileSync` is a SECOND
+listed-then-read window, and unlike the first it cannot be collapsed into one syscall. It now
+rethrows with the path and says out loud that an ENOENT there is a race rather than a finding.
+**Labelling beats swallowing here** — skipping an unreadable file would turn a report this guard
+exists to make into silence — and it means the next occurrence arrives diagnosed instead of being
+dismissed a third time.
+
 The general form is the part worth keeping: **a failure with no assertion in the message is not
 evidence of flakiness, it is evidence that something threw** — and "passes alone, fails in parallel"
-points at shared filesystem state, not at a build.
+points at shared filesystem state, not at a build. Its corollary, learned here: **a race you closed
+is not the same claim as a test that stopped failing.** Say which one you have.
 
 ### The engine can WARN now — `SymbioteDebug.h`, and it was ScrollView's blocker
 
