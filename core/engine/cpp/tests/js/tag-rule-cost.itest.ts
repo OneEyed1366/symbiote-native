@@ -25,7 +25,7 @@
 //
 //              native walk        js walk             per node   keys in the bag / what the rule does
 //   imagebg    3.0  3.0  3.0 ms   13.0 12.2 12.0 ms    ~9.4 us   2 + a 3-key style / writes ONE key
-//   spinner    3.9  3.7  3.7 ms   14.4 13.6 13.5 ms   ~10.1 us   4, no style / the most work here
+//   spinner    3.9  3.7  3.7 ms   14.4 13.6 13.5 ms   ~10.1 us   4, no style / the MOST work here
 //   accessory  3.1  3.2  3.1 ms   14.0 14.2 13.8 ms   ~10.8 us   4 / nothing at all
 //   button     4.2  3.9  3.9 ms   16.7 15.2 15.5 ms   ~11.8 us   5 + a 2-key style
 //   pressable  3.7  3.7  3.7 ms   18.1 17.7 18.3 ms   ~14.4 us   4 + a 3-key style
@@ -53,27 +53,19 @@
 // goes out as a `jsi::Value` and comes back through `jsi::dynamicFromValue`, a per-key JSI walk, for
 // a rule that rewrites a handful of keys.
 //
-// THE ACCESSORY ROW IS THE PROOF OF THAT SENTENCE, and it is why an arm with no rule earns a place
-// in a file about rules. Its fold did NOTHING — it took the bag apart and put it back together
-// unchanged, which is why the port deleted it instead of moving it — and it still cost 10.7 us per
-// node. A fold is charged for existing. Read down the table and the per-node column tracks BAG SIZE
-// and nothing else: the accessory's rule does the least work of the four and is the cheapest only
-// because its bag is the smallest, while image's is the dearest because its rule BUILDS keys (a
-// `source` object, a headers map, a style array) that all have to travel back.
-//
-// The corollary is worth stating, because it inverts the intuition that a trivial fold is a cheap
-// one: the WORST value in this file is a fold that does nothing to a large bag. There is no rule
-// there to be worth the crossing.
+// THE ACCESSORY ROW IS WHY AN ARM WITH NO RULE EARNS A PLACE IN A FILE ABOUT RULES. Its fold did
+// NOTHING — it took the bag apart and put it back together unchanged, which is why the port deleted
+// it instead of moving it — and it still cost ~11 us per node. A fold is charged for EXISTING.
 //
 // The NATIVE column is tight run to run and the JS column nearly as much on this sitting; expect the
 // JS one to drift more on a busier machine, since a JS fold allocates and carries GC that best-of-N
 // cannot fully suppress.
 //
-// These four rows REPLACE an earlier three-row table (pressable 4.1/20.6, switch 5.6/27.1, image
-// 6.9/32.2) taken in another sitting on a busier machine. Every figure in both is real and neither
-// is the other's before/after — ONE RULER PER COMPARISON, which is why all four rules are priced in
-// the same file, in the same process, in one sitting, and why the old rows were replaced rather than
-// kept alongside.
+// This table REPLACES an earlier three-row one (pressable 4.1/20.6, switch 5.6/27.1, image 6.9/32.2)
+// taken in another sitting on a busier machine. Every figure in both is real and neither is the
+// other's before/after — ONE RULER PER COMPARISON, which is why every rule is priced in the same
+// file, in the same process, in one sitting, and why the old rows were replaced rather than kept
+// alongside. Adding a row means re-running all of them.
 
 import {
   registerActivityIndicatorBehavior,
