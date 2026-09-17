@@ -556,11 +556,23 @@ report();
 //   4000          5  416.0       1.1       0.0        414.9
 //
 // Same twenty thousand nodes in every row. Widening the changed parent's child list 8x multiplies
-// the commit 35x, and Fabric's own share goes 0.2 -> 1.1 ms, i.e. linear and negligible. So the
-// term is **superlinear in the SIBLING COUNT of the node that changed** — roughly O(width^1.75) —
-// and `adoptCommitted`'s whole-tree descent is ruled out by these four arms, because a cost
-// proportional to total nodes would have been flat across them. That refutes this file's own first
-// hypothesis, which named `adoptCommitted`.
+// the commit 35x, and Fabric's own share goes 0.2 -> 1.1 ms, i.e. linear and negligible. So the term
+// is driven by the SIBLING COUNT of the node that changed and not by tree size, and
+// `adoptCommitted`'s whole-tree descent is ruled out by these four arms — a cost proportional to
+// total nodes would have been flat across them. That refutes this file's own first hypothesis, which
+// named `adoptCommitted`.
+//
+// **DO NOT QUOTE AN EXPONENT OFF THESE FOUR ROWS.** 35x for 8x looks like O(W^1.75), and this build
+// cannot support that reading: `core/engine/cpp/tests` configures `CMAKE_BUILD_TYPE Debug` with
+// asserts deliberately on, and the compile line for RN's own translation units carries no `-O` flag
+// at all. At `-O0`, allocator and refcount traffic that a release build folds away is paid in full,
+// and a superlinear-looking curve can come from allocation pressure rather than from an algorithm.
+// What survives that objection is everything measured as an A/B INSIDE one binary, where the
+// constant factor cancels: the 35x at constant node count above, and the parent-vs-child contrast
+// below. The exponent itself needs an optimised build to claim, and this file does not make one.
+// (`REACT_NATIVE_DEBUG` is NOT defined here, so `ensureYogaChildrenLookFine()` — an O(W) assert walk
+// called twice per `adoptYogaChild` — compiles away and is NOT the cause. It was the first suspect
+// and it is ruled out by the compile line, not by argument.)
 //
 // This is the shape a real list has: `BenchmarkScreen`'s own step is 1 000-2 000 flat rows under one
 // parent, and every commit that touches any one of them pays it again.
@@ -577,12 +589,18 @@ report();
 //    1000       30.0                  0.0
 //    2000      106.0                  2.0
 //
-// The parent arm is FLAT in width and the child arm is superlinear. That is the comment's own claim,
+// The parent arm is FLAT in width and the child arm is not. That is the comment's own claim,
 // measured: "`fragment.children` is read as a flag three times inside the clone... it forces
 // `updateYogaChildren()`, which calls `adoptYogaChild` per child, and a child already owned by its
 // previous parent's yoga node is CLONED and swapped in by `replaceChild`... So a props-only change on
-// a parent of a thousand rows re-clones all thousand, every commit, forever." `replaceChild` scans to
-// find the child it replaces, so W clones each paying an O(W) scan is the O(W^1.75) measured above.
+// a parent of a thousand rows re-clones all thousand, every commit, forever."
+//
+// Read in the vendor, `updateYogaChildren` is W clones plus W `replaceChild` calls per commit, and
+// BOTH `replaceChild`s take an accurate `suggestedIndex` on this path — `yogaLayoutableChildren_` is
+// rebuilt incrementally, so index `i` is always the entry just appended. The linear scan their
+// fallback would do is therefore NOT reached, and the per-child re-cloning is linear. What makes the
+// measured curve steeper than linear is not identified here; see the build caveat above before
+// reading a complexity class into it.
 //
 // **The path built to avoid exactly this is `canReplaceInPlace`, and it returns false
 // unconditionally** (SymbioteTree.cpp, disabled 2026-09-15 for a fuzzer-confirmed correctness
