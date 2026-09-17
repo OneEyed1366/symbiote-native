@@ -1560,6 +1560,33 @@ for that reason. The census must assert ABSOLUTE counts, not that before matches
 censuses match perfectly. And the shadow names are not the element names — `RCTText` commits as
 `Paragraph`, its string child as `RawText`, `RCTSinglelineTextInputView` as `TextInput`.
 
+**Split into render and move, the deficit is entirely the move — and our RENDER is faster than
+stock's.** A re-render with the SAME order reconciles all thousand children, every one bailing out of
+`memo`, and commits nothing:
+
+```
+                  re-render   swap    the move itself
+ stock               3.5       5.9         2.4
+ ours                1.8      19.9        18.1     engine 2.6 of it
+```
+
+**And the move does not track DISTANCE**: swapping rows 1 and 2 costs 20.8 ms against 19.9 for rows 1
+and 998. Both move exactly two rows, so React's flag walk and our host-config calls are identical and
+only the travel differs — which rules out the two obvious suspects, `getHostSibling`'s search in
+React's mutation commit and the `std::vector::insert` tail shift `kOpInsertBefore` still pays. What
+is left is a FIXED price that appears the moment any placement exists.
+
+The shape fits React's mutation-effect traversal: with no placement the parent's `subtreeFlags` carry
+no `MutationMask` and React skips its thousand children outright — that is the 1.8 ms idle arm — and
+one placement makes it walk all of them. **Persistent mode has no equivalent**: a move there is
+expressed during the RENDER phase, by cloning the parent and rebuilding its child set, which is why
+stock pays 2.4 ms on the move and a heavier 3.5 ms render. If that is right, the cost is a property
+of driving React in MUTATION mode, which `<M1 + M2>` chose deliberately so that R2 could not be
+skipped — not something the engine can remove.
+
+NOT CONFIRMED, and one arm away: run the same swap at 2 000 rows. Doubling means the traversal;
+holding means something else fires once per commit.
+
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the
 reasoning that a `Map` lookup costs what converting a boolean costs. Booleans need no `Map` — there

@@ -41,10 +41,34 @@
 // stays because the 55 ms split is a real finding about what an unmemoized list costs — it is just
 // not this file's headline.
 //
-// What remains open is the comparison this file cannot make: stock does the same swap in 9.6 ms on
-// device and we take 35.3. Both run the same reconciler on the same tree, so the difference is what
-// React does PER FIBER against a mutation-mode host config versus its own persistent-mode one — and
-// answering it needs React's own Fabric renderer standing up in this harness, which nothing does yet.
+// ── AND THE STOCK ARM EXISTS NOW, SO THE GAP HAS A SHAPE ────────────────────────────────────────
+//
+// `stock-swap-cost.itest.tsx` runs the same thousand memoized rows through React's own Fabric
+// renderer. Split into the render phase (a re-render with the SAME order — the parent reconciles all
+// thousand children, every one bailing out of `memo`, and nothing commits) and the move:
+//
+//                       re-render   swap    the move itself
+//   stock                  3.5       5.9         2.4
+//   ours                   1.8      19.9        18.1
+//
+// **Our RENDER phase is FASTER than stock's.** The entire deficit is the move — 18.1 against 2.4,
+// and the engine is 2.6 ms of it (`walk=0.8 apply=2.6`, `setProps=0`, `cloned=2`).
+//
+// AND IT DOES NOT TRACK DISTANCE: swapping rows 1 and 2 costs 20.8 ms against 19.9 for rows 1 and
+// 998. Both move exactly two rows, so React's flag walk and our host-config calls are identical and
+// only the travel differs. That rules out the two obvious suspects — `getHostSibling`'s search in
+// React's mutation commit, and the `std::vector::insert` tail shift the engine's `kOpInsertBefore`
+// still pays. What is left is a FIXED price that appears the moment any placement exists at all.
+//
+// The shape fits React's mutation-effect traversal: with no placement the parent's `subtreeFlags`
+// carry no `MutationMask` and React skips its thousand children outright, which is the 1.8 ms idle
+// arm. One placement and it walks all of them. Persistent mode has no equivalent — a move there is
+// expressed during the RENDER phase, by cloning the parent and rebuilding its child set — which is
+// why stock pays 2.4 ms and a heavier render.
+//
+// NOT CONFIRMED, and the check that would confirm it is one arm away: run the same swap at 2 000
+// rows. If the fixed cost doubles it is the traversal; if it holds, it is something else that fires
+// once per commit.
 //
 // RUN ON `build-release` (`pnpm run bench:itest`).
 
@@ -265,19 +289,46 @@ describe('what a keyed swap costs above the engine', () => {
     const before = committedTags().length;
     readSurfaceTelemetry(ROOT_TAG);
 
-    const order: number[] = [];
-    for (let id = 0; id < ROWS; id += 1) order.push(id);
-    [order[FIRST], order[SECOND]] = [order[SECOND], order[FIRST]];
-
     if (setMemoOrder === undefined) {
       throw new Error('the memo screen never rendered');
     }
+
+    // THE RENDER PHASE ALONE, the twin of the arm in `stock-swap-cost.itest.tsx`. A fresh array
+    // holding the SAME order re-renders the parent and reconciles all thousand children — every one
+    // bailing out of `memo` — and commits nothing. Subtracting it from the swap leaves the move
+    // itself, and the two halves attribute differently: a deficit here is the reconciler, a deficit
+    // in the difference is the host config.
+    const same: number[] = [];
+    for (let id = 0; id < ROWS; id += 1) same.push(id);
+    const idleStartedAt = performance.now();
+    setMemoOrder(same);
+    flushTimers();
+    surface.commit();
+    const idle = performance.now() - idleStartedAt;
+    mounted();
+    readSurfaceTelemetry(ROOT_TAG);
+    print(`DEBUG memo re-render, same order: ${idle.toFixed(1)} ms`);
+
+    const order: number[] = [];
+    for (let id = 0; id < ROWS; id += 1) order.push(id);
+    [order[FIRST], order[SECOND]] = [order[SECOND], order[FIRST]];
+    // SPLIT, because the engine's own telemetry accounts for only ~3 ms of this arm and the rest has
+    // to be somewhere nameable. `flushTimers()` covers React's render AND its commit — which is
+    // where our host config's `insertBefore` runs — while `surface.commit()` is the engine's
+    // materialize. Timing them apart says which side of that line the deficit is on.
     const startedAt = performance.now();
     setMemoOrder(order);
+    const setStateReturned = performance.now() - startedAt;
     flushTimers();
+    const throughReact = performance.now() - startedAt;
     surface.commit();
     const wall = performance.now() - startedAt;
     mounted();
+    print(
+      `DEBUG memo    setState=${setStateReturned.toFixed(1)} ` +
+        `drain=${(throughReact - setStateReturned).toFixed(1)} ` +
+        `engineCommit=${(wall - throughReact).toFixed(1)}`,
+    );
 
     const telemetry = readSurfaceTelemetry(ROOT_TAG);
     const after = committedTags().length;
@@ -291,6 +342,26 @@ describe('what a keyed swap costs above the engine', () => {
 
     expect(after).toBe(before);
     expect(telemetry?.nodesCreated ?? 0).toBe(0);
+
+    // ADJACENT vs DISTANT, on the same standing list and the same screen. Both move exactly two
+    // rows, so React's flag-walking and our host-config calls are identical; the only thing that
+    // differs is how far the two travel. If the cost tracks DISTANCE it is a search or a shift —
+    // `getHostSibling` in React's mutation commit, or the `std::vector::insert` the engine's
+    // `kOpInsertBefore` still pays. If it does not, the ~20 ms is a fixed price per moved row and
+    // neither of those is the subject.
+    const near: number[] = [];
+    for (let id = 0; id < ROWS; id += 1) near.push(id);
+    [near[1], near[2]] = [near[2], near[1]];
+    const nearStartedAt = performance.now();
+    setMemoOrder(near);
+    flushTimers();
+    surface.commit();
+    const nearWall = performance.now() - nearStartedAt;
+    mounted();
+    readSurfaceTelemetry(ROOT_TAG);
+    print(
+      `DEBUG memo    adjacent swap=${nearWall.toFixed(1)} vs distant=${wall.toFixed(1)}`,
+    );
   });
 });
 

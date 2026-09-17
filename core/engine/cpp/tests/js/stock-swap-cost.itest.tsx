@@ -187,11 +187,25 @@ describe('what a keyed swap costs through stock React Native', () => {
     expect(before.get('RawText')).toBe(3 * ROWS);
     expect(before.get('TextInput')).toBe(ROWS);
 
+    if (setOrder === undefined) throw new Error('the screen never rendered');
+
+    // THE RENDER PHASE ALONE. A fresh array holding the SAME order re-renders the parent and
+    // reconciles all thousand children — every one of which bails out of `memo` — and then commits
+    // nothing, because nothing moved. Subtracting it from the swap below leaves the part that is
+    // actually the move, and the two halves answer different questions: a deficit in THIS number is
+    // the reconciler, a deficit in the difference is the host config.
+    const same: number[] = [];
+    for (let id = 0; id < ROWS; id += 1) same.push(id);
+    const idleStartedAt = performance.now();
+    setOrder(same);
+    flushTimers();
+    const idle = performance.now() - idleStartedAt;
+    mounted();
+    print(`DEBUG stock re-render, same order: ${idle.toFixed(1)} ms`);
+
     const order: number[] = [];
     for (let id = 0; id < ROWS; id += 1) order.push(id);
     [order[FIRST], order[SECOND]] = [order[SECOND], order[FIRST]];
-
-    if (setOrder === undefined) throw new Error('the screen never rendered');
     const startedAt = performance.now();
     setOrder(order);
     flushTimers();
