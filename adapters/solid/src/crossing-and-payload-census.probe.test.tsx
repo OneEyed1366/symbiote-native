@@ -255,12 +255,16 @@ describe('what one benchmark row actually commits', () => {
     // implementation detail of whichever host processes the op stream and is not guaranteed to
     // agree between hosts, so pinning it is the whole thing to avoid here. `testID` itself is
     // excluded below — it is this query's own marker, not something the CSS or the fold seeded.
+    // The pressable seeds NOTHING here any more, and that is the port rather than a regression:
+    // `accessible`/`focusable` are resolved by the engine (`foldPressableProps`) and this probe
+    // reads the TypeScript builder's payload, which carries no copy of the rule. Asserted where it
+    // runs — `core/engine/cpp/tests/js/pressable-payload.itest.ts`.
     expect(
       seeded(
         entry => entry.props.testID === 'flex1-pressable',
         ['flex', 'testID'],
       ),
-    ).toEqual(['accessible', 'focusable']);
+    ).toEqual([]);
     expect(
       seeded(
         entry => entry.viewName === 'RCTSinglelineTextInputView',

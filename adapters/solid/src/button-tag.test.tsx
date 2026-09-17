@@ -162,12 +162,13 @@ describe('Solid: `button` as a tag', () => {
     // single-bag composition matters: with a spread-then-override on the tag, Solid's mergeProps
     // semantics change which side wins.
     //
-    // `accessible` and the rest of `accessibilityState` are the two this file used to get WRONG,
-    // and it asserted the divergence rather than catching it. RN passes `accessible` through and
-    // lets TouchableOpacity default it (`accessible !== false`, TouchableOpacity.js:303), so an
-    // explicit `false` survives; and it MERGES the state, keeping busy/checked/expanded/selected
-    // and overriding only `disabled` (Button.js:333-338).
-    it('pins the button role and the disabled state, and passes the rest through', async () => {
+    // `accessible` and the state MERGE are the two this file used to get wrong, and they now live
+    // where the rule does — `core/engine/cpp/tests/js/pressable-payload.itest.ts`, which asserts
+    // both on the `button` tag against the payload the commit actually sent. They left as a PAIR
+    // with the role rather than one at a time: this harness builds its payload through the
+    // TypeScript `fabricProps`, which holds no copy of the pressable rule, so an assertion left
+    // here would have gone green over a rule it cannot reach.
+    it('pins the button role over the caller', async () => {
       mount(ROOT_TAG, () => (
         <button
           testID={TEST_ID}
@@ -180,10 +181,7 @@ describe('Solid: `button` as a tag', () => {
       ));
       await tick();
 
-      const props = touchable().payload;
-      expect(props.accessibilityRole).toBe('button');
-      expect(props.accessible).toBe(false);
-      expect(props.accessibilityState).toEqual({ busy: true, disabled: true });
+      expect(touchable().payload.accessibilityRole).toBe('button');
     });
 
     // why: touchSoundDisabled is Button's own spelling of the pressable's android_disableSound —

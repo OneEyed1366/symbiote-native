@@ -73,9 +73,6 @@ const settle = async (): Promise<void> => {
   await tick();
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
 /** The committed host, found by the `nativeID` its `id` folded into. */
 function hostOf(label: string): ILiveNode {
   const host = live.findLive(
@@ -180,16 +177,17 @@ describe('Svelte: `button` as a tag', () => {
   });
 
   // why: `disabled` greys the label and wins over an explicit `color` (Button.js pushes the
-  // disabled colour after the tint), and it lands on the a11y state so a screen reader announces
-  // it. Both are the behavior's folds reaching Fabric through Svelte's own prop bag.
-  it('greys the label over an explicit color and announces itself disabled', async () => {
+  // disabled colour after the tint) — Button's own fold, reaching Fabric through Svelte's prop bag.
+  //
+  // The a11y half went to `core/engine/cpp/tests/js/pressable-payload.itest.ts`: Button composes
+  // the pressable rule, that rule is the engine's now, and this harness's payload is built by the
+  // TypeScript `fabricProps`, which holds no copy of it.
+  it('greys the label over an explicit color', async () => {
     const root = await mountSource(
       `<button p={{ id: 'btn', title: 'Go', color: '#ff0000', disabled: true }}></button>`,
     );
 
     const host = hostOf('btn');
-    const state = host.payload.accessibilityState;
-    expect(isRecord(state) && state.disabled).toBe(true);
     expect(host.children[0].children[0].payload.color).toBe(DISABLED_GREY);
 
     unmount(root);

@@ -135,11 +135,6 @@ function fireAt(handle: unknown, type: string, x: number, y: number): void {
   });
 }
 
-function accessibilityDisabled(props: Record<string, unknown>): unknown {
-  const state = props.accessibilityState;
-  return isRecord(state) ? state.disabled : undefined;
-}
-
 function terminationGate(
   handle: unknown,
 ): ((event: unknown) => unknown) | undefined {
@@ -189,7 +184,10 @@ describe('Solid Pressable on the engine', () => {
     // why: RN's disabled Pressable must not claim the responder or fire feedback at all, and must
     // still report itself disabled to a screen reader — a disabled control that keeps reacting is
     // both a product and an a11y bug.
-    it('suppresses the press and folds accessibilityState.disabled when disabled', async () => {
+    // The a11y half of this case is the engine's rule now (`foldPressableProps`) and is asserted in
+    // `core/engine/cpp/tests/js/pressable-payload.itest.ts`; what is left here is the half that is
+    // genuinely Solid's — that a disabled tag reaches the press machine and the press never fires.
+    it('suppresses the press when disabled', async () => {
       let presses = 0;
       mount(ROOT_TAG, () => (
         <pressable
@@ -202,17 +200,17 @@ describe('Solid Pressable on the engine', () => {
       ));
       await flush();
 
-      expect(accessibilityDisabled(committedTargetProps())).toBe(true);
       const handle = responderHandle();
       fire(handle, TOUCH_START);
       fire(handle, TOUCH_END);
       expect(presses).toBe(0);
     });
 
-    // why: the disabled fold must not leak — an enabled Pressable must NOT report
-    // accessibilityState.disabled just because the fold ran, and unrelated a11y props must reach
-    // the native node untouched.
-    it('passes a11y props through and leaves an enabled Pressable undisabled', async () => {
+    // why: unrelated a11y props reach the native node untouched. The "an enabled Pressable must not
+    // report itself disabled" half left with its disabled twin, to
+    // `core/engine/cpp/tests/js/pressable-payload.itest.ts` — an absence assertion on a harness
+    // that can no longer produce the key passes for the wrong reason forever.
+    it('passes a11y props through untouched', async () => {
       mount(ROOT_TAG, () => (
         <pressable
           testID={TARGET}
@@ -222,9 +220,7 @@ describe('Solid Pressable on the engine', () => {
       ));
       await flush();
 
-      const props = committedTargetProps();
-      expect(props.accessibilityLabel).toBe('save');
-      expect(accessibilityDisabled(props)).not.toBe(true);
+      expect(committedTargetProps().accessibilityLabel).toBe('save');
     });
 
     // why: RN's long-press is exclusive with a tap — a held press must fire onLongPress and must
@@ -562,16 +558,13 @@ describe('Solid Pressable on the engine', () => {
       await flush();
 
       const props = committedTargetProps();
-      for (const key of [
-        'delayLongPress',
-        'unstable_pressDelay',
-        'pressRetentionOffset',
-        'onLongPress',
-        'onPressMove',
-        'onHoverIn',
-        'delayHoverIn',
-        'android_ripple',
-      ]) {
+      // LISTENERS ONLY. The timing and config props beside them — `delayLongPress`,
+      // `unstable_pressDelay`, `pressRetentionOffset`, `delayHoverIn`, `android_ripple` — are
+      // stripped by the engine now (`foldPressableProps`) and are asserted in
+      // `core/engine/cpp/tests/js/pressable-payload.itest.ts`. These three are a different
+      // mechanism that is still entirely JS: `ownedListeners` diverts them into the behavior's
+      // stash at `routeProp`, so they never become props at all.
+      for (const key of ['onLongPress', 'onPressMove', 'onHoverIn']) {
         expect(key in props, `${key} must not reach Fabric`).toBe(false);
       }
       // hitSlop is the deliberate exception: the machine reads it AND native needs it to enlarge
@@ -606,7 +599,6 @@ describe('Solid Pressable on the engine', () => {
       setDisabled(true);
       await flush();
 
-      expect(accessibilityDisabled(committedTargetProps())).toBe(true);
       fire(handle, TOUCH_START);
       fire(handle, TOUCH_END);
       expect(presses, 'a disabled Pressable stops responding').toBe(1);

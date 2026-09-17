@@ -21,21 +21,36 @@ namespace symbiote {
  * change which processors run on every nested text node.
  */
 /**
- * A behavior's own payload fold, or empty for the ~all of them that have none.
+ * A behavior's own payload fold, for the ones that genuinely cannot live on this side.
  *
- * It CANNOT be ported to this side and it cannot become data. `registerHostBehavior` takes any tag,
- * third-party views included, so a C++ copy would cover only the primitives that happen to be ours;
- * and on the tags branch a fold is no longer a function of the primitive at all — `stickyFold` is
- * built per node and reads `runtime.state.translateY`, live JS state that is not a prop and moves on
- * every scroll frame. Any scheme that folds ahead of time serves that node a stale payload.
+ * THIS USED TO SAY "IT CANNOT BE PORTED", FULL STOP, AND THAT WAS TOO WIDE. Two have moved —
+ * `<text-input>`'s W3C aliases and `<pressable>`'s accessibility/ripple/machine-key rule — because
+ * both are a function of the TAG and nothing else, which is the definition of user-agent behavior.
+ * What the old wording was actually right about is the rest:
  *
- * So it stays a JS closure, and this side calls it. `SymbioteTree` supplies the wrapper; the cost is
- * one JSI round trip plus a bag marshalled both ways, per folded node per commit.
+ *   a third-party view's `validAttributes[*].process`, since `registerHostBehavior` takes any tag
+ *   and a C++ table would cover only the primitives that happen to be ours;
+ *
+ *   `stickyFold`, which is built PER NODE and reads `runtime.state.translateY` — live JS state that
+ *   is not a prop and moves on every scroll frame. Nothing folded ahead of time can serve it.
+ *
+ * So a fold that is a property of the tag moves here; a fold that is a property of the instance
+ * stays a JS closure and this side calls it. `SymbioteTree` supplies the wrapper; the cost is one
+ * JSI round trip plus a bag marshalled both ways, per folded node per commit.
  */
 using IPayloadFold = std::function<folly::dynamic(const folly::dynamic &)>;
 
+/**
+ * `tagName` is the INTRINSIC TAG (`pressable`), empty for a node that carries no host behavior.
+ *
+ * It is separate from `component` because it has to be: a `<pressable>` commits as `RCTView`, so
+ * the Fabric view name cannot distinguish it from a plain view, and a rule keyed off the view name
+ * would either miss every pressable or fire on every view. `<text-input>` is the case that hid
+ * this — its view name happens to name it uniquely, so the first port needed no tag at all.
+ */
 folly::dynamic fabricProps(
     const std::string &component,
+    const std::string &tagName,
     const folly::dynamic &props,
     const IPayloadFold &fold = {});
 

@@ -65,6 +65,7 @@ constexpr int32_t kOpSetProp = 6;
 constexpr int32_t kOpSetText = 7;
 constexpr int32_t kOpCommit = 8;
 constexpr int32_t kOpSetComponent = 9;
+constexpr int32_t kOpSetTag = 10;
 
 constexpr int32_t kKindElement = 0;
 constexpr int32_t kKindRawText = 1;
@@ -164,6 +165,11 @@ struct Node : jsi::NativeState {
   // As the adapter authored it. `committedViewName` below is what was actually sent, which differs
   // exactly when the virtual-text rule fired.
   std::string viewName;
+  // The INTRINSIC TAG — `pressable`, `text-input` — or empty for the ~all of them that carry no host
+  // behavior. It is what `fabricProps` keys this tag's platform props off, and it is not derivable
+  // from `viewName`: a pressable commits as `RCTView` like any other view. Arrives once, at
+  // `attachHostBehavior`, and never changes — a tag is what the node IS.
+  std::string tagName;
   react::Tag tag = 0;
   folly::dynamic props = folly::dynamic::object();
   std::shared_ptr<const react::InstanceHandle> instanceHandle;
@@ -1183,7 +1189,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
     if (fold) walkCost_.foldsFound += 1;
 
     startedAt = ISteadyClock::now();
-    folly::dynamic payload = fabricProps(node.viewName, node.props, fold);
+    folly::dynamic payload = fabricProps(node.viewName, node.tagName, node.props, fold);
     walkCost_.propsNs += nanosSince(startedAt);
     // The payload is needed TWICE and only one of those needs a copy. `RawProps` takes its
     // `folly::dynamic` BY VALUE (`RawProps.h:65`) and consumes it, so Fabric's half is a copy no
@@ -1229,7 +1235,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
       if (fold) walkCost_.foldsFound += 1;
 
       startedAt = ISteadyClock::now();
-      next = fabricProps(node.viewName, node.props, fold);
+      next = fabricProps(node.viewName, node.tagName, node.props, fold);
       walkCost_.propsNs += nanosSince(startedAt);
       startedAt = ISteadyClock::now();
       payload = diffProps(node.committedProps, next);
@@ -1636,6 +1642,13 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         if (node->viewName == viewName) break;
         node->viewName = viewName;
         markDirty(*node);
+        break;
+      }
+      // No `markDirty`: this arrives at `createElement`, before any prop is routed and long before
+      // the node's first commit, so the payload it changes has not been built yet.
+      case kOpSetTag: {
+        const auto &node = nodeAt(ops[at + 1]);
+        node->tagName = stringAt(ops[at + 2]);
         break;
       }
       case kOpSetText: {

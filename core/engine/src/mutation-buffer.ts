@@ -78,6 +78,19 @@ export const OP_SET_PROP = 6; // [slot, key, value] — value = NO_VALUE deletes
 export const OP_SET_TEXT = 7; // [slot, text]
 export const OP_COMMIT = 8; // [rootTag, surface]
 export const OP_SET_COMPONENT = 9; // [slot, viewName]
+/**
+ * The INTRINSIC TAG this node came from — `pressable`, not `RCTView`. `[slot, tag]`.
+ *
+ * Emitted only for a node a host behavior actually attached to, from `attachHostBehavior`, which is
+ * where the tag is already in hand and already matched. Every other node pays nothing.
+ *
+ * WHY THE TAG HAS TO CROSS AT ALL. A tag's platform props are resolved natively now, and the native
+ * side keys them off what it knows the node IS. For `<text-input>` the Fabric view name answers
+ * that by itself (`RCTSinglelineTextInputView` names nothing else); for `<pressable>` it does not —
+ * it commits as `RCTView`, byte-identical to a plain view. The tag is the only fact that separates
+ * them, and it is the same fact a browser keys user-agent behavior off.
+ */
+export const OP_SET_TAG = 10; // [slot, tag]
 
 /**
  * A `setProp` whose value slot is this DELETES the key.
@@ -415,6 +428,10 @@ export function recordSetText(handle: object, text: string): void {
  */
 export function recordSetComponent(handle: object, viewName: string): void {
   push(OP_SET_COMPONENT, slotOf(handle), intern(viewName));
+}
+
+export function recordSetTag(handle: object, tag: string): void {
+  push(OP_SET_TAG, slotOf(handle), intern(tag));
 }
 
 export function recordCommit(rootTag: number, surface: object): void {

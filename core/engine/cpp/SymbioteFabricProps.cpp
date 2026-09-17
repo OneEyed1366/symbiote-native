@@ -1,6 +1,7 @@
 #include "SymbioteFabricProps.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
@@ -719,10 +720,134 @@ dynamic foldTextInputAliases(const dynamic &props, bool isMultiline) {
   return out;
 }
 
+/**
+ * Which tags the pressable rule below belongs to — the three that a pressable IS, in RN's own terms.
+ *
+ * `touchable-opacity` is a pressable plus a fade (`TouchableOpacity.js` wraps Pressability), and
+ * `button` is a touchable plus a label on iOS and a TouchableNativeFeedback on Android
+ * (`Button.js:283`) — so on either platform a `<button>`'s platform half runs through this. Both
+ * composed the same function in JS before it moved, which is what this list is the record of.
+ *
+ * A composed tag has to be NAMED here because the wire carries what the node IS, not what its
+ * behavior was built out of — the browser's arrangement, and the one worth keeping: a reader asks
+ * "what does a `<button>` send" and this answers it without tracing a composition.
+ *
+ * `touchable-highlight` is deliberately ABSENT and always was: its behavior replaces the fold rather
+ * than composing it, so it has never carried the machine-key strip. That is a gap in it, not here.
+ */
+bool usesPressableRule(const std::string &tagName) {
+  return tagName == "pressable" || tagName == "touchable-opacity" ||
+      tagName == "button";
+}
+
+/**
+ * The props the press MACHINE consumes and the host must never see.
+ *
+ * A wrapper dropped them by DESTRUCTURING — they went into `createPressHandlers` and were simply
+ * absent from the object it spread onto its View. A tag has no destructure, so every one of them
+ * rode into the payload as a key no ViewConfig declares: a wire slot, an interned string and a
+ * hashed `RawProps` entry apiece, per pressable, per commit.
+ *
+ * `hitSlop` is deliberately NOT here and belongs to the same prop family — it is a real native View
+ * prop Fabric reads. `pressRetentionOffset` beside it is not.
+ */
+const std::array<const char *, 9> kPressableMachineKeys = {
+    // Consumed below and replaced by the resolved `nativeBackgroundAndroid` /
+    // `nativeForegroundAndroid`; the raw config is not a native prop.
+    "android_ripple",
+    "disabled",
+    "cancelable",
+    "delayLongPress",
+    "minPressDuration",
+    "unstable_pressDelay",
+    "pressRetentionOffset",
+    "delayHoverIn",
+    "delayHoverOut",
+};
+
+/**
+ * The Android native-feedback background, from the `android_ripple` config. `TouchableNativeFeedback`
+ * is where the shape comes from; RN's own `Pressable` spreads `useAndroidRippleForView`'s `viewProps`
+ * onto its OWN View (`Pressable.js:251`), which is why one node carries it and no inner view is
+ * needed.
+ *
+ * The colour stays a STRING, as the JS this replaces left it: `nativeBackgroundAndroid` is a nested
+ * object and the payload's colour processing is keyed on top-level names, so converting here would be
+ * a change to the rule rather than a move of it. Android resolves the string; `null` is its
+ * documented "no tint".
+ *
+ * STILL MISSING, and it always was: RN also dispatches `Commands.hotspotUpdate(x, y)` on
+ * pressIn/pressMove and `Commands.setPressed` on pressIn/pressOut, which is what makes the ripple
+ * originate at the touch point. Neither the old wrapper nor the behavior ever sent them.
+ */
+#ifdef ANDROID
+void applyAndroidRipple(dynamic &out, const dynamic &config) {
+  dynamic background = dynamic::object();
+  background["type"] = "RippleAndroid";
+  const std::string *color = stringAt(config, "color");
+  background["color"] = color != nullptr ? dynamic(*color) : dynamic(nullptr);
+  const bool *borderless = boolAt(config, "borderless");
+  background["borderless"] = borderless != nullptr && *borderless;
+  const dynamic *radius = config.get_ptr("radius");
+  if (radius != nullptr && radius->isNumber()) background["rippleRadius"] = *radius;
+
+  const bool *foreground = boolAt(config, "foreground");
+  out[foreground != nullptr && *foreground ? "nativeForegroundAndroid"
+                                           : "nativeBackgroundAndroid"] = std::move(background);
+}
+#endif
+
+/**
+ * Pressable's user-agent half, applied to the bag on its way to the payload.
+ *
+ * Every line is `Pressable.js` and none of it is any app's, any framework's or any instance's:
+ *
+ *   :257  `disabled` reaches a screen reader ONLY as `accessibilityState.disabled` — it is not a
+ *         native View prop at all. Lowering once dropped this fold and nothing went red, because
+ *         press suppression reads the node's own prop: the button behaved correctly and announced
+ *         itself as enabled.
+ *   :252  accessible unless the app opts OUT, and `!== false` rather than `?? true` — only a
+ *         literal false opts out, an explicit `undefined` still reads as accessible.
+ *   :258  the same shape for `focusable`, in its PLAIN form with no press-handler or disabled leg. A
+ *         Touchable composing this tag has already resolved its own three-leg formula and passes the
+ *         answer down as `focusable`, which `!== false` leaves alone — that is how the two compose
+ *         without either knowing about the other.
+ */
+dynamic foldPressableProps(const dynamic &props) {
+  dynamic out = props;
+
+  // Read BEFORE the machine keys are erased, and `!= null` rather than truthiness: an explicit
+  // `disabled: false` is a real announcement, so it is presence and not value that decides.
+  const bool *disabled = boolAt(props, "disabled");
+  if (disabled != nullptr) {
+    const dynamic *authored = props.get_ptr("accessibilityState");
+    dynamic state =
+        authored != nullptr && authored->isObject() ? *authored : dynamic::object();
+    state["disabled"] = *disabled;
+    out["accessibilityState"] = std::move(state);
+  }
+
+  // Off Android there is nothing to resolve — `rippleProps` returned undefined there — and the
+  // config is simply erased with the rest of the machine's keys below.
+#ifdef ANDROID
+  const dynamic *ripple = props.get_ptr("android_ripple");
+  if (ripple != nullptr && ripple->isObject()) applyAndroidRipple(out, *ripple);
+#endif
+
+  for (const char *key : kPressableMachineKeys) out.erase(key);
+
+  const bool *accessible = boolAt(props, "accessible");
+  out["accessible"] = accessible == nullptr || *accessible;
+  const bool *focusable = boolAt(props, "focusable");
+  out["focusable"] = focusable == nullptr || *focusable;
+  return out;
+}
+
 } // namespace
 
 dynamic fabricProps(
     const std::string &component,
+    const std::string &tagName,
     const dynamic &props,
     const IPayloadFold &fold) {
   if (component == kRawTextComponent) {
@@ -746,6 +871,16 @@ dynamic fabricProps(
   if (hasAriaAlias(props)) {
     aliasFolded = foldAriaProps(props);
     bag = &aliasFolded;
+  }
+
+  // The TAG's own platform props, in the slot the behavior's JS fold used to occupy — after the aria
+  // fold and before anything else, because that order is load-bearing and always was: the aria fold
+  // writes `accessibilityState` from `aria-disabled`, and this resolves that against `disabled`.
+  // Swapped, whichever ran second would silently win.
+  dynamic tagResolved;
+  if (usesPressableRule(tagName)) {
+    tagResolved = foldPressableProps(*bag);
+    bag = &tagResolved;
   }
 
   // The behavior's own fold, BETWEEN the two, which is where the reference runs it

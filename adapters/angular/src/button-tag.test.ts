@@ -118,16 +118,18 @@ describe('Angular: `button` as a tag', () => {
   });
 
   // why: `disabled` greys the label and wins over an explicit `color` (Button.js pushes the
-  // disabled colour after the tint), and it lands on the a11y state so a screen reader announces
-  // it. `[disabled]` rather than `disabled` — an attribute is the STRING "true" and the fold reads
-  // a boolean.
-  it('greys the label over an explicit color and announces itself disabled', async () => {
+  // disabled colour after the tint). `[disabled]` rather than `disabled` — an attribute is the
+  // STRING "true" and the fold reads a boolean, which is still exactly what this arm is for.
+  //
+  // The a11y half went to `core/engine/cpp/tests/js/pressable-payload.itest.ts`: Button composes
+  // the pressable rule, that rule is the engine's now, and this harness's payload is built by the
+  // TypeScript `fabricProps`, which holds no copy of it.
+  it('greys the label over an explicit color', async () => {
     await mountTemplate(
       `<button id="btn" title="Go" color="#ff0000" [disabled]="true"></button>`,
     );
 
     const host = hostOf('btn');
-    expect(host.payload.accessibilityState).toMatchObject({ disabled: true });
     expect(host.children[0].children[0].payload.color).toBe(DISABLED_GREY);
   });
 });

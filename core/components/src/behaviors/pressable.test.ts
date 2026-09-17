@@ -279,32 +279,15 @@ describe('pressable host behavior', () => {
     });
   });
 
-  // Pressable.js:258, and the whole reason there are TWO formulas rather than one. RN's Pressable
-  // has no press-handler and no disabled leg — a disabled Pressable with no callback stays in the
-  // focus order — so collapsing it onto the Touchable* formula would silently drop it out.
-  it('stays focusable while disabled and handler-less, and opts out only on a literal false', () => {
-    registerPressableBehavior();
-    const node = makePressable();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'disabled', true);
-    const surface = mount(node);
-
-    expect(committedPropsOf(TEST_ID)?.focusable).toBe(true);
-
-    routeProp(node, 'focusable', false);
-    surface.commit();
-    expect(committedPropsOf(TEST_ID)?.focusable).toBe(false);
-  });
-
-  // The control for the pair above: unregistered, nothing computes `focusable`, so neither reading
-  // can be an engine default.
-  it('writes no focusable when the behavior is not registered', () => {
-    const node = makePressable();
-    routeProp(node, 'testID', TEST_ID);
-    mount(node);
-
-    expect(committedPropsOf(TEST_ID)?.focusable).toBeUndefined();
-  });
+  // THE FOCUSABLE PAIR MOVED, with its control:
+  // `core/engine/cpp/tests/js/pressable-payload.itest.ts`. Pressable.js:258 is the engine's rule
+  // now (`foldPressableProps`), and this harness commits through the TypeScript `fabricProps`,
+  // which holds no copy of it — so a case left here would read a payload built by the wrong
+  // implementation, which is worse than no case at all.
+  //
+  // What it was pinning is intact there: a disabled, handler-less Pressable STAYS focusable (the
+  // formula has no disabled leg, unlike the Touchable* one), an explicit `false` opts out, and a
+  // tag with no behavior grows neither key.
 
   // The other half of keying by tag, and the reason the fix is not "register under the Fabric
   // name": a pressable IS an RCTView, so a Fabric-keyed registry would give the press machine to

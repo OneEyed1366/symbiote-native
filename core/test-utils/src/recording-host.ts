@@ -26,6 +26,7 @@ import {
   OP_INSERT_BEFORE,
   OP_REMOVE_CHILD,
   OP_SET_COMPONENT,
+  OP_SET_TAG,
   OP_SET_PROP,
   OP_SET_TEXT,
   OP_STRIDE,
@@ -51,6 +52,7 @@ type IRecorded = {
   handle: ISymbioteNode;
   instanceHandle: unknown;
   viewName: string;
+  tagName: string;
   props: Record<string, unknown>;
   parent: IRecorded | undefined;
   children: IRecorded[];
@@ -144,6 +146,14 @@ export type IAuthoredNode = {
   instanceHandle: unknown;
   /** As the ops named it. Fabric may commit it under a different name; that is not known here. */
   viewName: string;
+  /**
+   * The intrinsic tag, for a node a host behavior attached to; empty for every other node.
+   *
+   * Recorded so a test can ASK what a node is — the real host resolves a tag's platform props off
+   * it and a plain `RCTView` cannot be told from a `<pressable>` any other way. It changes nothing
+   * about the payload this host builds; see the `OP_SET_TAG` case.
+   */
+  tagName: string;
   props: Readonly<Record<string, unknown>>;
 };
 
@@ -269,6 +279,7 @@ export function createRecordingHost(): IRecordingHost {
           handle,
           instanceHandle,
           viewName,
+          tagName: '',
           props,
           parent: undefined,
           children: [],
@@ -335,6 +346,14 @@ export function createRecordingHost(): IRecordingHost {
             break;
           case OP_SET_COMPONENT:
             at(a).viewName = strings[b];
+            break;
+          // RECORDED AND NOT ACTED ON, deliberately. The real host resolves a tag's platform props
+          // off this (`foldPressableProps`); this host builds its payload through the TypeScript
+          // `fabricProps`, which carries no copy of those rules and must not grow one — a second
+          // implementation is how a test goes green over a rule that no longer runs. A test that
+          // needs to read what a tag actually sends belongs in `core/engine/cpp/tests/js`.
+          case OP_SET_TAG:
+            at(a).tagName = strings[b];
             break;
           case OP_COMMIT: {
             host.commits += 1;

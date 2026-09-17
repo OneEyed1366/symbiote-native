@@ -82,8 +82,13 @@ describe('React: `button` as a tag', () => {
   });
 
   // why: `disabled` greys the label and wins over an explicit `color` (Button.js pushes the
-  // disabled colour after the tint), and it lands on the a11y state so a screen reader announces it.
-  it('greys the label over an explicit color and announces itself disabled', () => {
+  // disabled colour after the tint).
+  //
+  // The a11y half of this case — `accessibilityState.disabled` — moved to
+  // `core/engine/cpp/tests/js/pressable-payload.itest.ts`, which covers the `button` tag by name:
+  // Button composes the pressable rule, and that rule is the engine's now, so this harness's
+  // TypeScript-built payload cannot see it. The greying is Button's OWN fold and stays here.
+  it('greys the label over an explicit color', () => {
     mount(
       ROOT_TAG,
       createElement('button', {
@@ -95,7 +100,6 @@ describe('React: `button` as a tag', () => {
     );
 
     const host = hostOf('btn');
-    expect(host.payload.accessibilityState).toMatchObject({ disabled: true });
     expect(host.children[0].children[0].payload.color).toBe(DISABLED_GREY);
   });
 });

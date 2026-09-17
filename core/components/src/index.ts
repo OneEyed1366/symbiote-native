@@ -198,7 +198,6 @@ export {
   isTouchWithinRegion,
   readPoint,
   computeRegion,
-  rippleProps,
   DEFAULT_DELAY_LONG_PRESS_MS,
   DEFAULT_MIN_PRESS_DURATION_MS,
   DEFAULT_PRESS_RECT_OFFSETS,

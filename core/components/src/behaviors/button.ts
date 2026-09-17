@@ -270,6 +270,13 @@ const touchable: Pick<
  *                       fold then merges `props.disabled` over it, which composes to RN's
  *                       `props.disabled ?? aria ?? state.disabled` — the same value, with
  *                       busy/checked/expanded/selected preserved, without a Button-specific fold.
+ *
+ * ON ANDROID THE TOUCHABLE'S HALF IS NO LONGER A FUNCTION AT ALL, and the absence is the design
+ * rather than a gap: `createPressBehavior` has no `foldPayload` any more, because the pressable
+ * rule moved into the engine (`foldPressableProps`, `SymbioteFabricProps.cpp`), which names `button`
+ * among the tags it serves on Android. So the same work happens, one layer down and before this
+ * fold runs — the order is unchanged, the trip into JS is gone. On iOS `touchable` is still
+ * TouchableOpacity's behavior and its fold is still JS, so the branch below stays live there.
  */
 function ownerFold(node: ISymbioteNode): IPayloadFold {
   return props => {
@@ -290,7 +297,13 @@ function ownerFold(node: ISymbioteNode): IPayloadFold {
       next.android_disableSound = next.touchSoundDisabled;
       delete next.touchSoundDisabled;
     }
-    const { color, disabled } = projectionOf(props);
+    // THE NODE, not the bag this fold was handed. The two agreed while the pressable rule ran
+    // inside this function; they do not now that it runs before it, because the rule folds
+    // `disabled` INTO `accessibilityState` and erases the raw key — so reading the bag would resolve
+    // through `state.disabled` and lose RN's `props.disabled ?? aria ?? state.disabled` precedence
+    // wherever the two disagree. `propsOf(owner)` is already what both derived children read, so
+    // this also makes the three projections one answer instead of two.
+    const { color, disabled } = projectionOf(propsOf(node));
     // TouchableOpacity.js:336 and TouchableNativeFeedback.js:369 — the SAME expression, so the tag
     // owes it on both platforms. `onPress` is an owned name, so it is in the stash and never in
     // `props`; a flip of it dirties nothing by itself, which `onOwnedListenerChange` answers.

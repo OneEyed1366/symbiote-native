@@ -108,9 +108,14 @@ describe('a bare tag commits what a wrapper used to', () => {
       // what a real device commits it as (`RootView`), nor its creation-time name (`RCTView`), but
       // it is the live tree's honest answer and incidental to what this case is actually pinning.
       '#surface{flex,pointerEvents}',
-      // `accessible` (Pressable.js:252) and `focusable` (Pressable.js:258) are RN's defaults, and
-      // the behavior is the only thing that supplies them now.
-      'RCTView{accessibilityLabel,accessible,focusable,testID}',
+      // No `accessible`/`focusable`: RN's two Pressable defaults are the engine's rule now
+      // (`foldPressableProps`), and this harness's payload comes from the TypeScript
+      // `fabricProps`, which holds no copy of it —
+      // `core/engine/cpp/tests/js/pressable-payload.itest.ts` has them.
+      //
+      // The case is unharmed: what it pins is that a tag reaches its BEHAVIOR and lands in the
+      // right tree SHAPE, and the shape is the half a single-node check cannot see.
+      'RCTView{accessibilityLabel,testID}',
     ]);
   });
 

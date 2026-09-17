@@ -189,11 +189,16 @@ const CASES: readonly IFoldCase[] = [
     sfc: '<pressable id="p" />',
     jsx: '<pressable id="p" />',
     handWritten: () => h('pressable', { id: 'p' }),
-    // `accessible` (Pressable.js:252) and `focusable` (Pressable.js:258) are RN's own defaults;
-    // this previously pinned their absence, i.e. a divergence from RN that every adapter shared.
-    // `focusable` is the ONE-leg Pressable form — a Touchable* resolves its own three-leg version
-    // (TouchableOpacity.js:336-340) and hands the answer down as this prop.
-    expected: [{ nativeID: 'p', accessible: true, focusable: true }],
+    // `accessible` (Pressable.js:252) and `focusable` (:258) are NOT listed, and their absence here
+    // means something different from what it meant before: they are the engine's rule now
+    // (`foldPressableProps`), and this file compares payloads built by the TypeScript
+    // `fabricProps`, which holds no copy of it. Their values are asserted in
+    // `core/engine/cpp/tests/js/pressable-payload.itest.ts`.
+    //
+    // Which costs this row nothing, because what it asks is PARITY between three Vue paths — the
+    // engine applies its rule to all three identically or to none of them, so it cannot be the
+    // thing that makes them differ.
+    expected: [{ nativeID: 'p' }],
   },
   {
     // The aria/role fold, which the engine now applies in `fabricProps` — the one point that sees

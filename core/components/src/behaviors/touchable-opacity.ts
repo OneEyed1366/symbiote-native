@@ -162,18 +162,18 @@ const refine: IPressConfigRefinement = (node, config) => {
   };
 };
 
-const press = createPressBehavior(refine);
-
 // The `id -> nativeID` alias every primitive's spec entry declares, applied here because
 // `HOST_PRIMITIVES` deliberately withholds this primitive's entry until the other adapters'
 // wrappers collapse to one node (the note at its Pressable neighbour says why). A raw `id` is a key
 // no ViewConfig declares, so Fabric drops it and the nativeID is lost on device with nothing red.
 //
 // Unconditional priority when both are set, matching RN (`View.js:77-79`) and `foldHostBag`.
+// The press machine's own half of this used to be the first line here (`press.foldPayload(props)`)
+// and is now the engine's — `foldPressableProps` in `SymbioteFabricProps.cpp` names
+// `touchable-opacity` among the tags it serves, and it runs BEFORE this fold, which is the order
+// the composition always had. Nothing was dropped and nothing is duplicated.
 const foldPayload: IPayloadFold = props => {
-  const folded =
-    press.foldPayload === undefined ? props : press.foldPayload(props);
-  const next: Record<string, unknown> = { ...folded };
+  const next: Record<string, unknown> = { ...props };
   // TouchableOpacity.js:303. The tag is this primitive's only path, so unlike `pressable` there is
   // no wrapper for it to disagree with.
   next.accessible = accessibleUnlessOptedOut(props);
@@ -262,14 +262,18 @@ export function createTouchableOpacityBehavior(
 // fold cannot reach. `./button` composes this behavior and resolves its own; the tag resolves it
 // here, over the node.
 //
-// `props.disabled`, not `next.disabled`: the press fold strips it (MACHINE_ONLY_KEYS).
+// `disabled` COMES OFF THE NODE, not off the bag, and that is not a style choice: the engine's
+// pressable rule runs ahead of this fold and strips `disabled` from what it hands over, so reading
+// the bag would resolve every disabled touchable as focusable — the exact focus-order bug this
+// expression exists to prevent, and one that shows up on a TV remote and in no test that reads
+// props. Anything a JS fold needs AFTER a tag rule has stripped it has to be read from the node.
 function tagFold(node: ISymbioteNode): IPayloadFold {
   return props => {
     const next = foldPayload(props);
     next.focusable = resolveTouchableFocusable(
       booleanOr(props.focusable),
       appListenerFor(node, 'press') !== undefined,
-      booleanOr(props.disabled),
+      booleanOr(propOf(node, 'disabled')),
     );
     return next;
   };

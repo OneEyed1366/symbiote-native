@@ -97,16 +97,20 @@ async function commit(
   return props;
 }
 
-// The press behavior writes RN's `accessible` (Pressable.js:252) and `focusable`
-// (Pressable.js:258) defaults, and `view` has neither, so the payload differs by primitive.
+// THE PAYLOAD NO LONGER DIFFERS BY PRIMITIVE HERE, and the two keys that used to make it differ
+// are not gone — they moved. RN's `accessible` (Pressable.js:252) and `focusable` (:258) defaults
+// are resolved by the engine now (`foldPressableProps`, `SymbioteFabricProps.cpp`), and this
+// harness builds its payload through the TypeScript `fabricProps`, which carries no copy of that
+// rule. They are asserted where they are actually produced:
+// `core/engine/cpp/tests/js/pressable-payload.itest.ts`.
+//
+// Which is fine for what this file asks, and worth saying so the parameter does not look vestigial:
+// the subject is STYLE surviving three Vue compiler doors, and the press defaults were only ever
+// noise this assertion had to account for.
 function expectedProps(
-  primitive: string,
   style: Record<string, unknown>,
 ): Record<string, unknown> {
-  const base = { testID: 'p', ...style };
-  return primitive === 'pressable'
-    ? { ...base, accessible: true, focusable: true }
-    : base;
+  return { testID: 'p', ...style };
 }
 
 describe('a functional style survives v-bind', () => {
@@ -119,7 +123,7 @@ describe('a functional style survives v-bind', () => {
 
       // `opacity: 1` is the callback resolved at `pressed: false` by routeProp. Before the
       // normalizeProps override this key was absent entirely — not wrong, missing.
-      expect(props).toEqual(expectedProps(primitive, { opacity: 1 }));
+      expect(props).toEqual(expectedProps({ opacity: 1 }));
     },
   );
 
@@ -130,7 +134,7 @@ describe('a functional style survives v-bind', () => {
     async primitive => {
       const props = await commit(primitive, FUNCTION_STYLE, sfcMerged);
 
-      expect(props).toEqual(expectedProps(primitive, { opacity: 1 }));
+      expect(props).toEqual(expectedProps({ opacity: 1 }));
     },
   );
 
@@ -149,7 +153,7 @@ const __tagArm = true;
 <template><${primitive} testID="p" :style="${expr}" /></template>`,
     );
 
-    expect(props).toEqual(expectedProps('pressable', { opacity: 1 }));
+    expect(props).toEqual(expectedProps({ opacity: 1 }));
   });
 
   // The control. Without it, "the style is present" cannot distinguish a working override from a
@@ -160,7 +164,7 @@ const __tagArm = true;
     async primitive => {
       const props = await commit(primitive, '{ opacity: 0.3 }');
 
-      expect(props).toEqual(expectedProps(primitive, { opacity: 0.3 }));
+      expect(props).toEqual(expectedProps({ opacity: 0.3 }));
     },
   );
 });

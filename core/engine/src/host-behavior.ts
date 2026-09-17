@@ -28,6 +28,7 @@
 // all" before anyone starts debugging the behavior itself.
 
 import { parentsOf, subtreesOf } from './host-access';
+import { recordSetTag } from './mutation-buffer';
 import { dlog } from './debug';
 import type { ISymbioteNode } from './node';
 
@@ -482,6 +483,11 @@ export function attachHostBehavior(node: ISymbioteNode, tag: string): void {
   if (behavior === undefined) return;
   attached.set(node, behavior);
   hasAttached = true;
+  // The tag itself, over the wire, so the host can resolve this tag's PLATFORM props without a trip
+  // back into JS. Here rather than in `createElement` because here is where a tag is known to name
+  // something: an app's own `<div>`-equivalent would otherwise pay an intern and an op to tell the
+  // host a name it has no rule for.
+  recordSetTag(node, tag);
   // A field rather than a lookup at payload-build time: `fabricProps` runs per node per commit and
   // must not pay a Map probe to discover that almost nothing has a fold.
   node.payloadFold = behavior.foldPayload;
