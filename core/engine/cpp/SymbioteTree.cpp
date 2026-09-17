@@ -964,6 +964,25 @@ std::shared_ptr<const react::ShadowNode> materialize(
  * and a MISS walks to the root. That is affordable because nothing calls this per node — it is
  * reached only from inside a tag rule that has already matched.
  */
+/**
+ * The parent as `IOwner` — its props, its TAG, and its press bit.
+ *
+ * The tag is the half that is new (2026-09-18) and it is what lets a rule be a DESCENDANT rule:
+ * `TouchableNativeFeedback` and `TouchableWithoutFeedback` commit an anchor and clone their props
+ * onto whatever child the app wrote, and that child usually carries no tag of its own.
+ *
+ * `c_str()` on `Node::tagName`, whose storage outlives the `fabricProps` call it is handed to —
+ * the node is alive for the whole commit. A default-constructed `IOwner` at a root, so a rule that
+ * asks about its parent gets the same answer as one whose parent is nameless.
+ */
+IOwner ownerOf(const Node &node) {
+  if (node.parent == nullptr) return {};
+  return IOwner{
+      &node.parent->props,
+      node.parent->tagName.c_str(),
+      node.parent->hasPressListener};
+}
+
 const folly::dynamic *ancestorPropsOf(const void *context, const char *tag) {
   const auto *node = static_cast<const Node *>(context);
   if (node == nullptr || tag == nullptr) return nullptr;
@@ -1231,7 +1250,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
         node.tagName,
         node.props,
         fold,
-        node.parent == nullptr ? nullptr : &node.parent->props,
+        ownerOf(node),
         node.hasPressListener,
         IAncestorLookup{&ancestorPropsOf, &node});
     walkCost_.propsNs += nanosSince(startedAt);
@@ -1284,7 +1303,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
           node.tagName,
           node.props,
           fold,
-          node.parent == nullptr ? nullptr : &node.parent->props,
+          ownerOf(node),
           node.hasPressListener,
           IAncestorLookup{&ancestorPropsOf, &node});
       walkCost_.propsNs += nanosSince(startedAt);

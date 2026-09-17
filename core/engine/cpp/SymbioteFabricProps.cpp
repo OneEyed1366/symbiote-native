@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -1413,6 +1414,175 @@ dynamic foldPressableProps(
   return out;
 }
 
+/**
+ * `TouchableNativeFeedback.js:349-390`, verbatim and in RN's own order. A CLOSED list, not a
+ * passthrough: RN clones exactly these and nothing else, and it clones them WHATEVER their value —
+ * `cloneElement` assigns every key of its config, so an owner with no `accessibilityLabel` CLEARS
+ * the child's. Writing the key unconditionally is what reproduces that; `fabricProps` drops an
+ * undefined on its way out, which is the same erasure the JS fold relied on.
+ */
+const std::array<const char *, 18> kNativeFeedbackClonedKeys = {
+    "accessibilityHint",
+    "accessibilityLanguage",
+    "accessibilityLabel",
+    "accessibilityRole",
+    "accessibilityActions",
+    "accessibilityValue",
+    "importantForAccessibility",
+    "accessibilityViewIsModal",
+    "accessibilityLiveRegion",
+    "accessibilityElementsHidden",
+    "hasTVPreferredFocus",
+    "hitSlop",
+    "nextFocusDown",
+    "nextFocusForward",
+    "nextFocusLeft",
+    "nextFocusRight",
+    "nextFocusUp",
+    "testID",
+};
+
+/**
+ * `TouchableWithoutFeedback.js:281` — copied ONLY when set, which is the whole split from TNF's
+ * unconditional clone. Reproducing the difference matters: an owner with no `testID` leaves the
+ * child's standing here and erases it there, and RN's two bodies genuinely differ that way.
+ */
+const std::array<const char *, 10> kWithoutFeedbackWhenSetKeys = {
+    "accessibilityActions",
+    "accessibilityHint",
+    "accessibilityLanguage",
+    "accessibilityIgnoresInvertColors",
+    "accessibilityLabel",
+    "accessibilityRole",
+    "accessibilityValue",
+    "accessibilityViewIsModal",
+    "hitSlop",
+    "testID",
+};
+
+/**
+ * `:253-276`, assigned whatever their value. Three of them are in RN's when-set list TOO, and the
+ * later conditional copy can only re-assign what the aria fold already resolved — so they belong
+ * here, where they clear.
+ */
+const std::array<const char *, 3> kWithoutFeedbackAlwaysKeys = {
+    "accessibilityElementsHidden",
+    "accessibilityLiveRegion",
+    "importantForAccessibility",
+};
+
+#ifdef ANDROID
+// `TouchableNativeFeedback.js` via `Platform.Version >= 23` — foreground ripples need API 23.
+constexpr int kAndroidForegroundMinVersion = 23;
+
+// RN's `TouchableNativeFeedback.SelectableBackground()` with no ripple radius, which is what its
+// body falls back to when the app passes no `background` (`:343-348`).
+dynamic selectableItemBackground() {
+  dynamic background = dynamic::object();
+  background["type"] = "ThemeAttrAndroid";
+  background["attribute"] = "selectableItemBackground";
+  return background;
+}
+#endif
+
+bool usesCloneOntoChildRule(const char *ownerTag) {
+  if (ownerTag == nullptr) return false;
+  return std::strcmp(ownerTag, "touchable-native-feedback") == 0 ||
+      std::strcmp(ownerTag, "touchable-without-feedback") == 0;
+}
+
+/**
+ * `cloneElement(child, {…})` as a DESCENDANT rule: the child's own bag first, the owner's clone list
+ * over it.
+ *
+ * This is the first rule keyed on the PARENT's tag rather than on the node's own, and the reason is
+ * structural rather than convenient — see `IOwner`. Both touchables render no view, so the owner is
+ * an anchor whose props reach Fabric nowhere else; the clone is not a decoration on the child, it is
+ * the entire primitive.
+ *
+ * THE OWNER'S ARIA FOLD RUNS HERE, over the owner's bag. `fabricProps` folds aria for the node being
+ * committed, and these props are on a node that is never committed — so without this an
+ * `aria-label` on a TNF would reach nothing at all.
+ */
+dynamic foldCloneOntoChild(
+    const dynamic &props, const IOwner &owner, bool isNativeFeedback) {
+  if (owner.props == nullptr) return props;
+  const bool foldsAria = hasAriaAlias(*owner.props);
+  const dynamic ariaFolded = foldsAria ? foldAriaProps(*owner.props) : dynamic();
+  const dynamic &source = foldsAria ? ariaFolded : *owner.props;
+
+  dynamic out = props;
+  if (isNativeFeedback) {
+    for (const char *key : kNativeFeedbackClonedKeys) {
+      const dynamic *value = source.get_ptr(key);
+      if (value == nullptr) out.erase(key);
+      else out[key] = *value;
+    }
+  } else {
+    for (const char *key : kWithoutFeedbackWhenSetKeys) {
+      const dynamic *value = source.get_ptr(key);
+      if (value != nullptr) out[key] = *value;
+    }
+    for (const char *key : kWithoutFeedbackAlwaysKeys) {
+      const dynamic *value = source.get_ptr(key);
+      if (value == nullptr) out.erase(key);
+      else out[key] = *value;
+    }
+  }
+
+  // `:369-372` / `:253-276`. All four are the OWNER'S, which is the point: the child never saw any
+  // of them, and `focusable`'s middle leg is a listener the owner owns and no bag can carry.
+  const std::optional<bool> disabled = boolAt(source, "disabled");
+  out["accessible"] = boolAt(source, "accessible").value_or(true);
+  out["focusable"] = boolAt(source, "focusable").value_or(true) &&
+      owner.hasPressListener && !disabled.value_or(false);
+  // A STRING or nothing, which is the narrowing `stringOr` did — and "nothing" is an ERASE rather
+  // than a null, because a cleared clone key reaches Fabric by being absent from the payload.
+  const std::string *nativeID = stringAt(source, "nativeID");
+  if (nativeID == nullptr) out.erase("nativeID");
+  else out["nativeID"] = *nativeID;
+
+  // `resolveDisabledAccessibilityState`: a present `disabled` MERGES over the owner's authored
+  // state, an absent one passes that state through untouched. `!= null` and not truthiness — an
+  // explicit `disabled: false` is a real announcement, the same reading `foldPressableProps` takes.
+  const dynamic *authoredState = source.get_ptr("accessibilityState");
+  if (disabled.has_value()) {
+    dynamic state = authoredState != nullptr && authoredState->isObject()
+        ? *authoredState
+        : dynamic::object();
+    state["disabled"] = *disabled;
+    out["accessibilityState"] = std::move(state);
+  } else if (authoredState == nullptr) {
+    out.erase("accessibilityState");
+  } else {
+    out["accessibilityState"] = *authoredState;
+  }
+
+  // `:343-348` + `:402`. `getBackgroundProp` returns null off Android, so nothing is spread there —
+  // and that branch is a compile-time one for the reason `android_ripple` already is: both
+  // touchables commit an ordinary `RCTView`, so no component name can tell the platforms apart.
+  //
+  // The dict itself is the APP'S — `TouchableNativeFeedback.Ripple(...)` and its three siblings are
+  // pure factories the app calls, so the rule only picks the default and the SLOT. That is why this
+  // is not `applyAndroidRipple`, which builds `android_ripple`'s dict from scratch: here there is
+  // nothing to build.
+#ifdef ANDROID
+  if (isNativeFeedback) {
+    const dynamic *authored = source.get_ptr("background");
+    dynamic background = authored != nullptr && authored->isObject()
+        ? *authored
+        : selectableItemBackground();
+    // `canUseNativeForeground()` — RN's own guard, and `Platform.Version` on Android IS the API
+    // level, so the JS check and this one read the same number.
+    out[boolAt(source, "useForeground").value_or(false) &&
+                android_get_device_api_level() >= kAndroidForegroundMinVersion
+            ? "nativeForegroundAndroid"
+            : "nativeBackgroundAndroid"] = std::move(background);
+  }
+#endif
+  return out;
+}
+
 // The names Image CONSUMES rather than forwards. Every one is a W3C spelling or a size alias, and
 // none is a Fabric prop — leaving one in the payload is how a reader concludes the rule ran when it
 // did not. `source` is absent on purpose: it is consumed and then WRITTEN BACK, resolved.
@@ -1735,7 +1905,7 @@ dynamic fabricProps(
     const std::string &tagName,
     const dynamic &props,
     const IPayloadFold &fold,
-    const dynamic *ownerProps,
+    const IOwner &owner,
     bool hasPressListener,
     const IAncestorLookup &ancestors) {
   if (component == kRawTextComponent) {
@@ -1794,7 +1964,7 @@ dynamic fabricProps(
     // the other way (`ImageBackground.js:83-98`); the decision is pinned in
     // `core/components/src/behaviors/image-background.test.ts` and moving the fold does not reopen it.
     if (tagName == "image-background-image")
-      tagResolved = foldImageBackgroundImageProps(tagResolved, ownerProps);
+      tagResolved = foldImageBackgroundImageProps(tagResolved, owner.props);
     bag = &tagResolved;
   } else if (tagName == "button-label-text") {
     tagResolved = foldButtonLabelStyle(*bag, ancestors);
@@ -1806,7 +1976,7 @@ dynamic fabricProps(
   } else if (
       tagName == "scroll-content" || tagName == "horizontal-scroll-content") {
     tagResolved = foldScrollContentProps(
-        *bag, tagName == "horizontal-scroll-content", ownerProps);
+        *bag, tagName == "horizontal-scroll-content", owner.props);
     bag = &tagResolved;
   } else if (tagName == "image-background") {
     tagResolved = foldImageBackgroundProps(*bag);
@@ -1824,6 +1994,20 @@ dynamic fabricProps(
     // here. It also makes both halves reachable from one test build.
     tagResolved = foldSwitchProps(*bag, component == kAndroidSwitchComponent);
     bag = &tagResolved;
+  }
+
+  // THE DESCENDANT RULE, and it is its own step rather than an arm of the chain above because it is
+  // keyed on a different thing. Every branch up there asks "what tag am I"; this asks "what tag
+  // contains me", and a node can answer both — a `<pressable>` under a TouchableWithoutFeedback gets
+  // its own rule AND the clone, in that order, which is the order RN composes them in.
+  //
+  // One `strcmp` against a usually-empty parent tag per node, placed after the chain so the common
+  // case pays only that.
+  dynamic ownerResolved;
+  if (usesCloneOntoChildRule(owner.tagName)) {
+    ownerResolved = foldCloneOntoChild(
+        *bag, owner, std::strcmp(owner.tagName, "touchable-native-feedback") == 0);
+    bag = &ownerResolved;
   }
 
   // The behavior's own fold, BETWEEN the two, which is where the reference runs it

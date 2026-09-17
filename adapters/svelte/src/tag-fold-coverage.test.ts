@@ -86,18 +86,21 @@ function expectedFoldOutput(name: string): Record<string, unknown> {
   return expected;
 }
 
-// A tag whose descriptor IS the anchor commits no node of its own and folds onto its SINGLE CHILD
-// instead (`touchable-native-feedback` — TouchableNativeFeedback.js:289,339). It still owes the
-// same folded payload; the payload just lands one level down, so the probe has to give it a child
-// to land on. Keyed on the descriptor rather than on the name, so the next such primitive is
-// covered by existing.
+// A tag whose descriptor IS the anchor commits no node of its own and lands its payload on its
+// SINGLE CHILD instead (`touchable-native-feedback` — TouchableNativeFeedback.js:289,339).
 //
-// The locator below still finds it by `testID`, which is one of the props RN's TNF CLONES (:389) —
-// so the child inherits the probe id and the row measures the same thing every other row does.
-function childOf(tag: string): string {
-  return descriptorFor(tag).component === ANCHOR_COMPONENT
-    ? '<view></view>'
-    : '';
+// THOSE TWO ROWS ARE EXCLUDED FROM THIS FILE SINCE 2026-09-18, and the reason is not that they are
+// awkward. What carried the probe down to the child was the CLONE, which is `foldCloneOntoChild` in
+// `SymbioteFabricProps.cpp` now — a rule keyed on the PARENT'S tag, and one this host cannot run,
+// since it builds payloads through the TypeScript `fabricProps` and that carries no copy of the tag
+// rules. So the row was never really asserting what this file is about (a bare tag reaching its
+// spec's folds); it was asserting the clone, which has its own fixture:
+// `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
+//
+// Keyed on the descriptor rather than on a name list, so the next anchor primitive is excluded by
+// existing rather than by being remembered.
+function commitsItsOwnNode(tag: string): boolean {
+  return descriptorFor(tag).component !== ANCHOR_COMPONENT;
 }
 
 // Find the committed node carrying `testID` and require `expected`'s keys to be present with
@@ -166,10 +169,20 @@ afterAll(() => {
 describe('a bare primitive tag commits the folds its spec declares', () => {
   // Derived from the spec, so a ninth primitive is covered the day its key lands and cannot be
   // forgotten here (`test-harness-false-greens.md` §24).
-  const NAMES = Object.keys(HOST_PRIMITIVES);
+  const NAMES = Object.keys(HOST_PRIMITIVES).filter(name =>
+    commitsItsOwnNode(HOST_PRIMITIVES[name].intrinsic),
+  );
 
-  it('covers every primitive', () => {
+  it('covers every primitive that commits a node', () => {
     expect(NAMES.length).toBeGreaterThan(0);
+  });
+
+  // The anti-degeneracy guard for the FILTER, which is the new way this file could go quietly
+  // empty: a `descriptorFor` that started answering the anchor for everything would leave zero rows
+  // and the case above would still need `NAMES.length > 0` to fail before anyone noticed.
+  it('excludes only the tags that commit no node of their own', () => {
+    const excluded = Object.keys(HOST_PRIMITIVES).length - NAMES.length;
+    expect(excluded).toBe(2);
   });
 
   // The anti-degeneracy guard for the derived half of the expectation below: every row is
@@ -202,12 +215,12 @@ describe('a bare primitive tag commits the folds its spec declares', () => {
 
       const base = NAMES.indexOf(name) * 10 + 9_800;
       const attributes = await mountProbe(
-        `<${tag} id="${PROBE_ID}" testID="${PROBE_TEST_ID}">${childOf(tag)}</${tag}>`,
+        `<${tag} id="${PROBE_ID}" testID="${PROBE_TEST_ID}"></${tag}>`,
         `${name}Attributes.svelte`,
         base + 1,
       );
       const bag = await mountProbe(
-        `<${tag} p={{ id: "${PROBE_ID}", testID: "${PROBE_TEST_ID}" }}>${childOf(tag)}</${tag}>`,
+        `<${tag} p={{ id: "${PROBE_ID}", testID: "${PROBE_TEST_ID}" }}></${tag}>`,
         `${name}Bag.svelte`,
         base + 2,
       );

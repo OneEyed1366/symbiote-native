@@ -104,12 +104,37 @@ struct IAncestorLookup {
   const void *context = nullptr;
 };
 
+/**
+ * The parent, as the three facts a rule can ask about it.
+ *
+ * `props` was a bare parameter until the descendant rule below needed the other two, and bundling
+ * them is not tidying: a rule keyed on the parent's TAG is a different kind of rule from one keyed
+ * on its own, and this is the one place that distinction is expressible.
+ *
+ * `tagName` is what makes a DESCENDANT rule possible — the shape a user-agent stylesheet has always
+ * had (`td > *`), and the only shape that can serve `TouchableNativeFeedback` /
+ * `TouchableWithoutFeedback`. Those render no view: RN's bodies end in `cloneElement(child, {…})`,
+ * so our tag commits an anchor and the owner's props land on whatever the app wrote underneath. That
+ * child's own tag is usually EMPTY — a plain `<view>` registers no behavior — so a self-keyed rule
+ * can never reach it, and giving it the owner's tag is not available either, since it may already
+ * own one.
+ *
+ * `hasPressListener` is the parent's bit, not the node's. `focusable` on a cloned child is a
+ * function of whether the OWNER has a press callback, which is exactly the fact
+ * `OP_SET_OWNED_LISTENER` already carries — read one hop up instead of on self.
+ */
+struct IOwner {
+  const folly::dynamic *props = nullptr;
+  const char *tagName = nullptr;
+  bool hasPressListener = false;
+};
+
 folly::dynamic fabricProps(
     const std::string &component,
     const std::string &tagName,
     const folly::dynamic &props,
     const IPayloadFold &fold = {},
-    const folly::dynamic *ownerProps = nullptr,
+    const IOwner &owner = {},
     bool hasPressListener = false,
     const IAncestorLookup &ancestors = {});
 

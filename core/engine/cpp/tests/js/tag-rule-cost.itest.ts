@@ -13,6 +13,11 @@
 //   `<tag>-in-js`   a tag registered HERE with a `payloadFold` that produces the same payload —
 //                   which is what the real tag was until the port
 //
+// ONE ARM DIFFERS AND IT IS THE `clone` ROW. Its rule is keyed on the PARENT'S tag rather than the
+// node's, so what the two arms differ in is the CONTAINER: a `touchable-native-feedback` on the
+// native side, a plain `view` on the JS side, so nothing native can fire there and the fold is the
+// only thing working. Same comparison, one level up.
+//
 // The payloads are asserted EQUAL, key by key, before any millisecond is read. Two arms that
 // disagree about what they send are not one measurement, and a fold that quietly did less would
 // look faster.
@@ -24,16 +29,24 @@
 // MEASURED on `build-release`, three consecutive runs, one sitting, a thousand nodes per commit:
 //
 //              native walk        js walk             per node   keys in the bag / what the rule does
-//   content    2.8  2.9  3.2 ms   11.1 11.4 12.2 ms    ~8.6 us   3 + a 2-key style / READS ITS PARENT
-//   imagebg    2.9  3.0  3.3 ms   12.2 12.9 13.2 ms    ~9.7 us   2 + a 3-key style / writes ONE key
-//   spinner    3.8  3.8  4.1 ms   14.6 13.9 15.2 ms   ~10.7 us   4, no style / the MOST work here
-//   accessory  3.4  3.2  3.2 ms   14.8 14.5 14.7 ms   ~11.4 us   4 / nothing at all
-//   button     4.1  3.8  4.3 ms   16.8 16.1 16.6 ms   ~12.4 us   5 + a 2-key style
-//   pressable  3.7  3.7  3.9 ms   17.8 18.2 19.9 ms   ~14.8 us   4 + a 3-key style
-//   scroll     4.2  4.2  4.5 ms   19.1 19.2 20.9 ms   ~15.4 us   4 + a 2-key style / the BIGGEST rule
-//   switch     4.8  4.8  5.1 ms   23.9 24.3 25.4 ms   ~19.6 us   6 + nested trackColor
-//   image      5.9  6.1  6.4 ms   27.6 29.4 29.8 ms   ~22.9 us   6 + what the rule BUILDS
-//   bgimage    7.5  7.6  7.9 ms   36.9 38.8 39.2 ms   ~30.6 us   6 + a 3-part style / TWO rules
+//   content    4.2  2.9  2.9 ms   13.2 11.7 11.0 ms    ~8.7 us   3 + a 2-key style / READS ITS PARENT
+//   imagebg    3.4  3.2  3.0 ms   13.4 12.8 12.3 ms    ~9.6 us   2 + a 3-key style / writes ONE key
+//   spinner    3.7  3.9  3.8 ms   14.2 13.7 13.8 ms   ~10.1 us   4, no style / the MOST work here
+//   accessory  3.2  3.3  3.2 ms   14.5 13.9 14.1 ms   ~10.9 us   4 / nothing at all
+//   button     3.9  4.0  3.9 ms   16.8 16.3 15.9 ms   ~12.4 us   5 + a 2-key style
+//   clone      4.7  4.6  4.6 ms   18.6 18.0 18.0 ms   ~13.6 us   1 / READS ITS PARENT'S TAG, 18 keys
+//   pressable  3.9  3.7  3.7 ms   20.6 18.3 17.8 ms   ~15.1 us   4 + a 3-key style
+//   scroll     4.6  4.2  4.2 ms   21.0 20.6 18.8 ms   ~15.8 us   4 + a 2-key style / the BIGGEST rule
+//   switch     5.0  4.8  5.0 ms   25.6 23.8 23.5 ms   ~19.4 us   6 + nested trackColor
+//   image      6.2  6.3  6.0 ms   30.4 29.3 27.5 ms   ~23.0 us   6 + what the rule BUILDS
+//   bgimage    7.8  8.0  7.7 ms   38.7 38.5 36.8 ms   ~30.1 us   6 + a 3-part style / TWO rules
+//
+// `clone` is the one DESCENDANT rule and the one row whose bag is not the node's own: its child
+// carries a single prop and the rule marshals EIGHTEEN off the parent. It lands where the bag says
+// it should, mid-table beside `pressable` and `button`, which is the model holding on a rule that
+// could have broken it — the cost follows what crosses, whichever node the keys came from.
+//
+// Read it as the price of one TNF or TWF per commit, not per row: those tags have exactly one child.
 //
 // `bgimage` is the dearest row in the file and it is the model's own prediction rather than a
 // surprise: its tag runs the image rule AND the background one, so it carries `image`'s bag plus a
@@ -519,6 +532,91 @@ registerHostBehavior('button-in-js', {
 // from a rule that always answers false.
 const HAS_PRESS_LISTENER_IN_FIXTURE = false;
 
+// THE ONE DESCENDANT ARM, and its two registrations are not symmetric with any other pair in this
+// file — the rule is dispatched from the PARENT'S tag, so what the native arm needs is a tagged
+// CONTAINER, and the row's own tag carries no rule at all.
+registerHostBehavior('touchable-native-feedback', {
+  attach(): void {},
+  detach(): void {},
+});
+registerHostBehavior('clone', { attach(): void {}, detach(): void {} });
+
+// RN's clone list (`TouchableNativeFeedback.js:349-390`), the shape the JS fold this replaced had.
+const CLONE_KEYS_IN_JS: readonly string[] = [
+  'accessibilityHint',
+  'accessibilityLanguage',
+  'accessibilityLabel',
+  'accessibilityRole',
+  'accessibilityActions',
+  'accessibilityValue',
+  'importantForAccessibility',
+  'accessibilityViewIsModal',
+  'accessibilityLiveRegion',
+  'accessibilityElementsHidden',
+  'hasTVPreferredFocus',
+  'hitSlop',
+  'nextFocusDown',
+  'nextFocusForward',
+  'nextFocusLeft',
+  'nextFocusRight',
+  'nextFocusUp',
+  'testID',
+];
+
+registerHostBehavior('clone-in-js', {
+  attach(): void {},
+  detach(): void {},
+  foldPayload(props: Readonly<Record<string, unknown>>) {
+    const out: Record<string, unknown> = { ...props };
+    // The owner through a CLOSURE, as the real fold did — a JS fold has no parent to consult, which
+    // is the whole reason the rule could not be self-keyed and had to become a descendant one.
+    for (const key of CLONE_KEYS_IN_JS) {
+      if (jsOwnerProps[key] === undefined) delete out[key];
+      else out[key] = jsOwnerProps[key];
+    }
+    const disabled =
+      typeof jsOwnerProps.disabled === 'boolean'
+        ? jsOwnerProps.disabled
+        : undefined;
+    out.accessible = jsOwnerProps.accessible !== false;
+    out.focusable =
+      jsOwnerProps.focusable !== false &&
+      HAS_PRESS_LISTENER_IN_FIXTURE &&
+      disabled !== true;
+    if (typeof jsOwnerProps.nativeID === 'string')
+      out.nativeID = jsOwnerProps.nativeID;
+    else delete out.nativeID;
+    if (disabled !== undefined) {
+      const authored = jsOwnerProps.accessibilityState;
+      out.accessibilityState = {
+        ...(typeof authored === 'object' && authored !== null ? authored : {}),
+        disabled,
+      };
+    } else if (jsOwnerProps.accessibilityState === undefined) {
+      delete out.accessibilityState;
+    } else {
+      out.accessibilityState = jsOwnerProps.accessibilityState;
+    }
+    return out;
+  },
+});
+
+// The bag the rule marshals, which by this file's own finding is what a fold's price tracks. Eight
+// of RN's clone names plus the four it computes — a TNF an app actually writes carries a handful,
+// not all eighteen.
+const CLONE_OWNER_PROPS: Record<string, unknown> = {
+  accessibilityLabel: 'Save',
+  accessibilityHint: 'Saves the draft',
+  accessibilityRole: 'button',
+  importantForAccessibility: 'yes',
+  hitSlop: 8,
+  nextFocusDown: 12,
+  testID: 'owner',
+  nativeID: 'tnf',
+  accessibilityState: { busy: true },
+  disabled: false,
+};
+
 // `props.disabled ?? aria-disabled ?? accessibilityState.disabled` (`Button.js:331,337`), off the
 // AUTHORED bag — by the time the folds above have run, `disabled` has been erased into
 // `accessibilityState` and the precedence would collapse.
@@ -575,9 +673,14 @@ function buildList(
   // `ownerProps`. Empty for every arm but `content`, whose whole subject is that read — and without
   // it that arm would measure a rule taking its early-out, i.e. nothing.
   ownerProps: Record<string, unknown> = {},
+  // The container's own TAG. Every arm but `clone` leaves it a plain `view`: a rule keyed on the
+  // node's own tag does not care what contains it. `clone` is the one DESCENDANT rule in the file —
+  // it is dispatched from the parent's tag — so for that arm this is the thing under test, and the
+  // JS arm gets a plain `view` here precisely so the native rule cannot fire on it.
+  ownerTag = 'view',
 ): IArm {
   const surface = createSurface(rootTag);
-  const container: ISymbioteNode = createElement('RCTView', false, 'view');
+  const container: ISymbioteNode = createElement('RCTView', false, ownerTag);
   for (const [name, value] of Object.entries(ownerProps))
     setProp(container, name, value);
   // The SURFACE takes its child through its own method — it is not an engine node, so the free
@@ -644,10 +747,18 @@ function bestArm(
   tag: string,
   props: Record<string, unknown>,
   ownerProps: Record<string, unknown> = {},
+  ownerTag = 'view',
 ): IArm {
   let best: IArm | undefined;
   for (let run = 0; run < SAMPLES; run += 1) {
-    const arm = buildList((nextRootTag += 1), view, tag, props, ownerProps);
+    const arm = buildList(
+      (nextRootTag += 1),
+      view,
+      tag,
+      props,
+      ownerProps,
+      ownerTag,
+    );
     if (best === undefined || arm.walk < best.walk) best = arm;
   }
   if (best === undefined) throw new Error('no sample was taken');
@@ -660,11 +771,15 @@ function priced(
   tag: string,
   props: Record<string, unknown>,
   ownerProps: Record<string, unknown> = {},
+  ownerTag = 'view',
 ): void {
   // The JS arm reads its owner through a CLOSURE, which is what the fold it replaces did, so the
   // value has to be handed to it out of band — there is no parent for it to consult.
   jsOwnerProps = ownerProps;
-  const native = bestArm(view, tag, props, ownerProps);
+  const native = bestArm(view, tag, props, ownerProps, ownerTag);
+  // A plain `view` container on the JS arm, always. For a self-keyed rule that changes nothing; for
+  // the descendant rule it is what STOPS the native rule firing, so the JS fold is the only thing
+  // doing the work — which is the whole comparison.
   const js = bestArm(view, `${tag}-in-js`, props, ownerProps);
 
   expectSamePayload(native, js);
@@ -737,6 +852,20 @@ describe('what a ported tag rule costs on each side of the wire', () => {
 
   it('pays no trip into JS for a thousand buttons', () => {
     priced('button', 'RCTView', 'button', BUTTON_PROPS);
+  });
+
+  // The only arm whose rule is keyed on the PARENT'S tag. The native container is a
+  // `touchable-native-feedback`; the JS one is a plain `view`, so nothing native fires and the fold
+  // is the only thing doing the work.
+  it('pays no trip into JS for a thousand cloned children', () => {
+    priced(
+      'clone',
+      'RCTView',
+      'clone',
+      { backgroundColor: 'red' },
+      CLONE_OWNER_PROPS,
+      'touchable-native-feedback',
+    );
   });
 
   it('pays no trip into JS for a thousand input accessory views', () => {

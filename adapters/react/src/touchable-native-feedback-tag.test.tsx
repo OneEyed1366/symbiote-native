@@ -67,7 +67,19 @@ describe('touchable-native-feedback as a tag', () => {
 
   // why: the count above is satisfied by an unregistered tag too — an anchor commits nothing on its
   // own. This is the arm that fails when the registration is missing.
-  it('clones the owner’s props onto that one child', () => {
+  //
+  // THE WITNESS CHANGED ON 2026-09-18 and the case did not. It used to be the CLONE — the owner's
+  // `accessibilityLabel`/`nativeID`/`testID` arriving on the child — and that moved to
+  // `foldCloneOntoChild` in C++, which this host cannot run: it builds its payloads through the
+  // TypeScript `fabricProps`, which carries no copy of the tag rules.
+  //
+  // `onLayout` is the replacement and it is the same KIND of claim: the owner declares it, the child
+  // is the only node with a native view, and RN clones it as a LISTENER (`:386`) — so the behavior's
+  // `FORWARDED_LISTENERS` is what carries it across, which is still JS. It is also a Fabric
+  // BOOLEAN-GATED event, so a forwarded listener is visible in the payload as `true` rather than
+  // only in a stash. Break-tested the same way: drop `registerTouchableNativeFeedbackBehavior()`
+  // from `./register` and the count stays 1 while this goes undefined.
+  it('forwards the owner’s listener onto that one child', () => {
     mount(
       ROOT_TAG,
       createElement(
@@ -75,19 +87,13 @@ describe('touchable-native-feedback as a tag', () => {
         { nativeID: 'root' },
         createElement(
           'touchable-native-feedback',
-          { accessibilityLabel: 'Save', nativeID: 'tnf', testID: 'probe' },
-          createElement('view', { testID: 'ignored' }),
+          { accessibilityLabel: 'Save', nativeID: 'tnf', onLayout: () => {} },
+          createElement('view', {}),
         ),
       ),
     );
 
     const [child] = subtreeOf('root');
-    expect(child.payload).toMatchObject({
-      accessibilityLabel: 'Save',
-      // :373 — the owner's `id`/`nativeID`, not the child's.
-      nativeID: 'tnf',
-      // :389 — `testID` is cloned, so the OWNER's wins over whatever the child declared.
-      testID: 'probe',
-    });
+    expect(child.payload.onLayout).toBe(true);
   });
 });

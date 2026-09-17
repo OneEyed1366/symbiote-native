@@ -117,21 +117,25 @@ describe('touchable-native-feedback as a tag', () => {
 
   // why: the count above is satisfied by an unregistered tag too — an anchor commits nothing on its
   // own. This is the arm that fails when the registration is missing.
-  it('clones the owner’s props onto that one child', async () => {
+  // THE WITNESS CHANGED ON 2026-09-18 and the case did not. It used to be the CLONE, which moved to
+  // `foldCloneOntoChild` in C++ and which this host cannot run — it builds its payloads through the
+  // TypeScript `fabricProps`, carrying no copy of the tag rules. `onLayout` is the same KIND of
+  // claim and is still JS: RN clones it as a LISTENER (`:386`), the behavior's `FORWARDED_LISTENERS`
+  // carries it, and being a Fabric BOOLEAN-GATED event it shows up in the payload as `true`.
+  it('forwards the owner’s listener onto that one child', async () => {
     const root = await mountSource(
       [
+        '<script>const noop = () => {};</script>',
         '<view id="root">',
-        '  <touchable-native-feedback id="tnf" accessibilityLabel="Save">',
-        '    <view id="kid"></view>',
+        '  <touchable-native-feedback id="tnf" onLayout={noop}>',
+        '    <view></view>',
         '  </touchable-native-feedback>',
         '</view>',
       ].join('\n'),
     );
 
     const [child] = subtreeOf('root');
-    expect(child.payload.accessibilityLabel).toBe('Save');
-    // :373 — the owner's `id` wins, overwriting the child's own.
-    expect(child.payload.nativeID).toBe('tnf');
+    expect(child.payload.onLayout).toBe(true);
 
     unmount(root);
     await settle();

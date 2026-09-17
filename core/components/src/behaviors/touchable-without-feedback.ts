@@ -39,28 +39,18 @@
 import {
   ARIA_ALIAS_KEYS,
   appListenerFor,
-  foldAriaProps,
   markPropsDirty,
   registerHostBehavior,
   requestCommitFor,
   setBehaviorListener,
   type IHostBehavior,
-  type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
   propOf,
-  propsOf,
 } from '@symbiote-native/engine';
 
 import {
-  resolveDisabledAccessibilityState,
-  resolveTouchableFocusable,
-} from '../view/render-pressable';
-import {
-  accessibleUnlessOptedOut,
-  asAccessibilityState,
   attachPressMachine,
-  booleanOr,
   detachPressMachine,
   type IPressConfigRefinement,
 } from './pressable';
@@ -166,56 +156,17 @@ function numberOr(value: unknown, fallback: number): number {
   return typeof value === 'number' ? value : fallback;
 }
 
-function stringOr(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-/**
- * `cloneElement(element, elementProps)` as a payload fold: the child's own props first, the owner's
- * two lists over them. Pure, as `IPayloadFold` requires — the owner is read, never written.
- */
-function cloneFold(owner: ISymbioteNode, inner: IPayloadFold | undefined) {
-  return (
-    props: Readonly<Record<string, unknown>>,
-  ): Record<string, unknown> => {
-    const next: Record<string, unknown> = {
-      ...(inner === undefined ? props : inner(props)),
-    };
-    // The owner's aria props are on the OWNER, so the engine's own fold at `fabricProps` — which
-    // reads the node being committed — never sees them. Run it here over the source bag; the fold
-    // returns its input by identity when there is nothing to do.
-    const ownerProps = propsOf(owner);
-    const source = owner.hasAriaAlias ? foldAriaProps(ownerProps) : ownerProps;
-
-    for (const key of CLONED_ALWAYS) next[key] = source[key];
-    for (const key of CLONED_WHEN_SET) {
-      if (source[key] !== undefined) next[key] = source[key];
-    }
-
-    // :255-266. `onPress` is an OWNED name, so it lives in the stash and never in `props`.
-    const disabled = booleanOr(source.disabled);
-    next.accessible = accessibleUnlessOptedOut(source);
-    next.focusable = resolveTouchableFocusable(
-      booleanOr(source.focusable),
-      appListenerFor(owner, 'press') !== undefined,
-      disabled,
-    );
-    // :275 gives `id` priority; the passthrough loop then re-assigns a set `nativeID` over it
-    // (:280-284), so upstream an explicit `nativeID` wins where TNF's `id` does. NOT reproduced,
-    // and there is nothing left here that could: `source` is the OWNER'S NODE PROPS, and
-    // `routeProp` resolved the two names into one on the way in. A `stringOr(source.id)` leg read
-    // a key that can no longer exist, so it was deleted rather than left standing as a second
-    // opinion about precedence.
-    next.nativeID = stringOr(source.nativeID);
-    // :257-262 folded by the engine above, then :258-263: an explicit `disabled` overrides the
-    // aria/accessibilityState answer.
-    next.accessibilityState = resolveDisabledAccessibilityState(
-      asAccessibilityState(source.accessibilityState),
-      disabled,
-    );
-    return next;
-  };
-}
+// `cloneFold` LEFT THIS FILE ON 2026-09-18 — `foldCloneOntoChild` in `SymbioteFabricProps.cpp`,
+// reached through the first rule keyed on the PARENT'S tag (`IOwner`). TWF's two lists are NOT
+// TNF's: the passthrough half is copied only when SET (`:281`), and the C++ rule keeps that split
+// rather than collapsing the two into one.
+//
+// One quirk of upstream's that is deliberately still not reproduced: `:280-284`'s passthrough loop
+// re-assigns a set `nativeID` over the `id` it just resolved, so an explicit `nativeID` wins here
+// where TNF's `id` does. `routeProp` settles the two names into one on the way in, so by the time
+// any rule runs there is nothing left to disagree about.
+//
+// Contract: `core/engine/cpp/tests/js/clone-onto-child-payload.itest.ts`.
 
 /**
  * `delayPressIn` / `delayPressOut` (:186-188) plus RN's unconditional `minPressDuration: 0` (:190).
@@ -340,10 +291,11 @@ function onChildInserted(node: ISymbioteNode, child: ISymbioteNode): void {
   // `childHost` (node.ts), so this only runs when a framework inserts without removing first.
   if (previous !== undefined) detachPressMachine(previous);
   node.childHost = child;
-  child.payloadFold = cloneFold(node, child.payloadFold);
   // The owner's props were very likely written BEFORE this child existed (React and Solid set props
-  // at createInstance), so the fold owes a run even though nothing was written since. Witnessed by
+  // at createInstance), so the CLONE owes a run even though nothing was written since. Witnessed by
   // the MOVED-child case, not by a fresh one — `appendChild` already dirties a node it created.
+  // Still owed now that the rule is in C++: it runs on the child's commit, and a child nothing
+  // dirtied has no commit.
   markPropsDirty(child);
   arm(node, child);
 }
