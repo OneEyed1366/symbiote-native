@@ -224,6 +224,26 @@ describe('routeProp: event vs plain-prop classification', () => {
     expect(propOf(node, 'onPress')).toBeUndefined();
   });
 
+  // why: the boundary the `on*` test encodes is "on" followed by an UPPER-CASE letter, and nothing
+  // pinned it. A prop whose name merely begins with the letters o and n — `online`, `onyx`,
+  // `onValueChange` is the real one this repo ships — must reach Fabric as a prop. Written before
+  // the check was rewritten off a regex, so the rewrite had an oracle rather than a reviewer.
+  it('a name starting with a lower-case letter after "on" is a plain prop', () => {
+    const node = createElement('RCTView');
+    for (const key of ['online', 'onyx', 'once']) {
+      routeProp(node, key, 'value');
+      expect(propOf(node, key)).toBe('value');
+    }
+    expect(node.listeners?.size ?? 0).toBe(0);
+  });
+
+  it('a name too short to carry an event name after "on" is a plain prop', () => {
+    const node = createElement('RCTView');
+    routeProp(node, 'on', 'value');
+    expect(propOf(node, 'on')).toBe('value');
+    expect(node.listeners?.size ?? 0).toBe(0);
+  });
+
   // why: PanResponder's negotiation callbacks are a JS-side protocol synthesized from raw
   // touches, not a Fabric ViewConfig event — isEventFor would never know them, so routeProp
   // special-cases RESPONDER_EVENTS to keep panHandlers from silently becoming dead props.

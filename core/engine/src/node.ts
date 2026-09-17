@@ -857,7 +857,19 @@ export function setEventListener(
     setProp(node, flagProp, isHandler ? true : undefined);
 }
 
-const ON_PREFIX = /^on[A-Z]/;
+// `/^on[A-Z]/` spelled out, because this runs on EVERY prop write and a regex is the one guard in
+// that sequence that is not obviously cheap. Priced on `build-release`
+// (`mutation-api-fill-cost.itest.ts`): 0.09 us for the regex against 0.03 for the character reads,
+// on a prop write that costs 0.88 us end to end — so ~7% of a write, ~1% of a create. Small, and it
+// is free: the boundary is pinned by its own tests in `node.test.ts`.
+//
+// 111 is 'o', 110 is 'n', and 65-90 is A-Z. `charCodeAt` past the end answers NaN, which fails every
+// comparison — so a two-character `on` needs no length check.
+function isOnEventName(key: string): boolean {
+  if (key.charCodeAt(0) !== 111 || key.charCodeAt(1) !== 110) return false;
+  const third = key.charCodeAt(2);
+  return third >= 65 && third <= 90;
+}
 
 // onChange -> change
 function listenerName(propName: string): string {
@@ -1398,7 +1410,7 @@ export function routeProp(
     pushClassStyle(node, parts);
     return;
   }
-  if (ON_PREFIX.test(key)) {
+  if (isOnEventName(key)) {
     // A native-driven `Animated.event` needs the native module as well as the listener map, and
     // registers under the PROP name — see `bindAnimatedEvent`, which no-ops for anything else.
     if (hasAnimatedNodes()) bindAnimatedEvent(node, key, resolved);
