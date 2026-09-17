@@ -34,6 +34,7 @@
   "files": [
     "build",
     "cpp",
+    "!cpp/tests",
     "ios",
     "android",
     "codegen-specs",
