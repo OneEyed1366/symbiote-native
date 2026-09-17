@@ -6,7 +6,6 @@
 // helpers from prepareScrollView. What diverges per platform, and how a RefreshControl
 // integrates, stays in the adapter's .ios/.android files.
 
-import { Platform } from '@symbiote-native/engine';
 import type {
   IStyleProp,
   ISymbioteEvent,
@@ -25,25 +24,18 @@ export function readLayoutDimension(
   return readLayoutField(event, key);
 }
 
-// 'normal'/'fast' resolve to DIFFERENT friction constants per platform: RN's
-// processDecelerationRate.js Platform.select()s them: iOS glides longer (0.998/0.99),
-// Android sooner (0.985/0.9). Hardcoding the iOS pair made Android momentum scroll
-// glide far too long on 'fast'. This is the file's one Platform read: the header's
-// "no Platform.OS" rule governs component-intrinsic selection, not a value transform
-// RN itself platform-branches. `default` mirrors iOS so any non-ios/android host stays
-// defined (select would otherwise yield undefined). Numeric rates pass through unchanged.
-export function resolveDecelerationRate(
-  rate: 'normal' | 'fast' | number,
-): number {
-  if (typeof rate === 'number') return rate;
-  // select() types as `number | undefined`; the always-present `default` makes the
-  // `??` fallback unreachable, but it narrows the return to a plain `number` (no cast).
-  if (rate === 'normal')
-    return (
-      Platform.select({ ios: 0.998, android: 0.985, default: 0.998 }) ?? 0.998
-    );
-  return Platform.select({ ios: 0.99, android: 0.9, default: 0.99 }) ?? 0.99;
-}
+// 'normal'/'fast' resolve to DIFFERENT friction constants per platform — RN's
+// `processDecelerationRate.js` `Platform.select()`s them: iOS glides longer (0.998/0.99), Android
+// sooner (0.985/0.9). Hardcoding the iOS pair once made Android momentum scroll glide far too long
+// on 'fast', which is why the pair is worth naming even now that it lives elsewhere.
+//
+// `resolveDecelerationRate` WAS HERE and is gone (2026-09-18): the rule is `foldScrollViewProps` in
+// `SymbioteFabricProps.cpp`, and after the port nothing called this but its own unit test — the
+// mirror shape this migration keeps turning up, green forever and consulted by nothing on a device.
+//
+// Its four constants went with it and are `#ifdef ANDROID` there rather than `Platform.select`'d,
+// because on iOS both scroll tags resolve to `RCTScrollView` and a component name cannot tell the
+// platforms apart. That puts the Android pair outside headless reach, which is recorded at the rule.
 
 // RN applies a base style to the scroll-view NODE itself, per axis (ScrollView.js
 // styles.baseHorizontal/baseVertical). Two parts carry weight:

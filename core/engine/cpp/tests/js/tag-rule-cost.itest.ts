@@ -24,13 +24,19 @@
 // MEASURED on `build-release`, three consecutive runs, one sitting, a thousand nodes per commit:
 //
 //              native walk        js walk             per node   keys in the bag / what the rule does
-//   imagebg    3.0  3.0  3.0 ms   13.0 12.2 12.0 ms    ~9.4 us   2 + a 3-key style / writes ONE key
-//   spinner    3.9  3.7  3.7 ms   14.4 13.6 13.5 ms   ~10.1 us   4, no style / the MOST work here
-//   accessory  3.1  3.2  3.1 ms   14.0 14.2 13.8 ms   ~10.8 us   4 / nothing at all
-//   button     4.2  3.9  3.9 ms   16.7 15.2 15.5 ms   ~11.8 us   5 + a 2-key style
-//   pressable  3.7  3.7  3.7 ms   18.1 17.7 18.3 ms   ~14.4 us   4 + a 3-key style
-//   switch     4.7  4.7  4.8 ms   23.5 23.3 23.8 ms   ~18.8 us   6 + nested trackColor
-//   image      5.9  5.8  5.9 ms   27.8 27.1 27.8 ms   ~21.7 us   6 + what the rule BUILDS
+//   imagebg    3.0  3.0  3.4 ms   12.2 12.6 13.2 ms    ~9.5 us   2 + a 3-key style / writes ONE key
+//   spinner    3.7  3.7  4.1 ms   14.1 13.9 14.4 ms   ~10.3 us   4, no style / the MOST work here
+//   accessory  3.4  3.1  3.1 ms   15.0 14.3 13.6 ms   ~11.1 us   4 / nothing at all
+//   button     3.9  3.8  3.9 ms   17.0 15.5 15.2 ms   ~12.0 us   5 + a 2-key style
+//   pressable  3.9  3.8  3.8 ms   18.7 18.9 18.5 ms   ~14.9 us   4 + a 3-key style
+//   scroll     4.2  4.2  4.7 ms   19.3 19.3 20.6 ms   ~15.4 us   4 + a 2-key style / the BIGGEST rule
+//   switch     4.8  5.0  4.8 ms   24.0 24.1 23.6 ms   ~19.0 us   6 + nested trackColor
+//   image      6.1  6.0  5.9 ms   28.1 28.1 28.0 ms   ~22.1 us   6 + what the rule BUILDS
+//
+// `scroll` is the fourth point on that experiment and the one that closes it. Its rule is the
+// BIGGEST in the file — compose a base style, default a flag, strip the axis, resolve an asymmetric
+// pair, erase two keys, map a word to a friction constant — and it lands mid-table, next to
+// `pressable`, whose rule does far less over a bag of the same size. Size of bag, not size of rule.
 //
 // THE TOP THREE ROWS ARE A DELIBERATE EXPERIMENT, not three ports that happened to be cheap. Their
 // rules do, in order: almost nothing (ONE key written), the MOST work in the file (builds a style
@@ -302,6 +308,47 @@ const IMAGE_BACKGROUND_PROPS = {
   style: { width: 120, height: 80, borderRadius: 4 },
 };
 
+// The BIGGEST rule in the file by what it does — compose a base style, default a flag, strip the
+// axis, resolve an asymmetric pair, erase two keys, map a word to a friction constant.
+registerHostBehavior('scroll-view-in-js', {
+  attach(): void {},
+  detach(): void {},
+  foldPayload(props: Readonly<Record<string, unknown>>) {
+    const out: Record<string, unknown> = {
+      ...props,
+      style: [
+        {
+          flexGrow: 1,
+          flexShrink: 1,
+          flexDirection: 'column',
+          overflow: 'scroll',
+        },
+        props.style,
+      ],
+      nestedScrollEnabled: props.nestedScrollEnabled ?? true,
+    };
+    delete out.horizontal;
+    if (props.alwaysBounceVertical === undefined)
+      out.alwaysBounceVertical = true;
+    delete out.stickyHeaderIndices;
+    delete out.invertStickyHeaders;
+    if (props.decelerationRate === 'normal') out.decelerationRate = 0.998;
+    else if (props.decelerationRate === 'fast') out.decelerationRate = 0.99;
+    return out;
+  },
+});
+
+// Registered bare, like `button`'s and `image-background`'s arms: the real behavior builds a content
+// node per scroll view, and this file prices ONE rule against ONE fold, not a subtree.
+registerHostBehavior('scroll-view', { attach(): void {}, detach(): void {} });
+
+const SCROLL_VIEW_PROPS = {
+  decelerationRate: 'fast',
+  stickyHeaderIndices: [0],
+  testID: 'list',
+  style: { height: 400, backgroundColor: '#ffffff' },
+};
+
 const SPINNER_PROPS = {
   size: 'large',
   animating: true,
@@ -495,6 +542,10 @@ describe('what a ported tag rule costs on each side of the wire', () => {
 
   it('pays no trip into JS for a thousand images', () => {
     priced('image', 'RCTImageView', 'image', IMAGE_PROPS);
+  });
+
+  it('pays no trip into JS for a thousand scroll views', () => {
+    priced('scroll', 'RCTScrollView', 'scroll-view', SCROLL_VIEW_PROPS);
   });
 
   it('pays no trip into JS for a thousand image backgrounds', () => {

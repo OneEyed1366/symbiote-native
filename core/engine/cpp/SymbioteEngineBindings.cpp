@@ -1,5 +1,6 @@
 #include "SymbioteEngineBindings.h"
 
+#include "SymbioteDebug.h"
 #include "SymbioteTree.h"
 
 #include <react/renderer/mounting/ShadowTreeRegistry.h>
@@ -8,7 +9,9 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace symbiote {
@@ -110,6 +113,48 @@ jsi::Value probeUIManager(
 
 void installBindings(jsi::Runtime &runtime) {
   auto bindings = jsi::Object(runtime);
+
+  // THE SWITCH, pushed down from the same two places `debug.ts` reads. Done at install so a host
+  // that sets `__SYMBIOTE_DEBUG__` in its bootstrap (every example's `index.js` does) gets the C++
+  // half armed without calling anything; `setDebugEnabled` below is what a LATER toggle uses, since
+  // this read happens exactly once.
+  const auto flag = runtime.global().getProperty(runtime, "__SYMBIOTE_DEBUG__");
+  const char *const env = std::getenv("DEBUG");
+  setDebugEnabled(
+      (flag.isBool() && flag.getBool()) ||
+      (env != nullptr && std::string(env) == "1"));
+
+  bindings.setProperty(
+      runtime,
+      "setDebugEnabled",
+      jsi::Function::createFromHostFunction(
+          runtime,
+          jsi::PropNameID::forAscii(runtime, "setDebugEnabled"),
+          1,
+          [](jsi::Runtime & /*rt*/, const jsi::Value & /*thisVal*/, const jsi::Value *args, size_t count)
+              -> jsi::Value {
+            if (count > 0 && args[0].isBool()) setDebugEnabled(args[0].getBool());
+            return jsi::Value::undefined();
+          }));
+
+  // Drains what the C++ side logged. The reason the lines are retained at all: a diagnostic nobody
+  // can assert on is a diagnostic that rots — this is what lets a test say "the engine warned"
+  // rather than a human noticing a line scroll past.
+  bindings.setProperty(
+      runtime,
+      "takeDebugLog",
+      jsi::Function::createFromHostFunction(
+          runtime,
+          jsi::PropNameID::forAscii(runtime, "takeDebugLog"),
+          0,
+          [](jsi::Runtime &rt, const jsi::Value & /*thisVal*/, const jsi::Value * /*args*/, size_t /*count*/)
+              -> jsi::Value {
+            const std::vector<std::string> lines = takeDebugLog();
+            auto out = jsi::Array(rt, lines.size());
+            for (size_t at = 0; at < lines.size(); at += 1)
+              out.setValueAtIndex(rt, at, jsi::String::createFromUtf8(rt, lines[at]));
+            return out;
+          }));
 
   bindings.setProperty(runtime, "version", jsi::Value(kNativeVersion));
   bindings.setProperty(

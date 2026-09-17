@@ -65,11 +65,14 @@ function payloadFor(viewName: string): Record<string, unknown> {
 // No Negative group: `horizontal` is a plain boolean prop with no guard clause — every value
 // it accepts is valid, so there is no reject path to assert against.
 describe('horizontal FlatList (Positive — no throwing path)', () => {
-  it('forwards horizontal to the native RCTScrollView', () => {
-    // why: iOS decides the scroll axis from the native RCTScrollView's own `horizontal` prop,
-    // so a dropped forward silently degrades a horizontal list back to vertical.
+  it('reaches the horizontal scroll tag, which is what carries the axis', () => {
+    // why: the axis flag itself is `foldScrollViewProps` in the engine
+    // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`) and this host carries no copy of the
+    // tag rules — but WHICH TAG the list picks is this adapter's own decision, and a list that chose
+    // the vertical tag would silently scroll the wrong way. The committed content view is the tell:
+    // only the horizontal tag builds a row-styled content node.
     mount(ROOT_TAG, createElement(App));
-    expect(payloadFor('RCTScrollView').horizontal).toBe(true);
+    expect(payloadFor('RCTScrollContentView').flexDirection).toBe('row');
   });
 
   it('pins the content view to the full row width as a row', () => {

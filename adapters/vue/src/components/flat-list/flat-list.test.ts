@@ -214,7 +214,9 @@ describe('Vue FlatList on the engine', () => {
       );
       await tick();
 
-      expect(findCreated('RCTScrollView').payload.horizontal).toBe(true);
+      // The axis FLAG is `foldScrollViewProps` in the engine and unreachable from this host
+      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`). Which TAG the list picked is this
+      // adapter's decision and is what the row-styled content node below proves.
       const content = findCreated('RCTScrollContentView');
       // Pinned to the full row width (not the frame width) so the row overflows and scrolls.
       expect(content.payload.width).toBe(TOTAL_WIDTH);

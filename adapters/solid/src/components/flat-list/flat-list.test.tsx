@@ -455,7 +455,9 @@ describe('Solid FlatList on the engine', () => {
       ));
       await tick();
 
-      expect(committed(SCROLL_VIEW).payload.horizontal).toBe(true);
+      // The axis FLAG is `foldScrollViewProps` in the engine and unreachable from this host
+      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`). Which TAG the list picked is this
+      // adapter's decision, and the row-pinned content node below is what proves it.
       expect(committed(CONTENT_VIEW).payload.width).toBe(
         ITEM_HEIGHT * ITEM_COUNT,
       );
@@ -1009,7 +1011,8 @@ describe('Solid FlatList on the engine', () => {
       ));
       await tick();
 
-      expect(committed(SCROLL_VIEW).payload.horizontal).toBe(true);
+      // The axis flag is the engine's rule (`scroll-view-payload.itest.ts`); what this case is about
+      // is the PACKING below.
       // All four rows, because an unmeasured horizontal viewport does not bound the first batch the
       // way the vertical one does — a VirtualizedList property, not FlatList's; the point here is
       // only that the packing happened at all.

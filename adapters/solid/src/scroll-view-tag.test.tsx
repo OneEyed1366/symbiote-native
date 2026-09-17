@@ -113,7 +113,10 @@ describe('Solid scroll-view / horizontal-scroll-view tags', () => {
     await tick();
 
     const scroll = committed(SCROLL_VIEW);
-    expect(scroll.payload.horizontal).toBe(true);
+    // The axis FLAG is `foldScrollViewProps` in the engine and unreachable from this host
+    // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`). What this adapter decides — and
+    // what this case is named for — is which TAG it renders, and the row-styled content node under
+    // it is that decision made visible.
     const content = scroll.children[0];
     expect(content?.payload.flexDirection).toBe('row');
   });

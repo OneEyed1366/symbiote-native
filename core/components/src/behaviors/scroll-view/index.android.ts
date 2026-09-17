@@ -19,21 +19,25 @@ import {
 } from '@symbiote-native/engine';
 
 import { splitScrollViewStyle } from '../../scroll-view-commands';
-import {
-  ownerFold,
-  registerScrollViewBehaviors,
-  type IScrollPlatform,
-} from './shared';
+import { registerScrollViewBehaviors, type IScrollPlatform } from './shared';
 
-// The owner under a wrap: the ordinary fold with the VISUAL half of its own style in place of the
-// composed one. Delegating rather than restating is what keeps `decelerationRate`, `horizontal` and
-// `nestedScrollEnabled` in ONE place — none of the three has anything to do with the wrap, and the
-// hand-written copy this replaced had already lost the first of them.
-function wrappedOwnerFold(base: IViewStyle, horizontal: boolean): IPayloadFold {
-  const plain = ownerFold(base, horizontal);
+// The owner under a wrap: the VISUAL half of its own style in place of the composed one. Everything
+// ELSE the owner needs — the axis, the bounce pair, `nestedScrollEnabled`, `decelerationRate`, the
+// two strips — is `foldScrollViewProps` in the engine now and has already run by the time this is
+// called, which is why this no longer delegates to anything. None of it has to do with the wrap.
+//
+// IT READS THE OWNER'S STYLE OFF THE NODE, not off the bag it was handed, and that is Trap A rather
+// than a preference: the engine's rule runs FIRST and replaces `style` with `[base, authored]`, so
+// `props.style` here is the composed array and splitting it would put the base's own layout props on
+// the wrapper. `propOf(owner, 'style')` is the authored value, which is what the split wants — the
+// same correction `wrapperFold` below already made for the same reason.
+function wrappedOwnerFold(
+  owner: ISymbioteNode,
+  base: IViewStyle,
+): IPayloadFold {
   return props => ({
-    ...plain(props),
-    style: splitScrollViewStyle(base, props.style).inner,
+    ...props,
+    style: splitScrollViewStyle(base, propOf(owner, 'style')).inner,
   });
 }
 
@@ -50,13 +54,12 @@ function wrapperFold(owner: ISymbioteNode, base: IViewStyle): IPayloadFold {
 const android: IScrollPlatform = {
   claimMode: 'wrap',
   slotDerived: ['style'],
-  onWrapChange: (base, horizontal) => (owner, wrapper) => {
-    // Back to the ordinary composition, not to `undefined` — the plain fold carries the axis and
-    // the gesture props, which have nothing to do with the wrap.
+  onWrapChange: base => (owner, wrapper) => {
+    // Back to NO fold when the wrap goes away, which is now the honest answer rather than a loss:
+    // the axis and the gesture props are the engine's rule, they run off the tag whatever this
+    // field holds, and the only thing a fold was ever needed for here is the style split.
     owner.payloadFold =
-      wrapper === undefined
-        ? ownerFold(base, horizontal)
-        : wrappedOwnerFold(base, horizontal);
+      wrapper === undefined ? undefined : wrappedOwnerFold(owner, base);
     if (wrapper !== undefined) wrapper.payloadFold = wrapperFold(owner, base);
   },
 };

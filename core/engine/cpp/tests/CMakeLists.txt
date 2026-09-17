@@ -278,6 +278,7 @@ add_executable(symbiote_tree_tests
   mounted-tree.cpp
   ${REACT_COMMON_DIR}/jsc/JSCRuntime.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteTree.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteDebug.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteFabricProps.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteEngineBindings.cpp)
 target_include_directories(symbiote_tree_tests PRIVATE
@@ -300,6 +301,7 @@ add_executable(symbiote_tester
   symbiote-tester.cpp
   ${REACT_COMMON_DIR}/jsc/JSCRuntime.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteTree.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteDebug.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteFabricProps.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteEngineBindings.cpp)
 target_include_directories(symbiote_tester PRIVATE

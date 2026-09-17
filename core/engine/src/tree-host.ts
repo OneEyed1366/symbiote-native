@@ -481,3 +481,30 @@ export function readSurfaceTelemetry(
 ): ISurfaceTelemetry | undefined {
   return nativeEngine()?.readSurfaceTelemetry?.(surfaceId);
 }
+
+/**
+ * Arm the C++ half's diagnostics (`SymbioteDebug.h`), which `installBindings` already did from
+ * `DEBUG=1` / `globalThis.__SYMBIOTE_DEBUG__` at install.
+ *
+ * This is for the LATER toggle — the runtime escape hatch `debug.ts` documents for hosts where the
+ * env is not reachable. Without it a `globalThis.__SYMBIOTE_DEBUG__ = true` typed into a running app
+ * would flip the JS half and silently leave the engine's own half dark, which is the surprise worth
+ * the six lines.
+ */
+export function setNativeDebug(enabled: boolean): void {
+  nativeEngine()?.setDebugEnabled?.(enabled);
+}
+
+/**
+ * Drain what the C++ half has logged since the last call.
+ *
+ * The reason those lines are retained at all rather than only written to stderr: a diagnostic nobody
+ * can assert on is one that rots. This is what lets a test say "the engine warned about that" —
+ * see `core/engine/cpp/tests/js/native-debug-log.itest.ts`.
+ *
+ * An empty array on a runtime without the binding, not `undefined`: the question "what was logged"
+ * has an honest empty answer, unlike the telemetry read above, where a zero would be a false claim.
+ */
+export function takeNativeDebugLog(): readonly string[] {
+  return nativeEngine()?.takeDebugLog?.() ?? [];
+}

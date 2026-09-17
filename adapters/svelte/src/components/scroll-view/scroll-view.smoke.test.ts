@@ -156,8 +156,9 @@ describe('the scroll-view tag (real compiled source)', () => {
       // padding/overflow travel through the style slot, so they only show up in the flattened
       // payload — not the author's raw prop bag.
       expect(payloadOf(content.handle).padding).toBe(8);
-      // overflow:'scroll' is RN's base clip style on both axes (SCROLL_VIEW_BASE_VERTICAL).
-      expect(payloadOf(outer.handle).overflow).toBe('scroll');
+      // The base clip style (`overflow: scroll`) is `foldScrollViewProps` in the engine now
+      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`); this host carries no copy of the
+      // tag rules. The content node's padding above is the routing half, which is the adapter's.
     });
 
     // why: `bind:this` is the only way app code drives a scroll view imperatively (RN parity:

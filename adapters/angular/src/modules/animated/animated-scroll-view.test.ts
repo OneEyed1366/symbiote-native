@@ -89,7 +89,9 @@ describe('AnimatedScrollView', () => {
     // recording host has no `.children` on a node (see its header).
     const scrollChildren = childrenOf(scrollView.handle);
     expect(scrollChildren).toHaveLength(1);
-    expect(payloadOf(scrollView.handle).nestedScrollEnabled).toBe(true);
+    // `nestedScrollEnabled` is `foldScrollViewProps` in the engine now and this host carries no copy
+    // of the tag rules (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`). What this case is
+    // about either way is the projected-children wrap below.
 
     const contentNode = fabric.find(n => n.handle === scrollChildren[0]);
     expect(contentNode?.viewName).toBe('RCTScrollContentView');
@@ -112,16 +114,18 @@ describe('AnimatedScrollView', () => {
   // over sibling views instead of scrolling clipped (Android's native ViewGroup clips regardless
   // of the style prop, which is why this was invisible there). See
   // core/components/src/view/render-scroll-view.ts's SCROLL_VIEW_BASE_VERTICAL comment.
-  it('applies the scroll-view base style (overflow: scroll) so content clips to the frame', async () => {
+  // The base style itself is `foldScrollViewProps` in the engine since 2026-09-18, asserted on the
+  // committed payload in `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`; this host builds
+  // its payload through the TypeScript `fabricProps`, which carries no copy of the tag rules. What
+  // an Animated ScrollView still owes THIS file is that the animated wrapper reaches a real
+  // `RCTScrollView` at all — lose that and the base style has nothing to land on.
+  it('commits a real RCTScrollView from the animated wrapper', async () => {
     mount(ROOT_TAG, AnimatedScrollViewApp);
     await tick();
 
-    const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
-    // The scroll-view base style is folded onto `props.style`, so the flat `overflow`/
-    // `flexDirection` keys only exist on the PAYLOAD.
-    const payload = scrollView && payloadOf(scrollView.handle);
-    expect(payload?.overflow).toBe('scroll');
-    expect(payload?.flexDirection).toBe('column');
+    expect(
+      fabric.find(node => node.viewName === 'RCTScrollView'),
+    ).toBeDefined();
   });
 
   // why: the default from bug #2 must be a DEFAULT, not a forced value — an app that

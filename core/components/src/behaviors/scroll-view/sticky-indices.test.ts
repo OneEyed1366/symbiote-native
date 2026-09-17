@@ -252,11 +252,13 @@ describe('an index selects a child the same way a tag marks one', () => {
       stickyHeaderIndices: [0],
       invertStickyHeaders: true,
     });
-    const committed = commit();
-    // The positive control: the app really did write them, and the behavior really does read them.
+    commit();
+    // The app really did write them, and the behavior really does read them — which is the half
+    // this host can still answer. That neither key reaches the PAYLOAD is the engine's strip
+    // (`foldScrollViewProps`), asserted in `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`;
+    // the TypeScript `fabricProps` carries no copy of the tag rules, so an absence assertion here
+    // would now be measuring the harness rather than the strip.
     expect(propOf(owner, 'stickyHeaderIndices')).toEqual([0]);
-    expect(Object.hasOwn(committed.payload, 'stickyHeaderIndices')).toBe(false);
-    expect(Object.hasOwn(committed.payload, 'invertStickyHeaders')).toBe(false);
   });
 });
 

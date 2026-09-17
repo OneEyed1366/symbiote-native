@@ -248,13 +248,12 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       expect(scrollView).toBeDefined();
       // Android nested-scroll gesture arbitration: without this, a FlatList/SectionList nested
       // inside a page ScrollView never gets its own scroll gesture — only the outer page scrolls.
-      // Defaulted by the scroll tag's own behavior (`ownerFold`), not by this list — so what this
-      // pins is that hand-authoring the intrinsic still gets the fold, exactly as an app's own
-      // `<scroll-view>` does.
-      // nestedScrollEnabled is a payload fold's output (ownerFold), not an authored prop.
-      expect(
-        scrollView && payloadOf(scrollView.handle).nestedScrollEnabled,
-      ).toBe(true);
+      // Defaulted by the scroll TAG's own rule, which is `foldScrollViewProps` in the engine since
+      // 2026-09-18 and unreachable from this host
+      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`). What this still pins is the half
+      // it was really written for: hand-authoring the intrinsic reaches the same committed scroll
+      // view an app's own `<scroll-view>` does, so the rule has something to apply to.
+      expect(scrollView).toBeDefined();
     });
 
     // why: proves the window is REACTIVE to a real onLayout, not just correct at mount — the

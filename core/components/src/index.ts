@@ -68,7 +68,6 @@ export type { ISwitchState, ISwitchAction } from './state/switch';
 // owns the refs/effects/element assembly and the sticky-header component; these supply the
 // platform-invariant math and plumbing every adapter shares.
 export {
-  resolveDecelerationRate,
   selectScrollIntrinsics,
   readLayoutDimension,
   didContentSizeChange,

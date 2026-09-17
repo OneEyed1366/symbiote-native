@@ -87,7 +87,6 @@ import {
   didContentSizeChange,
   preservesContentChildren,
   readLayoutDimension,
-  resolveDecelerationRate,
   SCROLL_VIEW_BASE_HORIZONTAL,
   SCROLL_VIEW_BASE_VERTICAL,
   type IContentSize,
@@ -136,46 +135,24 @@ export const REFRESH_CONTROL = descriptorFor('refresh-control').component;
 // `nestedScrollEnabled` defaults ON because every wrapper writes it on every ScrollView, both
 // platforms. RN itself only defaults it on the Android RefreshControl WRAP path
 // (`ScrollView.js:1862`) — parity here is with the wrapper this behavior replaced.
-export function ownerFold(base: IViewStyle, horizontal: boolean): IPayloadFold {
-  return props => {
-    const next: Record<string, unknown> = {
-      ...props,
-      style: [base, props.style],
-      nestedScrollEnabled: props.nestedScrollEnabled ?? true,
-    };
-    // The tag is the ONLY axis input, which is what keeps the three halves of the axis from
-    // disagreeing. RN derives all three from one prop, so a mismatch is unrepresentable there, and
-    // on iOS both tags really are RCTScrollView — a stray `horizontal` would turn a vertical
-    // scroller over a content node with no row style, a shape RN cannot produce.
-    if (props.horizontal !== undefined && props.horizontal !== horizontal) {
-      dlog(
-        `ScrollView: horizontal=${String(props.horizontal)} ignored — the axis comes from the ` +
-          `tag; write <${horizontal ? SCROLL_VIEW_TAG : HORIZONTAL_SCROLL_VIEW_TAG}> instead`,
-      );
-    }
-    delete next.horizontal;
-    if (horizontal) next.horizontal = true;
-    // The bounce pair is the axis's other consequence (`ScrollView.js:1753-1761`), ASYMMETRIC
-    // because RN falls back to `this.props.horizontal` — unset on a vertical view, so the
-    // horizontal key resolves to undefined and never reaches the payload. Both names are declared
-    // in every adapter's prop type and computed in none: vertical never bounced by default.
-    if (props.alwaysBounceHorizontal === undefined && horizontal)
-      next.alwaysBounceHorizontal = true;
-    if (props.alwaysBounceVertical === undefined)
-      next.alwaysBounceVertical = !horizontal;
-    // Consumed by the behavior and declared by no ViewConfig — neither name appears anywhere under
-    // `ReactCommon/react/renderer/components/scrollview`. `stickyHeaderIndices` decides which
-    // children get a `sticky-header`, `invertStickyHeaders` feeds the pin. Every wrapper strips both
-    // (Vue's `HANDLED_ATTRS` is the reference list), and a key Fabric does not know throws nothing,
-    // logs nothing and paints nothing — so the strip has to be here or it is never noticed.
-    delete next.stickyHeaderIndices;
-    delete next.invertStickyHeaders;
-    const rate = props.decelerationRate;
-    if (rate === 'normal' || rate === 'fast' || typeof rate === 'number')
-      next.decelerationRate = resolveDecelerationRate(rate);
-    return next;
-  };
-}
+// THE OWNER'S FOLD IS GONE (2026-09-18) — `foldScrollViewProps` in `SymbioteFabricProps.cpp`. Every
+// input it had was the node's own bag plus the AXIS, and the axis is the tag (`scroll-view` vs
+// `horizontal-scroll-view`), so it was a tag rule by every criterion: the base style composition,
+// `nestedScrollEnabled`, the `horizontal` strip, the asymmetric bounce pair, the two ViewConfig-less
+// strips, and `decelerationRate`. Contract:
+// `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`.
+//
+// IT WAS BLOCKED ON A MISSING LOG, not on anything about the rule. An app writing `horizontal` on
+// the vertical tag has it IGNORED, and this fold `dlog`'d where to write it instead — while
+// `core/engine/cpp` had no logging facility at all, only `throw jsi::JSError`. Moving the rule as
+// written would have deleted a diagnostic, which `<keep_logs_gate_behind_DEBUG>` forbids. So
+// `SymbioteDebug.h` was built first and this is its first caller
+// (`core/engine/cpp/tests/js/native-debug-log.itest.ts`).
+//
+// `decelerationRate`'s two constants went with it and are `#ifdef ANDROID` there: on iOS BOTH tags
+// resolve to `RCTScrollView`, so a component name cannot tell iOS-vertical from Android-vertical the
+// way `foldSwitchProps` can. That leaves the Android half outside headless reach — the same gap
+// already recorded for `android_ripple`, and the only part of this rule a test here cannot see.
 
 // The SLOT's fold. Two halves with different sources, which is why it takes the owner:
 //
@@ -337,7 +314,6 @@ function scrollBehavior(
     claimedChildren: { [REFRESH_CONTROL]: platform.claimMode },
     onWrapChange: platform.onWrapChange?.(base, horizontal),
     buildStructure: buildContent(contentIntrinsic, rowStyle),
-    foldPayload: ownerFold(base, horizontal),
     // The scroll dispatcher is installed here and never conditionally: it is what drives the
     // sticky AnimatedValue, and a header can register long after this node was created. It costs a
     // forward per scroll event on a ScrollView with no sticky child, which is what RN pays too.

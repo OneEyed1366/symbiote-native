@@ -1,5 +1,7 @@
 #include "SymbioteFabricProps.h"
 
+#include "SymbioteDebug.h"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -799,6 +801,84 @@ const std::array<const char *, 6> kTouchableFeedbackKeys = {
 };
 
 /**
+ * ScrollView's owner, both axes (`ScrollView.js:1753-1761` and the wrapper body).
+ *
+ * THE TAG IS THE ONLY AXIS INPUT, which is what keeps the three halves of the axis from disagreeing:
+ * the scroller's own `horizontal`, the base style's `flexDirection`, and the content node's row
+ * style all derive from ONE thing. RN derives them from one prop so a mismatch is unrepresentable
+ * there; here the tag plays that part, and on iOS both tags really are `RCTScrollView`, so a stray
+ * `horizontal` would otherwise produce a vertical scroller over a content node with no row style —
+ * a shape RN cannot make.
+ *
+ * So an app writing `horizontal` on the vertical tag is IGNORED, and ignoring it in silence is the
+ * failure the warning below exists to prevent. This is the first rule in the engine to WARN rather
+ * than crash, and it is why `SymbioteDebug.h` had to exist before this port could happen at all.
+ *
+ * THE BOUNCE PAIR IS ASYMMETRIC and that is upstream's shape rather than an oversight: RN falls back
+ * to `this.props.horizontal`, which is unset on a vertical view, so `alwaysBounceHorizontal` simply
+ * never resolves there and never reaches the payload. Both names are declared in every adapter's
+ * prop type and computed in none — vertical never bounced by default.
+ *
+ * THE TWO STRIPS are consumed by the behavior and declared by no ViewConfig — neither name appears
+ * anywhere under `ReactCommon/react/renderer/components/scrollview`. `stickyHeaderIndices` decides
+ * which children become a `sticky-header`; `invertStickyHeaders` feeds the pin. A key Fabric does
+ * not know throws nothing, logs nothing and paints nothing, so the strip is only ever visible in a
+ * payload test.
+ */
+dynamic foldScrollViewProps(const dynamic &props, bool isHorizontal) {
+  dynamic out = props;
+
+  dynamic base = dynamic::object();
+  base["flexGrow"] = 1;
+  base["flexShrink"] = 1;
+  base["flexDirection"] = isHorizontal ? "row" : "column";
+  base["overflow"] = "scroll";
+
+  dynamic composed = dynamic::array(std::move(base));
+  const dynamic *authored = props.get_ptr("style");
+  if (authored != nullptr) composed.push_back(*authored);
+  out["style"] = std::move(composed);
+
+  out["nestedScrollEnabled"] = boolAt(props, "nestedScrollEnabled").value_or(true);
+
+  const std::optional<bool> authoredAxis = boolAt(props, "horizontal");
+  if (authoredAxis.has_value() && *authoredAxis != isHorizontal) {
+    SYMBIOTE_DLOG(
+        std::string("ScrollView: horizontal=") +
+        (*authoredAxis ? "true" : "false") +
+        " ignored — the axis comes from the tag; write <" +
+        (isHorizontal ? "scroll-view" : "horizontal-scroll-view") + "> instead");
+  }
+  out.erase("horizontal");
+  if (isHorizontal) out["horizontal"] = true;
+
+  if (props.get_ptr("alwaysBounceHorizontal") == nullptr && isHorizontal)
+    out["alwaysBounceHorizontal"] = true;
+  if (props.get_ptr("alwaysBounceVertical") == nullptr)
+    out["alwaysBounceVertical"] = !isHorizontal;
+
+  out.erase("stickyHeaderIndices");
+  out.erase("invertStickyHeaders");
+
+  // `normal` / `fast` are RN's two names for a platform constant (`ScrollView.js`'s
+  // `decelerationRate` prop); a number passes through as itself. The values are iOS's and Android's
+  // own, so this is the one branch here that a component name cannot decide — on iOS BOTH tags are
+  // `RCTScrollView`, so the name says nothing about the platform.
+  const dynamic *rate = props.get_ptr("decelerationRate");
+  if (rate != nullptr && rate->isString()) {
+    const std::string named = rate->asString();
+#ifdef ANDROID
+    if (named == "normal") out["decelerationRate"] = 0.985;
+    else if (named == "fast") out["decelerationRate"] = 0.9;
+#else
+    if (named == "normal") out["decelerationRate"] = 0.998;
+    else if (named == "fast") out["decelerationRate"] = 0.99;
+#endif
+  }
+  return out;
+}
+
+/**
  * ImageBackground's wrapper (`ImageBackground.js:75`), and the whole rule is one key.
  *
  * iOS's Smart Invert inverts colours for accessibility, and a PHOTOGRAPH is exactly what must not be
@@ -1443,6 +1523,10 @@ dynamic fabricProps(
     bag = &tagResolved;
   } else if (tagName == "image") {
     tagResolved = foldImageProps(*bag);
+    bag = &tagResolved;
+  } else if (tagName == "scroll-view" || tagName == "horizontal-scroll-view") {
+    tagResolved =
+        foldScrollViewProps(*bag, tagName == "horizontal-scroll-view");
     bag = &tagResolved;
   } else if (tagName == "image-background") {
     tagResolved = foldImageBackgroundProps(*bag);

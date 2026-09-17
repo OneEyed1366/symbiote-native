@@ -115,6 +115,8 @@ export {
   treeHost,
   readCommitProfile,
   readSurfaceTelemetry,
+  setNativeDebug,
+  takeNativeDebugLog,
 } from './tree-host';
 export type { ISurfaceTelemetry } from './tree-host';
 // The native host, exported for the same audience as `setTreeHost` — a HOST author, not an app.

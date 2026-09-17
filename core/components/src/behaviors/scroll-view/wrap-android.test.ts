@@ -165,20 +165,16 @@ describe('the style splits across the two boxes', () => {
     expect(scroll.payload.overflow).toBe('scroll');
   });
 
-  // The inner view has to consume the gesture before the refresh parent sees it, or a scroll
-  // becomes a pull-to-refresh.
-  it('wires nestedScrollEnabled on the inner scroll view', () => {
-    const { scroll } = boxes({});
-    expect(scroll.payload.nestedScrollEnabled).toBe(true);
-  });
-
-  // The wrap swaps the owner's fold, so anything the ordinary fold does had to be restated in the
-  // wrapped copy — and `decelerationRate` was not. It reached Fabric as the string 'fast' on every
-  // Android ScrollView carrying a RefreshControl, which the native side cannot read.
-  it('still resolves decelerationRate while wrapped', () => {
-    const { scroll } = boxes({ decelerationRate: 'fast' });
-    expect(typeof scroll.payload.decelerationRate).toBe('number');
-  });
+  // `nestedScrollEnabled` and `decelerationRate` LEFT THIS FILE on 2026-09-18, and the reason they
+  // can leave is the interesting half: both used to be restated in the WRAPPED copy of the owner's
+  // fold, because the wrap swapped that fold out and anything the ordinary one did had to be
+  // repeated. `decelerationRate` once was NOT repeated, and reached Fabric as the string 'fast' on
+  // every Android ScrollView carrying a RefreshControl.
+  //
+  // That whole class of bug is now unrepresentable: the rule is `foldScrollViewProps` in the engine,
+  // it runs off the TAG, and the wrap cannot swap it out — what the wrap swaps is a JS fold that now
+  // does nothing but split the style. Asserted against the committed payload in
+  // `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`; this host carries no copy of the rule.
 
   // `markPropsDirty` bubbles UP, so a style written on the owner reaches every ancestor and never
   // the wrapper. `slotDerived` naming `style` is what makes the wrapper rebuild.
@@ -193,12 +189,14 @@ describe('the style splits across the two boxes', () => {
     expect(commit().payload.height).toBe(320);
   });
 
-  // The plain fold does more than compose the base — dropping it on unwrap would silently take
-  // `decelerationRate` resolution with it.
-  it('restores the ordinary owner fold when the wrap goes away', () => {
+  // Unwrapping drops the owner's fold to `undefined` now rather than restoring a plain one, and the
+  // style is the whole question that remains: the split must stop, so the owner's own authored style
+  // reaches it whole again. `decelerationRate` used to be asserted here too — it was what the fold
+  // silently took with it on unwrap — and it is the engine's rule now, which runs off the tag
+  // whatever this field holds. That is why the fold can be dropped at all.
+  it('stops splitting the style when the wrap goes away', () => {
     const { node, root, refresh, commit } = mount({
       style: { height: 200 },
-      decelerationRate: 'fast',
     });
     appendChild(node, refresh);
     appendChild(node, createElement('RCTImageView'));
@@ -206,8 +204,6 @@ describe('the style splits across the two boxes', () => {
     commit();
 
     removeChild(node, refresh);
-    const scroll = commit();
-    expect(scroll.payload.height).toBe(200);
-    expect(typeof scroll.payload.decelerationRate).toBe('number');
+    expect(commit().payload.height).toBe(200);
   });
 });

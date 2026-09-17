@@ -185,6 +185,13 @@ export type INativeEngineBindings = {
    * members above that `isBindings` requires. Treat an absent member as "no answer", never as
    * zeroes — a zero reads as "React's commit measures no text", the claim this exists to test.
    */
+  /**
+   * The C++ half's diagnostics (`SymbioteDebug.h`). OPTIONAL, like `readSurfaceTelemetry` and for
+   * the same reason: an older native binary that predates them must still pass `isBindings` rather
+   * than failing bring-up over a member nothing on the critical path needs.
+   */
+  setDebugEnabled?: (enabled: boolean) => void;
+  takeDebugLog?: () => readonly string[];
   readSurfaceTelemetry?: (surfaceId: number) => {
     /**
      * The inside of a commit, read out of RN's OWN `TransactionTelemetry` rather than timed by us

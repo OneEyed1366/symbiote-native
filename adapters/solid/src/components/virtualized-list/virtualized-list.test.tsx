@@ -1089,7 +1089,9 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await tick();
       const scroll = committed(SCROLL_VIEW);
-      expect(scroll.payload.horizontal).toBe(true);
+      // The axis FLAG is `foldScrollViewProps` in the engine and unreachable from this host
+      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`); the row-styled content node is
+      // this adapter's own evidence that it picked the horizontal tag.
       expect(committed(CONTENT_VIEW).payload.flexDirection).toBe('row');
       expect(committed(CONTENT_VIEW).payload.width).toBe(
         ITEM_HEIGHT * ROW_COUNT,
@@ -1433,7 +1435,11 @@ describe('Solid VirtualizedList on the engine', () => {
       ));
       await settleViewport();
 
-      expect(committed(SCROLL_VIEW).payload.nestedScrollEnabled).toBe(true);
+      // `nestedScrollEnabled` is `foldScrollViewProps` in the engine now
+      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`), and this host carries no copy of
+      // the tag rules. What a VirtualizedList still owes here is that it reaches a committed scroll
+      // view at all — the default has nothing to land on otherwise.
+      expect(committed(SCROLL_VIEW)).toBeDefined();
     });
 
     // why: RN both FORWARDS maintainVisibleContentPosition to native (so the scroll view anchors the

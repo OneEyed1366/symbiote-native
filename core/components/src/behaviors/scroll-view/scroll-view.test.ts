@@ -32,10 +32,7 @@ import {
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../../component-names';
-import {
-  resolveDecelerationRate,
-  selectScrollIntrinsics,
-} from '../../view/render-scroll-view';
+import { selectScrollIntrinsics } from '../../view/render-scroll-view';
 import {
   HORIZONTAL_SCROLL_VIEW_TAG,
   registerScrollViewBehavior,
@@ -209,35 +206,29 @@ describe('style precedence, which is opposite on the two nodes', () => {
     return { owner, slot };
   }
 
-  it('horizontal: the base wins on the slot and loses on the owner', () => {
-    const { owner, slot } = commitScroll(HORIZONTAL_SCROLL_VIEW_TAG, {
-      // Collides with SCROLL_VIEW_BASE_HORIZONTAL's flexGrow: 1 — the app must win.
+  // THE OWNER'S HALF OF THIS PAIR LEFT THIS FILE on 2026-09-18 — the base style composition is
+  // `foldScrollViewProps` in the engine now, and this host builds its payload through the TypeScript
+  // `fabricProps`, which carries no copy of the tag rules. Asserted on the committed payload in
+  // `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`. What stays is the SLOT's half, whose
+  // fold is still JS because `collapsableChildren` is derived from props that live on the OWNER.
+  it('horizontal: the row constant wins on the slot', () => {
+    const { slot } = commitScroll(HORIZONTAL_SCROLL_VIEW_TAG, {
       style: { flexGrow: 9, backgroundColor: 'red' },
       // Collides with the fold's flexDirection: 'row' — the CONSTANT must win, because the
       // wrapper writes `[contentContainerStyle, {flexDirection:'row'}]`.
       contentContainerStyle: { padding: 12, flexDirection: 'column' },
     });
 
-    expect(owner.payload.flexGrow).toBe(9);
-    expect(owner.payload.backgroundColor).toBe('red');
-    // Untouched halves of the base still land.
-    expect(owner.payload.flexDirection).toBe('row');
-    expect(owner.payload.overflow).toBe('scroll');
-
     expect(slot.payload.padding).toBe(12);
     expect(slot.payload.flexDirection).toBe('row');
     expect(slot.payload.collapsable).toBe(false);
   });
 
-  it('vertical: the base composes under the app style and the slot has no constant', () => {
-    const { owner, slot } = commitScroll(SCROLL_VIEW_TAG, {
+  it('vertical: the slot has no constant of its own', () => {
+    const { slot } = commitScroll(SCROLL_VIEW_TAG, {
       style: { flexDirection: 'row' },
       contentContainerStyle: { padding: 4 },
     });
-
-    // SCROLL_VIEW_BASE_VERTICAL says 'column'; the app said 'row' and wins.
-    expect(owner.payload.flexDirection).toBe('row');
-    expect(owner.payload.flexGrow).toBe(1);
 
     expect(slot.payload.padding).toBe(4);
     // Nothing composes a direction onto a vertical content node — the wrapper's contentStyle for
@@ -293,16 +284,16 @@ function layoutEvent(
 }
 
 describe('decelerationRate reaches Fabric as a number', () => {
-  // RN's two words resolve to DIFFERENT friction constants per platform, and a wrapper is what did
-  // that resolution. A tag has none, so the string would reach Fabric unread and the
-  // scroll would keep the native default with nothing red.
-  it.each(['normal', 'fast'] as const)('resolves %s', word => {
-    const { commit } = mountScroll(SCROLL_VIEW_TAG, { decelerationRate: word });
-    expect(commit().owner.payload.decelerationRate).toBe(
-      resolveDecelerationRate(word),
-    );
-  });
-
+  // RN's two WORDS resolve to different friction constants per platform, and that resolution left
+  // this file with `resolveDecelerationRate` itself (2026-09-18): it is `foldScrollViewProps` in the
+  // engine now, and this host builds its payload through the TypeScript `fabricProps`, which carries
+  // no copy of the tag rules. Both words are asserted against the committed payload in
+  // `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`.
+  //
+  // The two cases below stay because neither depends on a rule this host cannot run: a NUMBER is
+  // passed through by the same rule, and an absent rate must invent nothing. They would also both
+  // pass with the rule deleted entirely — which is why the two WORD cases, the only ones that can
+  // tell a working resolution from a missing one, moved rather than being left as the file's cover.
   it('passes a numeric rate through untouched', () => {
     const { commit } = mountScroll(SCROLL_VIEW_TAG, { decelerationRate: 0.5 });
     expect(commit().owner.payload.decelerationRate).toBe(0.5);
@@ -316,98 +307,21 @@ describe('decelerationRate reaches Fabric as a number', () => {
   });
 });
 
-// `horizontal` is a real C++ prop (`BaseScrollViewProps.h:56`) and the separate ViewManager is
-// ANDROID's — on iOS both tags resolve to RCTScrollView, so the prop is the only thing that turns
-// the axis there. Silent and device-only: the tag looks right, the content node is a row, and the
-// scroller still pages vertically.
-describe('the horizontal tag sets the C++ axis flag, not just the style', () => {
-  it('writes horizontal on the horizontal tag', () => {
-    const { commit } = mountScroll(HORIZONTAL_SCROLL_VIEW_TAG);
-    expect(commit().owner.payload.horizontal).toBe(true);
-  });
-
-  // The negative half, and the case above is its control on the same fold: both tags go through
-  // `ownerFold`, so a fold that wrote the key unconditionally would fail here and a fold that wrote
-  // it nowhere would fail there.
-  it('invents no key on the vertical tag, matching the wrapper', () => {
-    const { commit } = mountScroll(SCROLL_VIEW_TAG);
-    expect(Object.hasOwn(commit().owner.payload, 'horizontal')).toBe(false);
-  });
-});
-
-// why: in RN the axis has ONE input. `horizontal` picks the native component, the row
-// contentContainerStyle and the payload key together (`ScrollView.js:1644-1656`), so the three can
-// never disagree. Our input is the TAG, which reopens the disagreement the wrapper used to close:
-// an app writing `horizontal` on the vertical tag would otherwise ship a combination RN cannot
-// produce — RCTScrollView with the axis flipped, a vertical content node and no row style. On iOS
-// both tags ARE RCTScrollView, so the stray prop really does turn the scroller.
-describe('the tag is the only axis input, as the prop is in RN', () => {
-  it('eats an app-written horizontal on the vertical tag', () => {
-    const { commit } = mountScroll(SCROLL_VIEW_TAG, { horizontal: true });
-    expect(Object.hasOwn(commit().owner.payload, 'horizontal')).toBe(false);
-  });
-
-  // The control: the same fold on the other tag must still write the flag, so a fold that deleted
-  // the key unconditionally fails here rather than passing the case above for the wrong reason.
-  it('still writes the flag from the horizontal tag when the app also wrote it', () => {
-    const { commit } = mountScroll(HORIZONTAL_SCROLL_VIEW_TAG, {
-      horizontal: false,
-    });
-    expect(commit().owner.payload.horizontal).toBe(true);
-  });
-});
-
-// why: RN derives the bounce pair from the axis and nothing else does
-// (`ScrollView.js:1753-1761`): `alwaysBounceHorizontal ?? horizontal`,
-// `alwaysBounceVertical ?? !horizontal`. Both names are DECLARED in all five adapters' prop types
-// and COMPUTED in none of them, so a vertical scroll view has never bounced by default on iOS —
-// a gap on the wrapper path too, which is why no parity oracle reported it.
-describe('the bounce pair defaults from the axis, as RN derives it', () => {
-  // The pair is ASYMMETRIC, and copying it rather than tidying it is the point: RN's fallback is
-  // `this.props.horizontal`, which a vertical ScrollView leaves UNSET, so the horizontal key
-  // resolves to undefined and never reaches the payload at all. Writing `false` there instead
-  // would mean the same thing to native and one more prop key on every vertical scroll view.
-  it('vertical: bounces vertically, and writes no horizontal key', () => {
-    const { commit } = mountScroll(SCROLL_VIEW_TAG);
-    expect(commit().owner.payload.alwaysBounceVertical).toBe(true);
-    expect(
-      Object.hasOwn(commit().owner.payload, 'alwaysBounceHorizontal'),
-    ).toBe(false);
-  });
-
-  it('horizontal: bounces horizontally and not vertically', () => {
-    const { commit } = mountScroll(HORIZONTAL_SCROLL_VIEW_TAG);
-    expect(commit().owner.payload.alwaysBounceHorizontal).toBe(true);
-    expect(commit().owner.payload.alwaysBounceVertical).toBe(false);
-  });
-
-  it('lets an explicit value win on both keys', () => {
-    const { commit } = mountScroll(SCROLL_VIEW_TAG, {
-      alwaysBounceHorizontal: true,
-      alwaysBounceVertical: false,
-    });
-    expect(commit().owner.payload.alwaysBounceHorizontal).toBe(true);
-    expect(commit().owner.payload.alwaysBounceVertical).toBe(false);
-  });
-});
-
-// Every wrapper writes `nestedScrollEnabled ?? true` on every ScrollView, both platforms — RN
-// itself only defaults it on Android's RefreshControl WRAP path (`ScrollView.js:1862`), and it is
-// the WRAPPER this behavior replaced. Without it an Android list nested in a scroll view does
-// not scroll on its own.
-describe('nested scrolling defaults on, as the wrapper leaves it', () => {
-  it('defaults to true when the app set nothing', () => {
-    const { commit } = mountScroll(SCROLL_VIEW_TAG);
-    expect(commit().owner.payload.nestedScrollEnabled).toBe(true);
-  });
-
-  it('honours an explicit false', () => {
-    const { commit } = mountScroll(SCROLL_VIEW_TAG, {
-      nestedScrollEnabled: false,
-    });
-    expect(commit().owner.payload.nestedScrollEnabled).toBe(false);
-  });
-});
+// THE AXIS, THE BOUNCE PAIR AND `nestedScrollEnabled` ALL LEFT THIS FILE on 2026-09-18, four
+// describes at once, and the grouping is the point rather than tidiness.
+//
+// All three are `foldScrollViewProps` in the engine now, and this host builds its payload through
+// the TypeScript `fabricProps`, which carries no copy of the tag rules. Every one of them is
+// asserted against the committed payload in `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`,
+// including the ignored-`horizontal` WARNING, which has no JS equivalent at all
+// (`core/engine/cpp/tests/js/native-debug-log.itest.ts`).
+//
+// WHY ALL FOUR AND NOT JUST THE RED ONES. Each described pair had a deliberate control — "invents no
+// key on the vertical tag", "honours an explicit false", "lets an explicit value win" — and every
+// one of those controls went on PASSING after the port, because an absent key and an unmodified
+// passthrough are exactly what a harness with no rule produces. Left behind they would have read as
+// coverage of a rule this file can no longer reach, which is the false green this migration keeps
+// meeting. A control is only a control beside the thing it controls.
 
 describe('collapsableChildren is derived from props that stay on the owner', () => {
   it('writes no key when neither anchor prop is set', () => {
