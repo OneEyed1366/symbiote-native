@@ -1305,6 +1305,31 @@ tenth row clones 302, `clear` walks 0.1 ms. The expensive update is `append` (73
 onto a standing 1 000), and it is create-shaped — 10 000 `createNode`s plus a Yoga pass over 2 000
 rows.
 
+### The reconciler is 40% of a React create, and it is React's — measured, not assumed
+
+Every headless number above builds the tree by calling the engine's own mutation API. The layer above
+it had never been measured here, which matters because the engine is already BELOW the floor of a
+zero-cost driver — so a create that got slower cannot have got slower there.
+`core/engine/cpp/tests/js/adapter-create-cost.itest.tsx` builds the identical ten-node row both ways
+in one process and asserts the committed node counts match before reading any millisecond:
+
+```
+engine's mutation API directly    67-75 ms      walk 24-28   apply 43-49
+the same tree through React      115-120 ms     walk 23      apply 43
+delta                             45-48 ms      1.6-1.7x
+```
+
+**The engine's own two phases do not move between the arms** — same tree, same work, and that is
+asserted rather than observed. The 45-48 ms is fibers, and ~4.8 us per node of it. So for the React
+adapter, engine work is 58% of a create and further engine optimization has a hard ceiling; for
+Vue/Svelte/Solid, whose reconcilers are far lighter, the same engine is most of the cost, which is
+why those three beat stock on create-shaped rows and React sits at parity with it.
+
+One hypothesis was checked and is a NEGATIVE result, recorded so it is not rebuilt: `foldHostBag`
+copies the props bag to seed an absent default, so every `<Text>` that does not spell
+`allowFontScaling` — which is nearly all of them — allocates a copy. Three thousand of them on this
+screen cost 0.8-5.4 ms of ~116, inside the spread of the arm it is compared against.
+
 ### A re-render that changes nothing is free now, whichever way the style is written
 
 The commonest shape any app produces: a parent's state moves, the framework re-renders the subtree,
