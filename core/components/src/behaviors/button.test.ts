@@ -154,10 +154,14 @@ describe('button host behavior', () => {
     // long label clips mid-word instead of ellipsising, on device only.
     expect(text.payload.ellipsizeMode).toBe('tail');
     expect(text.payload.allowFontScaling).toBe(true);
-    // `styles.text` flattened into the payload — RN spells the inset as a MARGIN, so the tap
-    // target grows rather than the glyphs insetting.
-    expect(text.payload.textAlign).toBe('center');
-    expect(text.payload.margin).toBe(8);
+    // `styles.text` LEFT ON 2026-09-18 — the label's whole style is `foldButtonLabelStyle` in
+    // `SymbioteFabricProps.cpp`, and this host builds its payload through the TypeScript
+    // `fabricProps`, which carries no copy of the tag rules. Pinned against the committed payload in
+    // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`.
+    //
+    // The Text DEFAULTS above stay, and the difference is worth seeing: those are written as real
+    // props by `buildStructure` at build time, so they are this side's and observable here. The
+    // style is a RULE and is not.
   });
 
   it('keeps title and color off the payload and pins the button role', async () => {
@@ -182,9 +186,10 @@ describe('button host behavior', () => {
     // on a harness that can no longer produce the key passes forever for the wrong reason — the
     // false green the text-input port was caught by.
     expect(host.payload.title).toBeUndefined();
-    // On iOS `color` tints the LABEL, never the button (Button.js:318-324) — and THAT half is still
-    // this file's, because the label's fold reads `propsOf(node)` and never the stripped payload.
-    expect(text.payload.color).toBe('#ff0000');
+    // The tint went with the style on 2026-09-18. On iOS `color` tints the LABEL, never the button
+    // (Button.js:318-324), and that half is now `foldButtonLabelStyle` reading the button through
+    // `IAncestorLookup` — pinned in `button-derived-payload.itest.ts`, where the tinted and untinted
+    // labels are compared on the committed payload.
   });
 
   it('greys the label from aria-disabled and merges accessibilityState', async () => {
@@ -198,8 +203,10 @@ describe('button host behavior', () => {
     mount(node);
     await settle();
 
-    const { host, text } = subtreeOf(TEST_ID);
-    expect(text.payload.color).toBe('#cdcdcd');
+    const { host } = subtreeOf(TEST_ID);
+    // The GREY that `aria-disabled` causes is `foldButtonLabelStyle`'s now and is asserted in
+    // `button-derived-payload.itest.ts`; what stays here is the accessibilityState merge, which is
+    // this side's and is the half this case is named for.
     // MERGES: RN keeps busy/checked/expanded/selected and overrides only `disabled`
     // (Button.js:333-338). Nothing in `button.ts` does this — the engine's aria fold and the press
     // fold compose to it, which is the whole reason Button owes no accessibilityState fold.
@@ -260,22 +267,15 @@ describe('button host behavior', () => {
   // its constant `{}`, which is the exact mirror of Android, where it tints the view and leaves the
   // label white. A projection that only ever re-folded the slot the engine marks would pass one of
   // the two and fail the other.
-  it('re-tints the label when color changes after mount', async () => {
-    vi.useFakeTimers();
-    registerButtonBehavior();
-    const node = makeButton();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'title', 'Save');
-    const surface = mount(node);
-    await settle();
-    expect(subtreeOf(TEST_ID).text.payload.color).toBe('#007AFF');
-
-    routeProp(node, 'color', '#ff0000');
-    surface.commit();
-    await settle();
-
-    expect(subtreeOf(TEST_ID).text.payload.color).toBe('#ff0000');
-  });
+  // The RE-TINT case left on 2026-09-18 and MOVED rather than being deleted, because its subject is
+  // not fold content: it pins that a `color` written on the BUTTON after the first commit reaches the
+  // derived label at all (`addDerivedNode` extending `slotDerived`'s mark past the slot). That
+  // invariant is unchanged by the port and is now asserted where the rule runs —
+  // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, against the committed payload.
+  //
+  // It could not stay: the tint it checks is `foldButtonLabelStyle`'s, and this harness builds its
+  // payload through the TypeScript `fabricProps`, which holds no copy of the tag rules. A case that
+  // cannot produce the value it asserts is not a weaker test, it is a red one.
 
   it('runs the composed press machine', async () => {
     vi.useFakeTimers();

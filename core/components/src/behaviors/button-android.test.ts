@@ -76,9 +76,7 @@ Object.assign(globalThis, {
 const BUTTON_VIEW_NAME = 'RCTView';
 const TEST_ID = 'subject';
 const ANDROID_BLUE = '#2196F3';
-const ANDROID_TEXT = 'white';
 const ANDROID_DISABLED_BACKGROUND = '#dfdfdf';
-const ANDROID_DISABLED_TEXT = '#a1a1a1';
 // TouchableNativeFeedback.js:343-348 — Button passes no `background`, so TNF resolves
 // `SelectableBackground()` onto the background slot.
 const SELECTABLE_BACKGROUND = {
@@ -183,12 +181,14 @@ describe('button host behavior on Android', () => {
     mountButton();
     await settle();
 
-    const { host, text } = subtreeOf(TEST_ID);
+    const { host } = subtreeOf(TEST_ID);
     // On iOS this lives one node down and is `{}`; here the host IS `<View style={buttonStyles}>`.
     expect(host.payload.backgroundColor).toBe(ANDROID_BLUE);
     expect(host.payload.elevation).toBe(4);
     expect(host.payload.borderRadius).toBe(2);
-    expect(text.payload.color).toBe(ANDROID_TEXT);
+    // The LABEL's white left on 2026-09-18 with the rest of its style — `foldButtonLabelStyle` in
+    // `SymbioteFabricProps.cpp`, whose Android branch is `#ifdef ANDROID` and therefore pinned
+    // nowhere headless. This file mocks `Platform.OS`, which that rule does not read.
   });
 
   it('carries the selectable-background ripple and runs no opacity fade', async () => {
@@ -221,8 +221,10 @@ describe('button host behavior on Android', () => {
 
     const after = subtreeOf(TEST_ID);
     expect(after.host.payload.backgroundColor).toBe('#ff0000');
-    // …and the label keeps Android's own white, which is the half a one-hop mark would have lost.
-    expect(after.text.payload.color).toBe(ANDROID_TEXT);
+    // The label's half of this pair — that it keeps Android's own white rather than picking up the
+    // tint — was the half a one-hop mark would have lost, and it is `foldButtonLabelStyle`'s now.
+    // Its iOS twin is asserted on the committed payload in
+    // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`; the Android branch is not.
     // That the raw `color` is absent from the HOST is the engine's strip (`foldButtonProps`), which
     // this host's TypeScript `fabricProps` does not carry — asserted in
     // `core/engine/cpp/tests/js/button-payload.itest.ts`. The re-tint above is the question here,
@@ -242,7 +244,7 @@ describe('button host behavior on Android', () => {
       ANDROID_DISABLED_BACKGROUND,
     );
     expect(after.host.payload.elevation).toBe(0);
-    expect(after.text.payload.color).toBe(ANDROID_DISABLED_TEXT);
+    // The label's grey is `foldButtonLabelStyle`'s, Android branch, and unreachable here.
   });
 
   // TouchableNativeFeedback.js:230-252. Without these the drawable is installed and never animates:

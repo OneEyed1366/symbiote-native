@@ -1186,6 +1186,78 @@ std::optional<bool> buttonDisabled(const dynamic &authored) {
  * Trap A, and it is the same correction the JS fold carried before the port, spelled
  * `projectionOf(propsOf(node))` for exactly this reason.
  */
+// Button's label styling, `Button.js:404-430` (`styles.text` / `styles.textDisabled`). NOT a mirror
+// of the JS constants that used to hold them: `resolveButtonTextStyle` and `buttonTextStyle` were
+// deleted in the same commit, so these are the only copy.
+constexpr double kButtonTextMargin = 8;
+// Guarded by the same `#ifdef` as their only use: `-Wunused-const-variable` is an ERROR here
+// (`-Werror`), so a platform constant compiled into the other platform's build does not merely sit
+// unused, it fails the build.
+#ifdef ANDROID
+constexpr const char *kAndroidButtonText = "white";
+constexpr const char *kAndroidButtonFontWeight = "500";
+constexpr const char *kAndroidDisabledText = "#a1a1a1";
+#else
+constexpr const char *kIosButtonBlue = "#007AFF";
+constexpr double kIosButtonFontSize = 18;
+constexpr const char *kIosDisabledText = "#cdcdcd";
+#endif
+
+/**
+ * Button's LABEL STYLE, on the `text` node the behavior builds (`Button.js:389-400`).
+ *
+ * THE ONLY RULE THAT READS AN ANCESTOR RATHER THAN A PARENT, and it has to: its inputs are the
+ * BUTTON's `color` and `disabled`, and the button is this node's grandparent on iOS
+ * (`button -> view -> text`) and its parent on Android. Asking for "the nearest button" rather than
+ * "two up" is what makes one rule correct on both.
+ *
+ * NOT FOUND IS A REAL ANSWER and is left alone rather than defaulted: a `button-label-text` tag can
+ * only be built by Button itself, so a miss means the tree was torn down around it mid-commit. A
+ * default style would paint a stray label as a button.
+ *
+ * `color` tints the TEXT on iOS and the BUTTON on Android (`Button.js:318-324`), which is why the
+ * tint is `#ifndef ANDROID` here and the same value lands on the view's style there. `disabled`
+ * wins over the tint on both, because RN pushes the disabled colour after it.
+ */
+dynamic foldButtonLabelStyle(
+    const dynamic &props,
+    const IAncestorLookup &ancestors) {
+  if (ancestors.find == nullptr) return props;
+  const dynamic *owner = ancestors.find(ancestors.context, "button");
+  if (owner == nullptr) return props;
+
+  dynamic style = dynamic::object();
+  style["textAlign"] = "center";
+  style["margin"] = kButtonTextMargin;
+#ifdef ANDROID
+  style["color"] = kAndroidButtonText;
+  style["fontWeight"] = kAndroidButtonFontWeight;
+#else
+  style["color"] = kIosButtonBlue;
+  style["fontSize"] = kIosButtonFontSize;
+  const dynamic *color = owner->get_ptr("color");
+  if (color != nullptr && color->isString()) style["color"] = *color;
+#endif
+
+  const std::optional<bool> disabled = buttonDisabled(*owner);
+  if (disabled.value_or(false)) {
+#ifdef ANDROID
+    style["color"] = kAndroidDisabledText;
+#else
+    style["color"] = kIosDisabledText;
+#endif
+  }
+
+  dynamic out = props;
+  out["style"] = std::move(style);
+  // RN puts `disabled` on the Text as well (`Button.js:386`) — a real RCTText prop that Android's
+  // accessibility layer reads, and a different thing from the greying above. ABSENT when none of the
+  // three sources spoke, because that is what RN sends: `disabled={undefined}` is omitted, and
+  // writing `false` would put a key on every button's label that upstream never emits.
+  if (disabled.has_value()) out["disabled"] = *disabled;
+  return out;
+}
+
 dynamic foldButtonProps(
     const dynamic &props,
     const dynamic &authored,
@@ -1677,7 +1749,8 @@ dynamic fabricProps(
     const dynamic &props,
     const IPayloadFold &fold,
     const dynamic *ownerProps,
-    bool hasPressListener) {
+    bool hasPressListener,
+    const IAncestorLookup &ancestors) {
   if (component == kRawTextComponent) {
     dynamic out = dynamic::object();
     const dynamic *text = props.get_ptr("text");
@@ -1744,6 +1817,9 @@ dynamic fabricProps(
     // `core/components/src/behaviors/image-background.test.ts` and moving the fold does not reopen it.
     if (tagName == "image-background-image")
       tagResolved = foldImageBackgroundImageProps(tagResolved, ownerProps);
+    bag = &tagResolved;
+  } else if (tagName == "button-label-text") {
+    tagResolved = foldButtonLabelStyle(*bag, ancestors);
     bag = &tagResolved;
   } else if (tagName == "scroll-view" || tagName == "horizontal-scroll-view") {
     tagResolved =

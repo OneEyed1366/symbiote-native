@@ -951,6 +951,28 @@ std::shared_ptr<const react::ShadowNode> materialize(
  * on the Node: the closure names the handle, the handle owns the Node through `NativeState`, and a
  * `Node -> Function -> handle -> Node` edge is the GC-boundary cycle this file's header refuses.
  */
+/**
+ * The nearest ANCESTOR carrying `tag`, for `IAncestorLookup`. Never the node itself.
+ *
+ * `ownerProps` answers "my parent", which is what almost every derived rule wants. Button's label is
+ * the exception: its style is a function of the BUTTON's `color` and `disabled`, and the button is
+ * its grandparent on iOS (`button -> view -> text`) and its parent on Android. Asking for "two up"
+ * would encode one platform's tree shape into a rule; asking for the nearest button is the same
+ * question a CSS ancestor selector asks and is true on both.
+ *
+ * Unbounded in principle and short in practice: the one rule that uses it looks one or two hops up,
+ * and a MISS walks to the root. That is affordable because nothing calls this per node — it is
+ * reached only from inside a tag rule that has already matched.
+ */
+const folly::dynamic *ancestorPropsOf(const void *context, const char *tag) {
+  const auto *node = static_cast<const Node *>(context);
+  if (node == nullptr || tag == nullptr) return nullptr;
+  for (const Node *up = node->parent; up != nullptr; up = up->parent) {
+    if (up->tagName == tag) return &up->props;
+  }
+  return nullptr;
+}
+
 IPayloadFold foldFor(jsi::Runtime &runtime, Node &node) {
   if (node.foldProbe == FoldProbe::absent) return {};
 
@@ -1210,7 +1232,8 @@ std::shared_ptr<const react::ShadowNode> materialize(
         node.props,
         fold,
         node.parent == nullptr ? nullptr : &node.parent->props,
-        node.hasPressListener);
+        node.hasPressListener,
+        IAncestorLookup{&ancestorPropsOf, &node});
     walkCost_.propsNs += nanosSince(startedAt);
     // The payload is needed TWICE and only one of those needs a copy. `RawProps` takes its
     // `folly::dynamic` BY VALUE (`RawProps.h:65`) and consumes it, so Fabric's half is a copy no
@@ -1262,7 +1285,8 @@ std::shared_ptr<const react::ShadowNode> materialize(
           node.props,
           fold,
           node.parent == nullptr ? nullptr : &node.parent->props,
-          node.hasPressListener);
+          node.hasPressListener,
+          IAncestorLookup{&ancestorPropsOf, &node});
       walkCost_.propsNs += nanosSince(startedAt);
       startedAt = ISteadyClock::now();
       payload = diffProps(node.committedProps, next);

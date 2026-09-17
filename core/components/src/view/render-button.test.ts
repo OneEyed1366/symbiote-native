@@ -7,35 +7,20 @@
 // inputs that can tell a correct fold from one that ignores the platform: `color` tints the TEXT
 // here and the BUTTON there, the disabled greys differ, and the title is uppercased there only.
 import { describe, expect, it } from 'vitest';
-import {
-  resolveButtonDisabled,
-  resolveButtonTextStyle,
-  resolveButtonViewStyle,
-} from './render-button';
+import { resolveButtonDisabled, resolveButtonViewStyle } from './render-button';
 
-const IOS_BLUE = '#007AFF';
-const IOS_DISABLED = '#cdcdcd';
 const CUSTOM = '#ff0000';
 
 describe('Button folds on iOS', () => {
-  it('styles the label blue and spaces it with a MARGIN, as RN does', () => {
-    // margin, not padding: the label pushes the button's edges out rather than insetting itself,
-    // so the tap target is 16pt taller than the glyphs.
-    expect(resolveButtonTextStyle(undefined, undefined)).toEqual({
-      textAlign: 'center',
-      margin: 8,
-      color: IOS_BLUE,
-      fontSize: 18,
-    });
-  });
-
-  it('tints the TEXT with `color` — the half Android does the other way', () => {
-    expect(resolveButtonTextStyle(CUSTOM, undefined).color).toBe(CUSTOM);
-  });
-
-  it('greys the label when disabled, over any color', () => {
-    expect(resolveButtonTextStyle(CUSTOM, true).color).toBe(IOS_DISABLED);
-  });
+  // THE LABEL'S THREE CASES LEFT ON 2026-09-18 with `resolveButtonTextStyle` itself. The style is
+  // `foldButtonLabelStyle` in `SymbioteFabricProps.cpp` now, keyed off the label text's own tag and
+  // reading the BUTTON through `IAncestorLookup` — the function these asserted no longer exists, so
+  // they could not be pointed at anything here.
+  //
+  // Their iOS half is `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, against the
+  // payload a commit actually sent: the blue-at-18pt base, the `color` tint, and the grey winning
+  // over it. The Android half is `#ifdef ANDROID` and is pinned NOWHERE headless — the same gap
+  // `android_ripple` and `decelerationRate`'s constants have.
 
   it('leaves the inner view unstyled in every combination', () => {
     expect(resolveButtonViewStyle(undefined, undefined)).toEqual({});

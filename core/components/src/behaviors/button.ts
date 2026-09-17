@@ -12,17 +12,23 @@
 // Android Button's own `<View style={buttonStyles}>` IS the responder:
 //
 //   iOS      button   RCTView      TouchableOpacity's Animated.View — the responder + the fade
-//            └ view   RCTView      resolveButtonViewStyle(color, disabled) — `{}` here
-//              └ text RCTText      resolveButtonTextStyle(color, disabled) + RN's Text defaults
-//                └ raw RCTRawText  resolveButtonTitle(title)                       FOUR nodes
+//            └ view   RCTView      no style at all, and no fold
+//              └ text RCTText      `button-label-text` — foldButtonLabelStyle + RN's Text defaults
+//                └ raw RCTRawText  `button-label`    — foldButtonLabel            FOUR nodes
 //
 //   Android  button   RCTView      the styled button view, CLONED onto: the responder, the ripple
 //            │                     background, the whole a11y fold. No fade, no wrapper.
 //            └ text   RCTText
 //              └ raw  RCTRawText   UPPERCASED (Button.js:352-353)                 THREE nodes
 //
-// EVERY FOLD IS ALREADY WRITTEN AND TESTED in `../view/render-button`; nothing here re-derives one.
-// What is new is only WHERE they run: on engine nodes, instead of in a component body.
+// EVERY RULE IS IN THE ENGINE AS OF 2026-09-18, and off Android this primitive binds no
+// `payloadFold` on any of its four nodes — it costs ZERO trips into JS, down from five. The one that
+// survives is the OWNER's on Android, for the view style and the ripple background.
+//
+// The last to move was the label text's, and it needed a seam none of the others did: its style is a
+// function of the BUTTON's `color` and `disabled`, and the button is its GRANDPARENT here and its
+// parent on Android. `IAncestorLookup` asks for the nearest ancestor carrying a tag — a CSS ancestor
+// selector — so one rule is correct on both trees.
 //
 // ---------------------------------------------------------------------------------------------
 // HOW THE PROJECTION REACHES ITS NODES, given that each `payloadFold` MUST be pure:
@@ -126,7 +132,6 @@ import { descriptorFor } from '../component-names';
 import { resolveTextProps } from '../text-props';
 import {
   resolveButtonDisabled,
-  resolveButtonTextStyle,
   resolveButtonViewStyle,
 } from '../view/render-button';
 import {
@@ -225,18 +230,15 @@ const buttonDisabled: IDisabledResolver = props => projectionOf(props).disabled;
 // view's committed keys, including with an app-set `color` — which lands on the LABEL here and must
 // not reach this node.
 
-function textFold(owner: ISymbioteNode): IPayloadFold {
-  return props => {
-    const { color, disabled } = projectionOf(propsOf(owner));
-    return {
-      ...props,
-      style: resolveButtonTextStyle(color, disabled),
-      // RN puts `disabled` on the Text as well (Button.js:386) — a real RCTText prop read by
-      // Android's accessibility layer, and not the same thing as the greyed colour above.
-      disabled,
-    };
-  };
-}
+// THE LABEL TEXT'S TAG. Its style is a function of the BUTTON's `color` and `disabled`, and the
+// button is this node's grandparent on iOS (`button -> view -> text`) and its parent on Android —
+// so the rule asks for the NEAREST BUTTON ancestor rather than for a fixed number of hops, which is
+// the same question a CSS ancestor selector asks and is true on both trees.
+//
+// `foldButtonLabelStyle` in `SymbioteFabricProps.cpp`, reached through `IAncestorLookup`. That seam
+// was the thing this fold was waiting for: `ownerProps` answers "my parent" and this node's parent
+// is the wrapping view, which knows none of it.
+export const BUTTON_LABEL_TEXT_TAG = 'button-label-text';
 
 // The label's own tag. A raw text carrying one looks odd and is not: it has no props an app can
 // write, but its CONTENT is the platform's decision here — RN renders a button's title uppercased on
@@ -345,7 +347,7 @@ function buildStructure(node: ISymbioteNode): ISymbioteNode {
   const text = createElement(
     textDescriptor.component,
     textDescriptor.isText,
-    'text',
+    BUTTON_LABEL_TEXT_TAG,
   );
   // RN's Text.js applies these to every non-virtual Text on its way to native, and a hand-written
   // host tag inherits nothing a `<Text>` component did — Svelte's Button clipped long labels
@@ -357,7 +359,6 @@ function buildStructure(node: ISymbioteNode): ISymbioteNode {
   // (`isEmptyRawText`, node.ts), so no Fabric node exists for it until it has a label — and that
   // check reads `props.text`, which the redirect writes, not the fold's uppercased output.
   const label = createRawText('', BUTTON_LABEL_TAG);
-  text.payloadFold = textFold(node);
   // The hop `slotDerived` alone does not make: it marks the slot (the label), and this is past it.
   addDerivedNode(node, text);
   appendChild(text, label);
@@ -414,5 +415,15 @@ export function registerButtonBehavior(): void {
     slotProps: SLOT_PROPS,
     slotDerived: SLOT_DERIVED,
   };
+  // The two DERIVED nodes' tags, registered with no runtime at all. A tag reaches C++ only through
+  // `recordSetTag`, which `attachHostBehavior` emits, so a tag nobody registered carries an empty
+  // `tagName` in the host and no rule fires for it — however the rule is written. Same shape as the
+  // ActivityIndicator spinner's and ImageBackground's inner image.
+  //
+  // A registration is how this codebase declares a tag HAS platform semantics, which is exactly the
+  // claim: the label's style is RN's, not the app's.
+  const derived: IHostBehavior = { attach() {}, detach() {} };
+  registerHostBehavior(BUTTON_LABEL_TEXT_TAG, derived);
+  registerHostBehavior(BUTTON_LABEL_TAG, derived);
   registerHostBehavior(BUTTON_TAG, behavior);
 }

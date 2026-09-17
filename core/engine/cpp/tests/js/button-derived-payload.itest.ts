@@ -150,22 +150,110 @@ describe('what a button’s derived nodes send native', () => {
     expect(Object.keys(commit({}).label)).toEqual(['text']);
   });
 
-  // why: THE PRICE, and the number it started from was wrong in a way the measurement had to
-  // correct. This file recorded FOUR crossings, one per node the behavior builds. Driven through
-  // `routeProp` a single mounted button measured FIVE, because the fold counter is per SURFACE over
-  // the commits a button actually performs and its touchable's `afterCommit` settle re-commits it —
-  // the same reason one touchable reads 5 rather than 1. "One fold per node" was never the model.
+  // why: THE LABEL'S LOOK, which is the last thing about this primitive that was not the engine's.
+  // `Button.js:389-400` styles its Text from the button's own props, and off Android that is the
+  // iOS system blue at 18pt with an 8pt margin. An unstyled label is the visible failure.
+  it('paints the label with the platform button style', () => {
+    const text = commit({}).text;
+
+    expect(text.fontSize).toBe(18);
+    expect(text.margin).toBe(8);
+    expect(text.textAlign).toBe('center');
+  });
+
+  // why: `color` tints the TEXT on iOS and the BUTTON on Android (`Button.js:318-324`). This is the
+  // half that needs the BUTTON's props while this node's parent is the VIEW — the read that made
+  // this the last fold standing.
+  it('tints the label from the button’s color, two nodes up', () => {
+    const plain = commit({}).text;
+    const tinted = commit({ color: '#ff0000' }).text;
+
+    // Asserted as CHANGED rather than as a literal: RN's colour processor has run by the time a
+    // payload exists, so both are integers. What this case is about is that the value travelled.
+    expect(typeof plain.color).toBe('number');
+    expect(typeof tinted.color).toBe('number');
+    expect(plain.color === tinted.color).toBe(false);
+  });
+
+  // why: `disabled` WINS over `color` on both platforms, because RN pushes the disabled text colour
+  // after the tint (`Button.js:396-399`). A disabled button that still shows its brand tint reads as
+  // enabled, which is the whole point of the greying.
+  it('greys the label when disabled, over any tint', () => {
+    const grey = commit({ disabled: true }).text;
+    const greyWithTint = commit({ disabled: true, color: '#ff0000' }).text;
+
+    expect(grey.color).toBe(greyWithTint.color);
+  });
+
+  // why: and it is BUTTON's three-way `disabled`, not the raw prop — `aria-disabled` alone greys the
+  // label (`Button.js:331,337`), the same resolution its `focusable` uses. A rule reading one prop
+  // would leave an aria-disabled button looking enabled while already refusing the press.
+  it('greys the label from aria-disabled alone', () => {
+    expect(commit({ 'aria-disabled': true }).text.color).toBe(
+      commit({ disabled: true }).text.color,
+    );
+  });
+
+  // why: RN puts `disabled` on the Text as well (`Button.js:386`) — a real RCTText prop that
+  // Android's accessibility layer reads, and not the same thing as the greyed colour above.
   //
-  // Five to three when the view's fold was deleted and the label's became a tag rule; three to ONE
-  // when the owner's went off Android, which was worth two by itself for the re-commit reason above.
+  // ABSENT rather than `false` when nothing disabled it, which is RN's own shape: the resolution
+  // answers `undefined` when none of the three sources spoke, and React omits an undefined prop
+  // rather than sending it. Writing `false` here would put a key on every button's label that RN
+  // never sends.
+  it('carries disabled onto the text node itself', () => {
+    expect(commit({ disabled: true }).text.disabled).toBe(true);
+    expect(commit({}).text.disabled).toBe(undefined);
+  });
+
+  // why: THE FAILURE MODE AN ANCESTOR-READING RULE INTRODUCES, and this primitive's version of it.
+  // The rule runs when the LABEL TEXT is dirty, so a `color` written on the BUTTON after the first
+  // commit has to mark that node dirty or the label keeps its first tint forever while the button
+  // believes it changed. `markPropsDirty` bubbles UP, never down, so nothing does this by accident.
   //
-  // The one that remains is the text's, and it is the only fold left in this primitive: it needs the
-  // BUTTON's `color` and `disabled` while its parent is the VIEW — a GRANDPARENT, which `ownerProps`
-  // does not reach. That is the next seam and it is not built.
-  it('costs one crossing now instead of five', () => {
+  // `slotDerived` marks the slot and `addDerivedNode` extends the mark past it to the text — which
+  // is why `buildStructure` calls it. The requirement did not change when the fold became a rule,
+  // and it was not asserted against a committed payload until now.
+  it('re-tints the label when the button’s color changes after mount', () => {
+    const surface = createSurface(ROOT_TAG);
+    const button: ISymbioteNode = createElement('RCTView', false, 'button');
+    routeProp(button, 'title', 'Save');
+    surface.appendChild(button);
+    surface.commit();
+    mounted();
+
+    const text = childrenOf(childrenOf(button)[0])[0];
+    const before = committedPayloadOf(text)?.color;
+
+    routeProp(button, 'color', '#ff0000');
+    surface.commit();
+    mounted();
+
+    const after = committedPayloadOf(text)?.color;
+    expect(typeof before).toBe('number');
+    expect(typeof after).toBe('number');
+    expect(before === after).toBe(false);
+  });
+
+  // why: THE PRICE, and off Android it is now ZERO — the most expensive primitive in this codebase
+  // costs nothing in JS. It read 5, then 3, then 1, then 0 in three days.
+  //
+  // The number it started from was wrong in a way the measurement had to correct: this file recorded
+  // FOUR, one per node the behavior builds. Driven through `routeProp` a single mounted button
+  // measured FIVE, because the fold counter is per SURFACE over the commits a button actually
+  // performs and its touchable's `afterCommit` settle re-commits it. "One fold per node" was never
+  // the model, which is also why removing the owner's single fold was worth two.
+  //
+  // The last one needed a seam that did not exist: the label's style is a function of the BUTTON's
+  // `color` and `disabled` while its parent is the VIEW, so `ownerProps` could not reach it.
+  // `IAncestorLookup` asks for the nearest ancestor carrying a tag instead — a CSS ancestor
+  // selector, and the same rule is then correct on iOS (grandparent) and Android (parent).
+  //
+  // On Android ONE fold survives, the owner's, for the view style and the ripple background.
+  it('costs no trip into JS at all', () => {
     const tree = commit({});
     print(`DEBUG button-derived folds=${tree.folds}`);
-    expect(tree.folds).toBe(1);
+    expect(tree.folds).toBe(0);
   });
 });
 

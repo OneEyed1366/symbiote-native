@@ -13,11 +13,7 @@
 // (`core/engine/src/accessibility-props.ts`), so repeating it here would fold twice.
 
 import { Platform } from '@symbiote-native/engine';
-import type {
-  ITextStyle,
-  IViewStyle,
-  ISymbioteEvent,
-} from '@symbiote-native/engine';
+import type { IViewStyle, ISymbioteEvent } from '@symbiote-native/engine';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
 
 // Author-facing props: the framework-agnostic public surface every adapter exposes. Button has
@@ -41,19 +37,14 @@ export interface IButtonProps extends IAccessibilityProps, IAriaProps {
   nextFocusUp?: number;
 }
 
-// Button.js:394-437, one constant per literal so a value cannot drift silently.
-const IOS_BUTTON_BLUE = '#007AFF';
-const IOS_DISABLED_TEXT = '#cdcdcd';
+// Button.js:394-437, one constant per literal so a value cannot drift silently. The LABEL's seven
+// went with `resolveButtonTextStyle` on 2026-09-18 — they live in `SymbioteFabricProps.cpp` beside
+// the rule that reads them and are deliberately not duplicated here.
 const ANDROID_BUTTON_BLUE = '#2196F3';
 const ANDROID_DISABLED_BACKGROUND = '#dfdfdf';
-const ANDROID_DISABLED_TEXT = '#a1a1a1';
-const ANDROID_TEXT = 'white';
 const ANDROID_ELEVATION = 4;
 const ANDROID_DISABLED_ELEVATION = 0;
 const ANDROID_BORDER_RADIUS = 2;
-const TEXT_MARGIN = 8;
-const IOS_FONT_SIZE = 18;
-const ANDROID_FONT_WEIGHT = '500';
 
 // `BUTTON_ACCESSIBILITY_ROLE` and `resolveButtonImportantForAccessibility` WERE HERE and are gone
 // (2026-09-18). Both are `foldButtonProps` in `SymbioteFabricProps.cpp` now, and neither had a
@@ -61,18 +52,16 @@ const ANDROID_FONT_WEIGHT = '500';
 // a JS copy of a rule that runs elsewhere, kept alive by the test that asserts it. It would have
 // stayed green forever while meaning nothing.
 
-// `styles.text` — the platform-invariant half plus the platform's own. RN spells the margin as
-// MARGIN, not padding: the label pushes the button's edges outward rather than insetting itself,
-// so a background (Android) or a tap target (both) is 16pt taller than the glyphs.
-export const buttonTextStyle: ITextStyle = {
-  textAlign: 'center',
-  margin: TEXT_MARGIN,
-  ...Platform.select({
-    ios: { color: IOS_BUTTON_BLUE, fontSize: IOS_FONT_SIZE },
-    android: { color: ANDROID_TEXT, fontWeight: ANDROID_FONT_WEIGHT },
-    default: { color: IOS_BUTTON_BLUE, fontSize: IOS_FONT_SIZE },
-  }),
-};
+// `buttonTextStyle` AND `resolveButtonTextStyle` ARE GONE (2026-09-18) — the label's style is
+// `foldButtonLabelStyle` in `SymbioteFabricProps.cpp`, reached off the label text's own tag. Its
+// constants live THERE now and are not mirrored here; this file keeps only what Android's own fold
+// still needs.
+//
+// It was the last rule in this primitive to move and it needed a seam none of the others did. Its
+// inputs are the BUTTON's `color` and `disabled`, and the node it hangs on is the button's
+// GRANDCHILD on iOS (`button -> view -> text`) and its child on Android — so `ownerProps`, which
+// answers "my parent", could not reach it. `IAncestorLookup` asks for the nearest ancestor carrying
+// a tag instead, which is a CSS ancestor selector and makes one rule right on both trees.
 
 // `styles.button` — empty on iOS, the whole Material look on Android.
 export const buttonViewStyle: IViewStyle =
@@ -85,26 +74,6 @@ export const buttonViewStyle: IViewStyle =
     },
     default: {},
   }) ?? {};
-
-/**
- * The label style with `color` and `disabled` folded in.
- *
- * `color` tints the TEXT on iOS and the BUTTON on Android (Button.js:318-324), so on Android this
- * ignores it — see `resolveButtonViewStyle`, which is where it lands there. `disabled` wins over
- * `color` on both, because RN pushes `textDisabled` after the tint.
- */
-export function resolveButtonTextStyle(
-  color: string | undefined,
-  disabled: boolean | undefined,
-): ITextStyle {
-  const style: ITextStyle = { ...buttonTextStyle };
-  if (color !== undefined && Platform.OS !== 'android') style.color = color;
-  if (disabled === true) {
-    style.color =
-      Platform.OS === 'android' ? ANDROID_DISABLED_TEXT : IOS_DISABLED_TEXT;
-  }
-  return style;
-}
 
 /**
  * The inner view's style with `color` and `disabled` folded in — `{}` on iOS in every combination,

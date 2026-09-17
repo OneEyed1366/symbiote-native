@@ -28,9 +28,6 @@ const live = createLiveTree(fabric);
 
 // RN Button.js's iOS label look, owned by `buttonTextStyle` in @symbiote-native/components. MARGIN,
 // not padding (Button.js:409) — the label pushes the button's edges outward instead of insetting.
-const DEFAULT_BLUE = '#007AFF';
-const DISABLED_GREY = '#cdcdcd';
-const LABEL_MARGIN = 8;
 
 // Every node under `root`, in tree order — the shape the view-name assertions below compare.
 function flatten(root: ILiveNode): ILiveNode[] {
@@ -75,33 +72,25 @@ describe('React: `button` as a tag', () => {
     ]);
 
     const text = host.children[0].children[0];
-    expect(text.payload.color).toBe(DEFAULT_BLUE);
-    expect(text.payload.margin).toBe(LABEL_MARGIN);
+    // The label's STYLE left on 2026-09-18 — `foldButtonLabelStyle` in `SymbioteFabricProps.cpp`,
+    // reached off the label text's own tag and reading the button through `IAncestorLookup`. This
+    // harness builds its payload through the TypeScript `fabricProps`, which carries no copy of the
+    // tag rules, so the base blue and the margin are `core/engine/cpp/tests/js/
+    // button-derived-payload.itest.ts`'s now. The SUBTREE SHAPE, which is what this adapter
+    // contributes, is what stays.
     // RN's Text.js defaults, which a hand-written host tag inherits from nothing — without them a
     // long label clips mid-word instead of ellipsising, on device only.
     expect(text.payload.ellipsizeMode).toBe('tail');
     expect(text.children[0].payload.text).toBe('Save');
   });
 
-  // why: `disabled` greys the label and wins over an explicit `color` (Button.js pushes the
-  // disabled colour after the tint).
+  // THE GREYING CASE LEFT ON 2026-09-18. `disabled` greys the label and wins over an explicit
+  // `color` (RN pushes the disabled colour after the tint), and that whole expression is
+  // `foldButtonLabelStyle` in `SymbioteFabricProps.cpp` now — including the three-way `disabled`
+  // resolution it shares with the button's `focusable`. It is asserted against the committed payload
+  // in `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, with the aria-disabled arm beside
+  // it.
   //
-  // The a11y half of this case — `accessibilityState.disabled` — moved to
-  // `core/engine/cpp/tests/js/pressable-payload.itest.ts`, which covers the `button` tag by name:
-  // Button composes the pressable rule, and that rule is the engine's now, so this harness's
-  // TypeScript-built payload cannot see it. The greying is Button's OWN fold and stays here.
-  it('greys the label over an explicit color', () => {
-    mount(
-      ROOT_TAG,
-      createElement('button', {
-        id: 'btn',
-        title: 'Go',
-        color: '#ff0000',
-        disabled: true,
-      }),
-    );
-
-    const host = hostOf('btn');
-    expect(host.children[0].children[0].payload.color).toBe(DISABLED_GREY);
-  });
+  // Nothing about THIS adapter went with it: its part is driving the tag so the subtree exists at
+  // all, which the case above holds.
 });

@@ -114,24 +114,17 @@ describe('what a button sends native', () => {
     expect(payload.color).toBe(undefined);
   });
 
-  // why: THE PRICE, and it has read 4, then 3, then 1 in as many days. The iOS wrapper view's fold
-  // was deleted (it wrote an empty style), and then the OWNER's went off Android once `focusable`
-  // became a tag rule — worth TWO crossings on its own, because the touchable's `afterCommit`
-  // settle re-commits the node and the fold is charged per commit, not per node.
+  // why: THE PRICE, and it has read 4, then 3, then 1, then ZERO in three days. Off Android this
+  // primitive now binds no `payloadFold` on any of its four nodes.
   //
-  // The ONE that remains is the text's, and it is the only fold left in this primitive: it needs the
-  // BUTTON's `color` and `disabled` while its parent is the VIEW, so it reads a GRANDPARENT — an
-  // ancestor seam `ownerProps` does not provide and nothing has built.
-  //
-  // THIS FIXTURE UNDERSTATES THE BUTTON, and the reason is worth keeping rather than fixing. It
-  // writes props with `setProp`, so the app's `title` never takes the slot redirect that lives in
-  // `routeProp`; the raw label stays empty, the commit walk drops an empty raw text from its
-  // parent's child set, and the label's fold therefore never ran here at ALL. The two fixtures agree
-  // at 1 today only because the label's fold is gone from both.
-  it('pays one trip, and it is the text fold that reads a grandparent', () => {
+  // The last to go was the label text's, which needed `IAncestorLookup`: its style is a function of
+  // the BUTTON's `color` and `disabled` while its parent is the wrapping view, so `ownerProps` —
+  // which answers "my parent" — could not reach it. On Android the owner's fold survives for the
+  // view style and the ripple background.
+  it('costs no trip into JS at all', () => {
     const one = commit({});
     print(`DEBUG button folds=${one.folds}`);
-    expect(one.folds).toBe(1);
+    expect(one.folds).toBe(0);
   });
 });
 

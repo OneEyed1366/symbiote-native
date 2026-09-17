@@ -33,13 +33,9 @@ const ROOT_TAG = 843;
 const TEST_ID = 'primary-button';
 const TITLE = 'Tap me';
 // RN Button.js's iOS label look, owned by buttonTextStyle in @symbiote-native/components.
-const DEFAULT_BLUE = '#007AFF';
-const DISABLED_GREY = '#cdcdcd';
-const LABEL_FONT_SIZE = 18;
 // MARGIN, not padding. This read `padding` until 2026-09-09 and pinned a divergence: RN spells it
 // `margin: 8` (Button.js:409), so the label pushes the button's edges outward instead of insetting
 // itself — a different tap target and, on Android, a different background size.
-const LABEL_MARGIN = 8;
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -110,11 +106,12 @@ describe('Solid: `button` as a tag', () => {
       mount(ROOT_TAG, () => <button testID={TEST_ID} title={TITLE} />);
       await tick();
 
-      const labelProps = label().payload;
-      expect(labelProps.color).toBe(DEFAULT_BLUE);
-      expect(labelProps.textAlign).toBe('center');
-      expect(labelProps.fontSize).toBe(LABEL_FONT_SIZE);
-      expect(labelProps.margin).toBe(LABEL_MARGIN);
+      // The label's STYLE left on 2026-09-18 — `foldButtonLabelStyle` in
+      // `SymbioteFabricProps.cpp`, off the label text's own tag, reading the button through
+      // `IAncestorLookup`. This harness builds its payload through the TypeScript `fabricProps`,
+      // which carries no copy of the tag rules, so the base blue, the size and the margin are
+      // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`'s now. What this adapter
+      // contributes — the title reaching the raw label, and the subtree below — stays.
       expect(label().children[0].payload.text).toBe(TITLE);
       // RN's FOUR nodes on iOS, in order and by view name — the host (TouchableOpacity's own
       // Animated.View, which the tag IS), the inner view carrying the Material look on Android and
@@ -133,31 +130,13 @@ describe('Solid: `button` as a tag', () => {
       expect(innerView.children[0].children[0].viewName).toBe('RCTRawText');
     });
 
-    // why: `color` tints the LABEL on iOS (RN Button.js), never the touchable's background — a
-    // colour landing on the wrong node paints a solid block instead of coloured text.
-    it('tints the label with an explicit color and leaves the touchable uncoloured', async () => {
-      mount(ROOT_TAG, () => (
-        <button testID={TEST_ID} title={TITLE} color="#ff0000" />
-      ));
-      await tick();
-
-      // The half this host can still answer, and the one that matters here: the tint reaches the
-      // LABEL. That it is absent from the touchable is the engine's strip (`foldButtonProps`), which
-      // the TypeScript `fabricProps` does not carry — `core/engine/cpp/tests/js/button-payload.itest.ts`.
-      expect(label().payload.color).toBe('#ff0000');
-    });
-
-    // why: RN's fold makes `disabled` win over `color` — a disabled button must read as disabled
-    // even when the caller tinted it, and getting the precedence backwards is invisible until a
-    // designer notices a bright-red greyed-out button.
-    it('greys the label when disabled, overriding an explicit color', async () => {
-      mount(ROOT_TAG, () => (
-        <button testID={TEST_ID} title={TITLE} color="#ff0000" disabled />
-      ));
-      await tick();
-
-      expect(label().payload.color).toBe(DISABLED_GREY);
-    });
+    // THE TINT AND THE GREYING both left on 2026-09-18 — `color` landing on the LABEL rather than
+    // the touchable, and `disabled` winning over it. Both are `foldButtonLabelStyle`'s, including
+    // the three-way `disabled` resolution it shares with the button's `focusable`, and both are
+    // asserted against the committed payload in
+    // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`.
+    //
+    // They went as a PAIR: the greying case is only meaningful beside the tint it overrides.
 
     // why: RN's Button pins role=button and the disabled state AFTER the caller's own props, so a
     // caller cannot accidentally announce it as something else. This is the one place the
@@ -239,12 +218,15 @@ describe('Solid: `button` as a tag', () => {
       ));
       await tick();
       const labelAtMount = label().handle;
-      expect(label().payload.color).toBe('#ff0000');
 
       setColor('#00ff00');
       await tick();
 
-      expect(label().payload.color).toBe('#00ff00');
+      // IDENTITY, which is the half this adapter owns and the reason the case survives the port:
+      // Solid's fine-grained update must re-commit the SAME node rather than rebuild the subtree,
+      // and a rebuild would be invisible to every assertion about the payload. What the new colour
+      // looks like is the engine's rule and is pinned in
+      // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, which drives the same late write.
       expect(label().handle, 'the label node kept its identity').toBe(
         labelAtMount,
       );

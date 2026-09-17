@@ -283,10 +283,8 @@ export type {
 // its own touchable + view + text around them). The VIEW style is the half that was missing until
 // 2026-09-09 and it is the whole Android look.
 export {
-  buttonTextStyle,
   buttonViewStyle,
   resolveButtonDisabled,
-  resolveButtonTextStyle,
   resolveButtonViewStyle,
 } from './view/render-button';
 export type { IButtonProps } from './view/render-button';

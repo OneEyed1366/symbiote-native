@@ -30,13 +30,10 @@ vi.mock('@symbiote-native/engine', async () => {
   };
 });
 
-const { resolveButtonTextStyle, resolveButtonViewStyle } =
-  await import('./render-button');
+const { resolveButtonViewStyle } = await import('./render-button');
 
 const ANDROID_BLUE = '#2196F3';
-const ANDROID_TEXT = 'white';
 const ANDROID_DISABLED_BACKGROUND = '#dfdfdf';
-const ANDROID_DISABLED_TEXT = '#a1a1a1';
 const CUSTOM = '#ff0000';
 
 describe('Button folds on Android', () => {
@@ -48,11 +45,15 @@ describe('Button folds on Android', () => {
     });
   });
 
-  it('sends `color` to the BUTTON, not to the text — the reverse of iOS', () => {
+  // Each of these used to assert the VIEW and the TEXT together, which is what made the pair
+  // meaningful: `color` goes to the button here and to the label on iOS, and the two greys differ.
+  // The label half left on 2026-09-18 with `resolveButtonTextStyle` — it is `foldButtonLabelStyle`
+  // in `SymbioteFabricProps.cpp`, behind `#ifdef ANDROID`, so its Android branch is pinned NOWHERE
+  // headless. Only the view half can still be asserted here, and it is.
+  it('sends `color` to the BUTTON — the reverse of iOS', () => {
     expect(resolveButtonViewStyle(CUSTOM, undefined).backgroundColor).toBe(
       CUSTOM,
     );
-    expect(resolveButtonTextStyle(CUSTOM, undefined).color).toBe(ANDROID_TEXT);
   });
 
   it('flattens and greys the button when disabled, over any color', () => {
@@ -60,18 +61,6 @@ describe('Button folds on Android', () => {
       elevation: 0,
       backgroundColor: ANDROID_DISABLED_BACKGROUND,
       borderRadius: 2,
-    });
-    expect(resolveButtonTextStyle(undefined, true).color).toBe(
-      ANDROID_DISABLED_TEXT,
-    );
-  });
-
-  it('styles the label white and bold, with no fontSize of its own', () => {
-    expect(resolveButtonTextStyle(undefined, undefined)).toEqual({
-      textAlign: 'center',
-      margin: 8,
-      color: ANDROID_TEXT,
-      fontWeight: '500',
     });
   });
 

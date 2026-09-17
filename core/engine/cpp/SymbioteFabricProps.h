@@ -81,12 +81,36 @@ using IPayloadFold = std::function<folly::dynamic(const folly::dynamic &)>;
  * What is genuinely unreachable is narrower than the old wording: a value only JS can COMPUTE. A
  * value JS merely happens to HOLD is a wiring question, and wiring is cheap.
  */
+/**
+ * A rule's way of asking for an ANCESTOR further up than its parent.
+ *
+ * `ownerProps` answers the common case and `Button`'s label is the one that needs more: its style is
+ * a function of the BUTTON's `color` and `disabled` while its parent is the wrapping view, so the
+ * node it must read is a grandparent on iOS and a parent on Android. "Two up" is the wrong question
+ * to build a seam around — what the rule wants is **the nearest ancestor that is a button**, which
+ * is a CSS ancestor selector and is the shape a browser would use.
+ *
+ * A function pointer plus a context rather than a `std::function`, because this is on the per-node
+ * commit path: a `std::function` would allocate for every node whether or not any rule asks. This
+ * costs one pointer pair to pass and one indirect call only when a rule actually looks.
+ *
+ * The walk is the TREE's, which is why this is a callback at all — `SymbioteTree` owns `Node` and
+ * this translation unit does not. What lives here is which tag to ask for; what lives there is how
+ * to find it.
+ */
+struct IAncestorLookup {
+  /** The nearest ancestor carrying `tag`, or nullptr. Never the node itself. */
+  const folly::dynamic *(*find)(const void *context, const char *tag) = nullptr;
+  const void *context = nullptr;
+};
+
 folly::dynamic fabricProps(
     const std::string &component,
     const std::string &tagName,
     const folly::dynamic &props,
     const IPayloadFold &fold = {},
     const folly::dynamic *ownerProps = nullptr,
-    bool hasPressListener = false);
+    bool hasPressListener = false,
+    const IAncestorLookup &ancestors = {});
 
 } // namespace symbiote
