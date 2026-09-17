@@ -1,4 +1,11 @@
+// @symbiote-platform-extensions
+//
 // Can React's OWN Fabric renderer stand up in this harness?
+//
+// The directive on the first line asks the runner to resolve `.ios.js` before `.js` for React
+// Native's own imports, the way Metro does. It is opt-in per file and this is the only file that
+// takes it — see `reactNativePlatformExtensions` in `scripts/run-itests.mjs` for what turning it on
+// for everything cost.
 //
 // why: every comparison against stock React Native in `CLAUDE.md` is taken on a device, because
 // nothing here can run the other side. That is why `Swap` has carried "the standing React anomaly"
@@ -94,15 +101,11 @@ describe('react own Fabric renderer in the headless harness', () => {
   // different payload and the comparison would be measuring the stand-in. This repo has a standing
   // rule about exactly that shape of error.
   //
-  // ── THIS IS A KNOWN-GAP MARKER, AND IT IS MEANT TO FAIL WHEN THE GAP CLOSES ────────────────────
+  // ── THE CHAIN, AND IT IS CLOSED ────────────────────────────────────────────────────────────────
   //
-  // It asserts `registered === false`, which is not a requirement — it is the state of the harness.
-  // Someone who adds platform-extension resolution will see this go red, and the `detail` line is
-  // their handover.
-  //
-  // THE CHAIN, each link measured by satisfying the previous one and reading the next throw. Every
-  // step took one line, and every line is in this test rather than the shared runner because it is a
-  // fact about the stock arm:
+  // Each link was found by satisfying the previous one and reading the next throw. The first four
+  // live in this test rather than the shared runner because they are facts about the stock arm; the
+  // fifth had to be the runner, because it is a resolver rule.
   //
   //   1. `Can't find variable: global`                     -> runner prelude, `global = globalThis`
   //   2. `__fbBatchedBridgeConfig is not set`               -> an EMPTY bridge, so `NativeModules`
@@ -112,20 +115,18 @@ describe('react own Fabric renderer in the headless harness', () => {
   //                                                           not converge
   //   4. `Cannot destructure property 'screen'`             -> `getConstants()` returning a screen
   //                                                           shape, since `{}` is not inert
-  //   5. `Platform_default.select is undefined`             -> THE WALL, and it is not a fake:
+  //   5. `Platform_default.select is undefined`             -> Metro's platform extensions, in the
+  //                                                           runner, scoped to RN's own importers
   //
-  // `Libraries/Utilities/Platform.js` is a compatibility shim whose entire body is
-  // `import Platform from './Platform'; export default Platform;` — it relies on METRO resolving
-  // `./Platform` to `Platform.ios.js`. esbuild has no platform extensions, so it resolves the file to
-  // itself, the cycle yields `undefined`, and `BridgelessUIManager` dies on `Platform.select`.
+  // The fifth was the only one that was not a fake. `Libraries/Utilities/Platform.js` is a
+  // compatibility shim whose entire body is `import Platform from './Platform'; export default
+  // Platform;` — it relies on METRO resolving `./Platform` to `Platform.ios.js`. esbuild has no
+  // platform extensions, so it resolved the file to ITSELF, the cycle yielded `undefined`, and the
+  // throw named `BridgelessUIManager`, several modules from the cause.
   //
-  // Closing it means teaching the runner `.ios.js` before `.js` for paths under `react-native` —
-  // scoped there deliberately, because widening `resolveExtensions` globally would change how OUR
-  // own sources resolve, and the project's folder-as-module layout already settled that question.
-  //
-  // What is NOT in the way, having been budgeted for and then not needed: Flow (the runner strips
-  // it), and `ReactNativePrivateInterface` (all twelve of the renderer's uses resolved).
-  it('stops at platform-extension resolution, and nothing earlier', () => {
+  // What was NOT in the way, having been budgeted for and then not needed: Flow (the runner already
+  // strips it), and `ReactNativePrivateInterface` (all twelve of the renderer's uses resolved).
+  it('resolves React Native own view config for RCTView', () => {
     let detail: string;
     let registered = false;
     try {
@@ -217,12 +218,14 @@ describe('react own Fabric renderer in the headless harness', () => {
     print(
       `DEBUG RCTView view config: registered=${String(registered)} :: ${detail}`,
     );
-    // Deliberately asserting the GAP. Red here means someone taught the runner platform extensions
-    // and a stock arm is now buildable — update this file, do not silence it.
-    expect(registered).toBe(false);
-    // And it must still stop where the header says. A different message means the chain moved and
-    // the handover above is stale, which is worse than the gap itself.
-    expect(detail.includes('Platform_default.select')).toBe(true);
+    expect(registered).toBe(true);
+    // RN's OWN config, not a stand-in, and the count is what proves it: `RCTView` carries 194
+    // `validAttributes` in 0.86. A hand-written config would pass the line above and produce a
+    // different payload out of `createAttributePayload`, which is the failure this file exists to
+    // avoid — the comparison would be measuring the stand-in. The number is a floor, not an exact
+    // match, so an upstream bump adding a prop does not read as a break.
+    expect(detail.includes('validAttributes')).toBe(true);
+    expect(Number.parseInt(detail, 10) > 150).toBe(true);
   });
 });
 

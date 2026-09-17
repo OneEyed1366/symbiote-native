@@ -1466,30 +1466,41 @@ renderer's uses resolved. **This is also the RN-port backlog's "step 0", which t
 as never tried** — it is now tried, in the itest runner rather than in `vitest.config.ts`, and the
 answer is that RN's Flow is not what blocks importing it.
 
-**Rendering is not done, and the remaining chain is measured rather than guessed.** The renderer
-resolves a host element through `ReactNativeViewConfigRegistry.get`, so a stock arm needs RN's OWN
-view config for `RCTView` — a hand-written stand-in would carry different `validAttributes` and the
-comparison would be measuring the stand-in. Reaching the real one went five steps, each found by
-satisfying the previous and reading the next throw:
+**And RN's own view config for `RCTView` now resolves too — 194 `validAttributes`, the real one.**
+That matters because `createAttributePayload` reads exactly that table, so a hand-written stand-in
+would produce a different payload and the comparison would be measuring the stand-in. Reaching it
+went five steps, each found by satisfying the previous and reading the next throw:
 
 ```
-1. Can't find variable: global                  runner prelude, global = globalThis        DONE
-2. __fbBatchedBridgeConfig is not set           an EMPTY bridge, so NativeModules can      DONE
-                                                evaluate and every lookup misses cleanly
-3. getEnforcing('SourceCode') not found         a turbomodule proxy answering to any name  DONE
-4. Cannot destructure property 'screen'         getConstants() returning a screen shape    DONE
-5. Platform_default.select is undefined         THE WALL                                   OPEN
+1. Can't find variable: global                  runner prelude, global = globalThis
+2. __fbBatchedBridgeConfig is not set           an EMPTY bridge, so NativeModules can evaluate
+                                                and every lookup misses cleanly
+3. getEnforcing('SourceCode') not found         a turbomodule proxy answering to any name
+4. Cannot destructure property 'screen'         getConstants() returning a screen shape
+5. Platform_default.select is undefined         Metro's platform extensions, in the runner
 ```
 
-Step 5 is not a fake: `Libraries/Utilities/Platform.js` is a compatibility shim whose whole body is
-`import Platform from './Platform'; export default Platform;`, relying on **Metro** resolving
-`./Platform` to `Platform.ios.js`. esbuild has no platform extensions, so it resolves the file to
-itself, the cycle yields `undefined`, and `BridgelessUIManager` dies on `Platform.select`. Closing it
-means teaching the runner `.ios.js` before `.js` **scoped to `react-native`** — widening
-`resolveExtensions` globally would change how our own sources resolve.
+Only the fifth was not a fake. `Libraries/Utilities/Platform.js` is a compatibility shim whose whole
+body is `import Platform from './Platform'; export default Platform;`, relying on **Metro** resolving
+`./Platform` to `Platform.ios.js`. esbuild has none, so it resolved the file to itself, the cycle
+yielded `undefined`, and the throw named `BridgelessUIManager` — several modules from the cause.
 
-The probe asserts the gap (`registered === false`, stopping at that exact message), so it goes RED
-when someone closes it rather than sitting silent.
+**Platform extensions are OPT-IN per file (`// @symbiote-platform-extensions`), and the rest of the
+suite paid to establish that.** Turned on for everything they broke 154 of 158 itests: the engine
+imports RN's `processColor`, which imports `Platform`, and resolved properly `Platform.ios.js` wants
+`NativePlatformConstantsIOS` → a native module → every bundle dies at import. Satisfying that
+harness-wide would need a permissive `__turboModuleProxy`, and **the engine reads that global
+itself** — so every itest asserting a module is absent would silently start finding one, which is
+the trap `<native_module_name_is_platform_specific>` names.
+
+**The latent fact underneath is worth carrying into the RN-port backlog:** in every itest bundle
+without the directive, RN's `Platform` is `undefined`, and any upstream module that dereferences it
+throws. Our colour path imports `processColor`, whose `Platform.OS === 'android'` check sits on a
+branch our itests evidently never reach — on device they would. So "it imports and the tests pass"
+is NOT evidence that an upstream module works headlessly; it may only mean the line that needs
+`Platform` was never executed. Tier A's candidates should be checked against this specifically.
+
+Still not done: RENDERING. The config resolves; standing a surface up is the next step.
 
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the

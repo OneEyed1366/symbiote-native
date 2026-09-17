@@ -167,6 +167,52 @@ const RN_SOURCE =
   /\/node_modules\/(react-native|@react-native\/[^/]+)\/.*\.jsx?$/;
 
 /**
+ * Metro's platform extensions, for React Native's own files only.
+ *
+ * RN resolves `./Platform` to `Platform.ios.js` and esbuild does not, which is not a nuisance but a
+ * correctness wall: `Libraries/Utilities/Platform.js` is a compatibility shim whose entire body is
+ * `import Platform from './Platform'; export default Platform;`. Without platform extensions it
+ * resolves to ITSELF, the cycle yields `undefined`, and the first `Platform.select` throws — the
+ * error naming `BridgelessUIManager`, several modules away from the cause.
+ *
+ * SCOPED TO THE IMPORTER, deliberately. Widening esbuild's own `resolveExtensions` would change how
+ * OUR sources resolve, and the project settled that question the other way: a module with platform
+ * variants lives in a folder with `index.ios.ts` beside `index.ts`, so nothing of ours wants
+ * suffix resolution and something of ours might quietly get it.
+ *
+ * AND OPT-IN PER FILE, which the rest of the suite paid for first. Turned on for everything, it
+ * broke 154 of 158 itests: our engine imports RN's `processColor`, which imports `Platform`, and
+ * with the shim resolving to itself that `Platform` was `undefined` — harmless only because nothing
+ * dereferenced it. Resolved properly, `Platform.ios.js` wants `NativePlatformConstantsIOS`, which
+ * wants a native module, and every bundle died at import. Satisfying that harness-wide would mean a
+ * permissive `__turboModuleProxy`, and the engine READS that global itself
+ * (`core/engine/src/native-modules`) — so every itest asserting "this module is absent" would
+ * silently start finding one. That is the trap `<native_module_name_is_platform_specific>` names.
+ *
+ * So a file asks for it with `// @symbiote-platform-extensions` and takes on the fakes that come
+ * with it. A directive rather than a filename convention: it greps, and it does not make a rename
+ * change behaviour.
+ *
+ * iOS because iOS is this project's reference surface. An Android arm would mean a second bundle,
+ * not a second extension in this list.
+ */
+const PLATFORM_EXTENSIONS_DIRECTIVE = '@symbiote-platform-extensions';
+
+const RN_IMPORTER = /[/\\]node_modules[/\\](react-native|@react-native[/\\])/;
+const RELATIVE_REQUEST = /^\.\.?[/\\]/;
+
+const reactNativePlatformExtensions = {
+  name: 'react-native-platform-extensions',
+  setup(build) {
+    build.onResolve({ filter: RELATIVE_REQUEST }, ({ path: request, importer, resolveDir }) => {
+      if (!RN_IMPORTER.test(importer)) return undefined;
+      const candidate = path.resolve(resolveDir, `${request}.ios.js`);
+      return existsSync(candidate) ? { path: candidate } : undefined;
+    });
+  },
+};
+
+/**
  * `ReactNativePrivateInitializeCore` is RN's app bootstrap, and nothing headless wants it to run.
  *
  * React's own Fabric renderer (`ReactFabric-prod.js`) requires it for its side effects on line 16,
@@ -522,6 +568,9 @@ try {
         svelteComponents,
         vueSfc,
         stubReactNativeBootstrap,
+        ...(readFileSync(file, 'utf8').includes(PLATFORM_EXTENSIONS_DIRECTIVE)
+          ? [reactNativePlatformExtensions]
+          : []),
         reactNativeFlow,
       ],
       logLevel: 'silent',
