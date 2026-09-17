@@ -645,6 +645,10 @@ struct IWalkCost {
   // cannot say which half moved.
   double foldLookupNs = 0;
   size_t foldsFound = 0;
+  // Inside a fold that runs: converting the bag out, the JS call, converting the result back.
+  double foldToJsNs = 0;
+  double foldCallNs = 0;
+  double foldFromJsNs = 0;
   double rawPropsNs = 0;
   double createNs = 0;
   double appendNs = 0;
@@ -942,10 +946,23 @@ IPayloadFold foldFor(jsi::Runtime &runtime, Node &node) {
   // callable, and `jsi::Function` is move-only. Capturing it by value does not compile.
   auto function = std::make_shared<jsi::Function>(fold.getObject(runtime).getFunction(runtime));
   return [&runtime, function](const folly::dynamic &props) {
-    return boundedDynamicFrom(
-        runtime,
-        function->call(runtime, jsi::valueFromDynamic(runtime, props)),
-        [] { return std::string("the payloadFold result"); });
+    // Billed in three because the fold's CONTRACT is bag in, bag out, and that is a different cost
+    // from the fold's own work: both conversions walk every key of the node whatever the fold reads.
+    // If the conversions dominate, the fix is to narrow the contract; if the call does, the fix is to
+    // not have a fold. The split is the only thing that can say which.
+    auto startedAt = ISteadyClock::now();
+    jsi::Value argument = jsi::valueFromDynamic(runtime, props);
+    walkCost_.foldToJsNs += nanosSince(startedAt);
+
+    startedAt = ISteadyClock::now();
+    jsi::Value result = function->call(runtime, std::move(argument));
+    walkCost_.foldCallNs += nanosSince(startedAt);
+
+    startedAt = ISteadyClock::now();
+    folly::dynamic folded = boundedDynamicFrom(
+        runtime, std::move(result), [] { return std::string("the payloadFold result"); });
+    walkCost_.foldFromJsNs += nanosSince(startedAt);
+    return folded;
   };
 }
 
@@ -2178,6 +2195,9 @@ jsi::Value Tree::readSurfaceTelemetry(
   result.setProperty(runtime, "walkMs", millis(walkCost_.walkNs));
   result.setProperty(runtime, "propsMs", millis(walkCost_.propsNs));
   result.setProperty(runtime, "foldLookupMs", millis(walkCost_.foldLookupNs));
+  result.setProperty(runtime, "foldToJsMs", millis(walkCost_.foldToJsNs));
+  result.setProperty(runtime, "foldCallMs", millis(walkCost_.foldCallNs));
+  result.setProperty(runtime, "foldFromJsMs", millis(walkCost_.foldFromJsNs));
   result.setProperty(
       runtime, "foldsFound", static_cast<double>(walkCost_.foldsFound));
   result.setProperty(runtime, "rawPropsMs", millis(walkCost_.rawPropsNs));

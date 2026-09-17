@@ -1357,9 +1357,26 @@ would pay this twice per row if those behaviors declared a fold. So read `foldsF
 attributing any per-adapter deficit — a fold count that differs between two adapters on one tree is
 the difference, and nothing else in the walk has to be examined.
 
-Not fixed. The fold has to run in JS somewhere; moving it to where React runs it — ahead of
-`setProp`, so ordinary props cross and the host never calls back — is a change to the behavior
-contract, and it wants its own pass.
+**Splitting the fold three ways says which part, and it is not the part it looks like:**
+
+```
+toJs = 1.6    call = 1.6    fromJs = 13.3
+```
+
+The SAME bag travels both directions — `foldPayload` returns `{ ...props, ...folded }` — and reading
+it back costs eight times sending it and eight times the fold's own work. Sending is
+`jsi::valueFromDynamic`, building an object out of a `folly::dynamic` the host already holds. Reading
+back is `jsi::dynamicFromValue`: `getPropertyNames`, then per key `getValueAtIndex` + `getString` + a
+`std::string` allocation + `getProperty` — the same per-key JSI walk `RawProps::parse` pays and
+`mutation-buffer.ts`'s header describes. It is upstream's function; there is nothing to tune inside
+it.
+
+So the cost is not that a fold RUNS. It is that a fold's contract is **bag in, bag out**, so ~18 keys
+come back to express a change to about five. **A fold that returned a PATCH would leave `toJs` and
+`call` untouched and cut `fromJs` by the ratio of the bags — ~10 ms of the 18 measured here.** That
+is the fix, and it is named rather than made: ~14 fold sites across `core/components/src/behaviors/`
+share the contract, and dropping a key needs a marker the props bag has no room for (`null` already
+means "reset to the platform default"). It wants its own pass with the whole set in view.
 
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the

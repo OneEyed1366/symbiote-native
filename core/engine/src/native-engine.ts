@@ -210,6 +210,9 @@ export type INativeEngineBindings = {
     propsMs: number;
     foldLookupMs: number;
     foldsFound: number;
+    foldToJsMs: number;
+    foldCallMs: number;
+    foldFromJsMs: number;
     rawPropsMs: number;
     createNodeMs: number;
     appendChildMs: number;

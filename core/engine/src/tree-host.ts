@@ -355,6 +355,14 @@ export type ISurfaceTelemetry = {
   foldLookupMs: number;
   /** How many nodes the lookup found one on. Zero makes `foldLookupMs` pure probe cost. */
   foldsFound: number;
+  /**
+   * Inside a fold that runs, split three ways because a fold's CONTRACT is bag in, bag out: both
+   * conversions walk every key of the node whatever the fold actually reads. If the conversions
+   * dominate, the fix is a narrower contract; if `foldCallMs` does, the fix is not having a fold.
+   */
+  foldToJsMs: number;
+  foldCallMs: number;
+  foldFromJsMs: number;
   /** The payload copy Fabric consumes, kept because `committedProps` is next commit's baseline. */
   rawPropsMs: number;
   createNodeMs: number;

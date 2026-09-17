@@ -287,9 +287,26 @@ describe('what a reconciler adds to a create', () => {
   // a screen of a thousand rows with two lowered `Pressable`s would pay this twice per row if those
   // behaviors declared a fold. Measure `foldsFound` before reading any per-adapter deficit.
   //
-  // Not fixed here. The fold has to run in JS somewhere, and moving it to where React runs it —
-  // ahead of `setProp`, so ordinary props cross and the host never calls back — is a change to the
-  // behavior contract, not to this file.
+  // ── AND THE THREE-WAY SPLIT SAYS WHICH PART, WHICH IS NOT THE PART IT LOOKS LIKE ────────────────
+  //
+  //   toJs = 1.6    call = 1.6    fromJs = 13.3
+  //
+  // The SAME bag travels in both directions — `foldPayload` returns `{ ...props, ...folded }` — and
+  // reading it back is eight times sending it and eight times the fold's own work. Sending is
+  // `jsi::valueFromDynamic`, which builds an object from a `folly::dynamic` the host already holds.
+  // Reading back is `jsi::dynamicFromValue`: `getPropertyNames`, then per key `getValueAtIndex` +
+  // `getString` + a `std::string` allocation + `getProperty`. That is the same per-key JSI walk this
+  // repo already pays inside `RawProps::parse` and describes in `mutation-buffer.ts`'s header — and
+  // it is upstream's function, so there is nothing to tune inside it.
+  //
+  // So the cost is not that a fold runs. It is that a fold's CONTRACT is bag in, bag out, so ~18 keys
+  // come back to express a change to about five. A fold that returned a PATCH would leave `toJs` and
+  // `call` where they are and cut `fromJs` by roughly the ratio of the bags — ~10 ms of the 18 here.
+  //
+  // Not done in this pass, and the reason is scope rather than doubt: ~14 fold sites across
+  // `core/components/src/behaviors/` share the contract, and dropping a key needs a marker the props
+  // bag has no room for (`null` already means "reset to the platform default"). It wants its own
+  // pass with the whole set in front of it.
   it('builds the same 1 000 rows through the Vue adapter', () => {
     const rows = [];
     for (let id = 0; id < ROWS; id += 1) rows.push(vueRow(id));
@@ -310,6 +327,11 @@ describe('what a reconciler adds to a create', () => {
         `apply=${(telemetry?.applyMs ?? 0).toFixed(1)} nodes=${nodes} ` +
         `created=${telemetry?.nodesCreated ?? 0} cloned=${telemetry?.nodesCloned ?? 0} ` +
         `reused=${telemetry?.nodesReused ?? 0}`,
+    );
+    print(
+      `DEBUG vue     fold split: toJs=${(telemetry?.foldToJsMs ?? 0).toFixed(1)} ` +
+        `call=${(telemetry?.foldCallMs ?? 0).toFixed(1)} ` +
+        `fromJs=${(telemetry?.foldFromJsMs ?? 0).toFixed(1)}`,
     );
     print(
       `DEBUG vue     walk split: props=${(telemetry?.propsMs ?? 0).toFixed(1)} ` +
