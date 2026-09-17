@@ -45,6 +45,34 @@ function shimDocument(): IDocumentLike {
   return documentFactory();
 }
 
+// How many insertBefore ref lookups fell through `indexNearEnd`'s bounded window into the full,
+// unbounded `children.indexOf` scan, and how much of the array each one walked. Read-and-zeroed
+// through `takeShimScanStats`, same shape as `core/engine/src/node.ts`'s `propStats`. This is the
+// JS-side twin of a question F-80 already answered for the engine's own `OP_INSERT_BEFORE`
+// (`std::find` over `siblings`, exonerated as too small): before `indexNearEnd` existed, Svelte's
+// OWN reconciler paid the identical linear scan a second time, one layer up, on every keyed
+// `{#each}` append — measured at 1.5M comparisons for a 1 000-row Append onto 1 000 standing
+// (`each-append-scan-cost.probe.test.ts`). A zero reading here now means every ref this run
+// needed was found in the tail window; a nonzero one means something inserts against a ref
+// further from the end than `TAIL_SCAN_WINDOW` covers, which is real work this counter still
+// prices honestly rather than hiding behind the fast path.
+const shimScanStats = { calls: 0, scanned: 0 };
+
+// Covers the measured case (a trailing block/component boundary anchor, one small constant hop
+// from the true end) with room to spare, without making the fallback-miss case pay a meaningfully
+// bigger constant before it gives up and scans properly.
+const TAIL_SCAN_WINDOW = 8;
+
+export function takeShimScanStats(): { calls: number; scanned: number } {
+  const snapshot = {
+    calls: shimScanStats.calls,
+    scanned: shimScanStats.scanned,
+  };
+  shimScanStats.calls = 0;
+  shimScanStats.scanned = 0;
+  return snapshot;
+}
+
 export abstract class ShimNode {
   parent: ShimNode | null = null;
   children: ShimNode[] = [];
@@ -168,13 +196,36 @@ export abstract class ShimNode {
     }
   }
 
+  // Bounded backward scan, O(TAIL_SCAN_WINDOW) not O(children.length). Covers the case that
+  // dominates a real Append: a keyed `{#each}` growing at the tail inserts every new row via
+  // `newRow.before(ref)` where `ref` is the block's own closing boundary anchor — measured
+  // (`each-append-scan-cost.probe.test.ts`) sitting a SMALL, constant distance from the true end
+  // (one extra trailing anchor from the component's own root fragment in the measured case, not
+  // necessarily always exactly one — hence a window, not a hardcoded offset). Returns `undefined`
+  // on a miss so the caller falls back to the full, always-correct scan; this never changes the
+  // result, only how cheaply the common case finds it.
+  private indexNearEnd(ref: ShimNode): number | undefined {
+    const { children } = this;
+    const start = Math.max(0, children.length - TAIL_SCAN_WINDOW);
+    for (let i = children.length - 1; i >= start; i -= 1) {
+      if (children[i] === ref) return i;
+    }
+    return undefined;
+  }
+
+  private scannedIndexOf(ref: ShimNode): number {
+    shimScanStats.calls += 1;
+    shimScanStats.scanned += this.children.length;
+    return this.children.indexOf(ref);
+  }
+
   private insertOne(node: ShimNode, ref: ShimNode | null): void {
     detachFromParent(node);
     node.parent = this;
     if (ref === null) {
       this.children.push(node);
     } else {
-      const index = this.children.indexOf(ref);
+      const index = this.indexNearEnd(ref) ?? this.scannedIndexOf(ref);
       this.children.splice(index < 0 ? this.children.length : index, 0, node);
     }
     if (this.engineNode !== undefined && this.surface !== undefined) {
