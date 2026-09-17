@@ -1305,6 +1305,32 @@ tenth row clones 302, `clear` walks 0.1 ms. The expensive update is `append` (73
 onto a standing 1 000), and it is create-shaped — 10 000 `createNode`s plus a Yoga pass over 2 000
 rows.
 
+### A re-render that changes nothing is free now, whichever way the style is written
+
+The commonest shape any app produces: a parent's state moves, the framework re-renders the subtree,
+every child writes back what it already had. A component that builds its style inline hands over a
+FRESH object each time, which `Object.is` cannot refuse — so the write used to cross into the host
+and become a `folly::dynamic` before anything could say it was unchanged. Measured on 1 000 rows with
+nothing changed (`core/engine/cpp/tests/js/no-op-rerender-cost.itest.ts`):
+
+```
+                    before   after
+hoisted style          0.3     0.6      StyleSheet.create / a CSS class / a module constant
+rebuilt literal        9.7     0.6      16x — the whole gap was the conversion
+whole row rewritten   12.9     2.3      the 1 000 left are per-row testID strings, genuinely distinct
+```
+
+`routeProp` now compares a rebuilt style against the standing one key for key before recording
+anything (`isSameShallowStyle`, `core/engine/src/node.ts`) — shallow and conservative, so a nested
+value (transform list, shadow, style array) still crosses and the host's `diffProps` refuses it as
+before. Being wrong there is slow, never incorrect. Nothing propagates in any of the three passes:
+`created=0 cloned=0`, and the differ is told nothing.
+
+**Do not read `commitMs` / `layoutMs` for a step whose commit was SKIPPED.** `readSurfaceTelemetry`
+answers off `getCurrentRevision().telemetry`, so a skipped commit leaves the PREVIOUS commit's
+numbers standing — all three passes above report the create's `fabric=8.4 layout=7.6`. Use
+`mountingLogs()` (the differ's output) to ask whether the platform was told anything.
+
 ## Reference material
 
 - RN source: `.vendors/react-native` (and `.vendors/react` for the renderer

@@ -1150,6 +1150,46 @@ function sharedStylePair(
 // styles nothing" object. An IDENTITY compare rather than a key count — `Object.keys(x).length`
 // allocates an array, and this runs on every class and style write, ~14 000 times on one benchmark
 // create. That is the F-12 shape: an expensive guard in front of cheap work.
+/** A plain style bag — not an array of styles, not a callback, not null. */
+function isStyleRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Is this rebuilt style the same style, key for key?
+ *
+ * A component body that writes its style inline hands over a FRESH object every render, equal to
+ * the one already standing — the commonest shape any app produces, and one `Object.is` cannot see.
+ * Without this the write crosses into the host, becomes a `folly::dynamic`, and is only THEN found
+ * to be unchanged. Measured on `build-release` (`no-op-rerender-cost.itest.ts`), 1 000 rows
+ * re-rendered with nothing changed: 9.7 ms against 0.3 ms for the same app with its style hoisted,
+ * and 5.2 ms of that was the conversion. The cheapest place to refuse a write is the earliest place
+ * that can see it is a no-op.
+ *
+ * SHALLOW AND CONSERVATIVE, both deliberately. A nested value (a transform list, a shadow, a style
+ * array) reports "not the same" rather than being compared deeply, because a deep compare makes this
+ * guard cost the size of the style — which is the cost it exists to avoid. Those keep crossing and
+ * the host's own `diffProps` refuses them exactly as before, so being wrong here is slow, never
+ * incorrect.
+ *
+ * `undefined` on either side also reports "not the same", which is what lets the key COUNT stand in
+ * for a key-set comparison: equal counts plus every key of `next` matching a defined value in
+ * `standing` cannot leave a key unaccounted for.
+ */
+function isSameShallowStyle(next: unknown, standing: unknown): boolean {
+  if (!isStyleRecord(next) || !isStyleRecord(standing)) return false;
+  const keys = Object.keys(next);
+  if (keys.length !== Object.keys(standing).length) return false;
+  for (const key of keys) {
+    const value = next[key];
+    if (value === undefined || isStyleRecord(value) || Array.isArray(value)) {
+      return false;
+    }
+    if (!Object.is(value, standing[key])) return false;
+  }
+  return true;
+}
+
 function contributesNothing(slot: unknown): boolean {
   return slot === undefined || slot === EMPTY_STYLE;
 }
@@ -1384,6 +1424,23 @@ export function routeProp(
       parts.activeStyle = resolved({ pressed: true });
       parts.activeStyleFromCallback = true;
     } else {
+      // A REBUILT LITERAL EQUAL TO WHAT IS STANDING IS NOT A CHANGE — see `isSameShallowStyle`.
+      //
+      // Gated on something being PUBLISHED, which is what keeps the restore path intact: a
+      // `setNativeProps` write bypasses the parts and clears `parts.published`, and after that this
+      // must never turn a write away — the re-push IS the restore. Same mechanism `isAlreadyPublished`
+      // relies on, and the same reason.
+      //
+      // Gated on the previous write NOT having come from a callback, because that one owns
+      // `parts.activeStyle` and the branch below has to clear it. Returning early would leave the old
+      // pressed look standing under a plain style.
+      if (
+        parts.published !== undefined &&
+        !parts.activeStyleFromCallback &&
+        isSameShallowStyle(resolved, parts.explicitStyle)
+      ) {
+        return;
+      }
       parts.explicitStyle = resolved;
       // Only a variant WE derived is stale now. `style` switching from a callback to a plain value
       // must not leave the old pressed look standing, and an AUTHORED `activeStyle` must survive a

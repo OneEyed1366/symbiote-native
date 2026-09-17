@@ -67,6 +67,61 @@ describe('the style slot is shared between nodes styled the same way', () => {
     expect(published[1]).toBe(style);
   });
 
+  // ── THE NO-OP RE-RENDER, WHICH IS THE COMMONEST SHAPE THERE IS ─────────────────────────────────
+  //
+  // A component body that builds its style inline hands over a FRESH object every render, equal to
+  // the one already standing. Identity cannot see that, so the write crossed into the host, was
+  // converted to a `folly::dynamic`, and only then compared — and the comparison said "unchanged".
+  // Measured on `build-release` (`no-op-rerender-cost.itest.ts`), 1 000 rows re-rendered with no
+  // change at all: 9.7 ms against 0.3 ms for the same app with the style hoisted, and 5.2 ms of the
+  // 9.7 was that conversion.
+  //
+  // The cheapest place to refuse a write is the earliest place that can see it is a no-op.
+  it('records nothing when a rebuilt style equals the one standing', () => {
+    resetMutationBuffer();
+    const node = createElement('RCTView');
+    routeProp(node, 'style', { height: 44, flexDirection: 'row' });
+    takeBatch();
+
+    routeProp(node, 'style', { height: 44, flexDirection: 'row' });
+    expect(takeBatch().values.length).toBe(0);
+  });
+
+  // why: the guard must be an equality test, not a "looks similar" test. Each of these is a real
+  // change an app makes, and each must still reach the host.
+  it('records a rebuilt style that differs in a value, a key, or a count', () => {
+    const cases: Record<string, unknown>[] = [
+      { height: 48, flexDirection: 'row' },
+      { height: 44, flexDirection: 'column' },
+      { height: 44, flexDirection: 'row', paddingLeft: 10 },
+      { height: 44 },
+      { height: 44, alignItems: 'row' },
+    ];
+    for (const next of cases) {
+      resetMutationBuffer();
+      const node = createElement('RCTView');
+      routeProp(node, 'style', { height: 44, flexDirection: 'row' });
+      takeBatch();
+
+      routeProp(node, 'style', next);
+      expect(takeBatch().values.length).toBe(1);
+    }
+  });
+
+  // why: CONSERVATIVE on anything nested. A style holding an array or an object (a transform list, a
+  // shadow, a nested style array) would need a deep compare to refuse, and a deep compare makes the
+  // guard cost the size of the style — which is the cost it exists to avoid. Those keep crossing,
+  // and the host's own `diffProps` refuses them exactly as it did before.
+  it('lets a style carrying a nested value through rather than comparing deeply', () => {
+    resetMutationBuffer();
+    const node = createElement('RCTView');
+    routeProp(node, 'style', { transform: [{ scale: 1 }] });
+    takeBatch();
+
+    routeProp(node, 'style', { transform: [{ scale: 1 }] });
+    expect(takeBatch().values.length).toBe(1);
+  });
+
   // why: two DIFFERENT styles must not collapse onto one entry. The cache is keyed on the parts, so
   // a bug that ignored the key would show up here and nowhere else in this file.
   it('keeps two different style objects apart', () => {
