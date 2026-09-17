@@ -200,12 +200,11 @@ describe('the ImageBackground behavior — where a prop lands', () => {
     expect(host.payload.height).toBe(BOX.height);
   });
 
-  it('opts the box out of colour inversion, which no wrapper ever did', () => {
-    mount(makeImageBackground({ source: SOURCE }));
-    // `ImageBackground.js:75` sets it unconditionally; a photograph inverted by Smart Invert is the
-    // case it exists for.
-    expect(subtree().host.payload.accessibilityIgnoresInvertColors).toBe(true);
-  });
+  // The Smart Invert opt-out (`ImageBackground.js:75`) left this file on 2026-09-18: it is
+  // `foldImageBackgroundProps` in the engine now, and this host builds its payload through the
+  // TypeScript `fabricProps`, which carries no copy of the tag rules. Asserted against the committed
+  // payload in `core/engine/cpp/tests/js/image-background-payload.itest.ts`. What stays here is the
+  // COMPOSITION — which node each prop lands on, and the style the inner image derives from the box.
 
   it('folds id to nativeID on the image, where the spread puts it', () => {
     mount(makeImageBackground({ source: SOURCE, id: 'hero' }));

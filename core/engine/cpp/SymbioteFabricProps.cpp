@@ -798,6 +798,24 @@ const std::array<const char *, 6> kTouchableFeedbackKeys = {
     "delayPressOut",
 };
 
+/**
+ * ImageBackground's wrapper (`ImageBackground.js:75`), and the whole rule is one key.
+ *
+ * iOS's Smart Invert inverts colours for accessibility, and a PHOTOGRAPH is exactly what must not be
+ * inverted — a background image shown as its own negative is the case the prop exists for. RN sets
+ * it on every ImageBackground it renders, so it is unconditional here too.
+ *
+ * Only the OWNER's rule. The inner image's style is DERIVED from this node's live style (RN proxies
+ * the wrapper's width/height onto the image so it fills the box rather than collapsing to the
+ * source's intrinsic size), which reads a second node and therefore stays a JS fold — composition,
+ * not platform.
+ */
+dynamic foldImageBackgroundProps(const dynamic &props) {
+  dynamic out = props;
+  out["accessibilityIgnoresInvertColors"] = true;
+  return out;
+}
+
 // The two native spinners. Which one a tag resolves to is the PLATFORM split, and branching on the
 // component name rather than on `#ifdef` keeps both halves reachable from one test build — the same
 // choice `foldSwitchProps` makes for `Switch` / `AndroidSwitch`.
@@ -1425,6 +1443,9 @@ dynamic fabricProps(
     bag = &tagResolved;
   } else if (tagName == "image") {
     tagResolved = foldImageProps(*bag);
+    bag = &tagResolved;
+  } else if (tagName == "image-background") {
+    tagResolved = foldImageBackgroundProps(*bag);
     bag = &tagResolved;
   } else if (tagName == "activity-indicator") {
     tagResolved = foldActivityIndicatorProps(*bag);

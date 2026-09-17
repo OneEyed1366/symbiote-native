@@ -79,13 +79,12 @@ function styleOf(value: unknown): IStyleProp<IViewStyle> | undefined {
   return { ...value };
 }
 
-// RN opts the wrapper out of iOS's Smart Invert for its whole subtree (`ImageBackground.js:75`) —
-// a photograph inverted by accessibility settings is the case that prop exists for. None of the
-// five wrappers ever wrote it, so this closes a standing gap rather than reproducing one.
-const hostFold: IPayloadFold = props => ({
-  ...props,
-  accessibilityIgnoresInvertColors: true,
-});
+// The owner's fold is GONE (2026-09-18), not moved into this file under another name: its whole
+// content was `accessibilityIgnoresInvertColors: true`, a function of the tag and nothing else, and
+// it is `foldImageBackgroundProps` in `SymbioteFabricProps.cpp` now. The owner therefore pays no
+// trip into JS at all, and a committed ImageBackground is down from two crossings to one — the
+// remaining one is the inner image's, below, which derives its style from THIS node and so cannot be
+// a per-node rule. Contract: `core/engine/cpp/tests/js/image-background-payload.itest.ts`.
 
 // Read one explicit dimension off the (already-flattened) box style. A dp number or a percentage
 // string is a valid IDimensionValue; anything else (auto / undefined) yields undefined.
@@ -171,7 +170,6 @@ const imageBackgroundBehavior: IHostBehavior = {
   slotDerived: IMAGE_BACKGROUND_SLOT_DERIVED,
   slotTakesNoChildren: true,
   buildStructure: buildBackgroundImage,
-  foldPayload: hostFold,
   // Required by the interface and deliberately empty: this primitive owns no timer, no listener
   // and no native handshake. Written out rather than shared with a `noop` so the emptiness reads
   // as a decision.

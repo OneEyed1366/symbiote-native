@@ -23,20 +23,26 @@
 //
 // MEASURED on `build-release`, three consecutive runs, one sitting, a thousand nodes per commit:
 //
-//              native walk        js walk             per node   keys in the bag
-//   spinner    3.6  3.7  3.7 ms   13.4 13.5 13.3 ms    ~9.7 us   4, no style in
-//   accessory  3.2  3.1  3.1 ms   14.6 13.9 13.7 ms   ~10.9 us   4
-//   button     3.9  3.9  3.9 ms   16.6 15.4 15.2 ms   ~11.8 us   5 + a 2-key style
-//   pressable  3.7  3.7  3.7 ms   18.0 18.7 18.1 ms   ~14.6 us   4 + a 3-key style
-//   switch     4.8  4.9  4.8 ms   23.6 23.6 23.4 ms   ~18.7 us   6 + nested trackColor
-//   image      5.8  5.9  5.8 ms   27.7 27.9 27.6 ms   ~21.9 us   6 + what the rule builds
+//              native walk        js walk             per node   keys in the bag / what the rule does
+//   imagebg    3.0  3.0  3.0 ms   13.0 12.2 12.0 ms    ~9.4 us   2 + a 3-key style / writes ONE key
+//   spinner    3.9  3.7  3.7 ms   14.4 13.6 13.5 ms   ~10.1 us   4, no style / the most work here
+//   accessory  3.1  3.2  3.1 ms   14.0 14.2 13.8 ms   ~10.8 us   4 / nothing at all
+//   button     4.2  3.9  3.9 ms   16.7 15.2 15.5 ms   ~11.8 us   5 + a 2-key style
+//   pressable  3.7  3.7  3.7 ms   18.1 17.7 18.3 ms   ~14.4 us   4 + a 3-key style
+//   switch     4.7  4.7  4.8 ms   23.5 23.3 23.8 ms   ~18.8 us   6 + nested trackColor
+//   image      5.9  5.8  5.9 ms   27.8 27.1 27.8 ms   ~21.7 us   6 + what the rule BUILDS
 //
-// THE SPINNER IS THE CHEAPEST ROW AND ITS RULE DOES THE MOST WORK OF ANY OF THEM — it builds a style
-// object, resolves a size two ways, writes two defaults and picks a colour. It is cheapest because
-// its bag arrives with no `style` key, which is the column's rule stated as an experiment rather than
-// an observation: the price is what has to be MARSHALLED, not what the rule computes. A rule that
-// creates keys on the way OUT still pays for them (see `image`); a rule that reads a small bag does
-// not, however much it does with it.
+// THE TOP THREE ROWS ARE A DELIBERATE EXPERIMENT, not three ports that happened to be cheap. Their
+// rules do, in order: almost nothing (ONE key written), the MOST work in the file (builds a style
+// object, resolves a size two ways, writes two defaults, picks a colour), and literally nothing at
+// all. They land within 1.4 us of each other. Whatever the price is a function of, it is not what the
+// rule computes.
+//
+// It is what has to be MARSHALLED. Read the column against the bag and it orders cleanly, with the
+// dearest row dear because its rule CREATES keys (a `source` object, a headers map, a style array)
+// that then have to travel back. So the cost model for a fold is: bag in, bag out, and the body is
+// free — which is why a trivial fold over a large bag is the worst value available, and why deleting
+// one that does nothing (see `accessory`) is worth as much as porting one that does a lot.
 //
 // `button`'s arm carries BOTH its rules — the pressable one its tag also gets, then its own — which
 // is why its JS twin composes the two folds rather than spelling only half. It still lands under
@@ -281,6 +287,29 @@ registerHostBehavior('activity-indicator-spinner-in-js', {
   },
 });
 
+// The SMALLEST rule in the file — one key, written unconditionally — and it is here as the control
+// for the column's own claim. If price tracked what a rule DOES, this row would be nearly free.
+registerHostBehavior('image-background-in-js', {
+  attach(): void {},
+  detach(): void {},
+  foldPayload(props: Readonly<Record<string, unknown>>) {
+    return { ...props, accessibilityIgnoresInvertColors: true };
+  },
+});
+
+// Registered bare rather than through `registerImageBackgroundBehavior`, which would build an inner
+// image per node and price a subtree instead of a rule — the same reason `button`'s arm is bare.
+registerHostBehavior('image-background', {
+  attach(): void {},
+  detach(): void {},
+});
+
+const IMAGE_BACKGROUND_PROPS = {
+  testID: 'hero',
+  accessibilityLabel: 'a hero',
+  style: { width: 120, height: 80, borderRadius: 4 },
+};
+
 const SPINNER_PROPS = {
   size: 'large',
   animating: true,
@@ -474,6 +503,10 @@ describe('what a ported tag rule costs on each side of the wire', () => {
 
   it('pays no trip into JS for a thousand images', () => {
     priced('image', 'RCTImageView', 'image', IMAGE_PROPS);
+  });
+
+  it('pays no trip into JS for a thousand image backgrounds', () => {
+    priced('imagebg', 'RCTView', 'image-background', IMAGE_BACKGROUND_PROPS);
   });
 
   it('pays no trip into JS for a thousand spinners', () => {
