@@ -46,6 +46,9 @@ export {
   textOf,
   propOf,
   propsOf,
+  // A TEST read, exported off the package root because the itest fixtures reach it that way — the
+  // real payload builder lives in C++ and this is the only complete view of what it produced.
+  committedPayloadOf,
 } from './host-access';
 // For a HOST BEHAVIOR that owns an animated style layer on its own node — TouchableOpacity's press
 // fade, which RN drives from an `Animated.View` the tag replaces.

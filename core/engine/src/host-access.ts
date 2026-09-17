@@ -267,6 +267,24 @@ export function propsOf(
   return merged;
 }
 
+/**
+ * A TEST read: the PAYLOAD the last commit handed Fabric for this node, `undefined` before one.
+ *
+ * `propsOf` above is the props AS THE OPS NAMED THEM — what the adapter said. This is what the
+ * payload builder MADE of them, after the aria fold, the behavior's own fold, the component-keyed
+ * folds and the style hoist. The two answer different questions and a test has to pick: "did the
+ * adapter write `inputMode`" is `propsOf`, and "did that reach native as `keyboardType`" is this.
+ *
+ * Only the native host can answer it — see `ITreeHost.committedPayloadOf`. Under the recording host
+ * it throws, on purpose, naming the itest suite as where the question belongs.
+ */
+export function committedPayloadOf(
+  node: ISymbioteNode,
+): Readonly<Record<string, unknown>> | undefined {
+  flushOps();
+  return treeHost()?.committedPayloadOf(node);
+}
+
 export function propOf(node: ISymbioteNode, key: string): unknown {
   // Before the host, because a function prop never reached it — see `writeProp`. Cheap enough to be
   // unconditional: this runs at gesture and lifecycle rate, never on a commit path.

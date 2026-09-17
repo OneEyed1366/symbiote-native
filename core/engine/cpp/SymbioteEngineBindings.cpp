@@ -166,6 +166,10 @@ void installBindings(jsi::Runtime &runtime) {
   install("subtreesOf", 1, &Tree::subtreesOf);
   install("ancestorsOf", 1, &Tree::ancestorsOf);
   install("committedRecordOf", 1, &Tree::committedRecordOf);
+  // A TEST read, and it is on this list rather than behind a build flag because the bag it returns
+  // is already retained per node for diffing — see `Tree::committedPayloadOf` for why the complete
+  // props read-back cannot come from React Native's own `getDebugProps` or `rawProps`.
+  install("committedPayloadOf", 1, &Tree::committedPayloadOf);
 
   install("dispatchCommand", 3, &Tree::dispatchCommand);
   install("sendAccessibilityEvent", 2, &Tree::sendAccessibilityEvent);

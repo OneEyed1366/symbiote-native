@@ -383,6 +383,23 @@ export function createRecordingHost(): IRecordingHost {
         rootTag: committedSurfaceRootTags.get(node) ?? NO_TAG,
       };
     },
+    /**
+     * REFUSED, loudly, and that is the whole point of implementing it here.
+     *
+     * This host records the OPS it was handed; it never builds a Fabric payload, because building
+     * one is `SymbioteFabricProps.cpp`'s job and that code does not exist in a vitest process. An
+     * answer synthesised from the JS twin would be a test asserting against the wrong
+     * implementation — the exact drift `ITreeHost.committedPayloadOf` was added to close.
+     *
+     * So a test asking this question belongs in `core/engine/cpp/tests/js/` (`pnpm run test:itest`),
+     * where the real builder runs. `.props` on this host stays the read for "what did the adapter
+     * SAY", which is a different and still-useful question.
+     */
+    committedPayloadOf(): Readonly<Record<string, unknown>> | undefined {
+      throw new Error(
+        'recording host: committedPayloadOf needs the real payload builder — move this to an itest',
+      );
+    },
     parentOf(handle: object): object | undefined {
       return nodeOf(handle, 'parentOf').parent?.handle;
     },

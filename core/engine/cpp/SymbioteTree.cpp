@@ -1965,6 +1965,20 @@ jsi::Value Tree::committedRecordOf(
   return record;
 }
 
+jsi::Value Tree::committedPayloadOf(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count) {
+  if (count < 1) {
+    throw jsi::JSError(runtime, "symbiote engine: expected committedPayloadOf(handle)");
+  }
+  const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "committedPayloadOf");
+  // Before the first commit there is no payload, and that is an ANSWER rather than an error — the
+  // same shape `committedRecordOf` gives for the same state.
+  if (node->committed == nullptr) return jsi::Value::undefined();
+  return jsi::valueFromDynamic(runtime, node->committedProps);
+}
+
 // ── THE IMPERATIVE FIVE ──────────────────────────────────────────────────────────────────────────
 //
 // See the header for why they are here rather than beside `Applier`. The one shape they all share:

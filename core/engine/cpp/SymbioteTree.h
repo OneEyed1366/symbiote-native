@@ -227,6 +227,31 @@ class Tree {
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);
+
+  /**
+   * The PAYLOAD the last commit handed Fabric for this node, or `undefined` before its first.
+   *
+   * A TEST READ, and the only complete one there is. What a committed node can otherwise report is
+   * `Props::getDebugProps()`, a hand-written SELECTION per component — `RCTView` answers seven keys
+   * and `RCTSinglelineTextInputView` answers `testID` and nothing else, because RN implements none
+   * for `TextInputProps`. So a test asking "did the payload builder resolve `inputMode` into
+   * `keyboardType`" had no way to look, and every rule in `SymbioteFabricProps.cpp` was verifiable
+   * only through its TypeScript twin.
+   *
+   * RN's own complete read is `Props::rawProps`, behind `RN_SERIALIZABLE_STATE` — which drags
+   * `fbjni/fbjni.h` into `State`'s virtual interface and cannot compile on a host build (tried
+   * 2026-09-15, recorded in `core/engine/cpp/tests/CMakeLists.txt`). This needs no flag: the bag is
+   * already retained per node as the next commit's diff baseline, so the read costs a conversion and
+   * nothing else, and no commit path changes at all.
+   *
+   * WHAT IT IS NOT: proof that Fabric PARSED any of it. A key no ViewConfig declares sits in here
+   * exactly as it was sent — `processor-refusal.itest.ts` is the test for that question, and
+   * `getDebugProps` stays the read that proves the round trip. This answers what we SENT.
+   */
+  facebook::jsi::Value committedPayloadOf(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
 };
 
 } // namespace symbiote

@@ -130,6 +130,10 @@ export type INativeEngineBindings = {
   /** The upward twin, deepest first — one crossing for a chain the event path walks per event. */
   ancestorsOf: (handle: object) => readonly object[];
   committedRecordOf: (handle: object) => ICommittedRecord | undefined;
+  /** A TEST read — the payload the last commit sent. See `ITreeHost.committedPayloadOf`. */
+  committedPayloadOf: (
+    handle: object,
+  ) => Readonly<Record<string, unknown>> | undefined;
   /**
    * The imperative six, taking the same placeholder object `applyOps` put the node on.
    *

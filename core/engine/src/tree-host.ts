@@ -106,6 +106,23 @@ export type ITreeHost = {
   // with a DERIVED payload has; see `markPropsDirty` (node.ts).
   markPropsDirty: (handle: object) => void;
   committedRecordOf: (handle: object) => ICommittedRecord | undefined;
+  /**
+   * A TEST read: the PAYLOAD the last commit handed Fabric for this node, `undefined` before one.
+   *
+   * It exists because the alternative reads are both blind. `Props::getDebugProps()` is a
+   * hand-written selection per component — `RCTSinglelineTextInputView` reports `testID` and nothing
+   * else — and RN's complete `Props::rawProps` needs `RN_SERIALIZABLE_STATE`, which pulls fbjni into
+   * `State` and does not compile on a host build. So the rules in `SymbioteFabricProps.cpp` were
+   * verifiable only through their TypeScript twins, which is the drift this read closes.
+   *
+   * Not on any commit path, and it adds no bookkeeping: the bag is already retained per node as the
+   * next commit's diff baseline.
+   *
+   * It answers what we SENT, not what Fabric parsed — a key no ViewConfig declares is still in here.
+   */
+  committedPayloadOf: (
+    handle: object,
+  ) => Readonly<Record<string, unknown>> | undefined;
   parentOf: (handle: object) => object | undefined;
   childrenOf: (handle: object) => readonly object[];
   // The next entry in the parent's child list — NOT `parentOf` plus `childrenOf` spelled in JS.
