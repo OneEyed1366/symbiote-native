@@ -78,6 +78,26 @@ function timeApply(act: () => void): number {
   return since(startedAt);
 }
 
+// How many times each width is measured before the BEST reading is kept.
+//
+// The minimum, not the mean, and it is the difference between an instrument and a coin flip. This
+// file times sub-millisecond work (a 1 000-wide clear is ~0.45 ms on the assert build) and the
+// runner spawns a process per test file — 62 of them — so a sample can be interrupted by the
+// scheduler for longer than the thing being measured. Noise is one-sided: it only ever ADDS time,
+// so the smallest of several runs is the closest to the work itself, while a mean carries every
+// interruption into the ratio.
+//
+// Measured before this existed: the clear row read 0.94x-1.52x run to run in isolation and blew
+// past its 2.0 bound under a full parallel suite, twice — a false failure on a test with no defect,
+// which is the most expensive kind. The BOUND is unchanged; only the sampling is.
+const SAMPLES = 5;
+
+function bestOf(measure: () => number): number {
+  let best = Number.POSITIVE_INFINITY;
+  for (let run = 0; run < SAMPLES; run += 1) best = Math.min(best, measure());
+  return best;
+}
+
 describe('a child list under structural churn', () => {
   // why: removing every child is what `Clear` is, and it is the row stock wins. If the cost is the
   // list rather than the removals, an app's teardown gets worse the longer its list is — which is
@@ -85,9 +105,13 @@ describe('a child list under structural churn', () => {
   it('removes every child in time proportional to the list, not its square', () => {
     const perRemoval: number[] = [];
     for (const width of WIDTHS) {
-      const { list, children } = openList(width);
-      const apply = timeApply(() => {
-        for (const child of children) removeChild(list, child);
+      // A FRESH LIST PER SAMPLE: a cleared list has nothing left to remove, so re-timing the same
+      // one would measure an empty loop and report a beautifully flat curve.
+      const apply = bestOf(() => {
+        const { list, children } = openList(width);
+        return timeApply(() => {
+          for (const child of children) removeChild(list, child);
+        });
       });
       perRemoval.push((apply * 1000) / width);
       print(
@@ -128,14 +152,18 @@ describe('a child list under structural churn', () => {
   it('reorders a keyed list quadratically, which is the container and not the search', () => {
     const perInsert: number[] = [];
     for (const width of WIDTHS) {
-      const { list, children } = openList(width);
-      // Move the tail half to the front, one at a time, anchored on the current head. Each insert
-      // names an anchor that is already at index 0, so a hint-free implementation still has to scan
-      // to find it and then shift everything after it.
-      const apply = timeApply(() => {
-        for (let at = width - 1; at >= width / 2; at -= 1) {
-          insertBefore(list, children[at], children[0]);
-        }
+      // Best of several, same as the clear row — and a FRESH list per sample, because a reordered
+      // list is no longer the shape this measures.
+      const apply = bestOf(() => {
+        const { list, children } = openList(width);
+        // Move the tail half to the front, one at a time, anchored on the current head. Each insert
+        // names an anchor that is already at index 0, so a hint-free implementation still has to
+        // scan to find it and then shift everything after it.
+        return timeApply(() => {
+          for (let at = width - 1; at >= width / 2; at -= 1) {
+            insertBefore(list, children[at], children[0]);
+          }
+        });
       });
       perInsert.push((apply * 2000) / width);
       print(
