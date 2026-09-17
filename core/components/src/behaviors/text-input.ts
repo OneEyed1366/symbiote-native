@@ -41,7 +41,6 @@ import {
   foldText,
   INITIAL_EVENT_COUNT,
   SELECTION_NONE,
-  resolveTextInputProps,
   shouldCommandText,
   textFromChange,
   type ITextInputChangeEvent,
@@ -140,30 +139,10 @@ function callValueChange(
   listener(changeEvent);
 }
 
-// The W3C/legacy alias fold the WRAPPER runs in its component body — `inputMode` -> `keyboardType`,
-// `enterKeyHint` -> `returnKeyType`, `readOnly` -> inverted `editable`, `blurOnSubmit` ->
-// `submitBehavior`, plus the `underlineColorAndroid: 'transparent'` default that hides the Material
-// bar. A tag has no body, so before this every one of them was dropped: the raw alias
-// reached Fabric as a key no ViewConfig declares, which throws nothing and renders nothing, so
-// `inputMode="numeric"` simply produced the default keyboard on a device while the whole headless
-// suite stayed green.
-//
-// Found by the wrapper-vs-behavior import audit rather than by hand
-// (`.claude/rules/adapter-parity-audit.md`) — the same audit that found Pressable's two.
-const ALIAS_ONLY_KEYS = [
-  'inputMode',
-  'enterKeyHint',
-  'readOnly',
-  'blurOnSubmit',
-] as const;
-
-function stringOf(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-function booleanOf(value: unknown): boolean | undefined {
-  return typeof value === 'boolean' ? value : undefined;
-}
+// The alias list and its two narrowing helpers went with the fold. They existed only to feed
+// `resolveTextInputProps`, and that resolution is `foldTextInputAliases` in
+// `SymbioteFabricProps.cpp` now — keeping a copy of the names here would be a second statement of
+// the same rule, which is the thing the move was for.
 
 // `multiline` picks between TWO Fabric views, so the TAG decides it and no later prop write moves a
 // node between them. The wrapper that used to stand here CONSUMED the prop to pick its intrinsic;
@@ -186,35 +165,26 @@ function booleanOf(value: unknown): boolean | undefined {
 // the error. Refusing a contradicting prop therefore stays in each adapter's own prop-write path,
 // where the author's stack still exists (Solid's `renderer.ts` is the reference); this file only
 // guarantees that whatever the props say, the payload matches the TAG.
-function foldPayload(
-  props: Readonly<Record<string, unknown>>,
-  isMultilineTag: boolean,
-): Record<string, unknown> {
-  const folded = resolveTextInputProps({
-    inputMode: stringOf(props.inputMode),
-    keyboardType: stringOf(props.keyboardType),
-    enterKeyHint: stringOf(props.enterKeyHint),
-    returnKeyType: stringOf(props.returnKeyType),
-    readOnly: booleanOf(props.readOnly),
-    editable: booleanOf(props.editable),
-    submitBehavior: stringOf(props.submitBehavior),
-    blurOnSubmit: booleanOf(props.blurOnSubmit),
-    multiline: isMultilineTag,
-    cursorColor: stringOf(props.cursorColor),
-    selectionColor: stringOf(props.selectionColor),
-    selectionHandleColor: stringOf(props.selectionHandleColor),
-    autoComplete: stringOf(props.autoComplete),
-    textContentType: stringOf(props.textContentType),
-    showSoftInputOnFocus: booleanOf(props.showSoftInputOnFocus),
-    underlineColorAndroid: stringOf(props.underlineColorAndroid),
-  });
-
-  const out: Record<string, unknown> = { ...props, ...folded };
-  // The aliases themselves must NOT ride along: they are inert at native, and leaving them in the
-  // payload is how a reader concludes the fold ran when it did not.
-  for (const key of ALIAS_ONLY_KEYS) delete out[key];
-  return out;
-}
+// THE FOLD IS GONE — the rule lives in the engine now, `foldTextInputAliases` in
+// `core/engine/cpp/SymbioteFabricProps.cpp`, beside the tree it writes into.
+//
+// It is UA behavior in the browser sense: mapping the web-facing spelling (`inputMode`,
+// `enterKeyHint`, `readOnly`, the W3C `autoComplete` token) onto React Native's own is a property of
+// the PLATFORM, not of any app, framework or component instance. Blink resolves `<input>`'s
+// attributes in the engine and every framework on top pays nothing for it; this is the same move.
+//
+// And it had a price. A `payloadFold` is a JS closure the C++ walk calls per node per commit, which
+// means converting the whole props bag to a `jsi::Value` and the result back again — ~17 us apiece,
+// and the entire gap between React's walk (24-27 ms, no folds) and every other adapter's (41-44 ms,
+// `foldsFound=1000`) on a byte-identical benchmark tree.
+//
+// There is deliberately NO TypeScript twin. `core/engine/cpp/tests/js/text-input-payload.itest.ts`
+// is the contract, and it reads the payload the commit actually sent rather than a second copy of
+// the rule.
+//
+// What stays here is the MACHINE: the controlled-value handshake, the event-count acknowledgement,
+// autofocus. Those run at gesture and lifecycle rate and call back into app code — which is exactly
+// what a browser keeps above the engine too.
 
 function onChange(node: ISymbioteNode, event: ISymbioteEvent): void {
   const state = stateOf(node);
@@ -396,19 +366,21 @@ export function buildTextInputHandle(node: ISymbioteNode): ITextInputHandle {
 // Idempotent: an adapter entry may be imported more than once in a bundle, and re-registering the
 // same tag with an equivalent behavior must not double-install anything.
 export function registerTextInputBehavior(): void {
-  const behaviorFor = (isMultilineTag: boolean) => ({
+  // THE TWO TAGS NOW SHARE ONE BEHAVIOR OBJECT, and that is the port showing up in the shape of the
+  // code. `multiline` was the only thing the two registrations did not share: each closed over its
+  // own answer to feed `foldPayload`. With the fold gone the machine is identical for both, and the
+  // engine answers `multiline` from the component name it already holds
+  // (`foldTextInputAliases`'s `isMultiline` argument, `SymbioteFabricProps.cpp`) — which is the
+  // better place for it anyway, since the component name is what Fabric actually keys the view on.
+  const behavior = {
     attach,
     attachAfterCommit,
     afterCommit,
     detach,
-    // The one thing the two registrations do NOT share: the tag is what answers `multiline`, so
-    // each closes over its own answer. Everything else is the same machine.
-    foldPayload: (props: Readonly<Record<string, unknown>>) =>
-      foldPayload(props, isMultilineTag),
     // The three the machine needs as INPUTS. Without the stash the app's own `onChange` would
     // evict the machine from the very event the controlled handshake runs on.
     ownedListeners: ['change', 'focus', 'blur'],
-  });
-  registerHostBehavior(TEXT_INPUT_TAG, behaviorFor(false));
-  registerHostBehavior(TEXT_INPUT_MULTILINE_TAG, behaviorFor(true));
+  };
+  registerHostBehavior(TEXT_INPUT_TAG, behavior);
+  registerHostBehavior(TEXT_INPUT_MULTILINE_TAG, behavior);
 }

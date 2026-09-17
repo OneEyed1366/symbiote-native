@@ -120,20 +120,19 @@ describe('<text-input>', () => {
     inputNode(MULTILINE);
   });
 
-  // why: submitBehavior is RN's replacement for the legacy blurOnSubmit boolean — an unset
-  // submitBehavior on a single-line field must still resolve to a real native value
-  // ('blurAndSubmit', RN's single-line default) rather than leaving the native prop undefined.
-  it('folds an unset submitBehavior to blurAndSubmit on a single-line field', () => {
-    mount(ROOT_TAG, <text-input value="x" />);
-    expect(inputNode(SINGLELINE).payload.submitBehavior).toBe('blurAndSubmit');
-  });
-
-  // why: an explicit submitBehavior is the caller's own choice and must win outright over any
-  // derived default — proves the fold doesn't override an explicit value with the legacy path.
-  it('lets an explicit submitBehavior win over the derived default', () => {
-    mount(ROOT_TAG, <text-input value="x" submitBehavior="submit" />);
-    expect(inputNode(SINGLELINE).payload.submitBehavior).toBe('submit');
-  });
+  // THE ALIAS AND submitBehavior CASES MOVED:
+  // `core/engine/cpp/tests/js/text-input-payload.itest.ts`.
+  //
+  // `text-input`'s prop resolution is the ENGINE's now (`foldTextInputAliases` in
+  // `SymbioteFabricProps.cpp`), so `createLiveTree`'s `.payload` — built by the TypeScript
+  // `fabricProps` — cannot observe it. Keeping them here would not merely fail; the
+  // `submitBehavior="submit"` case would go GREEN, because an unfolded bag passes an authored value
+  // through untouched. A false green over a rule that is not running is the worst of the three
+  // outcomes, which is why it moved with the others rather than being left as the one that
+  // still passed.
+  //
+  // What stays in this file is what is still React's: the tag choice, the controlled-write command,
+  // the event narrowing, and `Keyboard.dismiss`.
 
   it('commands setTextAndSelection with the acked count on a divergent controlled write', () => {
     // why: a plain re-push of the new `value` prop would race the user's next keystroke (native
@@ -188,77 +187,9 @@ describe('<text-input>', () => {
   });
 
   // why: inputMode/enterKeyHint/readOnly are the W3C-standard HTML attribute names — native
-  // Fabric only understands the legacy RN prop names (keyboardType/returnKeyType/editable), so
-  // every alias must both fold to its native equivalent AND be stripped, or an unknown prop key
-  // reaches native untranslated.
-  it('folds W3C aliases to their legacy native props and strips the raw aliases', () => {
-    mount(
-      ROOT_TAG,
-      <text-input
-        inputMode="numeric"
-        enterKeyHint="done"
-        readOnly
-        selectionColor="#ff0000"
-      />,
-    );
-
-    const node = inputNode(SINGLELINE);
-    expect(node.payload.keyboardType).toBe('number-pad');
-    expect(node.payload.returnKeyType).toBe('done');
-    expect(node.payload.editable).toBe(false);
-    expect(node.payload.cursorColor).toBe('#ff0000');
-    for (const raw of ['inputMode', 'enterKeyHint', 'readOnly']) {
-      expect(
-        Object.hasOwn(node.payload, raw),
-        `raw alias "${raw}" must not reach Fabric`,
-      ).toBe(false);
-    }
-  });
-
-  // why: a mapped autoComplete token (e.g. "email") must resolve to iOS's textContentType so
-  // the system keyboard/autofill can recognize the field, and a normal inputMode must default
-  // the soft keyboard to visible (the opposite case, inputMode="none", is tested separately).
-  it('folds autoComplete + derives showSoftInputOnFocus:true from inputMode', () => {
-    mount(ROOT_TAG, <text-input autoComplete="email" inputMode="text" />);
-
-    const node = inputNode(SINGLELINE);
-    expect(node.payload.autoComplete).toBe('email');
-    expect(node.payload.textContentType).toBe('emailAddress');
-    expect(node.payload.showSoftInputOnFocus).toBe(true);
-  });
-
-  // why: inputMode="none" is the W3C signal for "I render my own custom keyboard/picker" — the
-  // system soft keyboard must NOT pop up over it, the opposite of every other inputMode value.
-  it('derives showSoftInputOnFocus:false from inputMode="none"', () => {
-    mount(ROOT_TAG, <text-input inputMode="none" />);
-    expect(inputNode(SINGLELINE).payload.showSoftInputOnFocus).toBe(false);
-  });
-
-  // why: not every autoComplete token has a bespoke mapping table entry — an unrecognized-but-
-  // valid token must still pass through as the raw autoComplete value while still resolving a
-  // real iOS textContentType, rather than silently dropping to undefined for anything unmapped.
-  it('passes an unmapped autoComplete token through with its iOS textContentType', () => {
-    mount(ROOT_TAG, <text-input autoComplete="cc-name" />);
-    const node = inputNode(SINGLELINE);
-    expect(node.payload.autoComplete).toBe('cc-name');
-    expect(node.payload.textContentType).toBe('creditCardName');
-  });
-
-  // why (F-76): Android-only. iOS's `RCTTextInputViewConfig` never declares this prop, and stock
-  // RN's own payload builder filters it out there (`ReactNativeAttributePayload.create` drops any
-  // key `validAttributes` doesn't declare) — so sending it on iOS was a wire slot for nothing.
-  // Headless resolves iOS; `resolveTextInputProps`'s own tests price the Android branch directly.
-  it('omits underlineColorAndroid off Android, where no view declares it', () => {
-    mount(ROOT_TAG, <text-input value="x" />);
-    expect(inputNode(SINGLELINE).payload.underlineColorAndroid).toBeUndefined();
-  });
-
-  // why: the transparent default above must not be hardcoded past an explicit caller choice —
-  // a designer who deliberately wants the underline back must be able to set it.
-  it('lets an explicit underlineColorAndroid win', () => {
-    mount(ROOT_TAG, <text-input value="x" underlineColorAndroid="#00ff00" />);
-    expect(inputNode(SINGLELINE).payload.underlineColorAndroid).toBe('#00ff00');
-  });
+  // The alias folds, `autoComplete`, `showSoftInputOnFocus` and the `underlineColorAndroid` pair
+  // all moved with the rule — `core/engine/cpp/tests/js/text-input-payload.itest.ts`. Same reason as
+  // the block above: they read a payload the TypeScript builder no longer folds.
 
   // why: RN drives autoFocus in JS with an imperative `focus` command on mount (TextInput.js),
   // not a native prop — proves the effect actually fires exactly once for a genuinely

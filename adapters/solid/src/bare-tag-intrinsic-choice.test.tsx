@@ -1,9 +1,15 @@
 // The one prop that picks a NATIVE VIEW rather than a value, and both directions of it were
 // silently wrong:
 //
-//   <text-input-multiline />        the multiline view folded as SINGLE-line — `submitBehavior`
-//                                   'blurAndSubmit', so Return blurs instead of inserting a newline
-//   <text-input multiline />        the SINGLE-line view carrying the multiline fold
+//   <text-input-multiline />        committed the SINGLE-line view, so Return blurs instead of
+//                                   inserting a newline
+//   <text-input multiline />        committed the single-line view while claiming to be multiline
+//
+// `viewName` IS the observable, and it is the only one now: these cases used to corroborate it with
+// `submitBehavior`, whose resolution moved into the engine (`foldTextInputAliases`,
+// `SymbioteFabricProps.cpp`) and is asserted there —
+// `core/engine/cpp/tests/js/text-input-payload.itest.ts`. Reading the view name is the more direct
+// answer to the question this file asks anyway.
 //
 // The wrapper that used to stand here consumed `multiline` to choose its intrinsic, so it could not
 // reach either case. Device-only, nothing red. Everything else about a tag is covered by its
@@ -66,15 +72,12 @@ describe('the tag decides the text-input view, on a hand-written tag', () => {
     const node = await committed(() => <text-input-multiline testID="probe" />);
 
     expect(node.viewName).toBe('RCTMultilineTextInputView');
-    // The fold the seed exists for: single-line resolves this to 'blurAndSubmit'.
-    expect(node.payload.submitBehavior).toBe('newline');
   });
 
   it('folds the single-line tag as single-line', async () => {
     const node = await committed(() => <text-input testID="probe" />);
 
     expect(node.viewName).toBe('RCTSinglelineTextInputView');
-    expect(node.payload.submitBehavior).toBe('blurAndSubmit');
     // Not seeded on this tag: the wrapper's payload carries no `multiline` key either, and adding
     // one here would be a divergence in the opposite direction.
     expect(Object.keys(node.payload)).not.toContain('multiline');
@@ -100,7 +103,6 @@ describe('the tag decides the text-input view, on a hand-written tag', () => {
     ));
 
     expect(node.viewName).toBe('RCTMultilineTextInputView');
-    expect(node.payload.submitBehavior).toBe('newline');
   });
 
   // The spread is the shape a transform must REFUSE (`unreadableAttributeSet`) because it cannot

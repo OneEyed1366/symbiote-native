@@ -275,7 +275,11 @@ describe('what one benchmark row actually commits', () => {
           'width',
         ],
       ),
-    ).toEqual(['mostRecentEventCount', 'submitBehavior', 'text']);
+      // `submitBehavior` left this census when TextInput's prop resolution moved into the engine
+      // (`foldTextInputAliases`, `SymbioteFabricProps.cpp`) — this probe reads the TypeScript
+      // builder's payload, which no longer carries a copy of that rule. The two left are the
+      // MACHINE's, which is still JS: the acknowledged event count and the controlled text.
+    ).toEqual(['mostRecentEventCount', 'text']);
     unmount(ROOT_TAG + 21);
   });
 });

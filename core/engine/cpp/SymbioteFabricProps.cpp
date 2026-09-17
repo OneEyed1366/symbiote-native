@@ -467,6 +467,258 @@ dynamic foldTextInputValue(const dynamic &props) {
   return folded;
 }
 
+// ── TEXT INPUT: THE WEB SPELLING, RESOLVED ───────────────────────────────────────────────────────
+//
+// What Blink does for `<input>`, done here for the same reason: an app writes the W3C name and the
+// platform knows only its own. `inputMode` -> `keyboardType`, `enterKeyHint` -> `returnKeyType`,
+// `readOnly` -> `editable`, one `autoComplete` token -> Android's `autoComplete` AND iOS's
+// `textContentType`. It is a property of React Native, not of any app or framework, so every adapter
+// gets it for the price of emitting the tag.
+//
+// MOVED FROM `core/components/src/behaviors/text-input.ts`, where it was a `payloadFold` — a JS
+// closure the walk called per node per commit, converting the whole props bag out and back for it.
+// Measured at the entire gap between React's walk and every other adapter's on one tree:
+// `foldsFound=1000`, ~17 us apiece. There is NO TypeScript twin of what follows, deliberately; the
+// contract is `core/engine/cpp/tests/js/text-input-payload.itest.ts`, which reads the payload this
+// builder actually sent.
+//
+// Every table below is RN's own, cited to the line of `Libraries/Components/TextInput/TextInput.js`.
+
+/** RN's inputMode -> keyboardType map, TextInput.js:815. `search` is split per platform, below. */
+const std::unordered_map<std::string, std::string> &inputModeToKeyboardType() {
+  static const auto *table = new std::unordered_map<std::string, std::string>{
+      {"decimal", "decimal-pad"}, {"email", "email-address"}, {"none", "default"},
+      {"numeric", "number-pad"},  {"tel", "phone-pad"},       {"text", "default"},
+      {"url", "url"},
+  };
+  return *table;
+}
+
+/** RN's enterKeyHint -> returnKeyType map, TextInput.js:805. Note `enter` -> 'default'. */
+const std::unordered_map<std::string, std::string> &enterKeyHintToReturnKeyType() {
+  static const auto *table = new std::unordered_map<std::string, std::string>{
+      {"done", "done"}, {"enter", "default"},     {"go", "go"},     {"next", "next"},
+      {"previous", "previous"}, {"search", "search"}, {"send", "send"},
+  };
+  return *table;
+}
+
+/** RN's W3C autocomplete -> Android `autoComplete` map, TextInput.js:828. */
+const std::unordered_map<std::string, std::string> &autoCompleteWebToAndroid() {
+  static const auto *table = new std::unordered_map<std::string, std::string>{
+      {"additional-name", "name-middle"},
+      {"address-line1", "postal-address-region"},
+      {"address-line2", "postal-address-locality"},
+      {"bday", "birthdate-full"},
+      {"bday-day", "birthdate-day"},
+      {"bday-month", "birthdate-month"},
+      {"bday-year", "birthdate-year"},
+      {"cc-csc", "cc-csc"},
+      {"cc-exp", "cc-exp"},
+      {"cc-exp-month", "cc-exp-month"},
+      {"cc-exp-year", "cc-exp-year"},
+      {"cc-number", "cc-number"},
+      {"country", "postal-address-country"},
+      {"current-password", "password"},
+      {"email", "email"},
+      {"family-name", "name-family"},
+      {"given-name", "name-given"},
+      {"honorific-prefix", "name-prefix"},
+      {"honorific-suffix", "name-suffix"},
+      {"name", "name"},
+      {"new-password", "password-new"},
+      {"off", "off"},
+      {"one-time-code", "sms-otp"},
+      {"postal-code", "postal-code"},
+      {"sex", "gender"},
+      {"street-address", "street-address"},
+      {"tel", "tel"},
+      {"tel-country-code", "tel-country-code"},
+      {"tel-national", "tel-national"},
+      {"username", "username"},
+  };
+  return *table;
+}
+
+/** RN's W3C autocomplete -> iOS `textContentType` map, TextInput.js:862. */
+const std::unordered_map<std::string, std::string> &autoCompleteWebToTextContentType() {
+  static const auto *table = new std::unordered_map<std::string, std::string>{
+      {"additional-name", "middleName"},
+      {"address-line1", "streetAddressLine1"},
+      {"address-line2", "streetAddressLine2"},
+      {"bday", "birthdate"},
+      {"bday-day", "birthdateDay"},
+      {"bday-month", "birthdateMonth"},
+      {"bday-year", "birthdateYear"},
+      {"cc-additional-name", "creditCardMiddleName"},
+      {"cc-csc", "creditCardSecurityCode"},
+      {"cc-exp", "creditCardExpiration"},
+      {"cc-exp-month", "creditCardExpirationMonth"},
+      {"cc-exp-year", "creditCardExpirationYear"},
+      {"cc-family-name", "creditCardFamilyName"},
+      {"cc-given-name", "creditCardGivenName"},
+      {"cc-name", "creditCardName"},
+      {"cc-number", "creditCardNumber"},
+      {"cc-type", "creditCardType"},
+      {"country", "countryName"},
+      {"current-password", "password"},
+      {"email", "emailAddress"},
+      {"family-name", "familyName"},
+      {"given-name", "givenName"},
+      {"honorific-prefix", "namePrefix"},
+      {"honorific-suffix", "nameSuffix"},
+      {"name", "name"},
+      {"new-password", "newPassword"},
+      {"nickname", "nickname"},
+      {"off", "none"},
+      {"one-time-code", "oneTimeCode"},
+      {"organization", "organizationName"},
+      {"organization-title", "jobTitle"},
+      {"postal-code", "postalCode"},
+      {"street-address", "fullStreetAddress"},
+      {"tel", "telephoneNumber"},
+      {"url", "URL"},
+      {"username", "username"},
+  };
+  return *table;
+}
+
+/** The string a key holds, or null when it is absent or is not a string. */
+const std::string *stringAt(const dynamic &props, const char *key) {
+  const dynamic *found = props.get_ptr(key);
+  if (found == nullptr || !found->isString()) return nullptr;
+  return &found->getString();
+}
+
+/** The bool a key holds, or null when it is absent or is not a bool. */
+const bool *boolAt(const dynamic &props, const char *key) {
+  const dynamic *found = props.get_ptr(key);
+  if (found == nullptr || !found->isBool()) return nullptr;
+  static thread_local bool held = false;
+  held = found->getBool();
+  return &held;
+}
+
+/** A safe lookup: the mapped token, or null when the map has no entry. The caller owns the fallback. */
+const std::string *mappedToken(
+    const std::unordered_map<std::string, std::string> &table,
+    const std::string &token) {
+  const auto found = table.find(token);
+  return found == table.end() ? nullptr : &found->second;
+}
+
+/**
+ * RN's submitBehavior reconciliation, TextInput.js:559.
+ *
+ * It returns a value for an EMPTY bag, which is what makes it a RULE rather than a mapping: a
+ * singleline input with nothing authored still submits on return. An explicit `newline` on a
+ * singleline tag is coerced — there is no newline to insert.
+ */
+std::string foldSubmitBehavior(
+    const std::string *submitBehavior,
+    const bool *blurOnSubmit,
+    bool isMultiline) {
+  if (submitBehavior != nullptr) {
+    if (!isMultiline && *submitBehavior == "newline") return "blurAndSubmit";
+    return *submitBehavior;
+  }
+  if (isMultiline) {
+    return blurOnSubmit != nullptr && *blurOnSubmit ? "blurAndSubmit" : "newline";
+  }
+  return blurOnSubmit != nullptr && !*blurOnSubmit ? "submit" : "blurAndSubmit";
+}
+
+/**
+ * The whole rule, applied to the bag on its way to the payload.
+ *
+ * WRITES ONLY WHAT IT RESOLVES and erases only the aliases, so an authored native name always
+ * survives: every branch below reads the native key first and falls back to the web one, which is
+ * RN's own precedence (TextInput.js:930-946).
+ */
+dynamic foldTextInputAliases(const dynamic &props, bool isMultiline) {
+  dynamic out = props;
+
+  const std::string *inputMode = stringAt(props, "inputMode");
+  if (inputMode != nullptr && out.get_ptr("keyboardType") == nullptr) {
+    // `search` is the ONE token RN resolves per platform (TextInput.js:815-825): iOS has a dedicated
+    // search keyboard whose return key is a magnifier, every other host falls back to the default.
+    if (*inputMode == "search") {
+#ifdef ANDROID
+      out["keyboardType"] = "default";
+#else
+      out["keyboardType"] = "web-search";
+#endif
+    } else {
+      const std::string *mapped = mappedToken(inputModeToKeyboardType(), *inputMode);
+      if (mapped != nullptr) out["keyboardType"] = *mapped;
+    }
+  }
+
+  const std::string *enterKeyHint = stringAt(props, "enterKeyHint");
+  if (enterKeyHint != nullptr && out.get_ptr("returnKeyType") == nullptr) {
+    const std::string *mapped = mappedToken(enterKeyHintToReturnKeyType(), *enterKeyHint);
+    if (mapped != nullptr) out["returnKeyType"] = *mapped;
+  }
+
+  // The web spelling is the NEGATION of the native one. Getting it backwards makes every read-only
+  // field editable, silently.
+  const bool *readOnly = boolAt(props, "readOnly");
+  if (readOnly != nullptr && out.get_ptr("editable") == nullptr) {
+    out["editable"] = !*readOnly;
+  }
+
+  out["submitBehavior"] = foldSubmitBehavior(
+      stringAt(props, "submitBehavior"), boolAt(props, "blurOnSubmit"), isMultiline);
+
+  // RN's three selection colours coalesce onto one authored value, so writing `selectionColor` alone
+  // gets a matching caret and handle.
+  const dynamic *selectionColor = props.get_ptr("selectionColor");
+  if (selectionColor != nullptr && !selectionColor->isNull()) {
+    if (out.get_ptr("cursorColor") == nullptr) out["cursorColor"] = *selectionColor;
+    if (out.get_ptr("selectionHandleColor") == nullptr) {
+      out["selectionHandleColor"] = *selectionColor;
+    }
+  }
+
+  // RN resolves BOTH native props from the one W3C token (TextInput.js:938). Android reads
+  // `autoComplete` and iOS reads `textContentType`; each is inert on the other platform, so emitting
+  // both is safe and is what keeps this fold platform-agnostic. A token with no Android entry falls
+  // back to ITSELF (RN's `?? autoComplete`); one with no iOS entry leaves `textContentType` unset.
+  const std::string *autoComplete = stringAt(props, "autoComplete");
+  if (autoComplete != nullptr) {
+    const std::string *android = mappedToken(autoCompleteWebToAndroid(), *autoComplete);
+    out["autoComplete"] = android != nullptr ? *android : *autoComplete;
+    if (out.get_ptr("textContentType") == nullptr) {
+      const std::string *ios = mappedToken(autoCompleteWebToTextContentType(), *autoComplete);
+      if (ios != nullptr) out["textContentType"] = *ios;
+    }
+  }
+
+  // `inputMode: 'none'` is how the web spells "focusable but no keyboard".
+  if (inputMode != nullptr && out.get_ptr("showSoftInputOnFocus") == nullptr) {
+    out["showSoftInputOnFocus"] = *inputMode != "none";
+  }
+
+  // ANDROID ONLY, and that is F-76 rather than tidiness: iOS's `RCTSinglelineTextInputView`
+  // ViewConfig does not declare `underlineColorAndroid` at all, so RN's own
+  // `ReactNativeAttributePayload.create` filters it out and it never leaves JS there. We have no such
+  // filter, so defaulting it unconditionally sent a key every iOS view silently dropped — one wire
+  // slot, one interned string, one hashed RawProps entry, per TextInput, for nothing.
+#ifdef ANDROID
+  if (out.get_ptr("underlineColorAndroid") == nullptr) {
+    out["underlineColorAndroid"] = "transparent";
+  }
+#endif
+
+  // The aliases themselves must NOT ride along: none is a native prop, and leaving one in the payload
+  // is how a reader concludes the rule ran when it did not.
+  out.erase("inputMode");
+  out.erase("enterKeyHint");
+  out.erase("readOnly");
+  out.erase("blurOnSubmit");
+  return out;
+}
+
 } // namespace
 
 dynamic fabricProps(
@@ -514,10 +766,21 @@ dynamic fabricProps(
   }
 
   dynamic valueFolded;
-  if ((component == kSinglelineTextInput || component == kMultilineTextInput) &&
+  const bool isTextInput =
+      component == kSinglelineTextInput || component == kMultilineTextInput;
+  if (isTextInput &&
       (bag->get_ptr("value") != nullptr || bag->get_ptr("defaultValue") != nullptr)) {
     valueFolded = foldTextInputValue(*bag);
     bag = &valueFolded;
+  }
+
+  // TextInput's web spelling resolved into RN's own — the UA rule, moved off a JS `payloadFold`.
+  // See `foldTextInputAliases`. Unconditional because `submitBehavior` is produced for an empty bag,
+  // which is what makes this a rule rather than a mapping.
+  dynamic aliasResolved;
+  if (isTextInput) {
+    aliasResolved = foldTextInputAliases(*bag, component == kMultilineTextInput);
+    bag = &aliasResolved;
   }
 
   // RN's two Text defaults (`Text.js:289` and `:291`), applied here so no adapter has to write them

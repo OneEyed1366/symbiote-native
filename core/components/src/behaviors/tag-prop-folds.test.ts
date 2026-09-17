@@ -15,7 +15,9 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { registerPressableBehavior, PRESSABLE_TAG } from './pressable';
-import { registerTextInputBehavior, TEXT_INPUT_TAG } from './text-input';
+// Registered but not exercised here any more: its fold moved to the engine (see the note below the
+// helpers). Kept so this file's registry looks the way an app's does — every behavior installed.
+import { registerTextInputBehavior } from './text-input';
 
 const fabric = installRecordingFabric();
 // `.payload` throughout: a fold runs on the way into what Fabric is handed, and the author's bag
@@ -29,7 +31,6 @@ let nextRootTag = 9600;
 // PRODUCTION SHAPE — the Fabric view name as the component, the intrinsic tag third. Passing the
 // tag AS the component matches the behavior registry by accident and leaves every case green over
 // a registration that can never fire in an app (`.claude/rules/test-harness-false-greens.md` §11).
-const TEXT_INPUT_VIEW = 'RCTSinglelineTextInputView';
 const PRESSABLE_VIEW = 'RCTView';
 const TEST_ID = 'subject';
 
@@ -54,43 +55,20 @@ function commitTag(
   return live.nodeOf(node).payload;
 }
 
-describe('a text-input tag folds the W3C aliases', () => {
-  it('maps inputMode / readOnly / enterKeyHint onto the native props', () => {
-    const props = commitTag(TEXT_INPUT_VIEW, TEXT_INPUT_TAG, {
-      inputMode: 'numeric',
-      readOnly: true,
-      enterKeyHint: 'search',
-    });
-
-    expect(props.keyboardType).toBe('number-pad');
-    // `readOnly` is the INVERSE of `editable`, which is the half a hand-written fold gets wrong.
-    expect(props.editable).toBe(false);
-    expect(props.returnKeyType).toBe('search');
-  });
-
-  it('does not send the raw aliases, which no ViewConfig declares', () => {
-    const props = commitTag(TEXT_INPUT_VIEW, TEXT_INPUT_TAG, {
-      inputMode: 'numeric',
-      readOnly: true,
-      enterKeyHint: 'search',
-      blurOnSubmit: false,
-    });
-
-    expect(Object.keys(props)).not.toContain('inputMode');
-    expect(Object.keys(props)).not.toContain('readOnly');
-    expect(Object.keys(props)).not.toContain('enterKeyHint');
-    expect(Object.keys(props)).not.toContain('blurOnSubmit');
-  });
-
-  it('carries the defaults the wrapper carries', () => {
-    const props = commitTag(TEXT_INPUT_VIEW, TEXT_INPUT_TAG, {});
-
-    expect(props.submitBehavior).toBe('blurAndSubmit');
-    // F-76: Android-only default (headless resolves iOS, where no ViewConfig declares this key —
-    // `resolveTextInputProps`'s own tests price the Android branch directly).
-    expect(props.underlineColorAndroid).toBeUndefined();
-  });
-});
+// THE TEXT-INPUT CASES MOVED, they were not dropped:
+// `core/engine/cpp/tests/js/text-input-payload.itest.ts`.
+//
+// They asserted a rule that no longer exists in JavaScript. `text-input`'s alias resolution is the
+// engine's now — `foldTextInputAliases` in `SymbioteFabricProps.cpp` — so `createLiveTree`'s
+// `.payload`, which builds through the TypeScript `fabricProps`, cannot see it and never will. A
+// test that reads a payload built by the wrong implementation is worse than no test: it goes green
+// on a copy of the rule rather than on the rule.
+//
+// Everything they covered is covered there, on the payload the commit actually sent, plus the
+// assertion this harness could not make at all — `foldsFound === 0`, which is why the rule moved.
+//
+// Pressable's cases below STAY: its fold is still a JS `payloadFold`, so this is still the right
+// place to read it, and this file becomes the record of which folds have not moved yet.
 
 describe('a pressable tag folds disabled into accessibilityState', () => {
   it('announces a disabled button as disabled', () => {

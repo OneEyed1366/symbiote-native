@@ -109,33 +109,15 @@ describe('Solid TextInput on the engine', () => {
     });
 
     // why: RN's own aliases are folded in JS and are INERT at the native layer — forwarding
-    // `inputMode`/`enterKeyHint`/`readOnly` raw would leave the keyboard and the return key at
-    // their defaults while every JS-level check still passed.
-    it('folds the W3C aliases onto their native props', async () => {
-      mount(ROOT_TAG, () => (
-        <text-input
-          inputMode="email"
-          enterKeyHint="send"
-          readOnly
-          autoComplete="username"
-        />
-      ));
-      await tick();
-
-      const payload = committedInput().payload;
-      expect(payload.keyboardType).toBe('email-address');
-      expect(payload.returnKeyType).toBe('send');
-      expect(payload.editable).toBe(false);
-      // One W3C token resolves BOTH platforms' native props; the inert one rides along.
-      expect(payload.autoComplete).toBe('username');
-      expect(payload.textContentType).toBe('username');
-      // F-76: Android-only default. RN's own payload builder filters this key out on iOS
-      // (`RCTTextInputViewConfig.js` never declares it), so it must not be here either —
-      // `resolveTextInputProps`'s own tests price the Android branch directly.
-      expect(payload.underlineColorAndroid).toBeUndefined();
-      // Single-line with no explicit submitBehavior blurs on submit.
-      expect(payload.submitBehavior).toBe('blurAndSubmit');
-    });
+    // THE ALIAS CASE MOVED: `core/engine/cpp/tests/js/text-input-payload.itest.ts`.
+    //
+    // It asserted the resolution of `inputMode` / `enterKeyHint` / `readOnly` / `autoComplete`, and
+    // that rule is the engine's now (`foldTextInputAliases`, `SymbioteFabricProps.cpp`). This
+    // harness's `.payload` is built by the TypeScript `fabricProps`, which no longer carries a copy
+    // of it — deliberately, so there is one implementation rather than two that must agree.
+    //
+    // Nothing about it was Solid-specific: every adapter had its own transcription of the same
+    // assertions, and all of them collapse into the one file above.
 
     // why: placeholder/secureTextEntry/maxLength/autoCapitalize and friends are real Fabric props
     // this adapter never names — they ride through `passthrough` untouched. A split list that
@@ -445,19 +427,18 @@ describe('Solid TextInput on the engine', () => {
     // assertion pins a contract two layers hold, not this adapter alone.)
     it('never forwards the JS-only props onto the native prop bag', async () => {
       mount(ROOT_TAG, () => (
-        <text-input
-          value="a"
-          defaultValue="seed"
-          inputMode="email"
-          onValueChange={() => {}}
-        />
+        <text-input value="a" defaultValue="seed" onValueChange={() => {}} />
       ));
       await tick();
 
       const payload = committedInput().payload;
       expect('onValueChange' in payload).toBe(false);
       expect('defaultValue' in payload).toBe(false);
-      expect('inputMode' in payload).toBe(false);
+      // `inputMode` used to be asserted here too. It is stripped by the ENGINE now
+      // (`foldTextInputAliases`, `SymbioteFabricProps.cpp`), which this harness's payload cannot
+      // see, so the assertion moved with the rule —
+      // `core/engine/cpp/tests/js/text-input-payload.itest.ts`. The two left are still this layer's:
+      // a function prop and `defaultValue` are dropped by the TypeScript builder.
     });
 
     // A runtime multiline flip is NOT covered: single- and multiline are different native views,

@@ -326,16 +326,19 @@ describe('what the element directives commit', () => {
     expect(propsOf(all, 'probe').onLayout).toBe(true);
   });
 
-  it('still attaches the host behavior, so a bare tag keeps its folds', async () => {
+  // The OBSERVABLE changed and the question did not. This asserts that a bare tag gets its host
+  // behavior attached; it used to read `submitBehavior`, which was a fold output, and that fold is
+  // the engine's now (`foldTextInputAliases`, `SymbioteFabricProps.cpp`) — invisible to a recording
+  // host, which reports props as the OPS named them.
+  //
+  // `mostRecentEventCount` is the right observable and arguably always was: the MACHINE writes it,
+  // at attach, as a real prop op. It proves the thing the test is named for rather than a rule that
+  // happened to run nearby. Switch's `value` still comes from a JS fold and stays as it is.
+  it('still attaches the host behavior to a bare tag', async () => {
     const { all } = await mountTemplate(
       `<text-input [testID]="'probe'"></text-input><switch [testID]="'sw'"></switch>`,
     );
-    expect(propsOf(all, 'probe')).toMatchObject({
-      submitBehavior: 'blurAndSubmit',
-    });
-    // F-76: Android-only default, headless resolves iOS — see `resolveTextInputProps`'s own tests
-    // for the Android branch.
-    expect(propsOf(all, 'probe').underlineColorAndroid).toBeUndefined();
+    expect(propsOf(all, 'probe')).toMatchObject({ mostRecentEventCount: 0 });
     expect(propsOf(all, 'sw').value).toBe(false);
   });
 

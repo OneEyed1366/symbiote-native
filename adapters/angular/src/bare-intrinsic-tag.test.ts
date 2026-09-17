@@ -217,20 +217,22 @@ describe('a bare intrinsic tag, hand-written', () => {
     expect(payload?.onLayout).toBe(true);
   });
 
-  it('attaches the host behavior, so a bare tag carries its folds', async () => {
+  it('attaches the host behavior to a bare tag', async () => {
     const { all } = await mountTemplate(
       `<text-input testID="probe"></text-input><switch testID="sw"></switch>`,
       CUSTOM_ELEMENTS_SCHEMA,
     );
     // The behavior registry is keyed by the intrinsic TAG. A renderer that handed it the resolved
-    // Fabric name instead would attach nothing and these defaults would silently vanish.
+    // Fabric name instead would attach nothing and this would silently vanish.
+    //
+    // `mostRecentEventCount` rather than `submitBehavior`: the latter was a fold output and the
+    // fold is the engine's now (`foldTextInputAliases`, `SymbioteFabricProps.cpp`), which this
+    // harness's payload — built by the TypeScript `fabricProps` — cannot see. The count is written
+    // by the MACHINE at attach, so it is the observable this test was always reaching for.
     const probePayload = all.find(
       node => node.payload.testID === 'probe',
     )?.payload;
-    expect(probePayload).toMatchObject({ submitBehavior: 'blurAndSubmit' });
-    // F-76: Android-only default, headless resolves iOS — see `resolveTextInputProps`'s own tests
-    // for the Android branch.
-    expect(probePayload?.underlineColorAndroid).toBeUndefined();
+    expect(probePayload).toMatchObject({ mostRecentEventCount: 0 });
     expect(all.find(node => node.payload.testID === 'sw')?.payload.value).toBe(
       false,
     );
