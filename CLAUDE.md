@@ -1706,6 +1706,40 @@ marshalled, with the dearest row dear because its rule CREATES keys that then tr
 consequences worth keeping: a trivial fold over a large bag is the worst value available, and
 DELETING a fold that does nothing is worth as much as porting one that does a lot.
 
+### A mirror that cannot be removed is made LOUD — the scroll base style, held by a test
+
+`SCROLL_VIEW_BASE_{VERTICAL,HORIZONTAL}` exists in C++ (`foldScrollViewProps`) AND in JS
+(`render-scroll-view.ts`), and both are needed. Android's RefreshControl path does not go through the
+rule: RN wraps the scroll view and splits the app's style across two boxes with the base composed
+onto BOTH (`ScrollView.js:1854-1863` — "the ScrollView still needs the baseStyle to be scrollable").
+That split reads the OWNER's style from the WRAPPER's fold, one node reading another, so it is
+composition and stays in JS — which needs the value.
+
+`core/engine/cpp/tests/js/scroll-view-base-parity.itest.ts` commits a scroll view of each axis and
+compares the committed payload against the JS objects key by key. It works because the itest harness
+sees both sides in one process. **Verified by breaking it on purpose** — flipping the C++ `flexGrow`
+to 2 turned both rows red naming the key, then reverted. A guard that has never failed is one you are
+only hoping works.
+
+Without it the two paths diverge only on an Android device with a RefreshControl attached, which is
+the narrowest possible place to find out.
+
+### A test that "flakes" in the full run and passes alone — read the walk before blaming the build
+
+`load-time-registration.test.ts` failed intermittently and was dismissed as a stale-build artifact
+TWICE in one session before anyone looked. It is a real race, and a repo-shaped one: the audit walks
+`adapters/`, and the Svelte suites write a `.smoke-compiled-*.mjs` beside their own source and
+`rmSync` it in an `afterAll` — dozens of them, by design. `readdirSync` followed by a separate
+`statSync` leaves a window where one of those vanishes in between, and `statSync` throws ENOENT on an
+entry the walk was about to discard for its extension anyway.
+
+Fixed with `readdirSync(dir, { withFileTypes: true })`: the type comes from the SAME syscall, so the
+window does not exist rather than being caught. One syscall cheaper per entry, too.
+
+The general form is the part worth keeping: **a failure with no assertion in the message is not
+evidence of flakiness, it is evidence that something threw** — and "passes alone, fails in parallel"
+points at shared filesystem state, not at a build.
+
 ### The engine can WARN now — `SymbioteDebug.h`, and it was ScrollView's blocker
 
 Until 2026-09-18 the only channel out of `core/engine/cpp` was `throw jsi::JSError`: a rule could
