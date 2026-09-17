@@ -49,6 +49,18 @@ export function readLayoutDimension(
 //     scroll. Vertical keeps the default `column`.
 // Both axes match RN's baseHorizontal/baseVertical exactly. Composed UNDER the user style,
 // so an explicit value still wins.
+// THE SECOND COPY, and the first is `foldScrollViewProps` in `SymbioteFabricProps.cpp`. Both are
+// needed: the engine composes the base onto every ordinary scroll view, while Android's
+// RefreshControl path wraps the scroll view and splits the app's style across two boxes with the
+// base on BOTH (`ScrollView.js:1854-1863` — "the ScrollView still needs the baseStyle to be
+// scrollable"). That split reads the OWNER's style from the WRAPPER's fold, one node reading
+// another, which is composition and stays in JS — so these values have to exist here too.
+//
+// A mirror that cannot be removed is made LOUD instead:
+// `core/engine/cpp/tests/js/scroll-view-base-parity.itest.ts` commits a scroll view of each axis and
+// compares the payload against these objects key by key. Edit one side alone and it goes red naming
+// the key; leave it out and the two paths diverge only on an Android device with a RefreshControl
+// attached, which is the narrowest possible place to find out.
 export const SCROLL_VIEW_BASE_HORIZONTAL: IViewStyle = {
   flexGrow: 1,
   flexShrink: 1,

@@ -828,6 +828,11 @@ const std::array<const char *, 6> kTouchableFeedbackKeys = {
 dynamic foldScrollViewProps(const dynamic &props, bool isHorizontal) {
   dynamic out = props;
 
+  // THESE FOUR KEYS HAVE A SECOND COPY IN JS and it is not removable: Android's RefreshControl path
+  // wraps the scroll view and splits the app's style across two boxes, composing the base onto BOTH
+  // (`ScrollView.js:1854-1863`), and that split reads one node's style from another node's fold — so
+  // it is composition and stays in `behaviors/scroll-view/index.android.ts`, which needs the value.
+  // `core/engine/cpp/tests/js/scroll-view-base-parity.itest.ts` fails if the two copies drift.
   dynamic base = dynamic::object();
   base["flexGrow"] = 1;
   base["flexShrink"] = 1;
