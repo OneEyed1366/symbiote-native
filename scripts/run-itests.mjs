@@ -466,6 +466,26 @@ const testsDir = path.join(root, 'core/engine/cpp/tests/js');
  * So: correctness runs on `build`, timings run on `build-release`. Neither replaces the other.
  */
 const buildDirectory = process.env.SYMBIOTE_ITEST_BUILD ?? 'build';
+
+/**
+ * The JS half of the `build` / `build-release` split, and it was missing for as long as the split
+ * has existed.
+ *
+ * `__DEV__` and `NODE_ENV` used to be pinned to development for every run. That is right for the
+ * correctness build — it is what keeps React Native's invariants and warnings armed, the reason the
+ * C++ side is Debug there. On `build-release` it is the JS twin of the mistake `CLAUDE.md` already
+ * records for the native side ("never benchmark adapters in a Debug build; the sign of the headline
+ * comparison flipped"): `react/index.js` picks `react.development.js` off `NODE_ENV`, so every React
+ * arm this directory has ever timed ran the DEVELOPMENT React — validation, warnings and all — and
+ * the reconciler deltas published off those arms carry it.
+ *
+ * It also blocks the stock arm outright. `ReactFabric-prod` sets up React's internals in their
+ * production shape, and a development `createElement` then reaches for `dispatcher.getOwner()`,
+ * which production does not carry. The component renders nothing and REPORTS nothing — the error
+ * goes to `console.error` through RN's error dialog — so the failure reads as "components do not
+ * work here" rather than as a mixed build.
+ */
+const isBenchBuild = buildDirectory !== 'build';
 const binary = path.join(
   root,
   `core/engine/cpp/tests/${buildDirectory}/symbiote_tester`,
@@ -559,8 +579,10 @@ try {
       },
       banner: { js: PLATFORM_PRELUDE },
       define: {
-        __DEV__: 'true',
-        'process.env.NODE_ENV': '"development"',
+        __DEV__: isBenchBuild ? 'false' : 'true',
+        'process.env.NODE_ENV': isBenchBuild
+          ? '"production"'
+          : '"development"',
       },
       plugins: [
         workspaceSources,

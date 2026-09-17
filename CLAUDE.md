@@ -1442,6 +1442,27 @@ What stays open is the half this fixture cannot reach: both sides run the SAME r
 9.6-vs-35.3 difference is what React does per fiber against a mutation-mode host config versus its
 own persistent-mode one. Answering it needs React's own Fabric renderer standing up in this harness.
 
+### Every headless React arm ever timed here ran the DEVELOPMENT React, and `bench:itest` now does not
+
+`scripts/run-itests.mjs` pinned `__DEV__: true` and `NODE_ENV: "development"` for every run. That is
+right for the correctness build — it is what keeps React Native's invariants and warnings armed, the
+same reason the C++ side is Debug there — and it was applied to `build-release` too. `react/index.js`
+picks `react.development.js` off `NODE_ENV`, so **every React arm in `core/engine/cpp/tests/js/` was
+measured with validation and warnings on.** It is the JS twin of the mistake this file already
+records for the native side ("never benchmark adapters in a Debug build; the sign of the headline
+comparison flipped"), and it went unnoticed because nothing named it.
+
+Fixed: the defines follow the build (`isBenchBuild`). The measured cost on the swap fixture is
+**24.5 ms -> 20.6 ms, i.e. ~16% of that arm was development React** — so every reconciler delta this
+directory has published carries a share of it, including the 45-48 ms attributed to fibers. Re-read
+before quoting any of them.
+
+It also blocked the stock arm outright, and silently: `ReactFabric-prod` sets React's internals up in
+their production shape, a development `createElement` then calls `dispatcher.getOwner()` which
+production does not carry, React catches the throw, retries three times, and reports it through RN's
+error dialog into `console.error`. What the caller sees is a component that RAN and a surface holding
+`RootView()`, empty, with no error anywhere — which reads as "components do not work here".
+
 ### React's own Fabric renderer LOADS headlessly — a stock baseline is now a build-out, not a question
 
 Every stock comparison in this file is taken on a device because nothing here could run the other
@@ -1513,6 +1534,31 @@ surface**, `kSurfaceId = 1` (`symbiote-host.h`), which every reader visits and n
 into a root tag of its own — the careful-looking choice, since the raw arm keeps its tags clear of
 ours — committed into a surface nothing can read, and reported `RootView()` empty while `render` came
 back perfectly clean.
+
+### And the `Swap` anomaly reproduces headlessly: 2.42x, against 3.68x on device
+
+`core/engine/cpp/tests/js/stock-swap-cost.itest.tsx` builds the same thousand memoized rows through
+`ReactFabric-prod` and exchanges the same two. Census first, as always — `View=3001 Paragraph=3000
+RawText=3000 TextInput=1000`, the ten-node row exactly:
+
+```
+ stock          8.5 ms      device says 9.6 — the harness lands on the real number
+ our React     20.6 ms      engine 2.7 ms of it, `created=0 cloned=2 reused=1000 setProps=0`
+ ratio         2.42x        device says 3.68x
+```
+
+Both sides run the SAME reconciler over the same tree, and the engine is 2.7 ms of our 20.6 — so the
+remaining ~12 ms is the host config, mutation mode against React's own persistent mode, and it is
+now bisectable without a simulator. A SEPARATE FILE per arm on purpose: the runner spawns a process
+per file, which removes both the ~3%/arm contamination this directory has measured and the question
+of whether two renderers can share the harness's single surface.
+
+Three traps worth not re-paying. A failing stock render is **silent** (React retries, then reports
+through RN's error dialog into `console.error`), so a swap measured against an empty tree reads
+0.1 ms and passes every before/after comparison — the fixture captures `console.error` permanently
+for that reason. The census must assert ABSOLUTE counts, not that before matches after: two empty
+censuses match perfectly. And the shadow names are not the element names — `RCTText` commits as
+`Paragraph`, its string child as `RawText`, `RCTSinglelineTextInputView` as `TextInput`.
 
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the
