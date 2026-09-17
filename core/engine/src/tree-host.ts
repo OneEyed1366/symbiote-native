@@ -344,8 +344,17 @@ export type ISurfaceTelemetry = {
    * left over is the walk's own bookkeeping.
    */
   walkMs: number;
-  /** `fabricProps` + the prop fold, on both the create and the clone path. */
+  /** `fabricProps` alone, on both the create and the clone path. The fold LOOKUP is billed apart. */
   propsMs: number;
+  /**
+   * Asking a node whether it carries a `payloadFold`: a JSI property read, and on a hit a
+   * `jsi::Function` allocation. The fold's own CALL is inside `propsMs`, where `fabricProps` makes
+   * it. Separated because the two answer different questions — how big the payload is, against how
+   * much the seam to JS costs to reach.
+   */
+  foldLookupMs: number;
+  /** How many nodes the lookup found one on. Zero makes `foldLookupMs` pure probe cost. */
+  foldsFound: number;
   /** The payload copy Fabric consumes, kept because `committedProps` is next commit's baseline. */
   rawPropsMs: number;
   createNodeMs: number;
@@ -408,6 +417,15 @@ export type ISurfaceTelemetry = {
    */
   hostReadMs: number;
   hostReadHandles: number;
+  /**
+   * How many times `applyOps` was entered since the last read.
+   *
+   * The string and value tables are interned PER BATCH, so a driver that flushes in many small
+   * batches cannot fold a repeated value across them. This is what distinguishes "this adapter sends
+   * more values" from "this adapter sends the same values in more batches" — two very different
+   * findings that look identical in `valueEntries` alone.
+   */
+  applyCalls: number;
 };
 
 /**

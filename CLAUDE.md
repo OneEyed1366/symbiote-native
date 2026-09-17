@@ -1330,6 +1330,48 @@ copies the props bag to seed an absent default, so every `<Text>` that does not 
 `allowFontScaling` — which is nearly all of them — allocates a copy. Three thousand of them on this
 screen cost 0.8-5.4 ms of ~116, inside the spread of the arm it is compared against.
 
+### A `payloadFold` costs ~17 us per node PER COMMIT, and it is billed inside the C++ walk
+
+Running the same fixture through Vue put its delta at 54.7 ms against React's 49.0 — on an identical
+tree with byte-identical node counters, which should have made Vue the CHEAPER arm, its reconciler
+being far lighter than fibers. Splitting the walk's `props` phase found the whole gap in one place:
+
+```
+react   props= 1.4   foldLookup=2.9   folds=0
+vue     props=18.4   foldLookup=3.3   folds=1000
+```
+
+One node per row carries a `payloadFold` on Vue and none does on React. It is the `text-input`,
+whose host behavior declares `foldPayload`; Vue reaches the behavior because `text-input` is a tag
+resolved through `descriptorFor`, while React's adapter renders its own React component and attaches
+nothing. 17 ms for a thousand folds.
+
+**What a fold costs is the TRIP, not the function.** `fabricProps` converts the whole props bag to a
+`jsi::Value`, calls into JS, and converts the result back — for a fold that rewrites two keys. And
+`foldProbe` caches only the answer NO, so a node that folds pays this on every commit it is dirty in,
+for the life of the screen.
+
+That generalises past this fixture and past Vue, which is why it is here rather than in a Vue note:
+**every lowered primitive is a host behavior.** A thousand-row screen with two lowered `Pressable`s
+would pay this twice per row if those behaviors declared a fold. So read `foldsFound` before
+attributing any per-adapter deficit — a fold count that differs between two adapters on one tree is
+the difference, and nothing else in the walk has to be examined.
+
+Not fixed. The fold has to run in JS somewhere; moving it to where React runs it — ahead of
+`setProp`, so ordinary props cross and the host never calls back — is a change to the behavior
+contract, and it wants its own pass.
+
+A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
+win, recorded honestly as that. `internValue` excluded booleans from the intern table on the
+reasoning that a `Map` lookup costs what converting a boolean costs. Booleans need no `Map` — there
+are two of them, so a dedicated slot each is a branch — and the conversion was never the whole cost,
+since `values` is a JSI array the host reads entry by entry. Three adapters seed
+`allowFontScaling: true` at `createElement`, so the table held one entry per text node on the screen.
+Folding them took it from 5007 to 2008 on React's arm and 9007 to 3008 on Vue's, and moved the wall
+clock ~2%, which is inside the noise. Kept because the table is now an honest diagnostic — it counts
+DISTINCT values rather than writes of un-interned kinds — which is what made the fold count readable
+in the first place.
+
 ### A re-render that changes nothing is free now, whichever way the style is written
 
 The commonest shape any app produces: a parent's state moves, the framework re-renders the subtree,

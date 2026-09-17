@@ -637,6 +637,14 @@ size_t targetedReplaces_ = 0;
 struct IWalkCost {
   double walkNs = 0;
   double propsNs = 0;
+  // `propsNs` is two unrelated things billed together — assembling the payload, and asking the node
+  // whether it even has a `payloadFold`. The second is a JSI property read plus, when the answer is
+  // yes, a `jsi::Function` allocation and a round trip through JS with the whole bag converted both
+  // ways. `foldProbe` caches only the NO, so a folding node pays the round trip every commit. Split
+  // out because two adapters building the identical tree disagreed 4x on `propsNs` and the sum
+  // cannot say which half moved.
+  double foldLookupNs = 0;
+  size_t foldsFound = 0;
   double rawPropsNs = 0;
   double createNs = 0;
   double appendNs = 0;
@@ -677,6 +685,11 @@ struct IWalkCost {
   // difference between moving the mark into C++ and leaving it alone.
   double hostReadNs = 0;
   size_t hostReadHandles = 0;
+  // How many times `applyOps` was entered. The string and value tables are interned PER BATCH, so a
+  // driver that flushes in many small batches cannot fold a repeated value across them — and the
+  // count is the only thing that distinguishes "this adapter sends more values" from "this adapter
+  // sends the same values in more batches".
+  size_t applyCalls = 0;
   // Inside `structureNs`: promoting a node's WEAK handle reference to a strong one when it acquires
   // a parent. One `jsi::WeakObject::lock` plus one `jsi::Object` per node, i.e. real JSI work on an
   // op that otherwise touches nothing but our own vectors.
@@ -1141,8 +1154,12 @@ std::shared_ptr<const react::ShadowNode> materialize(
     // the local would silently change which processors run on every nested text node.
     //
     auto startedAt = ISteadyClock::now();
-    folly::dynamic payload =
-        fabricProps(node.viewName, node.props, foldFor(runtime, node));
+    IPayloadFold fold = foldFor(runtime, node);
+    walkCost_.foldLookupNs += nanosSince(startedAt);
+    if (fold) walkCost_.foldsFound += 1;
+
+    startedAt = ISteadyClock::now();
+    folly::dynamic payload = fabricProps(node.viewName, node.props, fold);
     walkCost_.propsNs += nanosSince(startedAt);
     // The payload is needed TWICE and only one of those needs a copy. `RawProps` takes its
     // `folly::dynamic` BY VALUE (`RawProps.h:65`) and consumes it, so Fabric's half is a copy no
@@ -1183,7 +1200,12 @@ std::shared_ptr<const react::ShadowNode> materialize(
     folly::dynamic payload = folly::dynamic::object();
     if (node.selfDirty) {
       auto startedAt = ISteadyClock::now();
-      next = fabricProps(node.viewName, node.props, foldFor(runtime, node));
+      IPayloadFold fold = foldFor(runtime, node);
+      walkCost_.foldLookupNs += nanosSince(startedAt);
+      if (fold) walkCost_.foldsFound += 1;
+
+      startedAt = ISteadyClock::now();
+      next = fabricProps(node.viewName, node.props, fold);
       walkCost_.propsNs += nanosSince(startedAt);
       startedAt = ISteadyClock::now();
       payload = diffProps(node.committedProps, next);
@@ -1286,6 +1308,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
   }
 
   const auto applyStartedAt = ISteadyClock::now();
+  walkCost_.applyCalls += 1;
   auto &uiManager = uiManagerFor(runtime, "applyOps");
 
   size_t opsLength = 0;
@@ -2154,6 +2177,9 @@ jsi::Value Tree::readSurfaceTelemetry(
   const auto millis = [](double nanos) { return jsi::Value(nanos / 1e6); };
   result.setProperty(runtime, "walkMs", millis(walkCost_.walkNs));
   result.setProperty(runtime, "propsMs", millis(walkCost_.propsNs));
+  result.setProperty(runtime, "foldLookupMs", millis(walkCost_.foldLookupNs));
+  result.setProperty(
+      runtime, "foldsFound", static_cast<double>(walkCost_.foldsFound));
   result.setProperty(runtime, "rawPropsMs", millis(walkCost_.rawPropsNs));
   result.setProperty(runtime, "createNodeMs", millis(walkCost_.createNs));
   result.setProperty(runtime, "appendChildMs", millis(walkCost_.appendNs));
@@ -2181,6 +2207,8 @@ jsi::Value Tree::readSurfaceTelemetry(
   result.setProperty(runtime, "hostReadMs", millis(walkCost_.hostReadNs));
   result.setProperty(
       runtime, "hostReadHandles", jsi::Value(static_cast<double>(walkCost_.hostReadHandles)));
+  result.setProperty(
+      runtime, "applyCalls", jsi::Value(static_cast<double>(walkCost_.applyCalls)));
   walkCost_ = IWalkCost{};
   return result;
 }

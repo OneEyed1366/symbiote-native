@@ -208,6 +208,8 @@ export type INativeEngineBindings = {
     /** `materialize`'s own walk and its breakdown — ours, zeroed on read. See `ISurfaceTelemetry`. */
     walkMs: number;
     propsMs: number;
+    foldLookupMs: number;
+    foldsFound: number;
     rawPropsMs: number;
     createNodeMs: number;
     appendChildMs: number;
@@ -231,6 +233,7 @@ export type INativeEngineBindings = {
     holdHandleMs: number;
     hostReadMs: number;
     hostReadHandles: number;
+    applyCalls: number;
   };
 };
 
