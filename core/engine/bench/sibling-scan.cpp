@@ -315,3 +315,27 @@ int main() {
 //
 //   clang++ -std=c++20 -O2 -DNDEBUG -o /tmp/sibling-scan core/engine/bench/sibling-scan.cpp \
 //     && /tmp/sibling-scan
+
+// ── ANSWER, measured (2026-09-17) ───────────────────────────────────────────────────────────────
+//
+// The scan is exonerated, exactly as arms B/C/D predicted it might be: at 4 000 standing siblings,
+// its OWN cost over the no-scan floor is +1.224 ms for 1 000 inserts (C -> D widens 4x in sibling
+// count but only 2.76x in time — sub-linear, the opposite of what a quadratic culprit would show).
+// Nowhere near the 107 ms device gap this file was built to explain. Do not re-open `std::find` as
+// a suspect without a new device measurement pointing back at it.
+//
+// Arms H/I found the real signal instead, unprompted: the FLOOR for a single-child-change commit
+// (copy the sibling vector, splice one slot) already costs real time at scale — 13.8 us/commit at
+// 4 000 siblings, expected, that is clone-on-write's own price. What `materialize` actually pays
+// for the SAME commit is 28.7 us/commit at the same width: a stable ~2.1x over the floor (2.9x at
+// 500 siblings, 2.1x at 1000/2000/4000 — converges, does not grow, so this is a constant per-child
+// overhead, not a second quadratic term hiding behind the first). The 14.8 us/commit gap at 4 000
+// siblings is `appendRenderable`'s own cost: a function call, the anchor test, the empty-raw-text
+// test, and a five-field reuse decision (`selfDirty`, `pathDirty`, committed pointer, family,
+// context), asked fresh for every UNCHANGED sibling on a commit where only one child differs.
+//
+// NOT fixed here. This is a real correctness-adjacent hot path (family tracking, anchor handling,
+// text-ancestor context all feed the reuse decision `materialize` makes per child) and changing it
+// needs the itest suite's full weight behind it, not a headless container bench. Left as the next
+// concrete target: a fast path for "parent structurally unchanged, exactly one child self-dirty"
+// that splices instead of re-deriving. Quantified in `.docs/tree-inefficiency-findings.md`.
