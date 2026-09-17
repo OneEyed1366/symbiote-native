@@ -1673,6 +1673,37 @@ copies the props bag to seed an absent default, so every `<Text>` that does not 
 `allowFontScaling` — which is nearly all of them — allocates a copy. Three thousand of them on this
 screen cost 0.8-5.4 ms of ~116, inside the spread of the arm it is compared against.
 
+### A fold is charged for EXISTING, not for what it does — the one that did nothing cost 10.7 us/node
+
+Four tag rules priced on one ruler, `build-release`, three runs, a thousand nodes per commit
+(`core/engine/cpp/tests/js/tag-rule-cost.itest.ts` — both arms the same tree in the same process,
+payloads asserted equal key by key before any millisecond is read):
+
+```
+             native walk   js walk    per node   the bag
+ accessory      3.1         13.8       10.7 us   4 keys — AND ITS FOLD DID NOTHING
+ pressable      3.8         18.2       14.1 us   4 keys + a 3-key style
+ switch         4.7         23.5       18.8 us   6 keys + nested trackColor
+ image          5.9         27.7       21.9 us   6 keys + what the rule BUILDS
+```
+
+`input-accessory-view`'s fold took the bag apart and reassembled it unchanged, so the port DELETED
+it rather than moving it — and it still cost 10.7 us per node to have had. Read down the column and
+the price tracks BAG SIZE, not rule complexity. **So the worst value available is a trivial fold
+over a large bag**, which inverts the intuition that a cheap-looking fold is cheap.
+
+Two holes the vendor read turned up beside the port, both fixed in the same commit: TouchableHighlight
+never folded `disabled` into `accessibilityState` (`TouchableHighlight.js:311-319`), so a disabled
+highlight announced itself to a screen reader as enabled; and neither touchable stripped the six
+props its feedback machine consumes (`activeOpacity`, `underlayColor`, `onShowUnderlay`,
+`onHideUnderlay`, `delayPressIn`, `delayPressOut`), two of them FUNCTIONS, all forwarded to a native
+view that declares none of them.
+
+`id` -> `nativeID` is now ONE rule (`foldIdAlias`) applied to every TAGGED node instead of five JS
+copies. It cannot reach a third-party view — that was the objection that kept it duplicated — because
+`tagName` is written only by `attachHostBehavior`, so it is non-empty for our own primitives and
+nothing else.
+
 ### A `payloadFold` costs ~17 us per node PER COMMIT, and it is billed inside the C++ walk
 
 Running the same fixture through Vue put its delta at 54.7 ms against React's 49.0 — on an identical
