@@ -116,17 +116,11 @@
   padding-right: 10px;
   border-radius: 8px;
   background-color: #151c33;
-  /* WIDTH lives here, unconditionally, so selecting a row never moves a Yoga layout key
-     (border-left-width dirties yogaStyle, which forces the targeted-replace guard to refuse and
-     clone the whole list instead of the one changed row — F-65,
-     `.docs/tree-inefficiency-findings.md`, 500x measured on Select). Selection changes only the
-     COLOUR below. Same look: an unselected row's border is invisible, not absent. */
-  border-left-width: 3px;
-  border-left-color: transparent;
 }
 
 .bench-row-selected {
   background-color: #3a2c10;
+  border-left-width: 3px;
   border-left-color: #f5a524;
 }
 
