@@ -93,6 +93,13 @@ export const OP_SET_COMPONENT = 9; // [slot, viewName]
 export const OP_SET_TAG = 10; // [slot, tag]
 
 /**
+ * An app callback appeared on, or disappeared from, an event name the behavior OWNS.
+ * `[slot, name, present]`. See `recordSetOwnedListener` for why the bit crosses and the closure
+ * does not.
+ */
+export const OP_SET_OWNED_LISTENER = 11; // [slot, name, present]
+
+/**
  * A `setProp` whose value slot is this DELETES the key.
  *
  * `undefined` cannot carry it: `null` is a legitimate Fabric prop value meaning "reset to the
@@ -432,6 +439,32 @@ export function recordSetComponent(handle: object, viewName: string): void {
 
 export function recordSetTag(handle: object, tag: string): void {
   push(OP_SET_TAG, slotOf(handle), intern(tag));
+}
+
+/**
+ * Whether an app callback is currently wired to an event name the BEHAVIOR owns. `[slot, name,
+ * present]`, `present` being 1 or 0.
+ *
+ * The EXISTENCE, never the function. A name a behavior owns is diverted into a JS stash by
+ * `setEventListener` and never becomes a prop, so the payload builder sees no trace of it — and
+ * `focusable` on a touchable is `focusable !== false && onPress !== undefined && !disabled`
+ * (`TouchableOpacity.js:336-339`), two props and one thing only JS knew. This is the one bit that
+ * closes that gap.
+ *
+ * The browser is the argument rather than convenience: a UA computes focusability itself and CAN,
+ * because `addEventListener` is its own API — it knows which elements carry a click handler, while
+ * the handler's body stays the application's. Same split.
+ *
+ * Emitted on a FLIP only, from `setEventListener`, which already refuses to notify on listener
+ * identity because a framework hands a fresh closure nearly every render. So this is a mount-time
+ * op, not a per-render one — against the per-commit fold it replaces.
+ */
+export function recordSetOwnedListener(
+  handle: object,
+  name: string,
+  isPresent: boolean,
+): void {
+  push(OP_SET_OWNED_LISTENER, slotOf(handle), intern(name), isPresent ? 1 : 0);
 }
 
 export function recordCommit(rootTag: number, surface: object): void {

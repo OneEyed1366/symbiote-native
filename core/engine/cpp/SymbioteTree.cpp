@@ -66,6 +66,7 @@ constexpr int32_t kOpSetText = 7;
 constexpr int32_t kOpCommit = 8;
 constexpr int32_t kOpSetComponent = 9;
 constexpr int32_t kOpSetTag = 10;
+constexpr int32_t kOpSetOwnedListener = 11;
 
 constexpr int32_t kKindElement = 0;
 constexpr int32_t kKindRawText = 1;
@@ -162,6 +163,17 @@ enum class FoldProbe : uint8_t { unknown, absent, present };
 struct Node : jsi::NativeState {
   int32_t kind = kKindElement;
   bool isText = false;
+  // Whether the APP has a callback wired to `press`, a name the behavior owns and that therefore
+  // never becomes a prop (`setEventListener` diverts it into a JS stash). `focusable` on a touchable
+  // is `focusable !== false && onPress !== undefined && !disabled` — two props and this.
+  //
+  // A BOOL rather than a set of names, and the choice is the same one `stashed` made on the JS side
+  // for the same reason: a container here would cost 24 bytes on EVERY node in every app to serve
+  // the handful that own a listener, where this one lands in padding that already existed. `press`
+  // is the only owned name any platform rule reads; a second would be a second bool, and only a
+  // third would be worth a bitmask. Names the host has no rule for are dropped at the op, which is
+  // also the browser's arrangement — a UA tracks the listeners its own rules consult.
+  bool hasPressListener = false;
   // As the adapter authored it. `committedViewName` below is what was actually sent, which differs
   // exactly when the virtual-text rule fired.
   std::string viewName;
@@ -1197,7 +1209,8 @@ std::shared_ptr<const react::ShadowNode> materialize(
         node.tagName,
         node.props,
         fold,
-        node.parent == nullptr ? nullptr : &node.parent->props);
+        node.parent == nullptr ? nullptr : &node.parent->props,
+        node.hasPressListener);
     walkCost_.propsNs += nanosSince(startedAt);
     // The payload is needed TWICE and only one of those needs a copy. `RawProps` takes its
     // `folly::dynamic` BY VALUE (`RawProps.h:65`) and consumes it, so Fabric's half is a copy no
@@ -1248,7 +1261,8 @@ std::shared_ptr<const react::ShadowNode> materialize(
           node.tagName,
           node.props,
           fold,
-          node.parent == nullptr ? nullptr : &node.parent->props);
+          node.parent == nullptr ? nullptr : &node.parent->props,
+          node.hasPressListener);
       walkCost_.propsNs += nanosSince(startedAt);
       startedAt = ISteadyClock::now();
       payload = diffProps(node.committedProps, next);
@@ -1662,6 +1676,23 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
       case kOpSetTag: {
         const auto &node = nodeAt(ops[at + 1]);
         node->tagName = stringAt(ops[at + 2]);
+        break;
+      }
+      // `markDirty`, unlike `kOpSetTag` above, and the difference is WHEN each arrives. A tag is set
+      // at `attachHostBehavior`, before any prop is routed and before the node's first commit, so
+      // there is no payload yet to invalidate. A listener can flip at any point in a screen's life —
+      // a row that becomes pressable once its data loads — and the key it decides is already
+      // committed by then. Without this the control renders permanently unfocusable while visibly
+      // interactive, and nothing else in the batch would mark it: a listener is not a prop write.
+      case kOpSetOwnedListener: {
+        const auto &node = nodeAt(ops[at + 1]);
+        // Only the names a platform rule actually reads. Anything else is a JS-side concern that
+        // happened to cross, and dropping it here costs one comparison.
+        if (stringAt(ops[at + 2]) != "press") break;
+        const bool isPresent = ops[at + 3] != 0;
+        if (node->hasPressListener == isPresent) break;
+        node->hasPressListener = isPresent;
+        markDirty(*node);
         break;
       }
       case kOpSetText: {

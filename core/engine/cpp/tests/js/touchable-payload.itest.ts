@@ -199,14 +199,22 @@ describe('what the fold-only touchables send native', () => {
     expect(style.padding).toBe(4);
   });
 
-  // why: THE PRICE, and for these two it is partial BY DESIGN. Each keeps a `payloadFold` for the
-  // half that reads the node, so `foldsFound` is 1 per node and what moved is the work inside the
-  // trip rather than the trip itself. Asserted so the difference from the other ports is a recorded
-  // fact rather than an oversight.
-  it('still pays one trip each, for the half that reads the node', () => {
-    const one = opacity({ id: 'save' });
-    print(`DEBUG touchable-opacity folds=${one.folds}`);
-    expect(one.folds).toBe(1);
+  // why: THE PRICE, and this case read 1 until 2026-09-18 with a comment calling the remainder
+  // partial BY DESIGN. What was actually left was `focusable`, whose middle leg is an owned
+  // listener's EXISTENCE — and that turned out to be one bit rather than something unportable, so
+  // `touchable-opacity` is at zero. See `touchable-focusable-payload.itest.ts`.
+  //
+  // `touchable-highlight` is NOT, and the distinction is worth keeping in the same case: its fold
+  // survives for the UNDERLAY, which is built from live press state (`shown` flips inside a
+  // gesture) and is the genuine article the old comment was reaching for.
+  it('costs the opacity tag no trip, and the highlight one for its underlay', () => {
+    const fade = opacity({ id: 'save' });
+    print(`DEBUG touchable-opacity folds=${fade.folds}`);
+    expect(fade.folds).toBe(0);
+
+    const underlay = highlight({ id: 'save', onPress: () => {} });
+    print(`DEBUG touchable-highlight folds=${underlay.folds}`);
+    expect(underlay.folds).toBe(1);
   });
 });
 

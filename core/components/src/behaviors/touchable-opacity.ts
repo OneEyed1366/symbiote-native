@@ -24,7 +24,6 @@ import {
   AnimatedValue,
   Easing,
   Platform,
-  appListenerFor,
   dlog,
   getExplicitStyle,
   markPropsDirty,
@@ -33,15 +32,12 @@ import {
   setAnimatedBehaviorStyle,
   timing,
   type IHostBehavior,
-  type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
   propOf,
   propsOf,
 } from '@symbiote-native/engine';
-import { resolveTouchableFocusable } from '../view/render-pressable';
 import {
-  booleanOr,
   createPressBehavior,
   type IDisabledResolver,
   type IPressConfigRefinement,
@@ -233,33 +229,29 @@ export function createTouchableOpacityBehavior(
   };
 }
 
-// `focusable` IS THE ONLY THING LEFT IN JS for this tag, because its middle leg — `onPress !==
-// undefined` (TouchableOpacity.js:338) — is an OWNED name and therefore lives in the stash, which a
-// props-only fold cannot reach. `./button` composes this behavior and resolves its own; the tag
-// resolves it here, over the node. Everything else this fold used to do — `accessible !== false`,
-// the `id -> nativeID` alias, the `disabled -> accessibilityState` merge, the strip of the six props
-// the feedback machine consumes — is the engine's now (`foldPressableProps` and `foldIdAlias` in
-// `SymbioteFabricProps.cpp`), which runs BEFORE this fold, the order the composition always had.
+// THIS TAG NOW COSTS ZERO TRIPS INTO JS (2026-09-18). `focusable` was the last thing here, and it
+// held out because its middle leg — `onPress !== undefined` (TouchableOpacity.js:338) — is an OWNED
+// name that lives in the stash and never becomes a prop, so a props-only rule could not see it.
 //
-// `disabled` COMES OFF THE NODE, not off the bag, and that is not a style choice: the engine's
-// pressable rule runs ahead of this fold and strips `disabled` from what it hands over, so reading
-// the bag would resolve every disabled touchable as focusable — the exact focus-order bug this
-// expression exists to prevent, and one that shows up on a TV remote and in no test that reads
-// props. Anything a JS fold needs AFTER a tag rule has stripped it has to be read from the node.
-function tagFold(node: ISymbioteNode): IPayloadFold {
-  return props => {
-    const next: Record<string, unknown> = { ...props };
-    next.focusable = resolveTouchableFocusable(
-      booleanOr(props.focusable),
-      appListenerFor(node, 'press') !== undefined,
-      booleanOr(propOf(node, 'disabled')),
-    );
-    return next;
-  };
-}
+// What moved was not the closure but ONE BIT. `setEventListener` already knew the flip (it computes
+// `wasWired !== isHandler` to fire `onOwnedListenerChange`); it now also records
+// `OP_SET_OWNED_LISTENER`, and `foldPressableProps` resolves the whole three-leg expression off the
+// node. The callback itself never left JS and never will — that is the split a browser draws too,
+// where the UA knows which elements carry a click handler and the handler's body stays the page's.
+//
+// So "a rule cannot read an owned listener" was two claims wearing one sentence, and only the one
+// about the FUNCTION was true. Contract:
+// `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
+//
+// `./button` keeps its own fold and its own resolution, deliberately: it resolves `disabled` three
+// ways through the projection its derived children share, and it folds an Android view style and
+// ripple regardless — so moving only its `focusable` would duplicate that precedence and buy back
+// no crossing.
 
-// A listener flip changes no payload by itself, so the commit after it is a no-op and no fold
-// re-runs (`IHostBehavior.onOwnedListenerChange`). `./button` carries the twin of this.
+// STILL NEEDED, and for a reason the wire did not remove: `markDirty` on the host marks the node
+// whose payload must be rebuilt, but the COMMIT still has to be asked for. A listener flip changes
+// no prop on this side, so nothing else would schedule one and the new answer would sit in the host
+// until some unrelated write happened to dirty the node.
 function onOwnedListenerChange(node: ISymbioteNode, name: string): void {
   if (name !== 'press') return;
   markPropsDirty(node);
@@ -271,13 +263,6 @@ export function registerTouchableOpacityBehavior(): void {
   const touchable = createTouchableOpacityBehavior();
   registerHostBehavior(TOUCHABLE_OPACITY_TAG, {
     ...touchable,
-    // `attachHostBehavior` writes `behavior.foldPayload` into the field one line BEFORE it calls
-    // `attach`, so binding here is what stands. Only the TAG binds it — a composing behavior owns
-    // its own node's fold (`./button` sets one in `buildStructure`, which runs later still).
-    attach(node: ISymbioteNode): void {
-      touchable.attach(node);
-      node.payloadFold = tagFold(node);
-    },
     onOwnedListenerChange,
   });
 }

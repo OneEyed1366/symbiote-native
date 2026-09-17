@@ -23,6 +23,7 @@ import {
   recordInsertBefore,
   recordRemoveChild,
   recordSetComponent,
+  recordSetOwnedListener,
   recordSetProp,
   recordSetText,
 } from './mutation-buffer';
@@ -864,8 +865,14 @@ export function setEventListener(
     // free). A flip is a mount-time event, not a per-render one.
     const wasWired = appListenerFor(node, name) !== undefined;
     stashAppListener(node, name, isHandler ? value : undefined);
-    if (wasWired !== isHandler)
+    if (wasWired !== isHandler) {
+      // The BIT, on the flip only. A platform rule can then resolve a key that depends on whether
+      // the app wired anything — `focusable` on a touchable is the case that needed it — without
+      // the closure ever leaving JS. Ordered before the notify so a behavior that re-commits from
+      // that callback finds the host already holding the new answer.
+      recordSetOwnedListener(node, name, isHandler);
       notifyOwnedListenerChange(node, name, isHandler);
+    }
     const flagged = GATED_EVENT_PROPS.get(name);
     if (flagged !== undefined)
       setProp(node, flagged, isHandler ? true : undefined);

@@ -612,64 +612,18 @@ describe('React Touchable* accessibility default', () => {
   });
 });
 
-// `focusable` is the OTHER half of that fold and it does NOT compose the same way: RN gives
-// Pressable a one-leg default (Pressable.js:258) and the Touchables a three-leg one
-// (TouchableOpacity.js:336-340, TouchableHighlight.js:370-374,
-// TouchableWithoutFeedback.js:263-266), so the wrapper has to resolve it and hand the answer down.
-// Nothing computed it anywhere until 2026-09-09 — a disabled touchable stayed focusable, so a
-// keyboard or TV remote could land on a control that cannot be pressed.
-describe('React Touchable* focusable', () => {
-  // The COMMITTED tree, not `live.findLive`: creation order is leaves-first (a parent is created
-  // with its children already in hand), so "the first RCTView that is not the surface root" is
-  // the touchable's own child, which carries none of the fold's props.
-  function responderProps(): Record<string, unknown> {
-    const view = live.nodeOf(live.appRoot()).children[0];
-    if (!view)
-      throw new Error('no RCTView (Pressable responder) was committed');
-    return view.payload;
-  }
-
-  const variants: [string, (props: Record<string, unknown>) => ReactElement][] =
-    [
-      [
-        'TouchableOpacity',
-        p => (
-          <touchable-opacity {...p}>
-            <view />
-          </touchable-opacity>
-        ),
-      ],
-      [
-        'TouchableHighlight',
-        p => (
-          <touchable-highlight {...p}>
-            <view />
-          </touchable-highlight>
-        ),
-      ],
-    ];
-
-  for (const [name, render] of variants) {
-    // Leg 2, read off the APP's onPress — the handler the wrapper hands Pressable is always
-    // defined, so resolving one level down could never answer false.
-    it(`${name} stays out of the focus order without an onPress`, () => {
-      mount(ROOT_TAG, render({}));
-      expect(responderProps().focusable).toBe(false);
-    });
-
-    it(`${name} focuses once it has an onPress`, () => {
-      mount(ROOT_TAG, render({ onPress: () => {} }));
-      expect(responderProps().focusable).toBe(true);
-    });
-
-    // Leg 3, and the case a `focusable ?? computed` implementation gets wrong: `&&` means an
-    // explicit opt-IN still loses to `disabled`.
-    it(`${name} refuses focus while disabled, opt-in notwithstanding`, () => {
-      mount(
-        ROOT_TAG,
-        render({ onPress: () => {}, disabled: true, focusable: true }),
-      );
-      expect(responderProps().focusable).toBe(false);
-    });
-  }
-});
+// `focusable`'s six cases LEFT THIS FILE on 2026-09-18. RN gives Pressable a one-leg default
+// (Pressable.js:258) and the Touchables a three-leg one (TouchableOpacity.js:336-340), and that
+// three-leg form is `foldPressableProps`'s now, keyed off the tag — so the payload this harness
+// builds through the TypeScript `fabricProps` no longer carries it, and asserting on it here would
+// be asserting on the absence of a rule. They are
+// `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`, read off a real commit.
+//
+// The middle leg is what had kept them here: `onPress !== undefined` is an OWNED name, stashed in
+// JS and never a prop, so no rule could see it. What crosses now is the EXISTENCE as one bit
+// (`OP_SET_OWNED_LISTENER`) while the callback stays in JS — a browser's own split, since a UA knows
+// which elements carry a click handler without the handler leaving the page.
+//
+// React contributes nothing to the resolution, which is why these could move rather than be
+// rewritten: its part is routing `onPress` through `setEventListener`, and every press case above
+// fails outright if it stops — a handler that never reached the stash does not fire.

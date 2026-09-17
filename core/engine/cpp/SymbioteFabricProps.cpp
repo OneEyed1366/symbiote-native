@@ -784,6 +784,23 @@ bool usesTouchableFeedbackRule(const std::string &tagName) {
 }
 
 /**
+ * The tags whose `focusable` takes RN's THREE-leg touchable form rather than Pressable's plain one:
+ * `focusable !== false && onPress !== undefined && !disabled`
+ * (`TouchableOpacity.js:336-339`, `TouchableHighlight.js` identically).
+ *
+ * `button` is deliberately NOT here even though it composes TouchableOpacity, and the reason is
+ * precedence rather than shape. Button resolves `disabled` three ways —
+ * `props.disabled ?? aria-disabled ?? accessibilityState.disabled` (`Button.js:331,337`) — through
+ * the same projection its derived children read, and it keeps a fold for its Android view style and
+ * ripple regardless. So moving only its `focusable` here would duplicate that precedence in two
+ * places and buy no crossing back. It stays on the plain form, whose `!== false` leaves the answer
+ * its own fold already computed untouched — which is how the two compose today.
+ */
+bool usesTouchableFocusableRule(const std::string &tagName) {
+  return tagName == "touchable-opacity" || tagName == "touchable-highlight";
+}
+
+/**
  * What the feedback machine CONSUMES. RN forwards none of them to the View it renders — read the
  * prop lists at `TouchableOpacity.js:302-345` and `TouchableHighlight.js:336-378`: every name they
  * pass is spelled out, and not one of these is among them.
@@ -1223,7 +1240,11 @@ void applyAndroidRipple(dynamic &out, const dynamic &config) {
  *         answer down as `focusable`, which `!== false` leaves alone — that is how the two compose
  *         without either knowing about the other.
  */
-dynamic foldPressableProps(const dynamic &props, bool isTouchableFeedback) {
+dynamic foldPressableProps(
+    const dynamic &props,
+    bool isTouchableFeedback,
+    bool isTouchableFocusable,
+    bool hasPressListener) {
   dynamic out = props;
 
   // Read BEFORE the machine keys are erased, and `!= null` rather than truthiness: an explicit
@@ -1250,7 +1271,14 @@ dynamic foldPressableProps(const dynamic &props, bool isTouchableFeedback) {
   }
 
   out["accessible"] = boolAt(props, "accessible").value_or(true);
-  out["focusable"] = boolAt(props, "focusable").value_or(true);
+  // `disabled` READ OFF `props`, the untouched input, and never off `out` — the erase loop above has
+  // already taken the raw key out of `out`, so reading it there would resolve every disabled
+  // touchable as focusable. That is a focus-order bug visible on a TV remote and in no test that
+  // reads props; the JS fold this replaces carried the same correction, spelled `propOf(node, ...)`.
+  out["focusable"] = isTouchableFocusable
+      ? boolAt(props, "focusable").value_or(true) && hasPressListener &&
+          !boolAt(props, "disabled").value_or(false)
+      : boolAt(props, "focusable").value_or(true);
   return out;
 }
 
@@ -1576,7 +1604,8 @@ dynamic fabricProps(
     const std::string &tagName,
     const dynamic &props,
     const IPayloadFold &fold,
-    const dynamic *ownerProps) {
+    const dynamic *ownerProps,
+    bool hasPressListener) {
   if (component == kRawTextComponent) {
     dynamic out = dynamic::object();
     const dynamic *text = props.get_ptr("text");
@@ -1615,7 +1644,11 @@ dynamic fabricProps(
 
   dynamic tagResolved;
   if (usesPressableRule(tagName)) {
-    tagResolved = foldPressableProps(*bag, usesTouchableFeedbackRule(tagName));
+    tagResolved = foldPressableProps(
+        *bag,
+        usesTouchableFeedbackRule(tagName),
+        usesTouchableFocusableRule(tagName),
+        hasPressListener);
     // Button is a touchable PLUS something, exactly as RN builds it (`Button.js:283`), so its own
     // rules layer over the touchable's rather than replacing them.
     if (tagName == "button") tagResolved = foldButtonProps(tagResolved);

@@ -283,26 +283,22 @@ describe('touchable-highlight host behavior', () => {
     expect(props.opacity).toBe(DEFAULT_HIGHLIGHT_CHILD_OPACITY);
   });
 
-  // TouchableHighlight.js's render: `focusable={this.props.focusable !== false &&
-  // this.props.onPress !== undefined && !this.props.disabled}`.
-  it('focuses only while it has an onPress and is enabled', async () => {
-    registerTouchableHighlightBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    const surface = mount(node);
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(false);
-
-    routeProp(node, 'onPress', () => {});
-    surface.commit();
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(true);
-
-    routeProp(node, 'disabled', true);
-    surface.commit();
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(false);
-  });
+  // `focusable` LEFT ON 2026-09-18 — `foldPressableProps` resolves it off the tag now — AND THIS
+  // CASE IS WHY THE MOVE MATTERED, not just where it went.
+  //
+  // It asserted the disabled leg and it PASSED, for weeks, while the real engine shipped the
+  // opposite: a disabled TouchableHighlight committed `focusable: true` and stayed in the focus
+  // order. The fold read `props.disabled` off the bag, and on a device the engine's pressable rule
+  // strips that key BEFORE the fold runs. This harness has no pressable rule — it builds payloads
+  // through the TypeScript `fabricProps`, which deliberately carries no copy — so the key was still
+  // there and the expression resolved correctly HERE and nowhere else.
+  //
+  // So the harness that is right to hold no mirror is also, for the same reason, unable to see a
+  // rule-ORDERING bug. A fold that reads a key an engine rule removes is invisible to every test on
+  // this side; only the committed payload can catch it. It was caught by writing the itest for the
+  // port, on unmodified HEAD, before a line of the port had landed.
+  //
+  // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts` carries the case and the rest.
 
   // `id -> nativeID`, `accessible !== false` and the `disabled -> accessibilityState` merge this
   // file never covered all live in the engine now (`foldIdAlias` / `foldPressableProps`,

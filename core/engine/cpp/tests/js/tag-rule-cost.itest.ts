@@ -431,6 +431,18 @@ registerHostBehavior('scroll-content', {
   detach(): void {},
 });
 
+// NO ARM FOR `touchable-opacity`'s `focusable`, and the reason is this file's own finding rather
+// than an omission. What that port deleted was a fold whose body was one key; the `accessory` row
+// already prices a fold whose body is NOTHING at 11.4 us/node, and the cost model these nine rows
+// establish is "bag in, bag out, body free". An arm here would have to mirror the whole pressable
+// rule to keep `expectSamePayload` satisfiable, which is a large mirror bought to re-derive a number
+// the page already carries.
+//
+// What is NOT already on the page is the MULTIPLIER, and it is measured where it is visible:
+// `touchable-focusable-payload.itest.ts` reads `foldsFound` 5 for a single mounted touchable, not 1
+// — the opacity settle re-commits the node several times before it comes to rest. So the saving is
+// ~5 trips per touchable at mount rather than one.
+
 const SCROLL_CONTENT_PROPS = {
   collapsable: false,
   testID: 'content',

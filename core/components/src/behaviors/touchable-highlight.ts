@@ -39,9 +39,7 @@ import {
   type ISymbioteNode,
   propOf,
 } from '@symbiote-native/engine';
-import { resolveTouchableFocusable } from '../view/render-pressable';
 import {
-  booleanOr,
   createPressBehavior,
   type IDisabledResolver,
   type IPressConfigRefinement,
@@ -176,11 +174,16 @@ function tagFold(node: ISymbioteNode): IPayloadFold {
     if (extra !== undefined) {
       next.style = [props.style, extra.underlay, extra.child];
     }
-    next.focusable = resolveTouchableFocusable(
-      booleanOr(props.focusable),
-      appListenerFor(node, 'press') !== undefined,
-      booleanOr(props.disabled),
-    );
+    // `focusable` LEFT THIS FOLD ON 2026-09-18, and it left carrying a bug with it. It read
+    // `props.disabled` off the BAG, which the engine's pressable rule strips before this fold ever
+    // runs — so the disabled leg silently evaluated to "not disabled" and every DISABLED highlight
+    // stayed in the focus order: reachable from a TV remote and a keyboard, announced as a focus
+    // stop, doing nothing when activated. `./touchable-opacity` had been corrected for exactly this
+    // (its copy read the NODE); this copy had not, which is what two copies of one expression do.
+    //
+    // One rule serves both tags now (`foldPressableProps`, keyed off the tag), so there is no second
+    // copy left to drift. Reproduced on the unported tree before the move, and pinned in
+    // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
     return next;
   };
 }

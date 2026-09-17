@@ -564,44 +564,13 @@ describe('Vue TouchableHighlight', () => {
 // wiring and its delayPressIn/delayPressOut scheduler are covered against the COMMITTED tree in
 // `core/components/src/behaviors/touchable-without-feedback.test.ts`.
 
-// RN gives Pressable a ONE-leg focusable default (Pressable.js:258) and the Touchables a THREE-leg
-// one (TouchableOpacity.js:336-340, TouchableHighlight.js:370-374), so each tag folds its own.
-describe('Vue Touchable* focusable', () => {
-  const VARIANTS = ['touchable-opacity', 'touchable-highlight'];
-
-  async function mountWith(
-    tag: string,
-    props: Record<string, unknown>,
-  ): Promise<void> {
-    const App = defineComponent({
-      setup: () => (): VNode => h(tag, { testID: TARGET, ...props }),
-    });
-    mount(ROOT_TAG, App);
-    await flush();
-  }
-
-  for (const tag of VARIANTS) {
-    // Leg 2, read off the app's own onPress — the machine's synthesized handler is always defined,
-    // so resolving one level down could never answer false.
-    it(`${tag} stays out of the focus order without an onPress`, async () => {
-      await mountWith(tag, {});
-      expect(committedPayload(TARGET).focusable).toBe(false);
-    });
-
-    it(`${tag} focuses once it has an onPress`, async () => {
-      await mountWith(tag, { onPress: () => {} });
-      expect(committedPayload(TARGET).focusable).toBe(true);
-    });
-
-    // Leg 3, the case a `focusable ?? computed` implementation gets wrong: an explicit opt-IN
-    // still loses to `disabled`.
-    it(`${tag} refuses focus while disabled, opt-in notwithstanding`, async () => {
-      await mountWith(tag, {
-        onPress: () => {},
-        disabled: true,
-        focusable: true,
-      });
-      expect(committedPayload(TARGET).focusable).toBe(false);
-    });
-  }
-});
+// `focusable`'s six cases LEFT THIS FILE on 2026-09-18, with the rule: the Touchables' three-leg
+// form (TouchableOpacity.js:336-340) is `foldPressableProps`'s now, keyed off the tag, and this
+// harness builds its payload through the TypeScript `fabricProps`, which holds no copy of the tag
+// rules. They are `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`, against the
+// payload a commit actually sent.
+//
+// Nothing about the ADAPTER went with them, which is why they could go rather than being rewritten:
+// what Vue contributes here is routing `onPress` through `setEventListener` so the engine ever
+// learns of it, and every press case above fails outright if it stops doing that — a tag whose
+// handler never reached the stash does not fire.

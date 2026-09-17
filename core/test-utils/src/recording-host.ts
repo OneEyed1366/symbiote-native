@@ -26,6 +26,7 @@ import {
   OP_INSERT_BEFORE,
   OP_REMOVE_CHILD,
   OP_SET_COMPONENT,
+  OP_SET_OWNED_LISTENER,
   OP_SET_TAG,
   OP_SET_PROP,
   OP_SET_TEXT,
@@ -53,6 +54,7 @@ type IRecorded = {
   instanceHandle: unknown;
   viewName: string;
   tagName: string;
+  ownedListeners: Record<string, boolean>;
   props: Record<string, unknown>;
   parent: IRecorded | undefined;
   children: IRecorded[];
@@ -154,6 +156,15 @@ export type IAuthoredNode = {
    * about the payload this host builds; see the `OP_SET_TAG` case.
    */
   tagName: string;
+  /**
+   * Which event names a BEHAVIOR owns currently have an app callback wired, by name.
+   *
+   * The presence only — the callback never crosses and is not here. It is what lets a platform rule
+   * resolve a key that depends on whether the app wired anything (`focusable` on a touchable is
+   * `focusable !== false && onPress !== undefined && !disabled`). Recorded for the same reason
+   * `tagName` is: so a test can ask what the host was TOLD, separately from what a rule made of it.
+   */
+  ownedListeners: Record<string, boolean>;
   props: Readonly<Record<string, unknown>>;
 };
 
@@ -280,6 +291,7 @@ export function createRecordingHost(): IRecordingHost {
           instanceHandle,
           viewName,
           tagName: '',
+          ownedListeners: {},
           props,
           parent: undefined,
           children: [],
@@ -354,6 +366,14 @@ export function createRecordingHost(): IRecordingHost {
           // needs to read what a tag actually sends belongs in `core/engine/cpp/tests/js`.
           case OP_SET_TAG:
             at(a).tagName = strings[b];
+            break;
+          // RECORDED, NOT APPLIED, exactly like the tag above. The real host resolves `focusable`'s
+          // three-leg touchable form off this bit; this host builds its payload through the
+          // TypeScript `fabricProps`, which carries no copy of the tag rules and must not grow one.
+          // So a test that wants the resolved key reads the committed payload in an itest, and what
+          // this records is the fact a test can ASK about.
+          case OP_SET_OWNED_LISTENER:
+            at(a).ownedListeners[strings[b]] = c !== 0;
             break;
           case OP_COMMIT: {
             host.commits += 1;

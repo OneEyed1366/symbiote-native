@@ -180,40 +180,17 @@ describe('touchable-opacity host behavior', () => {
   // would fail for the right reason today and, once someone "fixed" it by mirroring the rule in JS,
   // pass forever for the wrong one. Contract: `core/engine/cpp/tests/js/touchable-payload.itest.ts`.
 
-  // TouchableOpacity.js:336-340 — three legs, and every one of them is a silent accessibility
-  // regression when it is missing: a disabled or handler-less control that stays focusable can be
-  // reached by a keyboard, a TV remote or switch control and then does nothing.
-  it('focuses only while it has an onPress and is enabled', async () => {
-    vi.useFakeTimers();
-    registerTouchableOpacityBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    const surface = mount(node);
-    await settle();
-    // Leg 2, absent. `onPress` is an OWNED name and lives in the stash, which is why a props-only
-    // fold cannot answer this and the tag binds its fold to the node.
-    expect(committedPropsOf(TEST_ID).focusable).toBe(false);
-
-    // A listener flip dirties no payload by itself, so this also pins `onOwnedListenerChange`.
-    routeProp(node, 'onPress', () => {});
-    surface.commit();
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(true);
-
-    // Leg 3.
-    routeProp(node, 'disabled', true);
-    surface.commit();
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(false);
-
-    // And an explicit opt-IN does not beat `disabled` — `&&`, never `??`. This is the case a
-    // naive `focusable ?? computed` implementation gets wrong, and the one that hands a screen
-    // reader a focusable dead control.
-    routeProp(node, 'focusable', true);
-    surface.commit();
-    await settle();
-    expect(committedPropsOf(TEST_ID).focusable).toBe(false);
-  });
+  // `focusable` LEFT ON 2026-09-18 and it was the LAST thing in this tag's fold, so the tag now
+  // costs zero trips into JS. Same reason as the two rules above: it is `foldPressableProps`'s, and
+  // this host carries no copy of the tag rules.
+  //
+  // It held out longer because its middle leg is `onPress !== undefined` — an OWNED name, stashed
+  // in JS and never a prop. The comment that used to sit here said a props-only fold "cannot answer
+  // this", and that was two claims in one: the callback's IDENTITY genuinely cannot cross, its
+  // EXISTENCE is one bit and now does (`OP_SET_OWNED_LISTENER`).
+  //
+  // Contract, including the late-wiring and cleared-handler cases this used to carry:
+  // `core/engine/cpp/tests/js/touchable-focusable-payload.itest.ts`.
 
   // NO CASE FOR LEG 1 ALONE, and that is a finding rather than a gap: `focusable` is an ordinary
   // prop, so an authored `false` commits as `false` whether the fold runs or not. Break-tested —

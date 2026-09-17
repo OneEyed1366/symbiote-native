@@ -59,17 +59,34 @@ using IPayloadFold = std::function<folly::dynamic(const folly::dynamic &)>;
  * impossible, and this argument is why it is not: the TREE LIVES IN C++ NOW, so a node already knows
  * its parent and reading it costs a pointer hop rather than a JS closure and a crossing.
  *
- * It does NOT make everything portable, and the boundary is the same one as before: a rule may read
- * the parent's PROPS, which are declarative and present at commit time. It still cannot read live JS
- * state (`stickyFold`'s `translateY`), an owned LISTENER (`focusable`'s `onPress !== undefined`,
- * which lives in the stash and not in any bag), or anything a framework computes per render. Those
- * stay JS folds.
+ * It does NOT make everything portable. A rule may read the parent's PROPS, which are declarative
+ * and present at commit time. It cannot read live JS state (`stickyFold`'s `translateY`) or anything
+ * a framework computes per render; those stay JS folds.
+ */
+/**
+ * `hasPressListener` — whether the APP has a callback wired to `press`, which is a name the behavior
+ * owns and which therefore never becomes a prop.
+ *
+ * THIS PARAGRAPH USED TO SAY THE OPPOSITE, and the correction is the useful part. The boundary above
+ * listed "an owned LISTENER (`focusable`'s `onPress !== undefined`, which lives in the stash and not
+ * in any bag)" beside live JS state, as a thing a rule could never see. That conflated two different
+ * facts about a listener: its FUNCTION, which is the application's and must never cross, and its
+ * EXISTENCE, which is one bit the platform is entitled to know.
+ *
+ * The browser settles which is which rather than taste. A UA computes focusability itself, and it
+ * can, because `addEventListener` is the UA's own API — the browser knows which of its elements
+ * carry a click handler while the handler's body stays the page's. So the bit crosses, once per
+ * flip, as `OP_SET_OWNED_LISTENER`; the closure stays in the JS stash where it always was.
+ *
+ * What is genuinely unreachable is narrower than the old wording: a value only JS can COMPUTE. A
+ * value JS merely happens to HOLD is a wiring question, and wiring is cheap.
  */
 folly::dynamic fabricProps(
     const std::string &component,
     const std::string &tagName,
     const folly::dynamic &props,
     const IPayloadFold &fold = {},
-    const folly::dynamic *ownerProps = nullptr);
+    const folly::dynamic *ownerProps = nullptr,
+    bool hasPressListener = false);
 
 } // namespace symbiote
