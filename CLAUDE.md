@@ -1248,6 +1248,63 @@ Open work, priority order, and the per-adapter detail (React is an outlier three
 `Swap`, `Remove`, and the whole virtualized column — against its own siblings on the same engine):
 `symbiote-perf-measurement`, "The stock-React-Native baseline".
 
+### Headless measurement runs on `build-release`, and the assert build's SHAPE is wrong
+
+```
+pnpm run test:itest    # correctness — asserts ON, the reason this harness exists
+pnpm run bench:itest   # timings — NDEBUG + -O, with RN_ENABLE_DEBUG_STRING_CONVERTIBLE kept ON
+```
+
+That `core/engine/cpp/tests/build` is Debug with no `-O` was already known and already caveated. What
+was not: `NDEBUG` off also defines `REACT_NATIVE_DEBUG` (`ReactCommon/react/debug/flags.h`), and that
+compiles `ensureYogaChildrenLookFine` + `ensureYogaChildrenAlignment` into
+`YogaLayoutableShadowNode::appendChild` — each walks the parent's whole child list, so building an
+N-child list one append at a time is **O(N²) there and O(N) in the build that ships**. Measured
+2026-09-17: 10 000 appends onto one parent, 3 554 ms on the assert build against 27 ms optimized.
+
+It put `materialize` at 61% of a create when it is ~27%, and reported an O(N²) in list width that
+does not exist off the harness. **A number whose ORDER is right and whose SHAPE is wrong survives
+review**, which is what makes this worse than no number. Both readings were published before the
+second build existed.
+
+### A create, fully attributed (10 003 nodes, `build-release`, 2026-09-17)
+
+```
+fill    24   ours, JS      prop writes 12 · appendChild 5 · creates 6
+apply   16   ours, C++     decode 4 · setProp 1.5 · structure 1.2 · rawtext ~3 · op loop ~6
+commit  34                 materialize 24 (of which UIManager::createNode 17) + Fabric commit 8.5
+total   74                 0.90x of a bare-`nativeFabricUIManager` driver doing nothing else
+```
+
+The floor arm is `core/engine/cpp/tests/js/raw-fabric-vs-engine.itest.ts`: the same tree built
+through `createNode`/`appendChild`/`completeRoot` with no retained tree, no diff, no buffer. It sits
+BELOW React's own renderer, which still runs a fiber tree and builds every payload through
+`ReactNativeAttributePayload` — so "are we worse at driving Fabric than React" is answered a
+fortiori, and the answer is no.
+
+### One visual selection, two spellings, 6.5x apart — and nothing in the app can see it
+
+`canReplaceInPlace` refuses a clone that is not layout-clean (F-51), so whether a selected style
+keeps the row's layout properties decides whether the commit rewrites one slot or hands Fabric the
+whole child list. Measured on a standing 1 000-row list
+(`core/engine/cpp/tests/js/update-shapes-cost.itest.ts`):
+
+```
+                          wall    walk   Fabric   layout   targetedReplaces
+paint-only selection       0.4     0.2      0.0      0.0          2
+drops one paddingLeft      2.6     0.9      1.5      1.4          0
+```
+
+Both paint the same screen. **Write a selected style as the base style plus the paint properties, not
+as its own object** — an independently written selected style drops the fast path by omitting a
+padding, silently. The engine is not wrong here and there is nothing to fix in it: a genuine layout
+change must re-measure. The cost is the authoring spelling, and it is invisible to every other test.
+
+Update shapes otherwise behave: a select clones 3 nodes and reuses 1 003, a partial update of every
+tenth row clones 302, `clear` walks 0.1 ms. The expensive update is `append` (73 ms for 1 000 rows
+onto a standing 1 000), and it is create-shaped — 10 000 `createNode`s plus a Yoga pass over 2 000
+rows.
+
 ## Reference material
 
 - RN source: `.vendors/react-native` (and `.vendors/react` for the renderer
