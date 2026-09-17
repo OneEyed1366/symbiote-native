@@ -81,9 +81,25 @@
 //   a search or a shift   adjacent and distant swaps cost the same
 //   the child count       1.19x on a 2x widening, once the engine's own doubling is removed
 //
-// So ~18 ms is JS, above the engine, triggered by the existence of a placement, nearly flat in the
-// list size. Bisection by wall clock has taken this as far as it goes; the next step wants a
-// sampling profile of that window, not another arm.
+// ── AND ONE MORE BISECTION DID LAND IT, WITHOUT A PROFILER ──────────────────────────────────────
+//
+// The host config's `insertBefore` was replaced by an empty function and the arm re-run, same build,
+// same sitting, then reverted:
+//
+//   swap, as it is              23.3 ms     fabric 0.7  layout 0.0
+//   swap, insertBefore no-op    16.7 ms
+//   re-render, nothing moved     1.8 ms
+//
+// **With our insertion removed entirely the swap still costs 16.7 ms against an idle 1.8.** So at
+// least ~15 ms is React's own mutation-mode commit, with a host config that does literally nothing —
+// against the 2.4 ms stock's persistent mode spends on the same move. That is the architectural cost
+// of `<M1 + M2>`'s deliberate choice to drive React in MUTATION mode so R2 could not be skipped, and
+// it is not something the engine can remove.
+//
+// The remaining ~6.6 ms is our insertion chain, and the split inside it is NOT clean: with the no-op
+// the committed tree is wrong, so that arm's own commit differs (`fabric=9.2 layout=8.2` against
+// 0.7/0.0). Only the LOWER BOUND on React's share survives that, which is the number above; do not
+// read 6.6 as ours without an arm that keeps the tree correct.
 //
 // RUN ON `build-release` (`pnpm run bench:itest`).
 

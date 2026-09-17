@@ -1594,8 +1594,29 @@ leaves the JS above it at **1.19x**. A cost that came from walking the children 
 ```
 
 So ~18 ms is JS, above the engine, triggered by the existence of a placement, nearly flat in the list
-size. **Bisection by wall clock has taken this as far as it goes** — the next step wants a sampling
-profile of that window, not another arm.
+size.
+
+**One more bisection landed it without a profiler.** The host config's `insertBefore` was replaced by
+an empty function, the arm re-run in the same sitting, then reverted:
+
+```
+ swap, as it is              23.3 ms    fabric 0.7  layout 0.0
+ swap, insertBefore no-op    16.7 ms
+ re-render, nothing moved     1.8 ms
+```
+
+**With our insertion removed entirely the swap still costs 16.7 ms against an idle 1.8** — so at
+least ~15 ms is React's own mutation-mode commit, with a host config doing literally nothing, against
+the 2.4 ms stock's persistent mode spends on the same move. That is the cost of `<M1 + M2>`'s
+deliberate choice to drive React in MUTATION mode so R2 could not be skipped, and the engine cannot
+remove it. **`Swap` is therefore React-adapter-specific by construction** — Vue/Svelte/Solid/Angular
+emit their moves straight into the engine and the device table already shows them at 0.64-0.91x of
+stock on that row.
+
+The remaining ~6.6 ms is our insertion chain, and that split is NOT clean: with the no-op the
+committed tree is wrong, so that arm's own commit differs (`fabric=9.2 layout=8.2` against 0.7/0.0).
+Only the lower bound on React's share survives it — do not quote 6.6 as ours without an arm that
+keeps the tree correct.
 
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the
