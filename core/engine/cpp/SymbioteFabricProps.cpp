@@ -1123,6 +1123,38 @@ dynamic foldActivityIndicatorSpinnerProps(
  * tint, the Android view style) read it off `propsOf(node)`, which this cannot reach. That
  * separation is what makes the strip safe here and unsafe one layer up.
  */
+/**
+ * Button's TITLE, as it is rendered: uppercase on Android, verbatim everywhere else
+ * (`Button.js:352-353`).
+ *
+ * `#ifdef ANDROID` rather than a view-name branch, and for the reason `decelerationRate`'s constants
+ * take one: there is no name to read. A raw text commits as `RCTRawText` on both platforms — unlike
+ * `Switch`/`AndroidSwitch`, where the two platforms genuinely are two Fabric components and the wire
+ * already says which. So the Android arm is unreachable headless, like `android_ripple`'s, and that
+ * is a recorded gap rather than a hidden one.
+ *
+ * ASCII-only, deliberately, and it is upstream's own behaviour rather than a shortcut: RN calls
+ * JavaScript's `String.prototype.toUpperCase`, which is full Unicode, so a Cyrillic or Greek label
+ * uppercases there and would not here. Left ASCII because the alternative is dragging ICU into the
+ * engine for a label that is uppercased only on Android, and a wrong-case label is a cosmetic
+ * difference on one platform rather than a broken control. Recorded so it is a decision.
+ */
+dynamic foldButtonLabel(const dynamic &props) {
+#ifdef ANDROID
+  const dynamic *text = props.get_ptr("text");
+  if (text == nullptr || !text->isString()) return props;
+  std::string upper = text->asString();
+  for (char &character : upper)
+    character = static_cast<char>(
+        std::toupper(static_cast<unsigned char>(character)));
+  dynamic out = props;
+  out["text"] = std::move(upper);
+  return out;
+#else
+  return props;
+#endif
+}
+
 dynamic foldButtonProps(const dynamic &props) {
   dynamic out = props;
   out["accessibilityRole"] = "button";
@@ -1610,6 +1642,15 @@ dynamic fabricProps(
     dynamic out = dynamic::object();
     const dynamic *text = props.get_ptr("text");
     if (text != nullptr) out["text"] = *text;
+    // THE ONE TAG RULE ON THIS PATH, and a raw text is a stranger place for one than it looks. It
+    // has no props an app can write — the object above is the whole payload — but its CONTENT can
+    // still be the platform's decision rather than the app's, which is exactly what Button's title
+    // is: rendered uppercase on Android and verbatim everywhere else (`Button.js:352-353`). That is
+    // a user-agent choice about a control, so it belongs here and not in the app's string.
+    //
+    // Guarded on the tag rather than applied to every raw text, obviously — and the tag reaches a
+    // raw text at all because `createRawText` now takes one, for this.
+    if (tagName == "button-label") out = foldButtonLabel(out);
     return out;
   }
 

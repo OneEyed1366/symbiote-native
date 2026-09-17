@@ -124,15 +124,20 @@ export function resolveButtonViewStyle(
   return style;
 }
 
-/**
- * The label as it is rendered: UPPERCASE on Android (Button.js:352-353).
- *
- * RN also asserts the title is a string one line above. Not reproduced: the assert is a dev-only
- * `invariant`, and every adapter here types `title: string`.
- */
-export function resolveButtonTitle(title: string): string {
-  return Platform.OS === 'android' ? title.toUpperCase() : title;
-}
+// `resolveButtonTitle` IS GONE (2026-09-18) — the uppercase-on-Android rule is `foldButtonLabel` in
+// `SymbioteFabricProps.cpp`, reached off the label's own tag. It had no caller left but its own two
+// unit tests, which is the orphan shape this migration keeps turning up: a JS copy of a rule that
+// runs elsewhere, kept alive by the test asserting it, green forever and proving nothing.
+//
+// A COVERAGE GAP WENT WITH IT, recorded rather than hidden. The C++ rule is `#ifdef ANDROID` — a raw
+// text commits as `RCTRawText` on both platforms, so unlike `Switch`/`AndroidSwitch` there is no view
+// NAME for a rule to branch on — and this host is not Android. The deleted Android test reached the
+// branch by mocking `Platform.OS`; what it mocked was a JS function that no longer exists. Same
+// class as `android_ripple` and `decelerationRate`'s constants, and closing it means an Android arm
+// of the test host, not a mock.
+//
+// One behaviour difference shipped with the move and is deliberate: RN uppercases through
+// JavaScript's full-Unicode `toUpperCase`, and the C++ rule is ASCII-only. See `foldButtonLabel`.
 
 /**
  * Whether the button is disabled, which `aria-disabled` may decide on its own.

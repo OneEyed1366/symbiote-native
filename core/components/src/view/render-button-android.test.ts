@@ -30,7 +30,7 @@ vi.mock('@symbiote-native/engine', async () => {
   };
 });
 
-const { resolveButtonTextStyle, resolveButtonTitle, resolveButtonViewStyle } =
+const { resolveButtonTextStyle, resolveButtonViewStyle } =
   await import('./render-button');
 
 const ANDROID_BLUE = '#2196F3';
@@ -75,7 +75,14 @@ describe('Button folds on Android', () => {
     });
   });
 
-  it('uppercases the title', () => {
-    expect(resolveButtonTitle('Save')).toBe('SAVE');
-  });
+  // THE UPPERCASE CASE LEFT ON 2026-09-18 AND NOTHING REPLACED IT HEADLESSLY, which is a gap worth
+  // stating rather than a move. `Button.js:352-353` renders the title uppercased on Android, and
+  // that is `foldButtonLabel` in `SymbioteFabricProps.cpp` now — behind `#ifdef ANDROID`, because a
+  // raw text commits as `RCTRawText` on both platforms and there is no view NAME to branch on the
+  // way `Switch`/`AndroidSwitch` gives one.
+  //
+  // This case reached the branch by mocking `Platform.OS`, and what it mocked was a JS function that
+  // no longer exists — it would pass forever against a mock of nothing. Same class as
+  // `android_ripple` and `decelerationRate`'s constants: a compile-time branch is only testable in a
+  // build that compiles it, so closing this means an Android arm of the C++ test host.
 });

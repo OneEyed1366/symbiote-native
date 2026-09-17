@@ -473,9 +473,33 @@ export function createElement(
   return node;
 }
 
-export function createRawText(text: string): ISymbioteNode {
+/**
+ * `tag` mirrors `createElement`'s, and a raw text needs it for the same reason an element does: the
+ * behavior registry is keyed by tag, so a node that does not hand one over cannot have a rule.
+ *
+ * A raw text carrying a tag looks odd and is not. It has no props an app can write — its whole
+ * payload is `text` — but its CONTENT can still be a function of the platform rather than of the
+ * app: Button renders its title uppercased on Android (`Button.js:352-353`), which is a user-agent
+ * decision about a control, not anything the app asked for. That rule needs the node to be
+ * identifiable, and a tag is how this codebase identifies one.
+ *
+ * Defaulted to the raw-text component, so every existing caller is unchanged and pays the same
+ * lookup miss `createElement` already pays for a node nobody registered.
+ */
+export function createRawText(
+  text: string,
+  tag: string = RAW_TEXT_COMPONENT,
+): ISymbioteNode {
   const node = new SymbioteNode(RAW_TEXT_COMPONENT, false);
   recordCreateRawText(node, text);
+  // The TAG check comes first, and it is not the same guard `createElement` uses. There it asks
+  // `hasHostBehaviors()` because every element legitimately might have a behavior. Here almost none
+  // do — a raw text is the leaf under every `<Text>` on a screen, thousands of them, and exactly one
+  // kind is tagged. So an untagged raw text must pay a reference comparison against the default and
+  // not a registry lookup: `tag` is the same string literal in that case, so the compare is pointer
+  // equality and the intern, the op and the miss are all skipped.
+  if (tag !== RAW_TEXT_COMPONENT && hasHostBehaviors())
+    attachHostBehavior(node, tag);
   return node;
 }
 

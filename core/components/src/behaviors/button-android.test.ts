@@ -165,7 +165,17 @@ describe('button host behavior on Android', () => {
 
     const { host, label } = subtreeOf(TEST_ID);
     expect(countNodes(host)).toBe(3);
-    expect(label?.payload.text).toBe('SAVE'); // Button.js:352-353
+    // The label still carries the app's title — WHERE it lands is this case's subject, and that is
+    // the hop `subtreeOf` proves. The UPPERCASING left on 2026-09-18: it is `foldButtonLabel` in
+    // `SymbioteFabricProps.cpp`, behind `#ifdef ANDROID`, and this suite runs against neither an
+    // Android build nor the C++ payload builder — it mocks `Platform.OS`, which the rule no longer
+    // reads. Asserting 'SAVE' here would now be asserting a mock of nothing.
+    //
+    // NOT REPLACED, and that is the honest state: the identity branch is pinned in
+    // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, the Android branch is pinned
+    // NOWHERE, exactly like `android_ripple` and `decelerationRate`'s constants. A compile-time
+    // branch needs a build that compiles it.
+    expect(label?.payload.text).toBe('Save');
     expect(node.childHost).toBeDefined();
   });
 

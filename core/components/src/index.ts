@@ -287,7 +287,6 @@ export {
   buttonViewStyle,
   resolveButtonDisabled,
   resolveButtonTextStyle,
-  resolveButtonTitle,
   resolveButtonViewStyle,
 } from './view/render-button';
 export type { IButtonProps } from './view/render-button';

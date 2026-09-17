@@ -10,7 +10,6 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveButtonDisabled,
   resolveButtonTextStyle,
-  resolveButtonTitle,
   resolveButtonViewStyle,
 } from './render-button';
 
@@ -43,9 +42,10 @@ describe('Button folds on iOS', () => {
     expect(resolveButtonViewStyle(CUSTOM, true)).toEqual({});
   });
 
-  it('leaves the title alone', () => {
-    expect(resolveButtonTitle('Save')).toBe('Save');
-  });
+  // The title's own rule left this file on 2026-09-18 — `foldButtonLabel` in
+  // `SymbioteFabricProps.cpp`, off the label's tag. Its iOS half was the identity, so this case was
+  // asserting that a function did nothing; the real one is
+  // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`.
 });
 
 describe('Button folds that do not vary by platform', () => {

@@ -113,20 +113,24 @@ describe('what a button sends native', () => {
     expect(payload.color).toBe(undefined);
   });
 
-  // why: THE PRICE, and this tag's is the highest in the codebase — FOUR crossings for ONE
-  // `<Button>`, one per node the behavior builds: the owner, the iOS wrapper view, the text, and the
-  // raw label. At the ~14-22 us per node `tag-rule-cost.itest.ts` measures, a screen holding fifty
-  // buttons pays about 3 ms of pure marshalling on every commit they are dirty in.
+  // why: THE PRICE, which was 4 here and is 3 since the derived-node port (2026-09-18): the iOS
+  // wrapper view's fold was deleted outright, having written an empty style on the only platform
+  // that builds that node.
   //
-  // The count does NOT move with this port and that is the honest reading of it: what moved is the
-  // work inside the owner's trip, not the trip. The owner's fold survives for `focusable` and the
-  // Android style, and the other three hang on DERIVED nodes — the raw label carries no tag at all,
-  // so there is nothing for a tag-keyed rule to key on. Pinned at 4 so the day one of them is
-  // genuinely eliminated, this number has to be edited deliberately rather than drifting.
-  it('pays four trips, one per node the behavior builds', () => {
+  // THIS FIXTURE UNDERSTATES THE BUTTON, and the reason is worth keeping rather than fixing. It
+  // writes props with `setProp`, so the app's `title` never takes the slot redirect that lives in
+  // `routeProp`; the raw label stays empty, the commit walk drops an empty raw text from its
+  // parent's child set, and the label's fold therefore never ran here at ALL. So the label's port is
+  // invisible in this number and shows up only in `button-derived-payload.itest.ts`, which drives
+  // the same tag through `routeProp` and reads 5 -> 3.
+  //
+  // Left as it is because what this file is about is the OWNER's payload, and a fixture that
+  // committed a label would not change one assertion above it. Named so the two counts are not read
+  // as a contradiction.
+  it('pays three trips now that the view fold is gone', () => {
     const one = commit({});
     print(`DEBUG button folds=${one.folds}`);
-    expect(one.folds).toBe(4);
+    expect(one.folds).toBe(3);
   });
 });
 

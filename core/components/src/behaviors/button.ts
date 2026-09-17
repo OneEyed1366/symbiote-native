@@ -128,7 +128,6 @@ import { resolveTextProps } from '../text-props';
 import {
   resolveButtonDisabled,
   resolveButtonTextStyle,
-  resolveButtonTitle,
   resolveButtonViewStyle,
 } from '../view/render-button';
 import {
@@ -213,12 +212,20 @@ const buttonDisabled: IDisabledResolver = props => projectionOf(props).disabled;
  * (commit.ts) and reuses the committed handle when nothing moved. An equal-but-fresh style is
  * therefore not a change, and there is nothing to feed back.
  */
-function viewFold(owner: ISymbioteNode): IPayloadFold {
-  return props => {
-    const { color, disabled } = projectionOf(propsOf(owner));
-    return { ...props, style: resolveButtonViewStyle(color, disabled) };
-  };
-}
+// THE VIEW'S FOLD IS GONE AND WAS NOT PORTED — it was doing nothing, on the only platform where it
+// ran. It wrote `style: resolveButtonViewStyle(color, disabled)`, and that function returns the
+// constant `buttonViewStyle` on every platform but Android while the view node is built ONLY in the
+// non-Android branch of `buildStructure`. `buttonViewStyle` off Android is `{}`. So it read two
+// props off its owner, discarded both, and spent a JSI round trip per button per commit to write an
+// empty style.
+//
+// This is the `input-accessory-view` shape again, and the second time this migration has found one:
+// a fold's price is the TRIP, not the body, so a fold that does nothing is the worst value in the
+// file and deleting it is worth as much as porting one that does a lot.
+//
+// Proven not to move the payload rather than argued: `button-derived-payload.itest.ts` pins the
+// view's committed keys, including with an app-set `color` — which lands on the LABEL here and must
+// not reach this node.
 
 function textFold(owner: ISymbioteNode): IPayloadFold {
   return props => {
@@ -233,11 +240,16 @@ function textFold(owner: ISymbioteNode): IPayloadFold {
   };
 }
 
-// Reads its OWN `text`, which `SLOT_PROPS` redirected the app's `title` into — no owner closure, so
-// the fold is shared by every button. `fabricProps` reads only `.text` off a raw-text fold.
-const labelFold: IPayloadFold = props => ({
-  text: resolveButtonTitle(stringOr(props.text) ?? ''),
-});
+// The label's own tag. A raw text carrying one looks odd and is not: it has no props an app can
+// write, but its CONTENT is the platform's decision here — RN renders a button's title uppercased on
+// Android and verbatim elsewhere (`Button.js:352-353`), which is a user-agent choice about a control
+// rather than anything the app asked for.
+//
+// That is what the fold here used to do, and it is `foldButtonLabel` in `SymbioteFabricProps.cpp`
+// now, reached off this tag. `button-payload.itest.ts` recorded "a raw text carries no tag at all,
+// so there is nothing for a tag-keyed rule to key on" — true of `createRawText`'s old signature, not
+// of raw texts, and it takes a tag now for exactly this.
+export const BUTTON_LABEL_TAG = 'button-label';
 
 // ---- the Android touchable -------------------------------------------------------------------
 
@@ -342,9 +354,8 @@ function buildStructure(node: ISymbioteNode): ISymbioteNode {
   // Empty until the redirected `title` arrives. The commit walk drops an empty raw text
   // (`isEmptyRawText`, node.ts), so no Fabric node exists for it until it has a label — and that
   // check reads `props.text`, which the redirect writes, not the fold's uppercased output.
-  const label = createRawText('');
+  const label = createRawText('', BUTTON_LABEL_TAG);
   text.payloadFold = textFold(node);
-  label.payloadFold = labelFold;
   // The hop `slotDerived` alone does not make: it marks the slot (the label), and this is past it.
   addDerivedNode(node, text);
   appendChild(text, label);
@@ -359,7 +370,8 @@ function buildStructure(node: ISymbioteNode): ISymbioteNode {
       viewDescriptor.isText,
       'view',
     );
-    view.payloadFold = viewFold(node);
+    // No fold: see the note where `viewFold` was. Off Android this node's style was `{}` and this
+    // branch is the only one that builds it, so the fold was a crossing bought for an empty object.
     addDerivedNode(node, view);
     appendChild(view, text);
     // Lands on the owner, because `node.childHost` is still undefined here — the engine assigns it
