@@ -630,6 +630,35 @@ porting ANY further RN module by hand.**
 
 ## Where we stand against stock React Native (measured 2026-08-23)
 
+> ### !!! EVERY DEVICE NUMBER BELOW PREDATES THE BUFFER ARCHITECTURE. DO NOT READ IT AS CURRENT.
+>
+> The whole chapter — the table, every per-adapter column, every ratio against stock — was measured
+> on the **JS retained-tree** engine, the one `mutation-buffer.ts`'s header describes as replaced.
+> This branch (`feature/69-removing-shadow-tree`) moved the tree into C++ and the numbers MOVED WITH
+> IT. Device-verified 2026-09-17 across react, vue-sfc, angular, svelte and solid, and the direction
+> is not uniform:
+>
+> - **create-shaped rows REGRESSED** — `Create`, `Replace`, `Append`, `Swap`
+> - **update-shaped rows IMPROVED** — `Select` and its neighbours, everywhere
+>
+> So the buffer architecture did not pay off where it was expected to, and the gains it does show are
+> framework-level rather than architectural. The exact figures are NOT recorded here yet: they were
+> posted as screenshots and never transcribed, which is the whole reason this banner exists rather
+> than a corrected table.
+>
+> **What this invalidates, concretely.** Any cross-check of a headless measurement against a device
+> figure taken from this chapter is comparing two different engines. The `Swap` work below does
+> exactly that — it reads a headless 2.42x against "3.68x on device" — and that pairing is void: the
+> headless arm is this branch, the 3.68x is the old one. The headless numbers themselves stand, being
+> measured directly; only the device column they are read against is stale.
+>
+> `README.md`'s published table has the same provenance. It describes the RELEASED packages, so it is
+> not wrong today — it becomes wrong the moment this branch lands, and must be re-measured first.
+>
+> Everything below is kept because the METHOD in it is sound and hard-won — read the counters before
+> the milliseconds, one ruler per comparison, no verdict off a small-ms row. The METHOD transfers;
+> the numbers do not.
+
 `examples/bare-rn` is plain react-native 0.86 on React's own Fabric renderer, with a port of the
 same benchmark screen and the same 20 measurement constants — the baseline the adapters are read
 against. **iOS 26.5 simulator, Release build, 1 000 rows × 9 native views, all-mounted:**

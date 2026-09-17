@@ -109,6 +109,11 @@ three `View`, three `Text`, three raw text nodes and a `TextInput` — so a run 
 iOS 26.5 simulator, Release, 1 000 rows, all mounted. Lower is better; the ratio is ours over
 stock, so **below 1.00 means faster than stock React Native**. Bold marks a row we win.
 
+> **These are the released packages.** An engine rework in progress (the retained tree moves from JS
+> into C++) shifts them — create-shaped rows one way, update-shaped rows the other — so this table
+> will be re-measured in full before that work ships. It describes what `npm install` gives you
+> today, not the main branch's engine.
+
 | Operation      | stock RN |             Solid |            Svelte |               Vue |             React |          Angular |
 | -------------- | -------: | ----------------: | ----------------: | ----------------: | ----------------: | ---------------: |
 | Create 1 000   |    257.3 | **195.7 · 0.76x** | **205.0 · 0.80x** | **228.7 · 0.89x** |     264.7 · 1.03x |    367.2 · 1.43x |
