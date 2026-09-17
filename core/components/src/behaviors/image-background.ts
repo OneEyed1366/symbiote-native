@@ -31,15 +31,9 @@
 import {
   appendChild,
   createElement,
-  flattenStyle,
   registerHostBehavior,
-  type IDimensionValue,
   type IHostBehavior,
-  type IPayloadFold,
-  type IStyleProp,
   type ISymbioteNode,
-  type IViewStyle,
-  propOf,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../component-names';
@@ -47,14 +41,9 @@ import { IMAGE_TAG, registerImageBehavior } from './image';
 
 export const IMAGE_BACKGROUND_TAG = 'image-background';
 
-// The inner Image's positioning: absolute-fill behind the box's children.
-const ABSOLUTE_FILL: IViewStyle = {
-  position: 'absolute',
-  left: 0,
-  right: 0,
-  top: 0,
-  bottom: 0,
-};
+// The inner image's own tag. Distinct from `image` because the absolute fill must NOT reach a bare
+// `<image>`, and a tag is the only thing a per-node rule can branch on.
+export const IMAGE_BACKGROUND_IMAGE_TAG = 'image-background-image';
 
 // The props RN keeps on the wrapper View (`ImageBackground.js:74-78`), plus the two spellings of a
 // class name — `routeProp`'s slot redirect runs above its own class branch, so an unlisted `class`
@@ -71,14 +60,6 @@ const IMAGE_BACKGROUND_SLOT_DERIVED = ['style'];
 // `style` as `class` instead, so the registry resolves it on the image with nothing needed here.
 const IMAGE_BACKGROUND_SLOT_PROPS = { imageStyle: 'style' };
 
-// A StyleProp is an object, an array of them, or a registered class array — all of which
-// `flattenStyle` already handles one layer down. The only thing to exclude is a scalar.
-function styleOf(value: unknown): IStyleProp<IViewStyle> | undefined {
-  if (typeof value !== 'object' || value === null) return undefined;
-  if (Array.isArray(value)) return value;
-  return { ...value };
-}
-
 // The owner's fold is GONE (2026-09-18), not moved into this file under another name: its whole
 // content was `accessibilityIgnoresInvertColors: true`, a function of the tag and nothing else, and
 // it is `foldImageBackgroundProps` in `SymbioteFabricProps.cpp` now. The owner therefore pays no
@@ -86,49 +67,21 @@ function styleOf(value: unknown): IStyleProp<IViewStyle> | undefined {
 // remaining one is the inner image's, below, which derives its style from THIS node and so cannot be
 // a per-node rule. Contract: `core/engine/cpp/tests/js/image-background-payload.itest.ts`.
 
-// Read one explicit dimension off the (already-flattened) box style. A dp number or a percentage
-// string is a valid IDimensionValue; anything else (auto / undefined) yields undefined.
-function readDimension(
-  style: Record<string, unknown>,
-  key: 'width' | 'height',
-): IDimensionValue | undefined {
-  const value = Object.hasOwn(style, key) ? Reflect.get(style, key) : undefined;
-  if (typeof value === 'number' || typeof value === 'string') return value;
-  return undefined;
-}
-
-function imageFold(owner: ISymbioteNode): IPayloadFold {
-  return props => {
-    // RN's own workaround, and its comment is worth reading before "simplifying" this
-    // (`ImageBackground.js:86-96`): an RN Image overwrites its own width/height from the source's
-    // intrinsic size, which fights the box's explicit dimensions, so they are proxied back on.
-    // Reads the OWNER's live style — a class name lands there too, published by `pushClassStyle`.
-    const box = flattenStyle(styleOf(propOf(owner, 'style')));
-    const next: Record<string, unknown> = {
-      ...props,
-      // `imageStyle` last, so a caller still wins over the fill and the proxy.
-      style: [
-        ABSOLUTE_FILL,
-        {
-          width: readDimension(box, 'width'),
-          height: readDimension(box, 'height'),
-        },
-        styleOf(props.style),
-      ],
-    };
-    // Unconditional priority when both are set, matching RN (`View.js:77-79`) and `foldHostBag`.
-    // A raw `id` is a key no ViewConfig declares, so Fabric drops it and the nativeID is lost.
-    if (Object.hasOwn(next, 'id')) {
-      next.nativeID = next.id;
-      delete next.id;
-    }
-    // No `foldImagePayload` call at the end any more: the image rule is the ENGINE's
-    // (`foldImageProps`), it runs off the tag this node now carries, and it runs BEFORE this fold.
-    // What is left here is the COMPOSITION — a style derived from the owner and a rename — which is
-    // this primitive's own business and exactly the half the browser model keeps in JS.
-    return next;
-  };
-}
+// THE IMAGE'S FOLD IS GONE TOO (2026-09-18) — `foldImageBackgroundImageProps` in
+// `SymbioteFabricProps.cpp`, and with it this primitive costs ZERO trips into JS on both nodes.
+//
+// It outlived every other fold in this file because both of its inputs live on the node ABOVE: the
+// app writes `style` on the `<image-background>` and `IMAGE_BACKGROUND_HOST_PROPS` keeps it there.
+// "A per-node rule cannot reach another node" is what this file used to say, and it was a fact about
+// the JS FOLD rather than the engine — the tree is in C++, so `fabricProps` takes `ownerProps` from
+// `node.parent` and the proxy reads it there.
+//
+// The `id -> nativeID` half went earlier still and was DEAD before this port: `foldIdAlias` applies
+// to every tagged node and runs ahead of any fold, so by the time this ran the key was already
+// renamed. Worth naming, because a fold that still spells a rule someone else now applies reads as
+// load-bearing and is not.
+//
+// Contract: `core/engine/cpp/tests/js/image-background-image-payload.itest.ts`.
 
 // Returns the image, so `slotProps` / `slotPropsExcept` / `slotDerived` all point at it — and the
 // app's children stay on the owner because of `slotTakesNoChildren`, not because of what this
@@ -141,25 +94,30 @@ function imageFold(owner: ISymbioteNode): IPayloadFold {
 // shared mapping by hand at the end. The mapping is the ENGINE's now, reached off the tag, so the
 // tag is how this node gets the platform half at all; the JS slot is free for the composition.
 //
-// ONE ORDERING DIFFERENCE FALLS OUT, and it is deliberate rather than overlooked. The engine's rule
-// folds the image's own `width`/`height` PROPS under its style, and then this fold layers the box's
-// dimensions over that — where RN nests it the other way (`ImageBackground.js:83-98` puts the props
-// under the proxied box size). So when an app sets BOTH a `width` prop on the ImageBackground and a
-// conflicting width in its `style`, RN gives the style's and we give the prop's.
+// ONE ORDERING DIFFERENCE FALLS OUT, and it is deliberate rather than overlooked. The image rule
+// folds the image's own `width`/`height` PROPS under its style, and the background rule then layers
+// the box's dimensions over that — where RN nests it the other way (`ImageBackground.js:83-98` puts
+// the props under the proxied box size). So when an app sets BOTH a `width` prop on the
+// ImageBackground and a conflicting width in its `style`, RN gives the style's and we give the
+// prop's.
 //
 // It is left this way rather than reproduced: RN's own comment calls that nesting a "Temporary
-// Workaround" for an Image that overwrites its own dimensions, an explicit prop winning over an
-// inherited box is the less surprising of the two, and reproducing it would mean either a second
-// copy of the image rule in JS or a per-node fold ORDER knob in the payload builder. Pinned in
+// Workaround" for an Image that overwrites its own dimensions, and an explicit prop winning over an
+// inherited box is the less surprising of the two. Pinned in
 // `core/components/src/behaviors/image-background.test.ts` so it stays a decision.
+//
+// THE TAG IS ITS OWN, and that is what the C++ port needed. The node used to carry plain `image`,
+// which is right for everything the ordinary image rule does and wrong for the fill — a bare
+// `<image>` must NOT be absolutely positioned. `image-background-image` is served by BOTH rules, the
+// ordinary one first, the same shape `usesPressableRule` gives `button` and the touchables. The
+// COMPONENT still resolves through `IMAGE_TAG`, because the native view is an ordinary RCTImageView.
 function buildBackgroundImage(node: ISymbioteNode): ISymbioteNode {
   const descriptor = descriptorFor(IMAGE_TAG);
   const image = createElement(
     descriptor.component,
     descriptor.isText,
-    IMAGE_TAG,
+    IMAGE_BACKGROUND_IMAGE_TAG,
   );
-  image.payloadFold = imageFold(node);
   appendChild(node, image);
   return image;
 }
@@ -177,16 +135,34 @@ const imageBackgroundBehavior: IHostBehavior = {
   detach() {},
 };
 
+// The inner image's registration, and it is NOT a formality twice over.
+//
+// A tag reaches C++ only through `recordSetTag`, which `attachHostBehavior` emits — so a tag nobody
+// registered carries an EMPTY `tagName` in the host and no rule fires for it, however the rule is
+// written. Same reason the ActivityIndicator spinner and the scroll content nodes carry one.
+//
+// And `resolvesImageSources` has to be repeated here rather than inherited from `image`: the lookup
+// is by TAG, this node's tag is its own, and the flag is what makes `routeProp` run
+// `require('./photo.png')` through Metro's asset registry on the way in. Without it an
+// ImageBackground would commit the raw asset NUMBER and paint nothing — headless included, since
+// the resolution is JS-side by necessity.
+const backgroundImageBehavior: IHostBehavior = {
+  resolvesImageSources: true,
+  attach() {},
+  detach() {},
+};
+
 export function registerImageBackgroundBehavior(): void {
-  // A REAL DEPENDENCY, declared rather than assumed. The inner node is an `image` TAG now, so it
-  // gets its platform half — the engine's rule, and the write-time source resolution — only if
-  // Image's own behavior is registered. It used to need nothing, because the fold was a function
-  // this file called directly.
+  // A REAL DEPENDENCY, declared rather than assumed. The inner node is a TAG now, so it gets its
+  // platform half — the engine's two rules, and the write-time source resolution — only through
+  // these registrations. It used to need nothing, because the fold was a function this file called
+  // directly.
   //
-  // `register.ts` registers both anyway, so nothing in an app depended on this; what depended on it
-  // was every test that registers one behavior and not the whole set, and a silent inner image with
-  // no rule is precisely the failure that would reach a device before it reached a suite.
-  // Idempotent, like every `register*` here.
+  // `register.ts` registers everything anyway, so nothing in an app depended on this; what depended
+  // on it was every test that registers one behavior and not the whole set, and a silent inner
+  // image with no rule is precisely the failure that would reach a device before it reached a
+  // suite. Idempotent, like every `register*` here.
   registerImageBehavior();
+  registerHostBehavior(IMAGE_BACKGROUND_IMAGE_TAG, backgroundImageBehavior);
   registerHostBehavior(IMAGE_BACKGROUND_TAG, imageBackgroundBehavior);
 }

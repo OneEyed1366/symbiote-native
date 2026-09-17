@@ -944,6 +944,56 @@ dynamic foldImageBackgroundProps(const dynamic &props) {
   return out;
 }
 
+/**
+ * The INNER image of an ImageBackground, over and above the ordinary image rule its tag also gets.
+ *
+ * RN'S OWN WORKAROUND, and its comment calls it one (`ImageBackground.js:86-96`): an RN Image
+ * overwrites its own width/height from the SOURCE's intrinsic size, which fights the box the app
+ * sized. So the wrapper's explicit dimensions are proxied back onto the image, under an absolute
+ * fill, and the photograph covers the box instead of collapsing to the bitmap.
+ *
+ * Both inputs live on the node ABOVE — the app writes `style` on the `<image-background>` and
+ * `IMAGE_BACKGROUND_HOST_PROPS` keeps it there — which is why this was the last fold in the file to
+ * move and why `ownerProps` is what let it.
+ *
+ * READ THROUGH `lastStyleValue`, not off a plain object: a class name resolves into the owner's
+ * style slot as an ARRAY (`pushClassStyle`), so an app that sizes its background with a stylesheet
+ * rule — the common case — has no inline object to read.
+ *
+ * `imageStyle` arrives as this node's own `style` (the behavior's `slotProps` renames it) and is
+ * composed LAST, so a caller beats both the fill and the proxy.
+ */
+dynamic foldImageBackgroundImageProps(
+    const dynamic &props,
+    const dynamic *ownerProps) {
+  dynamic fill = dynamic::object();
+  fill["position"] = "absolute";
+  fill["left"] = 0;
+  fill["right"] = 0;
+  fill["top"] = 0;
+  fill["bottom"] = 0;
+
+  dynamic box = dynamic::object();
+  const dynamic *ownerStyle =
+      ownerProps == nullptr ? nullptr : ownerProps->get_ptr("style");
+  if (ownerStyle != nullptr) {
+    // Written only when the owner named one. A `width: undefined` would be the same as writing
+    // nothing, but a 0 would collapse the image — so an unsized (flex) owner proxies NOTHING.
+    const dynamic *width = lastStyleValue(*ownerStyle, "width");
+    const dynamic *height = lastStyleValue(*ownerStyle, "height");
+    if (width != nullptr) box["width"] = *width;
+    if (height != nullptr) box["height"] = *height;
+  }
+
+  dynamic composed = dynamic::array(std::move(fill), std::move(box));
+  const dynamic *own = props.get_ptr("style");
+  if (own != nullptr) composed.push_back(*own);
+
+  dynamic out = props;
+  out["style"] = std::move(composed);
+  return out;
+}
+
 // The two native spinners. Which one a tag resolves to is the PLATFORM split, and branching on the
 // component name rather than on `#ifdef` keeps both halves reachable from one test build — the same
 // choice `foldSwitchProps` makes for `Switch` / `AndroidSwitch`.
@@ -1570,8 +1620,15 @@ dynamic fabricProps(
     // rules layer over the touchable's rather than replacing them.
     if (tagName == "button") tagResolved = foldButtonProps(tagResolved);
     bag = &tagResolved;
-  } else if (tagName == "image") {
+  } else if (tagName == "image" || tagName == "image-background-image") {
     tagResolved = foldImageProps(*bag);
+    // The background's inner image is an image PLUS a fill, and the order is the recorded
+    // divergence from RN preserved exactly: the image rule folds this node's own `width`/`height`
+    // props under its style FIRST, and the box proxied from the owner layers over that. RN nests it
+    // the other way (`ImageBackground.js:83-98`); the decision is pinned in
+    // `core/components/src/behaviors/image-background.test.ts` and moving the fold does not reopen it.
+    if (tagName == "image-background-image")
+      tagResolved = foldImageBackgroundImageProps(tagResolved, ownerProps);
     bag = &tagResolved;
   } else if (tagName == "scroll-view" || tagName == "horizontal-scroll-view") {
     tagResolved =

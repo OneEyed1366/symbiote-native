@@ -79,14 +79,17 @@ describe('what an image background sends native', () => {
     );
   });
 
-  // why: THE PRICE, and the split is the point. The owner sheds its trip entirely; the inner image
-  // keeps one, because its style is derived from the owner and no per-node rule can read another
-  // node. So a committed ImageBackground goes from TWO crossings to ONE, and the remaining one is
-  // composition rather than platform — exactly where the browser model says it belongs.
-  it('pays one trip for the pair, and it is the image’s', () => {
+  // why: THE PRICE, and this case has read 2, then 1, then 0 across three ports. The last one was
+  // the inner image's, which held out because its style is DERIVED from this node — "no per-node
+  // rule can read another node" was the standing reason, and `ownerProps` retired it. A committed
+  // ImageBackground now costs NOTHING in JS on either node.
+  //
+  // The counter is per SURFACE, so this asserts the pair rather than the owner; the inner image's
+  // own behaviour is `image-background-image-payload.itest.ts`.
+  it('costs no trip into JS for the whole pair', () => {
     const one = commit({});
     print(`DEBUG image-background folds=${one.folds}`);
-    expect(one.folds).toBe(1);
+    expect(one.folds).toBe(0);
   });
 });
 
