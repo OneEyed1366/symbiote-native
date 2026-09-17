@@ -131,6 +131,48 @@ type IArm = { wall: number; nodes: number; walkMs: number; applyMs: number };
 let engineArm: IArm | undefined;
 let reactArm: IArm | undefined;
 
+type ITelemetry = ReturnType<typeof readSurfaceTelemetry>;
+
+/**
+ * `applyOps`' own half, for one arm.
+ *
+ * `applyMs` is the WHOLE native call and the commit runs inside it, so the walk has to come out or
+ * the two phases are double-counted — the same subtraction this file's `apply` figures already make.
+ * Printed for every arm rather than one, because the question it answers is only ever comparative:
+ * the ops loop does not know which reconciler wrote the ops, so a phase that differs between two
+ * adapters on one tree is a difference in the OPS, and the counters beside it say which kind.
+ *
+ * WHAT IT SAID, AND IT CLOSES THE PHASE RATHER THAN OPENING IT:
+ *
+ *            ops   decode  setProp  convert  structure  publish  handles   decoded
+ *   engine  19.3    4.0     1.3      0.4      1.2        2.4      1.6       7002
+ *   react   23.3    5.9     1.6      0.7      2.5        3.8      2.3       7002
+ *   vue     20.6    4.5     1.5      0.6      1.2        2.7      1.9       7002
+ *
+ * `apply` is `walk` plus `ops` in all three (44.4 = 25.1 + 19.3, 51.3 = 28.0 + 23.3,
+ * 65.1 = 44.5 + 20.6), and `ops` barely moves between them. So Vue's 14 ms of extra `apply` is
+ * entirely its WALK, which is the `payloadFold` above — there is no second cause hiding here, and
+ * the ops loop is not a place to look for one.
+ *
+ * The books therefore close on this fixture: **React's deficit against the direct arm is fibers, and
+ * Vue's deficit against React is the fold.** React's `ops` running 4 ms over the direct arm for
+ * byte-identical op counts (`decoded` and `conversions` match exactly) is the one residue, and at
+ * ~20% of a 19 ms phase with allocation as the obvious suspect it is not worth a hypothesis yet.
+ */
+function printApplySplit(label: string, telemetry: ITelemetry): void {
+  const at = (value: number | undefined): string => (value ?? 0).toFixed(1);
+  const apply = telemetry?.applyMs ?? 0;
+  const walk = telemetry?.walkMs ?? 0;
+  print(
+    `DEBUG ${label.padEnd(7)} apply split: ops=${(apply - walk).toFixed(1)} ` +
+      `decode=${at(telemetry?.decodeMs)} setProp=${at(telemetry?.setPropMs)} ` +
+      `convert=${at(telemetry?.propConvertMs)} strings=${at(telemetry?.stringDecodeMs)} ` +
+      `structure=${at(telemetry?.structureMs)} publish=${at(telemetry?.publishMs)} ` +
+      `handles=${at(telemetry?.instanceHandleMs)} ` +
+      `decoded=${telemetry?.nodesDecoded ?? 0} conversions=${telemetry?.valueConversions ?? 0}`,
+  );
+}
+
 describe('what a reconciler adds to a create', () => {
   // why: the floor for this comparison — the engine driven directly, which is what every other
   // measurement in this directory has been timing without naming it as a baseline for anything.
@@ -157,6 +199,7 @@ describe('what a reconciler adds to a create', () => {
       `DEBUG engine  wall=${wall.toFixed(1)} walk=${engineArm.walkMs.toFixed(1)} ` +
         `apply=${engineArm.applyMs.toFixed(1)} nodes=${engineArm.nodes}`,
     );
+    printApplySplit('engine', telemetry);
     expect(engineArm.nodes > 0).toBe(true);
   });
 
@@ -193,6 +236,7 @@ describe('what a reconciler adds to a create', () => {
         `appendChild=${(telemetry?.appendChildMs ?? 0).toFixed(1)} ` +
         `setProps=${telemetry?.setProps ?? 0} values=${telemetry?.valueEntries ?? 0}`,
     );
+    printApplySplit('react', telemetry);
 
     if (engineArm === undefined) throw new Error('the engine arm did not run');
     // THE ORACLE, and it comes before the delta means anything: two trees of different sizes are not
@@ -341,6 +385,7 @@ describe('what a reconciler adds to a create', () => {
         `appendChild=${(telemetry?.appendChildMs ?? 0).toFixed(1)} ` +
         `setProps=${telemetry?.setProps ?? 0} values=${telemetry?.valueEntries ?? 0}`,
     );
+    printApplySplit('vue', telemetry);
 
     if (engineArm === undefined || reactArm === undefined) {
       throw new Error('an earlier arm did not run');

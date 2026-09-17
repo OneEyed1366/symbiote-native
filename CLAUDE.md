@@ -1391,8 +1391,27 @@ onto the same `folly::dynamic` nullptr, so no value a key can hold distinguishes
 So the contract has to carry removal SEPARATELY — a two-slot return (`{ set, omit }`, unambiguous
 through the conversion and cheap) or a static per-component omit list, which two of the three
 strippers already have and Button does not. Whichever it is, **it lands in one commit across every
-site**: a mixed contract silently drops props. Full record, and the assertions that pin why replacing
-is load-bearing: `core/engine/src/__tests__/payload-fold-merge.test.ts`.
+site**: a mixed contract silently drops props. And an opt-in flag per behavior does not rescue it —
+the three folds that cost the most on device (`pressable`, `text-input`, Button's owner) are exactly
+the three that strip keys, so the sites a partial migration could safely take are the ones worth
+nothing. Full record, and the assertions that pin why replacing is load-bearing:
+`core/engine/src/__tests__/payload-fold-merge.test.ts`.
+
+**And the apply phase is ruled out as a second cause, which is what makes the fold the whole
+remaining lever.** Splitting `applyOps`' own half three ways on the same fixture:
+
+```
+           ops   decode  setProp  convert  structure  publish  handles   decoded
+ engine   19.3    4.0     1.3      0.4      1.2        2.4      1.6       7002
+ react    23.3    5.9     1.6      0.7      2.5        3.8      2.3       7002
+ vue      20.6    4.5     1.5      0.6      1.2        2.7      1.9       7002
+```
+
+`apply` is `walk` plus `ops` in all three, and `ops` barely moves between them — so Vue's 14 ms of
+extra `apply` is entirely its walk, i.e. the fold again. **The books close on this fixture: React's
+deficit against the direct arm is fibers, Vue's deficit against React is the fold.** The one residue
+is React's `ops` running 4 ms over the direct arm for byte-identical op counts, which at ~20% of a
+19 ms phase with allocation as the obvious suspect does not yet carry a hypothesis.
 
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the
