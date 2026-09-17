@@ -12,12 +12,13 @@
 //   same object    the framework hands back the identical reference — `StyleSheet.create`, a
 //                  hoisted literal, a resolved CSS class. `setProp`'s `Object.is` guard can see it.
 //   equal object   the framework rebuilds an equal one — a style literal inside a component body,
-//                  which is what most code actually writes. Identity says "changed"; only a VALUE
-//                  comparison can say otherwise, and that comparison lives in C++ in `diffProps`.
+//                  which is what most code actually writes. Identity says "changed".
 //
 // The second is the one that matters, because it is the one an author does not know they are
-// choosing. What must hold: the node goes dirty, `diffProps` finds nothing to send,
-// `sendsNothing` refuses the clone, and Fabric is never asked to commit at all.
+// choosing. When this file was written it cost 9.7 ms against 0.3 for a thousand rows, all of it
+// converting each fresh object to a `folly::dynamic` so that `diffProps` could find it unchanged.
+// `routeProp` now refuses it in JS first (`isSameShallowStyle`), so the two spellings cost the same
+// and neither reaches the platform at all — which is what the assertions at the foot pin.
 //
 // RUN ON `build-release` (`pnpm run bench:itest`).
 
