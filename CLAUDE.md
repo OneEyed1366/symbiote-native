@@ -1998,10 +1998,29 @@ skips the slot redirect that lives in `routeProp`, so its label never receives t
 raw text is dropped from its parent's child set, and that label's fold never ran there at all. Its
 count went 4 -> 3 and shows only the view's deletion. Read the two numbers together or neither.
 
-What remains is two folds, and both genuinely read another node: the owner's, whose `focusable` leg
-is an owned listener, and the text's, which needs the BUTTON's `color`/`disabled` while its parent is
-the VIEW — **a grandparent, which `ownerProps` does not reach.** That is the next seam this would
-need, and it is not built.
+**The owner's fold then went too, the same day, and off Android Button now binds NO fold at all —
+one crossing left, down from five.** Its last line was `focusable`, and both of its blockers had
+already dissolved: the middle leg is an owned listener, whose existence crosses as a bit since the
+touchable port, and Button's three-way `disabled` (`props.disabled ?? aria-disabled ??
+accessibilityState.disabled`, `Button.js:331,337`) was only ever three PROPS. `foldButtonProps`
+layers the three-leg answer over the one-leg one `foldPressableProps` writes, which is why
+`usesTouchableFocusableRule` excludes `button` — the same order the JS composition had.
+
+It reads the AUTHORED bag, not the one it is handed: by then `disabled` has been erased into
+`accessibilityState` and `aria-disabled` folded into the same place, so the `??` precedence would
+collapse to whatever ended up there. Trap A again, and the JS fold carried the identical correction
+as `projectionOf(propsOf(node))`.
+
+**That one fold was worth TWO crossings**, 3 -> 1 in both fixtures, because the touchable's
+`afterCommit` settle re-commits the node and a fold is charged per commit rather than per node. On
+Android the fold survives for the view style and the ripple background — a theme computation and a
+native config object, neither a prop rewrite — so `buildStructure` binds it behind `IS_ANDROID` and
+binds nothing otherwise.
+
+What remains is ONE fold, the text's, which needs the BUTTON's `color`/`disabled` while its parent is
+the VIEW — **a grandparent, which `ownerProps` does not reach.** That is the next seam and it is not
+built. The browser-shaped version of it is an ancestor query rather than a second parent pointer,
+since what the rule actually wants is "the nearest ancestor that is a button".
 
 **One coverage gap went with the port and is recorded rather than hidden.** `foldButtonLabel`'s
 uppercase arm is `#ifdef ANDROID`, because a raw text commits as `RCTRawText` on both platforms and
@@ -2016,7 +2035,7 @@ Android. Judged a cosmetic difference on one platform against dragging ICU into 
 `resolveButtonTitle` was deleted with it — no caller left but its own two unit tests, which is the
 orphan shape this migration keeps turning up.
 
-### A `<Button>` cost FOUR crossings per commit — superseded, see the section above
+### A `<Button>` cost FOUR crossings per commit — SUPERSEDED, it is one, see above
 
 Pinned in `core/engine/cpp/tests/js/button-payload.itest.ts`: one JS fold per node the behavior
 builds — the owner, the iOS wrapper view, the text, and the raw label. At the per-node figures above
