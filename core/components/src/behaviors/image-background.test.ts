@@ -182,12 +182,17 @@ describe('the ImageBackground behavior — where a prop lands', () => {
 
     const { host, image } = subtree();
     // RN spreads `...props` onto the Image (`ImageBackground.js:81`), so none of these belong to
-    // the box — and the shared mapping is what turns `alt` into an accessibility label.
+    // the box. WHERE each name LANDS is this file's subject; what the image rule then makes of
+    // `alt` and `source` is `foldImageProps`'s, asserted in
+    // `core/engine/cpp/tests/js/image-payload.itest.ts` — this harness builds its payload through
+    // the TypeScript `fabricProps`, which holds no copy of it.
+    //
+    // `source` IS still the array shape here, and that is not the fold: the three source props are
+    // resolved and normalised at WRITE time (`image-source-write.ts`), which this harness does see.
     expect(image.payload.source).toEqual([{ uri: SOURCE.uri }]);
     expect(image.payload.resizeMode).toBe('contain');
     expect(image.payload.testID).toBe('probe');
-    expect(image.payload.accessibilityLabel).toBe('A picture');
-    expect(image.payload.alt).toBeUndefined();
+    expect(image.payload.alt).toBe('A picture');
     expect(host.payload.source).toBeUndefined();
     expect(host.payload.testID).toBeUndefined();
     // The wrapper's own layout box, which is what the app wrote `style` for.

@@ -262,6 +262,16 @@ export interface IHostBehavior {
   detach(node: ISymbioteNode): void;
   // This primitive's own prop folds. See IPayloadFold.
   readonly foldPayload?: IPayloadFold;
+  /**
+   * Resolve `source` / `defaultSource` / `loadingIndicatorSource` on the way IN — Image's, and only
+   * Image's. See `image-source-write.ts`.
+   *
+   * It is declared here rather than inferred from the tag because it is a statement about what the
+   * primitive's props MEAN, which is exactly what a behavior is for. And it is a flag rather than a
+   * function: `routeProp` is the hottest path in the engine, so what it can afford per write is a
+   * boolean read on the node, not a call into a behavior.
+   */
+  readonly resolvesImageSources?: boolean;
 }
 
 const behaviors = new Map<string, IHostBehavior>();
@@ -488,6 +498,9 @@ export function attachHostBehavior(node: ISymbioteNode, tag: string): void {
   // something: an app's own `<div>`-equivalent would otherwise pay an intern and an op to tell the
   // host a name it has no rule for.
   recordSetTag(node, tag);
+  // BEFORE `attach` and before any prop is routed, which is the whole point: it changes how a
+  // WRITE is stored, so a source written to this node must never arrive ahead of it.
+  if (behavior.resolvesImageSources === true) node.resolvesImageSources = true;
   // A field rather than a lookup at payload-build time: `fabricProps` runs per node per commit and
   // must not pay a Map probe to discover that almost nothing has a fold.
   node.payloadFold = behavior.foldPayload;

@@ -58,6 +58,10 @@ import {
 } from './host-behavior';
 import { configPayloadFold } from './registry';
 import { resolveStructuredStyle } from './structured-style';
+import {
+  IMAGE_SOURCE_PROPS,
+  resolveImageSourceProp,
+} from './image-source-write';
 // A cycle, deliberately: `imperative.ts` imports this module for the node shape, and the prototype
 // methods below call back into it. Neither side touches the other at module-evaluation time - only
 // inside a function body - so every loader (tsc, vitest, Metro) resolves it fine. The alternative
@@ -166,6 +170,18 @@ export interface ISymbioteNode {
    * it describes the behavior's shape, and a behavior is attached once and detached whole.
    */
   hasCommitHook: boolean;
+  /**
+   * Whether this node's three image-source props are resolved on the way IN — see
+   * `image-source-write.ts` for why the asset lookup happens at write time and not in the payload.
+   *
+   * A boolean read per write, same shape and same reason as `hasCommitHook` above. It has to be
+   * gated on the NODE rather than applied to the key everywhere, because the resolution normalises
+   * to Image's ARRAY shape: a `WebView` or a third-party video view also spells `source`, and
+   * wrapping theirs would hand native a shape it does not read.
+   *
+   * Set once at `createElement`, by `attachHostBehavior`, for the behavior that declares it.
+   */
+  resolvesImageSources: boolean;
   // The payload fold this node's host behavior supplied, or undefined for the ~all of them that
   // have none. Set once at `createElement`, never per write, and read by `fabricProps` at the one
   // point where the whole bag is known.
@@ -305,6 +321,7 @@ class SymbioteNode implements ISymbioteNode {
   declare listeners: Map<string, IListener> | undefined;
   declare hasAriaAlias: boolean;
   declare hasCommitHook: boolean;
+  declare resolvesImageSources: boolean;
   declare styleParts: IClassStyleParts | undefined;
   declare payloadFold: IPayloadFold | undefined;
   declare childHost: ISymbioteNode | undefined;
@@ -326,6 +343,8 @@ class SymbioteNode implements ISymbioteNode {
     // Same hidden-class reason; `attachHostBehavior` raises it a few lines later for the rare node
     // whose behavior declares the recurring hook.
     this.hasCommitHook = false;
+    // Same again; `attachHostBehavior` raises it for the one behavior that declares it, Image's.
+    this.resolvesImageSources = false;
     this.styleParts = undefined;
     // Assigned here for the same hidden-class reason as `hasAriaAlias` above; `attachHostBehavior`
     // overwrites it a few lines later for the rare node that has a behavior.
@@ -704,10 +723,16 @@ export function writeProp(
   // headless only, and the device commits the raw CSS string, which Fabric drops in silence. See
   // `structured-style.ts`; it hands the same object back when nothing needed resolving, which is
   // what keeps the host's identity guard and `pushClassStyle` working.
-  const written =
-    key === 'style' || key === 'activeStyle'
-      ? resolveStructuredStyle(value)
-      : value;
+  // Image's three source props, resolved on the way in for the same reason and at the same seam —
+  // the asset lookup is Metro's registry, which exists only in JS. See `image-source-write.ts`.
+  // Gated on the node: the resolution normalises to Image's ARRAY shape, and a `WebView` spells
+  // `source` too.
+  let written: unknown = value;
+  if (key === 'style' || key === 'activeStyle') {
+    written = resolveStructuredStyle(value);
+  } else if (node.resolvesImageSources && IMAGE_SOURCE_PROPS.has(key)) {
+    written = resolveImageSourceProp(value);
+  }
   if (typeof written === 'function') {
     let bag = functionProps.get(node);
     if (bag === undefined) {

@@ -234,6 +234,26 @@ void addStyle(dynamic &out, const dynamic &style) {
   }
 }
 
+/**
+ * The last value a (possibly nested) style slot holds for `key`, or null.
+ *
+ * LAST rather than first: `addStyle` writes in order and a later entry wins, so this has to agree
+ * with what the hoist will do or the two disagree about what the style says. Used only by the image
+ * rule, which accepts `resizeMode` and `tintColor` as style keys as well as props.
+ */
+const dynamic *lastStyleValue(const dynamic &style, const char *key) {
+  if (style.isArray()) {
+    const dynamic *found = nullptr;
+    for (const auto &entry : style) {
+      const dynamic *inner = lastStyleValue(entry, key);
+      if (inner != nullptr) found = inner;
+    }
+    return found;
+  }
+  if (!style.isObject()) return nullptr;
+  return style.get_ptr(key);
+}
+
 // ── ARIA ─────────────────────────────────────────────────────────────────────────────────────────
 
 // Copied line for line from `core/engine/src/accessibility-props.ts`, which was itself copied from
@@ -849,6 +869,200 @@ dynamic foldPressableProps(const dynamic &props) {
   return out;
 }
 
+// The names Image CONSUMES rather than forwards. Every one is a W3C spelling or a size alias, and
+// none is a Fabric prop — leaving one in the payload is how a reader concludes the rule ran when it
+// did not. `source` is absent on purpose: it is consumed and then WRITTEN BACK, resolved.
+const std::array<const char *, 8> kImageConsumedKeys = {
+    "src",
+    "srcSet",
+    "crossOrigin",
+    "referrerPolicy",
+    "alt",
+    "width",
+    "height",
+    "loadingIndicatorSource",
+};
+
+/**
+ * The HTTP headers the two W3C aliases contribute to every source
+ * (`ImageSourceUtils.js:40-46`). Empty is a real answer and is still attached on the `src`/`srcSet`
+ * branches, because upstream pushes `{uri, headers, ...}` unconditionally there.
+ */
+dynamic imageHeaders(const dynamic &props) {
+  dynamic headers = dynamic::object();
+  const std::string *crossOrigin = stringAt(props, "crossOrigin");
+  // `anonymous` is the default browser behaviour and contributes nothing — upstream checks for
+  // `use-credentials` specifically.
+  if (crossOrigin != nullptr && *crossOrigin == "use-credentials") {
+    headers["Access-Control-Allow-Credentials"] = "true";
+  }
+  const std::string *referrerPolicy = stringAt(props, "referrerPolicy");
+  if (referrerPolicy != nullptr) headers["Referrer-Policy"] = *referrerPolicy;
+  return headers;
+}
+
+/** Copy the size aliases onto a source entry, as upstream does for the `src` and `srcSet` shapes. */
+void addSizeHints(dynamic &entry, const dynamic &props) {
+  const dynamic *width = props.get_ptr("width");
+  if (width != nullptr && width->isNumber()) entry["width"] = *width;
+  const dynamic *height = props.get_ptr("height");
+  if (height != nullptr && height->isNumber()) entry["height"] = *height;
+}
+
+/**
+ * `srcSet` expanded into scaled sources — `ImageSourceUtils.js:48-79`.
+ *
+ * `src` fills the 1x slot ONLY when the set omits it: native picks by screen scale, so a missing 1x
+ * is a blank image on a non-retina device and a duplicated one is undefined behaviour. A scale
+ * token that is not `<n>x` is SKIPPED rather than guessed at — guessing fetches the wrong asset at
+ * the wrong density, silently.
+ */
+dynamic expandSrcSet(
+    const std::string &srcSet,
+    const dynamic &props,
+    const dynamic &headers) {
+  dynamic sources = dynamic::array();
+  bool useSrcForDefaultScale = true;
+
+  for (size_t at = 0; at <= srcSet.size();) {
+    const size_t end = std::min(srcSet.find(", ", at), srcSet.size());
+    const std::string entry = srcSet.substr(at, end - at);
+    at = end + 2;
+    if (entry.empty()) continue;
+
+    const size_t space = entry.find(' ');
+    const std::string uri = entry.substr(0, space);
+    const std::string token =
+        space == std::string::npos ? "1x" : entry.substr(space + 1);
+    if (token.empty() || token.back() != 'x') continue;
+    char *parsedTo = nullptr;
+    const long scale = std::strtol(token.c_str(), &parsedTo, 10);
+    // `strtol` stops at the `x`, so a token that parsed nothing has no digits at all.
+    if (parsedTo == token.c_str()) continue;
+    if (scale == 1) useSrcForDefaultScale = false;
+
+    dynamic source = dynamic::object();
+    source["uri"] = uri;
+    source["scale"] = static_cast<double>(scale);
+    addSizeHints(source, props);
+    source["headers"] = headers;
+    sources.push_back(std::move(source));
+  }
+
+  const std::string *src = stringAt(props, "src");
+  if (useSrcForDefaultScale && src != nullptr) {
+    dynamic source = dynamic::object();
+    source["uri"] = *src;
+    source["scale"] = 1.0;
+    addSizeHints(source, props);
+    source["headers"] = headers;
+    sources.push_back(std::move(source));
+  }
+  return sources;
+}
+
+/**
+ * Which of `srcSet` / `src` / `source` native is actually shown — `ImageSourceUtils.js:47-89`, in
+ * that precedence. An app migrating from the web writes `src` and would otherwise see nothing paint.
+ *
+ * `source` ARRIVES ALREADY RESOLVED: `routeProp` ran it through Metro's asset registry and
+ * normalised it to an array on the way in (`image-source-write.ts`), because that registry is
+ * JavaScript and there is none here. So this only chooses and decorates.
+ */
+dynamic resolveImageSources(const dynamic &props) {
+  const dynamic headers = imageHeaders(props);
+
+  const std::string *srcSet = stringAt(props, "srcSet");
+  if (srcSet != nullptr) return expandSrcSet(*srcSet, props, headers);
+
+  const std::string *src = stringAt(props, "src");
+  if (src != nullptr) {
+    dynamic source = dynamic::object();
+    source["uri"] = *src;
+    addSizeHints(source, props);
+    source["headers"] = headers;
+    return dynamic::array(std::move(source));
+  }
+
+  const dynamic *resolved = props.get_ptr("source");
+  if (resolved == nullptr || !resolved->isArray()) return dynamic::array();
+
+  // A header-decorated SINGLE object source gets them merged in (`:84`), so the aliases work on the
+  // RN spelling too. The multi-entry and asset-id shapes pass through untouched, as upstream leaves
+  // them.
+  if (!headers.empty() && resolved->size() == 1 && resolved->at(0).isObject() &&
+      stringAt(resolved->at(0), "uri") != nullptr) {
+    dynamic only = resolved->at(0);
+    only["headers"] = headers;
+    return dynamic::array(std::move(only));
+  }
+  return *resolved;
+}
+
+/**
+ * Image's user-agent half.
+ *
+ * The one rule that does NOT move whole, and the split is worth understanding: every line here is a
+ * function of the tag, except the asset lookup that turns `require('./logo.png')` into a uri. That
+ * one asks Metro's registry — a JS table populated at bundle time — so it happens at WRITE time
+ * instead, the same seam and the same argument as `structured-style.ts`. By the time this runs, the
+ * bag already holds resolved sources.
+ */
+dynamic foldImageProps(const dynamic &props) {
+  dynamic out = props;
+  out["source"] = resolveImageSources(props);
+
+  // `ImageProps.js:195,202` — the size aliases are STYLE, not props, and an explicit style key wins.
+  // RN spells it `{width, height}, ...style`, so they go UNDER.
+  const dynamic *width = props.get_ptr("width");
+  const dynamic *height = props.get_ptr("height");
+  if (width != nullptr || height != nullptr) {
+    dynamic sizes = dynamic::object();
+    if (width != nullptr) sizes["width"] = *width;
+    if (height != nullptr) sizes["height"] = *height;
+    dynamic composed = dynamic::array(std::move(sizes));
+    const dynamic *authored = props.get_ptr("style");
+    if (authored != nullptr) composed.push_back(*authored);
+    out["style"] = std::move(composed);
+  }
+
+  // RN accepts these two as style keys as well as props; reading only the prop drops a style
+  // authors legitimately write.
+  const dynamic *style = props.get_ptr("style");
+  if (out.get_ptr("resizeMode") == nullptr && style != nullptr) {
+    const dynamic *fromStyle = lastStyleValue(*style, "resizeMode");
+    if (fromStyle != nullptr) out["resizeMode"] = *fromStyle;
+  }
+  if (out.get_ptr("tintColor") == nullptr && style != nullptr) {
+    const dynamic *fromStyle = lastStyleValue(*style, "tintColor");
+    if (fromStyle != nullptr) out["tintColor"] = *fromStyle;
+  }
+
+  // `alt` is the accessibility text (Image.ios.js / Image.android.js): it sets the label AND marks
+  // the image accessible, which is what puts it in the reader's order at all. An explicit label
+  // wins; an image with NO alt is left out of the order entirely, since a decorative image
+  // announcing itself is noise a screen-reader user cannot skip.
+  const std::string *alt = stringAt(props, "alt");
+  if (alt != nullptr) {
+    if (out.get_ptr("accessibilityLabel") == nullptr) {
+      out["accessibilityLabel"] = *alt;
+    }
+    out["accessible"] = true;
+  }
+
+  // Android's loading indicator is a bare uri STRING under a different name, not the array shape
+  // the main source uses. Sending the array paints no placeholder and says nothing.
+  const dynamic *indicator = props.get_ptr("loadingIndicatorSource");
+  if (indicator != nullptr && indicator->isArray() && indicator->size() > 0 &&
+      indicator->at(0).isObject()) {
+    const std::string *uri = stringAt(indicator->at(0), "uri");
+    if (uri != nullptr) out["loadingIndicatorSrc"] = *uri;
+  }
+
+  for (const char *key : kImageConsumedKeys) out.erase(key);
+  return out;
+}
+
 /** RN rounds the iOS background pill to this radius when `ios_backgroundColor` is set. */
 constexpr double kIosSwitchBackgroundRadius = 16;
 
@@ -1007,6 +1221,9 @@ dynamic fabricProps(
   dynamic tagResolved;
   if (usesPressableRule(tagName)) {
     tagResolved = foldPressableProps(*bag);
+    bag = &tagResolved;
+  } else if (tagName == "image") {
+    tagResolved = foldImageProps(*bag);
     bag = &tagResolved;
   } else if (tagName == "switch") {
     // The COMPONENT decides the platform half, not a compile-time macro: `Switch` and

@@ -24,19 +24,26 @@
 // MEASURED on `build-release`, three consecutive runs, one sitting, a thousand nodes per commit:
 //
 //              native walk          js walk              per node
-//   pressable  4.7  3.9  4.1 ms     18.9 18.5 18.7 ms    ~14.5 us      folds 0 against 1000
-//   switch     5.1  5.1  5.7 ms     23.9 24.3 24.4 ms    ~18.9 us      folds 0 against 1000
+//   pressable  4.1  4.3  4.3 ms     20.6 21.6 23.1 ms    ~17 us     folds 0 against 1000
+//   switch     5.6  5.5  6.0 ms     27.1 38.4 28.8 ms    ~26 us     folds 0 against 1000
+//   image      6.9  7.3  7.8 ms     32.2 38.2 33.3 ms    ~27 us     folds 0 against 1000
 //
-// So each rule itself is ~4-5 ms and the CROSSING was ~15-17 ms — three to four times the work it
-// was carrying. That is the same shape the text-input port measured (~17 us) and the reason a
-// fold's price is the TRIP and not the function: the bag goes out as a `jsi::Value` and comes back
-// through `jsi::dynamicFromValue`, a per-key JSI walk, for a rule that rewrites a handful of keys.
+// So each rule itself is 4-8 ms and the CROSSING was four to five times that. Same shape the
+// text-input port measured (~17 us) and the reason a fold's price is the TRIP and not the function:
+// the bag goes out as a `jsi::Value` and comes back through `jsi::dynamicFromValue`, a per-key JSI
+// walk, for a rule that rewrites a handful of keys. The bigger the bag, the worse the ratio — which
+// is why image, whose rule touches the most keys, is the most expensive to have had in JS.
 //
-// The pressable row read 5.6/28.6 when it was measured alone on a busier machine. Both figures are
-// real and neither is the other's before/after — ONE RULER PER COMPARISON, which is why the two
-// rules are now priced in the same file, in the same process, in one sitting.
+// The NATIVE column is tight run to run and the JS column is not, and that is the shape to expect:
+// a JS fold allocates, so its cost carries GC that best-of-N cannot fully suppress. Read the native
+// figures as measurements and the JS ones as a floor.
+//
+// The pressable row read 5.6/28.6 when it was measured alone on a busier machine. Every figure here
+// is real and none is another's before/after — ONE RULER PER COMPARISON, which is why all three
+// rules are priced in the same file, in the same process, in one sitting.
 
 import {
+  registerImageBehavior,
   registerPressableBehavior,
   registerSwitchBehavior,
 } from '@symbiote-native/components';
@@ -58,6 +65,7 @@ const ROWS = 1_000;
 
 registerPressableBehavior();
 registerSwitchBehavior();
+registerImageBehavior();
 
 // ── the JS arms: the same rule, written on the other side of the wire ────────────────────────────
 //
@@ -149,6 +157,47 @@ const PRESSABLE_PROPS = {
   style: { flexDirection: 'row', paddingLeft: 8, height: 44 },
 };
 
+// The `image` arm's JS twin. `source` is NOT in it: the asset lookup moved to write time for both
+// arms alike (`image-source-write.ts`), so it is not part of what either side of this comparison
+// does — which is exactly why the two arms can be compared at all.
+const IMAGE_ALIAS_KEYS = [
+  'src',
+  'srcSet',
+  'crossOrigin',
+  'referrerPolicy',
+  'alt',
+  'width',
+  'height',
+];
+
+registerHostBehavior('image-in-js', {
+  attach(): void {},
+  detach(): void {},
+  resolvesImageSources: true,
+  foldPayload(props: Readonly<Record<string, unknown>>) {
+    const out: Record<string, unknown> = { ...props };
+    const headers: Record<string, string> = {};
+    if (props.crossOrigin === 'use-credentials') {
+      headers['Access-Control-Allow-Credentials'] = 'true';
+    }
+    if (typeof props.referrerPolicy === 'string') {
+      headers['Referrer-Policy'] = props.referrerPolicy;
+    }
+    const size: Record<string, unknown> = {};
+    if (typeof props.width === 'number') size.width = props.width;
+    if (typeof props.height === 'number') size.height = props.height;
+
+    out.source = [{ uri: props.src, ...size, headers }];
+    if (Object.keys(size).length > 0) out.style = [size, props.style];
+    if (typeof props.alt === 'string') {
+      out.accessibilityLabel ??= props.alt;
+      out.accessible = true;
+    }
+    for (const key of IMAGE_ALIAS_KEYS) delete out[key];
+    return out;
+  },
+});
+
 const SWITCH_PROPS = {
   value: true,
   disabled: false,
@@ -156,6 +205,15 @@ const SWITCH_PROPS = {
   thumbColor: '#f5dd4b',
   ios_backgroundColor: '#3e3e3e',
   style: { margin: 4 },
+};
+
+const IMAGE_PROPS = {
+  src: 'https://example.test/hero.png',
+  alt: 'a hero',
+  width: 40,
+  height: 20,
+  crossOrigin: 'use-credentials',
+  style: { opacity: 0.9 },
 };
 
 type IArm = {
@@ -199,16 +257,50 @@ function buildList(
   };
 }
 
+// A CANONICAL string: array order preserved, object keys sorted. `folly::dynamic` does not keep an
+// object's authored key order, so a plain `JSON.stringify` comparison asserts the host's hash order
+// and fails on two payloads that are equal — which it did, on the image arm's `source`. Arrays are
+// deliberately NOT sorted: their order is part of the contract (native picks a source by scale).
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  const entries = Object.entries({ ...value }).sort(([left], [right]) =>
+    left < right ? -1 : 1,
+  );
+  return `{${entries.map(([key, held]) => `${key}:${canonical(held)}`).join(',')}}`;
+}
+
 // The gate on every measurement below: two arms that send different payloads are not one ruler.
 function expectSamePayload(native: IArm, js: IArm): void {
   expect(Object.keys(native.payload).sort().join(' ')).toBe(
     Object.keys(js.payload).sort().join(' '),
   );
   for (const key of Object.keys(native.payload)) {
-    expect(JSON.stringify(native.payload[key])).toBe(
-      JSON.stringify(js.payload[key]),
-    );
+    expect(canonical(native.payload[key])).toBe(canonical(js.payload[key]));
   }
+}
+
+// BEST OF N, for the reason `child-list-scaling.itest.ts` spells out: timing noise is one-sided —
+// it only ever ADDS — so the smallest of several runs is the closest reading to the work itself.
+// Here the first sample is also the coldest, and it showed: an arm read 13.0 ms on its first pass
+// and 4.3 on its third, in the same process.
+//
+// A fresh surface per sample, from a counter, so no two samples share a tree.
+const SAMPLES = 4;
+let nextRootTag = 1;
+
+function bestArm(
+  view: string,
+  tag: string,
+  props: Record<string, unknown>,
+): IArm {
+  let best: IArm | undefined;
+  for (let run = 0; run < SAMPLES; run += 1) {
+    const arm = buildList((nextRootTag += 1), view, tag, props);
+    if (best === undefined || arm.walk < best.walk) best = arm;
+  }
+  if (best === undefined) throw new Error('no sample was taken');
+  return best;
 }
 
 function priced(
@@ -216,10 +308,9 @@ function priced(
   view: string,
   tag: string,
   props: Record<string, unknown>,
-  rootTag: number,
 ): void {
-  const native = buildList(rootTag, view, tag, props);
-  const js = buildList(rootTag + 1, view, `${tag}-in-js`, props);
+  const native = bestArm(view, tag, props);
+  const js = bestArm(view, `${tag}-in-js`, props);
 
   expectSamePayload(native, js);
   print(
@@ -237,11 +328,15 @@ function priced(
 
 describe('what a ported tag rule costs on each side of the wire', () => {
   it('pays no trip into JS for a thousand pressables', () => {
-    priced('pressable', 'RCTView', 'pressable', PRESSABLE_PROPS, 1);
+    priced('pressable', 'RCTView', 'pressable', PRESSABLE_PROPS);
   });
 
   it('pays no trip into JS for a thousand switches', () => {
-    priced('switch', 'Switch', 'switch', SWITCH_PROPS, 3);
+    priced('switch', 'Switch', 'switch', SWITCH_PROPS);
+  });
+
+  it('pays no trip into JS for a thousand images', () => {
+    priced('image', 'RCTImageView', 'image', IMAGE_PROPS);
   });
 });
 

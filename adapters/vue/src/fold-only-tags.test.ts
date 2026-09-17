@@ -106,7 +106,15 @@ describe('Vue: the fold-only tags commit what their wrappers used to', () => {
     expect(Object.hasOwn(node.payload, 'onRefresh')).toBe(false);
   });
 
-  it('image folds src and the width/height box into the style', async () => {
+  // THE FOLD HALF MOVED: `core/engine/cpp/tests/js/image-payload.itest.ts`. `src` becoming the
+  // native source array and `width`/`height` becoming style is `foldImageProps` in
+  // `SymbioteFabricProps.cpp` now, and this harness commits through the TypeScript `fabricProps`,
+  // which holds no copy of that rule.
+  //
+  // What stays is what this FILE is about — that a bare Vue tag reaches the right native view and
+  // carries its props to the commit. The `image` arm is kept rather than deleted because the set of
+  // tags is the subject; losing one would quietly narrow it.
+  it('image reaches the native image view and carries its props', async () => {
     await mountTag('image', {
       testID: 'img',
       src: 'https://example.test/a.png',
@@ -116,10 +124,6 @@ describe('Vue: the fold-only tags commit what their wrappers used to', () => {
 
     const node = byTestId('img');
     expect(node.viewName).toBe('RCTImageView');
-    // `renderImage`'s job, now `registerImageBehavior`'s: `src` becomes the native source array and
-    // width/height become style, neither of which survives as the raw prop it was written as.
-    expect(Array.isArray(node.payload.source)).toBe(true);
-    expect(node.payload.width).toBe(12);
-    expect(node.payload.height).toBe(34);
+    expect(node.payload.src).toBe('https://example.test/a.png');
   });
 });

@@ -110,25 +110,26 @@ describe('Solid Image on the engine', () => {
       expect(firstSource(committedImage())).toEqual(RESOLVED_ASSET);
     });
 
-    // why: the W3C aliases are consumed by renderImage and fold into the resolved `source` array.
-    // Dropping one from the VIEW_PROPS split list would leave it riding through `passthrough` to
-    // Fabric raw as well — a prop native has no idea about, alongside a source that looks correct.
-    it('keeps the W3C aliases off the native prop bag, folding them into source', async () => {
+    // THE ALIAS FOLD MOVED: `core/engine/cpp/tests/js/image-payload.itest.ts`. `src`/`width`/
+    // `height`/`alt` becoming a resolved `source` array and an accessibility label is
+    // `foldImageProps` in `SymbioteFabricProps.cpp` now, and this harness commits through the
+    // TypeScript `fabricProps`, which holds no copy of that rule.
+    //
+    // What stays is the half that is Solid's: the aliases must reach the TAG as the app wrote them,
+    // because the engine folds what it is handed. A bare tag that swallowed one — the VIEW_PROPS
+    // split this case was named for — would send the engine a bag with nothing to fold.
+    it('hands the W3C aliases to the tag as written', async () => {
       mount(ROOT_TAG, () => (
         <image src="http://x/w.png" width={20} height={30} alt="a wombat" />
       ));
       await tick();
 
-      const props = committedImage().payload;
-      expect(firstSource(committedImage())).toEqual({
-        uri: 'http://x/w.png',
+      expect(committedImage().payload).toMatchObject({
+        src: 'http://x/w.png',
         width: 20,
         height: 30,
-        headers: {},
+        alt: 'a wombat',
       });
-      expect('src' in props).toBe(false);
-      expect('crossOrigin' in props).toBe(false);
-      expect(props.accessibilityLabel).toBe('a wombat');
     });
 
     // why: proves the engine's event-dispatch path reaches a Solid callback prop for Image — the
@@ -196,17 +197,20 @@ describe('Solid Image on the engine', () => {
       );
     });
 
-    // why: renderImage emits accessibilityLabel/accessible ONLY while `alt` holds a value, so the
-    // keys VANISH from the bag when it clears. Solid's spread walks the current key set with no
-    // removal pass, so without the bridge's withStableKeys widening this the native view keeps the
-    // old label forever and a screen reader announces text the app already removed
-    // (.claude/rules/solid-descriptor-bridge.md §1).
-    it('clears the alt-derived accessibility props when alt goes undefined after mount', async () => {
+    // why: a prop that goes `undefined` must be CLEARED on the node, not left standing. Solid's
+    // spread walks the current key set with no removal pass, so without the bridge's
+    // `withStableKeys` widening it the native view keeps the old value forever and a screen reader
+    // announces text the app already removed (.claude/rules/solid-descriptor-bridge.md §1).
+    //
+    // Observed on `alt` ITSELF now, where it used to be observed on the `accessibilityLabel` /
+    // `accessible` that `alt` folded into — that fold is the engine's
+    // (`core/engine/cpp/tests/js/image-payload.itest.ts`) and this harness cannot see it. The claim
+    // is unchanged and the observable is one step closer to it: `alt` is what Solid writes.
+    it('clears alt on the node when it goes undefined after mount', async () => {
       const [alt, setAlt] = createSignal<string | undefined>('a wombat');
       mount(ROOT_TAG, () => <image source={REMOTE} alt={alt()} />);
       await tick();
-      expect(committedImage().payload.accessibilityLabel).toBe('a wombat');
-      expect(committedImage().payload.accessible).toBe(true);
+      expect(committedImage().payload.alt).toBe('a wombat');
 
       setAlt(undefined);
       await tick();
@@ -214,14 +218,10 @@ describe('Solid Image on the engine', () => {
       // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
       // default", held only inside the diff the stand-in merged. The engine's op stream says the
       // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
-      const payload = committedImage().payload;
-      expect(Object.hasOwn(payload, 'accessibilityLabel')).toBe(false);
-      expect(Object.hasOwn(payload, 'accessible')).toBe(false);
+      expect(Object.hasOwn(committedImage().payload, 'alt')).toBe(false);
       // …and the half that proves the engine ACTED rather than merely stopping: the record carried
-      // both keys after the mount above, so their being gone from it means a clearing op was sent.
-      const recorded = createdImage();
-      expect(Object.hasOwn(recorded.props, 'accessibilityLabel')).toBe(false);
-      expect(Object.hasOwn(recorded.props, 'accessible')).toBe(false);
+      // the key after the mount above, so its being gone means a clearing op was sent.
+      expect(Object.hasOwn(createdImage().props, 'alt')).toBe(false);
     });
 
     // why: Object.assign(ImageComponent, imageStatics) must attach the SAME function references —

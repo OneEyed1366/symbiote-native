@@ -43,7 +43,7 @@ import {
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../component-names';
-import { foldImagePayload, IMAGE_TAG } from './image';
+import { IMAGE_TAG, registerImageBehavior } from './image';
 
 export const IMAGE_BACKGROUND_TAG = 'image-background';
 
@@ -123,7 +123,11 @@ function imageFold(owner: ISymbioteNode): IPayloadFold {
       next.nativeID = next.id;
       delete next.id;
     }
-    return foldImagePayload(next);
+    // No `foldImagePayload` call at the end any more: the image rule is the ENGINE's
+    // (`foldImageProps`), it runs off the tag this node now carries, and it runs BEFORE this fold.
+    // What is left here is the COMPOSITION — a style derived from the owner and a rename — which is
+    // this primitive's own business and exactly the half the browser model keeps in JS.
+    return next;
   };
 }
 
@@ -132,13 +136,30 @@ function imageFold(owner: ISymbioteNode): IPayloadFold {
 // returns. The image is appended FIRST and nothing else is ever placed in front of it, which is
 // what makes the children paint over it.
 //
-// Built WITHOUT handing `IMAGE_TAG` to `createElement`, deliberately: that would attach Image's own
-// behavior and set `payloadFold` to `foldImagePayload` alone, and this node's style has to be
-// derived from the owner. `payloadFold` is a single slot, so the composition is spelled here — and
-// it still calls the one shared mapping rather than restating it.
+// Built WITH `IMAGE_TAG` since 2026-09-18, which is the reverse of what it used to do and for a
+// reason that reversed with it. It used to withhold the tag so the node would not get Image's
+// `payloadFold` — a single slot this primitive needed for its own derived style — and call the
+// shared mapping by hand at the end. The mapping is the ENGINE's now, reached off the tag, so the
+// tag is how this node gets the platform half at all; the JS slot is free for the composition.
+//
+// ONE ORDERING DIFFERENCE FALLS OUT, and it is deliberate rather than overlooked. The engine's rule
+// folds the image's own `width`/`height` PROPS under its style, and then this fold layers the box's
+// dimensions over that — where RN nests it the other way (`ImageBackground.js:83-98` puts the props
+// under the proxied box size). So when an app sets BOTH a `width` prop on the ImageBackground and a
+// conflicting width in its `style`, RN gives the style's and we give the prop's.
+//
+// It is left this way rather than reproduced: RN's own comment calls that nesting a "Temporary
+// Workaround" for an Image that overwrites its own dimensions, an explicit prop winning over an
+// inherited box is the less surprising of the two, and reproducing it would mean either a second
+// copy of the image rule in JS or a per-node fold ORDER knob in the payload builder. Pinned in
+// `core/components/src/behaviors/image-background.test.ts` so it stays a decision.
 function buildBackgroundImage(node: ISymbioteNode): ISymbioteNode {
   const descriptor = descriptorFor(IMAGE_TAG);
-  const image = createElement(descriptor.component, descriptor.isText);
+  const image = createElement(
+    descriptor.component,
+    descriptor.isText,
+    IMAGE_TAG,
+  );
   image.payloadFold = imageFold(node);
   appendChild(node, image);
   return image;
@@ -159,5 +180,15 @@ const imageBackgroundBehavior: IHostBehavior = {
 };
 
 export function registerImageBackgroundBehavior(): void {
+  // A REAL DEPENDENCY, declared rather than assumed. The inner node is an `image` TAG now, so it
+  // gets its platform half — the engine's rule, and the write-time source resolution — only if
+  // Image's own behavior is registered. It used to need nothing, because the fold was a function
+  // this file called directly.
+  //
+  // `register.ts` registers both anyway, so nothing in an app depended on this; what depended on it
+  // was every test that registers one behavior and not the whole set, and a silent inner image with
+  // no rule is precisely the failure that would reach a device before it reached a suite.
+  // Idempotent, like every `register*` here.
+  registerImageBehavior();
   registerHostBehavior(IMAGE_BACKGROUND_TAG, imageBackgroundBehavior);
 }

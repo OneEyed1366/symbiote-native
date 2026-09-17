@@ -1,125 +1,34 @@
-// Image's host behavior, and it carries NOTHING but a prop fold — no listeners, no timers, no
-// commit hook. That is what a "fold-only" primitive means: the wrapper's whole body was prop
-// mapping, so the tag owes exactly that and nothing else.
+// Image's host behavior, and it carries no runtime at all — no listeners, no timers, no commit
+// hook, and since 2026-09-18 no fold either. What is left is ONE declaration: that this tag's three
+// source props are resolved on the way in.
 //
-// The fold itself is not written here. `mapImageProps` in `../view/render-image` is the one
-// implementation, and this file only narrows a flat prop bag into the typed view it takes — the
-// same shape `behaviors/text-input.ts` uses (`stringOf` / `booleanOf` guards, then hand the shared
-// resolver a typed object). A second copy of the mapping is the exact drift this primitive has
-// already paid for once: `adapters/svelte/src/components/image/image-logic.ts` reproduces it by
-// hand and says so in its own header, because nothing was exported to call.
+// WHERE THE FOLD WENT: `foldImageProps` in `SymbioteFabricProps.cpp`, with
+// `core/engine/cpp/tests/js/image-payload.itest.ts` as its contract. The `srcSet`/`src`/`source`
+// precedence, the W3C header decoration, the `width`/`height` fold into style, `alt` becoming
+// `accessibilityLabel` + `accessible`, `resizeMode`/`tintColor` falling back to style keys, and
+// `loadingIndicatorSource` being plucked down to a bare uri — all of it is a function of the tag,
+// which is what makes it the platform's.
 //
-// THE FOLD MAY MEET ALREADY-FOLDED PROPS — `renderImage` emits `image` too, and a re-render writes
-// the same bag back. That is safe because the mapping is idempotent:
-// every alias it consumes (`src`, `srcSet`, `alt`, `width`, `height`, …) is absent from its own
-// output, `source` comes back in the array shape `normalizeSource` guarantees, and
-// `loadingIndicatorSource` leaves under a DIFFERENT name (`loadingIndicatorSrc`), so a second pass
-// finds nothing left to fold. Idempotence is asserted in `image.test.ts` rather than assumed — the
-// audit rule's point is that a double fold is invisible precisely when it happens to be harmless,
-// so the property has to be pinned or it is an accident waiting to be broken.
+// WHY THIS ONE DID NOT MOVE WHOLE, and it is the first that did not. `resolveAssetSource` turns the
+// number `require('./logo.png')` returns into a `{uri, width, height, scale}` by asking METRO'S
+// ASSET REGISTRY — a JS module populated at bundle time. There is no such table in C++ and there
+// should not be: it belongs to the bundler, not to the platform.
+//
+// So the lookup moved EARLIER rather than across. `resolvesImageSources` tells `routeProp` to run
+// the three source props through the resolver on the way IN, exactly as it already resolves
+// `boxShadow`/`filter`/`transform` (`structured-style.ts`), and for the identical reason: a value
+// resolved at payload-build time is resolved HEADLESS ONLY, because the C++ builder has no JS to
+// call, and the device then commits the raw input for Fabric to drop in silence.
+//
+// The idempotence this file used to pin is GONE as a question rather than as a property. It
+// mattered because `renderImage` folded too and a re-render could hand the fold its own output;
+// there is one implementation now, at one point in the commit, so a bag cannot be folded twice.
 import {
   registerHostBehavior,
-  type IImageSourceProp,
-  type IStyleProp,
   type ISymbioteNode,
-  type IViewStyle,
 } from '@symbiote-native/engine';
 
-import {
-  IMAGE_VIEW_PROP_NAMES,
-  mapImageProps,
-  type IResizeMode,
-} from '../view/render-image';
-
 export const IMAGE_TAG = 'image';
-
-const RESIZE_MODES: ReadonlySet<string> = new Set([
-  'cover',
-  'contain',
-  'stretch',
-  'repeat',
-  'center',
-]);
-const CROSS_ORIGINS: ReadonlySet<string> = new Set([
-  'anonymous',
-  'use-credentials',
-]);
-const CONSUMED: ReadonlySet<string> = new Set(IMAGE_VIEW_PROP_NAMES);
-
-function stringOf(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-function numberOf(value: unknown): number | undefined {
-  return typeof value === 'number' ? value : undefined;
-}
-
-function resizeModeOf(value: unknown): IResizeMode | undefined {
-  if (typeof value !== 'string' || !RESIZE_MODES.has(value)) return undefined;
-  // Narrowed by the set membership above, then re-stated as the union through a switch rather than
-  // a cast: the set and the type are two declarations of one list, and only this makes them agree.
-  switch (value) {
-    case 'cover':
-    case 'contain':
-    case 'stretch':
-    case 'repeat':
-    case 'center':
-      return value;
-    default:
-      return undefined;
-  }
-}
-
-function crossOriginOf(
-  value: unknown,
-): 'anonymous' | 'use-credentials' | undefined {
-  if (typeof value !== 'string' || !CROSS_ORIGINS.has(value)) return undefined;
-  return value === 'anonymous' ? 'anonymous' : 'use-credentials';
-}
-
-// A source is an asset id (number), a `{uri}` object, or an array of those. Anything else cannot be
-// resolved and is dropped rather than forwarded — a malformed source reaching Fabric paints nothing
-// and reports nothing, which is worse than an image that is simply absent.
-function sourceOf(value: unknown): IImageSourceProp | undefined {
-  if (typeof value === 'number') return value;
-  if (typeof value !== 'object' || value === null) return undefined;
-  if (Array.isArray(value)) return value;
-  if (typeof Reflect.get(value, 'uri') === 'string') return { ...value };
-  return undefined;
-}
-
-// A StyleProp is an object, an array of them, or a registered class array — all of which
-// `flattenStyle` already handles. The only thing to exclude is a scalar.
-function styleOf(value: unknown): IStyleProp<IViewStyle> | undefined {
-  if (typeof value !== 'object' || value === null) return undefined;
-  if (Array.isArray(value)) return value;
-  return { ...value };
-}
-
-export function foldImagePayload(
-  props: Readonly<Record<string, unknown>>,
-): Record<string, unknown> {
-  const passthrough: Record<string, unknown> = {};
-  for (const key of Object.keys(props)) {
-    if (!CONSUMED.has(key)) passthrough[key] = props[key];
-  }
-  return mapImageProps({
-    source: sourceOf(props.source),
-    defaultSource: sourceOf(props.defaultSource),
-    loadingIndicatorSource: sourceOf(props.loadingIndicatorSource),
-    style: styleOf(props.style),
-    resizeMode: resizeModeOf(props.resizeMode),
-    tintColor: stringOf(props.tintColor),
-    src: stringOf(props.src),
-    srcSet: stringOf(props.srcSet),
-    alt: stringOf(props.alt),
-    width: numberOf(props.width),
-    height: numberOf(props.height),
-    crossOrigin: crossOriginOf(props.crossOrigin),
-    referrerPolicy: stringOf(props.referrerPolicy),
-    passthrough,
-  });
-}
 
 // Required by IHostBehavior and deliberately empty: Image owns no per-node runtime. Written out
 // rather than shared with a `noop` helper so the emptiness reads as a decision.
@@ -135,6 +44,6 @@ export function registerImageBehavior(): void {
   registerHostBehavior(IMAGE_TAG, {
     attach,
     detach,
-    foldPayload: foldImagePayload,
+    resolvesImageSources: true,
   });
 }

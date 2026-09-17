@@ -474,11 +474,7 @@ export type {
   IActivityIndicatorProps,
   IActivityIndicatorSize,
 } from './behaviors/activity-indicator';
-export {
-  foldImagePayload,
-  IMAGE_TAG,
-  registerImageBehavior,
-} from './behaviors/image';
+export { IMAGE_TAG, registerImageBehavior } from './behaviors/image';
 
 // Registered by all five adapters since 2026-09-09, in the same commit that deleted the five
 // wrappers — the tag builds the background image itself, so a surviving wrapper would have
