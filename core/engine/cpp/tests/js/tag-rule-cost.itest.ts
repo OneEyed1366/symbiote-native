@@ -24,15 +24,27 @@
 // MEASURED on `build-release`, three consecutive runs, one sitting, a thousand nodes per commit:
 //
 //              native walk        js walk             per node   keys in the bag / what the rule does
-//   content    2.9  2.9  2.9 ms   11.6 11.6 12.1 ms    ~8.8 us   3 + a 2-key style / READS ITS PARENT
-//   imagebg    3.3  3.2  3.1 ms   13.0 13.2 12.5 ms    ~9.7 us   2 + a 3-key style / writes ONE key
-//   spinner    3.9  3.8  3.8 ms   14.1 14.1 13.9 ms   ~10.3 us   4, no style / the MOST work here
-//   accessory  3.4  3.4  3.3 ms   14.4 14.5 14.6 ms   ~11.1 us   4 / nothing at all
-//   button     3.9  4.1  3.9 ms   16.7 16.9 16.0 ms   ~12.5 us   5 + a 2-key style
-//   pressable  3.8  3.7  3.7 ms   18.2 18.0 19.0 ms   ~14.6 us   4 + a 3-key style
-//   scroll     4.3  4.3  4.4 ms   19.5 20.1 19.3 ms   ~15.3 us   4 + a 2-key style / the BIGGEST rule
-//   switch     5.0  4.9  4.9 ms   24.8 23.5 24.2 ms   ~19.2 us   6 + nested trackColor
-//   image      6.2  6.0  6.3 ms   28.4 28.4 30.8 ms   ~23.0 us   6 + what the rule BUILDS
+//   content    2.8  2.9  3.2 ms   11.1 11.4 12.2 ms    ~8.6 us   3 + a 2-key style / READS ITS PARENT
+//   imagebg    2.9  3.0  3.3 ms   12.2 12.9 13.2 ms    ~9.7 us   2 + a 3-key style / writes ONE key
+//   spinner    3.8  3.8  4.1 ms   14.6 13.9 15.2 ms   ~10.7 us   4, no style / the MOST work here
+//   accessory  3.4  3.2  3.2 ms   14.8 14.5 14.7 ms   ~11.4 us   4 / nothing at all
+//   button     4.1  3.8  4.3 ms   16.8 16.1 16.6 ms   ~12.4 us   5 + a 2-key style
+//   pressable  3.7  3.7  3.9 ms   17.8 18.2 19.9 ms   ~14.8 us   4 + a 3-key style
+//   scroll     4.2  4.2  4.5 ms   19.1 19.2 20.9 ms   ~15.4 us   4 + a 2-key style / the BIGGEST rule
+//   switch     4.8  4.8  5.1 ms   23.9 24.3 25.4 ms   ~19.6 us   6 + nested trackColor
+//   image      5.9  6.1  6.4 ms   27.6 29.4 29.8 ms   ~22.9 us   6 + what the rule BUILDS
+//   bgimage    7.5  7.6  7.9 ms   36.9 38.8 39.2 ms   ~30.6 us   6 + a 3-part style / TWO rules
+//
+// `bgimage` is the dearest row in the file and it is the model's own prediction rather than a
+// surprise: its tag runs the image rule AND the background one, so it carries `image`'s bag plus a
+// three-part style composed on top. Biggest bag, biggest price.
+//
+// It is also the SECOND parent-reading rule, and the pair settles what `content` alone could not.
+// `content` reads its owner while doing almost nothing, so its cheapest-of-nine native walk could
+// have been the rule's smallness rather than the read's. Here the read sits inside the most
+// expensive rule in the file, and the arithmetic isolates it: `bgimage` native minus `image` native
+// is ~1.4 ms over a thousand nodes, i.e. **~1.4 us per node for the parent read plus the style it
+// builds**. A pointer hop on a tree already in memory, whatever is happening around it.
 //
 // `content` IS THE CHEAPEST NATIVE WALK OF THE NINE and it is the only rule that reads the node
 // ABOVE it, which is the answer to the question the `ownerProps` seam had to earn: reading a parent
@@ -215,32 +227,75 @@ const IMAGE_ALIAS_KEYS = [
   'height',
 ];
 
+function imageFoldInJs(
+  props: Readonly<Record<string, unknown>>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...props };
+  const headers: Record<string, string> = {};
+  if (props.crossOrigin === 'use-credentials') {
+    headers['Access-Control-Allow-Credentials'] = 'true';
+  }
+  if (typeof props.referrerPolicy === 'string') {
+    headers['Referrer-Policy'] = props.referrerPolicy;
+  }
+  const size: Record<string, unknown> = {};
+  if (typeof props.width === 'number') size.width = props.width;
+  if (typeof props.height === 'number') size.height = props.height;
+
+  out.source = [{ uri: props.src, ...size, headers }];
+  if (Object.keys(size).length > 0) out.style = [size, props.style];
+  if (typeof props.alt === 'string') {
+    out.accessibilityLabel ??= props.alt;
+    out.accessible = true;
+  }
+  for (const key of IMAGE_ALIAS_KEYS) delete out[key];
+  return out;
+}
+
 registerHostBehavior('image-in-js', {
   attach(): void {},
   detach(): void {},
   resolvesImageSources: true,
-  foldPayload(props: Readonly<Record<string, unknown>>) {
-    const out: Record<string, unknown> = { ...props };
-    const headers: Record<string, string> = {};
-    if (props.crossOrigin === 'use-credentials') {
-      headers['Access-Control-Allow-Credentials'] = 'true';
-    }
-    if (typeof props.referrerPolicy === 'string') {
-      headers['Referrer-Policy'] = props.referrerPolicy;
-    }
-    const size: Record<string, unknown> = {};
-    if (typeof props.width === 'number') size.width = props.width;
-    if (typeof props.height === 'number') size.height = props.height;
+  foldPayload: imageFoldInJs,
+});
 
-    out.source = [{ uri: props.src, ...size, headers }];
-    if (Object.keys(size).length > 0) out.style = [size, props.style];
-    if (typeof props.alt === 'string') {
-      out.accessibilityLabel ??= props.alt;
-      out.accessible = true;
+// ImageBackground's INNER image, and the only arm here whose tag runs TWO rules — the ordinary image
+// one and then the background's. So the twin composes both, in that order, which is also the record
+// of the ordering divergence from RN that the image port left standing.
+//
+// The background half reads the owner through a CLOSURE, exactly as `imageFold(owner)` did before
+// the `ownerProps` seam; the native half reads `node.parent`. That pairing is the whole point of the
+// row — it is the SECOND parent-reading rule, and the first was measured on a rule that does almost
+// nothing (`content`), so this one says whether the seam still costs nothing when the rule around it
+// is the most expensive in the file.
+registerHostBehavior('image-background-image-in-js', {
+  attach(): void {},
+  detach(): void {},
+  resolvesImageSources: true,
+  foldPayload(props: Readonly<Record<string, unknown>>) {
+    const out = imageFoldInJs(props);
+    const box: Record<string, unknown> = {};
+    const ownerStyle = jsOwnerProps.style;
+    if (typeof ownerStyle === 'object' && ownerStyle !== null) {
+      const flat: Record<string, unknown> = Array.isArray(ownerStyle)
+        ? Object.assign({}, ...ownerStyle)
+        : { ...ownerStyle };
+      if (flat.width !== undefined) box.width = flat.width;
+      if (flat.height !== undefined) box.height = flat.height;
     }
-    for (const key of IMAGE_ALIAS_KEYS) delete out[key];
+    out.style = [
+      { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
+      box,
+      out.style,
+    ];
     return out;
   },
+});
+
+registerHostBehavior('image-background-image', {
+  attach(): void {},
+  detach(): void {},
+  resolvesImageSources: true,
 });
 
 // THE ODD ONE OUT, and it is here precisely because it is odd: `input-accessory-view`'s native arm
@@ -613,6 +668,18 @@ describe('what a ported tag rule costs on each side of the wire', () => {
 
   it('pays no trip into JS for a thousand image backgrounds', () => {
     priced('imagebg', 'RCTView', 'image-background', IMAGE_BACKGROUND_PROPS);
+  });
+
+  it('pays no trip into JS for a thousand image-background images', () => {
+    priced(
+      'bgimage',
+      'RCTImageView',
+      'image-background-image',
+      IMAGE_PROPS,
+      // The box the proxy exists to counter. Without it this arm would measure the rule taking its
+      // early-out, which is the same trap the `content` arm's comment records.
+      { style: { width: 120, height: 80 } },
+    );
   });
 
   it('pays no trip into JS for a thousand spinners', () => {
