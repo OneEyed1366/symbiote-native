@@ -1714,7 +1714,9 @@ Three iterations of this migration recorded that ScrollView's content fold, Imag
 fold and the two clone-folds must stay in JS because "a per-node rule cannot reach another node".
 That was true of the JS FOLD shape and false of the engine: **the tree lives in C++, so a node
 already knows its parent.** `fabricProps` now takes `ownerProps` from `node.parent`, and a rule that
-is DERIVED from the node above reads it there.
+is DERIVED from the node above reads it there. (The two clone-folds needed one thing more than this
+— the parent's TAG, to be dispatched at all — and moved the same day; see "A rule may key on its
+PARENT'S TAG".)
 
 ScrollView's content rule is the first user, which takes the whole primitive to **zero crossings on
 both nodes**. Its two halves are why it was the right one: the row direction is a constant of the
@@ -1933,6 +1935,71 @@ registered carries an EMPTY `tagName`, so no rule fires.** `recordSetTag` is emi
 and measured a native side doing no work at all; what caught it was `expectSamePayload` refusing to
 time two arms that disagree, not a suspiciously good number. Any bare-tag fixture needs a stub
 behavior registered or it measures nothing.
+
+### A rule may key on its PARENT'S TAG — the descendant rule, and the two clone-folds it freed (2026-09-18)
+
+Every ported rule until now keys off the node's OWN tag, and three iterations of this migration
+recorded `TouchableNativeFeedback` / `TouchableWithoutFeedback` as unportable for that reason. Both
+render no view: RN's bodies end in `cloneElement(child, {…})`, so our tag commits an ANCHOR and the
+owner's props land on whatever the app wrote underneath — and that child usually carries NO TAG,
+because a plain `<view>` registers no behavior. A self-keyed rule can never reach it.
+
+**Giving the child the owner's tag is the obvious route and it is wrong**: the child may already own
+one (`<pressable>` under a TWF), and a node has exactly one tag. So the DISPATCH moved instead.
+`IOwner` now carries the parent's `tagName` beside its props, and `fabricProps` runs a second,
+parent-keyed step after the self-keyed chain — a node can match both, in that order, which is the
+order RN composes them in.
+
+**That is the browser's shape rather than a workaround.** A user-agent stylesheet is full of
+descendant rules (`td > *`), and an element's user-agent behaviour has always been allowed to depend
+on what contains it. It is the same argument `ownerProps` already made for reading the parent's
+PROPS, taken one step further to reading its NAME — and it costs the same, a pointer hop on a tree
+already in memory.
+
+Everything the rule needed had already crossed, which is why this was one commit and not a project:
+`ownerProps` (the scroll-content seam), the engine's own aria fold, `usesTouchableFocusableRule`,
+and `OP_SET_OWNED_LISTENER` — read off the PARENT, since `focusable` on a cloned child is a function
+of whether the OWNER has a press callback.
+
+**Priced on the same ruler as the other nine rules** (`tag-rule-cost.itest.ts`, `build-release`,
+three runs, payloads asserted equal key by key first): **~13.6 us per cloned child per commit**,
+landing mid-table beside `pressable` and `button`. The cost model held on a rule that could have
+broken it — the child's own bag is ONE prop and the rule marshals EIGHTEEN off its parent, and the
+price follows what crosses rather than whose node the keys came from. Read it as the price of one
+touchable per commit, not per row: these tags have exactly one child.
+
+**THE TEST MIGRATION WAS THE EXPENSIVE HALF, and its shape is the reusable part.** Thirty-six vitest
+cases went red on ONE cause: every file located its subject by the `testID` the owner CLONES, and a
+locator that depends on the ported rule stops working the moment the rule moves. The recording host
+builds payloads through the TypeScript `fabricProps`, which deliberately carries no copy of the tag
+rules — the property that makes it a sound harness for everything else is exactly what blinds it
+here. Locate a derived node by POSITION, which the tag guarantees anyway.
+
+Three things fell out of it, all recorded rather than smoothed over:
+
+- **Five adapter tests needed a NEW WITNESS, not a deleted case.** Each proved `./register` ran by
+  checking the clone; that is unobservable now, so they check a forwarded `onLayout` instead — the
+  other thing only a registered behavior installs, still JS, and visible in the payload because it is
+  a Fabric boolean-gated event. Same claim, different instrument.
+- **A control got WEAKER and says so.** "Clones nothing when the behavior is not registered" had
+  three absence assertions that now pass whether or not it is registered, because this host can no
+  longer produce a clone at all. The listener half still controls; the absence half moved.
+- **Two Android cases have NO new home and that is a coverage LOSS.** The background half is `#ifdef
+  ANDROID`, so it is not compiled into the test host, and mocking `Platform.OS` no longer reaches it
+  — what that mock steered was a JS function that no longer exists. Same hole `android_ripple`,
+  `underlineColorAndroid` and `decelerationRate` already carry, and a PROPERTY of porting a
+  platform-split rule.
+
+**One mirror survives and is named in the source rather than left to be found.** `CLONED_PROPS` in
+`touchable-native-feedback.ts` is now a copy of `kNativeFeedbackClonedKeys`, kept because
+`SLOT_DERIVED` answers a DIFFERENT question — which owner writes must dirty the child — and the two
+must name the same keys or the clone goes stale on a prop one list forgot. Closing it means the
+engine dirtying a child whose parent carries a clone rule, which needs no list at all. That is the
+next step, not this one.
+
+And two dead JS legs went with the port: both clone-folds read `stringOr(source.id) ?? stringOr(
+source.nativeID)` where `source` is the owner's NODE props, which `routeProp` had already resolved
+that morning. **A second opinion about precedence, kept alive by nothing.**
 
 ### `id` -> `nativeID` had SEVEN implementations, and the one in C++ was the wrong seam (2026-09-18)
 

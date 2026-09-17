@@ -3,8 +3,9 @@
 // `TouchableNativeFeedback` and `TouchableWithoutFeedback` render no view of their own. RN's bodies
 // end in `cloneElement(child, {…})` (`TouchableNativeFeedback.js:289,339`,
 // `TouchableWithoutFeedback.js:229,286`), so our tag commits an ANCHOR and the owner's props land on
-// its single child instead. That is the whole primitive, and it is a JS `payloadFold` bound onto the
-// child at attach time — one crossing per touchable per commit, with a ~40-key bag.
+// its single child instead. That is the whole primitive, and it WAS a JS `payloadFold` bound onto
+// the child at attach time — one crossing per touchable per commit, marshalling eighteen keys off a
+// node the child cannot see.
 //
 // WHY IT COULD NOT MOVE THE WAY THE OTHER RULES DID, and why it can now.
 //
@@ -28,10 +29,11 @@
 //   the press listener BIT   `OP_SET_OWNED_LISTENER`, and it is the OWNER'S bit, read off the parent
 //   the Android ripple       `#ifdef ANDROID`, the same branch `foldPressableProps` carries
 //
-// THE PRICE THIS FILE IS RED ABOUT. The payload assertions below pass today, through the JS fold.
-// `folds` is the assertion that does not: a child under either touchable costs one crossing per
-// commit, for a bag of forty keys, which by `tag-rule-cost.itest.ts`'s column is the worst value
-// available — the price tracks BAG SIZE and not what the rule does.
+// THE PRICE, and this file was written RED on exactly that line. Every payload assertion below
+// passed on the first run, through the JS fold; `folds` was the one that did not. Measured
+// afterwards on `build-release` (`tag-rule-cost.itest.ts`'s `clone` row): ~13.6 us per cloned child
+// per commit, which lands mid-table beside `pressable` and `button` — the cost tracks the size of
+// what crosses, and eighteen keys cross here off a node the child cannot see.
 
 import {
   registerTouchableNativeFeedbackBehavior,
