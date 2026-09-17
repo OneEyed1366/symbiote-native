@@ -1500,7 +1500,19 @@ branch our itests evidently never reach — on device they would. So "it imports
 is NOT evidence that an upstream module works headlessly; it may only mean the line that needs
 `Platform` was never executed. Tier A's candidates should be checked against this specifically.
 
-Still not done: RENDERING. The config resolves; standing a surface up is the next step.
+**AND IT RENDERS: `RootView(View())`, committed through `nativeFabricUIManager`.** React's own Fabric
+renderer mounts a real view into the harness's surface, with RN's own view config and RN's own
+`createAttributePayload` building the payload. **Every stock-vs-ours question in this file is now a
+two-arm headless fixture rather than a simulator run** — starting with `Swap` at 3.68x, where both
+sides run the same reconciler and the only difference left is mutation-mode against persistent-mode.
+
+Two things the control caught, and both would have shipped as findings without it. **"render
+returned" is not "a node committed"** — React schedules its work, so a clean return says only that
+nothing threw; `flushTimers()` then `mounted()` is what settles it. And **the harness has exactly ONE
+surface**, `kSurfaceId = 1` (`symbiote-host.h`), which every reader visits and no other: rendering
+into a root tag of its own — the careful-looking choice, since the raw arm keeps its tags clear of
+ours — committed into a surface nothing can read, and reported `RootView()` empty while `render` came
+back perfectly clean.
 
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the

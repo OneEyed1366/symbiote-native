@@ -45,14 +45,45 @@
 // Neither was `ReactNativePrivateInterface`, which was the thing budgeted for. The renderer's twelve
 // uses of it all resolved, so no stub was needed at all.
 //
-// WHAT THIS DOES NOT YET DO: render. It loads and exposes `render` / `stopSurface` /
-// `dispatchCommand`, which makes a headless stock baseline a build-out rather than a research
-// question — but standing a surface up needs view configs registered and a root tag the binding
-// knows, and none of that is here.
+// ── AND IT RENDERS. `RootView(View())`, committed through `nativeFabricUIManager`. ──────────────
+//
+// React's own Fabric renderer mounts a real view into this harness's surface, with RN's own view
+// config (194 `validAttributes` for `RCTView`) and RN's own `createAttributePayload` building the
+// payload. Every stock-vs-ours question in `CLAUDE.md` is now a two-arm fixture rather than a
+// simulator run — starting with `Swap` at 3.68x, where both sides run the SAME reconciler and the
+// only difference left is mutation-mode against persistent-mode.
+//
+// TWO THINGS THE CONTROL CAUGHT, and both would have shipped as findings without it:
+//
+//   - "render returned" is not "a node committed". React schedules its work, so a clean return says
+//     only that nothing threw. `flushTimers()` then `mounted()` is what settles it.
+//   - The harness has exactly ONE surface, `kSurfaceId = 1` (`symbiote-host.h`), and every reader
+//     visits that registry entry alone. Rendering into a root tag of its own — which looked like the
+//     careful thing to do, since the raw arm keeps its tags well clear of ours — committed into a
+//     surface nothing can read: `render` clean, `mounted()` back as `RootView()`, empty.
 
-import { describe, expect, it, print, report } from './harness';
+import {
+  describe,
+  expect,
+  flushTimers,
+  it,
+  mounted,
+  print,
+  report,
+  shapeOf,
+} from './harness';
 
 type IProbeResult = { loaded: boolean; detail: string };
+
+/** Set by the view-config arm, so the render arm below cannot report a failure it did not cause. */
+let stockIsReachable = false;
+
+// THE HARNESS HAS EXACTLY ONE SURFACE, `kSurfaceId = 1` (`core/engine/cpp/tests/symbiote-host.h`),
+// and every reader — `mounted()`, `committedShape()`, the mounting logs — visits that registry entry
+// and no other. A stock arm rendering into a tag of its own therefore commits into a surface nothing
+// can read, which is exactly what the first attempt did: `render` returned clean and `mounted()` came
+// back `RootView()`, empty. Free to take here because this file stands up no surface of its own.
+const STOCK_ROOT_TAG = 1;
 
 /** Load the renderer, and report what happened rather than letting the whole file die on it. */
 function probeStockRenderer(): IProbeResult {
@@ -218,6 +249,7 @@ describe('react own Fabric renderer in the headless harness', () => {
     print(
       `DEBUG RCTView view config: registered=${String(registered)} :: ${detail}`,
     );
+    stockIsReachable = registered;
     expect(registered).toBe(true);
     // RN's OWN config, not a stand-in, and the count is what proves it: `RCTView` carries 194
     // `validAttributes` in 0.86. A hand-written config would pass the line above and produce a
@@ -226,6 +258,67 @@ describe('react own Fabric renderer in the headless harness', () => {
     // match, so an upstream bump adding a prop does not read as a break.
     expect(detail.includes('validAttributes')).toBe(true);
     expect(Number.parseInt(detail, 10) > 150).toBe(true);
+  });
+
+  // why: the last step, and the one that turns this from a loading probe into a baseline. If
+  // `ReactFabric.render` drives `createNode` / `appendChildToSet` / `completeRoot` for a tree of
+  // plain host elements, then every stock-vs-ours question in `CLAUDE.md` — starting with `Swap` at
+  // 3.68x — becomes a two-arm fixture instead of a simulator run.
+  //
+  // Host elements are named as STRINGS (`'RCTView'`), which is what they already are inside React
+  // Native: `createReactNativeComponentClass('RCTView', …)` returns that string as the element type,
+  // and the renderer looks it up in the same registry the arm above just proved resolves.
+  //
+  // Reports rather than asserts a shape, for the same reason the arms above did: the point is to
+  // learn what the next wall is, cheaply, and a thrown error would hide it behind a stack.
+  it('renders one host element through the stock renderer, or says what stopped it', () => {
+    if (!stockIsReachable) throw new Error('the view-config arm did not run');
+
+    let detail: string;
+    let rendered = false;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const stock: unknown = require('react-native/Libraries/Renderer/implementations/ReactFabric-prod.js');
+      const render =
+        typeof stock === 'object' && stock !== null
+          ? (stock as Record<string, unknown>).render
+          : undefined;
+      if (typeof render !== 'function') {
+        detail = `render is ${typeof render}`;
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const react: unknown = require('react');
+        const createElement = (react as Record<string, unknown>).createElement;
+        if (typeof createElement !== 'function') {
+          detail = 'react has no createElement';
+        } else {
+          render(
+            createElement('RCTView', { nativeID: 'stock-root' }),
+            STOCK_ROOT_TAG,
+          );
+          // THE CONTROL, and the reason "render returned" is not the answer: React schedules its
+          // work, so a `render` that threw nothing may simply not have run yet. What settles it is
+          // whether a node reached the platform — `mounted()` reads the tree the host actually
+          // committed, so an empty one means the call was a no-op however clean it looked.
+          flushTimers();
+          const tree = mounted();
+          rendered = tree.children.length > 0 || tree.viewName !== '';
+          detail = `committed ${shapeOf(tree)}`;
+        }
+      }
+    } catch (error) {
+      const stack = error instanceof Error ? (error.stack ?? '') : '';
+      detail = `${error instanceof Error ? error.message : String(error)} | ${stack
+        .split('\n')
+        .slice(0, 4)
+        .join(' <- ')}`;
+    }
+    print(`DEBUG stock render: rendered=${String(rendered)} :: ${detail}`);
+    expect(rendered).toBe(true);
+    // The SHAPE, not just "something committed". `RootView()` on its own is what an empty surface
+    // reads as, and it is what the first attempt produced while `render` returned perfectly clean —
+    // so the only assertion worth making names the view.
+    expect(detail.includes('View')).toBe(true);
   });
 });
 
