@@ -1,33 +1,31 @@
-// Co-located unit test for the shared TextInput prop/event folds. Until now these were proven only
-// indirectly, and FOUR TIMES OVER: every adapter's own TextInput test re-asserted the same
-// resolutions through its own lifecycle. That is expensive and, more importantly, it cannot catch a
-// fold that is uniformly wrong — if `resolveTextInputProps` diverges from RN, all four adapters
-// agree with each other and every suite stays green. This file checks the folds against RN's
-// TextInput.js directly, which is the only place the divergence below could have surfaced.
+// Co-located unit test for TextInput's MACHINE — the controlled-value handshake and the two
+// readers that narrow a native change payload. Everything here runs at keystroke rate and calls
+// back into app code, which is why it is still JavaScript at all.
 //
-// Expectations here are taken from RN's source, not read back off our implementation:
-// TextInput.js:560-579 (submitBehavior), :805 (enterKeyHint map), :815 (inputMode map),
-// :828 / :862 (the two autoComplete maps), :930-936 (the render-time fold).
+// WHAT LEFT, and it was most of this file: the W3C->native prop resolution — `resolveTextInputProps`,
+// `keyboardTypeForInputMode`, `mapAutoComplete`, `foldAutoComplete`, `foldSubmitBehavior` and their
+// four lookup tables. That rule is the engine's now (`foldTextInputAliases`,
+// `SymbioteFabricProps.cpp`) and its contract is
+// `core/engine/cpp/tests/js/text-input-payload.itest.ts`, which reads the payload the commit
+// actually sent instead of the return value of a function.
 //
-// No Negative group. Every exported symbol in state/text-input.ts is a total function over its
-// input — there is no guard clause, no `throw`, nothing to reject; `grep -n throw` on the module
-// returns nothing. The failure modes are WRONG VALUES, not exceptions, so they are asserted as
-// values. Where a fold declines to produce a native prop, that is a Positive outcome named
-// "omits …", not an invented "should throw".
+// The cases did not come here and then get deleted — they moved with the rule, in the commit that
+// moved it. What was deleted is the JS, once nothing called it: an exported twin kept alive by its
+// own test is the mirror the port exists to remove.
+//
+// Expectations here are taken from RN's source, not read back off our implementation.
+//
+// No Negative group. Every symbol left in state/text-input.ts is a total function over its input —
+// no guard clause, no `throw`, nothing to reject. The failure modes are WRONG VALUES, not
+// exceptions, so they are asserted as values.
 
 import { describe, expect, it } from 'vitest';
 import { createElement, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
   eventCountFromChange,
-  foldAutoComplete,
-  foldSubmitBehavior,
   foldText,
-  keyboardTypeForInputMode,
-  mapAutoComplete,
-  resolveTextInputProps,
   shouldCommandText,
   textFromChange,
-  type ITextInputFoldInput,
 } from './text-input';
 
 // A change event carrying an arbitrary native payload. The node is real (not a mock) because the
@@ -42,127 +40,6 @@ function changeEvent(nativeEvent: Record<string, unknown>): ISymbioteEvent {
     stopPropagation: () => {},
   };
 }
-
-// The minimum a fold input needs; `multiline` is the only required field.
-function foldInput(
-  overrides: Partial<ITextInputFoldInput> = {},
-): ITextInputFoldInput {
-  return { multiline: false, ...overrides };
-}
-
-describe('mapAutoComplete (Positive — the safe map lookup every fold shares)', () => {
-  it('returns the native token for a key the map defines', () => {
-    expect(mapAutoComplete({ tel: 'phone-pad' }, 'tel')).toBe('phone-pad');
-  });
-
-  it('omits a token the map does not define', () => {
-    expect(mapAutoComplete({ tel: 'phone-pad' }, 'nope')).toBeUndefined();
-  });
-
-  // why: this is the entire reason the lookup uses hasOwnProperty rather than `map[token]`. A plain
-  // index would resolve inherited Object.prototype members, so `autoComplete="constructor"` would
-  // hand a FUNCTION to the native prop bag. On Android that reaches folly::dynamic, which cannot
-  // serialize a function and takes the surface down — the same class of crash the engine strips
-  // React's __self/__source for. An app can pass any string here, so this is reachable input.
-  it.each([
-    'constructor',
-    'toString',
-    'valueOf',
-    '__proto__',
-    'hasOwnProperty',
-  ])(
-    'omits the inherited Object.prototype key %s instead of resolving it',
-    key => {
-      expect(mapAutoComplete({ tel: 'phone-pad' }, key)).toBeUndefined();
-    },
-  );
-});
-
-describe('foldAutoComplete (Positive — one W3C token, both platforms resolved)', () => {
-  // why: RN resolves autoComplete per platform from two DIFFERENT maps (TextInput.js:828 Android,
-  // :862 iOS). We are Metro-built per platform but fold agnostically and emit both, because each
-  // native prop is inert on the other platform. So one token must produce BOTH native values when
-  // both maps define it.
-  it('resolves both native props when both maps define the token', () => {
-    expect(foldAutoComplete('additional-name')).toEqual({
-      autoComplete: 'name-middle',
-      textContentType: 'middleName',
-    });
-  });
-
-  // why: the two maps are not the same key set. `sex` is Android-only in RN, so iOS must get
-  // nothing rather than a fabricated textContentType — an unknown textContentType is rejected by
-  // UIKit, not ignored.
-  it('omits textContentType for a token only the Android map defines', () => {
-    expect(foldAutoComplete('sex')).toEqual({
-      autoComplete: 'gender',
-      textContentType: undefined,
-    });
-  });
-
-  // why: the Android side falls back to the RAW token when the map has no entry (RN's `??`
-  // fallback), because Android's autoComplete accepts many tokens verbatim. iOS does not get the
-  // same courtesy — an unmapped token yields undefined.
-  it('passes an unmapped token through to Android and omits it for iOS', () => {
-    expect(foldAutoComplete('totally-unknown')).toEqual({
-      autoComplete: 'totally-unknown',
-      textContentType: undefined,
-    });
-  });
-
-  it('omits both when no token was given', () => {
-    expect(foldAutoComplete(undefined)).toEqual({
-      autoComplete: undefined,
-      textContentType: undefined,
-    });
-  });
-});
-
-describe('foldSubmitBehavior (Positive — RN TextInput.js:560-579, branch for branch)', () => {
-  // why: RN coerces an explicit 'newline' on a SINGLE-line input, because a single-line field has
-  // no newline to insert — leaving it would make the return key do nothing at all.
-  it('coerces an explicit newline to blurAndSubmit on a single-line input', () => {
-    expect(foldSubmitBehavior('newline', undefined, false)).toBe(
-      'blurAndSubmit',
-    );
-  });
-
-  it('keeps an explicit newline on a multiline input', () => {
-    expect(foldSubmitBehavior('newline', undefined, true)).toBe('newline');
-  });
-
-  // why: an explicit submitBehavior is the app's decision and outranks the legacy blurOnSubmit,
-  // even when the two disagree.
-  it('lets an explicit behavior win over a conflicting blurOnSubmit', () => {
-    expect(foldSubmitBehavior('submit', true, false)).toBe('submit');
-  });
-
-  it('derives blurAndSubmit on multiline only when blurOnSubmit is explicitly true', () => {
-    expect(foldSubmitBehavior(undefined, true, true)).toBe('blurAndSubmit');
-  });
-
-  it.each([[undefined], [false]])(
-    'derives newline on multiline when blurOnSubmit is %s',
-    blurOnSubmit => {
-      expect(foldSubmitBehavior(undefined, blurOnSubmit, true)).toBe('newline');
-    },
-  );
-
-  // why: the single-line default is blurAndSubmit — the return key dismisses the keyboard. Only an
-  // explicit `false` opts out, so `undefined` must NOT be treated as false.
-  it.each([[undefined], [true]])(
-    'defaults a single-line input to blurAndSubmit when blurOnSubmit is %s',
-    blurOnSubmit => {
-      expect(foldSubmitBehavior(undefined, blurOnSubmit, false)).toBe(
-        'blurAndSubmit',
-      );
-    },
-  );
-
-  it('derives submit on a single-line input only when blurOnSubmit is explicitly false', () => {
-    expect(foldSubmitBehavior(undefined, false, false)).toBe('submit');
-  });
-});
 
 describe('foldText (Positive — controlled wins, then uncontrolled seed)', () => {
   it('prefers value over defaultValue', () => {
@@ -237,181 +114,5 @@ describe('shouldCommandText (Positive — the controlled-write decision)', () =>
 
   it('commands when a controlled value is cleared to empty', () => {
     expect(shouldCommandText('ab', '')).toBe(true);
-  });
-});
-
-describe('resolveTextInputProps (Positive — the precedence rules, RN TextInput.js:930-946)', () => {
-  // why: the W3C alias is the modern spelling and outranks the RN-legacy prop. If the legacy one
-  // won, an app migrating to inputMode would silently keep the old keyboard.
-  it('lets inputMode outrank keyboardType', () => {
-    const props = resolveTextInputProps(
-      foldInput({ inputMode: 'email', keyboardType: 'default' }),
-    );
-    expect(props.keyboardType).toBe('email-address');
-  });
-
-  it('falls back to keyboardType when no inputMode is given', () => {
-    expect(
-      resolveTextInputProps(foldInput({ keyboardType: 'number-pad' }))
-        .keyboardType,
-    ).toBe('number-pad');
-  });
-
-  it('lets enterKeyHint outrank returnKeyType', () => {
-    const props = resolveTextInputProps(
-      foldInput({ enterKeyHint: 'send', returnKeyType: 'done' }),
-    );
-    expect(props.returnKeyType).toBe('send');
-  });
-
-  // why: RN maps enterKeyHint 'enter' to 'default', NOT to 'enter' — the native return key type
-  // named 'enter' does not exist. A pass-through would produce an invalid native value.
-  it('maps the enterKeyHint "enter" onto the native default return key', () => {
-    expect(
-      resolveTextInputProps(foldInput({ enterKeyHint: 'enter' })).returnKeyType,
-    ).toBe('default');
-  });
-
-  // why: readOnly is the W3C spelling of the INVERSE of editable. Getting the inversion wrong makes
-  // a read-only field editable, which is a data-integrity bug rather than a cosmetic one.
-  it.each([
-    [true, false],
-    [false, true],
-  ])('inverts readOnly=%s into editable=%s', (readOnly, editable) => {
-    expect(
-      resolveTextInputProps(foldInput({ readOnly, editable: !editable }))
-        .editable,
-    ).toBe(editable);
-  });
-
-  it('falls back to editable when readOnly is not given', () => {
-    expect(resolveTextInputProps(foldInput({ editable: false })).editable).toBe(
-      false,
-    );
-  });
-
-  // why: RN defaults the cursor and the selection-handle colors from selectionColor so a single
-  // prop tints the whole selection UI; an explicit value still wins.
-  it('defaults the cursor and handle colors from selectionColor', () => {
-    const props = resolveTextInputProps(foldInput({ selectionColor: 'red' }));
-    expect(props.cursorColor).toBe('red');
-    expect(props.selectionHandleColor).toBe('red');
-  });
-
-  it('lets explicit cursor and handle colors win over selectionColor', () => {
-    const props = resolveTextInputProps(
-      foldInput({
-        selectionColor: 'red',
-        cursorColor: 'blue',
-        selectionHandleColor: 'green',
-      }),
-    );
-    expect(props.cursorColor).toBe('blue');
-    expect(props.selectionHandleColor).toBe('green');
-  });
-
-  // why: without this default Android's Material EditText paints its own underline bar under every
-  // input, which no other platform has and no app asked for.
-  it('hides the Android underline by default, on Android', () => {
-    expect(
-      resolveTextInputProps(foldInput(), 'android').underlineColorAndroid,
-    ).toBe('transparent');
-  });
-
-  // why (F-76): iOS's ViewConfig does not declare this prop at all — stock RN's own payload
-  // builder filters it before it ever leaves JS on that platform, so sending it there is a wire
-  // slot, an interned string and a hashed RawProps entry the native view can never read.
-  it('omits the underline color off Android, where no view declares it', () => {
-    expect(
-      resolveTextInputProps(foldInput(), 'ios').underlineColorAndroid,
-    ).toBeUndefined();
-  });
-
-  it('lets an explicit underlineColorAndroid win, on any platform', () => {
-    expect(
-      resolveTextInputProps(foldInput({ underlineColorAndroid: 'red' }), 'ios')
-        .underlineColorAndroid,
-    ).toBe('red');
-  });
-
-  // why: an explicitly chosen iOS textContentType is more specific than one derived from the
-  // generic autoComplete token, so it must not be overwritten by the fold.
-  it('lets an explicit textContentType win over the autoComplete-derived one', () => {
-    const props = resolveTextInputProps(
-      foldInput({
-        autoComplete: 'additional-name',
-        textContentType: 'nickname',
-      }),
-    );
-    expect(props.textContentType).toBe('nickname');
-    expect(props.autoComplete).toBe('name-middle');
-  });
-
-  // why: inputMode="none" is how the W3C spells "this field is focusable but must not raise the
-  // soft keyboard" (a date picker behind a text field). RN implements it by deriving
-  // showSoftInputOnFocus from inputMode whenever inputMode is present.
-  it('suppresses the soft keyboard for inputMode="none"', () => {
-    expect(
-      resolveTextInputProps(foldInput({ inputMode: 'none' }))
-        .showSoftInputOnFocus,
-    ).toBe(false);
-  });
-
-  it('keeps the soft keyboard for any other inputMode', () => {
-    expect(
-      resolveTextInputProps(foldInput({ inputMode: 'tel' }))
-        .showSoftInputOnFocus,
-    ).toBe(true);
-  });
-
-  it('falls back to the explicit showSoftInputOnFocus when no inputMode is given', () => {
-    expect(
-      resolveTextInputProps(foldInput({ showSoftInputOnFocus: false }))
-        .showSoftInputOnFocus,
-    ).toBe(false);
-  });
-});
-
-describe('keyboardTypeForInputMode (Positive — RN TextInput.js:815-825)', () => {
-  // why: RN resolves this ONE token per platform — iOS gets 'web-search', the keyboard whose
-  // return key is a magnifier, and every other host gets the plain default. Collapsing it to a
-  // single value silently costs every iOS `inputMode="search"` field its search keyboard, and no
-  // adapter test can see it because they all read the same map.
-  it('gives ios the search keyboard', () => {
-    expect(keyboardTypeForInputMode('search', 'ios')).toBe('web-search');
-  });
-
-  it('gives every other host the default keyboard for the same token', () => {
-    expect(keyboardTypeForInputMode('search', 'android')).toBe('default');
-  });
-
-  // why: `search` is the only token RN branches on. If a second entry ever became
-  // platform-dependent by accident, this is what would catch it.
-  it.each([
-    ['email', 'email-address'],
-    ['tel', 'phone-pad'],
-    ['decimal', 'decimal-pad'],
-    ['numeric', 'number-pad'],
-    ['none', 'default'],
-    ['text', 'default'],
-    ['url', 'url'],
-  ])('resolves %s identically on both platforms', (inputMode, expected) => {
-    expect(keyboardTypeForInputMode(inputMode, 'ios')).toBe(expected);
-    expect(keyboardTypeForInputMode(inputMode, 'android')).toBe(expected);
-  });
-
-  it('omits a token the map does not define', () => {
-    expect(keyboardTypeForInputMode('nonsense', 'ios')).toBeUndefined();
-  });
-});
-
-describe('resolveTextInputProps + inputMode="search" (Positive — the fold reads the host)', () => {
-  // why: the fold has to carry the platform branch through, not flatten it. Headless resolution
-  // lands on the iOS Platform module (platform/index.ts re-exports index.ios), so this asserts the
-  // iOS value; the android half is covered by keyboardTypeForInputMode directly.
-  it('carries the search keyboard through the fold', () => {
-    expect(
-      resolveTextInputProps(foldInput({ inputMode: 'search' })).keyboardType,
-    ).toBe('web-search');
   });
 });

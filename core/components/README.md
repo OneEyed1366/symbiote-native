@@ -91,7 +91,7 @@ host node untouched — the render function never names a framework type.
   (`createPressHandlers` / `createPressRuntime` in `state/pressable`) plus its render-decision
   helpers (`buildPressableListeners`, `resolveDisabledAccessibilityState`, `shouldClaimResponder`,
   … in `view/render-pressable`), the `Touchable*` timing constants, `Button`'s shared text-style
-  fold, `TextInput`'s controlled-value/event-count handshake (`resolveTextInputProps`, `foldText`,
+  fold, `TextInput`'s controlled-value/event-count handshake (`foldText`, `shouldCommandText`,
   `eventCountFromChange`, …), `KeyboardAvoidingView`'s inset math, `ScrollView`'s
   intrinsics/sticky-header math (no full 3-layer split — the adapter owns the element assembly).
 - **Two more shared reducers, driven by every adapter's reactive glue**: the sticky-header effect

@@ -295,17 +295,13 @@ export {
 } from './view/render-button';
 export type { IButtonProps } from './view/render-button';
 
-// TextInput: the controlled-value / event-count handshake. The logic half is the pure
-// folds/maps + the controlled-write predicate (not a single reducer: count must re-render the
-// imperative handle, lastNativeText must not); the view half picks the intrinsic and maps the
-// resolved native props. Both shared verbatim across React and Vue; the adapter owns only the
-// hooks/reactivity + the imperative handle.
+// TextInput: the controlled-value / event-count handshake, and ONLY that now — the machine. The
+// W3C->native prop resolution that used to sit beside it is the engine's (`foldTextInputAliases`,
+// `SymbioteFabricProps.cpp`), so `resolveTextInputProps` and the four lookup tables under it are
+// gone rather than exported-and-unused: a tag's platform props are resolved once, natively, for
+// every adapter, and a JS copy would only be a second answer to the same question.
 export {
-  resolveTextInputProps,
   foldText,
-  foldAutoComplete,
-  foldSubmitBehavior,
-  mapAutoComplete,
   textFromChange,
   eventCountFromChange,
   shouldCommandText,
@@ -317,14 +313,11 @@ export type {
   ITextInputHandle,
   ITextInputSelection,
   ITextInputEventHandler,
-  ITextInputFoldInput,
-  IFoldedTextInputProps,
   IInputMode,
   IEnterKeyHint,
   ISubmitBehavior,
   ITextInputChangeEvent,
 } from './state/text-input';
-export { keyboardTypeForInputMode } from './state/text-input';
 
 // VirtualizedList family: the framework-agnostic windowing engine + data shapes. Lists
 // have NO view/render-*.ts (the cell content is the framework's own children, so there is

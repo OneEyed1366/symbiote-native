@@ -229,7 +229,8 @@ describe('what one benchmark row actually commits', () => {
   // (`addNestedProperty`, same file) drops any key `validAttributes` doesn't declare, and iOS's
   // `RCTTextInputViewConfig.js` never declares `underlineColorAndroid` (only
   // `AndroidTextInputNativeComponent.js` does). So stock RN's own payload omits it on iOS; sending
-  // it there was ours to trim, and now we do (`resolveTextInputProps`, `os === 'android'`).
+  // it there was ours to trim, and now we do — in the engine, under `#ifdef ANDROID`
+  // (`foldTextInputAliases`, `SymbioteFabricProps.cpp`).
   //
   // Stylesheet-independent on purpose: a CSS edit must not move this test, because what it pins is
   // the FOLD, not the row's look. `payloadOf`, not the authored bag — the fold is the claim.
