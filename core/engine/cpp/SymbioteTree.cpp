@@ -614,6 +614,30 @@ bool canReplaceInPlace(
   // sends the layout pass into the children this path declined to re-adopt. The clone is checked
   // again after it exists, because `completeClone` dirties a measurable node whatever its props did.
   if (node.selfDirty) return false;
+  // A PARENT THAT DERIVES ITS OWN PAYLOAD FROM ITS CHILDREN CANNOT HAVE THEM SWAPPED SILENTLY.
+  //
+  // `LeafYogaNode` is Fabric's own name for a node whose children are CONTENT rather than laid-out
+  // children — `ParagraphShadowNode` is the one that matters here: its `AttributedString` is built
+  // from its children and published as STATE during layout
+  // (`updateStateIfNeeded<ParagraphState>`, ParagraphShadowNode.cpp:336). The targeted path hands
+  // `childrenPlaceholder()` and rewrites one slot, which changes the content and dirties NOTHING, so
+  // the paragraph keeps the state it measured last time. The tree is then correct and the screen is
+  // stale, because the differ compares ShadowViews and a ShadowView carries state: with the old state
+  // still standing it sees no change and tells the platform nothing.
+  //
+  // Measured, not reasoned: `react-state-reaches-the-screen.itest.tsx` reads
+  // `Update {type: "Paragraph"}` on every round with this path off and NOTHING with it on, while the
+  // committed shadow tree carries the new text in both arms. That is the whole device regression —
+  // a label stuck at 50% under a moving thumb.
+  //
+  // `replacedChangedChildren`'s own comment came within one word of this: it argues the parent needs
+  // no dirtying because "`completeClone` sets one only for a measurable node, which a `<View>` list
+  // parent is not". True of a `<View>`, and the reason the 500x list case is safe — and exactly
+  // false of a `<Text>`.
+  if (node.committed->getTraits().check(
+          react::ShadowNodeTraits::Trait::LeafYogaNode)) {
+    return false;
+  }
   if (!replacementsAreLayoutClean(node.committedChildren, next)) return false;
   if (!replacementsAreFresh(node.committedChildren, standing, next)) return false;
   // Indices align, so every `replaceChild` is O(1) however many of them there are, and the bound

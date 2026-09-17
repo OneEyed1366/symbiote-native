@@ -401,7 +401,16 @@ describe('a targeted replace leaves its untouched siblings addressable', () => {
 
     print(`DEBUG targetedReplaces total=${replaced} misses=${misses.length}`);
     for (const miss of misses) print(`DEBUG MISS ${miss}`);
-    expect(replaced > 0).toBe(true);
+    // ZERO IS THE CORRECT ANSWER HERE, and the chain that produces it is worth reading once. A text
+    // change replaces a raw text, whose `Paragraph` parent is a `LeafYogaNode` and is refused
+    // outright (it derives its own state from its children). The paragraph is therefore cloned with
+    // its whole child list, which leaves it NOT layout-clean — so the row above it is refused by
+    // `replacementsAreLayoutClean`, and the list above that by the same rule one level on. Every
+    // refusal is a different guard reaching the same verdict, which is what a coherent guard set
+    // looks like rather than a coincidence.
+    //
+    // What this arm asserts is that the VALUES land, and they do. Liveness is asserted where the
+    // shape actually supports it: `targeted-replace-is-live.itest.ts`.
     expect(misses.length).toBe(0);
   });
 });

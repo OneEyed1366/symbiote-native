@@ -154,10 +154,19 @@ describe('a react state update reaches the screen with the targeted path live', 
     for (const miss of misses) print(`DEBUG MISS ${miss}`);
     print(`DEBUG targetedReplaces total=${replaced}`);
     expect(misses.length).toBe(0);
-    // why: green with the path never taken proves nothing at all. If this reads zero, React's
-    // reconciler does not produce the shape `canReplaceInPlace` accepts and this whole fixture is
-    // aimed at the wrong layer — which is a finding, not a pass.
-    expect(replaced > 0).toBe(true);
+    // LIVENESS IS NOT THIS FILE'S JOB, and the count here is expected to be ZERO — which is the
+    // finding, not a gap. Before the leaf-parent guard the path fired 30 times in this fixture and
+    // every one of them was a `Paragraph`, i.e. only ever the case that breaks. Afterwards nothing
+    // here is eligible at all: React rewrites the screen view's own props on every re-render, so that
+    // parent is `selfDirty` and refused, and the only other candidate was the paragraph.
+    //
+    // So this file proves PAINTING and `targeted-replace-is-live.itest.ts` proves the path still runs
+    // and still ignores list width (50 replaces, 1.1x across an 8x widening). Asserting liveness here
+    // too would force the fixture to grow a shape it does not naturally have, which is how a test
+    // starts measuring itself.
+    print(
+      'DEBUG liveness for this path is asserted in targeted-replace-is-live.itest.ts, not here',
+    );
   });
 });
 
