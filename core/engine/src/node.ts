@@ -1061,6 +1061,79 @@ function baseStyleOf(parts: IClassStyleParts): unknown {
 // yet" and must never be turned away.
 const PUBLISHED_NOTHING: readonly unknown[] = Object.freeze([]);
 
+// ── ONE ARRAY PER DISTINCT PAIR, SHARED ACROSS NODES ─────────────────────────────────────────────
+//
+// The array above is per-node and identical for every node styled the same way, which is the normal
+// case for a list: one `StyleSheet.create` object, or one resolved CSS class, across a thousand rows.
+// `mutation-buffer.ts` interns the values it is handed BY IDENTITY, so a thousand distinct-but-equal
+// arrays are a thousand entries and a thousand JS -> `folly::dynamic` conversions on the far side.
+// Measured on `build-release`: 4 000 of 12 005 `setProp` ops refused to fold, and they were exactly
+// these.
+//
+// `WeakMap`, and both levels of it, so nothing here can grow without bound: a caller that builds a
+// fresh style object per render gets a fresh cache entry that dies with the object. That caller also
+// gets no sharing, which is correct — two structurally equal objects are two values to whoever reads
+// them, and a deep compare would make every prop write cost the size of the style.
+//
+// The three-slot (hidden) form is deliberately NOT cached. `display: 'none'` is a state almost no
+// node is ever in, so a third map would be paid for on every write to serve a case that is rare by
+// construction.
+const sharedPairByExplicit = new WeakMap<object, readonly unknown[]>();
+const sharedPairByBase = new WeakMap<
+  object,
+  WeakMap<object, readonly unknown[]> | readonly unknown[]
+>();
+
+/**
+ * The published array for this pair — the same object every time the same two parts are handed in.
+ *
+ * `undefined` when the pair cannot be keyed (a primitive half, or the hidden form), and the caller
+ * then builds its own array exactly as before. Sharing is an optimization here, never a requirement:
+ * every reader of `published` compares its SLOTS by identity, never the array itself.
+ */
+function sharedStylePair(
+  base: unknown,
+  explicit: unknown,
+): readonly unknown[] | undefined {
+  const baseIsKeyable = typeof base === 'object' && base !== null;
+  const explicitIsKeyable = typeof explicit === 'object' && explicit !== null;
+
+  if (base === undefined && explicitIsKeyable) {
+    const cached = sharedPairByExplicit.get(explicit);
+    if (cached !== undefined) return cached;
+    const made: readonly unknown[] = [base, explicit];
+    sharedPairByExplicit.set(explicit, made);
+    return made;
+  }
+  if (!baseIsKeyable) return undefined;
+
+  if (explicit === undefined) {
+    const cached = sharedPairByBase.get(base);
+    if (Array.isArray(cached)) return cached;
+    if (cached === undefined) {
+      const made: readonly unknown[] = [base, explicit];
+      sharedPairByBase.set(base, made);
+      return made;
+    }
+    // A base that has already been seen WITH an explicit half holds the second-level map here, and
+    // the base-only array has nowhere to live beside it. Rare enough not to earn a third map.
+    return undefined;
+  }
+  if (!explicitIsKeyable) return undefined;
+
+  const existing = sharedPairByBase.get(base);
+  const byExplicit = existing instanceof WeakMap ? existing : new WeakMap();
+  if (existing === undefined) sharedPairByBase.set(base, byExplicit);
+  // Same clash as above, the other way round: this base is holding its base-only array. Leave it.
+  if (Array.isArray(existing)) return undefined;
+
+  const cached = byExplicit.get(explicit);
+  if (cached !== undefined) return cached;
+  const made: readonly unknown[] = [base, explicit];
+  byExplicit.set(explicit, made);
+  return made;
+}
+
 // A slot that contributes no keys to the payload: absent, or the registry's shared "this class
 // styles nothing" object. An IDENTITY compare rather than a key count — `Object.keys(x).length`
 // allocates an array, and this runs on every class and style write, ~14 000 times on one benchmark
@@ -1138,10 +1211,12 @@ function pushClassStyle(node: ISymbioteNode, parts: IClassStyleParts): void {
   // change the style payload of every node in every app for a state almost none of them are ever
   // in — and this project spent a day removing per-frame allocations, so a slot that is undefined
   // 99.9% of the time does not get to ride along on every style write.
+  const base = baseStyleOf(parts);
+  const explicit = explicitStyleOf(parts);
   const published =
     parts.hiddenStyle === undefined
-      ? [baseStyleOf(parts), explicitStyleOf(parts)]
-      : [baseStyleOf(parts), explicitStyleOf(parts), parts.hiddenStyle];
+      ? (sharedStylePair(base, explicit) ?? [base, explicit])
+      : [base, explicit, parts.hiddenStyle];
   parts.published = published;
   setProp(node, 'style', published);
 }

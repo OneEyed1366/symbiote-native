@@ -290,10 +290,15 @@ describe('what the native applier decodes per op instead of per thing', () => {
       ].join('\n')}\n`,
     );
 
-    // Deterministic, not timing. The claim is that the applier decodes strictly more often than the
-    // batch has distinct things — if these ever became equal the finding would be gone, and that is
-    // exactly what the test should notice.
+    // Deterministic, not timing. The claim was that the applier decodes strictly more often than the
+    // batch has distinct things — "if these ever became equal the finding would be gone, and that is
+    // exactly what the test should notice". It noticed, for one of the two halves.
     expect(create.stringReads).toBeGreaterThan(create.stringEntries);
-    expect(create.entries).toBeGreaterThan(create.distinctEntries);
+    // CLOSED 2026-09-17, and this line is the guard that it stays closed. `mutation-buffer.ts` now
+    // interns prop VALUES by identity and `node.ts` shares one published `[class, style]` array per
+    // distinct pair, so the far side converts each distinct value once per batch instead of once per
+    // op. Greater-than here again would mean the sharing broke — most likely by something rebuilding
+    // a style object per node, which is invisible to every other test in this repository.
+    expect(create.entries).toBe(create.distinctEntries);
   });
 });
