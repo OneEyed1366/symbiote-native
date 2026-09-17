@@ -560,6 +560,38 @@ const ChildSet &liveChildrenOf(const Node &node) {
  */
 size_t targetedReplaces_ = 0;
 
+/**
+ * `materialize`'s own stopwatch, because the walk is invisible to every clock React Native owns.
+ *
+ * `TransactionTelemetry` times `ShadowTree::commit` and Yoga, and `materialize` runs in `kOpCommit`
+ * BEFORE `completeSurface` is called at all — so the walk sits in neither window. Priced by
+ * subtraction on 2026-09-17 (`raw-fabric-vs-engine.itest.ts`: our commit 229 ms against a Fabric
+ * `commitMs` of 26.7, and a bare-JSI arm whose whole `completeRoot` was 28 ms), which put ~200 ms of
+ * a 327 ms create inside this function and named nothing inside it. A number reached by subtracting
+ * two others is a budget, not an address.
+ *
+ * Nanoseconds, accumulated across the whole walk and zeroed when read. `steady_clock::now()` costs
+ * ~20 ns here against phases of tens of milliseconds, and it is read at most five times per node.
+ */
+struct IWalkCost {
+  double walkNs = 0;
+  double propsNs = 0;
+  double rawPropsNs = 0;
+  double createNs = 0;
+  double appendNs = 0;
+  double diffNs = 0;
+  size_t created = 0;
+  size_t cloned = 0;
+  size_t reused = 0;
+};
+IWalkCost walkCost_;
+
+using ISteadyClock = std::chrono::steady_clock;
+
+double nanosSince(const ISteadyClock::time_point &startedAt) {
+  return std::chrono::duration<double, std::nano>(ISteadyClock::now() - startedAt).count();
+}
+
 bool canReplaceInPlace(
     const Node &node,
     const ChildSet &standing,
@@ -982,6 +1014,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
 
   if (!node.selfDirty && !node.pathDirty && node.committed != nullptr && !needsFreshFamily &&
       contextHeld) {
+    walkCost_.reused += 1;
     return node.committed;
   }
 
@@ -1006,21 +1039,33 @@ std::shared_ptr<const react::ShadowNode> materialize(
     // AUTHORED component, which a nested `<Text>` never has rewritten to `RCTVirtualText`. Passing
     // the local would silently change which processors run on every nested text node.
     //
+    auto startedAt = ISteadyClock::now();
     folly::dynamic payload =
         fabricProps(node.viewName, node.props, foldFor(runtime, node));
+    walkCost_.propsNs += nanosSince(startedAt);
     // The payload is needed TWICE and only one of those needs a copy. `RawProps` takes its
     // `folly::dynamic` BY VALUE (`RawProps.h:65`) and consumes it, so Fabric's half is a copy no
     // matter what; the baseline `diffProps` will read on the next commit is the other half, and it
     // used to be a SECOND deep copy because `payload` was const. Every key and every value of every
     // created node, twice — 32 001 entries on a 1 000-row Solid create rather than 32 001 plus a
     // pointer swap. The update path below already moved both of its halves; only create did not.
+    startedAt = ISteadyClock::now();
+    folly::dynamic forFabric = payload;
+    walkCost_.rawPropsNs += nanosSince(startedAt);
+
+    startedAt = ISteadyClock::now();
     auto created = uiManager.createNode(
         node.tag,
         viewName,
         surfaceId,
-        react::RawProps(folly::dynamic(payload)),
+        react::RawProps(std::move(forFabric)),
         node.instanceHandle);
+    walkCost_.createNs += nanosSince(startedAt);
+
+    startedAt = ISteadyClock::now();
     for (const auto &child : *children) uiManager.appendChild(created, child);
+    walkCost_.appendNs += nanosSince(startedAt);
+    walkCost_.created += 1;
     node.committed = created;
     node.committedProps = std::move(payload);
   } else {
@@ -1036,9 +1081,14 @@ std::shared_ptr<const react::ShadowNode> materialize(
     folly::dynamic next = folly::dynamic::object();
     folly::dynamic payload = folly::dynamic::object();
     if (node.selfDirty) {
+      auto startedAt = ISteadyClock::now();
       next = fabricProps(node.viewName, node.props, foldFor(runtime, node));
+      walkCost_.propsNs += nanosSince(startedAt);
+      startedAt = ISteadyClock::now();
       payload = diffProps(node.committedProps, next);
+      walkCost_.diffNs += nanosSince(startedAt);
     }
+    walkCost_.cloned += 1;
     const size_t changedPositions = countChangedPositions(node.committedChildren, *children);
     const bool childrenHeld = changedPositions == 0;
     const bool sendsNothing = payload.empty() && childrenHeld;
@@ -1378,8 +1428,13 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         // never see the result of — so there is nothing to adopt back here, and these owners are
         // collected only because `appendRenderable` needs somewhere to put them.
         IOwnerTally rootOwners;
+        // THE ONE TIMER THAT IS NOT PER NODE, and it has to be here rather than inside
+        // `materialize`: the walk is recursive, so a timer around the recursive call would count
+        // every ancestor's time again for every descendant. This is the walk's single entry point.
+        const auto walkStartedAt = ISteadyClock::now();
         appendRenderable(
             runtime, uiManager, *childSet, rootOwners, *surface, false, surfaceId, nullptr);
+        walkCost_.walkNs += nanosSince(walkStartedAt);
         // SKIPPED when the root child set comes back identical. `materialize` already declines to
         // clone a node nothing changed, so an unchanged tree produces the same handles — and
         // `completeSurface` on them is a full `ShadowTree::commit`, with layout and a mount pass,
@@ -1892,6 +1947,20 @@ jsi::Value Tree::readSurfaceTelemetry(
   result.setProperty(
       runtime, "targetedReplaces", jsi::Value(static_cast<double>(targetedReplaces_)));
   targetedReplaces_ = 0;
+  // OURS TOO, and for the same reason: `materialize` runs outside every window above, so without
+  // these the walk can only be priced by subtracting `commitMs` from a JS stopwatch. See `IWalkCost`.
+  const auto millis = [](double nanos) { return jsi::Value(nanos / 1e6); };
+  result.setProperty(runtime, "walkMs", millis(walkCost_.walkNs));
+  result.setProperty(runtime, "propsMs", millis(walkCost_.propsNs));
+  result.setProperty(runtime, "rawPropsMs", millis(walkCost_.rawPropsNs));
+  result.setProperty(runtime, "createNodeMs", millis(walkCost_.createNs));
+  result.setProperty(runtime, "appendChildMs", millis(walkCost_.appendNs));
+  result.setProperty(runtime, "diffPropsMs", millis(walkCost_.diffNs));
+  result.setProperty(
+      runtime, "nodesCreated", jsi::Value(static_cast<double>(walkCost_.created)));
+  result.setProperty(runtime, "nodesCloned", jsi::Value(static_cast<double>(walkCost_.cloned)));
+  result.setProperty(runtime, "nodesReused", jsi::Value(static_cast<double>(walkCost_.reused)));
+  walkCost_ = IWalkCost{};
   return result;
 }
 

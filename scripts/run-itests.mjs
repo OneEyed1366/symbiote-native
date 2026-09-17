@@ -351,7 +351,29 @@ const workspaceSources = {
   },
 };
 const testsDir = path.join(root, 'core/engine/cpp/tests/js');
-const binary = path.join(root, 'core/engine/cpp/tests/build/symbiote_tester');
+/**
+ * `SYMBIOTE_ITEST_BUILD=build-release` picks the optimized tester instead of the assert build.
+ *
+ * The default build is Debug with `NDEBUG` OFF, deliberately — `react_native_assert` is the whole
+ * point of this harness, and two device aborts once hid under a green suite because a JS stand-in
+ * could not abort. But `NDEBUG` off also defines `REACT_NATIVE_DEBUG`
+ * (`ReactCommon/react/debug/flags.h`), and that compiles in consistency checks that walk a whole
+ * child list on every mutation — `YogaLayoutableShadowNode::appendChild` calls `ensureConsistency`
+ * plus `ensureYogaChildrenLookFine` and `ensureYogaChildrenAlignment`, so building a list of N
+ * children one at a time is O(N²) in this build and O(N) in the one that ships.
+ *
+ * Measured 2026-09-17: 10 000 appends onto one parent took 3 554 ms here. A PERFORMANCE reading off
+ * the default build is therefore not merely un-transferable in absolute terms, which was already
+ * known — its SHAPE is wrong, and a quadratic that only exists under asserts is exactly the kind of
+ * finding that sends a day's work at nothing.
+ *
+ * So: correctness runs on `build`, timings run on `build-release`. Neither replaces the other.
+ */
+const buildDirectory = process.env.SYMBIOTE_ITEST_BUILD ?? 'build';
+const binary = path.join(
+  root,
+  `core/engine/cpp/tests/${buildDirectory}/symbiote_tester`,
+);
 
 /**
  * Recursive, because this directory has to hold hundreds of files eventually and a flat one stops

@@ -332,6 +332,29 @@ export type ISurfaceTelemetry = {
    * disabled. Assert it is non-zero wherever the fast path is the point of the test.
    */
   targetedReplaces: number;
+  /**
+   * `materialize`'s own walk, and the fields below break it down. OURS, zeroed on read.
+   *
+   * The doc above says the walk falls outside every window React Native times, which left it
+   * priceable only by subtraction — and a subtraction gives a budget, not an address. Measured
+   * 2026-09-17: ~200 ms of a 327 ms headless create sat here with nothing inside it named.
+   *
+   * `walkMs` is the single entry point in `kOpCommit`; `propsMs` / `rawPropsMs` / `createNodeMs` /
+   * `appendChildMs` / `diffPropsMs` are per-node sums inside it and do NOT add up to it — what is
+   * left over is the walk's own bookkeeping.
+   */
+  walkMs: number;
+  /** `fabricProps` + the prop fold, on both the create and the clone path. */
+  propsMs: number;
+  /** The payload copy Fabric consumes, kept because `committedProps` is next commit's baseline. */
+  rawPropsMs: number;
+  createNodeMs: number;
+  appendChildMs: number;
+  diffPropsMs: number;
+  /** Nodes that minted a fresh Fabric family, were cloned, or were returned untouched. */
+  nodesCreated: number;
+  nodesCloned: number;
+  nodesReused: number;
 };
 
 /**

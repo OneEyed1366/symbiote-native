@@ -19,10 +19,37 @@
 //            It is the floor the platform itself charges.
 //   ENGINE   our mutation API -> op buffer -> one `applyOps` across JSI -> `materialize` -> commit.
 //
-// The ratio between them is the whole deliverable, and a ratio is the ONLY thing this binary may
-// produce: `core/engine/cpp/tests` is `CMAKE_BUILD_TYPE Debug` with no `-O` flag at all, so no
-// absolute millisecond here transfers to a device and no complexity exponent may be read off it.
-// Same binary, same process, same Fabric, back to back — that much is sound.
+// ── RUN THIS ON `build-release`, AND THE REASON IS NOT THE ONE THIS FILE FIRST GAVE ──────────────
+//
+//   pnpm run bench:itest                        # or SYMBIOTE_ITEST_BUILD=build-release
+//
+// The caveat everyone here already knew is that `core/engine/cpp/tests/build` is Debug with no `-O`,
+// so its milliseconds do not transfer. The caveat that cost a day is that its SHAPE does not either.
+// `NDEBUG` is off in that build on purpose — `react_native_assert` is what the harness is for — and
+// `NDEBUG` off also defines `REACT_NATIVE_DEBUG` (`ReactCommon/react/debug/flags.h`), which compiles
+// in consistency checks that walk a whole child list on every mutation:
+// `YogaLayoutableShadowNode::appendChild` runs `ensureConsistency` and then
+// `ensureYogaChildrenLookFine` + `ensureYogaChildrenAlignment`, so building an N-child list one
+// append at a time is O(N²) there and O(N) in the build that ships.
+//
+// Measured 2026-09-17, the same file on the two builds:
+//
+//                        build (asserts)   build-release      what it looked like
+//   RAW total                  ~307              ~92
+//   ENGINE total               ~325              ~98
+//   ratio engine/raw           1.06x         0.96-1.14x       unchanged, by luck
+//   walkMs (materialize)        200              ~27           "materialize is 61% of a create"
+//     createNode                128.7            18.5
+//     appendChild                44.2             1.0          "a fifth of the walk" -> 4%
+//   10 000 appends, 1 parent   3554 ms           27 ms         132x, entirely asserts
+//
+// So the assert build reported `materialize` at 61% of a create and it is ~27%, and it reported an
+// O(N²) in list width that does not exist off this harness. Both readings were published before the
+// second build existed. A number whose ORDER is right and whose SHAPE is wrong is worse than no
+// number, because it survives review.
+//
+// A ratio between the two arms is still the only claimable output even on `build-release` — JSC is
+// not Hermes and a Mac is not a phone. Same binary, same process, same Fabric, back to back.
 //
 // The two arms must build the SAME tree or the comparison is theatre, so each asserts its own node
 // census against the other's before any number is printed. That check is what makes this a
@@ -310,6 +337,30 @@ describe('one tree, two drivers, one Fabric', () => {
         `nodes=${engine.nodes}`,
     );
     print(`DEBUG ENGINE census ${engine.census}`);
+    // The walk, named from the inside. `walkMs` is the whole of `materialize`; the rest are per-node
+    // sums within it and deliberately do NOT total to it — the remainder is the walk's own
+    // bookkeeping, and seeing how big that remainder is was the point of splitting it.
+    if (telemetry !== undefined) {
+      print(
+        `DEBUG WALK   walkMs=${telemetry.walkMs.toFixed(1)} ` +
+          `props=${telemetry.propsMs.toFixed(1)} ` +
+          `rawPropsCopy=${telemetry.rawPropsMs.toFixed(1)} ` +
+          `createNode=${telemetry.createNodeMs.toFixed(1)} ` +
+          `appendChild=${telemetry.appendChildMs.toFixed(1)} ` +
+          `diffProps=${telemetry.diffPropsMs.toFixed(1)}`,
+      );
+      print(
+        `DEBUG WALK   created=${telemetry.nodesCreated} cloned=${telemetry.nodesCloned} ` +
+          `reused=${telemetry.nodesReused} · rest=${(
+            telemetry.walkMs -
+            telemetry.propsMs -
+            telemetry.rawPropsMs -
+            telemetry.createNodeMs -
+            telemetry.appendChildMs -
+            telemetry.diffPropsMs
+          ).toFixed(1)}`,
+      );
+    }
     expect(engine.nodes > 0).toBe(true);
   });
 

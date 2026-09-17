@@ -205,6 +205,16 @@ export type INativeEngineBindings = {
      * RN's — a LIVENESS signal for a fast path whose absence no correctness test can see.
      */
     targetedReplaces: number;
+    /** `materialize`'s own walk and its breakdown — ours, zeroed on read. See `ISurfaceTelemetry`. */
+    walkMs: number;
+    propsMs: number;
+    rawPropsMs: number;
+    createNodeMs: number;
+    appendChildMs: number;
+    diffPropsMs: number;
+    nodesCreated: number;
+    nodesCloned: number;
+    nodesReused: number;
   };
 };
 

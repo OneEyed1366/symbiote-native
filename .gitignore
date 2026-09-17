@@ -1,6 +1,8 @@
 node_modules/
 build/
 build-ngc/
+# the optimized twin of `core/engine/cpp/tests/build` — timings only, asserts compiled out
+build-release/
 dist/
 *.tsbuildinfo
 

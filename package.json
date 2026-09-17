@@ -44,7 +44,8 @@
     "test:vitest": "vitest run",
     "test:node": "node scripts/run-node-tests.mjs",
     "test:cpp": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build && cmake --build core/engine/cpp/tests/build -j 8 && ctest --test-dir core/engine/cpp/tests/build --output-on-failure",
-    "test:itest": "pnpm run test:cpp && node scripts/run-itests.mjs"
+    "test:itest": "pnpm run test:cpp && node scripts/run-itests.mjs",
+    "bench:itest": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build-release -DCMAKE_BUILD_TYPE=Release -DRN_ENABLE_DEBUG_STRING_CONVERTIBLE=ON && cmake --build core/engine/cpp/tests/build-release -j 8 && SYMBIOTE_ITEST_BUILD=build-release node scripts/run-itests.mjs"
   },
   "devDependencies": {
     "@babel/core": "catalog:",
