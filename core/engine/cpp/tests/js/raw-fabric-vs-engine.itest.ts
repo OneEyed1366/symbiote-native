@@ -1,0 +1,334 @@
+// What does the SAME tree cost through a zero-cost driver, and what does it cost through ours?
+//
+// why: the device run of 2026-09-17 says every create-shaped row got more expensive after the
+// buffer architecture — Create/Replace/Append/Clear up 10-37% on four adapters of five — while
+// every row that touches a handful of nodes got cheaper. The suspicion that follows is "we drive
+// Fabric worse than React does", and it cannot be answered by comparing two adapters: both are ours
+// and both would move together.
+//
+// So this file prices the FLOOR instead. `symbiote-host.h` calls
+// `UIManagerBinding::createAndInstallIfNeeded`, which publishes the same `global.nativeFabricUIManager`
+// a device has — the full persistent-mode surface, verified by `fabric-binding-probe.itest.ts`
+// (15 of 16 names present; only `cloneNode` is absent). So the identical tree can be built twice in
+// ONE process, against ONE C++ Fabric:
+//
+//   RAW      `createNode` / `appendChild` / `createChildSet` / `appendChildToSet` / `completeRoot`,
+//            with the prop payloads written out as object literals. No retained tree, no diff, no
+//            prop routing, no buffer. This is BELOW React, not equal to it: React's own host config
+//            still runs a fiber tree and builds each payload through `ReactNativeAttributePayload`.
+//            It is the floor the platform itself charges.
+//   ENGINE   our mutation API -> op buffer -> one `applyOps` across JSI -> `materialize` -> commit.
+//
+// The ratio between them is the whole deliverable, and a ratio is the ONLY thing this binary may
+// produce: `core/engine/cpp/tests` is `CMAKE_BUILD_TYPE Debug` with no `-O` flag at all, so no
+// absolute millisecond here transfers to a device and no complexity exponent may be read off it.
+// Same binary, same process, same Fabric, back to back — that much is sound.
+//
+// The two arms must build the SAME tree or the comparison is theatre, so each asserts its own node
+// census against the other's before any number is printed. That check is what makes this a
+// measurement rather than two unrelated timings.
+
+import {
+  appendChild,
+  createElement,
+  createRawText,
+  createSurface,
+  readSurfaceTelemetry,
+  routeProp,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
+import { flushOps } from '@symbiote-native/engine/tree-host';
+
+import {
+  committedTags,
+  committedTree,
+  describe,
+  expect,
+  it,
+  mounted,
+  print,
+  report,
+  type ICommittedNode,
+} from './harness';
+
+const ROOT_TAG = 1;
+const ROWS = 1_000;
+const NODES_PER_ROW = 10;
+
+// Hoisted exactly as a payload reaches Fabric: React Native flattens `style` into the top-level
+// props object before it crosses JSI (`ReactNativeAttributePayload.addNestedProperty`), and so does
+// our own `fabricProps`. Writing them nested here would make the native parse cheaper on one arm.
+const ROW_PROPS = { height: 44, flexDirection: 'row', paddingLeft: 10 };
+const CELL_PROPS = { flex: 1 };
+const INPUT_PROPS = { width: 96, height: 28 };
+const TEXT_PROPS = { ellipsizeMode: 'tail', allowFontScaling: true };
+
+const ROW_STYLE = { height: 44, flexDirection: 'row', paddingLeft: 10 };
+const CELL_STYLE = { flex: 1 };
+const INPUT_STYLE = { width: 96, height: 28 };
+
+type IFabricNode = object;
+type IFabricChildSet = object;
+
+type IFabricBinding = {
+  createNode: (
+    tag: number,
+    viewName: string,
+    rootTag: number,
+    props: Record<string, unknown>,
+    instanceHandle: object,
+  ) => IFabricNode;
+  appendChild: (parent: IFabricNode, child: IFabricNode) => IFabricNode;
+  createChildSet: (rootTag: number) => IFabricChildSet;
+  appendChildToSet: (childSet: IFabricChildSet, child: IFabricNode) => void;
+  completeRoot: (rootTag: number, childSet: IFabricChildSet) => void;
+};
+
+function fabric(): IFabricBinding {
+  const binding = (globalThis as Record<string, unknown>).nativeFabricUIManager;
+  if (binding === null || typeof binding !== 'object') {
+    throw new Error('no nativeFabricUIManager in this host');
+  }
+  // A narrowing, not a cast: every name the arm calls was proven to be a function by the probe, and
+  // `fabric-binding-probe.itest.ts` fails first if that ever stops being true.
+  const bag: Record<string, unknown> = binding as Record<string, unknown>;
+  for (const name of [
+    'createNode',
+    'appendChild',
+    'createChildSet',
+    'appendChildToSet',
+    'completeRoot',
+  ]) {
+    if (typeof bag[name] !== 'function') {
+      throw new Error(`nativeFabricUIManager.${name} is not a function`);
+    }
+  }
+  return binding as IFabricBinding;
+}
+
+/**
+ * Tags well past anything the engine hands out in this process.
+ *
+ * Fabric aborts on a duplicate tag inside one surface (`ShadowNodeFamily`), so an overlap would show
+ * up as a hard crash rather than a wrong number — but the arms are meant to be independent, and a
+ * shared counter would couple them.
+ */
+let nextRawTag = 10_000_001;
+function rawTag(): number {
+  nextRawTag += 2;
+  return nextRawTag;
+}
+
+function since(startedAt: number): number {
+  return performance.now() - startedAt;
+}
+
+/**
+ * How many of each view name the committed tree holds, as `RCTView=4002 RCTText=3000 …`.
+ *
+ * A total node count alone cannot say WHICH node an arm has that the other does not, and this repo
+ * has already paid for that distinction twice — two trees agreed on every structural counter while
+ * 19% of the prop keys were missing, and a 1.31x ratio turned out to be one missing element.
+ */
+function census(from: ICommittedNode | undefined): string {
+  const counts = new Map<string, number>();
+  const walk = (node: ICommittedNode): void => {
+    counts.set(node.viewName, (counts.get(node.viewName) ?? 0) + 1);
+    for (const child of node.children) walk(child);
+  };
+  if (from !== undefined) walk(from);
+  return [...counts.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([name, count]) => `${name}=${count}`)
+    .join(' ');
+}
+
+// ── the RAW arm ──────────────────────────────────────────────────────────────────────────────────
+
+/** `<view>` + three text/rawtext pairs + two cell views + one text input = 10 nodes, as the row. */
+function rawRow(binding: IFabricBinding, id: number): IFabricNode {
+  const node = (
+    viewName: string,
+    props: Record<string, unknown>,
+  ): IFabricNode => binding.createNode(rawTag(), viewName, ROOT_TAG, props, {});
+
+  const label = (text: string): IFabricNode => {
+    const outer = node('RCTText', TEXT_PROPS);
+    binding.appendChild(outer, node('RCTRawText', { text }));
+    return outer;
+  };
+
+  const row = node('RCTView', { ...ROW_PROPS, testID: `row-${id}` });
+  binding.appendChild(row, label(String(id)));
+  for (const text of [`row ${id}`, 'x']) {
+    const cell = node('RCTView', CELL_PROPS);
+    binding.appendChild(cell, label(text));
+    binding.appendChild(row, cell);
+  }
+  binding.appendChild(
+    row,
+    node('RCTSinglelineTextInputView', {
+      ...INPUT_PROPS,
+      text: `input ${id}`,
+    }),
+  );
+  return row;
+}
+
+// ── the ENGINE arm ───────────────────────────────────────────────────────────────────────────────
+
+function engineRow(id: number): ISymbioteNode {
+  const row = createElement('RCTView');
+  routeProp(row, 'style', ROW_STYLE);
+  routeProp(row, 'testID', `row-${id}`);
+
+  const label = (text: string): ISymbioteNode => {
+    const outer = createElement('RCTText');
+    routeProp(outer, 'ellipsizeMode', 'tail');
+    routeProp(outer, 'allowFontScaling', true);
+    appendChild(outer, createRawText(text));
+    return outer;
+  };
+
+  appendChild(row, label(String(id)));
+  for (const text of [`row ${id}`, 'x']) {
+    const cell = createElement('RCTView');
+    routeProp(cell, 'style', CELL_STYLE);
+    appendChild(cell, label(text));
+    appendChild(row, cell);
+  }
+
+  const input = createElement('RCTSinglelineTextInputView');
+  routeProp(input, 'style', INPUT_STYLE);
+  routeProp(input, 'text', `input ${id}`);
+  appendChild(row, input);
+  return row;
+}
+
+type IArm = {
+  total: number;
+  nodes: number;
+  commitMs: number;
+  layoutMs: number;
+  census: string;
+};
+
+// Module scope, because the arms run as separate cases ON PURPOSE: the harness resets the surface
+// and the registry between cases, and that reset is what keeps one arm's committed root from being
+// the base revision the next arm commits against. Two drivers writing the same surface back to back
+// would price the second one against a tree the first left behind.
+let raw: IArm | undefined;
+let engine: IArm | undefined;
+
+describe('one tree, two drivers, one Fabric', () => {
+  // why: the floor. Everything this arm spends is what the platform charges to hold 10 001 nodes —
+  // no retained tree, no diff, no prop routing, no op buffer, and below React's own renderer, which
+  // still runs a fiber tree and builds every payload through `ReactNativeAttributePayload`.
+  it('builds the 10 001-node tree through the bare JSI binding', () => {
+    const binding = fabric();
+    // Opening the surface is not part of either measurement, and the engine is what knows how.
+    createSurface(ROOT_TAG);
+
+    let startedAt = performance.now();
+    const childSet = binding.createChildSet(ROOT_TAG);
+    // TWO views above the rows, not one: `createSurface` puts its own container `<View>` under the
+    // `RootView`, so an arm that appends straight to the child set builds a tree one node shallower
+    // than the engine's and the census below refuses it. Matching it here is cheaper than special-
+    // casing the oracle, and a weaker oracle is how a node count gets read as a ratio.
+    const container = binding.createNode(rawTag(), 'RCTView', ROOT_TAG, {}, {});
+    const list = binding.createNode(
+      rawTag(),
+      'RCTView',
+      ROOT_TAG,
+      { flex: 1 },
+      {},
+    );
+    for (let id = 0; id < ROWS; id += 1) {
+      binding.appendChild(list, rawRow(binding, id));
+    }
+    binding.appendChild(container, list);
+    binding.appendChildToSet(childSet, container);
+    const build = since(startedAt);
+
+    startedAt = performance.now();
+    binding.completeRoot(ROOT_TAG, childSet);
+    const commit = since(startedAt);
+    mounted();
+
+    const telemetry = readSurfaceTelemetry(ROOT_TAG);
+    raw = {
+      total: build + commit,
+      nodes: committedTags().length,
+      commitMs: telemetry?.commitMs ?? -1,
+      layoutMs: telemetry?.layoutMs ?? -1,
+      census: census(committedTree()),
+    };
+    print(
+      `DEBUG RAW    build=${build.toFixed(1)} completeRoot=${commit.toFixed(1)} ` +
+        `total=${raw.total.toFixed(1)} commitMs=${raw.commitMs.toFixed(1)} ` +
+        `layoutMs=${raw.layoutMs.toFixed(1)} nodes=${raw.nodes}`,
+    );
+    print(`DEBUG RAW    census ${raw.census}`);
+    expect(raw.nodes > 0).toBe(true);
+  });
+
+  // why: the same tree through the shipped path, split where the architecture splits — JS fill, one
+  // `applyOps` across JSI, then `materialize` + commit + layout.
+  it('builds the same tree through the engine', () => {
+    const surface = createSurface(ROOT_TAG);
+
+    let startedAt = performance.now();
+    const list = createElement('RCTView');
+    routeProp(list, 'style', { flex: 1 });
+    for (let id = 0; id < ROWS; id += 1) {
+      appendChild(list, engineRow(id));
+    }
+    surface.appendChild(list);
+    const fill = since(startedAt);
+
+    startedAt = performance.now();
+    flushOps();
+    const apply = since(startedAt);
+
+    startedAt = performance.now();
+    surface.commit();
+    const commit = since(startedAt);
+    mounted();
+
+    const telemetry = readSurfaceTelemetry(ROOT_TAG);
+    engine = {
+      total: fill + apply + commit,
+      nodes: committedTags().length,
+      commitMs: telemetry?.commitMs ?? -1,
+      layoutMs: telemetry?.layoutMs ?? -1,
+      census: census(committedTree()),
+    };
+    print(
+      `DEBUG ENGINE fill=${fill.toFixed(1)} apply=${apply.toFixed(1)} ` +
+        `commit=${commit.toFixed(1)} total=${engine.total.toFixed(1)} ` +
+        `commitMs=${engine.commitMs.toFixed(1)} layoutMs=${engine.layoutMs.toFixed(1)} ` +
+        `nodes=${engine.nodes}`,
+    );
+    print(`DEBUG ENGINE census ${engine.census}`);
+    expect(engine.nodes > 0).toBe(true);
+  });
+
+  // why: THE ORACLE, and it comes before the ratio is allowed to mean anything. Two timings over two
+  // different trees are not a comparison — this repo has twice published a ratio that was a node
+  // count in disguise, and the census is the cheap check that catches it.
+  it('compares the two arms on a census they both pass', () => {
+    if (raw === undefined || engine === undefined) {
+      throw new Error('an arm did not run');
+    }
+    print(
+      `DEBUG RATIO  engine/raw total = ${(engine.total / Math.max(raw.total, 0.001)).toFixed(2)}x · ` +
+        `commitMs ${raw.commitMs.toFixed(1)} -> ${engine.commitMs.toFixed(1)} · ` +
+        `layoutMs ${raw.layoutMs.toFixed(1)} -> ${engine.layoutMs.toFixed(1)}`,
+    );
+    print(`DEBUG NODES  raw=${raw.nodes} engine=${engine.nodes}`);
+    expect(engine.nodes).toBe(raw.nodes);
+    expect(engine.census).toBe(raw.census);
+  });
+});
+
+report();
