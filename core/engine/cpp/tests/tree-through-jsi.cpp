@@ -33,6 +33,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+
 namespace facebook::react {
 namespace {
 
@@ -684,7 +686,24 @@ TEST_P(TreeFuzzTest, committedShapeMatchesTheOracleThroughAnOpProgram) {
 // taken 14 683 times across them, counted rather than assumed. Widen the range here to repeat it;
 // 5 000 costs ~18 s. Counting the hits matters as much as the green: this suite passed for eighteen
 // months with that path disabled, so "no failures" says nothing on its own about whether it ran.
-INSTANTIATE_TEST_SUITE_P(Seeds, TreeFuzzTest, ::testing::Range<uint64_t>(1, 301));
+// 300 in CI, widened by hand when a change touches the tree's own structure.
+//
+// `SYMBIOTE_FUZZ_SEEDS` raises the ceiling for one run, so a wider sweep needs no edit and no
+// commit that then has to be remembered and reverted. Run at 5 000 on 2026-09-17 for the re-enabled
+// targeted replace, and again the same day for the child-vector change that made a detach O(1)
+// (holes + a slot hint) — the shape of change a 300-seed range is least likely to catch, because it
+// only misbehaves once a list has been churned for a while.
+uint64_t fuzzSeedCeiling() {
+  const char *configured = std::getenv("SYMBIOTE_FUZZ_SEEDS");
+  if (configured == nullptr) return 301;
+  const auto parsed = std::strtoull(configured, nullptr, 10);
+  return parsed > 1 ? parsed + 1 : 301;
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Seeds,
+    TreeFuzzTest,
+    ::testing::Range<uint64_t>(1, fuzzSeedCeiling()));
 
 } // namespace
 } // namespace facebook::react

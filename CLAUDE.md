@@ -1326,6 +1326,43 @@ value (transform list, shadow, style array) still crosses and the host's `diffPr
 before. Being wrong there is slow, never incorrect. Nothing propagates in any of the three passes:
 `created=0 cloned=0`, and the differ is told nothing.
 
+### `Clear` was quadratic in list width, in our C++, and it is the one row stock wins
+
+Every device run this project has taken has stock ahead on `Clear` — 10.7 ms against our 9.1-44.2 —
+and the row was left alone because small-ms rows do not carry a verdict. A suspicious row plus a
+suspicious ALGORITHM is a different thing, and the algorithm was in `SymbioteTree.cpp`:
+`detachFromParent` ran `std::remove` over the parent's whole child vector and then `erase`d. That is
+O(width) per removal from EITHER end — `std::remove` scans the whole range whatever it finds, and
+`erase` shifts the tail — so clearing N children was O(N²).
+
+Measured with `core/engine/cpp/tests/js/child-list-scaling.itest.ts`, which reads a doubling factor
+rather than a millisecond (linear work doubles, quadratic quadruples):
+
+```
+clearing 1 000 / 2 000 / 4 000 children      apply ms        doubling factors
+before   std::remove + erase                 0.45 1.27 4.29     2.8  3.4
+after    hole + slot hint + lazy compaction  0.33 0.47 0.85     1.4  1.8
+```
+
+Per removal it went 0.45 → 1.07 us as the list grew, and is now flat at ~0.25 us. A node carries
+`slotInParent` (a HINT, validated against the vector before it is believed, with a scan as the
+fallback) and a detach nulls that slot instead of erasing; every reader of `children` calls
+`compactChildren` first, which is one branch on a dense vector and one linear pass on a churned one.
+
+**`insertBefore` is still quadratic and that is recorded, not fixed.** Finding the anchor is O(1) now
+through its hint; the `std::vector::insert` that follows shifts the tail, which is the container's
+problem and not the search's. An intrusive doubly-linked list would make insert, remove AND
+`nextSiblingOf` all O(1) and every reader in that file is already a forward walk — but the device
+table has us BEATING stock on `Swap` (6.1-8.7 against 9.6), so the core data structure does not get
+replaced on the strength of a row nobody has lost. The scaling test characterises it with a loose
+tripwire bound rather than asserting quadratic is right.
+
+Two traps this cost, both worth not repeating. Renumbering the tail's hints after an insert to keep
+them exact made a 4 000-row reorder 34.6 ms against 6.7 — five times worse to maintain a hint that
+nothing requires to be exact, since the detach validates before believing it. And a move WITHIN one
+parent must erase rather than hole: the insert shifts that vector anyway, so a hole adds a
+compaction pass on top of the shift.
+
 **Do not read `commitMs` / `layoutMs` for a step whose commit was SKIPPED.** `readSurfaceTelemetry`
 answers off `getCurrentRevision().telemetry`, so a skipped commit leaves the PREVIOUS commit's
 numbers standing — all three passes above report the create's `fabric=8.4 layout=7.6`. Use

@@ -168,7 +168,21 @@ struct Node : jsi::NativeState {
   folly::dynamic props = folly::dynamic::object();
   std::shared_ptr<const react::InstanceHandle> instanceHandle;
 
+  // MAY CONTAIN NULL HOLES between a detach and the next read — see `compactChildren`. Every reader
+  // of this vector calls it first; the destructor below is the one place that tolerates a hole
+  // instead, because it must not allocate or renumber while the node is being torn down.
   std::vector<NodePtr> children;
+  /** How many holes are standing. Zero means the vector is dense and every index is meaningful. */
+  size_t holes = 0;
+  /**
+   * Where this node sits in its parent's vector — a HINT, validated before it is believed.
+   *
+   * It is what makes a detach O(1): without it, removing a child means scanning the parent's whole
+   * child list to find it, so clearing a list of N costs N scans. Measured before this existed
+   * (`child-list-scaling.itest.ts`): clearing 1 000 / 2 000 / 4 000 children took 0.45 / 1.27 /
+   * 4.29 ms, i.e. doubling factors of 2.8 and 3.4 against the 2.0 linear work would give.
+   */
+  size_t slotInParent = 0;
   Node *parent = nullptr;
 
   // The placeholder object this node was published on, WEAK — what the structural reads hand back,
@@ -260,6 +274,10 @@ struct Node : jsi::NativeState {
   // alive), so nothing headless can reach this and there is no test to write for it.
   ~Node() {
     for (const NodePtr &child : children) {
+      // A HOLE, from a detach nothing has read past yet. The destructor is the one reader that does
+      // not compact first: compaction renumbers, and renumbering a vector whose owner is being
+      // destroyed buys nothing.
+      if (child == nullptr) continue;
       child->parent = nullptr;
       // Its parent is gone, so nothing pins its placeholder any more. Dropping the strong edge here
       // is what makes the release CASCADE: a child JS no longer names becomes unreachable from both
@@ -371,11 +389,44 @@ void markDirty(Node &node) {
   }
 }
 
+/**
+ * Close the holes a run of detaches left, and renumber what survived.
+ *
+ * Called by every reader of `node.children` before it walks. Costs nothing on a dense vector — one
+ * load and one branch — and one linear pass on a vector that was just emptied, which is what makes
+ * a clear of N children O(N) in total rather than O(N) per removal.
+ *
+ * The alternative was `erase` per removal, and it is quadratic from either end: `std::remove` scans
+ * the whole range whatever it finds, and `erase` then shifts the tail. Removing from the front pays
+ * the shift, removing from the back pays the scan.
+ */
+void compactChildren(Node &node) {
+  if (node.holes == 0) return;
+  auto &children = node.children;
+  children.erase(
+      std::remove(children.begin(), children.end(), nullptr), children.end());
+  for (size_t at = 0; at < children.size(); at += 1) children[at]->slotInParent = at;
+  node.holes = 0;
+}
+
 void detachFromParent(const NodePtr &child) {
   Node *parent = child->parent;
   if (parent == nullptr) return;
   auto &siblings = parent->children;
-  siblings.erase(std::remove(siblings.begin(), siblings.end(), child), siblings.end());
+  // O(1) THROUGH THE HINT, and the scan below is the safety net rather than the design: a hint is
+  // only ever stale if a path that moved a child forgot to set it, and a wrong hint must not silently
+  // punch a hole in the wrong slot.
+  const size_t hinted = child->slotInParent;
+  if (hinted < siblings.size() && siblings[hinted] == child) {
+    siblings[hinted] = nullptr;
+    parent->holes += 1;
+  } else {
+    auto found = std::find(siblings.begin(), siblings.end(), child);
+    if (found != siblings.end()) {
+      *found = nullptr;
+      parent->holes += 1;
+    }
+  }
   child->parent = nullptr;
   markDirty(*parent);
 }
@@ -903,6 +954,7 @@ void appendRenderable(
     const Node *fabricParent) {
   if (node.kind == kKindAnchor) {
     // The anchor is transparent, so its children's Fabric parent is the anchor's, not the anchor.
+    compactChildren(node);
     for (const auto &child : node.children) {
       appendRenderable(
           runtime, uiManager, out, owners, *child, hasTextAncestor, surfaceId, fabricParent);
@@ -956,6 +1008,7 @@ void adoptLandedChildren(Node &node, const std::vector<Node *> &owners) {
 // `appendRenderable`'s traversal with the materialising taken out: which of our nodes contribute
 // `node`'s Fabric children, in order. Anchors hoist theirs, an empty raw text contributes nothing.
 void collectRenderableOwners(Node &node, std::vector<Node *> &owners) {
+  compactChildren(node);
   for (const auto &child : node.children) {
     if (child->kind == kKindAnchor) {
       collectRenderableOwners(*child, owners);
@@ -1068,6 +1121,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
   // Same condition that branch tests — a node with no committed form is minting its first family,
   // which is a rebuild from a child's point of view exactly as a re-creation is.
   if (node.committed == nullptr || needsFreshFamily) node.familyGeneration += 1;
+  compactChildren(node);
   for (const auto &child : node.children) {
     appendRenderable(
         runtime, uiManager, *children, owners, *child, childHasTextAncestor, surfaceId, &node);
@@ -1395,6 +1449,9 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         const auto holdStartedAt = ISteadyClock::now();
         holdHandle(runtime, *child);
         walkCost_.holdHandleNs += nanosSince(holdStartedAt);
+        // The hint the detach path reads back. Appending past a hole is harmless — the hole keeps
+        // its place until the next read compacts, and order is preserved either way.
+        child->slotInParent = parent->children.size();
         parent->children.push_back(std::move(child));
         markDirty(*parent);
         walkCost_.structureNs += nanosSince(structureStartedAt);
@@ -1404,12 +1461,44 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         const auto &parent = nodeAt(ops[at + 1]);
         auto child = nodeAt(ops[at + 2]);
         const auto &before = nodeAt(ops[at + 3]);
-        detachFromParent(child);
+        // A MOVE WITHIN THE SAME PARENT ERASES RATHER THAN PUNCHING A HOLE, and the reason is that
+        // an insert shifts this vector anyway: a hole would force a compaction pass on top of the
+        // shift, which measured 2.4x worse on a 4 000-row reorder than simply erasing. A move to a
+        // DIFFERENT parent holes the old one as usual — nothing is about to shift it.
+        if (child->parent == parent.get()) {
+          auto &standing = parent->children;
+          const size_t hinted = child->slotInParent;
+          auto at = hinted < standing.size() && standing[hinted] == child
+              ? standing.begin() + static_cast<std::ptrdiff_t>(hinted)
+              : std::find(standing.begin(), standing.end(), child);
+          if (at != standing.end()) standing.erase(at);
+          child->parent = nullptr;
+          markDirty(*parent);
+        } else {
+          detachFromParent(child);
+        }
         child->parent = parent.get();
         holdHandle(runtime, *child);
+        // An insert has to land at a POSITION and a hole is not one. Free when the parent is dense,
+        // which after the branch above it is in the move-within-a-parent case.
+        compactChildren(*parent);
         auto &siblings = parent->children;
-        auto position = std::find(siblings.begin(), siblings.end(), before);
-        siblings.insert(position, std::move(child));
+        const size_t hinted = before->slotInParent;
+        const size_t index = hinted < siblings.size() && siblings[hinted] == before
+            ? hinted
+            : static_cast<size_t>(
+                  std::find(siblings.begin(), siblings.end(), before) - siblings.begin());
+        siblings.insert(siblings.begin() + static_cast<std::ptrdiff_t>(index), std::move(child));
+        siblings[index]->slotInParent = index;
+        // THE TAIL'S HINTS ARE NOW ONE TOO LOW, AND THEY ARE DELIBERATELY LEFT THAT WAY.
+        //
+        // Renumbering them is O(width) per insert, which was tried and made a reorder of 4 000 rows
+        // 34.6 ms against 6.7 — five times worse, to keep a hint exact that nothing requires to be.
+        // `detachFromParent` validates before it believes (`siblings[hinted] == child`) and falls
+        // back to a scan, so a stale hint costs one detach its old price and never costs correctness.
+        //
+        // What IS still linear here is the vector insert itself. Finding the anchor is a load now;
+        // making the insert a load needs a different container, not a different search.
         markDirty(*parent);
         break;
       }
@@ -1661,6 +1750,7 @@ jsi::Value Tree::nextSiblingOf(jsi::Runtime &runtime, const jsi::Value *argument
   }
   const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "nextSiblingOf");
   if (node->parent == nullptr) return jsi::Value::undefined();
+  compactChildren(*node->parent);
   const auto &siblings = node->parent->children;
   auto at = std::find_if(siblings.begin(), siblings.end(), [&](const NodePtr &sibling) {
     return sibling.get() == node.get();
@@ -1686,6 +1776,7 @@ jsi::Value Tree::childrenOf(jsi::Runtime &runtime, const jsi::Value *arguments, 
   // is an array of objects. The two are indistinguishable downstream — `childrenOf` in
   // `host-access.ts` filters anything that is not one of our nodes — so the typed one wins.
   std::vector<jsi::Value> live;
+  compactChildren(*node);
   live.reserve(node->children.size());
   for (const auto &child : node->children) {
     auto handle = handleOf(runtime, *child);
@@ -1708,6 +1799,7 @@ void collectSubtree(jsi::Runtime &runtime, const NodePtr &node, std::vector<jsi:
   auto handle = handleOf(runtime, *node);
   if (handle.isUndefined()) return;
   into.push_back(std::move(handle));
+  compactChildren(*node);
   for (const auto &child : node->children) collectSubtree(runtime, child, into);
 }
 
