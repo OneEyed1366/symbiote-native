@@ -1922,10 +1922,10 @@ props its feedback machine consumes (`activeOpacity`, `underlayColor`, `onShowUn
 `onHideUnderlay`, `delayPressIn`, `delayPressOut`), two of them FUNCTIONS, all forwarded to a native
 view that declares none of them.
 
-`id` -> `nativeID` is now ONE rule (`foldIdAlias`) applied to every TAGGED node instead of five JS
-copies. It cannot reach a third-party view — that was the objection that kept it duplicated — because
-`tagName` is written only by `attachHostBehavior`, so it is non-empty for our own primitives and
-nothing else.
+`id` -> `nativeID` became ONE rule (`foldIdAlias`) applied to every TAGGED node instead of five JS
+copies. **It did not survive that shape for a day — see "the seventh implementation" below.** The
+objection it was built to answer (a rule must not reach a third-party view) turned out to be the
+thing that made it wrong.
 
 **The corollary bit the measurement before it bit anything else: a node built with a tag NOBODY
 registered carries an EMPTY `tagName`, so no rule fires.** `recordSetTag` is emitted by
@@ -1933,6 +1933,53 @@ registered carries an EMPTY `tagName`, so no rule fires.** `recordSetTag` is emi
 and measured a native side doing no work at all; what caught it was `expectSamePayload` refusing to
 time two arms that disagree, not a suspiciously good number. Any bare-tag fixture needs a stub
 behavior registered or it measures nothing.
+
+### `id` -> `nativeID` had SEVEN implementations, and the one in C++ was the wrong seam (2026-09-18)
+
+A tag rule keys off `tagName`, which `recordSetTag` writes and `attachHostBehavior` alone emits — so
+`foldIdAlias` reached a node only if some behavior had been registered for its tag. `view` and
+`text` register none. **The rule never touched the two commonest elements in any app**, and the
+adapters' own folds were what saved them: `foldHostBag` off `HOST_PRIMITIVES[*].aliases` (nineteen
+entries, the same pair on every one) for React/Svelte/Angular, plus Vue's `patchProp`, Solid's
+renderer with a `WeakSet` for precedence, and Angular's own `PROP_ALIASES`.
+
+**THE OBVIOUS CLEANUP WAS THE WRONG ONE AND A TEST STOPPED IT.** With the C++ rule in place,
+`foldHostBag`'s alias half read as a leftover mirror — the shape this project deletes on sight.
+`id-alias-coverage.itest.ts` was written to confirm that before deleting it, and it reported the
+opposite: the coverage sets were different, not duplicated. **A second implementation of one rule is
+not automatically a mirror; ask what each one REACHES before removing either.**
+
+So the seam is `routeProp`. Every adapter's prop write ends there whatever shape it starts in, which
+is the one thing a bag fold and a per-key renderer have in common — a bag fold cannot serve Vue or
+Solid, and a per-key fold cannot serve React's `applyProps`. Seven implementations, one left.
+
+**It is a behaviour CHANGE for three adapters and the divergence was the bug, not the rename.** Vue,
+Solid and Angular folded per key with no gate, so they were ALREADY renaming `id` on third-party
+views while React and Svelte were not. One answer for everybody now, and it is upstream's: RN's
+convention is `nativeID`, and a raw `id` is dropped by any ViewConfig whatever the view.
+
+**The engine carries the PRECEDENCE that only Solid had built.** `nativeID={id ?? nativeID}`
+(`View.js:77-79`) is a whole-BAG expression; a renderer folding one key at a time never sees both, so
+precedence fell out of WRITE ORDER — `<view id nativeID>` keeping the stale legacy value while
+`<view nativeID id>` did not. `routeIdAlias` remembers which source fed the slot, so `id` wins in
+either order and clearing it hands the slot back to an authored `nativeID` rather than to undefined.
+
+**STRUCTURALLY INERT, which is the measurement that carries a verdict here.** Every counter on the
+eight-step bench suite is byte-identical to the recorded run — `setProps` vue/solid 10 000, react
+12 000, svelte/angular 13 000, with `unchanged=0`, `folds=0`, `created=10000 cloned=2 nodes=10003`.
+Same writes, same crossings, no fold. The wall clock on the machine that sitting ran on had a ~50%
+per-arm spread (react's create read 154-209 across four runs), far wider than two string compares
+could move, so **no timing verdict is claimed and none should be quoted from it.**
+
+Two dead JS legs fell out afterwards, and both were the same shape: `touchable-without-feedback` and
+`touchable-native-feedback` clone `stringOr(source.id) ?? stringOr(source.nativeID)` onto their
+child, where `source` is the OWNER'S NODE PROPS — which `routeProp` has already resolved. The `.id`
+leg read a key that can no longer exist. **A second opinion about precedence, kept alive by nothing.**
+
+And three tests were quietly measuring one thing twice. Each ran an `id` case over TWO arms, raw and
+`foldHostBag`-folded, because the adapters renamed in three different places; with one place left,
+`foldHostBag` returns its input and the two arms became one bag mounted twice. **A loop whose arms
+have converged reports agreement with itself** — collapsed rather than left green.
 
 ### A derived node's tag never reached C++ — and ActivityIndicator is the first primitive at ZERO folds
 
