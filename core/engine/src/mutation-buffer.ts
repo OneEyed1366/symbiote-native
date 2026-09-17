@@ -186,6 +186,11 @@ let handles: object[] = [];
 // names across 10 000 elements, and every prop KEY is drawn from a set of a few hundred.
 const stringIds = new Map<string, number>();
 const slots = new Map<object, number>();
+// The same table for prop VALUES, and the reason it pays is the far side rather than this one: the
+// host turns each entry into a `folly::dynamic` when the op is applied, so a style object reused
+// across a thousand rows was a thousand conversions of one object. Measured on `build-release`,
+// 12 005 `setProp` ops spent 20-29 ms converting inside a 35 ms `applyOps`.
+const valueIds = new Map<unknown, number>();
 
 function intern(text: string): number {
   const existing = stringIds.get(text);
@@ -193,6 +198,39 @@ function intern(text: string): number {
   strings.push(text);
   stringIds.set(text, strings.length - 1);
   return strings.length - 1;
+}
+
+/**
+ * The index the ops address this value by — deduplicated when it is worth deduplicating.
+ *
+ * OBJECTS, FUNCTIONS AND STRINGS ONLY. Those are the ones that repeat (one `StyleSheet.create`
+ * object per screen, `ellipsizeMode: 'tail'` on every text node) and the ones whose conversion costs
+ * something. A number or a boolean converts for about what the `Map` lookup would cost, so there is
+ * nothing to win — and `Map` keys compare by SameValueZero, which folds `-0` into `0` and `NaN` into
+ * itself. Cheap to convert is not worth a semantics question.
+ *
+ * Identity, never structural equality: comparing deeply would make the buffer's cost depend on the
+ * size of what it is handed, which is the opposite of the point.
+ *
+ * Reusing an index is safe against MUTATION of the value between two ops, and not by luck — the host
+ * converts at apply time, after the batch has closed, so both ops already saw the object's final
+ * state whether they shared an index or not.
+ */
+function internValue(value: unknown): number {
+  const kind = typeof value;
+  const isWorthInterning =
+    kind === 'string' ||
+    kind === 'function' ||
+    (kind === 'object' && value !== null);
+  if (!isWorthInterning) {
+    values.push(value);
+    return values.length - 1;
+  }
+  const existing = valueIds.get(value);
+  if (existing !== undefined) return existing;
+  values.push(value);
+  valueIds.set(value, values.length - 1);
+  return values.length - 1;
 }
 
 /**
@@ -329,8 +367,7 @@ export function recordSetProp(
     push(OP_SET_PROP, slotOf(handle), intern(key), NO_VALUE);
     return;
   }
-  values.push(value);
-  push(OP_SET_PROP, slotOf(handle), intern(key), values.length - 1);
+  push(OP_SET_PROP, slotOf(handle), intern(key), internValue(value));
 }
 
 export function recordSetText(handle: object, text: string): void {
@@ -389,6 +426,7 @@ export function takeBatch(): IMutationBatch {
   handles = [];
   stringIds.clear();
   slots.clear();
+  valueIds.clear();
   return batch;
 }
 

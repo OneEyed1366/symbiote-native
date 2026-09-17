@@ -215,6 +215,16 @@ export type INativeEngineBindings = {
     nodesCreated: number;
     nodesCloned: number;
     nodesReused: number;
+    decodeMs: number;
+    instanceHandleMs: number;
+    publishMs: number;
+    nativeStateMs: number;
+    nodesDecoded: number;
+    setPropMs: number;
+    propConvertMs: number;
+    setProps: number;
+    valueEntries: number;
+    valueConversions: number;
   };
 };
 

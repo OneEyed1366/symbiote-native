@@ -355,6 +355,38 @@ export type ISurfaceTelemetry = {
   nodesCreated: number;
   nodesCloned: number;
   nodesReused: number;
+  /**
+   * `applyOps`' own decode, per created element, and its three biggest parts.
+   *
+   * A different question from the walk's. The walk asks what Fabric charges; this asks what it costs
+   * US to turn one op into one node — and the buffer architecture only pays for itself if that is
+   * well under the per-node JSI call it replaces. On `build-release` it was not, which is why these
+   * exist. `publishMs` contains `nativeStateMs`; neither contains `instanceHandleMs`.
+   */
+  decodeMs: number;
+  instanceHandleMs: number;
+  publishMs: number;
+  nativeStateMs: number;
+  nodesDecoded: number;
+  /**
+   * `kOpSetProp` and, inside it, the JS value -> `folly::dynamic` conversion.
+   *
+   * `setPropMs` skips the two early exits (deleting an absent key, and a value equal to the one
+   * standing), so it under-counts exactly the cheap paths; `propConvertMs` has no such hole.
+   */
+  setPropMs: number;
+  propConvertMs: number;
+  setProps: number;
+  /**
+   * How well the buffer's value interning worked: entries in the batch's value table, and how many
+   * of them an op actually reached and converted.
+   *
+   * `setProps / valueEntries` is the dedup achieved. A ratio near 1 means the values are unique —
+   * which is a fact about what the caller HANDS the buffer, not about the interning: a style slot
+   * rebuilt per node arrives as a fresh reference and cannot be folded with anything.
+   */
+  valueEntries: number;
+  valueConversions: number;
 };
 
 /**

@@ -349,6 +349,22 @@ describe('one tree, two drivers, one Fabric', () => {
           `appendChild=${telemetry.appendChildMs.toFixed(1)} ` +
           `diffProps=${telemetry.diffPropsMs.toFixed(1)}`,
       );
+      // `applyOps`' half. The buffer exists to replace 10 001 JSI calls with one, so the thing to
+      // watch is whether the decode inside that one call has simply moved the per-node JSI work
+      // rather than removed it.
+      print(
+        `DEBUG DECODE decodeMs=${telemetry.decodeMs.toFixed(1)} ` +
+          `instanceHandle=${telemetry.instanceHandleMs.toFixed(1)} ` +
+          `publish=${telemetry.publishMs.toFixed(1)} ` +
+          `(setNativeState=${telemetry.nativeStateMs.toFixed(1)}) ` +
+          `nodes=${telemetry.nodesDecoded}`,
+      );
+      print(
+        `DEBUG SETPROP setPropMs=${telemetry.setPropMs.toFixed(1)} ` +
+          `jsValueToDynamic=${telemetry.propConvertMs.toFixed(1)} ` +
+          `ops=${telemetry.setProps} valueTable=${telemetry.valueEntries} ` +
+          `converted=${telemetry.valueConversions}`,
+      );
       print(
         `DEBUG WALK   created=${telemetry.nodesCreated} cloned=${telemetry.nodesCloned} ` +
           `reused=${telemetry.nodesReused} · rest=${(

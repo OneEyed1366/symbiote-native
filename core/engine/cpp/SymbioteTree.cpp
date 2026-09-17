@@ -583,6 +583,27 @@ struct IWalkCost {
   size_t created = 0;
   size_t cloned = 0;
   size_t reused = 0;
+  // `applyOps`' own half, which is a different question from the walk's: the walk asks what Fabric
+  // charges, this asks what OUR decode charges to turn one op into one node. On `build-release` the
+  // decode came out the same size as the per-node JSI calls it exists to replace, which is the one
+  // result that would make the buffer architecture pointless — so it gets named from the inside too.
+  double decodeNs = 0;
+  double instanceHandleNs = 0;
+  double publishNs = 0;
+  double nativeStateNs = 0;
+  size_t decoded = 0;
+  // `kOpSetProp`, and inside it the JS value -> `folly::dynamic` conversion. NOT counted on the two
+  // early exits (an absent key being deleted, and a value that compares equal to the standing one) —
+  // both leave before the accumulate, and both are the cheap paths, so the sum is an under-count of
+  // a case that is already small when it exits early. `propConvertNs` has no such hole.
+  double setPropNs = 0;
+  double propConvertNs = 0;
+  size_t setProps = 0;
+  // How well the interning actually worked: entries in the batch's value table against conversions
+  // performed. `setProps` / `valueEntries` is the dedup the buffer achieved, and
+  // `valueConversions` / `valueEntries` says how much of the table the ops even reached.
+  size_t valueEntries = 0;
+  size_t valueConversions = 0;
 };
 IWalkCost walkCost_;
 
@@ -1223,14 +1244,18 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
   // only place one is taken — afterwards the object JS already holds is the handle, and when JS and
   // the parent both let go, the node goes.
   auto publish = [&](int32_t slot, NodePtr node) {
+    const auto publishStartedAt = ISteadyClock::now();
     auto at = checkSlot(slot);
     auto object = handles.getValueAtIndex(runtime, at).asObject(runtime);
     // Taken once, here, for the same reason the node is: this is the only moment both halves are in
     // hand. Every later op resolves the node THROUGH the object, so the edge back can never be
     // re-derived from anything the ops carry.
     node->handle.emplace(runtime, object);
+    const auto stateStartedAt = ISteadyClock::now();
     object.setNativeState(runtime, std::make_shared<NodeState>(node));
+    walkCost_.nativeStateNs += nanosSince(stateStartedAt);
     bySlot[at] = std::move(node);
+    walkCost_.publishNs += nanosSince(publishStartedAt);
   };
 
   // Decoded ONCE per batch, not once per op that names a string.
@@ -1255,6 +1280,21 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
     }
   }
 
+  // Prop VALUES, converted at most once per entry per batch — the other half of the buffer's
+  // interning, and useless without it. `mutation-buffer.ts` gives one entry to one object however
+  // many nodes were handed it, so a `StyleSheet.create` style shared by a thousand rows arrives as
+  // one entry; this is what turns that into one conversion instead of a thousand identical ones.
+  //
+  // LAZY rather than eager, unlike the strings above: a batch's value table can hold entries no
+  // surviving op names — a prop written and then overwritten in the same batch — and converting one
+  // eagerly would charge for work the ops do not ask for. The strings table has no such shape.
+  //
+  // One consequence worth knowing when a conversion throws: `boundedDynamicFrom`'s message names the
+  // prop and view of the FIRST op to reach a given entry, not every op that shares it.
+  std::vector<folly::dynamic> convertedValues(values.size(runtime));
+  std::vector<bool> valueIsConverted(convertedValues.size(), false);
+  walkCost_.valueEntries += convertedValues.size();
+
   // Bounds-checked, which the per-op version got for free from `getValueAtIndex` throwing. A vector
   // would not throw — it would read past the end — so the check moves here with the decode.
   auto stringAt = [&](int32_t index) -> const std::string & {
@@ -1267,19 +1307,47 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
     return decodedStrings[static_cast<size_t>(index)];
   };
 
+  // `auto &&describe` and not a `std::function`: the description must stay a lambda the compiler can
+  // inline away, for the reason `boundedDynamicFrom`'s own comment gives — building the string
+  // eagerly was 48.8% of the decode path once, and a `std::function` per op would allocate to
+  // reintroduce half of it.
+  auto valueAt = [&](int32_t index, auto &&describe) -> const folly::dynamic & {
+    if (index < 0 || static_cast<size_t>(index) >= convertedValues.size()) {
+      throw jsi::JSError(
+          runtime,
+          "applyOps: op names value " + std::to_string(index) +
+              ", which is outside this batch's values table");
+    }
+    const auto at = static_cast<size_t>(index);
+    if (!valueIsConverted[at]) {
+      const auto convertStartedAt = ISteadyClock::now();
+      convertedValues[at] =
+          boundedDynamicFrom(runtime, values.getValueAtIndex(runtime, at), describe);
+      walkCost_.propConvertNs += nanosSince(convertStartedAt);
+      walkCost_.valueConversions += 1;
+      valueIsConverted[at] = true;
+    }
+    return convertedValues[at];
+  };
+
   for (size_t at = 0; at + kOpStride <= opsLength; at += kOpStride) {
     switch (ops[at]) {
       case kOpCreateElement: {
+        const auto decodeStartedAt = ISteadyClock::now();
         auto node = std::make_shared<Node>();
         node->kind = kKindElement;
         node->viewName = stringAt(ops[at + 2]);
         node->isText = ops[at + 3] != 0;
         node->tag = allocateTag();
+        const auto handleStartedAt = ISteadyClock::now();
         node->instanceHandle = std::make_shared<const react::InstanceHandle>(
             runtime,
             instanceHandles.getValueAtIndex(runtime, static_cast<size_t>(ops[at + 4])),
             node->tag);
+        walkCost_.instanceHandleNs += nanosSince(handleStartedAt);
         publish(ops[at + 1], std::move(node));
+        walkCost_.decodeNs += nanosSince(decodeStartedAt);
+        walkCost_.decoded += 1;
         break;
       }
       case kOpCreateRawText: {
@@ -1354,6 +1422,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
       // away strictly MORE writes than TS does. That changes the work, never the committed tree —
       // `diffProps` drops an unchanged key either way — so the two still agree on output.
       case kOpSetProp: {
+        const auto setPropStartedAt = ISteadyClock::now();
         const auto &node = nodeAt(ops[at + 1]);
         const auto &key = stringAt(ops[at + 2]);
         if (ops[at + 3] == kNoValue) {
@@ -1363,15 +1432,19 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
           if (node->props.get_ptr(key) == nullptr) break;
           node->props.erase(key);
         } else {
-          auto value = boundedDynamicFrom(
-              runtime,
-              values.getValueAtIndex(runtime, static_cast<size_t>(ops[at + 3])),
-              [&] { return "prop \"" + key + "\" on <" + node->viewName + ">"; });
+          const auto &value = valueAt(ops[at + 3], [&] {
+            return "prop \"" + key + "\" on <" + node->viewName + ">";
+          });
           const auto *existing = node->props.get_ptr(key);
           if (existing != nullptr && *existing == value) break;
-          node->props[key] = std::move(value);
+          // A COPY, where this used to move: the entry is shared by every node the same object was
+          // handed to, so it has to survive this op. One `folly::dynamic` copy against one JS ->
+          // dynamic conversion, and the conversion is the JSI crossing.
+          node->props[key] = value;
         }
         markDirty(*node);
+        walkCost_.setPropNs += nanosSince(setPropStartedAt);
+        walkCost_.setProps += 1;
         break;
       }
       // The same guard, and here it is strictly stronger than a reference check even in TS: `text`
@@ -1960,6 +2033,18 @@ jsi::Value Tree::readSurfaceTelemetry(
       runtime, "nodesCreated", jsi::Value(static_cast<double>(walkCost_.created)));
   result.setProperty(runtime, "nodesCloned", jsi::Value(static_cast<double>(walkCost_.cloned)));
   result.setProperty(runtime, "nodesReused", jsi::Value(static_cast<double>(walkCost_.reused)));
+  result.setProperty(runtime, "decodeMs", millis(walkCost_.decodeNs));
+  result.setProperty(runtime, "instanceHandleMs", millis(walkCost_.instanceHandleNs));
+  result.setProperty(runtime, "publishMs", millis(walkCost_.publishNs));
+  result.setProperty(runtime, "nativeStateMs", millis(walkCost_.nativeStateNs));
+  result.setProperty(runtime, "nodesDecoded", jsi::Value(static_cast<double>(walkCost_.decoded)));
+  result.setProperty(runtime, "setPropMs", millis(walkCost_.setPropNs));
+  result.setProperty(runtime, "propConvertMs", millis(walkCost_.propConvertNs));
+  result.setProperty(runtime, "setProps", jsi::Value(static_cast<double>(walkCost_.setProps)));
+  result.setProperty(
+      runtime, "valueEntries", jsi::Value(static_cast<double>(walkCost_.valueEntries)));
+  result.setProperty(
+      runtime, "valueConversions", jsi::Value(static_cast<double>(walkCost_.valueConversions)));
   walkCost_ = IWalkCost{};
   return result;
 }
