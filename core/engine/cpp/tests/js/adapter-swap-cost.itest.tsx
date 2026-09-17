@@ -66,9 +66,24 @@
 // expressed during the RENDER phase, by cloning the parent and rebuilding its child set — which is
 // why stock pays 2.4 ms and a heavier render.
 //
-// NOT CONFIRMED, and the check that would confirm it is one arm away: run the same swap at 2 000
-// rows. If the fixed cost doubles it is the traversal; if it holds, it is something else that fires
-// once per commit.
+// ── AND THE WIDENING ARM WEAKENS THAT, WHICH IS WHY IT IS AN ARM AND NOT A PARAGRAPH ────────────
+//
+// At 2 000 rows the swap costs 29.4 ms against 22.7 — 1.29x for a 2x widening. The engine's own
+// halves DID double (walk 0.9 -> 2.0, apply 2.8 -> 5.8), as a walk over twice the list must; taking
+// that out leaves the JS above it going 19.9 -> 23.6, i.e. **1.19x**. A cost that came from walking
+// the parent's children would have doubled.
+//
+// ── WHAT IT IS NOT, WHICH IS NOW MOST OF THE ANSWER ─────────────────────────────────────────────
+//
+//   the engine            2.8 ms of 22.7, and it scales with the list as it should
+//   Fabric's own commit   `fabric=0.8`, and `layout=0.0` — the platform is not in this at all
+//   the render phase      1.9 ms, and FASTER than stock's 3.5
+//   a search or a shift   adjacent and distant swaps cost the same
+//   the child count       1.19x on a 2x widening, once the engine's own doubling is removed
+//
+// So ~18 ms is JS, above the engine, triggered by the existence of a placement, nearly flat in the
+// list size. Bisection by wall clock has taken this as far as it goes; the next step wants a
+// sampling profile of that window, not another arm.
 //
 // RUN ON `build-release` (`pnpm run bench:itest`).
 
@@ -90,6 +105,8 @@ import {
 
 const ROOT_TAG = 1;
 const ROWS = 1_000;
+// Twice the rows, same everything else. See `WideMemoScreen`.
+const WIDE_ROWS = 2_000;
 
 // The two the benchmark screen exchanges: near the front and near the back, so the move is a real
 // one rather than two adjacent slots.
@@ -103,6 +120,8 @@ const INPUT_STYLE = { width: 96, height: 28 };
 let setOrder: ((next: readonly number[]) => void) | undefined;
 let setHoistedOrder: ((next: readonly number[]) => void) | undefined;
 let setMemoOrder: ((next: readonly number[]) => void) | undefined;
+let setWideOrder: ((next: readonly number[]) => void) | undefined;
+let memoSwapWall: number | undefined;
 let swapWall: number | undefined;
 
 /** The same ten-node row `adapter-create-cost` builds, so the two files measure one workload. */
@@ -157,6 +176,24 @@ function MemoScreen(): ReturnType<typeof h> {
   for (let id = 0; id < ROWS; id += 1) initial.push(id);
   const [order, setOrderState] = useState<readonly number[]>(initial);
   setMemoOrder = setOrderState;
+
+  return h(
+    'view',
+    { style: { flex: 1 } },
+    ...order.map(id => h(Row, { key: id, id })),
+  );
+}
+
+// The SAME screen at twice the rows, which is the one arm that can tell the two candidates apart.
+// A cost that comes from walking the parent's children scales with how many there are; a cost that
+// fires once per commit does not. Written as a second component rather than a parameter because the
+// state setter has to be captured per screen and a shared holder would have one arm driving the
+// other's list.
+function WideMemoScreen(): ReturnType<typeof h> {
+  const initial: number[] = [];
+  for (let id = 0; id < WIDE_ROWS; id += 1) initial.push(id);
+  const [order, setOrderState] = useState<readonly number[]>(initial);
+  setWideOrder = setOrderState;
 
   return h(
     'view',
@@ -324,13 +361,20 @@ describe('what a keyed swap costs above the engine', () => {
     surface.commit();
     const wall = performance.now() - startedAt;
     mounted();
+
+    const telemetry = readSurfaceTelemetry(ROOT_TAG);
     print(
       `DEBUG memo    setState=${setStateReturned.toFixed(1)} ` +
         `drain=${(throughReact - setStateReturned).toFixed(1)} ` +
-        `engineCommit=${(wall - throughReact).toFixed(1)}`,
+        `engineCommit=${(wall - throughReact).toFixed(1)} ` +
+        // REACT NATIVE'S OWN halves, and the reason they belong here: the idle arm commits NOTHING,
+        // so everything Fabric charges for a real commit — the differ, layout, the mounting pass —
+        // is in this arm and in neither of the two it is subtracted from. Reading them apart is what
+        // separates "our JS is slow" from "a commit costs this much".
+        `fabric=${(telemetry?.commitMs ?? 0).toFixed(1)} ` +
+        `layout=${(telemetry?.layoutMs ?? 0).toFixed(1)}`,
     );
 
-    const telemetry = readSurfaceTelemetry(ROOT_TAG);
     const after = committedTags().length;
     print(
       `DEBUG memo    wall=${wall.toFixed(1)} walk=${(telemetry?.walkMs ?? 0).toFixed(1)} ` +
@@ -362,6 +406,55 @@ describe('what a keyed swap costs above the engine', () => {
     print(
       `DEBUG memo    adjacent swap=${nearWall.toFixed(1)} vs distant=${wall.toFixed(1)}`,
     );
+    memoSwapWall = wall;
+  });
+
+  // why: THE arm that tells the two candidates apart. The move costs the same whether the rows
+  // travel one slot or 997, so it is a fixed price per commit-with-placements rather than a search
+  // or a shift. Two things can look like that: React walking the parent's thousand children once a
+  // placement puts `MutationMask` on its `subtreeFlags`, which scales with the CHILD COUNT, and
+  // something firing once per commit, which does not. Doubling the rows separates them.
+  it('swaps two rows of twice as many, which says whether the fixed cost is the child count', () => {
+    const surface = mount(ROOT_TAG, h(WideMemoScreen));
+    flushTimers();
+    surface.commit();
+    mounted();
+
+    const before = committedTags().length;
+    readSurfaceTelemetry(ROOT_TAG);
+
+    const order: number[] = [];
+    for (let id = 0; id < WIDE_ROWS; id += 1) order.push(id);
+    [order[FIRST], order[SECOND]] = [order[SECOND], order[FIRST]];
+
+    if (setWideOrder === undefined) {
+      throw new Error('the wide screen never rendered');
+    }
+    const startedAt = performance.now();
+    setWideOrder(order);
+    flushTimers();
+    surface.commit();
+    const wall = performance.now() - startedAt;
+    mounted();
+
+    const telemetry = readSurfaceTelemetry(ROOT_TAG);
+    print(
+      `DEBUG wide    wall=${wall.toFixed(1)} rows=${WIDE_ROWS} ` +
+        `walk=${(telemetry?.walkMs ?? 0).toFixed(1)} ` +
+        `apply=${(telemetry?.applyMs ?? 0).toFixed(1)} ` +
+        `cloned=${telemetry?.nodesCloned ?? 0} reused=${telemetry?.nodesReused ?? 0}`,
+    );
+    if (memoSwapWall !== undefined) {
+      print(
+        `DEBUG wide    growth over a 2x widening: ` +
+          `${(wall / Math.max(memoSwapWall, 0.001)).toFixed(2)}x ` +
+          `[~2 = the child walk · ~1 = once per commit]`,
+      );
+    }
+
+    // Same oracle as every other arm: a pure move, whatever it costs.
+    expect(committedTags().length).toBe(before);
+    expect(telemetry?.nodesCreated ?? 0).toBe(0);
   });
 });
 

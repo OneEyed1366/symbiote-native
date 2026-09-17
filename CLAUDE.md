@@ -1576,16 +1576,26 @@ only the travel differs — which rules out the two obvious suspects, `getHostSi
 React's mutation commit and the `std::vector::insert` tail shift `kOpInsertBefore` still pays. What
 is left is a FIXED price that appears the moment any placement exists.
 
-The shape fits React's mutation-effect traversal: with no placement the parent's `subtreeFlags` carry
-no `MutationMask` and React skips its thousand children outright — that is the 1.8 ms idle arm — and
-one placement makes it walk all of them. **Persistent mode has no equivalent**: a move there is
-expressed during the RENDER phase, by cloning the parent and rebuilding its child set, which is why
-stock pays 2.4 ms on the move and a heavier 3.5 ms render. If that is right, the cost is a property
-of driving React in MUTATION mode, which `<M1 + M2>` chose deliberately so that R2 could not be
-skipped — not something the engine can remove.
+That looked like React's mutation-effect traversal — with no placement the parent's `subtreeFlags`
+carry no `MutationMask` and React skips its thousand children outright, and one placement makes it
+walk all of them, which persistent mode has no equivalent of. **The widening arm weakens it.** At
+2 000 rows the swap costs 29.4 ms against 22.7, i.e. 1.29x for a 2x widening; the engine's own halves
+did double (walk 0.9 → 2.0, apply 2.8 → 5.8) as a walk over twice the list must, and taking that out
+leaves the JS above it at **1.19x**. A cost that came from walking the children would have doubled.
 
-NOT CONFIRMED, and one arm away: run the same swap at 2 000 rows. Doubling means the traversal;
-holding means something else fires once per commit.
+**What it is NOT is now most of the answer:**
+
+```
+ the engine            2.8 ms of 22.7, and it scales with the list as it should
+ Fabric's own commit   fabric=0.8, layout=0.0 — the platform is not in this at all
+ the render phase      1.9 ms, and faster than stock's 3.5
+ a search or a shift   adjacent and distant swaps cost the same
+ the child count       1.19x on a 2x widening, engine excluded
+```
+
+So ~18 ms is JS, above the engine, triggered by the existence of a placement, nearly flat in the list
+size. **Bisection by wall clock has taken this as far as it goes** — the next step wants a sampling
+profile of that window, not another arm.
 
 A second, smaller thing came out of the same bisect and is a structural fix with NO measured time
 win, recorded honestly as that. `internValue` excluded booleans from the intern table on the
