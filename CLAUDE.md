@@ -1960,7 +1960,63 @@ no rule ran at all, not because Android's half omitted it. An absence assertion 
 no longer produce the key passes forever and means nothing, so cases whose subject was a fold move as
 a GROUP with their positive twins, not one failing case at a time.
 
-### A `<Button>` costs FOUR crossings per commit — the most expensive primitive we ship
+### A raw text can carry a TAG, and two of Button's four folds were not rules at all
+
+Button's derived nodes are `button -> view -> text -> rawtext` on iOS and `button -> text -> rawtext`
+on Android. Two of their folds went on 2026-09-18, and neither went the way a port usually does.
+
+**`viewFold` was DELETED, not ported, because it was doing nothing on the only platform that runs
+it.** It wrote `style: resolveButtonViewStyle(color, disabled)`; that function returns the constant
+`buttonViewStyle` on every platform but Android, `buttonViewStyle` is `{}` off Android, and the view
+node is built only in the non-Android branch. So it read two props off its owner, discarded both, and
+spent a JSI round trip per button per commit to write an empty object. Second time this migration has
+found that shape after `input-accessory-view`, and the cost model says why it keeps happening: **the
+price is the TRIP, so a fold whose body is empty costs exactly what a fold that does real work
+costs.**
+
+**`labelFold` moved, and it needed `createRawText` to take a tag.** `button-payload.itest.ts`
+recorded "a raw text carries no tag at all, so there is nothing for a tag-keyed rule to key on" —
+true of the old signature, not of raw texts. A raw text has no props an app can write, but its
+CONTENT can still be the platform's decision: RN renders a button's title uppercased on Android
+(`Button.js:352-353`), which is a user-agent choice about a control. `foldButtonLabel` does it now.
+
+The guard on that new parameter is NOT `createElement`'s. There, every element might have a behavior,
+so the gate is `hasHostBehaviors()`. A raw text is the leaf under every `<Text>` on a screen and
+exactly one kind is tagged, so an untagged one compares `tag !== RAW_TEXT_COMPONENT` first — the same
+string literal, therefore pointer equality — and skips the intern, the op and the registry miss.
+Measured on the 3 000-raw-text create fixture: `engine wall` 69.0/69.3 ms against the recorded
+67-75 band, i.e. unmoved.
+
+**The count was wrong in both directions and the measurement corrected it.** This file recorded FOUR
+crossings, one per node. A button driven through `routeProp` measured **five** before and **three**
+after: the fold counter is per SURFACE over the commits a button actually performs, and its
+touchable's `afterCommit` settle re-commits it — the same reason a single touchable reads 5 rather
+than 1. What is exact is the delta: two folds removed, two crossings gone, one each.
+
+**And the two fixtures disagree on purpose.** `button-payload.itest.ts` writes with `setProp`, which
+skips the slot redirect that lives in `routeProp`, so its label never receives the title, an empty
+raw text is dropped from its parent's child set, and that label's fold never ran there at all. Its
+count went 4 -> 3 and shows only the view's deletion. Read the two numbers together or neither.
+
+What remains is two folds, and both genuinely read another node: the owner's, whose `focusable` leg
+is an owned listener, and the text's, which needs the BUTTON's `color`/`disabled` while its parent is
+the VIEW — **a grandparent, which `ownerProps` does not reach.** That is the next seam this would
+need, and it is not built.
+
+**One coverage gap went with the port and is recorded rather than hidden.** `foldButtonLabel`'s
+uppercase arm is `#ifdef ANDROID`, because a raw text commits as `RCTRawText` on both platforms and
+there is no view NAME to branch on the way `Switch`/`AndroidSwitch` gives one. Two vitest cases
+covered it by mocking `Platform.OS`, and what they mocked was a JS function that no longer exists —
+they would pass forever against a mock of nothing. Same class as `android_ripple` and
+`decelerationRate`'s constants: **a compile-time branch is only testable in a build that compiles
+it.** And one behaviour difference shipped deliberately: RN uppercases through JavaScript's
+full-Unicode `toUpperCase`, the C++ rule is ASCII-only, so a Cyrillic label will not uppercase on
+Android. Judged a cosmetic difference on one platform against dragging ICU into the engine.
+
+`resolveButtonTitle` was deleted with it — no caller left but its own two unit tests, which is the
+orphan shape this migration keeps turning up.
+
+### A `<Button>` cost FOUR crossings per commit — superseded, see the section above
 
 Pinned in `core/engine/cpp/tests/js/button-payload.itest.ts`: one JS fold per node the behavior
 builds — the owner, the iOS wrapper view, the text, and the raw label. At the per-node figures above
