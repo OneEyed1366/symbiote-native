@@ -179,18 +179,9 @@ function foldTextValue(
   return fold === undefined ? value : fold(value);
 }
 
-// The alias fold, at the RENDERER — the only place it can live now that an app writes the tag
-// itself. A bare `<view id="x">` has no wrapper to inherit the fold from, and `id` is a key Fabric
-// does not know, so it committed nothing while the component committed `nativeID`. Measured by
-// mounting both forms and diffing committed key NAMES; totals were identical and said nothing.
-//
-// One string comparison rather than a Map lookup, because this sits on the per-prop write path —
-// 32 001 prop writes on a benchmark create, where a Map.get is the kind of cost the engine spent
-// this month removing. That is only safe while every primitive shares ONE alias pair, which is a
-// property of the shared spec and not of this file, so `renderer-alias-fold.test.ts` re-derives
-// both constants from `HOST_PRIMITIVES` and fails the moment a second pair appears.
-const ALIAS_FROM = 'id';
-const ALIAS_TO = 'nativeID';
+// The `id` -> `nativeID` fold and its `aliasedNodes` WeakSet left this file on 2026-09-18. The
+// memory was the right shape and the wrong LAYER: `routeProp` carries it now, so all five adapters
+// resolve the precedence identically instead of three of them doing it three ways.
 
 // `multiline` selects between TWO Fabric views, so the TAG decides and no prop write moves a node
 // between them. An author writing `<text-input multiline>` instead of `<text-input-multiline>` gets
@@ -209,30 +200,6 @@ function assertMultilineMatchesTag(node: ISymbioteNode, value: unknown): void {
       `<text-input-multiline> are different Fabric views and no prop write moves a node ` +
       `between them. Pick the tag (a runtime choice needs a <Show> around both).`,
   );
-}
-
-// RN gives `id` UNCONDITIONAL priority when both are set (View.js:77-79,
-// `processedProps.nativeID = id`), and `foldHostBag` reproduces that by deleting the source key out
-// of a whole bag. This renderer never sees a bag — it folds one key at a time — so precedence would
-// otherwise come out as source order, and `<view id nativeID>` would keep the stale legacy value
-// while `<view nativeID id>` would not. The wrapper hid that; a bare tag does not.
-//
-// So the node remembers that its nativeID came from an `id`, and a later raw `nativeID` write loses
-// to it. Off the hot path in every ordinary case: nothing is touched unless the prop being written
-// is one of these two names.
-const aliasedNodes = new WeakSet<ISymbioteNode>();
-
-function foldAliasKey(
-  node: ISymbioteNode,
-  name: string,
-  value: unknown,
-): string {
-  if (name === ALIAS_FROM) {
-    if (value === undefined) aliasedNodes.delete(node);
-    else aliasedNodes.add(node);
-    return ALIAS_TO;
-  }
-  return name;
 }
 
 const nodeOps: RendererOptions<IHostNode> = {
@@ -291,16 +258,11 @@ const nodeOps: RendererOptions<IHostNode> = {
   setProperty(node, name, value) {
     if (isSurface(node)) return;
     if (name === MULTILINE_PROP) assertMultilineMatchesTag(node, value);
-    if (name === ALIAS_TO && aliasedNodes.has(node)) return;
     // routeProp makes the prop-vs-event decision from the node's ViewConfig (onPress on a View
     // becomes a listener; onTintColor on a Switch stays a prop), and centralizes the class+style
-    // merge. Shared with React and Vue — never re-implement an `onX` check here
-    // (symbiote-engine-core §2).
-    routeProp(
-      node,
-      foldAliasKey(node, name, value),
-      foldTextValue(node, name, value),
-    );
+    // merge and the `id` -> `nativeID` rename. Shared with React and Vue — never re-implement an
+    // `onX` check here (symbiote-engine-core §2).
+    routeProp(node, name, foldTextValue(node, name, value));
     requestCommit();
   },
 

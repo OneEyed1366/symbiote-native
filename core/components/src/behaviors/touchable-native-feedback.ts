@@ -285,8 +285,9 @@ function cloneFold(owner: ISymbioteNode, inner: IPayloadFold | undefined) {
       appListenerFor(owner, 'press') !== undefined,
       disabled,
     );
-    // :373. RN gives `id` unconditional priority over `nativeID`.
-    next.nativeID = stringOr(source.id) ?? stringOr(source.nativeID);
+    // :373. RN gives `id` unconditional priority over `nativeID`, and `routeProp` settled that on
+    // the way in — `source` is the owner's NODE props, where only one of the two names survives.
+    next.nativeID = stringOr(source.nativeID);
     // :318-323 folded by the engine above, then :324-330: an explicit `disabled` overrides the
     // aria/accessibilityState answer. Same helper every wrapper calls, so both paths agree.
     next.accessibilityState = resolveDisabledAccessibilityState(

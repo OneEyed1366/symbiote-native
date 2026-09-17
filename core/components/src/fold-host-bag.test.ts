@@ -6,6 +6,10 @@
 // spelling had no plan. No ViewConfig declares `id`, so Fabric drops it, the nativeID never reaches
 // the view, and nothing is red anywhere — device-only, and invisible to every test that asserts on
 // the props bag instead of the payload.
+//
+// THAT PARTICULAR BUG CAN NO LONGER HAPPEN, and the file is kept for the axis rather than for it:
+// `id` is renamed by `routeProp` on the way in now, for every node, so it does not depend on this
+// table naming a spelling. The next default this table grows still does.
 import { describe, expect, it } from 'vitest';
 import { HOST_PRIMITIVES } from '../host-primitives.cjs';
 import { FOLD_PLAN_BY_TAG, foldHostBag } from './fold-host-bag';
@@ -29,13 +33,24 @@ describe('foldHostBag covers every spelling a primitive commits under', () => {
     expect(FOLD_PLAN_BY_TAG.get(tag)).toBeDefined();
   });
 
-  // why: the end-to-end shape, on the payload rather than on the map. `id` is what the source
-  // writes and `nativeID` is what the fold PRODUCES, so both halves are asserted — an expectation
-  // naming only `nativeID` passes with the raw key left standing beside it.
-  it.each(alternateTags)('%s folds id to nativeID', tag => {
-    const folded = foldHostBag(tag, { id: 'pane' });
-    expect(folded.nativeID).toBe('pane');
-    expect('id' in folded).toBe(false);
+  // why: and it is the SAME plan, not merely a plan. The bug this file exists for was an alternate
+  // spelling folding LESS than its base one, which a presence check cannot see: a plan built from
+  // an empty entry is defined and folds nothing.
+  //
+  // The probe used to be `id` -> `nativeID`, the one alias every entry carried, asserted through
+  // `foldHostBag` end to end. That rename is `routeProp`'s since 2026-09-18 and this function no
+  // longer performs it — and no alternate spelling declares a DEFAULT, so an end-to-end probe would
+  // now iterate an empty list and report agreement while measuring nothing. Identity is the claim
+  // that survives an entry with nothing in it.
+  it.each(alternateTags)("%s shares its base spelling's plan", tag => {
+    const owner = Object.values(HOST_PRIMITIVES).find(
+      primitive => primitive.intrinsicWhen?.intrinsic === tag,
+    );
+    if (owner === undefined) throw new Error(`no primitive declares ${tag}`);
+
+    expect(FOLD_PLAN_BY_TAG.get(tag)).toBe(
+      FOLD_PLAN_BY_TAG.get(owner.intrinsic),
+    );
   });
 });
 

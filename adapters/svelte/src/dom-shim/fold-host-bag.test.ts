@@ -1,7 +1,7 @@
 // The shim's fold is keyed by INTRINSIC TAG, and one primitive can produce two of them
 // (`intrinsicWhen`). A map built from `primitive.intrinsic` alone covers the first flavour and
-// silently skips the second: the node still commits, it just loses its aliases and defaults —
-// an `id` on a multiline TextInput would never become `nativeID`.
+// silently skips the second: the node still commits, it just loses its defaults — a multiline
+// TextInput would never be seeded with what the single-line one is.
 //
 // That is the failure this file exists for, and it is the same shape Solid found one layer up: a
 // projection of the spec that drops a field before anything reads it. Neither goes red on its own,
@@ -21,6 +21,12 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 const SINGLE_LINE = 'text-input';
 const MULTILINE = 'text-input-multiline';
 
+// The probe was `id` -> `nativeID` until 2026-09-18, when that rename moved to `routeProp` and the
+// spec stopped carrying aliases at all. A DEFAULT is what `foldHostBag` still applies, so it is what
+// the second tag can still silently lose.
+const SEEDED_KEY = 'ellipsizeMode';
+const SEEDED_VALUE = 'tail';
+
 let foldHostBag: (tag: string, bag: Record<string, unknown>) => unknown;
 
 beforeAll(async () => {
@@ -29,8 +35,7 @@ beforeAll(async () => {
   Object.assign(spec.HOST_PRIMITIVES, {
     TextInput: {
       intrinsic: SINGLE_LINE,
-      aliases: { id: 'nativeID' },
-      defaults: {},
+      defaults: { [SEEDED_KEY]: { op: 'nullish', value: SEEDED_VALUE } },
       intrinsicWhen: { prop: 'multiline', intrinsic: MULTILINE },
     },
   });
@@ -44,11 +49,13 @@ afterAll(() => {
 
 describe('a primitive with two intrinsics', () => {
   it('folds the ALTERNATE tag, not only the base one', () => {
-    expect(foldHostBag(MULTILINE, { id: 'x' })).toEqual({ nativeID: 'x' });
+    expect(foldHostBag(MULTILINE, {})).toEqual({ [SEEDED_KEY]: SEEDED_VALUE });
   });
 
   it('still folds the base tag', () => {
-    expect(foldHostBag(SINGLE_LINE, { id: 'x' })).toEqual({ nativeID: 'x' });
+    expect(foldHostBag(SINGLE_LINE, {})).toEqual({
+      [SEEDED_KEY]: SEEDED_VALUE,
+    });
   });
 
   it('leaves a tag the spec does not name completely alone', () => {

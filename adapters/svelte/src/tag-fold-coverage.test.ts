@@ -1,5 +1,5 @@
 // Every primitive in `HOST_PRIMITIVES`, mounted as the BARE TAG an app now writes, must commit the
-// folds its spec declares — the `id -> nativeID` alias and Text's RN defaults.
+// folds that reach it — the engine's `id -> nativeID` rename and Text's RN defaults.
 //
 // THIS FILE REPLACES an equivalence oracle whose subject is gone rather than wrong. That oracle
 // mounted each primitive twice — once through its wrapper component, once as the tag — and compared
@@ -9,8 +9,8 @@
 // What survives is the half that oracle called ABSOLUTE, and it is the half that mattered. A
 // cross-arm comparison is structurally blind to a fold that stops running for EVERY arm
 // (`.claude/rules/test-harness-false-greens.md` §16) — measured on Vue, where emptying PROP_ALIASES
-// left 4 of 5 cases passing. So the expectation here is derived from the spec's own `aliases` and
-// `defaults` and asserted against the committed payload, never against another mount.
+// left 4 of 5 cases passing. So the expectation here is derived from the spec's own `defaults` and
+// asserted against the committed payload, never against another mount.
 //
 // TWO SPELLINGS, both asserted absolutely rather than against each other: attributes on the tag
 // (which reach the engine through `ShimElement.setAttribute`) and one `p={{…}}` bag (through the `p`
@@ -68,10 +68,17 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 // What the folds PRODUCE, derived from the primitive's own spec rather than restated. An
 // expectation echoing the author's input passes with the fold deleted, so `id="ident"` is asserted
 // as `nativeID`, and Text's seeded defaults as their resolved values.
+//
+// `nativeID` USED TO BE DERIVED TOO, off the spec's `aliases`, and it is named outright now because
+// the rename stopped being a property of any primitive on 2026-09-18: `routeProp` does it for every
+// node, so there is nothing per-entry left to read. The row is still worth running — it asserts the
+// Svelte shim's two doors both reach that rename — and it is still not a restatement, since the
+// probe writes `id` and the expectation names `nativeID`.
+const ALIAS_TO = 'nativeID';
+
 function expectedFoldOutput(name: string): Record<string, unknown> {
   const primitive = HOST_PRIMITIVES[name];
-  const expected: Record<string, unknown> = {};
-  for (const to of Object.values(primitive.aliases)) expected[to] = PROBE_ID;
+  const expected: Record<string, unknown> = { [ALIAS_TO]: PROBE_ID };
   for (const [key, rule] of Object.entries(primitive.defaults)) {
     if (!isRecord(rule)) continue;
     expected[key] = rule.op === 'notFalse' ? true : rule.value;
@@ -165,14 +172,18 @@ describe('a bare primitive tag commits the folds its spec declares', () => {
     expect(NAMES.length).toBeGreaterThan(0);
   });
 
-  // The anti-degeneracy guard for the derived expectation below: every row is conditioned on its
-  // own entry's data, so a spec whose aliases and defaults all went empty would leave every row
-  // green by agreement (`test-harness-false-greens.md` §23b).
-  it('has something to assert — at least one primitive declares a fold', () => {
-    const folding = NAMES.filter(
-      name => Object.keys(expectedFoldOutput(name)).length > 0,
+  // The anti-degeneracy guard for the derived half of the expectation below: every row is
+  // conditioned on its own entry's data, so a spec whose defaults all went empty would leave every
+  // row green by agreement (`test-harness-false-greens.md` §23b).
+  //
+  // It asks about DEFAULTS specifically, not about `expectedFoldOutput`'s key count. That count is
+  // now at least one for every primitive — `nativeID` is seeded unconditionally — so the guard would
+  // pass on a spec with nothing in it at all, which is the exact shape it exists to catch.
+  it('has something to assert — at least one primitive declares a default', () => {
+    const seeding = NAMES.filter(
+      name => Object.keys(HOST_PRIMITIVES[name].defaults).length > 0,
     );
-    expect(folding.length).toBeGreaterThan(0);
+    expect(seeding.length).toBeGreaterThan(0);
   });
 
   it.each(NAMES)(

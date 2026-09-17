@@ -31,7 +31,6 @@ import {
   registerImageBackgroundBehavior,
   IMAGE_BACKGROUND_TAG,
 } from './image-background';
-import { foldHostBag } from '../fold-host-bag';
 
 const fabric = installRecordingFabric();
 // `.payload` throughout, per the header: the behavior's work is a fold on the way into what Fabric
@@ -206,31 +205,18 @@ describe('the ImageBackground behavior — where a prop lands', () => {
   // payload in `core/engine/cpp/tests/js/image-background-payload.itest.ts`. What stays here is the
   // COMPOSITION — which node each prop lands on, and the style the inner image derives from the box.
 
+  // why: WHICH NODE, which is this file's subject: RN spreads `...props` onto the Image, so the
+  // name is never the box's. The RENAME is `routeProp`'s since 2026-09-18 — one rule on the way in,
+  // over every node — so what the redirect carries down is already `nativeID` and the raw `id`
+  // never existed to route. A second case used to sit beside this one asserting the two layers
+  // composed; there is one layer now.
   it('puts a bare id on the image, where the spread sends it', () => {
     mount(makeImageBackground({ source: SOURCE, id: 'hero' }));
 
     const { host, image } = subtree();
-    // WHICH NODE, which is this file's subject: RN spreads `...props` onto the Image, so `id` is
-    // never the box's. The RENAME to `nativeID` is `foldIdAlias`'s — one rule over every tagged node
-    // since 2026-09-18, not this primitive's — so it does not happen in this harness at all, and the
-    // key arrives spelled as the app wrote it. Both halves together:
-    // `core/engine/cpp/tests/js/image-background-image-payload.itest.ts`.
-    expect(image.payload.id).toBe('hero');
-    expect(host.payload.id).toBeUndefined();
-  });
-
-  it('composes with the spec alias an adapter already applied, rather than double-folding', () => {
-    // `HOST_PRIMITIVES.ImageBackground` carries `ID_ALIAS`, so every adapter that runs
-    // `foldHostBag` hands the owner a bag where `id` is already `nativeID`. Measured rather than
-    // reasoned: the alias DELETES its source key, so the behavior's own fold finds nothing left and
-    // both arms commit the same payload.
-    const folded = foldHostBag(IMAGE_BACKGROUND_TAG, { id: 'hero' });
-    expect(Object.keys(folded)).toEqual(['nativeID']);
-    mount(makeImageBackground({ source: SOURCE, ...folded }));
-
-    const { image } = subtree();
     expect(image.payload.nativeID).toBe('hero');
     expect(image.payload.id).toBeUndefined();
+    expect(host.payload.nativeID).toBeUndefined();
   });
 });
 

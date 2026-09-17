@@ -94,23 +94,13 @@ function textDefaultFor(el: IHostElement, key: string): unknown {
   return foldHostBag('text', { [key]: undefined })[key];
 }
 
-// RN's `id` is the modern W3C-named alias for `nativeID` (core/components/host-primitives.cjs's
-// `ID_ALIAS`) — View.js/Text.js copy it over unconditionally, so the two name ONE native prop.
-// Angular had this fold nowhere, so `<view id="x">`/`[id]="x"` reached Fabric with an unknown `id`
-// key and no `nativeID` — silently, on device only. Lives in the renderer (mirroring Vue's
-// `PROP_ALIASES`) so it covers every path that can set a prop — `setAttribute`, `setProperty`, a
-// hand-built call — not just the composed component's own `id` @Input.
+// `PROP_ALIASES` (`id` -> `nativeID`) left this renderer on 2026-09-18 — `routeProp` resolves it
+// for every adapter now, so every path that can set a prop still reaches it.
 // Angular's two-way sugar `[(value)]` compiles to a `(valueChange)` binding; the engine knows the
 // same fold as the function prop `onValueChange`. See `listen()`. The two names live in a leaf
 // module so `elements.ts`'s ControlValueAccessor can name them without importing this cyclic file.
 import { VALUE_CHANGE_EVENT, VALUE_CHANGE_PROP } from './value-change';
 import { flushViewFor } from '../change-detection-flush';
-
-const PROP_ALIASES: ReadonlyMap<string, string> = new Map([['id', 'nativeID']]);
-
-function aliasedPropName(name: string): string {
-  return PROP_ALIASES.get(name) ?? name;
-}
 
 // The app callbacks an engine behavior READS BACK inside the same microtask turn, as an Angular
 // `(event)` binding — `valueChange` is handled in `listen` on its own, since it also needs the field
@@ -408,7 +398,7 @@ export class SymbioteRenderer implements Renderer2 {
     if (isSurface(el)) return;
     countAngular('rendererWrites');
     noteAngularWrite(name);
-    routeProp(el, aliasedPropName(name), value);
+    routeProp(el, name, value);
     this.surface.requestCommit();
   }
 
@@ -416,8 +406,7 @@ export class SymbioteRenderer implements Renderer2 {
     if (isSurface(el)) return;
     countAngular('rendererWrites');
     noteAngularWrite(name);
-    const aliased = aliasedPropName(name);
-    routeProp(el, aliased, textDefaultFor(el, aliased));
+    routeProp(el, name, textDefaultFor(el, name));
     this.surface.requestCommit();
   }
 
@@ -484,12 +473,7 @@ export class SymbioteRenderer implements Renderer2 {
     if (isSurface(el)) return;
     countAngular('rendererWrites');
     noteAngularWrite(name);
-    const aliased = aliasedPropName(name);
-    routeProp(
-      el,
-      aliased,
-      value === undefined ? textDefaultFor(el, aliased) : value,
-    );
+    routeProp(el, name, value === undefined ? textDefaultFor(el, name) : value);
     this.surface.requestCommit();
   }
 

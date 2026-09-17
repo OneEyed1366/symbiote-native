@@ -90,26 +90,17 @@ const accessory = (props: Record<string, unknown>): ICommitted =>
   commit('RCTInputAccessoryView', 'input-accessory-view', props);
 
 describe('what the fold-only touchables send native', () => {
-  // why: `id` is the W3C spelling and `nativeID` the native one. The raw key must NOT survive — no
-  // ViewConfig declares `id`, so Fabric drops it and the nativeID is lost on device with nothing
-  // red in any suite.
-  it('renames id to nativeID on both touchables', () => {
-    expect(opacity({ id: 'save' }).payload.nativeID).toBe('save');
-    expect(opacity({ id: 'save' }).payload.id).toBe(undefined);
-    expect(highlight({ id: 'save' }).payload.nativeID).toBe('save');
-    expect(highlight({ id: 'save' }).payload.id).toBe(undefined);
-  });
-
-  // why: `id ?? nativeID` — the alias WINS when both are set, and falls back when it is absent.
-  // Getting it backwards is silent, since both spellings name one prop.
-  it('lets id win over an authored nativeID, and falls back to it', () => {
-    expect(
-      opacity({ id: 'from-id', nativeID: 'from-native' }).payload.nativeID,
-    ).toBe('from-id');
-    expect(opacity({ nativeID: 'from-native' }).payload.nativeID).toBe(
-      'from-native',
-    );
-  });
+  // THE `id` ALIAS LEFT THIS FILE ON 2026-09-18, and it left because it stopped being a PAYLOAD
+  // rule at all. It was `foldIdAlias` in the payload builder, keyed on the tag; it is `routeProp`'s
+  // now, resolved on the way IN and for every node rather than only the ones carrying a behavior.
+  // Seven implementations collapsed into that one — `core/engine/cpp/tests/js/id-alias-coverage.itest.ts`
+  // holds the whole story and both cases that used to be here.
+  //
+  // This fixture could not keep them even as passthrough: it writes with `setProp`, which is the raw
+  // write and skips routing entirely. That was invisible while the rule ran at commit time and is
+  // the reason the cases went red the moment it moved — the same trap the ScrollView content fixture
+  // and Button's title hit. An app reaches the engine through `routeProp`; a fixture that does not is
+  // testing a path nothing takes.
 
   // why: `accessible={this.props.accessible !== false}` — accessible unless the app opts OUT, and
   // `!== false` rather than `?? true`, so only a literal false opts out.

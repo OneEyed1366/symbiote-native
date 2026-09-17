@@ -25,11 +25,7 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { descriptorFor } from '../component-names';
-import { foldHostBag } from '../fold-host-bag';
-import {
-  registerTouchableWithoutFeedbackBehavior,
-  TOUCHABLE_WITHOUT_FEEDBACK_TAG as TAG,
-} from './touchable-without-feedback';
+import { registerTouchableWithoutFeedbackBehavior } from './touchable-without-feedback';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -231,20 +227,22 @@ describe('touchable-without-feedback host behavior', () => {
     expect(Object.keys(committed.payload)).not.toContain('disabled');
   });
 
-  // Both arms, because the adapters disagree about WHERE they rename (React/Svelte per tag through
-  // `foldHostBag`, Solid/Vue/Angular globally in the renderer) and the answer must not depend on it.
-  // The second arm is inert until the spec carries this primitive's entry; it costs nothing and
-  // becomes real the day the key lands.
-  it('folds `id` the same whichever layer renamed it', () => {
-    const authored = { id: 'from-id', nativeID: 'losing-value' };
-    for (const ownerProps of [authored, foldHostBag(TAG, authored)]) {
-      fabric.reset();
-      const { root, owner, child, surface } = mountIdentified(ownerProps);
-      engineAppend(root, owner);
-      engineAppend(owner, child);
-      surface.commit();
-      expect(findCommitted(SUBJECT_TEST_ID).payload.nativeID).toBe('from-id');
-    }
+  // why: the owner is an ANCHOR — its props never reach Fabric — so the name has to arrive on the
+  // CHILD or it is lost, and `id` beats a `nativeID` written beside it.
+  //
+  // This ran over TWO arms until 2026-09-18, the second one `foldHostBag(TAG, authored)`, because
+  // the adapters renamed in three different places. There is one place now, `routeProp`, which both
+  // arms already crossed — so the second arm had become the first one spelled longer.
+  it('lands the owner’s id on the child, with id winning', () => {
+    const { root, owner, child, surface } = mountIdentified({
+      id: 'from-id',
+      nativeID: 'losing-value',
+    });
+    engineAppend(root, owner);
+    engineAppend(owner, child);
+    surface.commit();
+
+    expect(findCommitted(SUBJECT_TEST_ID).payload.nativeID).toBe('from-id');
   });
 
   // RN's TWF passes `aria-*` to the child RAW and lets the child View fold them. We fold on the

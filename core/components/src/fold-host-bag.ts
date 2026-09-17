@@ -22,17 +22,14 @@ export type IHostBag = Record<string, unknown>;
 // Keyed by INTRINSIC TAG: the spec is keyed by component name (`View`), and by the time a bag
 // reaches an adapter's renderer the only name left is `view`.
 //
-// The spec's `aliases` and `defaults` are OBJECTS, and this runs once per node — 9 002 times on a
-// 1 000-row create. `Object.keys()` on each of them per call would allocate two arrays per element
-// for data that never changes. Flattened to tuple arrays at module load, so the hot path only
-// iterates.
+// The spec's `defaults` is an OBJECT, and this runs once per node — 9 002 times on a 1 000-row
+// create. `Object.keys()` per call would allocate an array per element for data that never changes.
+// Flattened to tuples at module load, so the hot path only iterates.
 interface IFoldPlan {
-  readonly aliases: ReadonlyArray<readonly [string, string]>;
   readonly defaults: ReadonlyArray<readonly [string, IFoldOp]>;
 }
 
 const planFor = (primitive: IHostPrimitive): IFoldPlan => ({
-  aliases: Object.entries(primitive.aliases),
   defaults: Object.entries(primitive.defaults),
 });
 
@@ -40,8 +37,8 @@ const planFor = (primitive: IHostPrimitive): IFoldPlan => ({
 // tags (`TextInput` -> `text-input` / `…-multiline`), and a plan keyed on the base spelling alone
 // silently skips the other.
 //
-// Folding an already-folded bag is a no-op — an alias deletes its source key, so a second pass finds
-// nothing to rename — which is what makes the fold safe to reach twice.
+// Folding an already-folded bag is a no-op — every default is idempotent — which is what makes the
+// fold safe to reach twice.
 function tagsOf(primitive: IHostPrimitive): string[] {
   const alternate = primitive.intrinsicWhen?.intrinsic;
   return alternate === undefined
@@ -64,26 +61,20 @@ function fold(op: IFoldOp, authored: unknown): unknown {
 }
 
 /**
- * Apply a primitive's aliases and defaults to a bag, copy-on-write.
+ * Apply a primitive's defaults to a bag, copy-on-write.
  *
  * Never mutates the input: the bag belongs to whoever built it, and a framework may hand the same
  * object back on a re-render, so writing into it would leak a fold into the author's own state.
+ *
+ * It applied the spec's `aliases` too until 2026-09-18, and that half is `routeProp`'s now — one
+ * rename for every node rather than one for every primitive this table happens to name. See
+ * `core/engine/cpp/tests/js/id-alias-coverage.itest.ts`.
  */
 export function foldHostBag(tagName: string, bag: IHostBag): IHostBag {
   const plan = FOLD_PLAN_BY_TAG.get(tagName);
   if (plan === undefined) return bag;
 
   let next = bag;
-  for (const [from, to] of plan.aliases) {
-    if (!(from in next)) continue;
-    if (next === bag) next = { ...bag };
-    // RN gives the alias unconditional priority when both are set (View.js:77-79,
-    // `processedProps.nativeID = id`), and the raw key must not survive — no ViewConfig declares
-    // `id`, so Fabric would drop it silently.
-    next[to] = next[from];
-    delete next[from];
-  }
-
   // Seeded whether or not the key was authored: a default that only applies to a key already
   // present is not a default.
   //

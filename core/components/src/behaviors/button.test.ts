@@ -18,7 +18,6 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import { registerButtonBehavior, BUTTON_TAG } from './button';
-import { foldHostBag } from '../fold-host-bag';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -495,28 +494,19 @@ describe('button host behavior', () => {
     expect(committedByTestId(TEST_ID).payload.opacity).toBe(resting);
   });
 
-  // why: the measurement that decided `HOST_PRIMITIVES.Button.aliases`, kept as the guard.
+  // why: a Button's name must reach its OWNER, and `id` beats a `nativeID` written beside it.
   //
-  // BOTH LAYERS, because the composed touchable folds `id` itself and the spec entry folds it too —
-  // the arms are the raw bag (what an adapter with no `foldHostBag` in front of it delivers) and
-  // the pre-folded one (what every adapter's renderer actually delivers). Identical answers is what
-  // says the two compose idempotently: the alias renames on the OWNER, and `Object.hasOwn(next,
-  // 'id')` one layer down then finds nothing left to do.
+  // This case used to be about COMPOSITION — two layers folding the same pair, asked over two arms
+  // to prove they composed idempotently, and it is what decided `HOST_PRIMITIVES.Button.aliases`.
+  // Both layers are gone: the spec's `aliases` was deleted on 2026-09-18 and the rename is
+  // `routeProp`'s, so there is one layer and nothing left for a second arm to disagree with. The
+  // loop survives because the case below still drives several props through `routeProp`.
   //
-  // The arm that made the entry NECESSARY is on Android, where the touchable is the bare press
-  // machine and folds nothing — see `button-android.test.ts`. iOS passes either way, which is
+  // The arm that made the old entry NECESSARY was on Android, where the touchable is the bare press
+  // machine and folded nothing — see `button-android.test.ts`. iOS passed either way, which is
   // exactly why declining the entry looked free.
-  //
-  // ONE ARM LEFT, and dropping the other is the point rather than a concession. The alias is
-  // `foldIdAlias` in the engine now, applied to every tagged node, and this host builds its payloads
-  // through the TypeScript `fabricProps`, which carries no copy — so the RAW arm can no longer be
-  // asked here and is asked in `core/engine/cpp/tests/js/touchable-payload.itest.ts` instead. What
-  // survives is the half that is still JS: `foldHostBag` renaming on the way in, and the engine
-  // finding nothing left to do afterwards. That is the composition this test existed for.
-  it('folds `id` the same whichever layer renamed it', async () => {
-    for (const props of [
-      foldHostBag(BUTTON_TAG, { id: 'from-id', nativeID: 'losing-value' }),
-    ]) {
+  it('folds `id` to `nativeID`, with id winning', async () => {
+    for (const props of [{ id: 'from-id', nativeID: 'losing-value' }]) {
       vi.useFakeTimers();
       fabric.reset();
       clearHostBehaviors();

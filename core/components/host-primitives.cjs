@@ -11,7 +11,7 @@
 // Vue and Solid apply the same fold in their renderers. Both are correct.
 //
 // Four transforms carried their own copy of this before it existed, and it had already produced a
-// real behaviour split — see `aliases` below.
+// real behaviour split — the `aliases` note below is what is left of it.
 
 // `intrinsicWhen` DECLARED AHEAD OF ITS FIRST ENTRY.
 //
@@ -37,39 +37,18 @@
 /**
  * @typedef {{ op: 'nullish', value: unknown } | { op: 'notFalse' }} IFoldOp
  * @typedef {{ prop: string, intrinsic: string }} IIntrinsicWhen
- * @typedef {{ intrinsic: string, aliases: Record<string, string>, defaults: Record<string, IFoldOp>, intrinsicWhen?: IIntrinsicWhen }} IHostPrimitive
+ * @typedef {{ intrinsic: string, defaults: Record<string, IFoldOp>, intrinsicWhen?: IIntrinsicWhen }} IHostPrimitive
  */
 
-// `id` is RN's W3C-named alias for `nativeID` and it WINS when both are set. Verified against RN
-// 0.86 rather than against our own adapters, because the three that implemented it disagreed:
-//
-//   View.js:77-79   if (id !== undefined) processedProps.nativeID = id;
-//   Text.js:222     const _nativeID = id ?? nativeID;
-//
-// Same outcome on both tags: `nativeID = id ?? nativeID`, and the raw `id` key must NOT reach
-// Fabric (no ViewConfig declares it, so it is silently dropped). What the adapters actually did:
-// Solid folded it on both tags, Svelte on View only (its `else` branch skips Text), and Vue on
-// neither — not in its renderer, not in `routeProp`. Vue's gap is a standing
-// <adapters_reach_full_feature_parity> miss.
-//
-// WHICH LAYER APPLIES IT IS THE ADAPTER'S CHOICE, exactly as for `defaults` below. Vue applies it
-// at RUNTIME (`PROP_ALIASES` in `adapters/vue/src/renderer/index.ts`, in `patchProp`) because it
-// covers every path to a node — SFC, TSX, and a hand-written `h('view', {id})` — with one
-// implementation. Applying it twice happens to be harmless here (the rename deletes `id`, so a
-// second pass sees nothing), but that is a property of THIS alias, not a licence.
-//
-// KNOWN DIVERGENCE FROM UPSTREAM, present in two adapters and not introduced by this file: when an
-// element carries BOTH `id` and `nativeID`, RN gives `id` unconditional priority, while a per-key
-// rename (Vue's runtime patchProp, Solid's compile-time rename producing two `nativeID`
-// attributes) lets the LAST one win. Honest parity needs per-node state; no example and no test
-// sets both today.
-const ID_ALIAS = { id: 'nativeID' };
+// `aliases` LEFT THIS SPEC ON 2026-09-18, and what it held was one pair — `id` -> `nativeID` —
+// repeated on all nineteen entries. It is `routeProp`'s now
+// (`core/engine/cpp/tests/js/id-alias-coverage.itest.ts`), which reaches every node rather than
+// every REGISTERED one, and resolves precedence the way upstream does instead of by write order.
 
 /** @type {Record<string, IHostPrimitive>} */
 const HOST_PRIMITIVES = {
   View: {
     intrinsic: 'view',
-    aliases: ID_ALIAS,
     defaults: {},
   },
   // The five-way switch, thrown 2026-08-23 once all three transforms carried the refusals
@@ -77,13 +56,10 @@ const HOST_PRIMITIVES = {
   // — the tag exists only so the host-behavior registry, which is keyed by TAG and never by
   // resolved name, can find the press machine.
   //
-  // No defaults, and only the `id` -> `nativeID` alias every primitive carries: the tag forwards
-  // its props otherwise untouched, and the machine reads them off `node.props` at event
-  // time. (This read "No aliases and no defaults" while the line below already said `ID_ALIAS`, and
-  // a Solid test injected a `Pressable` entry with `aliases: {}` on the strength of it.)
+  // No defaults: the tag forwards its props untouched, and the machine reads them off `node.props`
+  // at event time.
   Pressable: {
     intrinsic: 'pressable',
-    aliases: ID_ALIAS,
     defaults: {},
     // Turns on `stateInTemplate` and `renderPropChild`. Without them a render-prop button becomes
     // a tag with no machine — the whole reason this entry landed last.
@@ -98,20 +74,12 @@ const HOST_PRIMITIVES = {
   // derives its element set from this table and both Vue compilers read it. Missing here, the tag
   // cost a dev-mode resolve warning per element plus the component codegen path — a slot closure
   // instead of `_createElementBlock`.
-  //
-  // `aliases: ID_ALIAS` even though each behavior's own `foldPayload` already renames `id`. The
-  // two COMPOSE: `foldHostBag` deletes the source key, so the behavior's fold finds no `id` and is
-  // a no-op. Measured on the committed payload rather than reasoned, both arms identical — the
-  // check `adapter-parity-audit.md` demands before declining a majority value, run in the
-  // direction of accepting one.
   TouchableOpacity: {
     intrinsic: 'touchable-opacity',
-    aliases: ID_ALIAS,
     defaults: {},
   },
   TouchableHighlight: {
     intrinsic: 'touchable-highlight',
-    aliases: ID_ALIAS,
     defaults: {},
   },
   // The second primitive whose TAG depends on a prop, and the first where the prop is one RN's own
@@ -121,7 +89,6 @@ const HOST_PRIMITIVES = {
   // Vue's element set — a tag apps write directly and which would otherwise resolve as a component.
   ScrollView: {
     intrinsic: 'scroll-view',
-    aliases: ID_ALIAS,
     defaults: {},
     intrinsicWhen: {
       prop: 'horizontal',
@@ -137,7 +104,6 @@ const HOST_PRIMITIVES = {
   // only path an app has, so the machine has exactly one owner per node.
   TextInput: {
     intrinsic: 'text-input',
-    aliases: ID_ALIAS,
     defaults: {},
     // `multiline` picks between two SEPARATE native views, not one view with a flag, so the tag is
     // decided at compile time and a runtime selector must refuse — a wrong view here is
@@ -167,7 +133,6 @@ const HOST_PRIMITIVES = {
   // forced that flag.
   Switch: {
     intrinsic: 'switch',
-    aliases: ID_ALIAS,
     defaults: {},
   },
   // Filed as NOT LOWERABLE for a week under `.claude/rules/host-primitive-tier.md`'s "SECOND
@@ -185,22 +150,17 @@ const HOST_PRIMITIVES = {
   // the five wrappers folded exactly `resolveAccessibilityProps`, which the engine already runs at
   // `fabricProps` on every path — the same reason SafeAreaView has no behavior file.
   //
-  // ID_ALIAS, and it is the SafeAreaView resolution rather than the SafeAreaView position: none of
-  // the five wrappers declared `id`, and upstream's RefreshControl spreads `...ViewProps`
-  // (RefreshControl.js:70), so that was a standing parity gap rather than a deliberate omission.
-  // The prop is declared on all five in the same change as this alias — half of it in either
-  // direction is broken (a fold for a key nobody can pass, or a raw `id` reaching a view whose
-  // ViewConfig declares none).
+  // `id` is declared on all five wrappers, which it was not until 2026-09-01: upstream's
+  // RefreshControl spreads `...ViewProps` (RefreshControl.js:70), so its absence was a parity gap
+  // rather than a decision. The rename itself is the engine's.
   RefreshControl: {
     intrinsic: 'refresh-control',
-    aliases: ID_ALIAS,
     // None. RN seeds nothing: `refreshing` is required, and every other prop is per-platform
     // styling the native view defaults itself.
     defaults: {},
   },
   Text: {
     intrinsic: 'text',
-    aliases: ID_ALIAS,
     // RN's Text.js applies both unconditionally on the non-virtual path. Each key below cites
     // the upstream line verbatim, because THIS DATA is now the thing that must not drift from RN.
     // The
@@ -230,23 +190,14 @@ const HOST_PRIMITIVES = {
   // does not name compiles to `resolveComponent("image-background")` — children become a slot the
   // element path never reads, so the subtree renders BLANK with no error. `image`/`view`/`text` are
   // real SVG element names and survive that gap; this one is not.
-  //
-  // `aliases: ID_ALIAS` was MEASURED against the arm without it rather than reasoned about, because
-  // `behaviors/image-background.ts` folds `id` itself on the built image. Both arms commit
-  // `nativeID` on the image and no `id` anywhere, and the two compose because an alias DELETES its
-  // source key — so the second pass finds nothing. Kept for the property `foldHostBag` provides and
-  // the behavior cannot: the rename happens on the OWNER bag, before the redirect, so any adapter
-  // path that folds bags gets it whether or not the behavior ever runs.
   ImageBackground: {
     intrinsic: 'image-background',
-    aliases: ID_ALIAS,
     // None. The absolute-fill style, the box-dimension proxy and the Image mapping are all derived
     // from live props at commit, which a compile-time seed cannot express.
     defaults: {},
   },
   Image: {
     intrinsic: 'image',
-    aliases: ID_ALIAS,
     // None. Every default RN's Image applies is already inside the shared mapping (the source
     // array shape, the width/height style fold, `alt` -> accessibilityLabel), which the behavior
     // runs at commit — so there is nothing left for a compile-time seed to do.
@@ -259,7 +210,6 @@ const HOST_PRIMITIVES = {
   // decision.
   InputAccessoryView: {
     intrinsic: 'input-accessory-view',
-    aliases: ID_ALIAS,
     // None. The mapping has no aliasing and no derived value — every consumed name leaves under the
     // same name — so there is nothing for a compile-time seed to do.
     defaults: {},
@@ -277,25 +227,8 @@ const HOST_PRIMITIVES = {
   // `safe-area-view` with children on its framework's own channel (React's third argument,
   // a Vue slot, a Solid JSX child, Angular's `<ng-content>`, a Svelte snippet). That clears the
   // disqualifier in `.claude/rules/host-primitive-tier.md`.
-  //
-  // That the five entries above all share `ID_ALIAS` is a property of those five primitives, not a
-  // house style to copy: the sixth is where "every case so far did X" stops being a rule.
   SafeAreaView: {
     intrinsic: 'safe-area-view',
-    // ID_ALIAS was deliberately ABSENT here until 2026-09-01, because none of the five wrappers
-    // declared `id` and aliasing on the tag alone would have ADDED a fold the component spelling
-    // did not perform. That exposed a real divergence — Solid's renderer folds
-    // `id` from two string constants on the write path, so it aliased for a primitive whose spec
-    // said not to (`adapters/solid/src/renderer-alias-fold.test.ts`, whose header predicted exactly
-    // this the day a primitive stopped sharing the pair).
-    //
-    // Resolved by closing the gap rather than routing around it: `id` is now declared on all five
-    // wrappers and folded here. That keeps Solid's constant-pair fast path (32 001 writes on a
-    // benchmark create) and removes a real parity deficit — upstream's SafeAreaView takes the full
-    // ViewProps surface, so RN accepts `id` where none of ours did. Half of this is not an option
-    // in either direction: the alias without the prop folds a key nobody can pass, and the prop
-    // without the alias sends a raw `id` to a view whose ViewConfig declares no such key.
-    aliases: ID_ALIAS,
     defaults: {},
   },
   // The one primitive that commits NO NODE: its intrinsic resolves to the engine's anchor, and the
@@ -304,21 +237,11 @@ const HOST_PRIMITIVES = {
   // that deletes the five wrappers, because the registry is keyed by TAG: a wrapper still emitting
   // its own `pressable` while the behavior is registered would put two press machines on one tree.
   //
-  // ID_ALIAS, and it was proposed WITHOUT one on the reasoning that the behavior already reads
-  // `id ?? nativeID` itself (:373) so the shared alias would double-fold. Measured instead of
-  // reasoned (`behaviors/touchable-native-feedback.test.ts`, "folds `id` the same whichever layer
-  // renamed it"): the two compose idempotently — the alias renames on the OWNER, whose props never
-  // reach Fabric, and the behavior's `??` then reads the renamed key to the same answer. Declining
-  // the pair would have bought nothing and broken Solid's constant-pair fast path, whose guard
-  // (`adapters/solid/src/renderer-alias-fold.test.ts`) is what makes one string compare legal on
-  // 32 001 prop writes.
-  //
   // No `defaults`: RN's TNF seeds nothing at all — every value it derives (`accessible`,
   // `focusable`, `accessibilityState`, the ripple background) depends on ANOTHER prop or on a
   // listener, which is a fold and not a default.
   TouchableNativeFeedback: {
     intrinsic: 'touchable-native-feedback',
-    aliases: ID_ALIAS,
     defaults: {},
   },
   // The SECOND primitive that commits no node, same anchor shape and same reason
@@ -327,15 +250,13 @@ const HOST_PRIMITIVES = {
   // drops them — read `src/behaviors/touchable-without-feedback.ts`'s header rather than inheriting
   // the neighbour's fold.
   //
-  // ID_ALIAS for the reason measured on TNF: the alias renames on the OWNER, whose props never reach
-  // Fabric, and the behavior's own `id ?? nativeID` then reads the renamed key to the same answer.
   // Upstream's passthrough loop lets an explicit `nativeID` win over `id` here (:280-284, unlike
-  // TNF's :373); NOT reproduced, because with the alias in place that quirk would depend on which
-  // adapter folds where. No `defaults` — every value TWF derives depends on another prop or on a
-  // listener, which is a fold and not a default.
+  // TNF's :373); NOT reproduced — the engine resolves that precedence once, on the way in, and a
+  // per-primitive exception to it would be invisible from anywhere the app can see. No `defaults`:
+  // every value TWF derives depends on another prop or on a listener, which is a fold and not a
+  // default.
   TouchableWithoutFeedback: {
     intrinsic: 'touchable-without-feedback',
-    aliases: ID_ALIAS,
     defaults: {},
   },
   // RN's Button is a touchable wrapping a View wrapping a Text and takes NO children — `title` is a
@@ -344,25 +265,20 @@ const HOST_PRIMITIVES = {
   // by TAG, and a wrapper still building its own View/Text under a registered `button` would give
   // every existing Button a second copy of the subtree.
   //
-  // ID_ALIAS, and here it is REQUIRED rather than inherited — the one entry so far where declining
-  // it would have shipped a PLATFORM-DEPENDENT bug. Button's touchable is swapped by platform
-  // (Button.js:281-284), and only one of the two arms renames `id` itself: `touchable-opacity`'s
-  // own `foldPayload` does (it has no spec entry to do it for it), the bare press behavior does not
-  // (`Pressable`'s entry does it instead). Measured on the committed payload, no entry here:
+  // `id` used to be PLATFORM-DEPENDENT here, and the record is worth keeping because it is what a
+  // per-primitive rename costs. Button's touchable is swapped by platform (Button.js:281-284), only
+  // the iOS arm renamed `id` itself, and with no entry in this table the committed payload read:
   //
   //   iOS      nativeID: 'from-id'   id: absent      the touchable-opacity fold
   //   Android  nativeID: undefined   id: 'from-id'   a key no ViewConfig declares -> dropped
   //
-  // So the alias is what makes the two platforms agree, and it composes idempotently with the
-  // iOS-side fold exactly as TNF's does: the rename happens on the bag, so `Object.hasOwn(next,
-  // 'id')` one layer down finds nothing left to do.
+  // A rename that runs once, for every node, on the way in cannot produce that shape at all.
   //
   // No `defaults`: every value RN's Button seeds is derived from another prop or from a listener
   // (`accessible`, `focusable`, the greyed label, the uppercased title), which is a fold, not a
   // default.
   Button: {
     intrinsic: 'button',
-    aliases: ID_ALIAS,
     defaults: {},
   },
   // RN wraps the native spinner in a centering `<View>` (ActivityIndicator.js:112), so this tag is
@@ -370,23 +286,15 @@ const HOST_PRIMITIVES = {
   // commit that deletes the five wrappers: the registry is keyed by TAG, and a wrapper still
   // painting its own spinner while the behavior is registered would give every indicator two.
   //
-  // ID_ALIAS, and unlike Button's it is not platform-dependent — measured on the committed payload,
-  // both platform arms, with the entry absent:
-  //
-  //   iOS      spinner: id 'probe'   nativeID absent    ActivityIndicatorView declares no `id`
-  //   Android  spinner: id 'probe'   nativeID absent    AndroidProgressBar declares no `id`
-  //
-  // i.e. identically broken on both, because the platform half of this primitive is the spinner's
-  // COLOUR and native extras, and nothing about it touches the name fold. The alias renames on the
-  // OWNER's bag, before `slotPropsExcept` routes the survivor down — so the key that reaches the
-  // spinner is `nativeID`, which is where RN's `...restProps` puts it too (ActivityIndicator.js:99).
+  // `id` renames on the OWNER, before `slotPropsExcept` routes the survivor down — so the key that
+  // reaches the spinner is `nativeID`, which is where RN's `...restProps` puts it too
+  // (ActivityIndicator.js:99).
   //
   // No `defaults`: `animating` and `hidesWhenStopped` ARE `notFalse` folds, but they belong to the
   // SPINNER, and this table's ops are applied to the tag's own bag before any slot routing. They
   // live in the behavior's spinner fold instead, which is the only layer that can see that node.
   ActivityIndicator: {
     intrinsic: 'activity-indicator',
-    aliases: ID_ALIAS,
     defaults: {},
   },
 };

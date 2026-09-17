@@ -202,11 +202,11 @@ function cloneFold(owner: ISymbioteNode, inner: IPayloadFold | undefined) {
     );
     // :275 gives `id` priority; the passthrough loop then re-assigns a set `nativeID` over it
     // (:280-284), so upstream an explicit `nativeID` wins where TNF's `id` does. NOT reproduced,
-    // and deliberately: the spec entry declares `ID_ALIAS`, so on the three adapters that fold in
-    // the renderer `id` has already become `nativeID` before this runs and the quirk is
-    // unobservable — reproducing it would make the answer depend on WHICH adapter is driving,
-    // which is the divergence `.claude/rules/adapter-parity-audit.md` exists to prevent.
-    next.nativeID = stringOr(source.id) ?? stringOr(source.nativeID);
+    // and there is nothing left here that could: `source` is the OWNER'S NODE PROPS, and
+    // `routeProp` resolved the two names into one on the way in. A `stringOr(source.id)` leg read
+    // a key that can no longer exist, so it was deleted rather than left standing as a second
+    // opinion about precedence.
+    next.nativeID = stringOr(source.nativeID);
     // :257-262 folded by the engine above, then :258-263: an explicit `disabled` overrides the
     // aria/accessibilityState answer.
     next.accessibilityState = resolveDisabledAccessibilityState(

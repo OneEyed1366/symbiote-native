@@ -1287,30 +1287,17 @@ dynamic foldButtonProps(
   return out;
 }
 
-/**
- * `nativeID={this.props.id ?? this.props.nativeID}` — RN's W3C alias, spelled identically by every
- * component that accepts both (`View.js:77-79`, `TouchableOpacity.js:326`,
- * `TouchableHighlight.js:375`). The alias WINS when both are set and falls back when it is absent.
- *
- * WHY IT IS SAFE TO APPLY TO EVERY TAG, which is the question that kept it in five separate JS
- * folds: `tagName` is written only by `attachHostBehavior`, so it is non-empty ONLY for our own
- * primitives. A third-party native view — one that might legitimately declare its own `id`
- * attribute — never carries a tag and never reaches this. The rule's blast radius is exactly the
- * set of tags we define.
- *
- * Idempotent, and that is what lets it coexist with the adapters that still alias on their way in:
- * a bag already carrying `nativeID` and no `id` is returned untouched.
- */
-dynamic foldIdAlias(const dynamic &props) {
-  dynamic out = props;
-  const dynamic *id = props.get_ptr("id");
-  // `??`, so a null `id` falls through to an authored `nativeID` rather than erasing it. The raw key
-  // leaves either way — no ViewConfig declares `id`, so Fabric would drop it and the nativeID would
-  // be lost on device with nothing red in any suite.
-  if (id != nullptr && !id->isNull()) out["nativeID"] = *id;
-  out.erase("id");
-  return out;
-}
+// `foldIdAlias` IS GONE (2026-09-18). The rename lives in `routeProp` now — ONE implementation where
+// there were seven, and the reason it could not stay here is COVERAGE: a tag rule needs a non-empty
+// `tagName`, which only a node with a registered behavior has, so this rule never reached a plain
+// `<view>` or `<text>` and those are the commonest elements in any app. They were covered by the
+// adapters' own folds instead, three of which were separate implementations.
+//
+// Moving it to the write seam also settled a divergence rather than only removing copies: Vue, Solid
+// and Angular folded per key with no gate, so three of five adapters were already renaming `id` on
+// third-party views while React and Svelte were not. Everybody gets upstream's answer now.
+//
+// Contract: `core/engine/cpp/tests/js/id-alias-coverage.itest.ts`.
 
 /**
  * The props the press MACHINE consumes and the host must never see.
@@ -1787,15 +1774,6 @@ dynamic fabricProps(
   // fold and before anything else, because that order is load-bearing and always was: the aria fold
   // writes `accessibilityState` from `aria-disabled`, and this resolves that against `disabled`.
   // Swapped, whichever ran second would silently win.
-  // The `id` alias first, and for EVERY tag rather than for a list of them — see `foldIdAlias` for
-  // why a rule keyed on "carries a tag at all" cannot reach a third-party view. Guarded on presence
-  // so a bag with no `id`, which is nearly all of them, is not copied.
-  dynamic idResolved;
-  if (bag->get_ptr("id") != nullptr && !tagName.empty()) {
-    idResolved = foldIdAlias(*bag);
-    bag = &idResolved;
-  }
-
   dynamic tagResolved;
   if (usesPressableRule(tagName)) {
     tagResolved = foldPressableProps(

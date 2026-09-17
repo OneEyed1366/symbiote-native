@@ -6,7 +6,6 @@ export type IFoldOp = { op: 'nullish'; value: unknown } | { op: 'notFalse' };
 
 export interface IHostPrimitive {
   intrinsic: string;
-  aliases: Readonly<Record<string, string>>;
   defaults: Readonly<Record<string, IFoldOp>>;
   /**
    * The primitive's own state is observable from the TEMPLATE, so a call site that reads it

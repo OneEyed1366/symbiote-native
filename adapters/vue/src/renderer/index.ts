@@ -65,18 +65,10 @@ const TEXT_DEFAULTS: ReadonlyMap<string, unknown> = new Map<string, unknown>([
 // counter, against zero for React, which folds instead. `TEXT_DEFAULTS` stays for `textDefaultFor`
 // below, which is the clear-back-to-undefined path and not the create path.
 
-// RN's `id` is the modern W3C-named alias for `nativeID` — View.js copies it over
-// (`processedProps.nativeID = id`), so the two name ONE native prop. React folds it in its
-// component wrapper and Svelte and Solid elsewhere; Vue had it nowhere, so `<view id="x">` reached
-// Fabric with an unknown `id` and no `nativeID`, silently and on device only. It lives in the
-// renderer because that covers every Vue path at once — SFC, TSX, and a hand-written
-// `h('view', { id })` no compiler ever sees.
-//
-// Caveat, and it matches what Solid's compile-time rename already does: with BOTH `id` and
-// `nativeID` on one element the last patchProp wins, where upstream gives `id` priority
-// unconditionally. Honouring that needs per-node state to remember an `id` arrived; no example or
-// test sets both, so the state is not worth carrying.
-const PROP_ALIASES: ReadonlyMap<string, string> = new Map([['id', 'nativeID']]);
+// `PROP_ALIASES` (`id` -> `nativeID`) left this renderer on 2026-09-18 — `routeProp` resolves it
+// for every adapter now, and carries the per-node state the caveat here said was not worth it: with
+// both names on one element upstream gives `id` unconditional priority, where a per-key rename
+// resolved it by write order.
 
 // RN-style event prop naming ('onPress', 'onValueChange', ...), the same convention JSX itself
 // uses to separate an event from a plain value prop — good enough to decide whether to wrap,
@@ -260,8 +252,7 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       // lowers View/Text to their intrinsic tags (metro-vue-transformer.cjs), so those props
       // arrive one key at a time with no component to fold the bag. Idempotent for the wrapped
       // path, which already normalized.
-      const normalized = normalizeVueAttrKey(key);
-      const name = PROP_ALIASES.get(normalized) ?? normalized;
+      const name = normalizeVueAttrKey(key);
       const value = next === undefined ? textDefaultFor(el, name) : next;
       const routed =
         EVENT_PROP_NAME.test(name) && typeof value === 'function'

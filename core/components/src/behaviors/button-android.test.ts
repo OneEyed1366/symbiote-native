@@ -45,7 +45,6 @@ type IListener = import('@symbiote-native/engine').IListener;
 type ISymbioteEvent = import('@symbiote-native/engine').ISymbioteEvent;
 type ISymbioteNode = import('@symbiote-native/engine').ISymbioteNode;
 const { registerButtonBehavior, BUTTON_TAG } = await import('./button');
-const { foldHostBag } = await import('../fold-host-bag');
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -310,12 +309,11 @@ describe('button host behavior on Android', () => {
   // So the alias is what makes the two platforms agree, and the iOS twin of this test passes with
   // NO entry at all — which is exactly why declining the entry looked free.
   //
-  // ONE arm, unlike the iOS twin's two. There the raw bag is a legitimate second path (the
-  // touchable folds it itself, so the two compose and both must give one answer); here nothing
-  // folds a raw bag, and every adapter delivers a folded one — React, Angular and Svelte through
-  // `foldHostBag`, Vue and Solid through their renderers' own alias step.
+  // The bag is RAW now, where it used to be pre-folded by `foldHostBag`: the rename moved to
+  // `routeProp` on 2026-09-18, which `mountButton` crosses, so the pre-fold would be asking the
+  // same question one step earlier.
   it('folds `id` to `nativeID`, which no layer on this platform does for it', async () => {
-    mountButton(foldHostBag(BUTTON_TAG, { id: 'from-id', nativeID: 'losing' }));
+    mountButton({ id: 'from-id', nativeID: 'losing' });
     await settle();
 
     const { host } = subtreeOf(TEST_ID);

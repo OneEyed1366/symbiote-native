@@ -1407,6 +1407,59 @@ const CLASS_PROP_KEYS: ReadonlySet<string> = new Set(['class', 'className']);
 // ONLY when the node's component actually declares `x` as an event (per the shared
 // ViewConfig). Otherwise it is a plain prop, so `onTintColor` on a Switch, whose
 // only event is `change`, routes to setProp and reaches Fabric.
+// `id` is RN's W3C-named alias for `nativeID` and it WINS when both are set
+// (`View.js:77-79` — `processedProps.nativeID = id`). A raw `id` is declared by no ViewConfig, so
+// Fabric drops it in SILENCE: a rename that half-works loses the nativeID with nothing red anywhere.
+const ID_ALIAS_FROM = 'id';
+const ID_ALIAS_TO = 'nativeID';
+
+/**
+ * The ONE place this rename happens, as of 2026-09-18. It used to happen in SEVEN.
+ *
+ * `foldHostBag` did it for React, Svelte and Angular off `HOST_PRIMITIVES[*].aliases` (seventeen
+ * identical entries); Vue's `patchProp`, Solid's renderer and Angular's own `PROP_ALIASES` each did
+ * it again per key; and `foldIdAlias` did it a seventh time in C++. Three different coverage sets,
+ * so the answer depended on which adapter you were on and whether the node's tag happened to carry a
+ * registered behavior — `core/engine/cpp/tests/js/id-alias-coverage.itest.ts` measured that split
+ * before this collapsed it.
+ *
+ * HERE because this is the funnel: every adapter's prop write ends at `routeProp`, whatever shape it
+ * starts in. A bag fold cannot serve the per-key renderers and a per-key fold cannot serve the bag
+ * ones; the seam they SHARE can serve both.
+ *
+ * PRECEDENCE IS WHY THIS NEEDS STATE. Upstream reads both props at once, so `id ?? nativeID` is
+ * decided in one expression. A per-key writer never sees both, so precedence would otherwise fall
+ * out of write ORDER — `<view id nativeID>` keeping the stale legacy value while `<view nativeID id>`
+ * did not. Solid had already built exactly this memory for exactly this reason; it is one copy now.
+ *
+ * The authored `nativeID` is REMEMBERED rather than discarded, so clearing the `id` hands the slot
+ * back instead of latching. A framework that unsets a prop between renders must get the other
+ * source back.
+ */
+const idAliased = new WeakMap<
+  ISymbioteNode,
+  { fromId: boolean; authored: unknown }
+>();
+
+function routeIdAlias(node: ISymbioteNode, key: string, value: unknown): void {
+  const state = idAliased.get(node) ?? { fromId: false, authored: undefined };
+
+  if (key === ID_ALIAS_FROM) {
+    state.fromId = value !== undefined;
+    idAliased.set(node, state);
+    // Falling back to the authored `nativeID` rather than to undefined is what makes the clear a
+    // release and not an erase.
+    setProp(node, ID_ALIAS_TO, value ?? state.authored);
+    return;
+  }
+
+  state.authored = value;
+  idAliased.set(node, state);
+  // An `id` outranks this write, so the value is kept for a later release and not published.
+  if (state.fromId) return;
+  setProp(node, ID_ALIAS_TO, value);
+}
+
 export function routeProp(
   node: ISymbioteNode,
   key: string,
@@ -1438,6 +1491,16 @@ export function routeProp(
       );
       return;
     }
+  }
+  // AFTER the slot redirect, and that order is load-bearing rather than tidy. A composed primitive
+  // forwards most of its bag to an internal node — ImageBackground spreads everything but `style`
+  // onto its image, exactly as RN does — so an `id` written on the OWNER belongs to the node the
+  // redirect sends it to. Resolved before the redirect, the alias would publish a `nativeID` on the
+  // wrapper and the inner node would never see it: the owner would answer to a testID the app
+  // pointed at the image.
+  if (key === ID_ALIAS_FROM || key === ID_ALIAS_TO) {
+    routeIdAlias(node, key, value);
+    return;
   }
   // An AnimatedNode written straight into a prop — `<view style={{opacity: value}}/>` — is
   // resolved here into the value to PUBLISH, with the engine holding the subscription. Same
