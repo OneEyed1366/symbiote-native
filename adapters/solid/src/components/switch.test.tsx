@@ -27,10 +27,6 @@ import { mount, unmount } from '../render';
 
 const ROOT_TAG = 812;
 const SWITCH_VIEW = 'Switch';
-const TRACK_ON = '#81b0ff';
-const TRACK_OFF = '#767577';
-const THUMB = '#f5dd4b';
-const IOS_BACKGROUND = '#3e3e3e';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -71,46 +67,30 @@ describe('Solid Switch on the engine', () => {
   describe('Positive', () => {
     // why: RN's real Switch view name is `Switch` — a wrong native view name means the host never
     // resolves a component, which no JS-level check would otherwise catch.
-    it('emits the Fabric view name Switch and passes value through as a strict boolean', async () => {
-      mount(ROOT_TAG, () => <switch value />);
-      await tick();
-      expect(committedSwitch().payload.value).toBe(true);
-    });
-
-    // why: RN sends `value === true` to native (Switch.js) — an absent `value` must fold to a real
-    // `false`, not ride through as `undefined`, which native would misread.
-    it('folds an undefined value to a strict false', async () => {
-      mount(ROOT_TAG, () => <switch />);
-      await tick();
-      expect(committedSwitch().payload.value).toBe(false);
-    });
-
-    // why: trackColor/thumbColor/ios_backgroundColor are RN's public prop names, but native reads
-    // them under different keys — using the public names on the wire silently fails to paint. This
-    // also pins the one prop whose NAME lies about its kind: `onTintColor` must reach Fabric as a
-    // PROP, and does, because routeProp asks the Switch ViewConfig (whose only event is `change`)
-    // instead of guessing from an `on` prefix.
-    it('maps color + disabled props to the native iOS prop names', async () => {
-      mount(ROOT_TAG, () => (
-        <switch
-          value
-          disabled
-          trackColor={{ false: TRACK_OFF, true: TRACK_ON }}
-          thumbColor={THUMB}
-          ios_backgroundColor={IOS_BACKGROUND}
-        />
-      ));
+    it('emits the Fabric view name Switch and carries the authored props through', async () => {
+      mount(ROOT_TAG, () => <switch value disabled />);
       await tick();
 
-      const payload = committedSwitch().payload;
-      expect(payload.onTintColor).toBe(TRACK_ON);
-      expect(payload.tintColor).toBe(TRACK_OFF);
-      expect(payload.thumbTintColor).toBe(THUMB);
-      expect(payload.disabled).toBe(true);
-      // ios_backgroundColor folds into the style, which the engine flattens onto the node, so
-      // backgroundColor lands as a top-level committed prop.
-      expect(payload.backgroundColor).toBe(IOS_BACKGROUND);
+      expect(committedSwitch().viewName).toBe('Switch');
+      expect(committedSwitch().payload.disabled).toBe(true);
     });
+
+    // THE PROP-RESOLUTION CASES MOVED, as a GROUP:
+    // `core/engine/cpp/tests/js/switch-payload.itest.ts`. `value === true`, the per-platform colour
+    // renames and the `ios_backgroundColor` style fold are `foldSwitchProps` in
+    // `SymbioteFabricProps.cpp` now, and this harness commits through the TypeScript `fabricProps`,
+    // which holds no copy of that rule.
+    //
+    // They travelled together on purpose. The `<switch value />` case above would have stayed GREEN
+    // on its own — the app authored `true`, so a payload with no rule at all satisfies it — and a
+    // green case over a rule that no longer runs is worse than no case. It is renamed to what it
+    // still proves: the tag picks the right Fabric view and the authored props reach the commit.
+    //
+    // One claim went with them and is now unreachable BY CONSTRUCTION, which is worth recording:
+    // this file used to pin that `onTintColor` reaches Fabric as a PROP rather than being mistaken
+    // for a listener, because `routeProp` asks the Switch ViewConfig instead of guessing from the
+    // `on` prefix. The engine writes that name into the payload directly now, so `routeProp` never
+    // sees it and the hazard cannot occur. The authored name it DOES see is `trackColor`.
 
     // why: native reads only `accessibility*`; the web aliases must be folded in JS before commit
     // (RN's own View.js transform). Switch owns its host element rather than rendering through a

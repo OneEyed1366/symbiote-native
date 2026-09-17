@@ -65,93 +65,28 @@ function stateOf(node: ISymbioteNode): ISwitchState | undefined {
   return states.get(node);
 }
 
-function stringOf(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
+// The three narrowing helpers that stood here — `stringOf`, `booleanOf` and `trackColorOf` — went
+// with the fold. They existed to read an untyped bag safely, and the bag is read on the other side
+// of the wire now, where a `folly::dynamic` is checked the same way and with no allocation.
 
-function booleanOf(value: unknown): boolean | undefined {
-  return typeof value === 'boolean' ? value : undefined;
-}
-
-// `{ false?, true? }` narrowed at runtime — an authored object arriving through an untyped bag
-// cannot be trusted to the type system without reading it field by field, the same idiom
-// `text-input.ts`'s `selectionOf` uses for `{ start, end? }`.
-function trackColorOf(
-  value: unknown,
-): { false?: string; true?: string } | undefined {
-  if (typeof value !== 'object' || value === null) return undefined;
-  const bag: Record<string, unknown> = { ...value };
-  const falseColor = stringOf(bag.false);
-  const trueColor = stringOf(bag.true);
-  if (falseColor === undefined && trueColor === undefined) return undefined;
-  return { false: falseColor, true: trueColor };
-}
-
-// The prop fold a wrapper body used to run: `trackColor` / `thumbColor` / `ios_backgroundColor` are
-// AUTHORED names, none of them a real Fabric prop — RN's Switch view declares
-// `onTintColor`/`tintColor` (iOS) or `trackColorFor*`/`trackTintColor` (Android), plus
-// `thumbTintColor`. The wrappers took the per-platform prop NAMES from an adapter-supplied table; a
-// node has no adapter to ask, so this reads `Platform.OS` directly — the same fact every adapter's
-// own index.ios.ts/index.android.ts already encodes as a literal, read once here instead of five
-// times.
-function trackColorPropsFor(
-  value: boolean,
-  trackColor: { false?: string; true?: string } | undefined,
-): Record<string, unknown> {
-  if (Platform.OS === 'android') {
-    return {
-      trackColorForFalse: trackColor?.false,
-      trackColorForTrue: trackColor?.true,
-      trackTintColor: value ? trackColor?.true : trackColor?.false,
-    };
-  }
-  return {
-    onTintColor: trackColor?.true,
-    tintColor: trackColor?.false,
-  };
-}
-
-// RN rounds the iOS background pill to this radius when `ios_backgroundColor` is set — the same
-// constant `render-switch.ts` uses, kept independent rather than exported+imported for one
-// primitive-local literal (see that file for the upstream fact it encodes).
-const IOS_BACKGROUND_BORDER_RADIUS = 16;
+// THE PROP FOLD MOVED TO THE ENGINE — `foldSwitchProps` in `SymbioteFabricProps.cpp`, with
+// `core/engine/cpp/tests/js/switch-payload.itest.ts` as its contract.
+//
+// It is the clearest case of the three ports so far: `trackColor` / `thumbColor` /
+// `ios_backgroundColor` are AUTHORED names and none of them is a real Fabric prop. RN's Switch view
+// declares `onTintColor`/`tintColor` (iOS) or `trackColorFor*`/`trackTintColor` (Android), plus
+// `thumbTintColor`, and `ios_backgroundColor` is a STYLE rather than a prop. The wrappers took those
+// per-platform NAMES from an adapter-supplied table; a tag has no adapter to ask, so the branch
+// belongs beside the tree — once, instead of the five copies it had.
+//
+// What is still here is the MACHINE: the snap-back handshake below, which reads app state a
+// microtask after native reports a toggle and corrects a disagreement with an imperative command.
 
 // The platform-specific imperative command RN's own Switch sends to correct a rejected toggle
-// (Switch.js:221-225) — read off Platform.OS for the same reason `trackColorPropsFor` is.
+// (Switch.js:221-225). It reads `Platform.OS` because it is an IMPERATIVE call decided at gesture
+// time, not a prop — the payload half of the same platform split went to the engine with the fold.
 function snapBackCommand(): string {
   return Platform.OS === 'android' ? 'setNativeValue' : 'setValue';
-}
-
-function foldPayload(
-  props: Readonly<Record<string, unknown>>,
-): Record<string, unknown> {
-  const value = props.value === true;
-  const trackColor = trackColorOf(props.trackColor);
-  const iosBackground = stringOf(props.ios_backgroundColor);
-
-  const out: Record<string, unknown> = {
-    ...props,
-    value,
-    disabled: booleanOf(props.disabled),
-    ...trackColorPropsFor(value, trackColor),
-    thumbTintColor: stringOf(props.thumbColor),
-    style:
-      iosBackground === undefined
-        ? props.style
-        : [
-            props.style,
-            {
-              backgroundColor: iosBackground,
-              borderRadius: IOS_BACKGROUND_BORDER_RADIUS,
-            },
-          ],
-  };
-  // The authored names themselves must NOT ride along: none is a Fabric prop, and leaving them in
-  // the payload is how a reader concludes the fold ran when it did not.
-  delete out.trackColor;
-  delete out.thumbColor;
-  delete out.ios_backgroundColor;
-  return out;
 }
 
 // Shared by both triggers — see the module header for why there are two.
@@ -226,7 +161,6 @@ export function registerSwitchBehavior(): void {
     // cannot — a prop change with no preceding native event.
     afterCommit: evaluateSnapBack,
     detach,
-    foldPayload,
     ownedListeners: ['change'],
   });
 }

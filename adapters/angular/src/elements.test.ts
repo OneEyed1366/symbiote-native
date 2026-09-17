@@ -333,13 +333,16 @@ describe('what the element directives commit', () => {
   //
   // `mostRecentEventCount` is the right observable and arguably always was: the MACHINE writes it,
   // at attach, as a real prop op. It proves the thing the test is named for rather than a rule that
-  // happened to run nearby. Switch's `value` still comes from a JS fold and stays as it is.
+  // happened to run nearby. Switch's `value` followed text-input's into the engine one commit
+  // later (`foldSwitchProps`), so the second tag is now here for the mechanism — two tags is what
+  // makes this a claim about the REGISTRY rather than about text-input — and its payload is
+  // asserted in `core/engine/cpp/tests/js/switch-payload.itest.ts`.
   it('still attaches the host behavior to a bare tag', async () => {
     const { all } = await mountTemplate(
       `<text-input [testID]="'probe'"></text-input><switch [testID]="'sw'"></switch>`,
     );
     expect(propsOf(all, 'probe')).toMatchObject({ mostRecentEventCount: 0 });
-    expect(propsOf(all, 'sw').value).toBe(false);
+    expect(propsOf(all, 'sw').testID).toBe('sw');
   });
 
   // why: the transitional state, and it is reachable today — `ViewHost` matches the tag itself and is exported as `View` for an app's `imports:`, so

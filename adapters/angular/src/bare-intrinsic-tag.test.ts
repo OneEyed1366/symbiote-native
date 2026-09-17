@@ -229,13 +229,16 @@ describe('a bare intrinsic tag, hand-written', () => {
     // fold is the engine's now (`foldTextInputAliases`, `SymbioteFabricProps.cpp`), which this
     // harness's payload — built by the TypeScript `fabricProps` — cannot see. The count is written
     // by the MACHINE at attach, so it is the observable this test was always reaching for.
+    // The `<switch>` used to corroborate this through its folded `value`, and no longer can for the
+    // same reason — `foldSwitchProps` is the engine's too. It stays in the template because the
+    // claim is about the RENDERER handing over a tag, and a second tag is what makes the case about
+    // the mechanism rather than about text-input; its own payload is asserted in
+    // `core/engine/cpp/tests/js/switch-payload.itest.ts`.
     const probePayload = all.find(
       node => node.payload.testID === 'probe',
     )?.payload;
     expect(probePayload).toMatchObject({ mostRecentEventCount: 0 });
-    expect(all.find(node => node.payload.testID === 'sw')?.payload.value).toBe(
-      false,
-    );
+    expect(all.find(node => node.payload.testID === 'sw')).toBeDefined();
   });
 });
 

@@ -99,40 +99,21 @@ afterEach(() => unmount(currentRootTag));
 describe('React <switch> on the engine', () => {
   // why: RN's real Switch view name is `Switch` — a wrong native view name means the host
   // simply never resolves a component, which no JS-level check would otherwise catch.
-  it('emits the Fabric view name Switch and passes value through as a strict boolean', () => {
-    mountFresh(<switch value />);
-    expect(switchProps().value).toBe(true);
+  it('emits the Fabric view name Switch and carries the authored props through', () => {
+    mountFresh(<switch value disabled />);
+
+    expect(switchProps().disabled).toBe(true);
   });
 
-  // why: RN sends `value === true` to the native side (Switch.js) — an absent `value` prop must
-  // fold to a real `false`, not ride through as `undefined`, which native would reject/misread.
-  it('folds an undefined value to a strict false', () => {
-    mountFresh(<switch />);
-    expect(switchProps().value).toBe(false);
-  });
-
-  // why: trackColor/thumbColor/ios_backgroundColor are RN's public prop names, but native reads
-  // them under different keys (onTintColor/tintColor/thumbTintColor/backgroundColor) — using the
-  // public names on the wire would just silently not paint on device.
-  it('maps color + disabled props to the native iOS prop names', () => {
-    mountFresh(
-      <switch
-        value
-        disabled
-        trackColor={{ false: '#767577', true: '#81b0ff' }}
-        thumbColor="#f5dd4b"
-        ios_backgroundColor="#3e3e3e"
-      />,
-    );
-    const props = switchProps();
-    expect(props.onTintColor).toBe('#81b0ff');
-    expect(props.tintColor).toBe('#767577');
-    expect(props.thumbTintColor).toBe('#f5dd4b');
-    expect(props.disabled).toBe(true);
-    // ios_backgroundColor folds into the style, which the commit engine flattens onto the
-    // node, so backgroundColor lands as a top-level committed prop.
-    expect(props.backgroundColor).toBe('#3e3e3e');
-  });
+  // THE PROP-RESOLUTION CASES MOVED, as a GROUP:
+  // `core/engine/cpp/tests/js/switch-payload.itest.ts`. `value === true`, the per-platform colour
+  // renames and the `ios_backgroundColor` style fold are `foldSwitchProps` in
+  // `SymbioteFabricProps.cpp` now, and this harness commits through the TypeScript `fabricProps`,
+  // which holds no copy of that rule.
+  //
+  // As a group on purpose: `<switch value />` would have stayed GREEN alone, since the app authored
+  // `true` and a payload with no rule at all satisfies it. A green case over a rule that no longer
+  // runs is worse than no case — the same false green the text-input port was caught by.
 
   // why: onValueChange hands the caller ONE event, with the derived boolean carried as `.value`
   // on it — a consumer that reads `event.nativeEvent.value` (RN's own event shape) must still work.

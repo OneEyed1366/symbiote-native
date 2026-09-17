@@ -843,6 +843,79 @@ dynamic foldPressableProps(const dynamic &props) {
   return out;
 }
 
+/** RN rounds the iOS background pill to this radius when `ios_backgroundColor` is set. */
+constexpr double kIosSwitchBackgroundRadius = 16;
+
+/**
+ * Switch's user-agent half — and every authored name it reads is INVENTED.
+ *
+ * `trackColor`, `thumbColor` and `ios_backgroundColor` are not Fabric props. RN's Switch view
+ * declares `onTintColor`/`tintColor` on iOS and `trackColorFor*`/`trackTintColor` on Android, plus
+ * `thumbTintColor` on both, and `ios_backgroundColor` is not a prop at all — it is a STYLE
+ * (`Switch.js:266-276`, a background plus a 16pt radius so the pill shows through the track).
+ *
+ * A wrapper body took those per-platform NAMES from an adapter-supplied table. A tag has no adapter
+ * to ask, so the platform branch is here, once, instead of in five adapters.
+ *
+ * WRITES ONLY WHAT IT RESOLVES: an absent authored colour leaves its native name unset rather than
+ * writing a null, which is what the payload builder would otherwise send as an explicit reset.
+ */
+dynamic foldSwitchProps(const dynamic &props) {
+  dynamic out = props;
+
+  // `value === true`, not a passthrough (`Switch.js:280`): the native prop is a boolean, and an
+  // authored `undefined` must read as OFF. An uncontrolled switch painting ON is the worse failure.
+  const bool *value = boolAt(props, "value");
+  const bool isOn = value != nullptr && *value;
+  out["value"] = isOn;
+
+  const bool *disabled = boolAt(props, "disabled");
+  if (disabled == nullptr) out.erase("disabled");
+  else out["disabled"] = *disabled;
+
+  const dynamic *trackColor = props.get_ptr("trackColor");
+  const std::string *trackFalse = nullptr;
+  const std::string *trackTrue = nullptr;
+  if (trackColor != nullptr && trackColor->isObject()) {
+    trackFalse = stringAt(*trackColor, "false");
+    trackTrue = stringAt(*trackColor, "true");
+  }
+
+#ifdef ANDROID
+  if (trackFalse != nullptr) out["trackColorForFalse"] = *trackFalse;
+  if (trackTrue != nullptr) out["trackColorForTrue"] = *trackTrue;
+  const std::string *tint = isOn ? trackTrue : trackFalse;
+  if (tint != nullptr) out["trackTintColor"] = *tint;
+#else
+  if (trackTrue != nullptr) out["onTintColor"] = *trackTrue;
+  if (trackFalse != nullptr) out["tintColor"] = *trackFalse;
+#endif
+
+  const std::string *thumbColor = stringAt(props, "thumbColor");
+  if (thumbColor != nullptr) out["thumbTintColor"] = *thumbColor;
+
+  // The style slot takes an ARRAY, which `addStyle` flattens in order — so the authored style keeps
+  // its precedence and the pill is layered over it, exactly as `StyleSheet.compose` does upstream.
+  const std::string *iosBackground = stringAt(props, "ios_backgroundColor");
+  if (iosBackground != nullptr) {
+    dynamic pill = dynamic::object();
+    pill["backgroundColor"] = *iosBackground;
+    pill["borderRadius"] = kIosSwitchBackgroundRadius;
+    dynamic composed = dynamic::array();
+    const dynamic *authored = props.get_ptr("style");
+    if (authored != nullptr) composed.push_back(*authored);
+    composed.push_back(std::move(pill));
+    out["style"] = std::move(composed);
+  }
+
+  // None of the three is a native prop, and leaving one in the payload is how a reader concludes the
+  // rule ran when it did not.
+  out.erase("trackColor");
+  out.erase("thumbColor");
+  out.erase("ios_backgroundColor");
+  return out;
+}
+
 } // namespace
 
 dynamic fabricProps(
@@ -880,6 +953,9 @@ dynamic fabricProps(
   dynamic tagResolved;
   if (usesPressableRule(tagName)) {
     tagResolved = foldPressableProps(*bag);
+    bag = &tagResolved;
+  } else if (tagName == "switch") {
+    tagResolved = foldSwitchProps(*bag);
     bag = &tagResolved;
   }
 

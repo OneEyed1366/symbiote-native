@@ -187,41 +187,17 @@ describe('switch host behavior', () => {
     expect(committedPropsOf(TEST_ID)).toMatchObject({ value: true });
   });
 
-  it('folds trackColor/thumbColor/ios_backgroundColor to the iOS native prop names and drops the authored keys', () => {
-    registerSwitchBehavior();
-    const node = makeSwitch();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'value', true);
-    routeProp(node, 'trackColor', { false: '#111', true: '#222' });
-    routeProp(node, 'thumbColor', '#333');
-    routeProp(node, 'ios_backgroundColor', '#444');
-    mount(node);
-
-    const props = committedPropsOf(TEST_ID);
-    expect(props).toMatchObject({
-      value: true,
-      onTintColor: '#222',
-      tintColor: '#111',
-      thumbTintColor: '#333',
-    });
-    expect(props).not.toHaveProperty('trackColor');
-    expect(props).not.toHaveProperty('thumbColor');
-    expect(props).not.toHaveProperty('ios_backgroundColor');
-    expect(props).not.toHaveProperty('style');
-    // `fabricProps` hoists a style slot's keys onto the payload rather than keeping a nested
-    // `style` object (`core/engine/src/fabric-props.ts`'s `addStyle`), so the ios_backgroundColor
-    // fold's own keys land flat, same as every other adapter's committed payload.
-    expect(props).toMatchObject({ backgroundColor: '#444', borderRadius: 16 });
-  });
-
-  it('folds an authored non-boolean value to a strict false', () => {
-    registerSwitchBehavior();
-    const node = makeSwitch();
-    routeProp(node, 'testID', TEST_ID);
-    mount(node);
-
-    expect(committedPropsOf(TEST_ID)).toMatchObject({ value: false });
-  });
+  // THE TWO FOLD CASES MOVED: `core/engine/cpp/tests/js/switch-payload.itest.ts`. The authored-name
+  // resolution — `trackColor`/`thumbColor`/`ios_backgroundColor` onto the per-platform native names,
+  // and `value === true` — is `foldSwitchProps` in `SymbioteFabricProps.cpp` now, so this harness's
+  // payload (built by the TypeScript `fabricProps`) cannot see it and never will.
+  //
+  // They gained two assertions on the way that this file could not make: `foldsFound === 0`, which
+  // is the reason the rule moved at all, and a behaviorless control proving the renames are the
+  // rule rather than something the engine does for every node.
+  //
+  // Everything below stays, and it is the half that never moved: the snap-back handshake, which
+  // reads app state a microtask after native reports a toggle.
 
   it('resolves switch to the native Switch view, on iOS', () => {
     expect(descriptorFor('switch')).toEqual({
