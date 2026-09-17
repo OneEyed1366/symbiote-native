@@ -798,6 +798,96 @@ const std::array<const char *, 6> kTouchableFeedbackKeys = {
     "delayPressOut",
 };
 
+// The two native spinners. Which one a tag resolves to is the PLATFORM split, and branching on the
+// component name rather than on `#ifdef` keeps both halves reachable from one test build — the same
+// choice `foldSwitchProps` makes for `Switch` / `AndroidSwitch`.
+constexpr const char *kAndroidProgressBar = "AndroidProgressBar";
+
+// The fixed pixel boxes RN gives its two named sizes (`styles.sizeSmall` / `styles.sizeLarge`).
+constexpr double kSpinnerSmallPx = 20;
+constexpr double kSpinnerLargePx = 36;
+
+// RN's iOS default spinner colour (`ActivityIndicator.js:25`, GRAY). Android's default is the THEME,
+// which is expressed by OMITTING the key — see below.
+constexpr const char *kSpinnerIosDefaultColor = "#999999";
+
+/**
+ * The centering View RN wraps its spinner in (`ActivityIndicator.js:112-114`):
+ * `StyleSheet.compose(styles.container, style)`.
+ *
+ * BASE FIRST, which is the whole content of that compose: the container centres the spinner inside
+ * the space it was given, and an app's own style still wins over it. Reversed, an app could never
+ * override the centering and the override would fail silently.
+ *
+ * The container cannot be folded into the spinner instead: `alignItems`/`justifyContent` centre the
+ * spinner within its box, and on the spinner they would centre its children, of which it has none.
+ */
+dynamic foldActivityIndicatorProps(const dynamic &props) {
+  dynamic out = props;
+  dynamic container = dynamic::object();
+  container["alignItems"] = "center";
+  container["justifyContent"] = "center";
+
+  dynamic composed = dynamic::array(std::move(container));
+  const dynamic *authored = props.get_ptr("style");
+  if (authored != nullptr) composed.push_back(*authored);
+  out["style"] = std::move(composed);
+  return out;
+}
+
+/**
+ * The native spinner's own props — RN's component body (`ActivityIndicator.js:99-118`) applied to
+ * the node the app never names.
+ *
+ * SIZE IS TWO ANSWERS FROM ONE PROP. A named size gives a native enum AND a fixed pixel box; a
+ * NUMBER gives only the box, and the key has to LEAVE rather than merely go unwritten — the native
+ * enum takes "small"/"large" and nothing else, so a numeric `size` reaching it is a value it cannot
+ * read.
+ *
+ * THE COLOUR DEFAULT IS WHERE "absent" AND "null" STOP BEING THE SAME THING. Android's default is
+ * the theme, expressed by sending no key at all; Fabric's colour parser REJECTS a null, so writing
+ * one is a crash rather than a shade. iOS defaults to RN's GRAY.
+ */
+dynamic foldActivityIndicatorSpinnerProps(
+    const dynamic &props,
+    bool isAndroidProgressBar) {
+  dynamic out = props;
+
+  // RN's own default when the app writes no size (`:72`).
+  double box = kSpinnerSmallPx;
+  const char *sizeEnum = "small";
+  const dynamic *size = props.get_ptr("size");
+  if (size != nullptr && size->isString() && size->asString() == "large") {
+    box = kSpinnerLargePx;
+    sizeEnum = "large";
+  } else if (size != nullptr && size->isNumber()) {
+    box = size->asDouble();
+    sizeEnum = nullptr;
+  }
+  if (sizeEnum == nullptr) out.erase("size");
+  else out["size"] = sizeEnum;
+
+  // REPLACES whatever style the node carried, as the JS fold this replaces did: the spinner's box is
+  // the size translation's output and nothing else, and the app's own style lands on the centering
+  // host one level up.
+  dynamic sizeStyle = dynamic::object();
+  sizeStyle["width"] = box;
+  sizeStyle["height"] = box;
+  out["style"] = std::move(sizeStyle);
+
+  // RN defaults both to true and spells it `!== false`, so only a literal false turns them off. A
+  // tag has no destructuring default, which is why the rule carries it.
+  out["animating"] = boolAt(props, "animating").value_or(true);
+  out["hidesWhenStopped"] = boolAt(props, "hidesWhenStopped").value_or(true);
+
+  const dynamic *color = props.get_ptr("color");
+  if (color == nullptr || !color->isString()) {
+    if (isAndroidProgressBar) out.erase("color");
+    else out["color"] = kSpinnerIosDefaultColor;
+  }
+  return out;
+}
+
 /**
  * Button's own platform half, over and above the touchable's (`Button.js:350-382`). It runs AFTER
  * `foldPressableProps`, which is the order the JS composition always had.
@@ -1335,6 +1425,13 @@ dynamic fabricProps(
     bag = &tagResolved;
   } else if (tagName == "image") {
     tagResolved = foldImageProps(*bag);
+    bag = &tagResolved;
+  } else if (tagName == "activity-indicator") {
+    tagResolved = foldActivityIndicatorProps(*bag);
+    bag = &tagResolved;
+  } else if (tagName == "activity-indicator-spinner") {
+    tagResolved = foldActivityIndicatorSpinnerProps(
+        *bag, component == kAndroidProgressBar);
     bag = &tagResolved;
   } else if (tagName == "switch") {
     // The COMPONENT decides the platform half, not a compile-time macro: `Switch` and

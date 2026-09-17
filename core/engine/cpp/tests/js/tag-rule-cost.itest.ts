@@ -24,11 +24,19 @@
 // MEASURED on `build-release`, three consecutive runs, one sitting, a thousand nodes per commit:
 //
 //              native walk        js walk             per node   keys in the bag
-//   accessory  3.1  3.1  3.3 ms   14.1 13.6 15.5 ms   ~11.2 us   4
-//   button     3.9  3.9  4.2 ms   16.3 15.1 16.9 ms   ~12.1 us   5 + a 2-key style
-//   pressable  3.7  3.8  3.7 ms   18.0 17.5 18.4 ms   ~14.2 us   4 + a 3-key style
-//   switch     4.9  4.9  4.8 ms   23.5 23.2 23.6 ms   ~18.6 us   6 + nested trackColor
-//   image      5.9  5.9  6.1 ms   27.8 26.9 29.5 ms   ~22.1 us   6 + what the rule builds
+//   spinner    3.6  3.7  3.7 ms   13.4 13.5 13.3 ms    ~9.7 us   4, no style in
+//   accessory  3.2  3.1  3.1 ms   14.6 13.9 13.7 ms   ~10.9 us   4
+//   button     3.9  3.9  3.9 ms   16.6 15.4 15.2 ms   ~11.8 us   5 + a 2-key style
+//   pressable  3.7  3.7  3.7 ms   18.0 18.7 18.1 ms   ~14.6 us   4 + a 3-key style
+//   switch     4.8  4.9  4.8 ms   23.6 23.6 23.4 ms   ~18.7 us   6 + nested trackColor
+//   image      5.8  5.9  5.8 ms   27.7 27.9 27.6 ms   ~21.9 us   6 + what the rule builds
+//
+// THE SPINNER IS THE CHEAPEST ROW AND ITS RULE DOES THE MOST WORK OF ANY OF THEM — it builds a style
+// object, resolves a size two ways, writes two defaults and picks a colour. It is cheapest because
+// its bag arrives with no `style` key, which is the column's rule stated as an experiment rather than
+// an observation: the price is what has to be MARSHALLED, not what the rule computes. A rule that
+// creates keys on the way OUT still pays for them (see `image`); a rule that reads a small bag does
+// not, however much it does with it.
 //
 // `button`'s arm carries BOTH its rules — the pressable one its tag also gets, then its own — which
 // is why its JS twin composes the two folds rather than spelling only half. It still lands under
@@ -62,6 +70,7 @@
 // kept alongside.
 
 import {
+  registerActivityIndicatorBehavior,
   registerImageBehavior,
   registerInputAccessoryViewBehavior,
   registerPressableBehavior,
@@ -87,6 +96,7 @@ registerPressableBehavior();
 registerSwitchBehavior();
 registerImageBehavior();
 registerInputAccessoryViewBehavior();
+registerActivityIndicatorBehavior();
 
 // ── the JS arms: the same rule, written on the other side of the wire ────────────────────────────
 //
@@ -250,6 +260,33 @@ registerHostBehavior('input-accessory-view-in-js', {
     return out;
   },
 });
+
+// The spinner, whose rule is the only one in this file that had to be REACHED before it could be
+// priced: its tag is built by its owner and named by no app, so until a stub behavior was registered
+// for it the host saw an empty `tagName` and ran nothing. See `activity-indicator/shared.ts`.
+registerHostBehavior('activity-indicator-spinner-in-js', {
+  attach(): void {},
+  detach(): void {},
+  foldPayload(props: Readonly<Record<string, unknown>>) {
+    const out: Record<string, unknown> = { ...props };
+    const size = props.size;
+    const box = size === 'large' ? 36 : typeof size === 'number' ? size : 20;
+    if (typeof size === 'number') delete out.size;
+    else out.size = size === 'large' ? 'large' : 'small';
+    out.style = { width: box, height: box };
+    out.animating = props.animating !== false;
+    out.hidesWhenStopped = props.hidesWhenStopped !== false;
+    if (typeof props.color !== 'string') out.color = '#999999';
+    return out;
+  },
+});
+
+const SPINNER_PROPS = {
+  size: 'large',
+  animating: true,
+  accessibilityLabel: 'loading',
+  testID: 'spin',
+};
 
 const INPUT_ACCESSORY_VIEW_PROPS = {
   nativeID: 'keyboard-bar',
@@ -437,6 +474,15 @@ describe('what a ported tag rule costs on each side of the wire', () => {
 
   it('pays no trip into JS for a thousand images', () => {
     priced('image', 'RCTImageView', 'image', IMAGE_PROPS);
+  });
+
+  it('pays no trip into JS for a thousand spinners', () => {
+    priced(
+      'spinner',
+      'ActivityIndicatorView',
+      'activity-indicator-spinner',
+      SPINNER_PROPS,
+    );
   });
 
   it('pays no trip into JS for a thousand buttons', () => {

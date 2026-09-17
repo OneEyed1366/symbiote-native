@@ -1,23 +1,28 @@
-// ActivityIndicator's host behavior — the second consumer of `buildStructure` / `childHost`, and
-// the first composed primitive whose slot exists for a PROP redirect rather than for children.
+// ActivityIndicator's host behavior — the COMPOSITION half, which is all that is left in JS.
 //
 // WHAT THIS PROVES: the engine builds, from the tag alone, the two-node tree RN itself renders
-// (`ActivityIndicator.js:112`) and commits the right payload on both nodes. Every one of this
-// primitive's folds — the size translation, the two `!== false` defaults, the platform colour,
-// Android's two required native props — used to live in five wrapper bodies, and a tag inherits
-// nothing a component did.
+// (`ActivityIndicator.js:112`), routes the app's props across RN's own split, and seeds the native
+// props AndroidProgressBar requires. None of that is a prop rewrite; all of it is structure.
 //
-// NO COMPONENT ARM ANY MORE, and its absence is not a coverage loss. The two arms existed while
-// `renderActivityIndicator` painted the same tree for five wrappers, so the comparison answered
-// "did one path drop a fold". The wrappers and the render fn are gone in the same commit that
-// registered this behavior, so there is no second path to compare against and the ABSOLUTE
-// expectations below — which every case already carried, because a fold BOTH arms lost still
-// compares equal — are the whole oracle.
+// WHAT LEFT THIS FILE on 2026-09-18, and it was most of it. The size translation, the two `!== false`
+// defaults, the centering style and the platform colour are `foldActivityIndicatorProps` /
+// `foldActivityIndicatorSpinnerProps` in `SymbioteFabricProps.cpp` now, asserted against the payload
+// the commit actually sent in `core/engine/cpp/tests/js/activity-indicator-payload.itest.ts`. This
+// harness builds its payloads through the TypeScript `fabricProps`, which carries no copy of the tag
+// rules and must not grow one.
+//
+// THEY MOVED AS A GROUP, INCLUDING THE CASES THAT WERE STILL GREEN, and that is the part worth
+// reading before adding anything back. "OMITS colour entirely on the theme default" passed after the
+// port — for the wrong reason: the key is absent because no rule ran at all, not because Android's
+// half omitted it. So did "an explicit colour wins over the default", which cannot tell a rule that
+// prefers the app's value from a rule that does not exist. An absence assertion left on a harness
+// that can no longer produce the key passes forever and means nothing, so every case whose subject
+// was a fold went with its twin rather than the failing ones alone.
 //
 // PLATFORM ARMS ARE BY FILE, not by a `Platform.OS` mock, because the behavior's platform half is a
 // folder-as-module split. The intrinsic->native-name table still resolves to the iOS build under
 // vitest, so the Android arm's spinner serializes as `ActivityIndicatorView`; nothing below keys off
-// that name — the Android claims are about the colour omission and the two native extras.
+// that name — the Android claim here is about the two native extras.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,
@@ -30,7 +35,6 @@ import {
   clearHostBehaviors,
   createElement,
   createSurface,
-  registerRules,
   routeProp,
   type ISymbioteNode,
   childrenOf,
@@ -43,7 +47,6 @@ import { registerActivityIndicatorBehavior as registerAndroid } from './index.an
 import {
   ACTIVITY_INDICATOR_SPINNER_TAG,
   ACTIVITY_INDICATOR_TAG,
-  type IActivityIndicatorPlatform,
   type IActivityIndicatorProps,
 } from './shared';
 
@@ -63,25 +66,6 @@ const TEST_ID = 'indicator';
 const SPINNER_VIEW = descriptorFor(ACTIVITY_INDICATOR_SPINNER_TAG).component;
 const HOST_VIEW = descriptorFor(ACTIVITY_INDICATOR_TAG).component;
 
-// The two platform halves, restated rather than imported: these are the ABSOLUTE expectations the
-// harness asks for, so reading them out of the module under test would make every assertion below
-// pass with the module deleted.
-const IOS: IActivityIndicatorPlatform = {
-  defaultColor: '#999999',
-  nativeExtras: {},
-};
-const ANDROID: IActivityIndicatorPlatform = {
-  defaultColor: null,
-  nativeExtras: { styleAttr: 'Normal', indeterminate: true },
-};
-
-// RN's centering wrapper, flattened as the payload sees it (ActivityIndicator.js styles.container).
-const CENTERED = { alignItems: 'center', justifyContent: 'center' };
-const SIZE_SMALL_BOX = { width: 20, height: 20 };
-const SIZE_LARGE_BOX = { width: 36, height: 36 };
-
-const CARD_CLASS = 'card';
-
 afterEach(() => {
   clearHostBehaviors();
   clearGlobalStyles();
@@ -89,9 +73,7 @@ afterEach(() => {
 });
 
 // One node, the props written on it exactly as an app writes them on the tag. Nothing here names
-// the spinner — that is the behavior's job, and its absence is the test. Returns both handles
-// directly, so a caller reads `payloadOf(host)` / `payloadOf(spinner)` for the committed props —
-// no tree search needed, since `buildStructure` hands the spinner straight back as `childHost`.
+// the spinner — that is the behavior's job, and its absence is the test.
 function mountTag(props: IActivityIndicatorProps): {
   host: ISymbioteNode;
   spinner: ISymbioteNode;
@@ -153,251 +135,24 @@ describe('the tag builds RN’s two-node structure', () => {
   });
 });
 
-describe('the size fold, which is the whole reason `size` is not a native prop', () => {
-  beforeEach(registerIos);
-
-  it.each([
-    { size: 'small' as const, box: SIZE_SMALL_BOX },
-    { size: 'large' as const, box: SIZE_LARGE_BOX },
-  ])(
-    '$size maps to BOTH the native enum and the fixed box',
-    ({ size, box }) => {
-      const { spinner } = mountTag({ testID: TEST_ID, size });
-      const payload = payloadOf(spinner);
-
-      expect(payload.size).toBe(size);
-      expect(payload).toMatchObject(box);
-    },
-  );
-
-  it('a NUMBER sizes through style only and sends no enum at all', () => {
-    const { spinner } = mountTag({ testID: TEST_ID, size: 24 });
-    const payload = payloadOf(spinner);
-
-    expect(payload).toMatchObject({ width: 24, height: 24 });
-    expect(Object.hasOwn(payload, 'size')).toBe(false);
-  });
-
-  it('defaults to small when the app writes no size, as RN does', () => {
-    const payload = payloadOf(mountTag({ testID: TEST_ID }).spinner);
-
-    expect(payload.size).toBe('small');
-    expect(payload).toMatchObject(SIZE_SMALL_BOX);
-  });
-});
-
-describe('the two defaults a tag has no destructure for', () => {
-  beforeEach(registerIos);
-
-  it('animating and hidesWhenStopped are true when unwritten', () => {
-    const payload = payloadOf(mountTag({ testID: TEST_ID }).spinner);
-
-    expect(payload.animating).toBe(true);
-    expect(payload.hidesWhenStopped).toBe(true);
-  });
-
-  it('an explicit false still wins', () => {
-    const payload = payloadOf(
-      mountTag({
-        testID: TEST_ID,
-        animating: false,
-        hidesWhenStopped: false,
-      }).spinner,
-    );
-
-    expect(payload.animating).toBe(false);
-    expect(payload.hidesWhenStopped).toBe(false);
-  });
-});
-
-describe('the host keeps the centering style, and only that', () => {
-  beforeEach(registerIos);
-
-  it('composes RN styles.container UNDER the app style, so the app still wins', () => {
-    const { host, spinner } = mountTag({
-      testID: TEST_ID,
-      nativeID: 'native',
-      // Collides with the container's own alignItems — the app must win.
-      style: { alignItems: 'flex-start', margin: 4 },
-    });
-    const hostPayload = payloadOf(host);
-
-    expect(hostPayload).toMatchObject({
-      justifyContent: 'center',
-      alignItems: 'flex-start',
-      margin: 4,
-    });
-    // The two RN hands to the spinner instead (`ActivityIndicator.js:99`). Asserted as ABSENT here
-    // rather than only as present there: a fold that lands a key on BOTH nodes reads correct from
-    // the spinner's side alone.
-    expect(Object.hasOwn(hostPayload, 'testID')).toBe(false);
-    expect(Object.hasOwn(hostPayload, 'nativeID')).toBe(false);
-    expect(payloadOf(spinner)).toMatchObject({
-      testID: TEST_ID,
-      nativeID: 'native',
-    });
-  });
-
-  it('centres with no app style at all', () => {
-    expect(payloadOf(mountTag({ testID: TEST_ID }).host)).toMatchObject(
-      CENTERED,
-    );
-  });
-
-  // A class NAME is the only entry on the host list that is not RN's own: `routeProp`'s class
-  // branch resolves it to a STYLE, so a class routed to the spinner would style the 20x20 box
-  // instead of the centering view. Both spellings, because the list carries both and one case
-  // cannot witness the other.
-  it.each(['class', 'className'])(
-    'resolves a %s against the centering view, not the spinner',
-    spelling => {
-      registerRules([
-        {
-          tokens: [CARD_CLASS],
-          specificity: [0, 1, 0],
-          order: 0,
-          style: { backgroundColor: 'red' },
-        },
-      ]);
-      const { host, spinner } = mountTag({
-        testID: TEST_ID,
-        [spelling]: CARD_CLASS,
-      });
-
-      expect(payloadOf(host)).toMatchObject({
-        backgroundColor: 'red',
-        ...CENTERED,
-      });
-      expect(Object.hasOwn(payloadOf(spinner), 'backgroundColor')).toBe(false);
-    },
-  );
-});
-
-describe('the platform half: iOS', () => {
-  beforeEach(registerIos);
-
-  it("fills in RN's GRAY when the app names no colour", () => {
-    expect(payloadOf(mountTag({ testID: TEST_ID }).spinner).color).toBe(
-      '#999999',
-    );
-  });
-
-  it('an explicit colour wins over the default', () => {
-    expect(
-      payloadOf(mountTag({ testID: TEST_ID, color: '#ff0000' }).spinner).color,
-    ).toBe('#ff0000');
-  });
-
-  it('sends no native extras — those are AndroidProgressBar requirements', () => {
+// The native extras are NOT a fold and that is why they are still here: `buildStructure` writes them
+// with `setProp` at build time, as constants of the platform, the way ScrollView seeds
+// `collapsable: false`. They are props on the node before any payload is built, so this harness sees
+// them whether or not it carries the tag rules.
+describe('the platform half that is still structure, not a rule', () => {
+  it('sends no native extras on iOS — those are AndroidProgressBar requirements', () => {
+    registerIos();
     const payload = payloadOf(mountTag({ testID: TEST_ID }).spinner);
 
     expect(Object.hasOwn(payload, 'styleAttr')).toBe(false);
     expect(Object.hasOwn(payload, 'indeterminate')).toBe(false);
   });
-});
 
-describe('the platform half: Android', () => {
-  beforeEach(registerAndroid);
-
-  it('OMITS colour entirely on the theme default — a null is rejected by the colour parser', () => {
-    const payload = payloadOf(mountTag({ testID: TEST_ID }).spinner);
-
-    expect(Object.hasOwn(payload, 'color')).toBe(false);
-  });
-
-  it('an explicit colour still reaches the spinner', () => {
-    expect(
-      payloadOf(mountTag({ testID: TEST_ID, color: '#00ff00' }).spinner).color,
-    ).toBe('#00ff00');
-  });
-
-  it('sends styleAttr and indeterminate, without which the view throws setStyle()', () => {
+  it('sends styleAttr and indeterminate on Android, without which the view throws setStyle()', () => {
+    registerAndroid();
     const payload = payloadOf(mountTag({ testID: TEST_ID }).spinner);
 
     expect(payload.styleAttr).toBe('Normal');
     expect(payload.indeterminate).toBe(true);
   });
 });
-
-// The payload oracle, case by case.
-//
-// TWO expectations rather than one, because the split RN makes is the thing under test: the
-// payload naming `testID` is the SPINNER's. So the host needs its own assertion, or a tree that
-// put the centering style nowhere would still pass.
-describe('the tag commits RN’s payload on both of its nodes', () => {
-  const CASES: Array<{
-    name: string;
-    props: IActivityIndicatorProps;
-    host: Record<string, unknown>;
-    spinner: Record<string, unknown>;
-  }> = [
-    {
-      name: 'defaults only',
-      props: { testID: TEST_ID },
-      // Produced by the folds, never restating the input: the app wrote none of these.
-      host: { ...CENTERED },
-      spinner: { animating: true, hidesWhenStopped: true, ...SIZE_SMALL_BOX },
-    },
-    {
-      name: 'a named size and an explicit colour',
-      props: { testID: TEST_ID, size: 'large', color: '#123456' },
-      host: { ...CENTERED },
-      spinner: { color: '#123456', ...SIZE_LARGE_BOX },
-    },
-    {
-      name: 'a numeric size, which never reaches the native enum',
-      props: { testID: TEST_ID, size: 48, animating: false },
-      host: { ...CENTERED },
-      spinner: { animating: false, width: 48, height: 48 },
-    },
-    {
-      name: 'an app style over the centering container',
-      props: { testID: TEST_ID, style: { margin: 8 }, hidesWhenStopped: false },
-      host: { ...CENTERED, margin: 8 },
-      spinner: { hidesWhenStopped: false, ...SIZE_SMALL_BOX },
-    },
-    {
-      name: 'the accessibility fold rides to the spinner, onLayout stays behind',
-      props: {
-        testID: TEST_ID,
-        accessible: true,
-        accessibilityLabel: 'loading',
-        onLayout: () => {},
-      },
-      // The gate flag, not the callback: `fabricProps` drops a function and `setEventListener`
-      // writes `true` in its place (`.claude/rules/fabric-boolean-event-gates.md`).
-      host: { ...CENTERED, onLayout: true },
-      spinner: { accessible: true, accessibilityLabel: 'loading' },
-    },
-  ];
-
-  describe.each([
-    { platform: 'ios', register: registerIos, values: IOS },
-    { platform: 'android', register: registerAndroid, values: ANDROID },
-  ])('$platform', ({ register, values }) => {
-    beforeEach(register);
-
-    it.each(CASES)('$name', ({ props, host, spinner }) => {
-      const mounted = mountTag(props);
-
-      // The platform half is merged UNDER the case's own keys, so an explicit colour still wins —
-      // the same precedence the fold applies.
-      expect(payloadOf(mounted.spinner)).toMatchObject({
-        ...platformDefaults(values),
-        ...spinner,
-      });
-      const hostPayload = payloadOf(mounted.host);
-      expect(hostPayload).toMatchObject(host);
-      expect(Object.hasOwn(hostPayload, 'testID')).toBe(false);
-    });
-  });
-});
-
-// A null default colour means OMIT the key, not send a null — Fabric's colour parser rejects one.
-function platformDefaults(
-  platform: IActivityIndicatorPlatform,
-): Record<string, unknown> {
-  return platform.defaultColor === null
-    ? { ...platform.nativeExtras }
-    : { color: platform.defaultColor, ...platform.nativeExtras };
-}

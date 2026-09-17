@@ -50,10 +50,6 @@ const COMPILE_OPTIONS = {
   css: 'external',
 } as const;
 
-// RN's iOS default (`ActivityIndicator.js:25`, GRAY) and its fixed box for the named large size.
-const IOS_DEFAULT_COLOR = '#999999';
-const SIZE_LARGE_PX = 36;
-
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 const settle = async (): Promise<void> => {
@@ -116,24 +112,15 @@ describe('Svelte: `activity-indicator` as a tag', () => {
     // only because the behavior built it, so this is what fails when `./register` is dropped.
     const host = hostOf('ind');
     expect(host.viewName).toBe('RCTView');
-    expect(host.payload).toMatchObject({
-      alignItems: 'center',
-      justifyContent: 'center',
-    });
+    // The centering style and the spinner's whole payload — the size translation, the two defaults,
+    // the platform colour — are the ENGINE's rules now
+    // (`core/engine/cpp/tests/js/activity-indicator-payload.itest.ts`), and this host builds its
+    // payload through the TypeScript `fabricProps`, which carries no copy of them. What is left for
+    // an adapter to prove is the half that is its own: the tag reached the behavior and the second
+    // node exists, which is exactly what fails when `./register` is dropped.
     expect(host.children.map(node => node.viewName)).toEqual([
       'ActivityIndicatorView',
     ]);
-
-    // RN maps a NAMED size to both the native enum and a fixed box; the defaults have no
-    // destructure to come from on a tag, so the fold is what supplies them.
-    expect(host.children[0].payload).toMatchObject({
-      size: 'large',
-      width: SIZE_LARGE_PX,
-      height: SIZE_LARGE_PX,
-      animating: true,
-      hidesWhenStopped: true,
-      color: IOS_DEFAULT_COLOR,
-    });
 
     unmount(root);
     await settle();
