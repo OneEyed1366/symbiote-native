@@ -9,11 +9,7 @@ import { writeFileSync } from 'node:fs';
 import '@angular/compiler';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { describe, it } from 'vitest';
-import {
-  clearGlobalStyles,
-  readCommitProfile,
-  registerRules,
-} from '@symbiote-native/engine';
+import { clearGlobalStyles, readCommitProfile } from '@symbiote-native/engine';
 import {
   censusLive,
   installRecordingFabric,
@@ -78,36 +74,13 @@ class RowHost {
 }
 
 describe('node census', () => {
+  // No `registerRules` call — deliberately, to match Solid's probe: every class below then
+  // resolves to the registry's `EMPTY_STYLE` sentinel (no rule matches), which is the one input
+  // `pushClassStyle`'s `contributesNothing` guard (node.ts) skips outright. A rule REGISTERED to an
+  // empty `{}` body is a different, non-sentinel value and does still publish — confirmed with a
+  // minimal adapter-free `routeProp` repro — so adding rules here would silently stop measuring the
+  // same thing this file's twins measure.
   it('prices a reactive create of 1000 rows', async () => {
-    registerRules([
-      { tokens: ['bench-row'], specificity: [0, 1, 0], order: 0, style: {} },
-      {
-        tokens: ['bench-row-id'],
-        specificity: [0, 1, 0],
-        order: 1,
-        style: {},
-      },
-      { tokens: ['flex1'], specificity: [0, 1, 0], order: 2, style: {} },
-      {
-        tokens: ['bench-row-label'],
-        specificity: [0, 1, 0],
-        order: 3,
-        style: {},
-      },
-      {
-        tokens: ['bench-row-remove'],
-        specificity: [0, 1, 0],
-        order: 4,
-        style: {},
-      },
-      {
-        tokens: ['bench-row-remove-text'],
-        specificity: [0, 1, 0],
-        order: 5,
-        style: {},
-      },
-    ]);
-
     const fabric = installRecordingFabric();
     const surface = mount(ROOT_TAG, RowHost);
     await tick();
