@@ -313,10 +313,25 @@ export function readCommitProfile(): ICommitProfile {
 export type ISurfaceTelemetry = {
   layoutMs: number;
   textMs: number;
-  /** The commit phase BEFORE layout — the clone-on-write tree walk, `materialize`'s own window. */
+  /**
+   * `ShadowTree::commit`'s own window — and **NOT** `materialize`'s.
+   *
+   * This field's doc used to claim it was the clone-on-write walk, and F-80/F-81/F-82 each read it
+   * that way and concluded the native pipeline was too small to matter. `materialize` runs inside
+   * `kOpCommit` BEFORE `completeSurface` is called, so it is outside both this window and layout's.
+   * Pricing our own walk means timing `applyOps` from JS and subtracting these two.
+   */
   commitMs: number;
   layoutNodes: number;
   textMeasures: number;
+  /**
+   * How many parents took the targeted-replace path since the last read, zeroed on read.
+   *
+   * OURS, not React Native's. It is a LIVENESS signal, not a performance one: every test in this
+   * repository stays green when `canReplaceInPlace` is off, which is how it spent eighteen months
+   * disabled. Assert it is non-zero wherever the fast path is the point of the test.
+   */
+  targetedReplaces: number;
 };
 
 /**

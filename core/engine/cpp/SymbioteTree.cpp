@@ -504,56 +504,118 @@ bool replacementsAreLayoutClean(const ChildSet &previous, const ChildSet &next) 
  * it. That is a REORDER, which is what every list swap emits.
  *
  * The full child-list handover has no such restriction: `updateYogaChildren` re-adopts the lot.
+ *
+ * TWO CHILD LISTS, AND THE ASYMMETRY IS THE WHOLE POINT — see `liveChildrenOf`. `recorded` decides
+ * WHICH slots moved, because `next` was derived from it and only the two together are consistent.
+ * `standing` decides WHAT THIS PARENT ACTUALLY HOLDS, because a replacement already owned by this
+ * parent is an owner conflict whether or not our record knows the node is there.
  */
-bool replacementsAreFresh(const ChildSet &previous, const ChildSet &next) {
-  std::unordered_set<const react::ShadowNode *> standing;
-  standing.reserve(previous.size());
-  for (const auto &child : previous) standing.insert(child.get());
+bool replacementsAreFresh(
+    const ChildSet &recorded,
+    const ChildSet &standing,
+    const ChildSet &next) {
+  std::unordered_set<const react::ShadowNode *> held;
+  held.reserve(standing.size());
+  for (const auto &child : standing) held.insert(child.get());
   for (size_t at = 0; at < next.size(); at += 1) {
-    if (previous[at] == next[at]) continue;
-    if (standing.count(next[at].get()) != 0) return false;
+    if (recorded[at] == next[at]) continue;
+    if (held.count(next[at].get()) != 0) return false;
   }
   return true;
 }
 
+/**
+ * What this parent's children ARE right now, as opposed to what we recorded them to be.
+ *
+ * THE LAYOUT PASS MUTATES A STANDING PARENT IN PLACE, and that is the fact this whole path was
+ * disabled over. `YogaLayoutableShadowNode::cloneChildInPlace` clones a child and calls
+ * `replaceChild(childNode, clonedChildNode, layoutableChildIndex)` on the parent it is already
+ * holding — so the PARENT's own pointer never changes while its children vector does. That is what
+ * defeats `adoptCommitted`'s `node.committed == landed` stop: the pointer is identical, the subtree
+ * is not, and Fabric's "an identical child pointer means an identical subtree" invariant does not
+ * hold across a layout pass. Our record then names a node that is no longer in the list, and
+ * `ShadowNode::replaceChild` ends in `react_native_assert(false && "Child to replace was not
+ * found.")` — silent in Release, where the mutation is simply dropped.
+ *
+ * The rule the disabling comment asked for is therefore not a predicate over which nodes Fabric may
+ * substitute — it is to stop needing one. A record can go stale; the parent cannot be wrong about
+ * its own children. Note `cloneChildInPlace` substitutes AT THE SAME INDEX, which is what makes
+ * position the stable key both sides can agree on.
+ */
+const ChildSet &liveChildrenOf(const Node &node) {
+  static const ChildSet kNone;
+  return node.committed == nullptr ? kNone : node.committed->getChildren();
+}
+
+/**
+ * How many parents took the targeted path since this was last read.
+ *
+ * A LIVENESS counter, and it exists because every test in this repository stays green when the path
+ * is off — that is how it spent eighteen months disabled with a comment claiming a 500x on the line
+ * above it. Correctness here is the fuzzer's job; this answers the other question, which no
+ * correctness test can: did the fast path RUN. A guard tightened by accident shows up as a zero
+ * rather than as nothing at all.
+ *
+ * Process-wide and zeroed on read, the same deal `readCommitProfile`'s counters make in JS.
+ */
+size_t targetedReplaces_ = 0;
+
 bool canReplaceInPlace(
     const Node &node,
+    const ChildSet &standing,
     const ChildSet &next,
     size_t changed,
     bool indicesAlign) {
-  // OFF, and as of 2026-09-15 that is a measured verdict rather than the guess it used to be.
+  // ON since 2026-09-17, after eighteen months of this comment saying OFF. What changed is not
+  // another guard — it is where the old child comes from.
   //
-  // This path rewrites a standing parent's moved slots instead of handing Fabric a whole child list,
-  // and it measured 500x on a select over 1 000 rows (F-65). It was switched off after a device
-  // abort in `ShadowNode::replaceChild`, and at the time there was no way to reproduce that
-  // headless: `replaceChild` is not on the JSI slot, so the TypeScript stand-in could not execute
-  // this code at all and went on passing. The real engine now runs headless
-  // (`core/engine/cpp/tests/`), and its fuzzer settles the question.
+  // This path rewrites a standing parent's moved slots instead of handing Fabric a whole child list.
+  // Handing the list over ends in `YogaLayoutableShadowNode::updateYogaChildren`, which re-adopts and
+  // re-clones EVERY standing child, so the cost of touching one row is the width of the list it sits
+  // in. Measured through the real engine on a real JSI runtime
+  // (`core/engine/cpp/tests/js/create-append-phase-split.itest.ts`), one prop on one row of a list
+  // 4 000 wide, node count held constant at 20 000: **405 ms with this path off, 3 ms with it on**,
+  // and flat in width instead of rising with it. That is F-65's "500x on a select", recovered.
   //
-  // Turned back on, it fails inside fifty random op programs — each time differently, each time the
-  // same underlying conflict: the path breaks Fabric's "an identical child pointer means an
-  // identical subtree" invariant, which our adoption walk, `updateMountedFlag`, `progressState` and
-  // the differ all rest on.
+  // WHY IT WAS OFF, AND WHY THE TWO FAILURES WERE ONE FAILURE. It was disabled after a device abort
+  // in `ShadowNode::replaceChild` that nothing headless could reproduce; the fuzzer here then found
+  // two, and the older version of this comment read them as separate problems:
   //
-  //   seed 23, step 15 -> `YogaLayoutableShadowNode.cpp:303`, a replacement whose yoga node already
-  //                       has an owner. `replacementsAreFresh` below is the rule that answers that
-  //                       one, and it is necessary but not sufficient.
-  //   seed 51, step 31 -> `ShadowNode.cpp:281`, "Child to replace was not found": the LAYOUT pass
-  //                       swaps a clone into a standing parent, so our record of that parent's
-  //                       children can be stale at any depth and no pointer-based stop sees it.
+  //   `YogaLayoutableShadowNode.cpp:303` — a replacement whose yoga node already has an owner.
+  //   `ShadowNode.cpp:281` — "Child to replace was not found."
   //
-  // Widening the adoption walk to descend whole after an in-place commit was tried and does not
-  // close it — the layout pass substitutes on every commit, not only on ours. Re-enabling this needs
-  // a rule for which nodes Fabric may substitute behind us, not another guard bolted onto this one.
-  return false;
+  // Both are the same cause. `YogaLayoutableShadowNode::cloneChildInPlace` clones a child during
+  // LAYOUT and calls `replaceChild` on the parent it is already holding, so the parent's own pointer
+  // is unchanged while its children vector is not. `adoptCommitted`'s `node.committed == landed` stop
+  // therefore never fires for that parent, our `committedChildren` keeps the pre-layout pointers, and
+  // the next commit names a node that left the list. Fabric's "an identical child pointer means an
+  // identical subtree" invariant simply does not hold across a layout pass.
+  //
+  // THE RULE, and it is smaller than the one this comment used to ask for. It asked for a predicate
+  // over which nodes Fabric may substitute behind us. There is none worth writing: the answer is to
+  // stop keeping a record that can disagree with Fabric. `recorded` still decides WHICH slots moved,
+  // because `next` was derived from it and only those two are consistent with each other; but the
+  // node to name is read from the parent itself (`liveChildrenOf`, `replacedChangedChildren`), and a
+  // parent cannot be wrong about its own children. `cloneChildInPlace` substitutes at the SAME index,
+  // which is what leaves position as a key both sides still agree on.
+  //
+  // The fuzzer is the evidence, and it is the same fuzzer that condemned this path: 300 random op
+  // programs, each comparing the committed shape against the oracle, all green. Re-read
+  // `replacementsAreFresh` before weakening anything here — its membership set is the LIVE children
+  // for this same reason, and that is what closed the owner assert.
   if (react::ReactNativeFeatureFlags::enableViewCulling()) return false;
   if (changed == kWidthChanged || node.committedChildren.empty()) return false;
+  // The two lists must agree on WIDTH before position can be used as a key between them. Layout
+  // substitutes in place and never changes the count, so this holds wherever the rest of the guard
+  // does — it is here because `standing` is read from Fabric rather than maintained by us, and a
+  // rule that rests on an index must say out loud which index space it means.
+  if (standing.size() != node.committedChildren.size()) return false;
   // A props change of our OWN can dirty us through `updateYogaProps`, and a dirty parent is what
   // sends the layout pass into the children this path declined to re-adopt. The clone is checked
   // again after it exists, because `completeClone` dirties a measurable node whatever its props did.
   if (node.selfDirty) return false;
   if (!replacementsAreLayoutClean(node.committedChildren, next)) return false;
-  if (!replacementsAreFresh(node.committedChildren, next)) return false;
+  if (!replacementsAreFresh(node.committedChildren, standing, next)) return false;
   // Indices align, so every `replaceChild` is O(1) however many of them there are, and the bound
   // below has nothing left to protect.
   if (indicesAlign) return changed > 0;
@@ -614,11 +676,21 @@ bool canReplaceInPlace(
  */
 void replacedChangedChildren(
     react::ShadowNode &parent,
-    const ChildSet &previous,
+    const ChildSet &recorded,
     const ChildSet &next) {
-  for (size_t at = 0; at < next.size(); at += 1) {
-    if (previous[at] == next[at]) continue;
-    parent.replaceChild(*previous[at], next[at], at);
+  // THE OLD CHILD IS READ OFF THE PARENT, NOT OFF OUR RECORD, and the split is the fix that let this
+  // path come back on. `recorded` is what `next` was derived from, so it is the only list that can
+  // answer "did this slot move"; but it can name a node the LAYOUT pass has since replaced in place
+  // (`liveChildrenOf`), and naming that node is precisely the "Child to replace was not found" abort.
+  // The parent is never wrong about its own children, so the node to replace is read from there.
+  //
+  // A slot that moved AND was substituted resolves correctly under both readings: the replacement is
+  // a clone of our own (pre-layout) node, which is in the same family, and the subtree is dirty by
+  // construction so the layout metrics it drops are recomputed on this very commit.
+  const ChildSet &standing = parent.getChildren();
+  for (size_t at = 0; at < next.size() && at < standing.size(); at += 1) {
+    if (recorded[at] == next[at]) continue;
+    parent.replaceChild(*standing[at], next[at], at);
   }
 }
 
@@ -966,7 +1038,11 @@ std::shared_ptr<const react::ShadowNode> materialize(
       auto rawProps =
           node.selfDirty ? react::RawProps(std::move(payload)) : react::RawProps();
       if (canReplaceInPlace(
-              node, *children, changedPositions, childIndicesAlign(owners, *children))) {
+              node,
+              liveChildrenOf(node),
+              *children,
+              changedPositions,
+              childIndicesAlign(owners, *children))) {
         // The clone gets the PLACEHOLDER, so `fragment.children` is null and `updateYogaChildren()`
         // never runs (`YogaLayoutableShadowNode.cpp:149`) — nothing is re-adopted and nothing is
         // cloned. Then one slot per moved position is rewritten.
@@ -985,6 +1061,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
         if (layoutable == nullptr || layoutable->getIsLayoutClean()) {
           replacedChangedChildren(*cloned, node.committedChildren, *children);
           node.committed = std::move(cloned);
+          targetedReplaces_ += 1;
         } else {
           node.committed =
               uiManager.cloneNode(*node.committed, children, react::RawProps());
@@ -1761,9 +1838,13 @@ jsi::Value Tree::readSurfaceTelemetry(
         layoutMs = millisBetween(telemetry.getLayoutStartTime(), telemetry.getLayoutEndTime());
         textMs =
             std::chrono::duration<double, std::milli>(telemetry.getTextMeasureTime()).count();
-        // The phase BEFORE layout: `ShadowTree::commit`'s own commit callback, which is where
-        // `materialize`'s clone-on-write walk runs — every `createNode`/`cloneNode`/`appendChild`
-        // this file's `materialize` calls happens inside this window, not layout's.
+        // `ShadowTree::commit`'s own window, and **`materialize` IS NOT IN IT.** This comment used to
+        // say it was, and three rounds of investigation (F-80, F-81, F-82) read the number that way
+        // and concluded the native pipeline was small. `materialize` runs in `kOpCommit` BEFORE
+        // `uiManager.completeSurface` is called at all, so every `createNode`/`cloneNode`/
+        // `appendChild` it makes is outside both this window and layout's. To price our own walk,
+        // time `applyOps` from JS and subtract these two — see
+        // `core/engine/cpp/tests/js/create-append-phase-split.itest.ts`.
         commitMs = millisBetween(telemetry.getCommitStartTime(), telemetry.getCommitEndTime());
         layoutNodes = telemetry.getAffectedLayoutNodesCount();
         textMeasures = telemetry.getNumberOfTextMeasurements();
@@ -1773,6 +1854,11 @@ jsi::Value Tree::readSurfaceTelemetry(
   result.setProperty(runtime, "commitMs", jsi::Value(commitMs));
   result.setProperty(runtime, "layoutNodes", jsi::Value(static_cast<double>(layoutNodes)));
   result.setProperty(runtime, "textMeasures", jsi::Value(static_cast<double>(textMeasures)));
+  // OURS, not RN's, and the only field here that is not read off `TransactionTelemetry`. Zeroed on
+  // read, so a caller that samples per step gets disjoint windows. See `targetedReplaces_`.
+  result.setProperty(
+      runtime, "targetedReplaces", jsi::Value(static_cast<double>(targetedReplaces_)));
+  targetedReplaces_ = 0;
   return result;
 }
 

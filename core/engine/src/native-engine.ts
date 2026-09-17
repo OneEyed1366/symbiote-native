@@ -192,10 +192,19 @@ export type INativeEngineBindings = {
      */
     layoutMs: number;
     textMs: number;
-    /** The commit phase BEFORE layout — the clone-on-write tree walk, `materialize`'s own window. */
+    /**
+     * `ShadowTree::commit`'s own window, and NOT `materialize`'s — this used to say otherwise, and
+     * three rounds of investigation read the number that way. `materialize` runs in `kOpCommit`
+     * before `completeSurface` is called, so it falls outside this window and layout's alike.
+     */
     commitMs: number;
     layoutNodes: number;
     textMeasures: number;
+    /**
+     * Parents that took the targeted-replace path since the last read, zeroed on read. OURS, not
+     * RN's — a LIVENESS signal for a fast path whose absence no correctness test can see.
+     */
+    targetedReplaces: number;
   };
 };
 
