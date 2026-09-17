@@ -225,6 +225,10 @@ export type INativeEngineBindings = {
     setProps: number;
     valueEntries: number;
     valueConversions: number;
+    applyMs: number;
+    stringDecodeMs: number;
+    structureMs: number;
+    holdHandleMs: number;
   };
 };
 

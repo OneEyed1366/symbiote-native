@@ -359,6 +359,25 @@ describe('one tree, two drivers, one Fabric', () => {
           `(setNativeState=${telemetry.nativeStateMs.toFixed(1)}) ` +
           `nodes=${telemetry.nodesDecoded}`,
       );
+      // The books, closed. `applyMs` spans BOTH native calls this step makes — the explicit
+      // `flushOps()` and the one `surface.commit()` makes to run `kOpCommit` — and the whole walk
+      // happens inside the second, so `walkMs` has to come off before anything is attributed to the
+      // op loop. Reading it without that subtraction reports the walk twice.
+      const named =
+        telemetry.walkMs +
+        telemetry.decodeMs +
+        telemetry.setPropMs +
+        telemetry.stringDecodeMs +
+        telemetry.structureMs;
+      print(
+        `DEBUG APPLY  applyMs=${telemetry.applyMs.toFixed(1)} (both calls) ` +
+          `walk=${telemetry.walkMs.toFixed(1)} decode=${telemetry.decodeMs.toFixed(1)} ` +
+          `setProp=${telemetry.setPropMs.toFixed(1)} ` +
+          `strings=${telemetry.stringDecodeMs.toFixed(1)} ` +
+          `structure=${telemetry.structureMs.toFixed(1)} ` +
+          `(holdHandle=${telemetry.holdHandleMs.toFixed(1)}) ` +
+          `rest=${(telemetry.applyMs - named).toFixed(1)}`,
+      );
       print(
         `DEBUG SETPROP setPropMs=${telemetry.setPropMs.toFixed(1)} ` +
           `jsValueToDynamic=${telemetry.propConvertMs.toFixed(1)} ` +

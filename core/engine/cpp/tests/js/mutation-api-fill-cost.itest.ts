@@ -24,8 +24,10 @@ import {
   createRawText,
   createSurface,
   routeProp,
+  setProp,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
+import { recordSetProp } from '@symbiote-native/engine/mutation-buffer';
 import { flushOps } from '@symbiote-native/engine/tree-host';
 
 import { describe, expect, it, print, report } from './harness';
@@ -86,6 +88,17 @@ describe('what one recorded mutation costs', () => {
     const stringPropMs = timed(() => {
       for (let at = 0; at < OPS; at += 1)
         routeProp(nodes[at], 'testID', `row-${at}`);
+    });
+
+    // THE SAME WRITE, ENTERED ONE LAYER LOWER EACH TIME. `routeProp` classifies, `setProp` gates
+    // aria/derived-slot bookkeeping and hands to `writeProp`, `recordSetProp` encodes. Three arms
+    // over one op is the only way to say which layer holds the ~0.9 us, and the differences are the
+    // answer — the absolute numbers are a Debug-free JSC on a Mac and transfer no further than that.
+    const setPropMs = timed(() => {
+      for (const node of nodes) setProp(node, 'allowFontScaling', true);
+    });
+    const recordMs = timed(() => {
+      for (const node of nodes) recordSetProp(node, 'allowFontScaling', true);
     });
 
     const parent = createElement('RCTView');
@@ -173,6 +186,7 @@ describe('what one recorded mutation costs', () => {
         `style(shared)=${sharedStyleMs.toFixed(1)}·${each(sharedStyleMs)} ` +
         `style(fresh)=${freshStyleMs.toFixed(1)}·${each(freshStyleMs)} ` +
         `boolean=${scalarPropMs.toFixed(1)}·${each(scalarPropMs)} ` +
+        `[setProp=${each(setPropMs)} recordSetProp=${each(recordMs)}] ` +
         `string=${stringPropMs.toFixed(1)}·${each(stringPropMs)}`,
     );
 

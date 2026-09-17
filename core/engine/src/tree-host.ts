@@ -387,6 +387,18 @@ export type ISurfaceTelemetry = {
    */
   valueEntries: number;
   valueConversions: number;
+  /**
+   * `applyOps` end to end, plus the two parts of it that are neither a create nor a prop write.
+   *
+   * `applyMs` is the whole native call, so `applyMs` minus `decodeMs` / `setPropMs` /
+   * `stringDecodeMs` / `structureMs` is what the op loop itself costs — the books close here.
+   */
+  applyMs: number;
+  stringDecodeMs: number;
+  /** Every append / insert / remove op together. */
+  structureMs: number;
+  /** Inside `structureMs`: promoting a node's weak handle reference to a strong one. */
+  holdHandleMs: number;
 };
 
 /**

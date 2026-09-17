@@ -614,6 +614,15 @@ struct IWalkCost {
   // `valueConversions` / `valueEntries` says how much of the table the ops even reached.
   size_t valueEntries = 0;
   size_t valueConversions = 0;
+  // The rest of `applyOps`, so the phase's books close. `applyNs` is the whole call; the string
+  // table is decoded once up front; `structureNs` is every append/insert/remove op together.
+  double applyNs = 0;
+  double stringDecodeNs = 0;
+  double structureNs = 0;
+  // Inside `structureNs`: promoting a node's WEAK handle reference to a strong one when it acquires
+  // a parent. One `jsi::WeakObject::lock` plus one `jsi::Object` per node, i.e. real JSI work on an
+  // op that otherwise touches nothing but our own vectors.
+  double holdHandleNs = 0;
 };
 IWalkCost walkCost_;
 
@@ -1215,6 +1224,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         "symbiote engine: expected applyOps(ops, strings, values, instanceHandles, handles)");
   }
 
+  const auto applyStartedAt = ISteadyClock::now();
   auto &uiManager = uiManagerFor(runtime, "applyOps");
 
   size_t opsLength = 0;
@@ -1282,12 +1292,14 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
   // is 13 997 JSI crossings that simply stop happening, and nothing headless can price those.
   std::vector<std::string> decodedStrings;
   {
+    const auto stringsStartedAt = ISteadyClock::now();
     const size_t count = strings.size(runtime);
     decodedStrings.reserve(count);
     for (size_t at = 0; at < count; ++at) {
       decodedStrings.push_back(
           strings.getValueAtIndex(runtime, at).asString(runtime).utf8(runtime));
     }
+    walkCost_.stringDecodeNs += nanosSince(stringsStartedAt);
   }
 
   // Prop VALUES, converted at most once per entry per batch — the other half of the buffer's
@@ -1375,13 +1387,17 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         break;
       }
       case kOpAppendChild: {
+        const auto structureStartedAt = ISteadyClock::now();
         const auto &parent = nodeAt(ops[at + 1]);
         auto child = nodeAt(ops[at + 2]);
         detachFromParent(child);
         child->parent = parent.get();
+        const auto holdStartedAt = ISteadyClock::now();
         holdHandle(runtime, *child);
+        walkCost_.holdHandleNs += nanosSince(holdStartedAt);
         parent->children.push_back(std::move(child));
         markDirty(*parent);
+        walkCost_.structureNs += nanosSince(structureStartedAt);
         break;
       }
       case kOpInsertBefore: {
@@ -1562,6 +1578,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
     }
   }
 
+  walkCost_.applyNs += nanosSince(applyStartedAt);
   return jsi::Value::undefined();
 }
 
@@ -2055,6 +2072,10 @@ jsi::Value Tree::readSurfaceTelemetry(
       runtime, "valueEntries", jsi::Value(static_cast<double>(walkCost_.valueEntries)));
   result.setProperty(
       runtime, "valueConversions", jsi::Value(static_cast<double>(walkCost_.valueConversions)));
+  result.setProperty(runtime, "applyMs", millis(walkCost_.applyNs));
+  result.setProperty(runtime, "stringDecodeMs", millis(walkCost_.stringDecodeNs));
+  result.setProperty(runtime, "structureMs", millis(walkCost_.structureNs));
+  result.setProperty(runtime, "holdHandleMs", millis(walkCost_.holdHandleNs));
   walkCost_ = IWalkCost{};
   return result;
 }
