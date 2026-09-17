@@ -179,6 +179,22 @@ type ISelect = {
 const selected: ISelect[] = [];
 const repeated: number[] = [];
 
+/** `[rows, nodesPerRow]` — every pair is 20 000 nodes, and only the list's width changes. */
+const SHAPES = [
+  [500, 40],
+  [1_000, 20],
+  [2_000, 10],
+  [4_000, 5],
+] as const;
+
+const shapes: {
+  rows: number;
+  perRow: number;
+  wall: number;
+  commitMs: number;
+  layoutMs: number;
+}[] = [];
+
 function pad(text: string, width: number): string {
   return text.padStart(width);
 }
@@ -338,6 +354,52 @@ describe('where a create and an append spend themselves, end to end', () => {
     expect(repeated.length).toBe(5);
   });
 
+  // why: two suspects sit inside the unaccounted term and the sweep above cannot tell them apart,
+  // because it grew the list's WIDTH and the tree's SIZE together. `materialize` walks the changed
+  // parent's own child list (F-81's mechanism) and is therefore O(list width); `adoptCommitted`
+  // descends the committed tree and is O(total nodes) whenever its identity stop fails. Holding the
+  // NODE COUNT fixed at 20 000 and varying only the width separates them: a cost that tracks width
+  // is the sibling walk, a cost that stays flat is the whole-tree descent.
+  it('holds the node count at 20 000 and varies only the list width', () => {
+    for (const [rows, perRow] of SHAPES) {
+      openList();
+      const built: ISymbioteNode[] = [];
+      for (let id = 0; id < rows; id += 1) {
+        const row = createElement('RCTView');
+        routeProp(row, 'style', ROW_STYLE);
+        for (let at = 1; at < perRow; at += 1) {
+          const cell = createElement('RCTView');
+          routeProp(cell, 'style', CELL_STYLE);
+          appendChild(row, cell);
+        }
+        built.push(row);
+        appendChild(listOf(), row);
+      }
+      flushOps();
+      surfaceOf().commit();
+      mounted();
+
+      const startedAt = performance.now();
+      routeProp(built[rows >> 1], 'style', {
+        ...ROW_STYLE,
+        backgroundColor: '#f5a524',
+      });
+      flushOps();
+      surfaceOf().commit();
+      const wall = since(startedAt);
+      mounted();
+      const telemetry = readSurfaceTelemetry(ROOT_TAG);
+      shapes.push({
+        rows,
+        perRow,
+        wall,
+        commitMs: telemetry?.commitMs ?? 0,
+        layoutMs: telemetry?.layoutMs ?? 0,
+      });
+    }
+    expect(shapes.length).toBe(SHAPES.length);
+  });
+
   it('reports the split and the per-phase curve', () => {
     for (const line of [
       ...table('CREATE', created),
@@ -366,6 +428,23 @@ describe('where a create and an append spend themselves, end to end', () => {
       }),
       '',
       `five identical selects on one standing 1 000: ${repeated.map(one => one.toFixed(1)).join('  ')} ms`,
+      '',
+      'ONE prop on ONE row, 20 000 nodes throughout — only the LIST WIDTH changes',
+      pad('rows', 8) +
+        pad('nodes/row', 12) +
+        pad('wall', 8) +
+        pad('commitMs', 10) +
+        pad('layoutMs', 10) +
+        pad('unaccounted', 13),
+      ...shapes.map(
+        one =>
+          pad(String(one.rows), 8) +
+          pad(String(one.perRow), 12) +
+          pad(one.wall.toFixed(1), 8) +
+          pad(one.commitMs.toFixed(1), 10) +
+          pad(one.layoutMs.toFixed(1), 10) +
+          pad((one.wall - one.commitMs - one.layoutMs).toFixed(1), 13),
+      ),
       '',
       `per-node cost, ${WIDTHS[WIDTHS.length - 1]} rows vs ${WIDTHS[0]}:`,
       `  create   fill ${curveOf(created, 'fill').toFixed(2)}x   ` +
@@ -421,14 +500,31 @@ report();
 // So the unaccounted term in CREATE and APPEND is the same term: 176 ms of a 225 ms create commit and
 // 214 ms of a 274 ms append commit, in a walk whose size is the STANDING tree and not the change.
 //
+// **IT IS NOT THE TREE — IT IS THE WIDTH OF ONE CHILD LIST.** The sweep above grew the list's width
+// and the tree's size together, which cannot separate the two suspects: `materialize` walks the
+// changed parent's own child list (F-81's mechanism, O(width)) while `adoptCommitted` descends the
+// committed tree (O(total nodes)). Holding the node count at 20 000 and varying ONLY the width:
+//
+//   rows  nodes/row   wall  commitMs  layoutMs  unaccounted
+//    500         40   12.0       0.2       0.0         11.8
+//   1000         20   33.0       0.4       0.0         32.6
+//   2000         10  110.0       0.7       0.0        109.3
+//   4000          5  416.0       1.1       0.0        414.9
+//
+// Same twenty thousand nodes in every row. Widening the changed parent's child list 8x multiplies
+// the commit 35x, and Fabric's own share goes 0.2 -> 1.1 ms, i.e. linear and negligible. So the
+// term is **superlinear in the SIBLING COUNT of the node that changed** — roughly O(width^1.75) —
+// and `adoptCommitted`'s whole-tree descent is ruled out by these four arms, because a cost
+// proportional to total nodes would have been flat across them. That refutes this file's own first
+// hypothesis, which named `adoptCommitted`.
+//
+// This is the shape a real list has: `BenchmarkScreen`'s own step is 1 000-2 000 flat rows under one
+// parent, and every commit that touches any one of them pays it again.
+//
 // WHAT THIS DOES NOT ESTABLISH. JSC is not Hermes and a Mac is not a phone, so no millisecond here
-// transfers to a device — the CURVE and the SPLIT are what carry. And this file does not separate
-// `materialize` from `adoptCommitted`; both are inside the unaccounted term and only a C++-side
-// timer can tell them apart. `materialize` has a reuse fast path that a clean row should take in
-// nanoseconds, which is what makes 105 ms hard to attribute to it and points at `adoptCommitted` —
-// whose own comment claims "O(changed), not O(tree)" on the grounds that an identical child pointer
-// means an identical subtree, the SAME invariant `canReplaceInPlace` was disabled for violating.
-// If Fabric substitutes clones during the commit (`enableStateReconciliation: true`, and
-// `progressState` is named in that disabling comment), that stop condition never fires and the
-// descent is the whole tree. That is the next thing to instrument, and it is a hypothesis here, not
-// a result.
+// transfers to a device — the CURVE and the SPLIT are what carry. And "inside `materialize`/the
+// child-set build for a wide parent" is as far as four JS-side arms can localize it; which line is
+// superlinear needs a C++ timer, and the candidates worth timing first are the `ChildSet` copy into
+// `node.committedChildren`, the `IOwnerTally` per materialised parent, and RN's own
+// `YogaLayoutableShadowNode::updateYogaChildren` on a wide list — the last of which F-80 exonerated
+// in a container-only bench that never built a real committed tree.
