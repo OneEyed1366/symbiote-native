@@ -50,6 +50,31 @@ Svelte/Solid Expo canary screens and updated most but not all of the wrapper-pac
 reference them. Docs-site `.mdx` mirrors for these same packages were checked and don't repeat
 this sentence pattern at all (different structure), so no mirror-side fix was needed.
 
+## Eighth pass — more package samples, mostly clean this time
+
+Checked `brightness`/`haptics`'s "not yet wired into the non-Expo canary" claims against
+`find examples/react/screens -iname '*Brightness*'` / `*Haptic*` — both genuinely absent, claims
+accurate, no fix needed.
+
+Read `screen-orientation`, `keep-awake`, `localization`, `network` in full. Found a real but minor
+gap, NOT a factual error: their inline code-comment file-path citations
+(`// React — examples/expo-react/screens/XScreen.tsx`) are present for React/Vue/Angular but
+missing for the Svelte/Solid snippets (just `<!-- Svelte -->` / `// Solid`, no path) — even though
+`test -f examples/expo-{svelte,solid}/screens/<Name>Screen.*` confirms those files DO exist. This
+is an inconsistency in citation completeness, not a false claim (nothing says the files don't
+exist) — didn't fix it, it's below the "docs must not lie" bar this task is scoped to. Note it
+here so a future pass doesn't re-investigate from scratch and mistake it for another instance of
+the pass-6/7 pattern (it isn't — no wrong claim, just an uncited-but-real file).
+
+`secure-store`, `sharing`, `sms`, `standard-web-crypto` — no `examples/expo-*` screen citations at
+all in their READMEs (checked, this is by design for these — not every package's README cites the
+canary screen paths the same way `sensors`/`keep-awake`/etc. do). Nothing to fix.
+
+**Assessment: the package-README sampling is now hitting diminishing returns** — 8 of the last 10
+packages read in full had no factual errors. The remaining un-sampled packages (`android`,
+`expo-modules-link`, `splash-screen` full read, `navigation` full read) are the last reasonable
+candidates before this approach, too, should be considered exhausted.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
