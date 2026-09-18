@@ -128,6 +128,42 @@ If none of these turn up anything in a full read, that's a real signal to stop m
 findings and either do (a) the genuine Diátaxis prose-quality pass, or (b) report the task
 substantially complete rather than continuing to search.
 
+## Eleventh pass — examples/*/README.md, the biggest finding of this whole task
+
+Read `react`, `bare-rn`, `angular`, `vue-sfc`, `vue-tsx`, `svelte`, `solid` example READMEs in
+full (the non-Expo canaries; Expo-canary READMEs not yet read this pass).
+
+- **`vue-sfc/README.md` and `vue-tsx/README.md` described an app shape that no longer exists.**
+  Both said the app is "a Vue counter" whose `App.vue`/`App.tsx` directly holds a tap-to-increment
+  counter, a keyed-list `.map()`, a ternary-toggled spinner, and cited `onStartShouldSetResponder`/
+  `onResponderRelease`/`@start-should-set-responder` as the tap mechanism, with "`ActivityIndicator`
+  is the first `@symbiote-native/components` component." **None of this is true any more.** Both
+  apps' own source-file header comments say so directly: `App.vue`/`App.tsx` now compose a
+  `@symbiote-native/navigation` Stack over ~21-29 screens, `Menu` is the initial route, and the
+  old counter content moved wholesale into `CanaryScreen` ("the app's OWN former root content...
+  see CanaryScreen's header for the relocation note"). The counter now uses a plain `onPress`/
+  `@press` on a `<view>`, not the raw responder protocol. `examples/svelte`'s README already
+  described this correctly (it must have been updated when the restructuring happened); `vue-sfc`
+  and `vue-tsx` were simply never updated. **Root cause of the gap: they diverged from their own
+  sibling doc rather than from any grep pattern already swept.**
+- Rewrote both READMEs' structure listings (added `routes.ts`/`navigation-lines.ts`/
+  `navigation-linking.ts`/`screens/`/`components/`, matching svelte's shape), replaced the "tap
+  the box, counter increments" run-section language with "push into `Canary` from `Menu`", and
+  deleted (not replaced-with-a-guess) the stale raw-responder/`ActivityIndicator`-is-first
+  narrative — verified the *current* mechanism (`onPress` on a `<view>`) with `grep`/`sed` against
+  the actual `.vue`/`.tsx` source before writing the replacement text.
+- `react/README.md` — fixed two related omissions found while cross-referencing: "Every other
+  example (vue-tsx, vue-sfc, angular)" and the shared-native-shell note both omitted Svelte/Solid,
+  even though both copy `examples/react`'s native shell too (confirmed by their own READMEs).
+  `angular/README.md` had the same two omissions in its own mirror of that claim, fixed too.
+- `bare-rn`, `react` (aside from the above), `svelte`, `solid` — clean.
+
+**Lesson for the next pass: when two sibling READMEs describe "the same app, different authoring"
+(vue-sfc/vue-tsx, or any future pair), check whether one was updated after a real refactor and the
+other wasn't — this is a systematic risk shape, not a one-off.** The `examples/expo-*/README.md`
+files (6, not yet read this pass) are the obvious next check, especially since several are
+"same app as X" pairs too.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
