@@ -21,6 +21,7 @@ import {
   isTextContainer,
   nextSiblingOf,
   parentOf,
+  registerBeforeFlush,
   removeChild,
   routeProp,
   setEventListener,
@@ -182,9 +183,85 @@ export class SymbioteRenderer implements Renderer2 {
   // render.ts (unmount), so per-node cleanup is a no-op.
   destroyNode: ((node: ISymbioteNode) => void) | null = null;
 
-  constructor(private readonly surface: SymbioteSurface) {}
+  // THE STYLING RUN, and why it is held rather than published key by key.
+  //
+  // Angular has no whole-value styling call: `ɵɵstyleMap` / `ɵɵclassMap` walk the key-value array
+  // and call `setStyle` / `addClass` once PER KEY (`updateStyling` -> `applyStyling`, upstream
+  // `@angular/core`). RN wants one `style` prop, so publishing on each call rebuilt the whole object
+  // every time — N writes for an N-key style, the k-th carrying k keys, and N DISTINCT values where
+  // the app authored one. Measured on the headless bench arm: `values` 10 001 against Vue's 3 004
+  // for the identical tree, and `convert` 30.0 ms against 0.6.
+  //
+  // The run is safe to hold because it is CONTIGUOUS: `updateStyling` takes its node from
+  // `getSelectedIndex()` and the loop never changes element mid-way, so the calls for one node
+  // arrive with nothing between them. Anything else — a different node, any other renderer call, a
+  // host read, the commit — closes it first.
+  // `ISymbioteNode`, not `IHostElement`: a surface is turned away by `isSurface` at every entry
+  // point, so a run can only ever be open on a real node, and saying so keeps the publish below
+  // free of a second guard.
+  private pendingStyleNode: ISymbioteNode | undefined;
+  private pendingStyle: Record<string, unknown> = {};
+  private pendingClassNode: ISymbioteNode | undefined;
+  private readonly releaseBeforeFlush: () => void;
 
-  destroy(): void {}
+  constructor(private readonly surface: SymbioteSurface) {
+    // A READ AND A COMMIT BOTH ARRIVE FROM ELSEWHERE, so the renderer cannot close the run on its
+    // own: a turn whose last act is a style change has no next call to close it, and the commit
+    // would paint the node without it. `flushOps` is the one door in front of every drain.
+    this.releaseBeforeFlush = registerBeforeFlush(() => this.flushStyling());
+  }
+
+  destroy(): void {
+    this.flushStyling();
+    this.releaseBeforeFlush();
+  }
+
+  /**
+   * Publish whatever the styling run is holding. Idempotent, and free when it holds nothing.
+   *
+   * IT DOES NOT REQUEST A COMMIT, and that is not an omission — the request is made when the style
+   * is ACCUMULATED, exactly where it was made before the run existed. This runs from inside
+   * `flushOps`, which the commit itself calls first, so asking there schedules a SECOND commit whose
+   * tree is already current: a full `completeRoot` plus a Yoga pass for nothing.
+   *
+   * Measured, because it did not look like a cost. The bench arm's `select` fell 17.1 -> 3.8 ms and
+   * its `remove` rose 7.1 -> 18.2 in the same runs — the extra commit lands in whichever step's
+   * microtask happens to run it, so the work had MOVED between steps rather than gone. Two rows
+   * moving by the same amount in opposite directions is what that always looks like.
+   */
+  private flushStyling(): void {
+    const styled = this.pendingStyleNode;
+    if (styled !== undefined) {
+      const style = this.pendingStyle;
+      this.pendingStyleNode = undefined;
+      this.pendingStyle = {};
+      routeProp(styled, 'style', style);
+    }
+    const classed = this.pendingClassNode;
+    if (classed !== undefined) {
+      this.pendingClassNode = undefined;
+      const tokens = this.classTokens.get(classed);
+      routeProp(
+        classed,
+        'class',
+        tokens !== undefined && tokens.size > 0
+          ? [...tokens].join(' ')
+          : undefined,
+      );
+    }
+  }
+
+  /** The accumulator for this node's style run, opening one (and closing any other) if needed. */
+  private openStyleRun(el: ISymbioteNode): Record<string, unknown> {
+    if (this.pendingStyleNode === el) return this.pendingStyle;
+    this.flushStyling();
+    // Seeded from what is STANDING, because Angular sends only the keys that changed — an update
+    // that moves one key must not drop the rest.
+    const current = getExplicitStyle(el);
+    this.pendingStyle = isRecord(current) ? { ...current } : {};
+    this.pendingStyleNode = el;
+    return this.pendingStyle;
+  }
 
   createElement(name: string): IHostNode {
     // `name` is the component's host tag — a symbiote intrinsic (`view`,
@@ -368,8 +445,12 @@ export class SymbioteRenderer implements Renderer2 {
     return typeof selectorOrNode === 'string' ? this.surface : selectorOrNode;
   }
 
+  // The three prop writers below close the styling run FIRST. A read or a commit would do it through
+  // `registerBeforeFlush`, but neither happens here: this is one prop write landing on the same node
+  // whose `style` or `class` is still held, and a run published afterwards would overwrite it.
   setAttribute(el: IHostElement, name: string, value: string): void {
     if (isSurface(el)) return;
+    this.flushStyling();
     countAngular('rendererWrites');
     noteAngularWrite(name);
     routeProp(el, name, value);
@@ -378,6 +459,7 @@ export class SymbioteRenderer implements Renderer2 {
 
   removeAttribute(el: IHostElement, name: string): void {
     if (isSurface(el)) return;
+    this.flushStyling();
     countAngular('rendererWrites');
     noteAngularWrite(name);
     routeProp(el, name, undefined);
@@ -400,7 +482,7 @@ export class SymbioteRenderer implements Renderer2 {
     const tokens = this.classTokens.get(el) ?? new Set<string>();
     tokens.add(name);
     this.classTokens.set(el, tokens);
-    routeProp(el, 'class', [...tokens].join(' '));
+    this.openClassRun(el);
     this.surface.requestCommit();
   }
 
@@ -411,8 +493,16 @@ export class SymbioteRenderer implements Renderer2 {
     countAngular('rendererWrites');
     noteAngularWrite('class');
     tokens.delete(name);
-    routeProp(el, 'class', tokens.size > 0 ? [...tokens].join(' ') : undefined);
+    this.openClassRun(el);
     this.surface.requestCommit();
+  }
+
+  // The token SET is the accumulator here — `addClass` has already put the token in it — so this
+  // only has to remember whose run is open. Closing it re-joins the set once.
+  private openClassRun(el: ISymbioteNode): void {
+    if (this.pendingClassNode === el) return;
+    this.flushStyling();
+    this.pendingClassNode = el;
   }
 
   // Angular decomposes a [style] binding into per-key setStyle calls (ɵɵstyleMap). RN wants
@@ -424,20 +514,22 @@ export class SymbioteRenderer implements Renderer2 {
     if (isSurface(el)) return;
     countAngular('rendererWrites');
     noteAngularWrite(`style.${style}`);
-    const current = getExplicitStyle(el);
-    const base = isRecord(current) ? current : {};
-    routeProp(el, 'style', { ...base, [style]: value });
+    this.openStyleRun(el)[style] = value;
     this.surface.requestCommit();
   }
 
   removeStyle(el: IHostElement, style: string): void {
     if (isSurface(el)) return;
-    const current = getExplicitStyle(el);
-    if (!isRecord(current)) return;
+    // A remove on a node with no style at all is Angular clearing a binding it never set. Opening a
+    // run for it would publish an empty style onto a node that had none, which the old early return
+    // was there to avoid.
+    if (this.pendingStyleNode !== el && !isRecord(getExplicitStyle(el))) return;
     countAngular('rendererWrites');
     noteAngularWrite(`style.${style}`);
-    const { [style]: _removed, ...rest } = current;
-    routeProp(el, 'style', rest);
+    const run = this.openStyleRun(el);
+    // The accumulator is this renderer's own object, never the node's — see `openStyleRun`.
+
+    delete run[style];
     this.surface.requestCommit();
   }
 
@@ -445,6 +537,7 @@ export class SymbioteRenderer implements Renderer2 {
   // ViewConfig (identical to React/Vue), so the whole flat-bag prop layer is shared.
   setProperty(el: IHostElement, name: string, value: unknown): void {
     if (isSurface(el)) return;
+    this.flushStyling();
     countAngular('rendererWrites');
     noteAngularWrite(name);
     routeProp(el, name, value);
