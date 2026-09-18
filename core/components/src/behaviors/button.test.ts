@@ -149,18 +149,22 @@ describe('button host behavior', () => {
 
     const { text, label } = subtreeOf(TEST_ID);
     expect(label?.payload.text).toBe('Save');
-    // RN's Text.js defaults, which a hand-written host tag inherits from nothing. Without them a
-    // long label clips mid-word instead of ellipsising, on device only.
-    expect(text.payload.ellipsizeMode).toBe('tail');
-    expect(text.payload.allowFontScaling).toBe(true);
+    // RN's two Text defaults are what this line REPLACED, later the same day, and the comment below
+    // is why: it stated the criterion, and these two keys changed sides.
+    //
+    // The component name is the WITNESS that survives, and it is the better one — the engine's rule
+    // is keyed on exactly this, so asserting it says "whatever `buildStructure` built will be
+    // defaulted" without restating what the defaulting does.
+    expect(text.viewName).toBe('RCTText');
     // `styles.text` LEFT ON 2026-09-18 — the label's whole style is `foldButtonLabelStyle` in
     // `SymbioteFabricProps.cpp`, and this host builds its payload through the TypeScript
     // `fabricProps`, which carries no copy of the tag rules. Pinned against the committed payload in
     // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`.
     //
-    // The Text DEFAULTS above stay, and the difference is worth seeing: those are written as real
-    // props by `buildStructure` at build time, so they are this side's and observable here. The
-    // style is a RULE and is not.
+    // The Text DEFAULTS used to stay, on the stated grounds that they were written as real props by
+    // `buildStructure` at build time and so were this side's and observable here. That was true, and
+    // then the seed was deleted — they are a payload RULE now, exactly like the style, and they left
+    // through the same door. The criterion held; only the answer moved.
   });
 
   it('keeps title and color off the payload and pins the button role', async () => {

@@ -119,14 +119,19 @@ describe('a bare tag commits what a wrapper used to', () => {
     ]);
   });
 
-  it("text: RN's defaults reach the tag", async () => {
-    // These come from seedTextDefaults in createElement, NOT from textDefaultFor in patchProp —
-    // that one fires only when a value is an explicit `undefined`, so it is never reached by a
-    // text carrying no props at all. Disabling it leaves this test green; disabling
-    // seedTextDefaults empties the payload. The wrapper's own `resolveTextProps` copy was the
-    // second of two mechanisms that happened to agree; the seed is the one that survived.
+  it('text: the tag adds nothing of the adapter’s own', async () => {
+    // RN's two Text defaults left on 2026-09-18, the same way and for the same reason as the
+    // Pressable pair one case up: the rule is `foldTextDefaults` in `SymbioteFabricProps.cpp` now,
+    // and this harness's payload comes from the TypeScript `fabricProps`, which holds no copy of it.
+    // `core/engine/cpp/tests/js/committed-payload.itest.ts` has them.
+    //
+    // An EMPTY payload is the real assertion here rather than a leftover: this renderer once held
+    // three successive mechanisms for these two keys (a wrapper fold, a create-time seed, a
+    // patch-time substitution), each invisible to the others, and the seed in particular put both
+    // keys on every text node in the app. So "a text carrying no props commits no props" is exactly
+    // the regression that history makes worth pinning.
     const tag = await commit('text', {}, 'hi');
 
-    expect(tag).toEqual({ ellipsizeMode: 'tail', allowFontScaling: true });
+    expect(tag).toEqual({});
   });
 });

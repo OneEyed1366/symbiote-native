@@ -21,8 +21,7 @@ export type { IDescriptorShapeGuard } from './descriptor';
 // and its types. Framework-agnostic, so React, Vue, and the next adapter all fold
 // identically; moved here from @symbiote-native/react. RefreshControl/SafeAreaView/ScrollView consume it.
 export { resolveAccessibilityProps } from './accessibility-props';
-export { resolveTextProps } from './text-props';
-export type { IEllipsizeMode, ITextDefaultableProps } from './text-props';
+export type { IEllipsizeMode } from './text-props';
 export type {
   IAccessibilityProps,
   IAriaProps,

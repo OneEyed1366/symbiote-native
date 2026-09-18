@@ -96,10 +96,11 @@ afterAll(() => {
   rmSync(PROBE_OUT, { force: true });
 });
 
-// The wrapper-vs-bag comparison this file opened with is GONE with the wrappers. What replaced it
-// is not a smaller version of it: `tag-fold-coverage.test.ts` asserts every primitive's fold
-// ABSOLUTELY, against the spec, which is the half a cross-arm comparison was structurally blind to
-// anyway (`test-harness-false-greens.md` §16).
+// The wrapper-vs-bag comparison this file opened with is GONE with the wrappers, and so is
+// `tag-fold-coverage.test.ts`, which replaced it: the spec-driven `defaults` it asserted against
+// were deleted on 2026-09-18 along with `foldHostBag`, because the engine's own component-keyed
+// rules had made every one of them redundant. There is no per-primitive fold left in this adapter to
+// assert absolutely, which is the end state and not a gap.
 
 describe('children under a tag', () => {
   it('mount as markup, which a `children` key in the bag never does', async () => {
@@ -117,6 +118,10 @@ describe('children under a tag', () => {
     // something a transform emitted: the same child handed over as a bag KEY never mounts, because
     // `routeProp` treats `children` as an ordinary prop and a Snippet is not markup there.
     expect(kid, 'a child written as markup commits').toBeDefined();
-    expect(kid?.ellipsizeMode, 'and its Text defaults are folded').toBe('tail');
+    // The witness used to be `ellipsizeMode: 'tail'`, one of RN's Text defaults, which this adapter
+    // no longer supplies — the rule is the engine's, keyed on the component. `testID` is the better
+    // witness anyway: it proves the child's own BAG arrived, which is the thing a markup child and a
+    // `children` key actually differ about.
+    expect(kid?.testID, 'and its own bag arrived with it').toBe('kid');
   });
 });

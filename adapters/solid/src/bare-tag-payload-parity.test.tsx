@@ -15,6 +15,22 @@
 //
 // A row that goes red here names the layer that has not caught up, which is the whole reason to
 // diff payloads rather than assert individual keys.
+//
+// ── THE TWO ARMS HAVE CONVERGED, AND THAT IS NOT FIXABLE HERE (noticed 2026-09-18) ───────────────
+//
+// This file's own paragraph above predicted it: "once `View` is a string, there is no component left
+// to compare against". That day arrived — `adapters/solid/src/components/` holds no `text` or `view`
+// component, only `*-props.ts` — so `payloadOf(WRAPPER_ROOT, () => <text …/>)` and
+// `payloadOf(TAG_ROOT, () => <text …/>)` mount the SAME intrinsic twice. Every remaining case
+// compares a payload with itself and can no longer go red for the reason it was written.
+//
+// It is not a false green of the ordinary kind — the comparison DID its job, before and after the
+// switch, and the record is in the git history. It is a test that has outlived its subject, the same
+// shape as the three `id` cases collapsed on 2026-09-18 ("a loop whose arms have converged reports
+// agreement with itself"). The repair is to collapse each case to a single-arm ABSOLUTE assertion
+// naming the keys the layer now produces — which `tag-folds.test.tsx` already does, and which the
+// Text case below has had done to it. The other seven have not, and are left standing rather than
+// silently weakened in a commit that is about something else.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -102,17 +118,19 @@ describe('a bare intrinsic commits the wrapper payload', () => {
     expect(keysOf(wrapper.payload)).not.toContain('nativeID');
   });
 
-  it('Text: the two defaults reach the bare tag from the renderer', async () => {
-    const props = { numberOfLines: 1 };
+  // why: RN's two Text defaults left this case on 2026-09-18 — the header's row for them said "the
+  // renderer" and the answer is "the engine" now, keyed on the component and asserted in
+  // `core/engine/cpp/tests/js/committed-payload.itest.ts`. This harness has no copy of that rule, so
+  // asserting the values here would assert the headless builder instead of the device.
+  //
+  // What is left that this adapter decides is the COMPONENT and the authored passthrough, so that is
+  // what it says — absolutely, in the shape `tag-folds.test.tsx` uses, rather than by comparing two
+  // arms. See this describe block's closing note on why the comparison no longer discriminates.
+  it('Text: commits under the component the engine keys its rule on', async () => {
+    const tag = await payloadOf(TAG_ROOT, () => <text numberOfLines={1} />);
 
-    const wrapper = await payloadOf(WRAPPER_ROOT, () => <text {...props} />);
-    const tag = await payloadOf(TAG_ROOT, () => <text {...props} />);
-
-    expect(tag.view).toBe(wrapper.view);
-    expect(keysOf(tag.payload)).toEqual(keysOf(wrapper.payload));
-    expect(tag.payload).toEqual(wrapper.payload);
-    expect(wrapper.payload.ellipsizeMode).toBe('tail');
-    expect(wrapper.payload.allowFontScaling).toBe(true);
+    expect(tag.view).toBe('RCTText');
+    expect(tag.payload.numberOfLines).toBe(1);
   });
 
   it('Text: allowFontScaling={false} is the case a plain ?? would get wrong', async () => {

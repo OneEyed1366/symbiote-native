@@ -83,9 +83,11 @@ describe('reading back the payload a commit sent', () => {
     expect(payload.readOnly).toBe(undefined);
   });
 
-  // why: the component-keyed rule that has a TWIN in TypeScript, which is the drift this read
-  // closes. `applyTextDefaults` is written once in `fabric-props.ts` and once in
-  // `SymbioteFabricProps.cpp`, and until now only the first copy had a test.
+  // why: the component-keyed rule that HAD two TypeScript twins, which is the drift this read
+  // closes. `applyTextDefaults` in `fabric-props.ts` and `resolveTextProps` in
+  // `core/components/src/text-props.ts` were both deleted on 2026-09-18 and the four cases below are
+  // where their claims went. Neither could ever have caught the device rule: one is a vitest over the
+  // headless builder, the other a unit test of a function the commit path does not call.
   it('shows a text node the platform defaults no adapter writes', () => {
     const text = commit('RCTText', 'text', {});
 
@@ -94,6 +96,64 @@ describe('reading back the payload a commit sent', () => {
 
     expect(payload.ellipsizeMode).toBe('tail');
     expect(payload.allowFontScaling).toBe(true);
+  });
+
+  // why: a default is a FALLBACK, never an override — the half a payload-time rule can get wrong in
+  // a way a seed could not, since a seed ran before the author's write and simply lost. `clip` is a
+  // real RN mode rather than an absent value, so it has to survive rather than be re-defaulted.
+  it('lets an authored text value beat the platform default', () => {
+    const chosen = commit('RCTText', 'text', {
+      ellipsizeMode: 'clip',
+      allowFontScaling: false,
+    });
+    const payload = committedPayloadOf(chosen);
+    if (payload === undefined) throw new Error('the text committed no payload');
+
+    expect(payload.ellipsizeMode).toBe('clip');
+    expect(payload.allowFontScaling).toBe(false);
+  });
+
+  // why: `!== false`, not `?? true`. RN treats an explicit `undefined` and a missing prop alike and
+  // only a literal `false` opts out — so an adapter that spells an absent prop as `undefined` must
+  // still get the default rather than `undefined` reaching native.
+  it('treats an explicit undefined as absent, which only a literal false opts out of', () => {
+    const blank = commit('RCTText', 'text', {
+      ellipsizeMode: undefined,
+      allowFontScaling: undefined,
+    });
+    const payload = committedPayloadOf(blank);
+    if (payload === undefined) throw new Error('the text committed no payload');
+
+    expect(payload.ellipsizeMode).toBe('tail');
+    expect(payload.allowFontScaling).toBe(true);
+  });
+
+  // why: a NULL is not a value the author chose either, and getting that wrong is device-only and
+  // silent — `<text ellipsizeMode={null}>` committed null until Solid's renderer was corrected for
+  // it in 2026-08, its second revision of a rule it should never have held. Travelled here from
+  // `adapters/solid/src/tag-folds.test.tsx`, which could only ever see that adapter's own copy.
+  it('treats a null the same as an absent value', () => {
+    const nulled = commit('RCTText', 'text', {
+      ellipsizeMode: null,
+      allowFontScaling: null,
+    });
+    const payload = committedPayloadOf(nulled);
+    if (payload === undefined) throw new Error('the text committed no payload');
+
+    expect(payload.ellipsizeMode).toBe('tail');
+    expect(payload.allowFontScaling).toBe(true);
+  });
+
+  // why: the keys are Text's. A `<View>` carrying them would be two junk props on every node in the
+  // tree — the cost this rule exists to remove, reintroduced at a hundred times the scale. This is
+  // the control for the four cases above, and the reason the rule is keyed on the component.
+  it('leaves a non-text node without either default', () => {
+    const view = commit('RCTView', 'view', { testID: 'plain' });
+    const payload = committedPayloadOf(view);
+    if (payload === undefined) throw new Error('the view committed no payload');
+
+    expect(payload.ellipsizeMode).toBe(undefined);
+    expect(payload.allowFontScaling).toBe(undefined);
   });
 
   // why: the style hoist, which no other read can see at all. The builder writes the style slot's

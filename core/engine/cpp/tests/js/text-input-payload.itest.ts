@@ -265,6 +265,55 @@ describe('what a text input sends native, resolved by the engine', () => {
     expect(payload.text).toBe('hello');
     expect(payload.value).toBe(undefined);
   });
+
+  // why: RN HAS NO `value` FABRIC PROP — the controlled value rides as the private `text`. The four
+  // cases below pinned only the TypeScript twin of this rule until 2026-09-18, in a vitest that
+  // builds payloads through `fabric-props.ts` and therefore cannot see the C++ copy at all. The
+  // device rule could have broken with every one of them green. Same shape as the disabled
+  // `touchable-highlight` that committed `focusable: true` for as long as it did.
+  it('folds an uncontrolled defaultValue the same way', () => {
+    const payload = single({ defaultValue: 'initial' }).payload;
+    expect(payload.text).toBe('initial');
+    expect(payload.defaultValue).toBe(undefined);
+  });
+
+  // why: `value` is the controlled one, so it WINS — and `defaultValue` must still leave the bag,
+  // because neither name is a Fabric prop and an undeclared key is dropped in silence on device.
+  it('lets the controlled value win over the initial one, and drops both names', () => {
+    const payload = single({ value: 'now', defaultValue: 'then' }).payload;
+    expect(payload.text).toBe('now');
+    expect(payload.value).toBe(undefined);
+    expect(payload.defaultValue).toBe(undefined);
+  });
+
+  // why: an explicit `text` is the COMPONENT path, where the wrapper already folded. Re-folding
+  // there would let a stale `value` overwrite what the machine computed — the controlled-value
+  // handshake is one of the things that deliberately stayed in JS.
+  it('leaves an explicit text alone while still consuming value', () => {
+    const payload = single({ text: 'computed', value: 'stale' }).payload;
+    expect(payload.text).toBe('computed');
+    expect(payload.value).toBe(undefined);
+  });
+
+  // why: the rule is gated on the COMPONENT and not on the prop name, because `value` is also a prop
+  // of Switch and Slider — a name-keyed fold would write a bogus `text` onto both. Asserted from a
+  // view, which declares no `value` at all: if the gate ever keys on the prop, this is where it
+  // shows, and on device it would be a `text` prop on something that is not a text input.
+  it('does not touch value on a component that is not a text input', () => {
+    const payload = commit('RCTView', 'view', {
+      value: 'not a text input',
+    }).payload;
+    expect(payload.value).toBe('not a text input');
+    expect(payload.text).toBe(undefined);
+  });
+
+  // why: multiline is a different Fabric component with its own name, and the gate names both. A
+  // rule that checked only the singleline one would leave every `<TextInput multiline>` empty.
+  it('folds the value on the multiline component too', () => {
+    const payload = multi({ value: 'many lines' }).payload;
+    expect(payload.text).toBe('many lines');
+    expect(payload.value).toBe(undefined);
+  });
 });
 
 report();

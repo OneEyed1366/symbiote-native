@@ -317,10 +317,16 @@ describe('remove and reorder', () => {
   });
 });
 
-// An intrinsic TAG reaches the renderer with no component wrapper in between, so two things a
-// wrapper used to do must happen here — RN's Text.js defaults (resolveTextProps) and the
-// kebab->camel attr fold (normalizeVueAttrs). Both failures are silent: a clipped line with no
-// ellipsis, and a prop that never reaches Fabric.
+// An intrinsic TAG reaches the renderer with no component wrapper in between, so what a wrapper used
+// to do must happen somewhere else. There were TWO such things here and there is one left: the
+// kebab->camel attr fold (`normalizeVueAttrs`), whose failure is silent — a prop that never reaches
+// Fabric under a name no ViewConfig declares.
+//
+// RN's Text.js defaults were the other, and they went one layer further down on 2026-09-18 rather
+// than staying in this renderer. `foldTextDefaults` reads the authored bag at payload time, so it
+// needs no help from any adapter, and the claims are in
+// `core/engine/cpp/tests/js/committed-payload.itest.ts`. What this renderer still owes a text tag is
+// FORWARDING, which is what the cases below assert.
 describe('host primitives as intrinsic tags', () => {
   const findByTestId = (id: string): ILiveNode | undefined =>
     findCommitted(node => node.payload.testID === id);
@@ -330,14 +336,15 @@ describe('host primitives as intrinsic tags', () => {
     await tick();
   };
 
-  it("seeds RN's Text defaults on an intrinsic text", async () => {
+  // why: the engine's rule is keyed on the COMPONENT, so committing an intrinsic `text` as `RCTText`
+  // is the precondition for every default landing. This is what the old "seeds RN's Text defaults"
+  // case was really establishing about the renderer.
+  it('commits an intrinsic text under the component the rule is keyed on', async () => {
     await mountTemplate(() => h('text', { testID: 'plain' }, ['hello']));
-    const props = findByTestId('plain')?.payload;
-    expect(props?.ellipsizeMode).toBe('tail');
-    expect(props?.allowFontScaling).toBe(true);
+    expect(findByTestId('plain')?.viewName).toBe('RCTText');
   });
 
-  it('lets an explicit value beat the seeded default', async () => {
+  it('forwards an explicit value rather than folding it', async () => {
     await mountTemplate(() =>
       h(
         'text',
@@ -354,10 +361,12 @@ describe('host primitives as intrinsic tags', () => {
     expect(props?.allowFontScaling).toBe(false);
   });
 
-  // RN treats a missing prop and an explicit `undefined` alike — only a literal `false` opts out
-  // (core/components/src/text-props.ts). Without the re-seed in patchProp the undefined would
-  // delete the default instead.
-  it('keeps the default when the prop is explicitly undefined', async () => {
+  // why: this renderer used to SUBSTITUTE the default for an explicit `undefined` in `patchProp`,
+  // on the reasoning that RN treats a missing prop and an explicit `undefined` alike. True, and the
+  // engine is where it is now acted on — which means the renderer's job is the opposite one: pass
+  // the clear through untouched and let the rule decide. A renderer that still substituted would be
+  // invisible here and would diverge from the other four.
+  it('forwards an explicit undefined rather than substituting for it', async () => {
     await mountTemplate(() =>
       h(
         'text',
@@ -370,8 +379,8 @@ describe('host primitives as intrinsic tags', () => {
       ),
     );
     const props = findByTestId('undef')?.payload;
-    expect(props?.ellipsizeMode).toBe('tail');
-    expect(props?.allowFontScaling).toBe(true);
+    expect(props?.ellipsizeMode).toBeUndefined();
+    expect(props?.allowFontScaling).toBeUndefined();
   });
 
   it('folds a kebab attr to camelCase on an intrinsic tag', async () => {

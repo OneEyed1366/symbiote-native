@@ -189,18 +189,16 @@ describe('a bare intrinsic tag, hand-written', () => {
     });
   });
 
-  it('seeds the two Text defaults and takes a raw-text child', async () => {
+  it('commits as RCTText and takes a raw-text child', async () => {
     const { node, all } = await mountTemplate(
       `<text testID="probe">hello</text>`,
       NO_ERRORS_SCHEMA,
     );
+    // RN's two Text defaults were asserted here until 2026-09-18 and are the engine's rule now
+    // (`foldTextDefaults`), keyed on exactly this component name — so the name IS the claim, and
+    // `core/engine/cpp/tests/js/committed-payload.itest.ts` is where the values are read.
     expect(node?.viewName).toBe('RCTText');
-    // RN's Text.js applies both unconditionally; without them a clamped Text cuts mid-word with no
-    // ellipsis, on device only.
-    expect(node?.payload).toMatchObject({
-      ellipsizeMode: 'tail',
-      allowFontScaling: true,
-    });
+    expect(node?.payload).toMatchObject({ testID: 'probe' });
     expect(
       all.find(candidate => candidate.viewName === 'RCTRawText')?.payload,
     ).toMatchObject({ text: 'hello' });

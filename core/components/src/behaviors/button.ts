@@ -127,7 +127,6 @@ import {
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../component-names';
-import { resolveTextProps } from '../text-props';
 import { resolveButtonDisabled } from '../view/render-button';
 import {
   booleanOr,
@@ -319,12 +318,13 @@ function buildStructure(node: ISymbioteNode): ISymbioteNode {
     textDescriptor.isText,
     BUTTON_LABEL_TEXT_TAG,
   );
-  // RN's Text.js applies these to every non-virtual Text on its way to native, and a hand-written
-  // host tag inherits nothing a `<Text>` component did — Svelte's Button clipped long labels
-  // mid-word for exactly this reason (`.claude/rules/host-primitive-tier.md`, "The THIRD path").
-  // Constants, because the app cannot reach this node to override them.
-  for (const [key, value] of Object.entries(resolveTextProps({})))
-    setProp(text, key, value);
+  // RN's two Text defaults are NOT written here, and that is deliberate as of 2026-09-18: they are
+  // the platform's, applied by the payload builder to every `RCTText` (`foldTextDefaults`), so this
+  // node inherits them for being a text rather than for being handed them. Seeding them was two
+  // writes per button per commit producing the payload the builder already produces — the shape
+  // `seedTextDefaults` had in three adapters. `button-derived-payload.itest.ts` reads them off the
+  // committed payload and is what proves the node still gets them.
+  //
   // Empty until the redirected `title` arrives. The commit walk drops an empty raw text
   // (`isEmptyRawText`, node.ts), so no Fabric node exists for it until it has a label — and that
   // check reads `props.text`, which the redirect writes, not the fold's uppercased output.

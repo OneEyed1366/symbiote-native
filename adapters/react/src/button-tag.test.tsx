@@ -78,9 +78,11 @@ describe('React: `button` as a tag', () => {
     // tag rules, so the base blue and the margin are `core/engine/cpp/tests/js/
     // button-derived-payload.itest.ts`'s now. The SUBTREE SHAPE, which is what this adapter
     // contributes, is what stays.
-    // RN's Text.js defaults, which a hand-written host tag inherits from nothing — without them a
-    // long label clips mid-word instead of ellipsising, on device only.
-    expect(text.payload.ellipsizeMode).toBe('tail');
+    //
+    // RN's two Text DEFAULTS left the same way on 2026-09-18, for the same reason one layer along:
+    // they were applied by `resolveTextProps` here and by four other copies, and now by the engine's
+    // `foldTextDefaults` alone. `button-derived-payload.itest.ts` reads them off the label's real
+    // payload; the node is located by POSITION, which the subtree shape already guarantees.
     expect(text.children[0].payload.text).toBe('Save');
   });
 

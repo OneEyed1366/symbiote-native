@@ -65,22 +65,13 @@ describe('the folds a tag commits', () => {
     expect(Object.keys(props)).not.toContain('nativeID');
   });
 
-  it('text — RN’s two defaults land unwritten', async () => {
-    const props = await committed(() => <text testID={TARGET}>y</text>);
-
-    expect(props.ellipsizeMode).toBe('tail');
-    expect(props.allowFontScaling).toBe(true);
-  });
-
-  // A FOLD per key, not a default VALUE: `resolveTextProps` reads `ellipsizeMode ?? 'tail'`, so a
-  // null has to resolve to the default too. Substituting only on `undefined` committed the null.
-  it('text — an explicit null still resolves to the default', async () => {
-    const props = await committed(() => (
-      <text testID={TARGET} ellipsizeMode={null}>
-        y
-      </text>
-    ));
-
-    expect(props.ellipsizeMode).toBe('tail');
-  });
+  // THE TWO TEXT CASES LEFT ON 2026-09-18 — `ellipsizeMode: 'tail'` / `allowFontScaling: true`, and
+  // the null that had to resolve the same way. They are not a key this adapter produces any more:
+  // the rule is the engine's, keyed on the component, and both claims live in
+  // `core/engine/cpp/tests/js/committed-payload.itest.ts` against a real payload. Asserting them
+  // here would now be asserting the headless builder's behaviour, which does not have the rule — a
+  // false green in the opposite direction from the one this file's header describes.
+  //
+  // What this adapter still owes on a text tag is FORWARDING, and that is
+  // `renderer-text-props.test.ts`.
 });

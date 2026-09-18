@@ -48,22 +48,16 @@ function isRawText(node: ISymbioteNode): boolean {
   return isRawTextNode(node);
 }
 
-// RN's Text.js applies two defaults on the way to native (core/components/src/text-props.ts:
-// ellipsizeMode 'tail', allowFontScaling true unless literally false). The Vue <Text> wrapper
-// folded them with resolveTextProps; a `<text>` tag has no wrapper, so the renderer seeds them
-// instead. Without this a numberOfLines={1} line clips mid-word with no ellipsis — device-observed,
-// and silent.
-const TEXT_DEFAULTS: ReadonlyMap<string, unknown> = new Map<string, unknown>([
-  ['ellipsizeMode', 'tail'],
-  ['allowFontScaling', true],
-]);
-
-// THE SEED IS GONE, and the defaults now come from the payload builder
-// (`applyTextDefaults` in `core/engine/src/fabric-props.ts`, and its twin in
-// `SymbioteFabricProps.cpp`). Writing them as props cost a crossing each time the app authored the
-// same value: measured at 6 000 wasted writes per 1 000-row create with the `writesOfUnchanged`
-// counter, against zero for React, which folds instead. `TEXT_DEFAULTS` stays for `textDefaultFor`
-// below, which is the clear-back-to-undefined path and not the create path.
+// RN's two Text defaults left this renderer entirely on 2026-09-18, in two steps a month apart. The
+// CREATE seed went first, because writing them as props cost a crossing every time the app authored
+// the same value — 6 000 per 1 000-row create, measured with `writesOfUnchanged`. What stayed was a
+// clear-back: an explicit `undefined` at patch time was substituted for the default, since RN treats
+// a missing prop and an explicit `undefined` alike.
+//
+// That substitution is gone too, and it was redundant rather than wrong. The rule reads the AUTHORED
+// bag at payload time (`foldTextDefaults`, `SymbioteFabricProps.cpp`), so it cannot tell a cleared
+// prop from one never written — both are absent by the time it looks, and both get the default. The
+// adapter was re-supplying an answer the layer below already had.
 
 // `PROP_ALIASES` (`id` -> `nativeID`) left this renderer on 2026-09-18 — `routeProp` resolves it
 // for every adapter now, and carries the per-node state the caveat here said was not worth it: with
@@ -117,13 +111,6 @@ function wrapListenerForErrorHandling(
   // attach path reads `__getEvent` off the prop value it was given. A fresh closure with none of
   // the original's own properties silently breaks that — carry them forward.
   return Object.assign(wrapper, listener);
-}
-
-// An explicit `undefined` must NOT clear one of those defaults: RN treats a missing prop and an
-// explicit undefined alike, and only a literal `false` opts out of allowFontScaling. Reached
-// only when a value is already undefined, so it costs nothing on the hot path.
-function textDefaultFor(node: ISymbioteNode, key: string): unknown {
-  return isTextContainer(node) ? TEXT_DEFAULTS.get(key) : undefined;
 }
 
 // One renderer per mounted surface: the options close over the surface so every mutation
@@ -253,7 +240,7 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       // arrive one key at a time with no component to fold the bag. Idempotent for the wrapped
       // path, which already normalized.
       const name = normalizeVueAttrKey(key);
-      const value = next === undefined ? textDefaultFor(el, name) : next;
+      const value = next;
       const routed =
         EVENT_PROP_NAME.test(name) && typeof value === 'function'
           ? wrapListenerForErrorHandling(value, parentComponent ?? null)

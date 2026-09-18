@@ -3,16 +3,7 @@
 // component imports them and renders them in its template. Declaring `style` as a real
 // Angular input prevents Angular's CSS style engine from decomposing RN `StyleProp` arrays.
 
-import {
-  Component,
-  Input,
-  type OnInit,
-  type SimpleChanges,
-} from '@angular/core';
-import {
-  resolveTextProps,
-  type IEllipsizeMode,
-} from '@symbiote-native/components';
+import { Component } from '@angular/core';
 import { SymbiotePrimitiveHost } from './shared';
 
 export {
@@ -31,60 +22,26 @@ export {
 export class ViewHost extends SymbiotePrimitiveHost {}
 
 /**
- * Text carries the two defaults RN's Text.js applies unconditionally (`ellipsizeMode ?? 'tail'`,
- * `allowFontScaling !== false`, Text.js:289 and :291). Without them native falls back to `clip` and a
- * clamped Text cuts mid-word with no ellipsis — device-observed on the other adapters 2026-08-19.
+ * Text is an ORDINARY primitive host as of 2026-09-18, and the two `@Input()`s it used to declare
+ * are gone with the code that needed them.
  *
- * They are declared as real `@Input()`s, unlike the pass-through props the base's comment
- * describes, for one reason: the default can only be applied by code that can SEE whether the
- * caller supplied a value. A host-binding pass-through is invisible here, so blindly writing
- * 'tail' would silently overwrite an explicit `ellipsizeMode="clip"`.
+ * They existed for one stated reason: a default can only be applied by code that can SEE whether the
+ * caller supplied a value, and a pass-through host binding is invisible to the component — so the
+ * defaults had to be applied where the inputs were readable. That argument was sound and it is now
+ * answered one layer down. The payload builder reads the AUTHORED bag, so it can tell an absent
+ * `ellipsizeMode` from an explicit `clip` without anyone declaring anything; the rule is keyed on the
+ * component (`foldTextDefaults`, `SymbioteFabricProps.cpp`) and reaches every `RCTText` however it
+ * was spelled.
+ *
+ * The pass-through is therefore the CORRECT path for both props now, and `text-defaults.test.ts`'s
+ * "never overwrites a value the caller supplied" is what proves the authored value still arrives.
  */
 @Component({
   selector: 'text',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
-export class TextHost extends SymbiotePrimitiveHost implements OnInit {
-  @Input() ellipsizeMode?: IEllipsizeMode;
-  @Input() allowFontScaling?: boolean;
-
-  // ngOnChanges fires before ngOnInit when a binding exists, and not at all when none does —
-  // so both hooks are needed to guarantee the defaults land exactly once per settled value.
-  ngOnInit(): void {
-    this.applyTextDefaults();
-  }
-
-  override ngOnChanges(changes: SimpleChanges): void {
-    super.ngOnChanges(changes);
-    if ('ellipsizeMode' in changes || 'allowFontScaling' in changes) {
-      this.applyTextDefaults();
-    }
-  }
-
-  private applyTextDefaults(): void {
-    // NOTHING TO OVERRIDE, NOTHING TO WRITE. The renderer already SEEDS both defaults at
-    // `createElement` (`renderer/index.ts`, "seeding here therefore covers both the composed Text
-    // and a bare `text` tag") with exactly `resolveTextProps({})` — so when the caller supplied
-    // neither input, this would re-send the values that are already there.
-    //
-    // It was costing a write per text node per default: measured on a 1 000-row create,
-    // `ellipsizeMode` and `allowFontScaling` were each recorded 6 000 times for 3 000 text nodes,
-    // ~17% of everything the adapter emitted. The host turns the repeat away when it applies it,
-    // but the op is still built, buffered and carried across.
-    //
-    // The moment either input IS supplied, the pair must still be written in full: `resolveTextProps`
-    // resolves them together, and the seed is what an explicit `ellipsizeMode="clip"` overrides.
-    if (this.ellipsizeMode === undefined && this.allowFontScaling === undefined)
-      return;
-    const resolved = resolveTextProps({
-      ellipsizeMode: this.ellipsizeMode,
-      allowFontScaling: this.allowFontScaling,
-    });
-    this.setHostProp('ellipsizeMode', resolved.ellipsizeMode);
-    this.setHostProp('allowFontScaling', resolved.allowFontScaling);
-  }
-}
+export class TextHost extends SymbiotePrimitiveHost {}
 
 @Component({
   selector: 'image',

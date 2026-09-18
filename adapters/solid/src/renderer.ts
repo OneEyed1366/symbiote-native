@@ -139,45 +139,17 @@ export function removeNode(parent: IHostNode, node: IHostNode): void {
   requestCommit();
 }
 
-// RN's Text.js applies two defaults on the way to native (core/components/src/text-props.ts:
-// ellipsizeMode 'tail', allowFontScaling true unless literally false). A `<text>` tag has no
-// wrapper to fold them, so the renderer seeds them. Without this a numberOfLines={1} line clips
-// mid-word with no ellipsis — device-observed, and silent.
-// Vue's twin: adapters/vue/src/renderer/index.ts.
+// RN's two Text defaults left this renderer on 2026-09-18, and the per-key FOLD went with them. It
+// was the last and subtlest of the three shapes this file tried: a create-time SEED (gone a month
+// earlier, 6 000 wasted crossings per 1 000-row create), then a substitute-on-`undefined`, then a
+// fold per key — because `?? 'tail'` has to catch a null too, and substituting only on `undefined`
+// meant `<text ellipsizeMode={null}>` committed null, device-only and silent.
 //
-// A FOLD per key, not a default VALUE, and the difference is not cosmetic: `resolveTextProps` is
-// the authority and it reads `ellipsizeMode ?? 'tail'` / `allowFontScaling !== false`, so a null
-// (or 0, or '') has to resolve to the default too. Substituting only on `undefined` — which this
-// did until 2026-08-23 — meant `<text ellipsizeMode={null}>` committed null, device-only and
-// silent. The same two folds are described as data in `@symbiote-native/components/host-primitives`;
-// collapsing all of them onto resolveTextProps is a separate step.
-type ITextFold = (value: unknown) => unknown;
-
-const TEXT_FOLDS: ReadonlyMap<string, ITextFold> = new Map<string, ITextFold>([
-  ['ellipsizeMode', value => value ?? 'tail'],
-  ['allowFontScaling', value => value !== false],
-]);
-
-// THE SEED IS GONE — the defaults come from the payload builder now (`applyTextDefaults` in
-// `core/engine/src/fabric-props.ts` and its twin in `SymbioteFabricProps.cpp`). Writing them as props
-// cost a crossing every time the app authored the same value: 6 000 per 1 000-row create, measured
-// with `writesOfUnchanged`. `TEXT_FOLDS` stays for the clear-back-to-undefined path below, which is
-// off the create path.
-
-// Seeding at CREATE is not enough, and the gap is device-only. A framework that clears a prop it
-// set earlier hands us an explicit `undefined` at PATCH time, and the default has to come BACK
-// rather than stay cleared — RN treats a missing prop and an explicit undefined alike, and only a
-// literal `false` opts out of allowFontScaling. Two Map lookups on text nodes only, and none at
-// all on a View, so it stays off the hot path.
-function foldTextValue(
-  node: ISymbioteNode,
-  key: string,
-  value: unknown,
-): unknown {
-  if (!isTextContainer(node)) return value;
-  const fold = TEXT_FOLDS.get(key);
-  return fold === undefined ? value : fold(value);
-}
+// All three were answering a question the layer below now answers for everyone: the rule reads the
+// AUTHORED bag at payload time (`foldTextDefaults`, `SymbioteFabricProps.cpp`), where a null, an
+// explicit `undefined` and an absent prop are all simply "not a value the author chose". The
+// null case that cost this file two revisions is `ellipsize->isNull()` there, in one place, for
+// every adapter.
 
 // The `id` -> `nativeID` fold and its `aliasedNodes` WeakSet left this file on 2026-09-18. The
 // memory was the right shape and the wrong LAYER: `routeProp` carries it now, so all five adapters
@@ -262,7 +234,7 @@ const nodeOps: RendererOptions<IHostNode> = {
     // becomes a listener; onTintColor on a Switch stays a prop), and centralizes the class+style
     // merge and the `id` -> `nativeID` rename. Shared with React and Vue — never re-implement an
     // `onX` check here (symbiote-engine-core §2).
-    routeProp(node, name, foldTextValue(node, name, value));
+    routeProp(node, name, value);
     requestCommit();
   },
 

@@ -1,12 +1,17 @@
-// The runtime folds (`id` -> `nativeID`, RN's two Text defaults) asserted on EVERY Vue path that
-// can reach a host node: a hand-written `h()`, the SFC compiler's output, and the JSX/TSX plugin's.
+// What reaches a host node asserted on EVERY Vue path that can produce one: a hand-written `h()`,
+// the SFC compiler's output, and the JSX/TSX plugin's.
 //
 // WHY THIS FILE EXISTS. A tag inherits nothing a component wrapper used to do — defaults, aliases,
 // bag folds. Angular lost both Text defaults AND `id` -> `nativeID` exactly that way: silently, on
-// every app, visible only on a device. Vue applies both folds in the RENDERER (`PROP_ALIASES` and
-// `TEXT_DEFAULTS` in src/renderer/index.ts), specifically because that layer sits under all three
-// paths at once. This file is the proof of that claim rather than a restatement of it — the
-// placement argument is sound and would stay sound while a fold quietly stopped running.
+// every app, visible only on a device.
+//
+// BOTH OF THOSE FOLDS HAVE SINCE LEFT THIS ADAPTER, on 2026-09-18, and the file's subject moved with
+// them rather than expiring. Vue used to apply them in the RENDERER (`PROP_ALIASES` and
+// `TEXT_DEFAULTS`), on the argument that the renderer sits under all three paths at once. That
+// argument was right and the engine is a layer lower still: `routeProp` resolves the alias for every
+// adapter and `foldTextDefaults` supplies the defaults off the component name. So what three
+// compilers can still disagree about is not the folding — it is WHICH KEYS AND VALUES each one hands
+// over at all, which is what the cases below pin.
 //
 // WHY THE ORACLE IS THE COMMITTED PAYLOAD, KEY BY KEY. A count agrees for the wrong reasons: two
 // payloads of equal size can differ in which keys they carry, and a whole day was lost to a
@@ -275,26 +280,26 @@ const CASES: readonly IFoldCase[] = [
     expected: [{ nativeID: 'x', testID: 't' }],
   },
   {
-    what: "RN's two Text defaults on a bare text",
+    // RN's two Text defaults used to be the point of this case, and they left the renderer on
+    // 2026-09-18 — the rule is `foldTextDefaults` in `SymbioteFabricProps.cpp`, keyed on the
+    // component, and this harness holds no copy of it. What the case pins now is that NO arm adds a
+    // key of its own, which is the thing three compilers can still disagree about.
+    what: 'a bare text lands an empty payload on every path',
     sfc: '<text>hi</text>',
     jsx: '<text>hi</text>',
     // An ARRAY child, never a slot function: an element ignores slot children and renders nothing.
     handWritten: () => h('text', null, ['hi']),
-    expected: [
-      { ellipsizeMode: 'tail', allowFontScaling: true },
-      { text: 'hi' },
-    ],
+    expected: [{}, { text: 'hi' }],
   },
   {
-    // `notFalse`, not `nullish`: only a literal false opts out, and the key is emitted either way.
+    // `false` is the value a compiler is most likely to lose — a path that treats falsy as absent
+    // drops it, and the engine then correctly defaults it back to `true`, so the bug is invisible
+    // anywhere the rule runs. Carrying an `id` alongside keeps the alias fold in the same arm.
     what: 'an explicit allowFontScaling=false beside an id',
     sfc: '<text id="t" :allow-font-scaling="false">hi</text>',
     jsx: '<text id="t" allowFontScaling={false}>hi</text>',
     handWritten: () => h('text', { id: 't', allowFontScaling: false }, ['hi']),
-    expected: [
-      { ellipsizeMode: 'tail', allowFontScaling: false, nativeID: 't' },
-      { text: 'hi' },
-    ],
+    expected: [{ allowFontScaling: false, nativeID: 't' }, { text: 'hi' }],
   },
 ];
 

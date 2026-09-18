@@ -3,15 +3,23 @@
 // module imports from); this file only decides WHICH props are color props and wires the structured
 // CSS-style processors.
 //
-// IT IS CALLED BY THE HOST, and that is what the `props` parameter is for. The engine no longer
-// holds a tree, so the bag belongs to whoever built it: the TypeScript applier headlessly, the C++
-// applier on device. The NODE still comes in beside it, because three inputs to the fold are
-// JS-side facts about the node rather than entries in the bag — its authored component name, the
-// sticky `hasAriaAlias` flag, and the behavior's own `payloadFold`.
+// IT IS CALLED BY THE HOST, and that is what the `props` parameter is for. The NODE still comes in
+// beside it, because two inputs to the fold are JS-side facts about the node rather than entries in
+// the bag — its authored component name and the sticky `hasAriaAlias` flag.
 //
-// **The C++ side does not have this yet.** `SymbioteTree.cpp` hands its raw bag to `createNode`,
-// so every fold below — style hoisting included — is headless-only until it is ported. `style` is
-// not a Fabric prop name, so on device that is a blank screen rather than a subtle difference.
+// **THIS IS THE HEADLESS BUILDER, and the device one is `SymbioteFabricProps.cpp`.** The header used
+// to say the C++ side "does not have this yet", which was true mid-branch and stopped being true
+// when the payload builder was ported; a reader who believed it would go looking for a blank screen.
+//
+// What follows from that, and it is the file's main rule: **no platform rule may live here.** The ten
+// tag rules never got a copy, and RN's two Text defaults lost theirs on 2026-09-18. A rule with a
+// copy on this side is a rule whose only test runs on this side, and the device copy can then break
+// with everything green — not hypothetical: it is how a disabled `touchable-highlight` shipped
+// `focusable: true`.
+//
+// ONE breaks the rule and is the next thing to move: `foldTextInputValue`, below, with its own note
+// on why it did not travel with the defaults. Everything else here is the framework-agnostic half —
+// colour processing, the style hoist, the aria fold, a node's own `payloadFold`.
 
 import { foldAriaProps } from './accessibility-props';
 import type { IFabricProps } from './fabric';
@@ -205,28 +213,22 @@ function addStyle(out: Record<string, unknown>, style: unknown): void {
 const SINGLELINE_TEXT_INPUT = 'RCTSinglelineTextInputView';
 const MULTILINE_TEXT_INPUT = 'RCTMultilineTextInputView';
 
-// RN's two Text defaults (`Text.js:289` and `:291`), applied HERE so no adapter has to write them as
-// props. Three of them used to (`seedTextDefaults` in Vue, Angular and Solid): both keys landed on
-// every text node at `createElement`, the app then authored the same values, and each write crossed
-// into the host, converted to a `folly::dynamic` and was dropped for equalling what was there —
-// 6 000 wasted crossings per 1 000-row create, measured with `writesOfUnchanged`.
-//
-// The component NAME, not `node.isText`: a raw-text node is text too and takes neither of these.
-// `RCTVirtualText` is not listed because a nested `<Text>` reaches the builder under its AUTHORED
-// component, which the commit walk rewrites only afterwards — see `fabricProps`' caller.
-const TEXT_COMPONENT = 'RCTText';
-
-/** The rule, stated once: a fallback, never an override, and only a literal `false` opts out. */
-function applyTextDefaults(
-  props: Record<string, unknown>,
-): Record<string, unknown> {
-  return {
-    ...props,
-    ellipsizeMode: props.ellipsizeMode ?? 'tail',
-    allowFontScaling: props.allowFontScaling !== false,
-  };
-}
-
+/**
+ * THE ONE PLATFORM RULE STILL MIRRORED HERE, and it is next rather than fine.
+ *
+ * Its twin is `foldTextInputValue` in `SymbioteFabricProps.cpp`, and the header above says why that
+ * is a hazard: a vitest over this copy cannot see the device one. The gap was real until 2026-09-18
+ * — `defaultValue` appeared in no itest at all — and is closed by
+ * `core/engine/cpp/tests/js/text-input-payload.itest.ts`, which now pins the precedence, the
+ * erasure, the explicit-`text` case, the component gate and the multiline tag against the payload a
+ * commit actually sent. So the device rule is tested where it runs; what is left is the duplication.
+ *
+ * It did NOT go with the Text defaults because the two have different test topologies and deleting
+ * both in one change makes neither attributable. The defaults were 15 cases, every one a claim about
+ * the PLATFORM. This is ~32, and most are TextInput MACHINE tests — the controlled-value handshake,
+ * which deliberately stays in JS — that merely use `payload.text` as their observable. Re-aiming
+ * those at what they are actually about is its own piece of work, not a mechanical sweep.
+ */
 function foldTextInputValue(
   props: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -235,9 +237,9 @@ function foldTextInputValue(
   if (!hasValue && !hasDefault) return props;
 
   const folded: Record<string, unknown> = { ...props };
-  // `value` WINS over `defaultValue` — `foldText`'s rule, kept identical rather than re-derived.
-  // An explicit `text` is left alone: that is the component path, where the wrapper already folded,
-  // and re-folding there would let a stale `value` overwrite what the wrapper computed.
+  // `value` WINS over `defaultValue`. An explicit `text` is left alone: that is the component path,
+  // where the wrapper already folded, and re-folding there would let a stale `value` overwrite what
+  // the wrapper computed.
   if (folded.text === undefined) {
     folded.text = hasValue ? props.value : props.defaultValue;
   }
@@ -307,16 +309,19 @@ export function fabricProps(
     node.payloadFold !== undefined
       ? node.payloadFold(aliasFolded)
       : aliasFolded;
-  const valueFolded =
+  // RN'S TWO TEXT DEFAULTS USED TO BE APPLIED HERE AND ARE GONE (2026-09-18) — the rule lives in
+  // `SymbioteFabricProps.cpp` alone, and its claims in `committed-payload.itest.ts`, read off the
+  // payload a commit actually sent. It had FIVE other implementations that day (`resolveTextProps`,
+  // Angular's `TextHost`, Vue's and Solid's renderers, and this one); the engine is the only layer
+  // that can see the authored bag for every adapter at once, so it is the only one that needs to.
+  //
+  // So a text node's payload here is missing two keys the device's carries. That is a PROPERTY of
+  // this harness rather than a gap in it — do not close it by adding the rule back.
+  const props =
     node.component === SINGLELINE_TEXT_INPUT ||
     node.component === MULTILINE_TEXT_INPUT
       ? foldTextInputValue(behaviorFolded)
       : behaviorFolded;
-  // LAST of the component-keyed folds, so an adapter's own fold still gets to set either key and win.
-  const props =
-    node.component === TEXT_COMPONENT
-      ? applyTextDefaults(valueFolded)
-      : valueFolded;
   // Hoisted out of the loop: one cached lookup per node per commit, not one per key.
   const alreadyProcessed = configProcessedKeys(node.component);
   for (const key of Object.keys(props)) {
