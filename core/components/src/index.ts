@@ -502,4 +502,5 @@ export {
   HORIZONTAL_SCROLL_VIEW_TAG,
   registerScrollViewBehavior,
   SCROLL_VIEW_TAG,
+  STICKY_HEADER_TAG,
 } from './behaviors/scroll-view';

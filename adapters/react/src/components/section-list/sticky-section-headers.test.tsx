@@ -28,6 +28,7 @@
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { VirtualizedSectionList, mount, unmount } from '@symbiote-native/react';
+import { STICKY_HEADER_TAG } from '@symbiote-native/components';
 import {
   createLiveTree,
   installRecordingFabric,
@@ -49,27 +50,21 @@ const live = createLiveTree(fabric);
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-// `collapsable: false` is what the sticky seam sets at CREATE, and nothing else in this tree sets
-// it — a plain cell wrapper leaves it absent. The translateY is NOT the oracle: it needs a
-// measurement round trip, so a create-time `Array.isArray(transform)` reads 0 for a correct tree
-// and would also read "present" for a frozen pin (`test-harness-false-greens.md` §34). The pin's
-// motion is core's to prove; this file's question is which CHILDREN got marked.
+// The TAG the engine was told — what the sticky seam names a wrapper at CREATE, and the one thing
+// about it that is not a rule's output. The translateY is NOT the oracle: it needs a measurement
+// round trip, so a create-time `Array.isArray(transform)` reads 0 for a correct tree and would also
+// read "present" for a frozen pin (`test-harness-false-greens.md` §34). The pin's motion is core's
+// to prove; this file's question is which CHILDREN got marked.
 //
-// The PAYLOAD, not the authored bag: `stickyFold` is a `IPayloadFold` run inside `fabricProps`, so
-// `collapsable` never lands as its own authored prop — it is visible only in what the engine would
-// hand the renderer.
+// IT USED TO KEY ON `payload.collapsable === false`, and two things went with that: the key is a
+// tag rule in `SymbioteFabricProps.cpp` now (this harness builds payloads through the TypeScript
+// `fabricProps`, which carries no copy of the tag rules), and the scroll view's own CONTENT node
+// carried the same key, so the locator needed an `RCTScrollContentView` exclusion to mean anything.
+// A tag needs no exclusion — a content node's is `scroll-content`.
 function stickyWrappers(): ILiveNode[] {
   const found: ILiveNode[] = [];
   live.walkLive(live.appRoot(), node => {
-    if (
-      node.payload.collapsable === false &&
-      // The scroll view's own CONTENT node carries it too — Yoga must not flatten the box the
-      // sticky pins are measured against. It is not a header, and the disabled case is what makes
-      // that visible: one such node with zero sticky cells.
-      node.viewName !== 'RCTScrollContentView'
-    ) {
-      found.push(node);
-    }
+    if (node.tagName === STICKY_HEADER_TAG) found.push(node);
   });
   return found;
 }
@@ -97,16 +92,15 @@ describe('VirtualizedSectionList sticky section headers', () => {
   // headers visually stick at all. Wrapping the WRONG count/nodes (e.g. items instead of
   // headers) would silently break scroll UX with no runtime error to catch it. Also proves the
   // unset-`stickySectionHeadersEnabled` default resolves to enabled on this host.
-  it('marks each of the two section headers collapsable:false', () => {
+  it('wraps each of the two section headers and nothing else', () => {
     mount(ROOT_TAG, renderSection({ sections: SECTIONS }));
     const wrappers = stickyWrappers();
     expect(wrappers.length, 'one sticky wrapper per section header').toBe(2);
-    for (const wrapper of wrappers) {
-      expect(
-        wrapper.payload.collapsable,
-        'sticky wrapper is collapsable:false',
-      ).toBe(false);
-    }
+    // WHICH children, not merely how many — a count alone is satisfied by wrapping two items. The
+    // titles are what this file's `why:` is actually about, and they were never asserted.
+    expect(
+      wrappers.map(wrapper => wrapper.children[0]?.children[0]?.props.text),
+    ).toEqual(['A', 'B']);
   });
 
   // why: a caller who explicitly opts out (RN parity: some layouts don't want sticky headers,

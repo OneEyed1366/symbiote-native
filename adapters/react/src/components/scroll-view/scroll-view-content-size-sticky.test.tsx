@@ -19,6 +19,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
+import { STICKY_HEADER_TAG } from '@symbiote-native/components';
 import {
   createLiveTree,
   installRecordingFabric,
@@ -109,14 +110,16 @@ describe('React reaches the scroll view content-size and sticky seams', () => {
       header,
       'the sticky header is the first content child',
     ).toBeDefined();
-    // collapsable:false is what stops Yoga flattening the node the pin's transform rides on — a
-    // flattened header has nothing to animate. Asserted at CREATE, which is the only sticky state
-    // this file owns: the translateY itself needs a measurement, and core's `sticky.test.ts`
-    // drives that round trip.
-    expect(header.payload.collapsable).toBe(false);
+    // THE TAG the engine was told, which is this case's own claim said directly. It used to assert
+    // `collapsable: false` — a proxy for "a behavior attached", and one that expired the day the
+    // pin became a tag rule in `SymbioteFabricProps.cpp` (this harness builds payloads through the
+    // TypeScript `fabricProps`, which carries no copy of the tag rules). What the pin PAINTS is
+    // pinned in `core/engine/cpp/tests/js/sticky-header-payload.itest.ts`; what belongs here is
+    // that React resolved the hyphenated tag and handed it over.
+    expect(header.tagName).toBe(STICKY_HEADER_TAG);
     expect(header.children[0]?.viewName).toBe('RCTText');
     // The unflagged sibling stays an ordinary, untouched content child.
     expect(plain.payload.testID).toBe('plain');
-    expect(plain.payload.collapsable).toBeUndefined();
+    expect(plain.tagName).toBe('');
   });
 });

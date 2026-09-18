@@ -37,6 +37,16 @@ import type { IRecordingHost } from './recording-host';
 export type ILiveNode = {
   /** The Fabric view name it CURRENTLY resolves to — `componentOf`, not the name it was created under. */
   viewName: string;
+  /**
+   * The INTRINSIC tag the engine was told, or `''` for a node no behavior attached to.
+   *
+   * What the host was TOLD, as against what a rule made of it — which is the only durable way to
+   * locate a node whose platform props are a tag rule in `SymbioteFabricProps.cpp`. The payload
+   * this type exposes is built by the TypeScript `fabricProps`, which deliberately carries no copy
+   * of those rules, so a locator written as `payload.<key the rule writes>` finds nothing. Several
+   * were, and expired together the day the sticky pin moved.
+   */
+  tagName: string;
   /** The author's bag: `style` is still an object, the RN processors have not run. */
   props: Readonly<Record<string, unknown>>;
   /** What the engine would hand the renderer: style flattened, the aria fold and processors run. */
@@ -96,6 +106,7 @@ export function createLiveTree(host: IRecordingHost): ILiveTree {
 
   const nodeOf = (handle: ISymbioteNode): ILiveNode => ({
     viewName: componentOf(handle),
+    tagName: host.find(one => one.handle === handle)?.tagName ?? '',
     props: propsOf(handle),
     get payload(): Record<string, unknown> {
       return fabricProps(handle, propsOf(handle));

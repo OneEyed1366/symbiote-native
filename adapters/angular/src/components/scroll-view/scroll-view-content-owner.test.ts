@@ -19,11 +19,10 @@
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
+import { STICKY_HEADER_TAG } from '@symbiote-native/components';
 import { childrenOf } from '@symbiote-native/engine';
 import {
   installRecordingFabric,
-  payloadOf,
   type IAuthoredNode,
 } from '@symbiote-native/test-utils';
 
@@ -152,9 +151,10 @@ describe('the engine is the only builder of a ScrollView content node', () => {
     mount(ROOT_TAG, StickyFixture);
     await tick();
     assertSingleContentNode('sv-s');
-    const pinned = fabric.findAll(
-      node => payloadOf(node.handle).zIndex === STICKY_HEADER_Z_INDEX,
-    );
+    // By the TAG the engine was told, not by a key its tag rule writes: the pin lives in
+    // `SymbioteFabricProps.cpp` now, and this harness builds payloads through the TypeScript
+    // `fabricProps`, which carries no copy of it.
+    const pinned = fabric.findAll(node => node.tagName === STICKY_HEADER_TAG);
     expect(pinned.length).toBe(1);
   });
 });

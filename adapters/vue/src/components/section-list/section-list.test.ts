@@ -37,10 +37,10 @@ import {
   unmount,
   type ISectionListHandle,
 } from '@symbiote-native/vue';
+import { STICKY_HEADER_TAG } from '@symbiote-native/components';
 import {
   createLiveTree,
   installRecordingFabric,
-  payloadOf,
   type IAuthoredNode,
 } from '@symbiote-native/test-utils';
 
@@ -91,16 +91,18 @@ function collectTexts(): string[] {
   return texts;
 }
 
-// `collapsable: false` is a PAYLOAD fold (`stickyFold` in scroll-view/sticky.ts), not a prop the
-// ops ever set — it never reaches the authored bag, only `fabricProps`'s output. Nothing else in
-// this tree folds it except the scroll view's own content node (excluded below); a plain cell
-// wrapper leaves it absent. The translateY `transform` is NOT the oracle here: it needs a
-// measurement round trip, so a create-time `Array.isArray(transform)` reads 0 for a correct tree
+// The TAG the engine was told, which the recording host retains for exactly this kind of question.
+// The translateY `transform` is NOT the oracle here: it needs a measurement round trip, so a
+// create-time `Array.isArray(transform)` reads 0 for a correct tree
 // (`.claude/rules/test-harness-false-greens.md` §34).
+//
+// It used to key on `payload.collapsable === false`, and two things went with that: the key is a
+// tag rule in `SymbioteFabricProps.cpp` now (this harness builds payloads through the TypeScript
+// `fabricProps`, which carries no copy of the tag rules), and the scroll view's own content node
+// carried the same key, so the locator needed an `RCTScrollContentView` exclusion to mean anything.
+// A tag needs no exclusion — a content node's is `scroll-content`.
 function stickyWrappers(): readonly IAuthoredNode[] {
-  return fabric
-    .findAll(n => n.viewName !== 'RCTScrollContentView')
-    .filter(n => payloadOf(n.handle).collapsable === false);
+  return fabric.findAll(n => n.tagName === STICKY_HEADER_TAG);
 }
 
 function mountSectionList(extra: Record<string, unknown>): Promise<void> {
@@ -143,20 +145,16 @@ describe('Vue SectionList on the engine', () => {
       }
     });
 
-    it('wraps each section header in a collapsable:false sticky wrapper when enabled', async () => {
+    it('wraps each section header in a sticky wrapper when enabled', async () => {
       // why: proves stickySectionHeadersEnabled on the PUBLIC SectionList surface actually reaches
       // the inner stickyHeaderIndices mechanism through this wrapper — the shared wrap/transform
       // shape itself lives in VirtualizedList (N/A here) and is exercised, not re-derived.
       await mountSectionList({ stickySectionHeadersEnabled: true });
 
-      const wrappers = stickyWrappers();
-      expect(wrappers.length, 'one sticky wrapper per section header').toBe(2);
-      for (const wrapper of wrappers) {
-        expect(
-          payloadOf(wrapper.handle).collapsable,
-          'sticky wrapper is collapsable:false',
-        ).toBe(false);
-      }
+      expect(
+        stickyWrappers().length,
+        'one sticky wrapper per section header',
+      ).toBe(2);
     });
 
     it('wraps nothing when stickySectionHeadersEnabled is false', async () => {

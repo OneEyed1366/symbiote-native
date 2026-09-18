@@ -28,10 +28,9 @@ import type { Component } from 'svelte';
 import { childrenOf } from '@symbiote-native/engine';
 import {
   installRecordingFabric,
-  payloadOf,
   type IAuthoredNode,
 } from '@symbiote-native/test-utils';
-import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
+import { STICKY_HEADER_TAG } from '@symbiote-native/components';
 // Mounting through `../../render` skips `index.ts`, so the registration has to be named here —
 // and it is the whole subject of this file.
 import '../../register';
@@ -229,9 +228,10 @@ describe('the engine is the only builder of a ScrollView content node', () => {
     // walking the COMMITTED children instead (`sticky-indices.test.ts`, "the COMPATIBILITY half").
     // So the wrapper had been suppressing a working engine feature, and deleting it restored RN's
     // own API on this adapter. A zero here means the index walk stopped running.
-    const pinned = fabric.findAll(
-      node => payloadOf(node.handle).zIndex === STICKY_HEADER_Z_INDEX,
-    );
+    // By the TAG the engine was told, not by a key its tag rule writes: the pin lives in
+    // `SymbioteFabricProps.cpp` now, and this harness builds payloads through the TypeScript
+    // `fabricProps`, which carries no copy of it.
+    const pinned = fabric.findAll(node => node.tagName === STICKY_HEADER_TAG);
     expect(pinned.length).toBe(1);
   });
 

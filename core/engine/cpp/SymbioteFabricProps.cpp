@@ -1246,6 +1246,61 @@ dynamic foldActivityIndicatorProps(const dynamic &props) {
   return out;
 }
 
+/** RN's `styles.header` z-index (`ScrollViewStickyHeader.js:318`). */
+constexpr double kStickyHeaderZIndex = 10;
+
+/**
+ * The settled translate the sticky machine hands this rule. RN's twin is
+ * `passthroughAnimatedPropExplicitValues`, a whole style object; ours carries the one number that
+ * object ever holds, so it does not borrow the name. Stripped here — no ViewConfig declares it.
+ */
+constexpr const char *kStickyTranslateKey = "stickyTranslateY";
+
+/**
+ * The sticky header's wrapper (`ScrollViewStickyHeader.js:282-304`), and the LAST `payloadFold` this
+ * codebase had.
+ *
+ * ITS THREE OUTPUTS SPLIT BY ORIGIN, which is the whole argument for the move: `zIndex` and
+ * `collapsable` are constants of the wrapper — the platform's, in any app — while the translate is
+ * live. The live one is live at SETTLE rate rather than frame rate (the smooth pin rides an
+ * AnimatedProps leaf and never comes through here), and RN spells it as an ordinary PROP, so it
+ * crosses as one instead of as a new opcode.
+ *
+ * COMPOSED OVER, not under, and that inverts the neighbouring rules. A pin is the entire point of
+ * this element, so a header whose own style set a transform must not cancel it —
+ * `foldActivityIndicatorProps` goes the other way because its base is a DEFAULT an app may override.
+ * The distinction is whether the style is a default or a mechanism.
+ *
+ * `collapsable: false` is unconditional, as RN's literal JSX prop is. Yoga may flatten a view that
+ * only groups children, and a flattened header has no view left to carry a transform — so the pin
+ * would silently stop happening on exactly the headers that wrap nothing but their content.
+ */
+dynamic foldStickyHeaderProps(const dynamic &props) {
+  dynamic pin = dynamic::object();
+  pin["zIndex"] = kStickyHeaderZIndex;
+
+  // Absent until the debounce first fires. Inventing a zero here would snap every header to the top
+  // of its scroller on mount, so an unsettled machine contributes no transform at all and the app's
+  // own survives.
+  const dynamic *translate = props.get_ptr(kStickyTranslateKey);
+  if (translate != nullptr && translate->isNumber()) {
+    dynamic entry = dynamic::object();
+    entry["translateY"] = translate->asDouble();
+    pin["transform"] = dynamic::array(std::move(entry));
+  }
+
+  dynamic composed = dynamic::array();
+  const dynamic *authored = props.get_ptr("style");
+  if (authored != nullptr) composed.push_back(*authored);
+  composed.push_back(std::move(pin));
+
+  dynamic out = props;
+  out.erase(kStickyTranslateKey);
+  out["style"] = std::move(composed);
+  out["collapsable"] = false;
+  return out;
+}
+
 /**
  * The native spinner's own props — RN's component body (`ActivityIndicator.js:99-118`) applied to
  * the node the app never names.
@@ -2253,6 +2308,9 @@ dynamic fabricProps(
     bag = &tagResolved;
   } else if (tagName == "activity-indicator") {
     tagResolved = foldActivityIndicatorProps(*bag);
+    bag = &tagResolved;
+  } else if (tagName == "sticky-header") {
+    tagResolved = foldStickyHeaderProps(*bag);
     bag = &tagResolved;
   } else if (tagName == "activity-indicator-spinner") {
     tagResolved = foldActivityIndicatorSpinnerProps(

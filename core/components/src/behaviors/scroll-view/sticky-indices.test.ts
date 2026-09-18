@@ -124,13 +124,18 @@ function mountIndexed(
   };
 }
 
-// The committed sticky wrappers, in document order — identified by the zIndex the pin needs, which
-// is the one key only a sticky header carries. Read off the PAYLOAD's top level, because
-// `fabricProps` flattens the style slot straight into it.
+// The committed sticky wrappers, in document order — identified by the TAG the engine was told,
+// which is what the recording host retains for exactly this ("so a test can ask what the host was
+// TOLD, separately from what a rule made of it").
+//
+// It used to key on `payload.zIndex === 10`, and that stopped finding anything the day the pin
+// became a tag rule in `SymbioteFabricProps.cpp`: this harness builds payloads through the
+// TypeScript `fabricProps`, which deliberately carries no copy of the tag rules. A locator made of
+// the thing under test is a locator that expires with it — the tag is the durable half.
 function committedHeaders(scrollView: ILiveNode): ILiveNode[] {
   const found: ILiveNode[] = [];
   const walk = (node: ILiveNode): void => {
-    if (node.payload.zIndex === 10) found.push(node);
+    if (node.tagName === STICKY_HEADER_TAG) found.push(node);
     for (const child of node.children) walk(child);
   };
   walk(scrollView);

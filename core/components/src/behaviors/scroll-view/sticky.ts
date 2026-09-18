@@ -55,7 +55,6 @@ import {
   insertBefore,
   isAnchor,
   isNativeAnimatedAvailable,
-  markPropsDirty,
   Platform,
   removeChild,
   requestCommitFor,
@@ -64,7 +63,6 @@ import {
   whenCommitted,
   type AnimatedInterpolation,
   type IHostBehavior,
-  type IPayloadFold,
   type ISymbioteEvent,
   type ISymbioteNode,
   propOf,
@@ -88,6 +86,12 @@ import {
 import { resolveScrollForwarding } from '../../view/render-scroll-view';
 
 export const STICKY_HEADER_TAG = 'sticky-header';
+
+// The machine's one channel to its tag rule, and the only prop it ever writes. RN's twin is
+// `passthroughAnimatedPropExplicitValues` (`ScrollViewStickyHeader.js:282-304`), a whole style
+// object; ours carries the one number that object ever holds, so it does not borrow the name.
+// `foldStickyHeaderProps` composes it into the style and strips the key — no ViewConfig declares it.
+export const STICKY_TRANSLATE_PROP = 'stickyTranslateY';
 
 // The scroll views that could own a header, so a header can find its own by walking up. The tag is
 // not on the node (`createElement` looks the behavior up and stores nothing), and the parent chain
@@ -477,28 +481,16 @@ function nextHeaderY(
   return next === undefined ? undefined : sticky.layoutYs.get(next);
 }
 
-// The committed half of the pin: the debounced translateY RN pushes into the transform for
-// hit-testing (`passthroughAnimatedPropExplicitValues`), plus the two constants the wrapper always
-// carries. The SMOOTH half rides the AnimatedProps leaf below and never passes through here.
+// STICKY FOLD LEFT THIS FILE ON 2026-09-18, and it was the last `payloadFold` in the codebase.
 //
-// A per-node fold, assigned in `attach`, because what it reads is per-node runtime state rather
-// than a prop — the behavior-level `foldPayload` gets props and nothing else.
-function stickyFold(runtime: IStickyHeaderRuntime): IPayloadFold {
-  return props => {
-    const pin: Record<string, unknown> = { zIndex: STICKY_HEADER_Z_INDEX };
-    if (runtime.state.translateY !== null)
-      pin.transform = [{ translateY: runtime.state.translateY }];
-    return {
-      ...props,
-      // Over the app's, never under: the pin is the whole point of the element, and a header whose
-      // own style set a transform would otherwise cancel it.
-      style: [props.style, pin],
-      // Yoga may flatten a view that only groups children, and a flattened header has no transform
-      // to animate. RN's sticky wrapper sets it for the same reason.
-      collapsable: false,
-    };
-  };
-}
+// It wrote three things and they had two different origins. `zIndex: 10` and `collapsable: false`
+// are constants of the wrapper — the platform's in any app — and the debounced translate is the
+// machine's. Splitting them that way is what let the whole rule move: `foldStickyHeaderProps` in
+// `SymbioteFabricProps.cpp` owns the composition now, and the one live number crosses as an
+// ordinary prop (`STICKY_TRANSLATE_PROP`), which is how RN spells it too.
+//
+// Contract: `core/engine/cpp/tests/js/sticky-header-payload.itest.ts`. There is no JS twin — a
+// payload rule asserted against a second copy of itself is asserted against nothing.
 
 function dispatch(node: ISymbioteNode, action: IStickyAction): void {
   const runtime = headerRuntimes.get(node);
@@ -537,16 +529,21 @@ function runEffects(
         }, effect.delay);
         break;
       case 'apply-passthrough':
-        // The fold reads `runtime.state`, which no prop write touched, so nothing has marked the
-        // node — and dirtying is not publishing, hence both calls.
+        // The machine's one channel to its tag rule. A prop rather than runtime state the fold
+        // reaches back for, because RN spells this the same way
+        // (`ScrollViewStickyHeader.js:302`, `passthroughAnimatedPropExplicitValues`) and because a
+        // prop write is what the rule in `SymbioteFabricProps.cpp` can read at all.
         //
-        // NOT witnessed by a headless test, and the reason is worth knowing before deleting it:
-        // while the pin is JS-driven the animated leaf's own `setNativeProps` has already written
-        // the same transform and marked the node, so removing this line reddens nothing here. It
-        // is the NATIVE-driver path this exists for — there the leaf stops writing JS-side and the
-        // committed transform is all hit-testing has, which is exactly why RN keeps
-        // `passthroughAnimatedPropExplicitValues` beside the animated one.
-        markPropsDirty(node);
+        // The write marks the node itself, so only the commit request is still owed — dirtying is
+        // not publishing.
+        //
+        // WHY A COMMIT IS REQUESTED AT ALL, and it is NOT witnessed by a headless test: while the
+        // pin is JS-driven the animated leaf's own `setNativeProps` has already written the same
+        // transform and marked the node, so removing this reddens nothing here. It is the
+        // NATIVE-driver path it exists for — there the leaf stops writing JS-side and the committed
+        // transform is all hit-testing has, which is why RN keeps that explicit value beside the
+        // animated one.
+        setProp(node, STICKY_TRANSLATE_PROP, effect.translateY);
         requestCommitFor(node);
         break;
       case 'record-header-y':
@@ -631,7 +628,6 @@ function attach(node: ISymbioteNode): void {
     cancelBind: undefined,
   };
   headerRuntimes.set(node, runtime);
-  node.payloadFold = stickyFold(runtime);
   setBehaviorListener(node, 'layout', event => handleHeaderLayout(node, event));
 }
 

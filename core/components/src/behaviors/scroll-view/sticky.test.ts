@@ -20,6 +20,7 @@ import {
   clearHostBehaviors,
   createElement,
   createSurface,
+  propsOf,
   removeChild,
   routeProp,
   type ISymbioteEvent,
@@ -29,7 +30,7 @@ import {
 import { descriptorFor } from '../../component-names';
 import { registerScrollViewBehavior } from './index';
 import { SCROLL_VIEW_TAG } from './shared';
-import { STICKY_HEADER_TAG } from './sticky';
+import { STICKY_HEADER_TAG, STICKY_TRANSLATE_PROP } from './sticky';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -109,13 +110,18 @@ function mountSticky(
   };
 }
 
-// The committed sticky wrappers, in document order. Identified by the zIndex the pin needs to
-// paint over the rows scrolling under it, which is the one key only a sticky header carries — and
-// read off the PAYLOAD's top level, because `fabricProps` flattens the style slot straight into it.
+// The committed sticky wrappers, in document order — identified by the TAG the engine was told,
+// which the recording host retains for exactly this ("so a test can ask what the host was TOLD,
+// separately from what a rule made of it").
+//
+// It used to key on `payload.zIndex === 10`, and that stopped finding anything the day the pin
+// became a tag rule in `SymbioteFabricProps.cpp`: this harness builds payloads through the
+// TypeScript `fabricProps`, which deliberately carries no copy of the tag rules. A locator made of
+// the thing under test is a locator that expires with it.
 function committedHeaders(scrollView: ILiveNode): ILiveNode[] {
   const found: ILiveNode[] = [];
   const walk = (node: ILiveNode): void => {
-    if (node.payload.zIndex === 10) found.push(node);
+    if (node.tagName === STICKY_HEADER_TAG) found.push(node);
     for (const child of node.children) walk(child);
   };
   walk(scrollView);
@@ -142,13 +148,10 @@ afterEach(() => {
 });
 
 describe('a sticky header child is what the index array could not be', () => {
-  it('commits under the content node carrying the wrapper own two constants', () => {
+  it('commits a tagged wrapper under the content node, over the app child', () => {
     const { commit } = mountSticky(1);
     const [header] = committedHeaders(commit());
     if (header === undefined) throw new Error('no sticky header committed');
-    // Yoga flattens a view that only groups children, and a flattened header has no transform to
-    // animate — RN's own sticky wrapper sets both for the same reason.
-    expect(header.payload.collapsable).toBe(false);
     expect(header.children[0]?.viewName).toBe('RCTText');
   });
 
@@ -199,16 +202,23 @@ describe('the pin', () => {
 
   it('survives a re-render writing the style out from under it', () => {
     const { headers, commit, scroll, measure } = mountSticky(1);
-    measure(headers[0] as ISymbioteNode, 0, 50);
+    const header = headers[0] as ISymbioteNode;
+    measure(header, 0, 50);
     scroll(120);
     vi.advanceTimersByTime(DEBOUNCE_MS);
     // The animated pin lives in `node.props.style`, which a framework re-render REPLACES. RN keeps
-    // the settled value beside the animated one for exactly this; here it is the payload fold, and
-    // without it a header goes back to its resting place the next time the app touches its style.
-    routeProp(headers[0] as ISymbioteNode, 'style', { opacity: 0.5 });
-    expect(
-      committedTranslateY(committedHeaders(commit())[0] as ILiveNode),
-    ).toBe(120);
+    // the settled value beside the animated one for exactly this, and so do we — as a PROP of its
+    // own, which is why an app's style write cannot reach it.
+    //
+    // Asserted on the PROP rather than on the committed transform, and the split is the point: what
+    // this harness owns is that the machine's value is still standing on the node. Composing it
+    // into the style over the app's is the engine's, pinned in
+    // `core/engine/cpp/tests/js/sticky-header-payload.itest.ts` ("beats a transform the app wrote
+    // itself") — and it can no longer be LOST there, because the rule rebuilds the style from the
+    // bag on every commit instead of restoring something a previous one wrote.
+    routeProp(header, 'style', { opacity: 0.5 });
+    commit();
+    expect(propsOf(header)[STICKY_TRANSLATE_PROP]).toBe(120);
   });
 
   it('stops at the NEXT header, which is the whole reason a header is a child', () => {

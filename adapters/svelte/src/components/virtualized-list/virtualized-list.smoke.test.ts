@@ -9,6 +9,7 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
+import { STICKY_HEADER_TAG } from '@symbiote-native/components';
 import {
   createLiveTree,
   installRecordingFabric,
@@ -387,19 +388,19 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      // zIndex travels through the style slot, so it only shows up in the flattened payload.
+      // THE TAG the engine was told, which is this case's own claim said directly. It used to look
+      // for `payload.zIndex === 10` and `collapsable === false` — both are a tag rule in
+      // `SymbioteFabricProps.cpp` now, and this harness builds payloads through the TypeScript
+      // `fabricProps`, which carries no copy of the tag rules. What the pin PAINTS is pinned in
+      // `core/engine/cpp/tests/js/sticky-header-payload.itest.ts`; what belongs here is that the
+      // windowed cell reached the behavior at all.
       const stickyHost = fabric.find(
-        node =>
-          node.viewName === 'RCTView' && payloadOf(node.handle).zIndex === 10,
+        node => node.tagName === STICKY_HEADER_TAG,
       );
       expect(
         stickyHost,
         'the flagged cell painted through the sticky-header behavior',
       ).toBeDefined();
-      // collapsable is also stickyFold's output, not an authored prop.
-      expect(stickyHost && payloadOf(stickyHost.handle).collapsable).toBe(
-        false,
-      );
     });
 
     // why: the exported imperative surface (scrollToOffset, scrollToIndex, scrollToItem,
