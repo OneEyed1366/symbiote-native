@@ -38,6 +38,29 @@
 // coalescing a row's `setStyle` calls into one — while React's host config is the same order. Forty
 // per cent more calls does not make 6.5x.
 //
+// WHERE THAT 87-94 ms GOES, split by the cases at the end of this file:
+//
+//   structure     27.6 ms over 7 002 elements   ~3.9 us  building the tree with NOTHING bound,
+//                                                        against the same tree through the engine
+//   the styling   28.5 / 34.7 / 33.7 ms         ~3.2 us  `[style]` through `ɵɵstyleMap` against the
+//   channel                                              identical objects on a plain input
+//   the class     23.0 / 18.4 / 33.6 ms         ~3.3 us  the same for `[class]`, PER BINDING
+//   channel
+//
+// THE TWO STYLING CHANNELS ARE NOT THE SAME STORY, and the difference is one word in a directive.
+// Angular shadows a styling binding into a directive input when the directive declares that exact
+// public name (`setShadowStylingInputFlags`, `view/directives.ts`; `checkStylingMap` then routes the
+// whole value to the input and never calls the renderer per key). `SymbioteElement` declares
+// `style`, so `[style]` IS shadowed on the directive path. It does NOT declare `class`, so `[class]`
+// reaches the renderer one token at a time on every path there is — and every example app styles its
+// static look with a CSS class.
+//
+// A COINCIDENCE NEARLY SANK THAT FINDING. `rendererWrites` reads 17 001 on the bare arm and 17 001
+// on the directive arm, which says "the styling engine runs either way" and is wrong: the bare arm
+// is 14 001 plus 3 000 per-key style calls, and the directive arm is 14 001 plus 3 000 static
+// attributes written twice. Two different sums that agree exactly. `writesOfUnchanged` is what tells
+// them apart, and the correction was drafted the wrong way round before that counter was printed.
+//
 // So the 87 ms is Angular's own template execution plus whatever our `Renderer2` methods do inside
 // those 17 001 calls. THE VUE ROW IS THE ARGUMENT THAT IT IS MOSTLY THE FIRST: Vue drives the same
 // engine through a renderer of the same shape and thinness, and it lands at +31.3. Whatever is
@@ -60,8 +83,10 @@ import '@angular/compiler';
 import { CUSTOM_ELEMENTS_SCHEMA, Component } from '@angular/core';
 import { h as vh, mount as mountVue } from '@symbiote-native/vue';
 import {
+  SYMBIOTE_ELEMENTS,
   mount as mountAngular,
   readAngularProfile,
+  unmount as unmountAngular,
 } from '@symbiote-native/angular';
 
 import {
@@ -70,6 +95,7 @@ import {
   createRawText,
   createSurface,
   readSurfaceTelemetry,
+  registerRules,
   routeProp,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -178,6 +204,202 @@ class AngularCreateArm {
   readonly inputStyle = INPUT_STYLE;
 }
 
+/**
+ * THE SAME ROW WITH THE STYLE BINDINGS RENAMED, and the rename is the whole experiment.
+ *
+ * On a tag no directive matches, `[style]` belongs to Angular's own STYLING engine: `ɵɵstyleMap`
+ * parses the object, `updateStyling` walks it and `applyStyling` calls `renderer.setStyle` once per
+ * KEY — seven calls a row here, against one `ɵɵproperty` for any other binding. `[styleTest]` is an
+ * ordinary property binding carrying the identical objects, so the two arms differ in the CHANNEL
+ * and in nothing else: same tree, same node count, same number of bindings, same objects.
+ *
+ * What it cannot be read as: a payload comparison. `styleTest` is not a real prop, so this arm
+ * commits a tree no app wants — which is fine, because the question is what Angular spends getting
+ * a value from a template to a renderer, not what the renderer then does with it.
+ */
+@Component({
+  selector: 'angular-style-channel-arm',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `<view [styleTest]="rootStyle">
+    @for (id of ids; track id) {
+      <view [styleTest]="rowStyle" [testID]="'row-' + id">
+        <text ellipsizeMode="tail" [allowFontScaling]="true">{{ id }}</text>
+        <view [styleTest]="cellStyle"
+          ><text ellipsizeMode="tail" [allowFontScaling]="true"
+            >row {{ id }}</text
+          ></view
+        >
+        <view [styleTest]="cellStyle"
+          ><text ellipsizeMode="tail" [allowFontScaling]="true">x</text></view
+        >
+        <text-input
+          [styleTest]="inputStyle"
+          [text]="'input ' + id"
+        ></text-input>
+      </view>
+    }
+  </view>`,
+})
+class AngularStyleChannelArm {
+  readonly ids = Array.from({ length: ROWS }, (_unused, id) => id);
+  readonly rootStyle = { flex: 1 };
+  readonly rowStyle = ROW_STYLE;
+  readonly cellStyle = CELL_STYLE;
+  readonly inputStyle = INPUT_STYLE;
+}
+
+/**
+ * THE SAME ROW WITH THE ELEMENT DIRECTIVES IMPORTED, to test an ASSUMPTION rather than a cost.
+ *
+ * `SymbioteElement` declares `style` as an `@Input()`, and two iterations of this work have assumed
+ * that therefore a matched directive takes `[style]` OFF Angular's styling engine and hands it over
+ * whole. That is a claim about which INSTRUCTION ngtsc emits for a styling binding when a directive
+ * claims the name, and nothing here had checked it.
+ *
+ * `rendererWrites` answers it without a stopwatch: the styling engine calls the renderer once per
+ * style KEY (seven a row), an input arrives as one `setProperty` (four a row). 17 001 against
+ * ~14 001 is the difference, and it is not a question of degree.
+ */
+@Component({
+  selector: 'angular-directive-style-arm',
+  standalone: true,
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `<view [style]="rootStyle">
+    @for (id of ids; track id) {
+      <view [style]="rowStyle" [testID]="'row-' + id">
+        <text ellipsizeMode="tail" [allowFontScaling]="true">{{ id }}</text>
+        <view [style]="cellStyle"
+          ><text ellipsizeMode="tail" [allowFontScaling]="true"
+            >row {{ id }}</text
+          ></view
+        >
+        <view [style]="cellStyle"
+          ><text ellipsizeMode="tail" [allowFontScaling]="true">x</text></view
+        >
+        <text-input [style]="inputStyle" [text]="'input ' + id"></text-input>
+      </view>
+    }
+  </view>`,
+})
+class AngularDirectiveStyleArm {
+  readonly ids = Array.from({ length: ROWS }, (_unused, id) => id);
+  readonly rootStyle = { flex: 1 };
+  readonly rowStyle = ROW_STYLE;
+  readonly cellStyle = CELL_STYLE;
+  readonly inputStyle = INPUT_STYLE;
+}
+
+/**
+ * THE SAME PAIR FOR `[class]`, which `SymbioteElement` does NOT declare as an input.
+ *
+ * Angular shadows a styling binding into a directive input when the directive declares that exact
+ * public name — `setShadowStylingInputFlags` in `view/directives.ts` handles `'style'` and `'class'`
+ * identically, and `checkStylingMap` then routes the whole value to the input instead of calling the
+ * renderer per key. `style` is declared here and is shadowed; `class` is not declared and is not.
+ *
+ * So every `[class]` in an app goes through `ɵɵclassMap` and reaches the renderer one TOKEN at a
+ * time, on the directive path as well as the bare one — and `CLAUDE.md` records that every example
+ * app styles its static look with a CSS class. This pair prices that channel the same way the style
+ * pair does: `[classTest]` is an ordinary input carrying the identical string.
+ */
+@Component({
+  selector: 'angular-class-arm',
+  standalone: true,
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `<view>
+    @for (id of ids; track id) {
+      <view [class]="rowClass" [testID]="'row-' + id">
+        <text [class]="cellClass"></text>
+        <view [class]="cellClass"><text [class]="cellClass"></text></view>
+        <view [class]="cellClass"><text [class]="cellClass"></text></view>
+        <text-input [class]="cellClass"></text-input>
+      </view>
+    }
+  </view>`,
+})
+class AngularClassArm {
+  readonly ids = Array.from({ length: ROWS }, (_unused, id) => id);
+  readonly rowClass = 'row wide';
+  readonly cellClass = 'cell';
+}
+
+@Component({
+  selector: 'angular-class-input-arm',
+  standalone: true,
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `<view>
+    @for (id of ids; track id) {
+      <view [classTest]="rowClass" [testID]="'row-' + id">
+        <text [classTest]="cellClass"></text>
+        <view [classTest]="cellClass"
+          ><text [classTest]="cellClass"></text
+        ></view>
+        <view [classTest]="cellClass"
+          ><text [classTest]="cellClass"></text
+        ></view>
+        <text-input [classTest]="cellClass"></text-input>
+      </view>
+    }
+  </view>`,
+})
+class AngularClassInputArm {
+  readonly ids = Array.from({ length: ROWS }, (_unused, id) => id);
+  readonly rowClass = 'row wide';
+  readonly cellClass = 'cell';
+}
+
+/**
+ * THE SAME SHAPE WITH NOTHING BOUND, which splits Angular's cost into structure and bindings.
+ *
+ * Ten elements a row and no attribute, no interpolation, no binding anywhere — so `ɵɵelementStart`
+ * runs, our `createElement` and `appendChild` run, and not one `ɵɵproperty` does. Read against the
+ * propless ENGINE arm below it prices what Angular charges to build a tree at all; read against the
+ * full arm above it prices everything a binding costs, from the template instruction down through
+ * the renderer into the engine.
+ *
+ * The raw texts go too: an interpolation is a binding. That keeps the two propless arms identical.
+ */
+@Component({
+  selector: 'angular-structure-arm',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `<view>
+    @for (id of ids; track id) {
+      <view>
+        <text></text>
+        <view><text></text></view>
+        <view><text></text></view>
+        <text-input></text-input>
+      </view>
+    }
+  </view>`,
+})
+class AngularStructureArm {
+  readonly ids = Array.from({ length: ROWS }, (_unused, id) => id);
+}
+
+/** The same propless tree through the engine's own API — the floor the arm above is read against. */
+function structureRow(): ISymbioteNode {
+  const row = createElement('RCTView');
+  appendChild(row, createElement('RCTText'));
+  for (let at = 0; at < 2; at += 1) {
+    const cell = createElement('RCTView');
+    appendChild(cell, createElement('RCTText'));
+    appendChild(row, cell);
+  }
+  // THE TAG IS LOAD-BEARING HERE and it is not in `engineRow` above. A `text-input` carries a host
+  // BEHAVIOR, which the engine looks up by the intrinsic tag; Angular's renderer hands it over and
+  // the behavior writes ~1 prop per input at attach. Creating the node by its Fabric name alone
+  // skips that, so the first spelling of this arm read `setProps` 2 against Angular's 1002 and the
+  // two arms were not one workload — caught by the oracle below rather than by the clock.
+  appendChild(
+    row,
+    createElement('RCTSinglelineTextInputView', false, 'text-input'),
+  );
+  return row;
+}
+
 /** The same row, built the way the engine's own API is called — no reconciler above it. */
 function engineRow(id: number): ISymbioteNode {
   const row = createElement('RCTView');
@@ -210,6 +432,7 @@ type IArm = { wall: number; nodes: number; walkMs: number; applyMs: number };
 
 let engineArm: IArm | undefined;
 let reactArm: IArm | undefined;
+let angularArm: IArm | undefined;
 
 type ITelemetry = ReturnType<typeof readSurfaceTelemetry>;
 
@@ -518,6 +741,11 @@ describe('what a reconciler adds to a create', () => {
   // split is not evidence any more. This arm reads it against the same engine-direct floor the other
   // two reconcilers are read against.
   it('builds the same 1 000 rows through the Angular adapter', () => {
+    // BEFORE THE CLOCK, ALWAYS. `mount` tears down whatever app holds this root tag, and tearing
+    // down ten thousand nodes of Angular is not free — left inside the timed region it lands on the
+    // NEXT arm's wall. The propless arm at the end of this file read 176.7 ms against the bound
+    // arm's 157.1, which is impossible as work and was entirely this.
+    unmountAngular(ROOT_TAG);
     // Zeroed, so what follows is this mount's alone.
     readAngularProfile();
     const startedAt = performance.now();
@@ -567,6 +795,193 @@ describe('what a reconciler adds to a create', () => {
     // committed node — so the committed count must still land exactly on the other arms'.
     print(`DEBUG nodes: engine=${engineArm.nodes} angular=${nodes}`);
     expect(nodes).toBe(engineArm.nodes);
+    angularArm = { wall, nodes, walkMs: 0, applyMs: 0 };
+  });
+
+  // why: of the 87 ms Angular adds over the engine-direct floor, the single most suspicious piece is
+  // its STYLING engine — on a tag no directive matches, `[style]` is not a property binding at all.
+  // `ɵɵstyleMap` parses the object and `applyStyling` calls the renderer once per KEY, so this row
+  // pays seven renderer calls a row where any other binding pays one. If that is where the time is,
+  // then claiming `[style]` as a directive input is worth what the directive costs, and the two
+  // findings have to be read together rather than separately.
+  it('prices angular style bindings against the same objects on a plain prop', () => {
+    unmountAngular(ROOT_TAG);
+    readAngularProfile();
+    const startedAt = performance.now();
+    const surface = mountAngular(ROOT_TAG, AngularStyleChannelArm);
+    flushTimers();
+    surface.commit();
+    const wall = performance.now() - startedAt;
+    mounted();
+
+    const telemetry = readSurfaceTelemetry(ROOT_TAG);
+    const nodes = committedTags().length;
+    const profile = readAngularProfile();
+    print(
+      `DEBUG styleprop wall=${wall.toFixed(1)} nodes=${nodes} ` +
+        `created=${telemetry?.nodesCreated ?? 0} setProps=${telemetry?.setProps ?? 0} ` +
+        `rendererWrites=${profile.rendererWrites}`,
+    );
+
+    if (angularArm === undefined)
+      throw new Error('the angular arm did not run');
+    print(
+      `DEBUG angular styling channel: ${(angularArm.wall - wall).toFixed(1)} ms ` +
+        `(${(((angularArm.wall - wall) * 1000) / 10_002).toFixed(2)} us/element)`,
+    );
+
+    // THE ORACLE. Same tree, same count — only the binding's NAME changed, so anything else moving
+    // means the two arms stopped being one workload.
+    expect(nodes).toBe(angularArm.nodes);
+  });
+
+  // why: two iterations of this work assumed a matched directive takes `[style]` off Angular's
+  // styling engine, because `SymbioteElement` declares it as an input. That is a claim about which
+  // instruction the compiler emits, and an assumption of exactly the kind this file keeps catching.
+  // `rendererWrites` settles it: seven calls a row is the styling engine, four is an input.
+  it('says whether a matched directive takes style off the styling engine', () => {
+    unmountAngular(ROOT_TAG);
+    readAngularProfile();
+    const surface = mountAngular(ROOT_TAG, AngularDirectiveStyleArm);
+    flushTimers();
+    surface.commit();
+    mounted();
+
+    const profile = readAngularProfile();
+    const telemetry = readSurfaceTelemetry(ROOT_TAG);
+    print(
+      `DEBUG directive-style rendererWrites=${profile.rendererWrites} ` +
+        `created=${profile.nodesCreated} nodes=${committedTags().length} ` +
+        `setProps=${telemetry?.setProps ?? 0} ` +
+        // THE KEY THAT BREAKS THE TIE. A matched directive CLAIMS a static attribute as an input and
+        // Ivy writes it to the renderer as well, so every static attr on a directive-matched element
+        // is written twice and the second one lands as `unchanged`. Without this counter the
+        // directive arm's 17 001 renderer calls read as "the styling engine still ran", because the
+        // bare arm's total is also 17 001 — two different sums that happen to agree.
+        `unchanged=${telemetry?.writesOfUnchanged ?? 0}`,
+    );
+    expect(committedTags().length).toBe(10_003);
+  });
+
+  // why: `class` is the one styling name `SymbioteElement` does NOT declare, so it is the one that
+  // never gets shadowed — on the directive path as much as the bare one. Every example app styles
+  // with CSS classes, so this channel is the one a real screen actually uses.
+  it('prices the class channel against the same strings on a plain input', () => {
+    // REGISTERED, or the comparison measures nothing. `routeProp`'s class branch resolves a token
+    // through the registry and publishes nothing when it resolves to nothing — so with unregistered
+    // names the class arm wrote 2 002 engine props against the input arm's 9 002 and the two were
+    // seven thousand writes apart. The first run of this case read 19.6 ms off exactly that.
+    registerRules([
+      {
+        tokens: ['row'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { height: 44 },
+      },
+      {
+        tokens: ['wide'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { flex: 1 },
+      },
+      {
+        tokens: ['cell'],
+        specificity: [0, 1, 0],
+        order: 2,
+        style: { margin: 2 },
+      },
+    ]);
+    const arms: readonly (readonly [string, typeof AngularClassArm])[] = [
+      ['class', AngularClassArm],
+      ['classprop', AngularClassInputArm],
+    ];
+    const walls = new Map<string, number>();
+    for (const [name, component] of arms) {
+      unmountAngular(ROOT_TAG);
+      readAngularProfile();
+      const startedAt = performance.now();
+      const surface = mountAngular(ROOT_TAG, component);
+      flushTimers();
+      surface.commit();
+      walls.set(name, performance.now() - startedAt);
+      mounted();
+      const profile = readAngularProfile();
+      const telemetry = readSurfaceTelemetry(ROOT_TAG);
+      print(
+        `DEBUG ${name.padEnd(9)} wall=${(walls.get(name) ?? 0).toFixed(1)} ms ` +
+          `nodes=${committedTags().length} setProps=${telemetry?.setProps ?? 0} ` +
+          `rendererWrites=${profile.rendererWrites}`,
+      );
+    }
+    const bound = walls.get('class') ?? 0;
+    const shadowed = walls.get('classprop') ?? 0;
+    print(
+      `DEBUG angular class channel: ${(bound - shadowed).toFixed(1)} ms ` +
+        `(${(((bound - shadowed) * 1000) / 7002).toFixed(2)} us/binding)`,
+    );
+
+    // THE ORACLE. Both arms bind the same strings to the same 7 002 elements; only the NAME differs.
+    expect(committedTags().length).toBe(ROWS * 7 + 3);
+  });
+
+  // why: the pair below splits Angular's remaining cost into STRUCTURE and BINDINGS. The styling
+  // channel above accounts for about a third of it; what is left could be Angular building ten
+  // thousand elements, or Angular evaluating thirteen thousand bindings, and those want different
+  // fixes. Neither arm binds anything, so the delta between them is Angular's structural overhead
+  // alone — and the delta from each arm to its bound twin is what a binding costs on that side.
+  it('prices the same tree with nothing bound, engine and angular', () => {
+    unmountAngular(ROOT_TAG);
+    const surface = createSurface(ROOT_TAG);
+    const engineStartedAt = performance.now();
+    const list = createElement('RCTView');
+    for (let id = 0; id < ROWS; id += 1) appendChild(list, structureRow());
+    surface.appendChild(list);
+    flushOps();
+    surface.commit();
+    const engineWall = performance.now() - engineStartedAt;
+    mounted();
+    const engineNodes = committedTags().length;
+    const engineTelemetry = readSurfaceTelemetry(ROOT_TAG);
+
+    readAngularProfile();
+    const angularStartedAt = performance.now();
+    const angularSurface = mountAngular(ROOT_TAG, AngularStructureArm);
+    flushTimers();
+    angularSurface.commit();
+    const angularWall = performance.now() - angularStartedAt;
+    mounted();
+    const angularNodes = committedTags().length;
+    const angularTelemetry = readSurfaceTelemetry(ROOT_TAG);
+    const profile = readAngularProfile();
+
+    print(
+      `DEBUG structure engine=${engineWall.toFixed(1)} ms nodes=${engineNodes} ` +
+        `setProps=${engineTelemetry?.setProps ?? 0}`,
+    );
+    print(
+      `DEBUG structure angular=${angularWall.toFixed(1)} ms nodes=${angularNodes} ` +
+        `setProps=${angularTelemetry?.setProps ?? 0} ` +
+        `rendererWrites=${profile.rendererWrites} created=${profile.nodesCreated}`,
+    );
+    print(
+      // OVER 7 002 ELEMENTS, not 10 002 — this tree has no raw texts, and dividing by the bound
+      // arms' node count understated it by 30%.
+      `DEBUG angular structural overhead: ${(angularWall - engineWall).toFixed(1)} ms ` +
+        `(${(((angularWall - engineWall) * 1000) / (ROWS * 7 + 2)).toFixed(2)} us/element)`,
+    );
+
+    // THE ORACLE, and it is the whole comparability of this case: both build the same tree and BOTH
+    // write the same props — which here is not zero, because a `text-input` attaches a host behavior
+    // that writes one. An absolute count rather than "they match", since two zeroes match perfectly.
+    //
+    // SEVEN NODES A ROW, not ten: an interpolation is a binding, so the three raw texts of the bound
+    // arms are not here. This pair is read against ITSELF, never against the arms above.
+    expect(angularNodes).toBe(engineNodes);
+    expect(engineNodes).toBe(ROWS * 7 + 3);
+    expect(angularTelemetry?.setProps ?? 0).toBe(
+      engineTelemetry?.setProps ?? 0,
+    );
+    expect(angularTelemetry?.setProps ?? 0).toBe(ROWS + 2);
   });
 
   // why: the row arm says Vue hands the host 9 007 distinct values where React hands 5 007, for one
