@@ -45,7 +45,7 @@ const Row = memo(function RowView({
     label(String(row.id)),
     h('view', { style: CELL_STYLE }, label(row.label)),
     h('view', { style: CELL_STYLE }, label('x')),
-    h('textinput', { style: INPUT_STYLE, text: row.label }),
+    h('text-input', { style: INPUT_STYLE, text: row.label }),
   );
 });
 
