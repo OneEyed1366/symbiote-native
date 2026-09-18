@@ -2421,8 +2421,28 @@ shortcut.** Removing both at once turned 47 tests red across 25 files; removing 
 29. The remainder are mostly TextInput MACHINE tests — the controlled-value handshake, which stays in
 JS by design — using `payload.text` as their observable, so re-aiming them is a different piece of
 work with a different argument. Two rules deleted in one commit is one commit that cannot be
-attributed, which is the discipline this file already applies to measurements. The twin is marked in
-`fabric-props.ts` as the one rule that breaks its own header, with the reason it waited.
+attributed, which is the discipline this file already applies to measurements.
+
+**IT WENT IN THE NEXT COMMIT, and the split paid for itself in the counting.** Measured alone it is
+**18 cases across 8 files**, not the ~32 the combined run implied — the inflation was the two rules
+overlapping in the same files, which is exactly what makes a combined change hard to reason about
+before doing it. `core/engine/src/fabric-props.ts` now holds NO platform rule at all, and its header
+says so as the file's own contract.
+
+**The re-aim is one substitution with one idea behind it: `payload.text` becomes `payload.value`.**
+A machine test asking "did the app's controlled value settle correctly" can read it under the name
+the MACHINE writes, and the rename into RN's private `text` is the engine's. Nothing lost: the
+census probe still reads two keys (`mostRecentEventCount` + `value` where it was `+ text`), so even
+the key COUNT is unchanged — which is what makes it visibly a rename rather than a deletion.
+
+**One case flipped rather than moved, and it is the group-migration rule again.** `v-model`'s
+CONTROL arm asserted `committedProps()?.text` is undefined without the directive. After the port
+`text` is absent from every payload this harness builds, so that control would have passed forever
+while controlling nothing — it moved to `value` WITH its two positives, where it still discriminates
+because nothing writes `value` without the directive either. And Solid's "never forwards the JS-only
+props" lost its `defaultValue` leg for the same reason its `inputMode` leg went earlier: the stripping
+is the engine's. What is still that layer's is the FUNCTION, because dropping a function is not a
+rule about text inputs — it is a property of building a payload at all.
 
 ### TWO GUARDS THAT HAVE STOPPED GUARDING — found while porting, recorded rather than quietly fixed
 
