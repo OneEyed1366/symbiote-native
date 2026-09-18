@@ -762,6 +762,11 @@ porting ANY further RN module by hand.**
 > platform-split rule: a compile-time branch is only testable in a build that compiles it. Closing it
 > means an Android arm of the test host, not a mock.
 >
+> **CLOSED LATER THE SAME DAY — the arm exists.** `pnpm run test:android`, and the ripple's dict, its
+> foreground slot and its null colour are asserted on the committed payload there. See "The test host
+> has an ANDROID ARM now". `underlineColorAndroid` and the `search` keyboard split are still open, but
+> they are now a fixture to write rather than a device to find.
+>
 > ### The THIRD port — `switch` — and the first whose authored names are ALL invented (2026-09-18)
 >
 > `trackColor`, `thumbColor` and `ios_backgroundColor` are not Fabric props at any point. RN's Switch
@@ -1935,6 +1940,52 @@ registered carries an EMPTY `tagName`, so no rule fires.** `recordSetTag` is emi
 and measured a native side doing no work at all; what caught it was `expectSamePayload` refusing to
 time two arms that disagree, not a suspiciously good number. Any bare-tag fixture needs a stub
 behavior registered or it measures nothing.
+
+### The test host has an ANDROID ARM now, and five recorded coverage gaps close at once (2026-09-18)
+
+Every port in this migration that touched a platform split landed with the same sentence: *a
+compile-time branch is only testable in a build that compiles it*. `android_ripple`,
+`underlineColorAndroid`, `decelerationRate`'s constants, Button's uppercase label and its Material
+style, TouchableNativeFeedback's background — five gaps, each recorded honestly and each needing a
+device. `Switch` was the lucky exception, because `Switch` and `AndroidSwitch` are genuinely two
+Fabric components and its rule branches on a name already on the wire.
+
+```
+pnpm run test:android
+```
+
+**What made it cheap is a fact about where the rules live, not a trick: all twelve `#ifdef ANDROID`
+sites are in `SymbioteFabricProps.cpp`**, which includes `folly/dynamic.h` and our own headers and
+nothing else. So the define is scoped to that ONE translation unit
+(`set_source_files_properties`, `SYMBIOTE_PLATFORM_ANDROID`) and never reaches ReactCommon, whose own
+Android branches want fbjni and a real NDK. Defining it target-wide is the version that does not
+build.
+
+**One line genuinely could not cross and the split it needed is the reusable part.**
+`android_get_device_api_level` is the NDK's, so it exists when `__ANDROID__` is defined — which the
+real toolchain sets and `-DANDROID` does not. `androidApiLevel()` answers with the minimum RN
+supports on a host, so the arm exercises the branch a modern device takes while the QUERY stays the
+device's. A rule's logic and a rule's platform call are separable, and only the second needs hardware.
+
+**The fixtures split by SUFFIX, `*.android.itest.ts`, and the split is hard in both directions**:
+that file runs only on `build-android` and every other fixture runs only on the others. Each arm's
+cases assume their own platform — an Android fixture asserts keys the default build never writes, and
+the default fixtures assert their absence — so a one-way filter would leave half of them lying. It is
+Metro's own `.ios.js` / `.android.js` shape, and nothing has to maintain a list.
+
+**It is NOT a device and the file says so.** `Platform.OS` in JS still reads the host, so a behavior
+whose JS half branches on it takes its iOS path here — Button composes the iOS touchable, which is
+why one case asserts a late `color` write and not a late `disabled` one (the latter starts an opacity
+settle wanting a `requestAnimationFrame` the host lacks). What this build settles is what the RULE
+emits, which is where the ported logic now lives.
+
+**Button reached ZERO folds on both platforms in the same commit**, and the arm is what made that
+safe rather than a coverage trade: its Android owner fold — the Material style plus the selectable
+background TNF clones onto it — moved into `foldButtonProps`, and the four vitest cases that watched
+it were replaced by itest cases reading the committed payload. Strictly better than what they were:
+a mocked `Platform.OS` steers the JS half, and a rule in `SymbioteFabricProps.cpp` never reads it.
+It is the most expensive primitive this codebase ships (four crossings per commit three days ago) and
+it now costs nothing in JS.
 
 ### A rule may key on its PARENT'S TAG — the descendant rule, and the two clone-folds it freed (2026-09-18)
 
