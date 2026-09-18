@@ -326,6 +326,17 @@ claim without being able to verify it's actually wrong, not just different-looki
 this is a caching artifact of how the skill catalog is generated for the session, not evidence the
 file fix didn't take. Confirmed via direct `grep` that the file itself has all 6 fixes applied.
 
+## Twentieth pass — framework versions (Angular/Solid/Svelte/Vue) and the standalone benchmark, all clean
+
+Cross-checked `@angular/core >=20` (docs) against `~22.0.8` (actual) — satisfies the floor, fine.
+No specific-version claims found for Solid/Svelte/Vue elsewhere to cross-check. Verified
+`benchmarks/component-overhead/README.md`'s "React 18.3.1 / Vue 3.5.13" figures and "Not yet here:
+Solid, Svelte, Angular" — these are a standalone Chrome/V8 benchmark pinning its OWN CDN script
+versions independent of the monorepo's React 19.2.3 (confirmed via the actual `<script src=
+cdnjs.../react/18.3.1/...>` tag in `react.html`), and only `react.html`/`vue.html` exist on disk,
+matching the "not yet here" list exactly. Nothing to fix — this was a plausible-looking false
+alarm from the version-grep method, worth the two-minute check to rule out.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
