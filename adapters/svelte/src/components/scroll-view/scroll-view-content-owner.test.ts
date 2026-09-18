@@ -261,15 +261,20 @@ describe('the engine is the only builder of a ScrollView content node', () => {
   // tree; what would break this invariant is one of them growing a scroll tag, which is what the
   // grep in this test's sibling assertion answers.
   it('no Svelte source emits a content intrinsic any more', async () => {
-    const { readdirSync, statSync } = await import('node:fs');
+    const { readdirSync } = await import('node:fs');
     const roots = [join(__dirname, '..', '..')];
     const offenders: string[] = [];
     while (roots.length > 0) {
       const dir = roots.pop();
       if (dir === undefined) break;
-      for (const entry of readdirSync(dir)) {
+      // `withFileTypes` — the listed-then-stat race `load-time-registration.test.ts` documents.
+      // This walk reaches the very directories the Svelte suites write and delete
+      // `.smoke-compiled-*.mjs` in, so a separate `statSync` can throw ENOENT on an entry this loop
+      // was about to discard for its extension.
+      for (const dirent of readdirSync(dir, { withFileTypes: true })) {
+        const entry = dirent.name;
         const full = join(dir, entry);
-        if (statSync(full).isDirectory()) {
+        if (dirent.isDirectory()) {
           roots.push(full);
           continue;
         }

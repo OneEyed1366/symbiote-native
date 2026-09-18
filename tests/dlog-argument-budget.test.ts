@@ -22,7 +22,7 @@
 // is deliberate — raise the number and say why in the commit.
 
 import { describe, expect, it } from 'vitest';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
@@ -32,12 +32,24 @@ const SCANNED_ROOTS = ['core', 'adapters', 'packages'];
 // Measured 2026-09-15. Two files are gated and excluded from it by being gated, not by being named.
 const BUDGET = 347;
 
+// `withFileTypes`, and it is a RACE FIX rather than a tidy-up — the same one
+// `core/engine/src/load-time-registration.test.ts` carries, which this walk was written from and
+// which was never swept back across. This walks `adapters/`, and the Svelte suites write a
+// `.smoke-compiled-*.mjs` beside their own source and `rmSync` it in an `afterAll`, dozens of them
+// by design. A separate `statSync` after `readdirSync` leaves a window where one can vanish between
+// the listing and the stat, and `statSync` then throws ENOENT on an entry this function was about to
+// discard for its extension anyway.
+//
+// It presents as a guard that passes alone and fails in a full parallel run — which is exactly how
+// it was found: two clean full runs and then this file, after a change that touched neither. Asking
+// for the type in the SAME syscall closes the window rather than catching the throw.
 function sourceFiles(dir: string, out: string[]): void {
-  for (const entry of readdirSync(dir)) {
+  for (const dirent of readdirSync(dir, { withFileTypes: true })) {
+    const entry = dirent.name;
     if (entry === 'node_modules' || entry === 'build' || entry === 'build-ngc')
       continue;
     const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
+    if (dirent.isDirectory()) {
       sourceFiles(full, out);
       continue;
     }
@@ -114,7 +126,19 @@ describe('log messages built where nothing will print', () => {
 
     let total = 0;
     for (const file of files) {
-      const source = readFileSync(file, 'utf8');
+      // THE SECOND listed-then-read window, and unlike the first it cannot be collapsed into one
+      // syscall. Labelled rather than swallowed: skipping an unreadable file would turn a count this
+      // guard exists to make into a quietly smaller one, and a bare ENOENT here reads as a mystery.
+      // Same treatment `load-time-registration.test.ts` gives its own `parse()`.
+      let source: string;
+      try {
+        source = readFileSync(file, 'utf8');
+      } catch (cause) {
+        throw new Error(
+          `could not read ${file} — if this is ENOENT it is the .smoke-compiled-* race, not a finding`,
+          { cause },
+        );
+      }
       if (!source.includes('dlog(')) continue;
       total += ungatedComputedArguments(source);
     }

@@ -46,7 +46,7 @@
 // implementation, two allocators, nothing to drift. That one may stand indefinitely.
 // `native-engine.ts`'s header carries the full statement.
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { type Dirent, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -89,17 +89,23 @@ function filesUnder(
   directory: string,
   extensions: readonly string[],
 ): string[] {
-  let entries: string[];
+  // `withFileTypes` asks for the type in the SAME syscall that lists the entry, so a file that
+  // vanishes in between cannot throw ENOENT here. A separate `statSync` could, in a full parallel
+  // run: the Svelte suites write a `.smoke-compiled-*.mjs` beside their own source and `rmSync` it
+  // in an `afterAll`. The catch below is for a different thing — a directory that does not exist at
+  // all — and does not cover a mid-walk disappearance.
+  let entries: Dirent[];
   try {
-    entries = readdirSync(directory);
+    entries = readdirSync(directory, { withFileTypes: true });
   } catch {
     // The directory does not exist yet, which is the state before Android's shim lands.
     return [];
   }
   const found: string[] = [];
-  for (const entry of entries) {
+  for (const dirent of entries) {
+    const entry = dirent.name;
     const path = join(directory, entry);
-    if (statSync(path).isDirectory()) {
+    if (dirent.isDirectory()) {
       found.push(...filesUnder(path, extensions));
       continue;
     }
