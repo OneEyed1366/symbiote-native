@@ -309,6 +309,23 @@ re-grep the underlying fact (the count, or the enumerated list) across the WHOLE
 just the files the original investigation touched. Both pass 17 and this pass found real
 additional instances this way that the original targeted work had missed.
 
+## Nineteenth pass — cross-checked pinned tool/runtime versions, all consistent
+
+Extended the "re-grep a fact globally" method to version pins: React Native (`0.86`), Node
+(`>=22.13`), pnpm (`11.9.0`) — all consistent between docs and the actual root/`examples/react`
+`package.json` files, no fixes needed. One ambiguous case found and deliberately left alone:
+`symbiote-devtools-inspector/SKILL.md` cites `react@19.3.0` for a `.vendors/react` source read
+dated 2026-08-16, while the live app dependency is `19.2.3` — `.vendors/react` is a separately
+vendored copy for reading React's internals, not necessarily pinned to the app's own React
+version, and I could not verify what `.vendors/react` was at that historical date. Same category
+as the CLAUDE.md `DrawerLayoutAndroid` historical note from pass 9: don't "fix" a dated snapshot
+claim without being able to verify it's actually wrong, not just different-looking.
+
+**Note on the skill listing System sees:** the `Skill` tool's catalog description for
+`symbiote-devtools-inspector` shown in-session still displays the pre-fix text (omitting Solid) —
+this is a caching artifact of how the skill catalog is generated for the session, not evidence the
+file fix didn't take. Confirmed via direct `grep` that the file itself has all 6 fixes applied.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
