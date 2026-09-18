@@ -2223,6 +2223,51 @@ Three things fell out, all improvements rather than trade-offs:
   two wrappers, which two wrapped ITEMS would also satisfy; it now asserts the titles. The `why:`
   had always been about which children got marked and the assertion had never said so.
 
+### READING THE VENDOR TO PORT A CONSTANT FOUND A SHIPPING BUG INSTEAD (2026-09-18)
+
+The census's next lead was `setProp(content, 'collapsable', false)` in `buildStructure` — a platform
+CONSTANT written from JS onto a node whose tag already has a rule. Opening `ScrollView.js` to confirm
+it is unconditional turned up something worth more than the port:
+
+```
+ RN    maintainVisibleContentPosition != null || (Platform.OS === 'android' && snapToAlignment != null)
+ ours  maintainVisibleContentPosition != nullptr ||                            snapToAlignment != nullptr
+```
+
+**`snapToAlignment`'s leg is ANDROID-ONLY upstream and we honoured it on both platforms**, so every
+iOS ScrollView that merely SNAPS was telling Yoga not to flatten its children — work RN never asks
+for, on the commonest scroll configuration there is. Shipped, and invisible: the tree is correct,
+only more expensive.
+
+**A TEST PINNED IT AS CORRECT.** `scroll-content-payload.itest.ts` asserted
+`snapToAlignment: 'center'` -> `collapsableChildren: false` on the default build. It was written
+from the code rather than from upstream, which is the one thing a characterization must not be —
+**an assertion copied from the implementation cannot disagree with it.** The case now asserts RN's
+answer on the iOS arm and its twin on the Android arm, and break-testing the gate fires the iOS one.
+
+**The JS twin in `tag-rule-cost.itest.ts` refused to time the fix**, which is exactly what
+`expectSamePayload` is for: its arm used `snapToAlignment`, so the C++ rule and the JS copy disagreed
+the moment the gate landed. That arm now uses the platform-INVARIANT prop, because a cost ruler that
+only prices correctly on one build is a ruler that will mislead on the other.
+
+**Then the constant moved**, and its case needed a second assertion to mean anything. `collapsable`
+reaches the payload whether a `setProp` seeds it or a rule writes it, so the obvious case is green
+both ways; what discriminates is that a rule's output lives in the payload and **nowhere else**, so
+`propsOf(content).collapsable === undefined` is the half that says the seed is gone. Same witness the
+sticky port used a commit earlier.
+
+**It retired the rule's identity fast path** — there is no content node with nothing to add any more —
+and the ruler CANNOT price that, which is worth saying rather than implying. Its arm sets an anchor
+prop, so the fast path never fired there in the recorded 2.8 ms either; the retirement costs one bag
+copy per SCROLL VIEW, not per node. Measured anyway: `content` native walk 3.0/3.0/3.4 against a
+recorded 2.8, with the untouched `scroll` control moving 4.2 -> 4.3/4.4/4.5 in the same sitting. **A
+control that drifts with the subject is machine state**, so no row here carries a verdict.
+
+Six vitest cases went with it, all reading `collapsable` as the seed — the same group migration the
+sticky port had. Two adapter files already carried the note for `nestedScrollEnabled` moving the same
+way, which made the third and fourth obvious: **once a file has lost one assertion to the engine, the
+next one is a pattern rather than a surprise.**
+
 ### THE CENSUS AFTER THE LAST FOLD — one more mirror, and the two things that cannot move
 
 With no `payloadFold` left, "what still serves a TAG from JS" needs a different query than a fold
