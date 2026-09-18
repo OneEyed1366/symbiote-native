@@ -5,46 +5,74 @@
 // instance over the seven a row carries. That number is the whole remaining Angular deficit and it
 // has never been taken apart, so the next fix would be aimed by guesswork.
 //
-// WHAT IT ANSWERS, at 10 000 elements, and ONLY what survived two runs whose own floors were 1.0 ms
-// and 9.2 ms. The floor moves between runs, so a reading counts here only if it clears the WIDER one:
+// EVERY NUMBER THIS FILE PUBLISHED BEFORE 2026-09-18 WAS READ ACROSS A CENSUS IT NEVER TOOK, and
+// three of its four findings are void. The arms do not push the same prop writes at the engine —
+// they cannot, because a matched directive CLAIMS a binding that would otherwise reach
+// `setProperty` — so several pairs it compared were never two spellings of one workload:
 //
-//   a directive at all    FREE. `inert` reads 12.35-12.97 us/element against a bare tag's
-//                         12.60-12.87 — the two swap places between runs, which is what "no
-//                         difference" looks like. Angular's per-directive bookkeeping is not the cost.
-//   its three injections  +12.4-13.0 us/element, i.e. HALF of what a directive-shaped element costs,
-//                         and far outside either floor. THIS IS THE WHOLE OF IT.
+//   bare        20 001 writes    testID as a property + ellipsizeMode as a static ATTRIBUTE
+//   inert       10 001           testID claimed by the directive and forwarded nowhere
+//   minimal     30 001           both forwarded out of `ngOnChanges`, plus the attribute
+//   full        20 002           `ViewElement` does not declare `ellipsizeMode` — it is a Text prop
 //
-//   ngOnChanges           SETTERS ARE WORSE, +2.75 and +2.95 us/element across the two runs, both
-//                         outside their own floor. Not a saving in the wrong size — a cost, in the
-//                         opposite direction from the rewrite that was proposed here. Closed.
-//   279 declared inputs   +3.3 and +1.3 us/element, both outside their floor but disagreeing by 2.5x.
-//                         Real, small, and not worth a number tighter than "some".
+// A static attribute reaches the renderer whatever matches the element (Ivy writes it AND feeds it
+// to the input), which is where the odd 10 000 comes from and why no pair agrees by accident.
 //
-// THE 2 000-ELEMENT VERSION OF THIS FILE GOT THREE OF THESE BACKWARDS, and the floor is why: the
-// control pair disagreed by 2.8 ms while the deltas being read were 3.1. It reported "a directive at
-// all ~3.3 ms, and it is Angular's own" and "279 declared inputs: NOTHING", both of which the bigger
-// N reverses. An instrument that cannot beat its own control answers nothing however many rounds it
-// averages — and the fix was SIZE, not more rounds.
+// So: "a directive at all is FREE" compared 2 writes against 1, "279 declared inputs" compared 2
+// against 3, and "two of its injects" read an arm that FORWARDED NOTHING — its host directive used
+// an element selector where the template writes an attribute, so it never matched and the renderer
+// it was supposed to capture stayed `undefined`. The one survivor is the setter row, whose pair
+// happens to agree at 30 001.
 //
-// ONE MORE TRAP, and it is this file's own units: the table prints BOTH ms and us/element, and the
-// floor is in ms. Reading a us/element delta against a ms floor makes a real finding look like noise
-// — which is what happened to the setter row on the first pass through these numbers.
+// WHAT IT ANSWERS NOW, at 10 000 elements, every row read only against a pair whose census agrees:
 //
-// So the lever is DEPENDENCY INJECTION and nothing else here is measurable. Read that before
-// proposing the next rewrite of `elements.ts`.
+//   one injection         ~4.2 us/element. `minimal` against `one-inject` reads 76-97 ms over TWO of
+//                         them across nine runs, always outside the bar, censuses agreeing at
+//                         30 001/30 002. THREE is ~12.6 us/element — roughly half of what a
+//                         directive-shaped element costs, and the whole remaining lever here.
+//   ngOnChanges           SETTERS ARE WORSE, -4.8 to -20.5 ms over nine runs, census agreeing at
+//                         30 001. Unchanged by the correction, and the opposite direction from the
+//                         rewrite once proposed here.
+//   forwarding a prop     UNRESOLVED, and recorded as that rather than rounded to "free". Twenty
+//                         thousand extra writes read anywhere from -32 ms to +0.5 across nine runs —
+//                         the negative half is impossible as work, so what that row measures is the
+//                         instrument, not the write path. Not positional: rotating the arm order
+//                         changed nothing. Whatever it is, the write path is not LARGE.
+//   a directive at all    NO LONGER MEASURED — `bare` and `inert` cannot be compared, and making
+//                         them comparable means a template with no static attribute, which is a
+//                         different file's question.
+//
+// The cross-check that makes the injection figure trustworthy is arithmetic rather than a repeat:
+// `no-forward - inert` is one injection plus `ngOnChanges` at 71.6 ms, and `minimal - inert` minus
+// the two-injection delta lands at 71.5. Two paths to the same number through different arms.
+//
+// THE CONTROL PAIR WAS NEVER ENOUGH, and that is the root of every reversal in this file's history.
+// It answers "how far apart do two IDENTICAL arms land in ONE run" — a real question, and not the
+// one a reader needs. An arm's own minimum has moved 30 ms BETWEEN runs while that floor read 2.0,
+// and `full` once swung 47 ms with nothing changed. So each arm now reports the gap between its best
+// and second-best sample, which asks the same question inside one run, and a row must clear the
+// LARGER of that and the control pair. Rows that used to read "outside the floor" at 6 ms now read
+// what they are.
+//
+// ONE TRAP OF THIS FILE'S OWN, paid for twice: the table prints ms AND us/element while the bar is
+// in ms, so reading a us delta against it makes a real finding look like noise — that is what
+// happened to the setter row.
 //
 // The arms, separated by construction rather than by argument:
 //
-//   bare        no directive at all — the floor, and what the six-column ruler measures
-//   inert       a directive with inputs and NOTHING else — Angular's own per-directive bookkeeping
-//   minimal     + three injections and `ngOnChanges`, i.e. `SymbioteElement` in miniature
+//   bare        no directive at all
+//   inert       a directive with inputs and NOTHING else — no injection, no lifecycle
+//   no-forward  + one injection and `ngOnChanges`, writing nothing   -> isolates the injection
+//   one-inject  + the forwarding                                     -> isolates the write path
+//   minimal     + two more injections, i.e. `SymbioteElement` in miniature
 //   control     byte-identical to `minimal` — see `ControlElement`, and read it FIRST
 //   setters     the same inputs as SETTERS, no `ngOnChanges`  -> the `SimpleChanges` share
-//   full        the real `SymbioteElement`, 279 declared inputs  -> what the DECLARATION count costs
+//   full        the real `SymbioteElement`, 279 declared inputs
 //
 // EVERY ROW IS READ AGAINST THE CONTROL PAIR, which is the whole reason the file is trustworthy: two
 // arms doing identical work disagree by some amount, and nothing smaller than that is a finding. The
 // report prints that floor and labels each row against it rather than leaving the reader to guess.
+// The CENSUS is the half that was missing, and it is printed above the milliseconds for that reason.
 
 import '@angular/compiler';
 import {
@@ -62,6 +90,7 @@ import {
 } from '@angular/core';
 import { describe, expect, it } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
+import { readCommitProfile } from '@symbiote-native/engine';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -152,10 +181,39 @@ class OneInjectElement implements OnChanges {
 
 // Captures the renderer once so the arm above has one to write through — this is the PROBE's
 // shortcut, not a proposal: a real one would have to survive several surfaces.
-@Directive({ selector: 'one-inject-host', standalone: true })
+//
+// THE BRACKETS ARE THE WHOLE POINT. `selector: 'one-inject-host'` matches an ELEMENT of that name;
+// this directive is written as an ATTRIBUTE on the wrapper `<view>`, so it never matched, the
+// renderer was never captured, and `sharedRenderer?.` silently forwarded NOTHING for as long as this
+// arm existed. It read as the cheapest injecting arm in the file and its delta was published as
+// "two injections cost 4.5 us each". A census of prop writes is what caught it — 10 002 against
+// `minimal`'s 30 001 — and nothing in a millisecond could have.
+@Directive({ selector: '[one-inject-host]', standalone: true })
 class OneInjectHost {
   constructor() {
     sharedRenderer = inject(Renderer2);
+  }
+}
+
+// ONE injection and NO forwarding — the arm that separates the two, and the reason it had to exist
+// is that this file once did not have it. `inert` writes nothing at all while `one-inject` writes
+// three props per element through the renderer, so `one-inject - inert` was never a price for an
+// injection: it is an injection PLUS 30 000 trips through `routeProp`. The header claimed the first
+// reading until this arm was added. `ngOnChanges` still RUNS and still walks `changes`, so what
+// separates this from `one-inject` is the `setProperty` calls and nothing else.
+@Directive({ selector: 'no-forward-tag', standalone: true })
+class NoForwardElement implements OnChanges {
+  private readonly host = inject(ElementRef);
+
+  @Input() testID?: string;
+  @Input() ellipsizeMode?: string;
+  @Input() pointerEvents?: string;
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // The same walk, minus the write. Reading `nativeElement` keeps the injected value load-bearing
+    // — an unread injection is one the compiler could in principle drop.
+    for (const name of Object.keys(changes))
+      if (this.host.nativeElement === undefined) throw new Error(name);
   }
 }
 
@@ -193,8 +251,14 @@ class SetterElement {
 // `[testID]` is BOUND rather than static, so a change-detection pass has something to check on every
 // element. That is what the update arm below measures, and it is the shape a `select` has: one row
 // changes, and Angular checks all of them.
-const TEMPLATE = (tag: string): string =>
-  `<view testID="host">${Array.from(
+//
+// THE HOST ATTRIBUTE IS PART OF THE TEMPLATE, not a second spelling of it. `one-inject` needs a
+// directive on the WRAPPER to capture a renderer, and its first spelling wrote its own template to
+// get one — which quietly also made its `testID` STATIC while every other arm's was bound. Its check
+// row then read 0.4 ms against everyone else's 1.5 and was compared with them anyway. One template
+// for every arm is what stops that recurring.
+const TEMPLATE = (tag: string, hostAttribute = ''): string =>
+  `<view testID="host" ${hostAttribute}>${Array.from(
     { length: ELEMENTS },
     () => `<${tag} [testID]="label()" ellipsizeMode="tail"></${tag}>`,
   ).join('')}</view>`;
@@ -247,14 +311,18 @@ class ControlArm extends ArmBase {}
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [OneInjectElement, OneInjectHost],
-  template: `<view one-inject-host testID="host"
-    >${Array.from(
-      { length: ELEMENTS },
-      () => `<one-inject-tag testID="e" ellipsizeMode="tail"></one-inject-tag>`,
-    ).join('')}</view
-  >`,
+  template: TEMPLATE('one-inject-tag', 'one-inject-host'),
 })
 class OneInjectArm extends ArmBase {}
+
+@Component({
+  selector: 'no-forward-arm',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  imports: [NoForwardElement],
+  template: TEMPLATE('no-forward-tag'),
+})
+class NoForwardArm extends ArmBase {}
 
 @Component({
   selector: 'inert-arm',
@@ -290,22 +358,53 @@ async function race(
 ): Promise<{
   readonly create: Map<string, number>;
   readonly check: Map<string, number>;
+  readonly writes: Map<string, number>;
+  readonly commits: Map<string, number>;
+  readonly resolution: Map<string, number>;
 }> {
   const create = new Map<string, number>();
+  // EVERY create sample, not just the running minimum — the minimum alone cannot say how well it is
+  // resolved. The control pair answers "how far apart do two IDENTICAL arms land in ONE run", which
+  // is a real question and not the one that matters: an arm's own minimum has moved 30 ms BETWEEN
+  // runs while that floor read 2. The gap between an arm's best and second-best sample is the same
+  // question asked inside one run, and it is what this file's three reversed findings needed.
+  const samples = new Map<string, number[]>();
   const check = new Map<string, number>();
+  // THE CENSUS, and it is read BEFORE any millisecond. Two arms are comparable only if they push the
+  // same work at the engine; an arm that quietly writes nothing is faster for a reason that has
+  // nothing to do with what it is supposed to isolate. This file's `no-forward` arm was added
+  // without one and read SLOWER than the arm it is a strict subset of, three runs running.
+  const writes = new Map<string, number>();
+  // COMMITS BELONG IN THE CENSUS TOO, and leaving them out cost a whole investigation. An arm whose
+  // directive never calls `setProperty` never asks the renderer for a commit either, so it can reach
+  // the same tree on a different NUMBER of commits — a difference no write count can show and one
+  // that dwarfs what the arm was built to isolate.
+  const commits = new Map<string, number>();
   let rootTag = 8100;
   for (let round = 0; round < rounds; round += 1) {
-    for (const [name, component] of arms) {
+    // ROTATED, not merely interleaved. Interleaving gives every arm the same JIT warmth and this
+    // file already relied on it; it does NOT give them the same POSITION, and position turned out to
+    // matter more. Held fixed, the arm in slot 3 read ~28 ms slower than the one in slot 4 across
+    // three runs while writing twenty thousand FEWER props — stable, far outside the floor, and
+    // impossible as work. Rotating by the round index puts every arm in every slot.
+    for (let slot = 0; slot < arms.length; slot += 1) {
+      const arm = arms[(slot + round) % arms.length];
+      if (arm === undefined) continue;
+      const [name, component] = arm;
       rootTag += 1;
       fabric.reset();
       label.set('a');
+      readCommitProfile();
       const startedAt = performance.now();
       mount(rootTag, component);
       await tick();
-      create.set(
-        name,
-        Math.min(create.get(name) ?? Infinity, performance.now() - startedAt),
-      );
+      samples.set(name, [
+        ...(samples.get(name) ?? []),
+        performance.now() - startedAt,
+      ]);
+      const profile = readCommitProfile();
+      writes.set(name, profile.propWrites);
+      commits.set(name, profile.commits);
 
       // A PASS THAT CHANGES NOTHING, which is what a `select` does to the 999 rows it did not
       // touch: the signal moves, Angular re-checks every binding in the template, and every one of
@@ -324,7 +423,16 @@ async function race(
       unmount(rootTag);
     }
   }
-  return { create, check };
+  // The best sample is the reading; the gap to the second best is this run's own resolution for that
+  // arm. A delta smaller than the larger of the two arms' gaps is not a finding, whatever the
+  // control pair says.
+  const resolution = new Map<string, number>();
+  for (const [name, taken] of samples) {
+    const sorted = [...taken].sort((left, right) => left - right);
+    create.set(name, sorted[0] ?? Number.NaN);
+    resolution.set(name, (sorted[1] ?? Number.NaN) - (sorted[0] ?? Number.NaN));
+  }
+  return { create, check, writes, commits, resolution };
 }
 
 describe('what a directive costs, taken apart', () => {
@@ -332,6 +440,7 @@ describe('what a directive costs, taken apart', () => {
     const times = await race([
       ['bare', BareArm],
       ['inert', InertArm],
+      ['no-forward', NoForwardArm],
       ['one-inject', OneInjectArm],
       ['minimal', MinimalArm],
       ['control', ControlArm],
@@ -342,13 +451,11 @@ describe('what a directive costs, taken apart', () => {
     const checked = (name: string): number =>
       times.check.get(name) ?? Number.NaN;
     const bare = read('bare');
-    const inert = read('inert');
-    const oneInject = read('one-inject');
     const minimal = read('minimal');
     const control = read('control');
     const setters = read('setters');
-    const full = read('full');
-    // What two arms doing identical work disagree by. Every other row is read against it.
+    // What two arms doing identical work disagree by. Every row is read against it AND against the
+    // resolution of its own two arms, whichever is larger.
     const floor = Math.abs(minimal - control);
 
     const perElement = (ms: number): string =>
@@ -361,14 +468,19 @@ describe('what a directive costs, taken apart', () => {
       `${[
         `${ELEMENTS} elements, best of 7, arms interleaved`,
         '',
-        `${'arm'.padStart(10)}${'ms'.padStart(9)}   per element`,
-        `${'bare'.padStart(10)}${bare.toFixed(1).padStart(9)}   ${perElement(bare)}`,
-        `${'inert'.padStart(10)}${inert.toFixed(1).padStart(9)}   ${perElement(inert)}`,
-        `${'1-inject'.padStart(10)}${oneInject.toFixed(1).padStart(9)}   ${perElement(oneInject)}`,
-        `${'minimal'.padStart(10)}${minimal.toFixed(1).padStart(9)}   ${perElement(minimal)}`,
-        `${'control'.padStart(10)}${control.toFixed(1).padStart(9)}   ${perElement(control)}  <- identical to minimal`,
-        `${'setters'.padStart(10)}${setters.toFixed(1).padStart(9)}   ${perElement(setters)}`,
-        `${'full'.padStart(10)}${full.toFixed(1).padStart(9)}   ${perElement(full)}`,
+        'THE CENSUS FIRST — what each arm pushed at the engine on one create.',
+        'Two arms are comparable only if these agree. It is not a detail of the table.',
+        `${'arm'.padStart(12)}${'writes'.padStart(9)}${'commits'.padStart(9)}`,
+        ...[...times.writes].map(
+          ([name, count]) =>
+            `${name.padStart(12)}${String(count).padStart(9)}${String(times.commits.get(name)).padStart(9)}`,
+        ),
+        '',
+        `${'arm'.padStart(10)}${'ms'.padStart(9)}   per element   +-resolution`,
+        ...[...times.create].map(
+          ([name, ms]) =>
+            `${name.padStart(10)}${ms.toFixed(1).padStart(9)}   ${perElement(ms)}   +-${(times.resolution.get(name) ?? Number.NaN).toFixed(1)}`,
+        ),
         '',
         `THE FLOOR               ${floor.toFixed(1)} ms   minimal against its own twin`,
         // A BANNER RATHER THAN A FAILING ASSERTION, and the difference matters: a run under the full
@@ -387,6 +499,7 @@ describe('what a directive costs, taken apart', () => {
         ...[
           'bare',
           'inert',
+          'no-forward',
           'one-inject',
           'minimal',
           'control',
@@ -398,24 +511,69 @@ describe('what a directive costs, taken apart', () => {
         ),
         `check floor             ${Math.abs(checked('minimal') - checked('control')).toFixed(1)} ms`,
         '',
+        // A PAIR WHOSE CENSUS DISAGREES GETS NO VERDICT WHATEVER THE FLOOR SAYS, and that is checked
+        // here rather than left to the reader: three of this file's published findings compared arms
+        // pushing different work at the engine, and every one of them read comfortably "outside the
+        // floor" while doing it.
         ...(
           [
-            ['a directive at all  ', inert - bare],
-            ['two of its injects  ', minimal - oneInject],
-            ['its three injections', minimal - inert],
-            ['its ngOnChanges     ', minimal - setters],
-            ['279 declared inputs ', full - minimal],
+            // The last field says whether the two arms are MEANT to push different work. It is true
+            // exactly once, on the row whose subject IS the write count; everywhere else a census
+            // that disagrees means the pair is not one workload and the row answers nothing.
+            ['a directive at all  ', 'inert', 'bare', false],
+            ['ONE injection       ', 'no-forward', 'inert', false],
+            ['forwarding 20k props', 'one-inject', 'no-forward', true],
+            ['two more injections ', 'minimal', 'one-inject', false],
+            ['its ngOnChanges     ', 'minimal', 'setters', false],
+            ['279 declared inputs ', 'full', 'minimal', false],
           ] as const
-        ).map(
-          ([label, delta]) =>
-            `${label}    ${delta.toFixed(1).padStart(6)} ms   ${Math.abs(delta) > floor ? 'outside the floor' : 'INSIDE THE FLOOR — no verdict'}`,
-        ),
+        ).map(([label, left, right, writesDiffer]) => {
+          const delta = read(left) - read(right);
+          // WRITES PER ELEMENT, rounded — the question is whether the two arms push the same
+          // per-element work, and the wrapper's own chrome is not that. `one-inject` genuinely
+          // writes 1 more than `minimal` (its wrapper carries a second directive), which an exact
+          // comparison called a different workload. A tolerance of "< ELEMENTS" is the wrong repair
+          // and was tried first: it passes 9 999, which is a whole write per element minus one, and
+          // it silently readmitted the `full`-against-`minimal` row this rule exists to refuse.
+          const writesPerElement = (name: string): number =>
+            Math.round((times.writes.get(name) ?? 0) / ELEMENTS);
+          const censusAgrees =
+            writesPerElement(left) === writesPerElement(right);
+          // The BIGGER of the three: the control pair, and each arm's own best-to-second-best gap.
+          // A row survives only if it clears all of them.
+          const bar = Math.max(
+            floor,
+            times.resolution.get(left) ?? 0,
+            times.resolution.get(right) ?? 0,
+          );
+          const verdict =
+            censusAgrees === writesDiffer
+              ? `NO VERDICT — ${left} writes ${times.writes.get(left)}, ${right} writes ${times.writes.get(right)}`
+              : Math.abs(delta) > bar
+                ? `outside the bar (${bar.toFixed(1)} ms)`
+                : `INSIDE THE BAR (${bar.toFixed(1)} ms) — no verdict`;
+          return `${label}    ${delta.toFixed(1).padStart(6)} ms   ${verdict}`;
+        }),
         '',
       ].join('\n')}\n`,
     );
 
+    // EVERY arm produced a reading and a census, not just the two ends. An arm whose component
+    // failed to mount reports `NaN`, and `toBeGreaterThan` is what catches that — every comparison
+    // against `NaN` is false.
+    //
+    // IT WOULD NOT HAVE CAUGHT THE BUG THAT MADE THIS FILE LIE, and saying so is the point: the
+    // mis-wired `one-inject` arm wrote 10 002, which is comfortably greater than zero. What caught
+    // that is the census TABLE, by being printed above the milliseconds where a reader compares it
+    // against the arm beside it. A guard proves an arm is alive; only the census proves two arms are
+    // the same workload, and no assertion here can replace reading it.
+    for (const [name] of times.create) {
+      expect(read(name), `${name} produced no create time`).toBeGreaterThan(0);
+      expect(times.writes.get(name), `${name} wrote nothing`).toBeGreaterThan(
+        0,
+      );
+    }
     expect(bare).toBeGreaterThan(0);
-    expect(full).toBeGreaterThan(0);
-    // Seven arms, seven rounds, ten thousand elements each — well past vitest's default.
+    // Eight arms, seven rounds, ten thousand elements each — well past vitest's default.
   }, 120_000);
 });
