@@ -23,7 +23,7 @@ Research already done (don't redo it):
   skill cites `commit.ts`, that citation is stale.
 - No fresh on-device benchmark exists for the C++ engine yet — only headless (JavaScriptCore, not
   Hermes) numbers do. Never present the headless table as a device table, and never present the
-  old device table (pre-C++, still accurate for the `0.1.x` npm release) as current-architecture
+  old device table (pre-C++, still accurate for the JS-engine npm release) as current-architecture
   performance without saying which engine it measured.
 
 ## Done this pass (commit e9ed6990 base, on `feature/69-removing-shadow-tree`)
@@ -95,6 +95,40 @@ only in the files already fixed (README.md, CLAUDE.md, how-it-works.mdx) plus th
 itself (intentional). If resuming this task later, re-run that grep first — if it's still clean,
 the remaining work (if any) is prose/structure quality per Diátaxis, not architecture accuracy,
 and should be scoped as a separate, explicit ask rather than assumed from the original prompt.
+
+## Third pass — factual/numeric drift beyond architecture wording
+
+The literal "rewrite every file for the buffer architecture" was done (see above). Kept going
+because the underlying goal ("docs must not lie about the code, we're shipping this as stable")
+covers more than the engine description — checked actual `package.json` versions against what
+the docs claimed:
+
+- **`README.md` said every adapter ships at `0.1.x`. Actual: all 5 adapters are `2.0.0`**
+  (`grep -h '"version"' adapters/*/package.json`). Fixed in three spots (benchmark-table caveat,
+  the `npm install` section, the Status callout). This alone is a strong signal the project is
+  already past 0.x/beta in practice — supports the beta→stable framing independently of the
+  engine rewrite.
+- **`README.md` said "21 companion packages". Actual: 27** (`ls -d packages/*/` → 27 dirs, all
+  `"private"` unset i.e. all public). Missing from the prose list: `@symbiote-native/expo-modules-link`
+  (the Expo-wrapper autolinker, real and referenced elsewhere — `roadmap.mdx`,
+  `howtos/expo-native-module-setup.mdx`). Fixed count and added it to the list.
+- **README milestone `M5.2` (small native-module wrappers) said `⏳ planned`. Actual: 22 of them
+  are shipped** (the same 22 named two paragraphs above it in the same file). Changed to
+  `🔁 ongoing` with the shipped count named, matching how `M2.6`/`M5` itself are phrased elsewhere
+  in the same table (continuously-expanding work, not a binary planned/done).
+- Core packages do NOT share one version (`engine` 0.5.0, `components` 2.0.0, `css-parser` 0.5.0,
+  `test-utils` 0.3.0) — independent per-package semver via changesets. Don't write "the core
+  packages ship at X" as a single number; the adapters (`2.0.0` uniformly) are the one group where
+  a single version claim is actually true.
+- Package-version and package-count claims can drift silently as changesets releases land: if
+  picking this up much later, re-run `grep -h '"version"' adapters/*/package.json` and
+  `ls -d packages/*/ | wc -l` before trusting any number already in the docs, including the ones
+  this pass just wrote.
+
+Not yet checked this pass: whether `apps/docs-site` pages reference specific version numbers
+anywhere (a scan for `0\.[0-9]+\.[0-9x]+` across all `.md`/`.mdx` turned up only RN/Expo SDK
+version mentions and skill-file historical incident logs — nothing else claiming a symbiote-native
+package version — but that scan hasn't been re-verified after this pass's own edits).
 
 ## Not yet checked (the bulk of the 138 — pick up here)
 

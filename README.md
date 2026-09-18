@@ -112,7 +112,7 @@ iOS 26.5 simulator, Release, 1 000 rows, all mounted. Lower is better; the ratio
 stock, so **below 1.00 means faster than stock React Native**. Bold marks a row we win.
 
 > **These numbers are the last full on-device measurement, taken on the JS-engine architecture
-> (published as `0.1.x`).** The retained tree has since moved into C++ (this is now what ships —
+> that shipped in earlier npm releases.** The retained tree has since moved into C++ (this is now what ships —
 > see [How It Works](#how-it-works)), which changes this table; a fresh on-device run for the C++
 > engine hasn't happened yet. The best available read on the new engine is the headless comparison
 > [below](#the-c-engine-headless-so-far), which is a real measurement but not this same device table.
@@ -293,7 +293,7 @@ live in the per-adapter READMEs:
 Full guides, per-framework setup, and package API references live at
 **[docs.symbiote-native.dev](https://docs.symbiote-native.dev)**.
 
-Every adapter is [published to npm](https://www.npmjs.com/org/symbiote-native) at `0.1.x`. Pick your framework and add it to an existing React Native app:
+Every adapter is [published to npm](https://www.npmjs.com/org/symbiote-native) at `2.0.0`. Pick your framework and add it to an existing React Native app:
 
 ```bash
 # React
@@ -324,12 +324,14 @@ example app, per the adapter's own README:
 - **[`adapters/svelte`](./adapters/svelte)** — adds a Metro transformer for `.svelte` files, same recipe as Vue SFC.
 - **[`adapters/solid`](./adapters/solid)** — needs `@symbiote-native/solid/babel-preset` listed last in Metro's Babel presets, so it claims the JSX before the RN preset's own React-JSX transform does.
 
-Beyond the five adapters, **21 companion packages** are also on npm, installed the same way —
+Beyond the five adapters, **27 companion packages** are also on npm, installed the same way —
 one framework-agnostic core each, reachable from every adapter it lists in its own `exports`:
 navigation ([`@symbiote-native/navigation`](./packages/navigation), a native stack navigator over
 `react-native-screens`), third-party native views
 ([`@symbiote-native/slider`](./packages/slider), [`@symbiote-native/splash-screen`](./packages/splash-screen)),
-the Android host-shim package ([`@symbiote-native/android`](./packages/android)), and Expo-module
+the Android host-shim package ([`@symbiote-native/android`](./packages/android)), the Expo-module
+autolinker ([`@symbiote-native/expo-modules-link`](./packages/expo-modules-link), a postinstall
+script that registers whichever Expo-wrapper packages below are installed), and Expo-module
 wrappers covering device/sensor/permission APIs — application, battery, brightness, cellular,
 clipboard, crypto, device, haptics, keep-awake, local-auth, localization, network,
 screen-orientation, secure-store, sensors, sharing, sms, standard-web-crypto, store-review,
@@ -344,8 +346,8 @@ README and full per-adapter usage examples.
 > **Stable API, native core rewritten underneath.** The thesis is proven _five times over_: React Native's
 > renderer is extracted, and **five** frameworks — React, Vue 3, Angular, Svelte, and Solid — drive
 > the same untouched framework-agnostic core on iOS + Android, with RN's own renderer never in the path.
-> Every adapter (and the shared core packages under it) ships to npm at `0.1.x`, so you can add one
-> to an existing RN app today — see [Try It In Your Own App](#try-it-in-your-own-app). All five run
+> Every adapter ships to npm at `2.0.0` (the shared core packages under it version independently),
+> so you can add one to an existing RN app today — see [Try It In Your Own App](#try-it-in-your-own-app). All five run
 > on device and are on the landing-page switcher, in day-to-day use. What's still catching up: the long-tail prop surface keeps widening, automated
 > device coverage is just coming online, and the `create-symbiote` scaffolder doesn't exist yet, so wiring Metro/CocoaPods follows
 > the example apps rather than one command. iOS stays the reference surface; Android is at canary
@@ -428,7 +430,7 @@ framework adapter.
 | **M4** | Angular adapter                                  | `Renderer2`/`RendererFactory2` + DOM-less bootstrap on the validated core — second non-React framework, full canary component parity, on the live framework switcher                                                                                                                                                                                  | ✅ done    |
 | **M5** | **App-ready ecosystem**                          | the minimal third-party surface a real app needs, built once against the agnostic core (like `@symbiote-native/slider`) rather than ported per-framework — navigation shipped, next targeting package-surface parity with Expo's SDK                                                                                                                  | 🔁 ongoing |
 | ↳ M5.1 | Navigation                                       | a framework-agnostic navigation core (stack/tab/drawer state + `react-native-screens` prop folds) in `@symbiote-native/navigation`, with a thin per-adapter screen/lifecycle bridge — the `react-navigation` UI itself is React-only (`<third_party_rn_packages_are_react_only>`), so this couldn't be a wrapper, it's a genuine new shared component | ✅ done    |
-| ↳ M5.2 | Small native-module wrappers                     | one-dependency proxy packages closing the gap against Expo's package set one module at a time — Clipboard-class APIs first (same recipe as `@symbiote-native/slider`/`@symbiote-native/splash-screen`), plus lingering primitive-level gaps (persistent storage, safe-area edges beyond `SafeAreaView`)                                               | ⏳ planned |
+| ↳ M5.2 | Small native-module wrappers                     | one-dependency proxy packages closing the gap against Expo's package set one module at a time (same recipe as `@symbiote-native/slider`/`@symbiote-native/splash-screen`) — 22 shipped (Clipboard, Haptics, Sensors, Battery, Device, and more), autolinked through `@symbiote-native/expo-modules-link`; lingering primitive-level gaps remain (persistent storage, safe-area edges beyond `SafeAreaView`) | 🔁 ongoing |
 | ↳ M5.3 | Reanimated                                       | the largest remaining gap, saved for last — a full worklet-driven animation layer                                                                                                                                                                                                                                                                     | ⏳ planned |
 | **M6** | **Svelte adapter**                               | a DOM-shim adapter over stock compiled Svelte output driving the engine's mutation API — third non-React framework, full component parity                                                                                                                                                                                                             | ✅ done    |
 | **M7** | Solid adapter                                    | `solid-js/universal`'s `createRenderer` on the validated core, fourth non-React framework with full component parity (`createPortal`/`createTunnel`/`Animated`/`AppRegistry`), running on device and on the landing-page switcher                                                                                                                     | ✅ done    |
