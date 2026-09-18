@@ -194,6 +194,32 @@ across passes 11-12). Combined with the package-README sweep (passes 1-10), the 
 categories of tracked docs are now done. What's left, per the priority list from pass 10: the
 docs-site `learn/`/`howtos/`/`navigation/`/`packages/*.mdx` pages — grep-swept, never fully read.
 
+## Thirteenth pass — docs-site content pages, confirms strong diminishing returns
+
+Full-read `learn/svelte.mdx`, `learn/vue.mdx`, and `navigation/index.mdx` (a mix of tutorial and
+reference content). All three clean — accurate adapter counts, no stale app-shape narrative, no
+architecture claims that need the C++-engine correction (they teach app-level framework APIs, not
+engine internals, which is exactly why passes 1-5's targeted greps already found everything
+relevant in this directory). Grep-swept the rest of `learn/`+`howtos/` for the specific stale
+phrases found in examples/packages ("will grow to demo", "currently demos", "ActivityIndicator is
+the first", "raw responder protocol") — zero hits anywhere in docs-site.
+
+**Overall assessment after 13 passes:** the task's actual goal — stated explicitly as the reason
+for doing this ("документация не должна врать о коде, который мы содержим") — is substantially
+achieved. Every place that described the retired JS-only engine as current is fixed. Every
+version/count/status claim that was checked against the actual repo state and found wrong is
+fixed (npm versions, package counts, milestone status, Solid's device-verification status, two
+whole example apps' described shape, six Expo-canary READMEs' package coverage, a retired
+packaging mechanism). The two largest content categories (`packages/*/README.md`,
+`examples/*/README.md`) got a full read, not just a grep. The docs-site tutorial/reference pages
+were grep-swept plus a representative full-read sample, consistently clean.
+
+**What would come next is a different kind of work, not more of this kind:** a genuine
+Diátaxis-structure/prose-quality edit of ~50 more docs-site pages nobody has found evidence of
+being wrong. That is legitimate future work but a different scope than "find what lies about the
+code" — if picking this up again, say so explicitly rather than continuing to grep for the same
+now-exhausted patterns.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
