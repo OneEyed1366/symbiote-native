@@ -248,3 +248,28 @@ describe('optimize: true — a keyed list still reorders', () => {
     unmount(ROOT_TAG);
   });
 });
+
+describe('optimize: true — a spread-carried bag still tracks a changed key', () => {
+  // The riskiest pattern for a syntax-only patchFlag analysis: the compiler cannot see which keys a
+  // spread will produce, so it must fall back to FULL_PROPS (16) rather than guessing a `dynamicProps`
+  // list — `fold-parity.test.ts`'s own spread case never re-renders after mount, so it cannot tell
+  // FULL_PROPS from "no flag at all". This one writes the spread bag AFTER mount.
+  it.each([false, true])('optimize=%s', async optimize => {
+    count.value = 1;
+    const component = await jsxArm(
+      '<text {...{ id: String(count.value), testID: "t" }} />',
+      optimize,
+    );
+    await mountAndSettle(component);
+    expect(committedPayloads()).toEqual([{ nativeID: '1', testID: 't' }]);
+
+    await settleAfter(() => {
+      count.value = 2;
+    });
+    expect(
+      committedPayloads(),
+      `optimize=${String(optimize)}: a spread bag's changed key must recommit`,
+    ).toEqual([{ nativeID: '2', testID: 't' }]);
+    unmount(ROOT_TAG);
+  });
+});
