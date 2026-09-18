@@ -2223,6 +2223,49 @@ Three things fell out, all improvements rather than trade-offs:
   two wrappers, which two wrapped ITEMS would also satisfy; it now asserts the titles. The `why:`
   had always been about which children got marked and the assertion had never said so.
 
+### THE CENSUS AFTER THE LAST FOLD — one more mirror, and the two things that cannot move
+
+With no `payloadFold` left, "what still serves a TAG from JS" needs a different query than a fold
+count. The one that worked: **ask what every remaining `Platform.OS` / `IS_ANDROID` branch in
+`core/components` is FOR.** A platform branch is where a platform rule hides once the obvious
+channel is closed.
+
+Five sites, and four are correctly placed: `switch.ts` picks an imperative command NAME at gesture
+time, `nativeFeedbackRefinement` configures the press MACHINE and dispatches view commands,
+`button.ts:257` picks WHICH machine, and `render-keyboard-avoiding-view` takes the host as an
+ARGUMENT so both branches stay testable. Machines and imperative calls are JS by the model, not by
+omission.
+
+**The fifth was a mirror: `backgroundProps`.** It mapped TouchableNativeFeedback's resolved
+background plus `useForeground` onto the Android slot — which is the `#ifdef ANDROID` tail of
+`foldCloneOntoChild`, api-level gate included, since `Platform.Version` on Android IS the api level.
+No runtime caller, no test, reachable only through the package barrel. Deleted.
+
+**`canUseNativeForeground` beside it STAYS, and the line between them is the reusable half.** It is
+a QUESTION an app asks the platform — RN's own public `TouchableNativeFeedback.canUseNativeForeground()`
+— not a rule that decides a payload. Same class as the slider reading a folded `accessibilityState`:
+**asking is not reimplementing.** Two functions in one file, one a mirror and one not.
+
+Break-tested before deleting, and the FIRST attempt did not run: inlining the slot pick left
+`androidApiLevel` unused and `-Werror` failed the build. The same trap `IFirstChild`'s A/B already
+recorded — **a build that fails is a test that did not run** — and it is easy to miss here, because
+the runner prints a clean-looking result from the stale binary. Re-broken by inverting the gate
+instead (which keeps every symbol used), it fires exactly one case on the Android arm.
+
+**WHAT IS LEFT IS TWO THINGS, and neither is a fold, a mirror or an oversight:**
+
+- **A tag's derived STRUCTURE is built in JS** (`buildStructure`). Button assembles four nodes on
+  iOS and three on Android; ScrollView, ActivityIndicator and ImageBackground do the same. That is
+  the platform's — RN builds it in a component body — but moving it means a tree builder in C++,
+  which is a different piece of work from a prop rule and has no seam yet.
+- **The tag -> Fabric component NAME table is in JS** (`component-names/index.{ios,android}.ts`),
+  and it cannot simply move. `createElement` needs the native name BEFORE anything crosses, so a
+  C++ table would cost a crossing per node — ten thousand on a benchmark create. Same shape as
+  `resolveAssetSource`: a lookup that belongs on the side that needs it first.
+
+So "all behavior lives beside the C++" is TRUE OF PROPS and not yet of structure. Say which one is
+meant before calling this migration finished.
+
 ### A rule may read its CHILD — `IFirstChild`, and the last structural blocker goes (2026-09-18)
 
 Every seam before this one reads UP: `ownerProps` (the parent's props), `IOwner.tagName` (the
