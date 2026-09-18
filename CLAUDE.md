@@ -2181,6 +2181,18 @@ settle — so it is per-settle, not per-mount. A screen holds a handful of these
 saving is small and the reason to do it is that **`IHostBehavior.foldPayload` is now declared by
 nothing in production.**
 
+**And the CONTROL, because the port adds a branch to a chain every node walks.** The self-keyed
+dispatch in `fabricProps` is an `if`/`else if` over tag names with no early-out, so an untagged node
+— which is nearly all of them — already pays every compare in it, and this made it one longer.
+`adapter-create-cost.itest.tsx` on `build-release`, three runs: engine wall **72.9 / 73.4 / 75.4**,
+walk 26.3-27.8, against the 67-75 and 24-28 this page already records. Inside the band, so **no
+regression and no claim of one either.**
+
+An `if (tagName.empty())` skip over that chain was considered and NOT written: at ~13 compares over
+10 000 nodes it is a few tenths of a millisecond against an arm whose own spread is ~2.5 ms, so this
+instrument could not attribute it. **A change this page could not measure is a change this page does
+not ship** — the same rule applied to the combined Vue run that could not be attributed.
+
 **THE SEAM STAYS ANYWAY, and the reason is recorded on the field rather than left to be re-derived.**
 It reads as a leftover, and this codebase's question about one is what it REACHES, not who uses it
 today. It reaches two things: it is the JS ARM of every measurement in `tag-rule-cost.itest.ts` —
