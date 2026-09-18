@@ -125,6 +125,35 @@ the docs claimed:
   `ls -d packages/*/ | wc -l` before trusting any number already in the docs, including the ones
   this pass just wrote.
 
+## Fifth pass — swept for the same Solid-device-status conflation elsewhere
+
+Grepped the whole tracked doc set for `still pending|not yet|still catching up|no.*harness yet|
+doesn.t exist yet` and found two more copies of the exact same stale claim (Solid "not yet proven
+on-device" / "hasn't been verified on a real iOS/Android device"), fixed the same way per the
+user's correction — all 5 adapters are device-verified:
+
+- `apps/docs-site/src/content/docs/docs/api/index.mdx` (Solid API summary line)
+- `apps/docs-site/src/content/docs/docs/project/faq.mdx` ("Is Solid a first-class adapter?")
+
+Also found and fixed an unrelated stale claim while sweeping the same grep hit list:
+`apps/docs-site/src/content/docs/docs/packages/slider.mdx` said `@symbiote-native/slider` is "a
+workspace package, not yet published" — false, `packages/slider/package.json` has no `private`
+field and is at version `7.0.0`. `packages/slider/README.md` (the source-tree one) already had
+the correct `npm install` instructions; only the docs-site `.mdx` mirror had drifted. Fixed to
+match `splash-screen.mdx`'s pattern (`npm install @symbiote-native/slider ...`).
+
+Checked but NOT changed (narrower, plausible, no contrary evidence found):
+`howtos/error-boundaries.mdx` ("verified via vitest, not yet exercised on a real device") — this
+is about one specific FEATURE, not a whole adapter, so the user's "all 5 adapters are
+device-verified" correction doesn't necessarily apply; left as-is. Same for `css-parser/README.md`
+(Vue inline `<style module>` typing gap) and `packages/{brightness,haptics}/README.md` ("not yet
+wired into the public canary") — specific, narrow, plausible claims, not swept.
+
+**Don't re-run this exact grep for Solid again** — the known instances are fixed. If a NEW
+"not verified on device" claim about a whole adapter shows up anywhere, treat it as stale by
+default per the user's correction, unless it's about React/Vue/Angular/Svelte/Solid gaining a
+BRAND NEW adapter not yet listed here (there are only 5, this doesn't apply going forward).
+
 ## Fourth pass — internal contradiction (Solid device status)
 
 README's own M7 milestone row says Solid is "running on device ... ✅ done", while
