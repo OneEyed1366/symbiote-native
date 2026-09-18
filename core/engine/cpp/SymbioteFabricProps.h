@@ -34,6 +34,18 @@ namespace symbiote {
  *   `stickyFold`, which is built PER NODE and reads `runtime.state.translateY` — live JS state that
  *   is not a prop and moves on every scroll frame. Nothing folded ahead of time can serve it.
  *
+ * `stickyFold` IS THE LAST ONE, as of 2026-09-18, and the case that nearly joined it is the useful
+ * comparison. TouchableHighlight's underlay was listed here too, on the same "live state" reasoning:
+ * `shown` flips inside a gesture and no props-only rule can see it. True, and not the question. That
+ * fold's RULE was three ordinary inputs and one bit, so the bit crosses (`OP_SET_UNDERLAY_SHOWN`) and
+ * the rule is `foldTouchableHighlightUnderlay` below.
+ *
+ * WHAT SEPARATES THE TWO IS RATE, not liveness. `shown` flips twice a tap, so a bit per flip is
+ * cheaper than a fold per commit. `translateY` moves every frame while a finger drags, so the same
+ * arrangement would be an op per frame to save a fold per frame — no trade at all. **"Live JS state"
+ * on its own does not settle a fold's home; ask how often it changes against how often the node
+ * commits.**
+ *
  * So a fold that is a property of the tag moves here; a fold that is a property of the instance
  * stays a JS closure and this side calls it. `SymbioteTree` supplies the wrapper; the cost is one
  * JSI round trip plus a bag marshalled both ways, per folded node per commit.

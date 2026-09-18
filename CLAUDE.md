@@ -1797,12 +1797,17 @@ comes to rest. So the saving is ~5 trips per touchable at mount.
 The tag-rule ruler is unmoved by it (`pressable` native walk 3.6-3.7 ms against 3.7-3.9 before),
 which is the expected answer for an op that runs at mount and not in the walk.
 
-**Scope, stated because it is not all three touchables.** `touchable-opacity` is at ZERO folds.
-`touchable-highlight` keeps one for its UNDERLAY, which is built from live press state (`shown` flips
-inside a gesture) and is the genuine unportable article. `button` keeps its own: it resolves
-`disabled` three ways (`props.disabled ?? aria ?? accessibilityState.disabled`, `Button.js:331,337`)
-through the projection its derived children share, and folds an Android view style and ripple
-regardless — so moving only its `focusable` would duplicate that precedence and buy back no crossing.
+**Scope as it stood that hour, and BOTH of its exceptions expired the same day** — kept because the
+wording is a worked example of the mistake this page keeps making. It read: `touchable-opacity` is at
+ZERO folds; `touchable-highlight` keeps one for its UNDERLAY, "which is built from live press state
+(`shown` flips inside a gesture) and is the genuine unportable article"; `button` keeps its own for a
+three-way `disabled` and its Android view style.
+
+Button went first (see "A raw text can carry a TAG"). The underlay went last, and its note was half
+right in the way this whole section warns about: `shown` really is live and really is JS's, but the
+RULE was made of four inputs and three were already portable — two ordinary props the engine ALREADY
+strips, and listener existence, which this very section had just established crosses as a bit. See
+"The UNDERLAY was three portable inputs and one bit". **All three touchables are at zero.**
 
 **The general form, and it is the reusable half: "JS holds it" is not the same claim as "only JS can
 compute it."** The first is a wiring question and wiring is cheap. The second is the real boundary.
@@ -2152,6 +2157,73 @@ GREEN.
 What stays in that file is what the JS host is authoritative for and the itest is not: the TOPOLOGY —
 who ends up whose parent, that the owner keeps its identity across a wrap, that removing the
 RefreshControl puts it back.
+
+### The UNDERLAY was three portable inputs and one bit — and this page said otherwise three times
+
+TouchableHighlight's underlay fold outlived every other per-node rule, and three separate notes here
+called it "the genuine unportable article" because `shown` flips inside a gesture. Splitting the
+fold's inputs is what settled it:
+
+```
+ shown            live, held past release by a `delayPressOut` timer      JS — and still is
+ hasPressHandler  the EXISTENCE of any of four press listeners            crossing since OP_SET_OWNED_LISTENER
+ underlayColor    an ordinary prop — one the engine ALREADY strips        a prop
+ activeOpacity    the same                                                a prop
+```
+
+**Three of four were portable before the port began, and the fourth is ONE BIT.** `shown` is not the
+press state (`setNodePressed`) and could not reuse it: RN holds the underlay past release so a fast
+tap still flashes, so it LAGS the press by a timer. It crosses as `OP_SET_UNDERLAY_SHOWN`, on a flip
+— twice a tap — against a fold charged on every commit the node was dirty in.
+
+**THE TELL THAT MADE IT WORTH DOING was in the code rather than in the reasoning.** The engine strips
+`underlayColor` and `activeOpacity` (`kTouchableFeedbackKeys`, because RN forwards neither to the View
+it renders), so the JS fold could not read them off the bag it was handed and reached back to the NODE
+for them. **One side erasing a prop while the other reaches around it for the same value is two halves
+of one rule.** That is a cheap thing to grep for and a good signal for whatever is ported next.
+
+**The press-listener state had to become a MASK, and the field's own comment had predicted it.** It
+read "`press` is the only owned name any platform rule reads; a second would be a second bool, and
+only a third would be worth a bitmask." Two bools is not enough and not for a size reason: `focusable`
+asks about `onPress` ALONE (`TouchableOpacity.js:336-339`) while `_hasPressHandler` asks about any of
+four (`:296-302`) — and "any of four" can go DOWN when one name departs, which nothing on the C++ side
+can recompute, because the listeners live in JS and each op is about ONE name. A bit per name is the
+smallest state that answers both questions from what the ops carry. **Break-tested both ways**:
+collapsing the mask to one bit turns exactly the two four-name cases red, and making it OR-only (never
+clearing) turns the take-away case red here and one case red in `touchable-focusable-payload.itest.ts`.
+
+`bool hasPressListener` became `ISelf` in the same change — the lone bool beside three structs was the
+shape that grows a fourth unreadable positional argument, which is what `IOwner` had already learned.
+
+**THE COST MEASUREMENT IS A FOLD COUNT, NOT A MILLISECOND, and saying so is the honest part.** The
+tag-rule ruler cannot price this one: every arm there needs a JS twin with a `payloadFold`, and the
+twin cannot exist once the bit lives only in C++. What is exact is `foldsFound` — 1 -> 0 per commit,
+and the recorded FIVE at mount for a single touchable (the opacity settle re-commits it before it
+rests) -> 0. A screen holds a handful of these, not a thousand, so the absolute saving is small and
+the reason to do it is architectural.
+
+The ruler did move ~5% across every row in the same sitting, INCLUDING `image`, `content` and `clone`,
+which this change cannot reach. That is a built-in control: a uniform shift across untouched rows is
+machine state, and no row carries a verdict at that size.
+
+**ONE PARITY GAP FOUND AND NOT FIXED HERE.** `testOnly_pressed` (`TouchableHighlight.js:189`) forces
+the underlay on for snapshot tests and we support it nowhere — a real `<adapters_reach_full_feature_parity>`
+gap. Deliberately left for its own commit: a port is a MOVE, and folding a behaviour change into one
+makes both unattributable.
+
+**The test migration split cleanly for once, and the reason is worth keeping.** Every case asking WHEN
+the underlay shows survived on a new witness — the recorded bit, which the recording host takes from
+the op without applying any rule — while the two asking what it LOOKS like moved to the itest whole.
+A bit cannot tell a crimson underlay from a black one, so a colour case has no business being
+rewritten onto it; that is what makes "move the group" the right call rather than a shortcut. Across
+the three adapters the surviving claim sharpened rather than weakened: what an adapter owes is that
+its wiring reaches the machine and that the app's props reach the node, which is exactly what
+`underlayShown` plus `payload.underlayColor` say.
+
+**And the fixture lied to itself first.** `folds` was written as a lazy getter over
+`readSurfaceTelemetry`, which answers about the LAST commit — so the cost assertion read 0 while the
+`print` on the line above showed 1, and passed. **An assertion that reads its subject twice is not
+asserting about the same thing twice.** Captured at commit now.
 
 ### `id` -> `nativeID` had SEVEN implementations, and the one in C++ was the wrong seam (2026-09-18)
 
