@@ -119,11 +119,11 @@ const PRESS_LISTENERS: readonly string[] = [
   'responderTerminationRequest',
 ];
 
-// `asFeedbackBackground` went with the fold. It narrowed the app's `background` dict on its
-// discriminant before handing it to `backgroundProps`; the C++ rule asks only whether the value is
-// an OBJECT and copies it into the slot, because the four factories that produce it
-// (`render-touchable-native-feedback.ts`) are ours and the payload is not a place to re-validate
-// what a typed factory already built.
+// `asFeedbackBackground` went with the fold, and `backgroundProps` — the slot pick it fed — followed
+// on 2026-09-18 as the orphan it had become. The first narrowed the app's `background` dict on its
+// discriminant; the C++ rule asks only whether the value is an OBJECT and copies it into the slot,
+// because the four factories that produce it (`render-touchable-native-feedback.ts`) are ours and
+// the payload is not a place to re-validate what a typed factory already built.
 
 // TouchableNativeFeedback.js:280 — `locationX ?? 0`. The bag is raw Fabric payload, so guard.
 function hotspotAt(nativeEvent: Record<string, unknown>, key: string): number {

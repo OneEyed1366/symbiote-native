@@ -259,7 +259,6 @@ export type {
   ITouchableHighlightUnderlayView,
 } from './view/render-touchable-highlight';
 export {
-  backgroundProps,
   canUseNativeForeground,
   selectableBackground,
   selectableBackgroundBorderless,
