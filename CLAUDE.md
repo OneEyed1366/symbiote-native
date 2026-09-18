@@ -2541,10 +2541,44 @@ this is the spelling that stays sound without a cast.)
 
 **WHAT IS NOT DONE, stated plainly rather than implied by the commit.** The other ~15 callers still
 fold in JS, so the codebase is MIXED: one path forwards raw, the rest fold first. That is not a
-correctness problem — folding is idempotent and the engine folds whatever reaches it — but it is a
-half-migration and should be read as one. Not all of the rest are mechanical either:
-`adapters/react/src/components/modal/index.ts:94` DESTRUCTURES the folded result by canonical name,
-so it genuinely reads what the fold produces and cannot simply forward raw.
+correctness problem — folding is idempotent and the engine folds whatever reaches it.
+
+**AND THE REST SHOULD NOT BE CONVERTED, which is the opposite of what this section assumed.** The
+whole value of converting them was to DELETE the JS fold. That is off the table, and one call site
+settles it rather than a judgement call:
+
+```
+packages/slider/src/core/slider-state.ts
+  resolveSliderDisabled(disabled, accessibilityState) -> accessibilityState?.disabled === true
+```
+
+`<Slider aria-disabled>` must disable the slider's GESTURE MACHINE, and that decision is made in JS
+before any commit. **A component whose machine branches on the folded value needs the folded value in
+JS — it cannot wait for the payload.** That is the browser's arrangement too: a page may ask for an
+element's computed accessible state, and asking is not reimplementing.
+
+With the fold staying, converting the remaining callers buys almost nothing: `foldAriaProps` returns
+its input BY IDENTITY when the bag holds no alias, which is the ~99% case, so the cost it would
+remove is already not paid. Fifteen sites across five adapters for that is churn.
+
+**One claim in the paragraph above was WRONG and is corrected here.** It said
+`adapters/react/src/components/modal/index.ts:94` destructures the folded result by canonical name.
+It destructures the component's OWN props (`visible`, `style`, `children`) with `...passthrough`
+taking the rest, and never reads an `accessibility*` name — it could forward raw. The real reader is
+the slider, found by looking instead of inferring from a call shape.
+
+**So the mirror is load-bearing and is made LOUD instead**: `core/engine/cpp/tests/js/
+aria-fold-parity.itest.ts` computes the JS fold and commits the same bag through the C++ rule, over
+seventeen bags chosen one per branch, and compares every key both sides produce. **Break-tested** by
+flipping the C++ `aria-live="off"` answer from `none` to `assertive` — it fails naming the key and
+both values. It is the only place the comparison is possible, because the itest harness holds both
+in one process.
+
+It deliberately treats `undefined` and `null` as ONE answer. Both sides build a composite by listing
+every known field, so an unset field is present-with-no-value, and each spells that in its own
+language — JS `undefined`, C++ a `folly::dynamic` null. Every consumer reads them identically
+(`state?.disabled === true`, `coalesce`), so forcing agreement would make one side lie about its own
+types. **What must agree is every field that HAS a value**, and that is what is compared.
 
 **Two findings fell out that had nothing to do with the port:**
 
