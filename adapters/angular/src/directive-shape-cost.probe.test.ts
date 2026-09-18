@@ -5,7 +5,23 @@
 // instance over the seven a row carries. That number is the whole remaining Angular deficit and it
 // has never been taken apart, so the next fix would be aimed by guesswork.
 //
-// Three candidates, and this file separates them by construction rather than by argument:
+// WHAT IT ANSWERED, 2026-09-18, twice with a floor of 2-3 ms per run:
+//
+//   279 declared inputs   NOTHING — inside the floor both times. Angular's input map is per-TYPE and
+//                         static, so the exhaustive surface `elements.ts` declares for TYPING costs
+//                         no instance anything. "Declare fewer inputs" is closed.
+//   ngOnChanges           ~4 ms of ~12, i.e. about a third of the directive's discretionary cost —
+//                         and the price of collecting it is 279 hand-written setters. Closed.
+//   two of three injects  ~1.9 us/element, barely outside the floor, and both are load-bearing:
+//                         `Renderer2` would have to become a module-level singleton (wrong the
+//                         moment a second surface exists) and `ChangeDetectorRef` is what gives a
+//                         prop callback its `markForCheck` — whose absence was a device-reported bug.
+//   a directive at all    ~3.3 ms, and it is Angular's own bookkeeping. Not ours.
+//
+// So the remaining deficit is NOT adapter-shaped. Read that before proposing the next rewrite of
+// `elements.ts`.
+//
+// The arms, separated by construction rather than by argument:
 //
 //   bare        no directive at all — the floor, and what the six-column ruler measures
 //   inert       a directive with inputs and NOTHING else — Angular's own per-directive bookkeeping
