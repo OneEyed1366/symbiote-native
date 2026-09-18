@@ -41,6 +41,39 @@
 // element. `adapters/angular/src/directive-shape-cost.probe.test.ts` takes that apart, but read its
 // caveat first: it runs under vitest, where Angular's dev mode is still ON, so its per-injection
 // figure is a dev-mode one and is larger than what this arm now pays.
+//
+// AND THE DIRECTIVE IS DEARER WHILE WRITING LESS, which is the fact that decides what to do about
+// it. `setAngularProfileDetail` on the create step of each arm, same tree, same ten-node row:
+//
+//   this arm    style=4000            ellipsizeMode=6000  testID=1000  value=1000  #text=2000
+//   bare arm    style.height=2000 style.flex=2000 style.flexDirection=1000
+//               style.paddingLeft=1000 style.width=1000   ellipsizeMode=3000 …
+//
+// So the declared `style` input DOES claim the binding — 4 000 whole objects against 7 000 per-key
+// `setStyle` calls through `ɵɵstyleMap`, which is what the input shadow is for and it is working.
+// The directive still costs ~72-86 ms while making FEWER renderer calls, so the price is matching and
+// instantiating it, not the writes it performs. No write-side change can reach that.
+//
+// `ellipsizeMode` reading 6 000 against the bare arm's 3 000 is the `unchanged=3000` double write
+// this file's census already carries: a STATIC attribute goes through `setUpAttributes` AND feeds the
+// directive input, so a directive turns one authored attribute into two renderer calls. Priced
+// separately at ~0.3 ms — real, and not where the 86 ms is.
+//
+// THE ONLY IDEA LEFT IS TO REMOVE THE DIRECTIVE FROM THE RUNTIME, and the two arms are already most
+// of the evidence that it would work. `SymbioteElement.ngOnChanges` forwards each changed input with
+// `renderer.setProperty(host, name, …)` — which is the call `ɵɵproperty` makes DIRECTLY on an element
+// no directive claimed. Same destination, one hop shorter, and the bare arm passes the same oracle on
+// the same screen. What the bare shape genuinely loses is not the writes: it is `wrapCallback` (an
+// `on*` function prop wrapped so Angular learns it fired), `ReadBackElement`'s `registerViewFlush` on
+// `text-input`/`switch`/`refresh-control`, and the style shadow above. This screen exercises none of
+// the first two, so the 86 ms is an upper bound on what a compile-time-only spelling could recover,
+// not a promise.
+//
+// AND THE BARE ARM'S `remove` IS AN ARTIFACT OF THE BARE SHAPE. It reads 11.7-15.2 ms against every
+// other non-React adapter's 3.6-5.1 and was chased at length as Angular's worst row
+// (`angular-remove-cost.itest.ts`); this arm — the shape the device runs — reads **6.9**. So the
+// anomaly lives only in the configuration nobody ships, and the row Angular actually pays on a
+// removal is ordinary. Do not spend another session on it from the bare arm's number.
 
 import '@angular/compiler';
 import { Component, Input, signal } from '@angular/core';

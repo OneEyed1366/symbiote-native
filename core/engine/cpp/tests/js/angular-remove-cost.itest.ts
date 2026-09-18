@@ -2,6 +2,10 @@
 // pays 3.6-5.1 — the one row the project's own thesis says we should win, measured on the eight-step
 // suite, release build, repeated.
 //
+// READ THE LAST SECTION FIRST: that row belongs to the BARE arm, which is not the shape the device
+// runs, and the shape it does run removes a row in 6.9 ms. The file is kept for the A/B it built and
+// for how it went wrong, not for the premise below.
+//
 //   arm      wall  walk  apply  fabric  layout  cloned  reused  setProps
 //   vue       4.4   0.6    2.6     1.8     1.1       2     999         0
 //   angular  13.3   0.4   10.7     9.7     8.8       3    1002         1
@@ -30,10 +34,19 @@
 // clean attribution to the component. Read beside the arms above it cannot be: the anchored arm here
 // has every one of those anchors and none of that cost.
 //
-// WHAT IS LEFT, stated as the open question rather than guessed at: the expensive removal needs the
-// suite's STEP HISTORY — create, replace, partial, select, swap — and not merely the row's shape.
-// Something those steps leave standing turns a removal that costs 6 ms into one that costs 13, and
-// the per-row component is necessary for it but not sufficient. Naming it is the next thing to do.
+// THE OPEN QUESTION THIS FILE LEFT IS CLOSED, AND THE ANSWER IS THAT THE ROW WAS NOT WORTH CHASING.
+// `angular-suite.itest.ts` writes the screen with BARE tags under `CUSTOM_ELEMENTS_SCHEMA` — no
+// `SYMBIOTE_ELEMENTS`, so no directive matches anything. The device has never run that shape.
+// `angular-elements-suite.itest.ts` is the one it does run, and its removal reads **6.9 ms**, beside
+// Vue's 4.4-5.1 and nowhere near 13.
+//
+// So the anomaly is a property of the bare configuration alone, and every hypothesis tested against
+// it — the anchor, the step history, a deferred prop write — was aimed at a shape nobody ships. The
+// lesson is the one about reproductions above, one level up: before explaining a number, check that
+// the arm producing it is the arm anyone runs.
+//
+// What stays true and worth keeping is the A/B itself: the anchors are real, exactly one per row,
+// and they cost nothing.
 //
 // A NOTE ON REPRODUCTION, because it cost most of the time this took: four reconstructions of the
 // suite's sequence by hand — including one that threaded the state exactly as `bench-suite.ts` does
