@@ -118,13 +118,17 @@ function instrument(): {
   readonly restore: () => void;
 } {
   const byMethod = new Map<string, ITally>();
-  const originals = new Map<string, (...args: unknown[]) => unknown>();
+  // `Function` rather than a call signature, and that is the point: `typeof x === 'function'`
+  // narrows `unknown` to exactly this, so the map holds what the guard proved and no cast is needed.
+  // `Reflect.apply` takes a `Function`, which is why the wrapper below needs nothing more.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  const originals = new Map<string, Function>();
   const prototype: Record<string, unknown> = SymbioteRenderer.prototype;
 
   for (const name of TIMED) {
     const original: unknown = prototype[name];
     if (typeof original !== 'function') continue;
-    originals.set(name, original as (...args: unknown[]) => unknown);
+    originals.set(name, original);
     byMethod.set(name, { calls: 0, ms: 0 });
     prototype[name] = function timed(this: unknown, ...args: unknown[]) {
       const startedAt = performance.now();
