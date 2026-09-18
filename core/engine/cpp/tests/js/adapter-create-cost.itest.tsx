@@ -39,9 +39,19 @@
 // per cent more calls does not make 6.5x.
 //
 // So the 87 ms is Angular's own template execution plus whatever our `Renderer2` methods do inside
-// those 17 001 calls, and THAT split is the open question. It needs an arm with a no-op
-// `RendererFactory2` — Angular's machinery running with the host doing nothing — which `mount` does
-// not currently allow to be swapped.
+// those 17 001 calls. THE VUE ROW IS THE ARGUMENT THAT IT IS MOSTLY THE FIRST: Vue drives the same
+// engine through a renderer of the same shape and thinness, and it lands at +31.3. Whatever is
+// generic about "a per-adapter renderer over this engine" is priced there.
+//
+// Bounding our side from the other direction, by inspection rather than by a clock: `setProperty`
+// adds an `isSurface` check, a `flushStyling` that reads two fields and returns, one counter
+// increment, one gated no-op, and a `requestCommit` that early-returns on a boolean after the very
+// first call of a turn (`surface.ts:181`). None of that is microseconds.
+//
+// WHAT WOULD SETTLE IT is an arm with a no-op `RendererFactory2` — Angular's machinery running with
+// the host doing nothing — and `mount` does not allow that factory to be swapped. Worth building
+// only if the answer would change a decision; on this evidence it would not, because the residual
+// belongs to a framework this adapter consumes rather than implements.
 //
 // RUN ON `build-release` (`pnpm run bench:itest`).
 
