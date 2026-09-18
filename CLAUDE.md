@@ -3446,6 +3446,44 @@ answers off `getCurrentRevision().telemetry`, so a skipped commit leaves the PRE
 numbers standing — all three passes above report the create's `fabric=8.4 layout=7.6`. Use
 `mountingLogs()` (the differ's output) to ask whether the platform was told anything.
 
+### Vue's remaining JS-side cost is component SHAPE, not the adapter (2026-09-18)
+
+Re-audited `@symbiote-native/vue` end to end — `patchProp`/`insert`/`remove`/`nextSibling`, the
+`dlog`-argument policy (`tests/dlog-argument-budget.test.ts` already excludes it, deliberately —
+none of its sites sit on a per-node commit path), every primitive (View/Text/Image/Pressable/
+Switch/TextInput/ScrollView/touchables/Button) confirmed intrinsic-tag-only with no component
+wrapper, `VirtualizedList` confirmed lean (chrome built with `h()` directly, item content is
+whatever the APP's `renderItem` returns). Found nothing left to fix in the adapter's own code.
+
+**What is left is Vue's own per-instance machinery**, isolated with a byte-identical-payload A/B
+(`vue-row-component-shape-cost.itest.ts`): a stateful list row (`defineComponent`/options object)
+against the same row as a bare function (a Vue functional component — no instance, no
+`shallowReactive` props proxy, no per-component `ReactiveEffect`). On a 10%-of-1000 relabel
+(`vue-suite.itest.ts`'s own `partial` step, cloned=502 reused=1100 setProps=100 in every arm),
+functional cuts the non-engine JS time roughly in half (~7.1ms → ~3.7ms, react's own ~3.3ms). At
+MOUNT the same A/B gives a real but much smaller ~12% (functional's JS-only ~50ms against
+stateful's ~57ms for 1 000 fresh rows); at TEARDOWN it gives **nothing measurable, run to run** —
+not the uniform win a first guess predicts.
+
+**Do not chase a compiler pass that auto-converts a "pure" component to a functional one.** Checked
+before writing any such thing: Vue's own migration guide says the functional-vs-stateful create-time
+gap is "negligible" in Vue 3 (it was a Vue 2 optimization) — which matches the ~12% mount number
+above, not the ~50% update number. The real lever is the UPDATE path's `hasPropsChanged` walk, and
+that already has an official, supported flag: `optimize: true`
+(`@vue/babel-plugin-jsx`'s PatchFlags/`dynamicProps`), now the default in `adapters/vue/babel-jsx.cjs`
+for every TSX app on this adapter. `.vue` SFCs already had the equivalent unconditionally from
+`@vue/compiler-sfc`'s template compiler; TSX did not, until this. Verified against the REAL renderer
+in `adapters/vue/optimize-flag-safety.test.ts` — a changed prop, a conditional branch, a keyed-list
+reorder, a spread-carried bag (the riskiest pattern: the compiler cannot see which keys a spread
+produces, so it must fall back to FULL_PROPS), and the exact stateful-child-component shape the
+itest above measures — all still commit correctly with the flag on. Full repo suite (644 files,
+5313 tests) green after the default flip.
+
+A real app's own list row (`examples/vue-sfc/components/BenchmarkRow.vue`) is `<script setup>`,
+which is ALWAYS a stateful component — Vue 3 has no functional-SFC syntax, so this ceiling is not
+this adapter's to remove without inventing a new compiler feature, which the paragraph above says
+not to.
+
 ## Reference material
 
 - RN source: `.vendors/react-native` (and `.vendors/react` for the renderer
