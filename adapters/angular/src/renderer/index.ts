@@ -26,7 +26,6 @@ import {
   removeChild,
   routeProp,
   setEventListener,
-  setProp,
   setText,
   textOf,
   toPublicInstance,
@@ -246,15 +245,36 @@ export class SymbioteRenderer implements Renderer2 {
     const classed = this.pendingClassNode;
     if (classed !== undefined) {
       this.pendingClassNode = undefined;
-      const tokens = this.classTokens.get(classed);
-      routeProp(
-        classed,
-        'class',
-        tokens !== undefined && tokens.size > 0
-          ? [...tokens].join(' ')
-          : undefined,
-      );
+      routeProp(classed, 'class', this.classStringFor(classed));
     }
+  }
+
+  /**
+   * The union of a node's two class sources, or `undefined` when it has none.
+   *
+   * A node can be told its classes BOTH ways in one pass: Ivy compiles `[class.foo]`, `[ngClass]`
+   * and a static `class=` down to per-token `addClass`/`removeClass`, while a whole-string `class`
+   * arrives at `setProperty` — which is the shape Angular uses when a directive declares `class` as
+   * an input and the styling binding is shadowed into it (`setShadowStylingInputFlags`,
+   * `view/directives.ts`). Publishing either one alone erases the other, and the DOM renderer this
+   * mirrors has no such problem because `classList` accumulates for it.
+   */
+  private classStringFor(el: ISymbioteNode): string | undefined {
+    const tokens = this.classTokens.get(el);
+    const whole = this.classStrings.get(el);
+    if (whole === undefined) {
+      return tokens !== undefined && tokens.size > 0
+        ? [...tokens].join(' ')
+        : undefined;
+    }
+    if (tokens === undefined || tokens.size === 0) {
+      return whole.length > 0 ? whole : undefined;
+    }
+    const union = new Set(
+      whole.split(/\s+/u).filter(token => token.length > 0),
+    );
+    for (const token of tokens) union.add(token);
+    return union.size > 0 ? [...union].join(' ') : undefined;
   }
 
   /**
@@ -519,6 +539,11 @@ export class SymbioteRenderer implements Renderer2 {
   // resolves identically regardless of adapter.
   private readonly classTokens = new WeakMap<IHostNode, Set<string>>();
 
+  // The OTHER class source: a whole string written as a prop. Kept apart from the token set rather
+  // than merged into it, because the two are replaced independently — a new `[class]` value
+  // replaces this string entirely while leaving every `[class.foo]` token standing.
+  private readonly classStrings = new WeakMap<IHostNode, string>();
+
   addClass(el: IHostElement, name: string): void {
     if (isSurface(el)) return;
     countAngular('rendererWrites');
@@ -581,9 +606,18 @@ export class SymbioteRenderer implements Renderer2 {
   // ViewConfig (identical to React/Vue), so the whole flat-bag prop layer is shared.
   setProperty(el: IHostElement, name: string, value: unknown): void {
     if (isSurface(el)) return;
-    this.flushStyling();
     countAngular('rendererWrites');
     noteAngularWrite(name);
+    // A WHOLE CLASS STRING IS NOT AN ORDINARY PROP: it is one of two sources the node's class list
+    // is built from, and writing it straight through would erase every `[class.foo]` token the
+    // other one put there. It joins the class run instead, exactly as `addClass` does.
+    if (name === 'class') {
+      this.openClassRun(el);
+      this.classStrings.set(el, typeof value === 'string' ? value : '');
+      this.surface.requestCommit();
+      return;
+    }
+    this.flushStyling();
     routeProp(el, name, value);
     this.surface.requestCommit();
   }

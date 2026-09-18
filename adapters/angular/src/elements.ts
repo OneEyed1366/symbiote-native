@@ -217,6 +217,25 @@ export abstract class SymbioteElement implements OnChanges {
   // in what commits.
   @Input() style?: IElementProps['style'];
 
+  /**
+   * Declared so Angular SHADOWS the `[class]` binding into it instead of decomposing the string.
+   *
+   * A styling binding goes to a directive input when the directive declares that exact public name
+   * — `setShadowStylingInputFlags` sets `hasClassInput`/`hasStyleInput` off the input map, and
+   * `checkStylingMap` then hands the whole value over and never calls the renderer per key
+   * (`view/directives.ts`, `instructions/styling.ts`). `style` has been declared here all along and
+   * is shadowed; `class` was not, so every `[class]` reached the renderer one TOKEN at a time — on
+   * the element-directive path as much as the bare one. Measured at ~3.3 us per class binding
+   * (`adapter-create-cost.itest.ts`, "prices the class channel"), on the channel every example app
+   * uses for its static look.
+   *
+   * `[class.foo]` and `[ngClass]` are NOT shadowed and keep arriving as `addClass`, so a node can
+   * now be told its classes both ways at once; the renderer unions the two sources
+   * (`classStringFor`). Typed as a string rather than RN's `className`, because that is what
+   * `ɵɵclassMap` hands over after it concatenates any static `class=` prefix.
+   */
+  @Input() class?: string;
+
   // The flat-bag spelling of the events below. `(press)` and `[onPress]` are both supported and
   // land in the same place; an app that already holds a handler bag binds the props.
   @Input() onPress?: IElementProps['onPress'];

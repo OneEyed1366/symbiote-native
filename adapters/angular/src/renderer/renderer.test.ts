@@ -188,6 +188,60 @@ describe('Angular SymbioteRenderer drives the engine', () => {
     });
   });
 
+  // why: TWO SOURCES OF CLASSES ON ONE NODE MUST UNION, and this guard exists because the adapter
+  // is about to gain a second one. Angular shadows a `[class]` MAP into a directive input when the
+  // directive declares `class` (`setShadowStylingInputFlags`, `view/directives.ts`), while
+  // `[class.foo]` stays an `ɵɵclassProp` and keeps arriving as `addClass`. So a node can be told its
+  // classes as a whole STRING and one TOKEN at a time in the same pass, and whichever writes last
+  // must not erase the other — which a naive `routeProp(el, 'class', theString)` would do.
+  //
+  // Written against the renderer's two entry points directly, because that is what the two Ivy
+  // instructions call and the union has to hold whatever order they come in.
+  it('unions a whole class string with per-token classes, in either order', async () => {
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10 },
+      },
+      {
+        tokens: ['wide'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { flexGrow: 1 },
+      },
+      {
+        tokens: ['lit'],
+        specificity: [0, 1, 0],
+        order: 2,
+        style: { opacity: 1 },
+      },
+    ]);
+    const { surface, renderer } = setup();
+
+    const mapFirst = renderer.createElement('view');
+    renderer.setProperty(mapFirst, 'nativeID', 'map-first');
+    renderer.setProperty(mapFirst, 'class', 'card wide');
+    renderer.addClass(mapFirst, 'lit');
+    renderer.appendChild(surface, mapFirst);
+
+    const tokenFirst = renderer.createElement('view');
+    renderer.setProperty(tokenFirst, 'nativeID', 'token-first');
+    renderer.addClass(tokenFirst, 'lit');
+    renderer.setProperty(tokenFirst, 'class', 'card wide');
+    renderer.appendChild(surface, tokenFirst);
+    await tick();
+
+    // All three rules, from both channels, on both nodes.
+    expect(
+      findCommitted(n => n.payload.nativeID === 'map-first')?.payload,
+    ).toMatchObject({ padding: 10, flexGrow: 1, opacity: 1 });
+    expect(
+      findCommitted(n => n.payload.nativeID === 'token-first')?.payload,
+    ).toMatchObject({ padding: 10, flexGrow: 1, opacity: 1 });
+  });
+
   // why: `[ngClass]`/`[class.foo]="false"` compiles to a removeClass call — the resolved style
   // must be RECOMPUTED from the remaining token set, not just have the removed class's own
   // style subtracted (which would break if two classes shared a key), matching removeClass's
