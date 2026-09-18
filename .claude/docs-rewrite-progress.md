@@ -75,6 +75,35 @@ packages read in full had no factual errors. The remaining un-sampled packages (
 `expo-modules-link`, `splash-screen` full read, `navigation` full read) are the last reasonable
 candidates before this approach, too, should be considered exhausted.
 
+## Ninth pass — finished the "last reasonable candidates" list, found a real path bug
+
+Read `expo-modules-link/README.md`, `android/README.md`, `splash-screen/README.md`, and
+`navigation/README.md` (the last of the sampling candidates named in pass 8) in full.
+
+- `android/README.md` said Keyboard/Settings are "re-exported by the React, Vue and Angular
+  adapters alike" — omitted Svelte/Solid again (same cluster as pass 7). Verified both actually
+  re-export `Keyboard`/`Settings` (`grep -n "Keyboard\|Settings" adapters/{svelte,solid}/src/
+  index.ts`). Fixed. Also fixed "Where it's wired," which named only `examples/react` — verified
+  all 6 examples link `@symbiote-native/android` (`grep -l "@symbiote-native/android"
+  examples/*/package.json`), listed all 6.
+- **Found a real path error, not a completeness gap:** `splash-screen/README.md` and
+  `slider/README.md` both cited the Angular app entry as `examples/angular/App.ts` — the file is
+  actually at `examples/angular/src/App.ts` (`find examples/angular -maxdepth 2 -iname App.ts` →
+  `src/App.ts`; confirmed with `test -f`). Fixed both. Swept the whole doc set for the same wrong
+  path (`grep "examples/angular/App\.\|examples/angular/screens/"`) — one more hit, in `CLAUDE.md`,
+  but that one is dated 2026-07 describing a **historical** incident (`DrawerLayoutAndroid`,
+  removed), left alone deliberately since it may have been the correct path at that point in time
+  and this task is about current-state docs, not rewriting history.
+- `navigation/README.md` (243 lines, full read) and `expo-modules-link/README.md` (161 lines,
+  full read) — both clean, every file path and adapter-count claim checked out.
+
+**This closes the "last reasonable candidates" list from pass 8.** Combined with passes 1-9, the
+following have now been checked (grep sweep, full read, or both): root docs (README, CLAUDE.md,
+how-it-works/core/status/roadmap/index/faq/api-index.mdx), all `learn/`+`howtos/`+`api/*.mdx`, all
+navigation `.mdx`, all `.claude/skills/*.md`, and every `packages/*/README.md` except
+`cellular`/`clipboard`/`secure-store`/`sharing`/`sms`/`standard-web-crypto` (grep-checked, not
+full-read — lower priority, no "canary demo screens" pattern present to be stale in).
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
