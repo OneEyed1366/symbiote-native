@@ -21,6 +21,12 @@ export {
   routeProp,
   censusRetainedTree,
   getExplicitStyle,
+  // Exported for the ONE adapter that has to build style objects rather than receive them: Angular's
+  // `ɵɵstyleMap` hands over keys, so its renderer allocates a fresh object per node and needs to
+  // recognise one it has already published. A second copy of this comparator in the adapter is the
+  // mirror shape this codebase deletes on sight — and its deliberate conservatism (a nested value
+  // reports "not the same") is exactly right for that use too.
+  isSameShallowStyle,
   getPublishedStyle,
   setNodeHidden,
   setNodeComponent,

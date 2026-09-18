@@ -19,6 +19,7 @@ import {
   isSymbioteEvent,
   isSymbioteNode,
   isTextContainer,
+  isSameShallowStyle,
   nextSiblingOf,
   parentOf,
   registerBeforeFlush,
@@ -87,6 +88,10 @@ import { flushViewFor } from '../change-detection-flush';
 // wrapped by `SymbioteElement` itself, which reaches every one of them rather than a named three,
 // and adds the `markForCheck` a prop callback needs and an event binding gets from Angular.
 const READ_BACK_EVENTS: ReadonlySet<string> = new Set(['refresh']);
+
+// How many distinct style objects the renderer keeps to hand back by identity. A screen's styles are
+// a handful; the bench row has four. See `publishedStyles`.
+const STYLE_CACHE = 16;
 
 type IReadBackListener = (event: unknown) => unknown;
 
@@ -235,7 +240,7 @@ export class SymbioteRenderer implements Renderer2 {
       const style = this.pendingStyle;
       this.pendingStyleNode = undefined;
       this.pendingStyle = {};
-      routeProp(styled, 'style', style);
+      routeProp(styled, 'style', this.canonicalStyle(style));
     }
     const classed = this.pendingClassNode;
     if (classed !== undefined) {
@@ -249,6 +254,44 @@ export class SymbioteRenderer implements Renderer2 {
           : undefined,
       );
     }
+  }
+
+  /**
+   * Style objects this renderer has already published, so a list of identical rows sends ONE.
+   *
+   * The intern table keys by IDENTITY, so a fresh object per node is a fresh entry per node and the
+   * host converts every entry across JSI. Measured on the bench arm: `values` 7 001 against Vue's
+   * 3 004 for the identical tree, with `convert` 19.5 ms against 0.6 — and the gap is the KIND
+   * rather than the count, ~4 000 of Angular's being objects that convert recursively where Vue's
+   * are scalars plus four hoisted styles every row shares.
+   *
+   * Angular cannot share them on its own: `ɵɵstyleMap` hands over KEYS, so the object is this
+   * renderer's own construction. Recognising one it has already built is what puts an Angular app
+   * back on the footing of a framework whose author hoisted the constant.
+   *
+   * SMALL AND MRU. A screen has a handful of distinct styles and re-publishes them thousands of
+   * times, so a hit is almost always at the front; a miss costs at most `STYLE_CACHE` shallow
+   * compares, which is nothing beside the conversion it saves. An app with more distinct styles than
+   * this simply stops sharing — it never stops being correct.
+   */
+  private readonly publishedStyles: Record<string, unknown>[] = [];
+
+  /** A published object equal to this one, or this one — which then becomes the published copy. */
+  private canonicalStyle(
+    style: Record<string, unknown>,
+  ): Record<string, unknown> {
+    for (let at = 0; at < this.publishedStyles.length; at += 1) {
+      const known = this.publishedStyles[at];
+      if (!isSameShallowStyle(style, known)) continue;
+      if (at > 0) {
+        this.publishedStyles.splice(at, 1);
+        this.publishedStyles.unshift(known);
+      }
+      return known;
+    }
+    this.publishedStyles.unshift(style);
+    if (this.publishedStyles.length > STYLE_CACHE) this.publishedStyles.pop();
+    return style;
   }
 
   /** The accumulator for this node's style run, opening one (and closing any other) if needed. */

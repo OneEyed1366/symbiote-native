@@ -1226,7 +1226,7 @@ function isStyleRecord(value: unknown): value is Record<string, unknown> {
  * for a key-set comparison: equal counts plus every key of `next` matching a defined value in
  * `standing` cannot leave a key unaccounted for.
  */
-function isSameShallowStyle(next: unknown, standing: unknown): boolean {
+export function isSameShallowStyle(next: unknown, standing: unknown): boolean {
   if (!isStyleRecord(next) || !isStyleRecord(standing)) return false;
   const keys = Object.keys(next);
   if (keys.length !== Object.keys(standing).length) return false;

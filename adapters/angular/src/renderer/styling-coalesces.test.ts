@@ -42,6 +42,8 @@ import {
 } from '@symbiote-native/test-utils';
 import {
   clearGlobalStyles,
+  createElement,
+  getExplicitStyle,
   registerRules,
   setTreeHost,
   treeHost,
@@ -136,6 +138,39 @@ class ClassHost {
   readonly cls = 'alpha beta gamma';
 }
 
+let twinHost: TwinHost | undefined;
+
+// Two rows asking for the SAME style through two independent bindings — a list, minus the list.
+// Separate signal objects on purpose: sharing one would make the identity claim trivially true for
+// the wrong reason.
+@Component({
+  selector: 'twin-cost-host',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `
+    <view testID="twin-a" [style]="aStyle()"></view>
+    <view testID="twin-b" [style]="bStyle()"></view>
+  `,
+})
+class TwinHost {
+  readonly aStyle = signal<Record<string, unknown>>({
+    height: 44,
+    paddingLeft: 10,
+  });
+  readonly bStyle = signal<Record<string, unknown>>({
+    height: 44,
+    paddingLeft: 10,
+  });
+  constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    twinHost = this;
+  }
+}
+
+// `findLive` answers `undefined` for a miss and the assertions above say so before this is reached;
+// this keeps the style read total without an `as`.
+const NO_NODE = createElement('RCTView');
+
 function drive(): StyleHost {
   if (styleHost === undefined) throw new Error('the host was never mounted');
   return styleHost;
@@ -156,6 +191,7 @@ beforeEach(() => {
   writes = new Map();
   testIds = new Map();
   styleHost = undefined;
+  twinHost = undefined;
 });
 afterEach(() => {
   unmount(ROOT_TAG);
@@ -231,6 +267,60 @@ describe('a styling binding', () => {
 
     expect(probeNode().payload.height, 'the new value is committed').toBe(60);
     expect(fabric.commits - before, 'in one commit, not two').toBe(1);
+  });
+
+  // why: A LIST OF IDENTICAL ROWS MUST NOT SEND A THOUSAND STYLE OBJECTS. The intern table keys by
+  // IDENTITY, so a fresh object per node is a fresh entry per node, and the host converts every
+  // entry across JSI. Measured on the bench arm: `values` 7 001 against Vue's 3 004 for the same
+  // tree, and `convert` 19.5 ms against 0.6 — the gap is not the COUNT (2.3x) but the KIND, ~4 000
+  // of Angular's being objects that convert recursively where Vue's are mostly scalars plus four
+  // hoisted styles every row shares.
+  //
+  // Angular cannot share them on its own: `ɵɵstyleMap` hands over keys, so the renderer necessarily
+  // builds the object. Recognising one it has already published is what puts Angular back on the
+  // same footing as a framework whose author hoisted the constant.
+  it('publishes one object for rows that ask for the same style', async () => {
+    mount(ROOT_TAG, TwinHost);
+    await tick();
+
+    const first = live.findLive(
+      live.appRoot(),
+      node => node.payload.testID === 'twin-a',
+    );
+    const second = live.findLive(
+      live.appRoot(),
+      node => node.payload.testID === 'twin-b',
+    );
+    expect(first, 'both rows committed').toBeDefined();
+    expect(second).toBeDefined();
+
+    expect(
+      getExplicitStyle(first?.handle ?? NO_NODE),
+      'the same style is the same object',
+    ).toBe(getExplicitStyle(second?.handle ?? NO_NODE));
+  });
+
+  // why: THE TWO-SIDED HALF, and the hazard sharing introduces. One row changing its style must not
+  // drag its twin with it — a cache that handed back an object and then let it be mutated would do
+  // exactly that, and the symptom is a list where styling one row styles all of them.
+  it('does not drag a twin along when one of them changes', async () => {
+    mount(ROOT_TAG, TwinHost);
+    await tick();
+
+    twinHost?.aStyle.set({ height: 99 });
+    await tick();
+
+    const first = live.findLive(
+      live.appRoot(),
+      node => node.payload.testID === 'twin-a',
+    );
+    const second = live.findLive(
+      live.appRoot(),
+      node => node.payload.testID === 'twin-b',
+    );
+
+    expect(first?.payload.height, 'the one that changed moved').toBe(99);
+    expect(second?.payload.height, 'the one that did not, did not').toBe(44);
   });
 
   // why: REMOVAL travels the other entry point (`removeStyle`, for a key whose new value is null),
