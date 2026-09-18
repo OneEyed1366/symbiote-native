@@ -273,6 +273,18 @@ one method or the other.** Restating pass 15's conclusion: the task's goal is me
 without new code changes to react to would be re-verification of already-verified files, not new
 work.
 
+## Seventeenth pass — self-consistency check on my own earlier edits
+
+Re-grepped for `\bBeta\b` and `0\.1\.x` across the whole tracked set to check my own pass-3 fix was
+complete. `0.1.x` was fully clean. `Beta` had one leftover: the "Why Not NativeScript…" comparison
+table's last cell (`README.md`) still said "Beta, also there is no create-symbiote scaffolder yet"
+— missed earlier because pass 3 only grepped for the status-callout phrasing, not this table cell.
+Fixed to drop the stale status word and keep the (accurate) scaffolder caveat.
+
+Lesson: after fixing a status word in the obvious places, re-grep the exact word globally rather
+than trusting the first sweep's file list — a comparison table is a place the same fact gets
+restated in a form the first search didn't anticipate.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
