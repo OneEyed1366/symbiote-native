@@ -17,14 +17,25 @@
 // with everything green — not hypothetical: it is how a disabled `touchable-highlight` shipped
 // `focusable: true`.
 //
-// NONE IS LEFT, as of 2026-09-18. The two component-keyed ones went in that order — RN's Text
-// defaults first, then `value ?? defaultValue -> text` — separately and on purpose, because they had
-// different test topologies and one commit removing both could not be attributed to either.
+// NO COMPONENT-KEYED RULE IS LEFT, as of 2026-09-18. The two went in that order — RN's Text defaults
+// first, then `value ?? defaultValue -> text` — separately and on purpose, because they had
+// different test topologies and one commit removing both could not be attributed to either. So a
+// text input's payload here carries `value` where the device's carries `text`, and a text node's is
+// missing two keys. That asymmetry is the harness working as designed — do not close it by adding a
+// rule back.
 //
-// What is here is the framework-agnostic half: colour processing, the style hoist, the aria fold,
-// and a node's own `payloadFold`. So a text input's payload here carries `value` where the device's
-// carries `text`, and a text node's is missing two keys. That asymmetry is the harness working as
-// designed — do not close it by adding a rule back.
+// ONE PLATFORM RULE IS STILL CALLED FROM HERE AND IT IS A DIFFERENT CASE: `foldAriaProps`. The
+// FUNCTION is not a mirror to delete — `resolveAccessibilityProps` in `core/components` calls it on
+// the component path, where a body folds its bag before handing it on — so unlike the other two
+// there is real JS that needs it. What is arguably wrong is this CALL, which puts a platform rule
+// back in the headless payload and invites assertions that cannot see the device copy.
+//
+// The device copy is no longer untested either way: `core/engine/cpp/tests/js/aria-payload.itest.ts`
+// pins all eleven of its behaviours, break-tested. Removing the call here costs 27 cases across 16
+// files (measured), so it is its own piece of work with its own argument, not a tail of this one.
+//
+// The rest is the framework-agnostic half: colour processing, the style hoist, and a node's own
+// `payloadFold`.
 
 import { foldAriaProps } from './accessibility-props';
 import type { IFabricProps } from './fabric';

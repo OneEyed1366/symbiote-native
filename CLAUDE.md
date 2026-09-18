@@ -2444,6 +2444,40 @@ props" lost its `defaultValue` leg for the same reason its `inputMode` leg went 
 is the engine's. What is still that layer's is the FUNCTION, because dropping a function is not a
 rule about text inputs — it is a property of building a payload at all.
 
+### The aria fold is the THIRD rule written twice, and the first whose JS copy is not a mirror
+
+`foldAriaProps` exists in `core/engine/src/accessibility-props.ts` and in `SymbioteFabricProps.cpp`,
+the two written to be read side by side. Until 2026-09-18 every assertion about it ran against the
+FIRST, in vitest — so the device copy could have broken with the whole suite green, the same gap
+`foldTextInputValue`'s `defaultValue` leg had. `core/engine/cpp/tests/js/aria-payload.itest.ts` closes
+it: eleven cases off the committed payload, **break-tested by returning the bag unfolded**, which
+turns nine red and leaves exactly the two gate controls green.
+
+**BUT THE TWIN DOES NOT GET DELETED, and that is the distinction worth carrying.** The JS copy has a
+real runtime caller that is not the payload builder — `resolveAccessibilityProps` in `core/components`,
+which component bodies use to fold a bag before handing it on. "A second implementation is not
+automatically a mirror; ask what each one REACHES" cut the other way for the Text defaults, where
+nothing else reached them, and it cuts this way here. What is still arguably wrong is the payload
+builder's CALL to it, which puts a platform rule back in the headless payload; removing that costs
+**27 cases across 16 files**, measured, so it is its own piece with its own argument.
+
+**Three things the writing of that file taught, none of which came from reading the rule:**
+
+- **A case can assert an inner rule while never satisfying the OUTER gate.** "Replaces the state
+  composite" was written with only an `accessibilityState` in the bag — but the whole fold is behind
+  `hasAriaAlias`, so nothing ran and the composite passed through with its invented field intact. The
+  fix was an `aria-busy` in the bag, and the discovery became its own case: **a composite written
+  with no aria key beside it reaches Fabric exactly as authored**, unnormalised. Both implementations
+  agree, so it is the contract rather than a bug — and it is the surprising half, because the
+  composite rules do not apply to a node that only uses RN's own spelling.
+- **The itest harness's `toEqual` is `JSON.stringify`, so it is KEY-ORDER sensitive.** The two
+  implementations build `accessibilityState` in different orders and agree on every value; that read
+  as two failures. Assert a composite field by field. (It also means `toEqual` cannot see a key whose
+  value is `undefined`, since `JSON.stringify` drops it — worth knowing before trusting one.)
+- **"The explicit value survived" is a one-sided oracle**, true of a rule that never ran at all. It
+  needs the ERASURE asserted beside it, which is what makes the case fail under the break. Found by
+  running the break-test and noticing which cases stayed green, not by review.
+
 ### TWO GUARDS THAT HAVE STOPPED GUARDING — found while porting, recorded rather than quietly fixed
 
 Both were noticed by asking what a passing test can still SEE, which is the question the text-defaults
