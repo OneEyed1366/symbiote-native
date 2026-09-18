@@ -144,6 +144,17 @@ wording — find the actual file/command that settles it (`find`, `grep -h versi
 rewriting either side. A milestone table and a "what's verified" prose section are two different
 authors' summaries of the same reality and drift independently.
 
+**CORRECTION from the user, authoritative, overrides the above inference:** "все 5 адаптеров
+проверены на устройстве. точка" — all 5 adapters, Solid included, are verified on device, full
+stop. My `examples/solid` has-no-`e2e/`-dir finding was real (still true, checked with `find`),
+but I was wrong to frame it as "device verification still pending" — that conflated Detox e2e
+*journey-test* coverage (genuinely missing for Solid) with device verification generally (done,
+for all 5). Reverted `status.mdx`/`roadmap.mdx`/`index.mdx` to state Solid is device-verified
+like the other four, and downgraded the e2e gap to a plain "doesn't yet share the Detox
+`canary-journeys` spec" note with no "still pending on device" framing. **Lesson: a missing test
+harness for one testing METHOD (Detox e2e) is not evidence the whole verification claim is false
+— don't infer the stronger, more damaging claim from the narrower fact.**
+
 Not yet checked this pass: whether `apps/docs-site` pages reference specific version numbers
 anywhere (a scan for `0\.[0-9]+\.[0-9x]+` across all `.md`/`.mdx` turned up only RN/Expo SDK
 version mentions and skill-file historical incident logs — nothing else claiming a symbiote-native

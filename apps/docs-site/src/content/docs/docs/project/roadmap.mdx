@@ -61,10 +61,8 @@ agnostic seam for non-DOM targets. It reaches the same component parity as
 React, Vue, Angular, and Svelte, including `createPortal`, `createTunnel`,
 `Animated`, and `AppRegistry`, and every companion package now ships a
 `./solid` build too. It's also on the live switcher now, with its own demo
-clip, and the canary has been benchmarked on a real iOS simulator repeatedly
-(see the root `CLAUDE.md`'s device numbers); what's still missing is the
-shared Detox `canary-journeys` e2e spec React, Vue, and Svelte already carry
-— `examples/solid` has no `e2e/` harness yet.
+clip, verified on device like the other four adapters. It doesn't yet share
+the Detox `canary-journeys` e2e spec React, Vue, and Svelte carry.
 
 React, Vue, Angular, Svelte, and Solid keep expanding parity in the meantime:
 all five now have a portal primitive for same-surface content relocation
