@@ -16,7 +16,7 @@
 // op that NAMES that node as the child. So if the pending batch does not name it, the host's answer
 // is already the current one and there is nothing to publish first.
 //
-// `namesPendingParentChange` is the buffer's own bookkeeping, not a tree — it answers about the
+// `hasPendingPlacement` is the buffer's own bookkeeping, not a tree — it answers about the
 // BUFFER ("is this node's placement unpublished"), which is why it does not violate the standing
 // rule that JS holds no parent links (`node.ts:2`). Creation counts: a node the host has never
 // heard of has no answer to give.
