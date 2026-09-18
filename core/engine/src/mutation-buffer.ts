@@ -100,6 +100,28 @@ export const OP_SET_TAG = 10; // [slot, tag]
 export const OP_SET_OWNED_LISTENER = 11; // [slot, name, present]
 
 /**
+ * A behavior's FEEDBACK state flipped — TouchableHighlight's underlay is showing, or stopped.
+ * `[slot, shown]`.
+ *
+ * The second bit to cross for the same reason the first did. `OP_SET_OWNED_LISTENER` carries whether
+ * the app wired a handler; this carries whether the control is currently giving feedback, which is
+ * the platform's own `:active` in everything but the timing. `setNodePressed`'s header already calls
+ * the press state "the engine-owned half of what `:active` is on the web", and this is its twin for
+ * the one control whose feedback does NOT track the press exactly: RN holds the underlay past
+ * release so a fast tap still flashes (`TouchableHighlight.js:270-293`).
+ *
+ * THE TIMER STAYS IN JS and that is the boundary, not an omission. WHEN the bit flips is Pressability
+ * plus a `delayPressOut` hold, running at gesture rate and calling back into app code
+ * (`onShowUnderlay` / `onHideUnderlay`). WHAT a showing underlay looks like — a background colour and
+ * a dimmed child, from two props no ViewConfig declares — is the platform's, and it is
+ * `foldTouchableHighlightUnderlay` now.
+ *
+ * A flip is a GESTURE-rate event rather than a per-render one: twice a tap, against a `payloadFold`
+ * that was charged on every commit the node was dirty in for the life of the screen.
+ */
+export const OP_SET_UNDERLAY_SHOWN = 12; // [slot, shown]
+
+/**
  * A `setProp` whose value slot is this DELETES the key.
  *
  * `undefined` cannot carry it: `null` is a legitimate Fabric prop value meaning "reset to the
@@ -465,6 +487,11 @@ export function recordSetOwnedListener(
   isPresent: boolean,
 ): void {
   push(OP_SET_OWNED_LISTENER, slotOf(handle), intern(name), isPresent ? 1 : 0);
+}
+
+/** See `OP_SET_UNDERLAY_SHOWN`. Emitted on a flip only, from the behavior that owns the timer. */
+export function recordSetUnderlayShown(handle: object, shown: boolean): void {
+  push(OP_SET_UNDERLAY_SHOWN, slotOf(handle), shown ? 1 : 0);
 }
 
 export function recordCommit(rootTag: number, surface: object): void {

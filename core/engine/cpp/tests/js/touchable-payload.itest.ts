@@ -190,22 +190,28 @@ describe('what the fold-only touchables send native', () => {
     expect(style.padding).toBe(4);
   });
 
-  // why: THE PRICE, and this case read 1 until 2026-09-18 with a comment calling the remainder
-  // partial BY DESIGN. What was actually left was `focusable`, whose middle leg is an owned
-  // listener's EXISTENCE — and that turned out to be one bit rather than something unportable, so
-  // `touchable-opacity` is at zero. See `touchable-focusable-payload.itest.ts`.
+  // why: THE PRICE, and this case has now been wrong TWICE in the same direction — worth saying out
+  // loud, because both times the wrongness was a comment explaining why the remainder was permanent.
   //
-  // `touchable-highlight` is NOT, and the distinction is worth keeping in the same case: its fold
-  // survives for the UNDERLAY, which is built from live press state (`shown` flips inside a
-  // gesture) and is the genuine article the old comment was reaching for.
-  it('costs the opacity tag no trip, and the highlight one for its underlay', () => {
+  // It read 1 for the opacity tag with a note calling that partial BY DESIGN. What was actually left
+  // was `focusable`, whose middle leg is an owned listener's EXISTENCE — one bit, not something
+  // unportable (`touchable-focusable-payload.itest.ts`). Corrected to 0.
+  //
+  // It then read 1 for the HIGHLIGHT, with a note calling its underlay "built from live press state
+  // and the genuine article the old comment was reaching for". Also half right: `shown` is live and
+  // is still JS's, but the RULE was made of three portable inputs and one bit. Corrected to 0
+  // (`touchable-highlight-underlay.itest.ts`).
+  //
+  // BOTH TAGS ARE AT ZERO. The next note that explains why some remainder cannot move should be read
+  // with this case's history in hand.
+  it('costs neither touchable tag a trip into JS', () => {
     const fade = opacity({ id: 'save' });
     print(`DEBUG touchable-opacity folds=${fade.folds}`);
     expect(fade.folds).toBe(0);
 
     const underlay = highlight({ id: 'save', onPress: () => {} });
     print(`DEBUG touchable-highlight folds=${underlay.folds}`);
-    expect(underlay.folds).toBe(1);
+    expect(underlay.folds).toBe(0);
   });
 });
 

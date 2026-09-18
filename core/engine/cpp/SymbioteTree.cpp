@@ -67,6 +67,20 @@ constexpr int32_t kOpCommit = 8;
 constexpr int32_t kOpSetComponent = 9;
 constexpr int32_t kOpSetTag = 10;
 constexpr int32_t kOpSetOwnedListener = 11;
+constexpr int32_t kOpSetUnderlayShown = 12;
+
+// The owned listener names any platform rule reads, one bit each — see `Node::pressListeners`.
+// `press` is deliberately bit 0 so the `focusable` question is the cheapest of the two.
+constexpr uint8_t kPressListenerPress = 1u << 0;
+
+/** 0 for a name the host has no rule for, which is nearly all of them. */
+uint8_t pressListenerBit(const std::string &name) {
+  if (name == "press") return kPressListenerPress;
+  if (name == "pressIn") return 1u << 1;
+  if (name == "pressOut") return 1u << 2;
+  if (name == "longPress") return 1u << 3;
+  return 0;
+}
 
 constexpr int32_t kKindElement = 0;
 constexpr int32_t kKindRawText = 1;
@@ -167,13 +181,31 @@ struct Node : jsi::NativeState {
   // never becomes a prop (`setEventListener` diverts it into a JS stash). `focusable` on a touchable
   // is `focusable !== false && onPress !== undefined && !disabled` — two props and this.
   //
-  // A BOOL rather than a set of names, and the choice is the same one `stashed` made on the JS side
+  // BOOLS rather than a set of names, and the choice is the same one `stashed` made on the JS side
   // for the same reason: a container here would cost 24 bytes on EVERY node in every app to serve
-  // the handful that own a listener, where this one lands in padding that already existed. `press`
-  // is the only owned name any platform rule reads; a second would be a second bool, and only a
-  // third would be worth a bitmask. Names the host has no rule for are dropped at the op, which is
-  // also the browser's arrangement — a UA tracks the listeners its own rules consult.
-  bool hasPressListener = false;
+  // the handful that own a listener, where these land in padding that already existed. This said
+  // "`press` is the only owned name any platform rule reads; a second would be a second bool, and
+  // only a third would be worth a bitmask" — and the second came due the same day, so here it is.
+  // Names the host has no rule for are still dropped at the op, which is also the browser's
+  // arrangement: a UA tracks the listeners its own rules consult.
+  //
+  // A MASK rather than two bools, and it is not a preference — one bool per QUESTION cannot be
+  // maintained. "Any of four is wired" can go DOWN when one name departs, and the other three might
+  // still be there; nothing on this side can check, because the listeners live in JS and the op is a
+  // notification about ONE name. A bit per name is the smallest state that answers both questions
+  // from what the ops actually carry, in one byte.
+  //
+  // The two questions are NOT the same and collapsing them would be a real bug in both directions.
+  // `focusable` asks whether the app can be ACTIVATED, which is `onPress` alone
+  // (`TouchableOpacity.js:336-339`). TouchableHighlight's underlay asks whether the control reacts
+  // to a touch AT ALL, which RN spells as any of four (`_hasPressHandler`, `:296-302`) — so a
+  // `<TouchableHighlight onPressIn={…}>` with no `onPress` must flash and must not be a focus stop.
+  uint8_t pressListeners = 0;
+  // TouchableHighlight's underlay is showing. Set by `kOpSetUnderlayShown`, read by
+  // `foldTouchableHighlightUnderlay`. It LAGS the press: RN holds the underlay past release through
+  // a `delayPressOut` timer that stays in JS, which is why this is its own bit and not the press
+  // state that drives `:active` class resolution.
+  bool underlayShown = false;
   // As the adapter authored it. `committedViewName` below is what was actually sent, which differs
   // exactly when the virtual-text rule fired.
   std::string viewName;
@@ -980,7 +1012,15 @@ IOwner ownerOf(const Node &node) {
   return IOwner{
       &node.parent->props,
       node.parent->tagName.c_str(),
-      node.parent->hasPressListener};
+      (node.parent->pressListeners & kPressListenerPress) != 0};
+}
+
+/** The node's own non-prop bits, unpacked from the mask the ops maintain. See `ISelf`. */
+ISelf selfOf(const Node &node) {
+  return ISelf{
+      (node.pressListeners & kPressListenerPress) != 0,
+      node.pressListeners != 0,
+      node.underlayShown};
 }
 
 /**
@@ -1268,7 +1308,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
         node.props,
         fold,
         ownerOf(node),
-        node.hasPressListener,
+        selfOf(node),
         IAncestorLookup{&ancestorPropsOf, &node},
         firstChildOf(node));
     walkCost_.propsNs += nanosSince(startedAt);
@@ -1322,7 +1362,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
           node.props,
           fold,
           ownerOf(node),
-          node.hasPressListener,
+          selfOf(node),
           IAncestorLookup{&ancestorPropsOf, &node},
           firstChildOf(node));
       walkCost_.propsNs += nanosSince(startedAt);
@@ -1750,10 +1790,22 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         const auto &node = nodeAt(ops[at + 1]);
         // Only the names a platform rule actually reads. Anything else is a JS-side concern that
         // happened to cross, and dropping it here costs one comparison.
-        if (stringAt(ops[at + 2]) != "press") break;
-        const bool isPresent = ops[at + 3] != 0;
-        if (node->hasPressListener == isPresent) break;
-        node->hasPressListener = isPresent;
+        const uint8_t bit = pressListenerBit(stringAt(ops[at + 2]));
+        if (bit == 0) break;
+        const uint8_t next = ops[at + 3] != 0 ? uint8_t(node->pressListeners | bit)
+                                              : uint8_t(node->pressListeners & ~bit);
+        if (node->pressListeners == next) break;
+        node->pressListeners = next;
+        markDirty(*node);
+        break;
+      }
+      // A gesture-rate flip, so it marks dirty like the listener op and unlike `kOpSetTag`: the
+      // payload it invalidates is already committed by the time a finger lands.
+      case kOpSetUnderlayShown: {
+        const auto &node = nodeAt(ops[at + 1]);
+        const bool shown = ops[at + 2] != 0;
+        if (node->underlayShown == shown) break;
+        node->underlayShown = shown;
         markDirty(*node);
         break;
       }

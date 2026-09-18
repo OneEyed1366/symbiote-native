@@ -102,6 +102,21 @@ function target(): ILiveNode {
   return committed(node => node.payload.testID === TARGET);
 }
 
+// TouchableHighlight's underlay is `foldTouchableHighlightUnderlay` in the engine since 2026-09-18,
+// and this host builds payloads through the TypeScript `fabricProps`, which carries no copy of the
+// tag rules — so the painted colour is not readable here. The BIT is (`OP_SET_UNDERLAY_SHOWN`), and
+// it is what these cases actually claim: that SOLID's renderer reaches the machine. What a showing
+// underlay looks like is asserted on a real payload in
+// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+//
+// Located by TAG rather than by testID: a `<touchable-highlight>` commits as a plain `RCTView`, so
+// the tag is the only exact locator.
+function isUnderlayShown(): boolean {
+  const node = fabric.find(n => n.tagName === 'touchable-highlight');
+  if (node === undefined) throw new Error('no touchable-highlight was created');
+  return node.underlayShown;
+}
+
 describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
   describe('TouchableOpacity', () => {
     // why: RN's grant branch snaps to activeOpacity with NO fade (OPACITY_ACTIVE_GRANT_DURATION_MS
@@ -226,19 +241,22 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
         </touchable-highlight>
       ));
       await tick();
-      expect(target().payload.backgroundColor).not.toBe(UNDERLAY);
+      expect(isUnderlayShown()).toBe(false);
 
       const handle = target().instanceHandle;
       fabric.fireEvent(handle, TOUCH_START);
       await tick();
-      expect(target().payload.backgroundColor).toBe(UNDERLAY);
-      expect(target().payload.opacity).toBe(ACTIVE_OPACITY);
+      expect(isUnderlayShown()).toBe(true);
+      // Both feedback props reached the node, which is Solid's half; what the engine's rule makes of
+      // them is the itest's.
+      expect(target().payload.underlayColor).toBe(UNDERLAY);
+      expect(target().payload.activeOpacity).toBe(ACTIVE_OPACITY);
 
       // The release re-shows before scheduling the hide, and the hide is a TIMER even at
       // delayPressOut: 0 (RN holds the underlay past a fast tap) — settle() drains it.
       fabric.fireEvent(handle, TOUCH_END);
       await settle();
-      expect(target().payload.backgroundColor).not.toBe(UNDERLAY);
+      expect(isUnderlayShown()).toBe(false);
     });
 
     // why: `handlePressIn` shows on grant and `handlePress` re-affirms it before scheduling the
@@ -279,7 +297,7 @@ describe('Solid: `touchable-opacity` and `touchable-highlight` as tags', () => {
 
       fabric.fireEvent(target().instanceHandle, TOUCH_START);
       await tick();
-      expect(target().payload.backgroundColor).not.toBe(UNDERLAY);
+      expect(isUnderlayShown()).toBe(false);
     });
   });
 });

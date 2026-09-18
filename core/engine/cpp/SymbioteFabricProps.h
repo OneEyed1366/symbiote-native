@@ -159,13 +159,33 @@ struct IFirstChild {
   const char *tagName = nullptr;
 };
 
+/**
+ * The node's own facts that are NOT props — the bits a behavior owns and the platform is entitled to.
+ *
+ * It was a bare `bool hasPressListener` parameter until a second bit needed to cross, and bundling
+ * is the same move `IOwner` made when `ownerProps` grew a tag: a lone bool beside three structs is
+ * the shape that grows a fourth positional argument nobody can read at the call site.
+ *
+ * `hasPressListener` is `onPress` ALONE, which is what `focusable` asks (`TouchableOpacity.js:
+ * 336-339`). `hasAnyPressListener` is any of RN's four (`TouchableHighlight.js:296-302`), which is
+ * what "does this control react to a touch at all" asks. Two questions, deliberately not one.
+ *
+ * `underlayShown` is feedback STATE rather than wiring: TouchableHighlight's underlay, which lags the
+ * press through a hold timer that stays in JS.
+ */
+struct ISelf {
+  bool hasPressListener = false;
+  bool hasAnyPressListener = false;
+  bool underlayShown = false;
+};
+
 folly::dynamic fabricProps(
     const std::string &component,
     const std::string &tagName,
     const folly::dynamic &props,
     const IPayloadFold &fold = {},
     const IOwner &owner = {},
-    bool hasPressListener = false,
+    const ISelf &self = {},
     const IAncestorLookup &ancestors = {},
     const IFirstChild &firstChild = {});
 

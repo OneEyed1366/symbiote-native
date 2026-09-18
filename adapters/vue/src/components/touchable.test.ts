@@ -147,6 +147,16 @@ function committedPayload(testID: string): Record<string, unknown> {
   return payloadOf(findByTestId(testID).handle);
 }
 
+// TouchableHighlight's underlay is `foldTouchableHighlightUnderlay` in the engine since 2026-09-18,
+// and this host builds payloads through the TypeScript `fabricProps`, which carries no copy of the
+// tag rules — so the colour is not readable here. The BIT is (`OP_SET_UNDERLAY_SHOWN`), and it is
+// the right witness for what these cases actually claim: that VUE's wiring reaches the machine. What
+// the underlay LOOKS like is not Vue's business and is asserted against a real committed payload in
+// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+function isUnderlayShown(testID: string): boolean {
+  return findByTestId(testID).underlayShown;
+}
+
 function asNumber(value: unknown, label: string): number {
   if (typeof value !== 'number')
     throw new Error(
@@ -365,17 +375,19 @@ describe('Vue TouchableHighlight', () => {
     });
     mount(ROOT_TAG, App);
     await flush();
-    expect(committedPayload(TARGET).backgroundColor).toBeUndefined();
+    expect(isUnderlayShown(TARGET)).toBe(false);
     expect(committedPayload(TARGET).width).toBe(BASE_WIDTH);
     expect(committedPayload(CHILD).opacity).toBeUndefined();
 
     const handle = responderHandle();
     fabric.fireEvent(handle, TOUCH_START);
     await flush();
-    expect(committedPayload(TARGET).backgroundColor, 'the underlay').toBe(
-      '#abc',
-    );
-    expect(committedPayload(TARGET).opacity, 'the lowered opacity').toBe(0.5);
+    expect(isUnderlayShown(TARGET), 'the underlay').toBe(true);
+    // BOTH feedback props reached the node, which is Vue's half. What the engine's rule makes of
+    // them — a background and a lowered `opacity`, on this one node — is asserted on a committed
+    // payload in `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+    expect(committedPayload(TARGET).underlayColor).toBe('#abc');
+    expect(committedPayload(TARGET).activeOpacity).toBe(0.5);
     expect(committedPayload(TARGET).width, 'the base style survived').toBe(
       BASE_WIDTH,
     );
@@ -390,7 +402,7 @@ describe('Vue TouchableHighlight', () => {
     await wait(20);
     await flush();
     // A cleared prop is a vanished key on the real op stream, never `null`.
-    expect(isCleared(TARGET, 'backgroundColor')).toBe(true);
+    expect(isUnderlayShown(TARGET)).toBe(false);
     expect(isCleared(TARGET, 'opacity')).toBe(true);
   });
 
@@ -410,7 +422,7 @@ describe('Vue TouchableHighlight', () => {
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
     await flush();
-    expect(committedPayload(TARGET).backgroundColor).toBeUndefined();
+    expect(isUnderlayShown(TARGET)).toBe(false);
   });
 
   it('counts an onLongPress-only listener as a press handler', async () => {
@@ -427,7 +439,7 @@ describe('Vue TouchableHighlight', () => {
 
     fabric.fireEvent(responderHandle(), TOUCH_START);
     await flush();
-    expect(committedPayload(TARGET).backgroundColor).toBe('#abc');
+    expect(isUnderlayShown(TARGET)).toBe(true);
   });
 
   // why: THE reason the underlay is a machine and not a `pressed`-derived style. RN re-shows the
@@ -453,17 +465,11 @@ describe('Vue TouchableHighlight', () => {
     fabric.fireEvent(handle, TOUCH_START);
     fabric.fireEvent(handle, TOUCH_END);
     await flush();
-    expect(
-      committedPayload(TARGET).backgroundColor,
-      'still held after the tap',
-    ).toBe('#abc');
+    expect(isUnderlayShown(TARGET), 'still held after the tap').toBe(true);
 
     await wait(HOLD_MS + 20);
     await flush();
-    expect(
-      isCleared(TARGET, 'backgroundColor'),
-      'released after the hold',
-    ).toBe(true);
+    expect(isUnderlayShown(TARGET), 'released after the hold').toBe(false);
   });
 
   // why: the OTHER half of the hold. A cancelled gesture bubbles pressOut with no press before it,
@@ -488,14 +494,14 @@ describe('Vue TouchableHighlight', () => {
     const handle = responderHandle();
     fabric.fireEvent(handle, TOUCH_START);
     await flush();
-    expect(committedPayload(TARGET).backgroundColor).toBe('#abc');
+    expect(isUnderlayShown(TARGET)).toBe(true);
 
     fabric.fireEvent(handle, TOUCH_CANCEL);
     await flush();
     expect(
-      isCleared(TARGET, 'backgroundColor'),
+      isUnderlayShown(TARGET),
       'a cancelled press never armed the hold',
-    ).toBe(true);
+    ).toBe(false);
   });
 
   // why: RN fires onShowUnderlay / onHideUnderlay on a real transition only, and runs the visual
@@ -537,8 +543,14 @@ describe('Vue TouchableHighlight', () => {
     ]);
   });
 
-  // why: an underlayColor can be re-supplied after mount; the behavior reads the CURRENT props on
-  // each press, not a value captured at attach.
+  // why: an underlayColor can be re-supplied after mount, and VUE's half of that is getting the new
+  // value onto the node — a reactive `underlayColor` must reach the props rather than being captured
+  // at mount. That is what this asserts now; it used to read the painted `backgroundColor`, which is
+  // `foldTouchableHighlightUnderlay`'s output and no longer visible on this host.
+  //
+  // Reading the prop is not a weaker claim HERE, it is the correctly-scoped one: whether the engine
+  // then re-reads the current bag on every commit is the engine's, and travelled to
+  // `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts` as its own case.
   it('honors an underlayColor changed after mount', async () => {
     const color = ref('#abc');
     const App = defineComponent({
@@ -556,7 +568,8 @@ describe('Vue TouchableHighlight', () => {
     await flush();
     fabric.fireEvent(responderHandle(), TOUCH_START);
     await flush();
-    expect(committedPayload(TARGET).backgroundColor).toBe('#def');
+    expect(committedPayload(TARGET).underlayColor).toBe('#def');
+    expect(isUnderlayShown(TARGET)).toBe(true);
   });
 });
 

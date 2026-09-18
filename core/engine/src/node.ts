@@ -24,6 +24,7 @@ import {
   recordRemoveChild,
   recordSetComponent,
   recordSetOwnedListener,
+  recordSetUnderlayShown,
   recordSetProp,
   recordSetText,
 } from './mutation-buffer';
@@ -1363,6 +1364,27 @@ export function setNodePressed(node: ISymbioteNode, pressed: boolean): void {
   const parts = stylePartsOf(node);
   parts.isPressed = pressed;
   pushClassStyle(node, parts);
+}
+
+/**
+ * Tell the host a behavior's FEEDBACK is showing — TouchableHighlight's underlay, and only that.
+ *
+ * The sibling of `setNodePressed` and deliberately NOT the same bit. Press state drives `:active`
+ * class resolution, which happens in JS because a class name resolves against a JS registry; this
+ * drives a rule that lives in C++ (`foldTouchableHighlightUnderlay`), so it crosses as one op rather
+ * than resolving to a style here. And the two are genuinely different facts: RN holds the underlay
+ * past release so a fast tap still flashes, so `shown` LAGS `pressed` by a `delayPressOut` timer.
+ *
+ * No style is computed on this side at all, which is the whole point — the two props the rule reads
+ * (`underlayColor`, `activeOpacity`) are ones the engine already strips from the payload, so the
+ * values and their defaults live in one place instead of being erased in C++ and reached around for
+ * in JS.
+ */
+export function setNodeUnderlayShown(
+  node: ISymbioteNode,
+  shown: boolean,
+): void {
+  recordSetUnderlayShown(node, shown);
 }
 
 /**

@@ -21,11 +21,6 @@ import {
   registerTouchableHighlightBehavior,
   TOUCHABLE_HIGHLIGHT_TAG,
 } from './touchable-highlight';
-import {
-  DEFAULT_HIGHLIGHT_CHILD_OPACITY,
-  DEFAULT_UNDERLAY_COLOR,
-} from '../state/touchable';
-
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
 let nextRootTag = 7300;
@@ -60,13 +55,22 @@ function listenerOf(node: ISymbioteNode, name: string): IListener {
   return listener;
 }
 
-function committedPropsOf(testID: string): Record<string, unknown> {
-  const hit = live.findLive(
-    live.appRoot(),
-    node => node.payload.testID === testID,
-  );
-  if (hit === undefined) throw new Error(`no committed node testID=${testID}`);
-  return hit.payload;
+// THE WITNESS CHANGED ON 2026-09-18 AND THE CLAIM DID NOT. Every case below used to ask whether the
+// underlay was showing by reading `backgroundColor` off the committed payload. That worked while a
+// JS `payloadFold` painted it; the rule is `foldTouchableHighlightUnderlay` in the engine now, and
+// this host builds its payloads through the TypeScript `fabricProps`, which deliberately carries no
+// copy of the tag rules — so the colour is not here to read and never will be.
+//
+// What IS here is the bit the machine flipped, recorded from `OP_SET_UNDERLAY_SHOWN`. That is the
+// better instrument for this file anyway: every case in it is about WHEN the underlay shows — the
+// hold timer, the cancelled gesture, the re-arm — which is the half that stayed in JS. What a
+// showing underlay LOOKS like moved out whole, along with the two style cases that asked, and is
+// asserted against a real committed payload in
+// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+function isUnderlayShown(node: ISymbioteNode): boolean {
+  const hit = fabric.find(authored => authored.handle === node);
+  if (hit === undefined) throw new Error('the node never reached the host');
+  return hit.underlayShown;
 }
 
 // Style is published through routeProp, which is synchronous.
@@ -107,23 +111,17 @@ describe('touchable-highlight host behavior', () => {
     pressIn(node);
     listenerOf(node, 'press')(TOUCH);
     await settle();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBe(
-      DEFAULT_UNDERLAY_COLOR,
-    );
+    expect(isUnderlayShown(node)).toBe(true);
 
     // The tap already released — pressOut fires right after press, same as a real fast tap.
     listenerOf(node, 'pressOut')(TOUCH);
     await settle();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBe(
-      DEFAULT_UNDERLAY_COLOR,
-    );
+    expect(isUnderlayShown(node)).toBe(true);
 
     await vi.advanceTimersByTimeAsync(DELAY_PRESS_OUT);
     // The recomputed style simply carries no backgroundColor once hidden — absent, not a literal
     // null. The before/after pair above already proves the transition; this is its resting state.
-    expect(Object.hasOwn(committedPropsOf(TEST_ID), 'backgroundColor')).toBe(
-      false,
-    );
+    expect(isUnderlayShown(node)).toBe(false);
   });
 
   // why: a gesture that never fires `press` (dragged off before release) armed no hide timer, so
@@ -141,15 +139,11 @@ describe('touchable-highlight host behavior', () => {
 
     pressIn(node);
     await settle();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBe(
-      DEFAULT_UNDERLAY_COLOR,
-    );
+    expect(isUnderlayShown(node)).toBe(true);
 
     listenerOf(node, 'pressOut')(TOUCH);
     await settle();
-    expect(Object.hasOwn(committedPropsOf(TEST_ID), 'backgroundColor')).toBe(
-      false,
-    );
+    expect(isUnderlayShown(node)).toBe(false);
   });
 
   // why: `handlePressIn` clears any pending hide first — a second tap landing during the hold
@@ -174,9 +168,7 @@ describe('touchable-highlight host behavior', () => {
     await settle();
     // If the first hold timer had survived, it would fire here and hide the underlay early.
     await vi.advanceTimersByTimeAsync(DELAY_PRESS_OUT / 2 + 1);
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBe(
-      DEFAULT_UNDERLAY_COLOR,
-    );
+    expect(isUnderlayShown(node)).toBe(true);
   });
 
   // why: RN's `_hasPressHandler` gate — a decorative TouchableHighlight with no press callback
@@ -190,7 +182,7 @@ describe('touchable-highlight host behavior', () => {
 
     pressIn(node);
     await settle();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBeUndefined();
+    expect(isUnderlayShown(node)).toBe(false);
   });
 
   // why: `onShowUnderlay`/`onHideUnderlay` are app-facing notifications and must fire exactly once
@@ -249,39 +241,18 @@ describe('touchable-highlight host behavior', () => {
     expect(onPressOut).toHaveBeenCalledTimes(1);
   });
 
-  // why: RN settles back to the CALLER's activeOpacity/underlayColor, not a hardcoded one —
-  // TouchableHighlight.js's `_createExtraStyles` reads both off props with its own defaults.
-  it('applies a custom underlayColor and activeOpacity, and the wrapper defaults otherwise', async () => {
-    registerTouchableHighlightBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'onPress', () => {});
-    routeProp(node, 'underlayColor', 'crimson');
-    routeProp(node, 'activeOpacity', 0.5);
-    mount(node);
-    await settle();
-
-    pressIn(node);
-    await settle();
-    const props = committedPropsOf(TEST_ID);
-    expect(props.backgroundColor).toBe('crimson');
-    expect(props.opacity).toBe(0.5);
-  });
-
-  it('defaults to black at 0.85 opacity when unset', async () => {
-    registerTouchableHighlightBehavior();
-    const node = makeTouchable();
-    routeProp(node, 'testID', TEST_ID);
-    routeProp(node, 'onPress', () => {});
-    mount(node);
-    await settle();
-
-    pressIn(node);
-    await settle();
-    const props = committedPropsOf(TEST_ID);
-    expect(props.backgroundColor).toBe(DEFAULT_UNDERLAY_COLOR);
-    expect(props.opacity).toBe(DEFAULT_HIGHLIGHT_CHILD_OPACITY);
-  });
+  // THE TWO STYLE CASES LEFT ON 2026-09-18 — "applies a custom underlayColor and activeOpacity" and
+  // "defaults to black at 0.85 opacity when unset". They are the only ones here that asked what a
+  // showing underlay LOOKS like rather than when it shows, and that is `foldTouchableHighlightUnderlay`
+  // in the engine now, reading the same two props the payload builder already strips
+  // (`kTouchableFeedbackKeys`). Their twins are "paints the underlay and dims the child while
+  // pressed" and "falls back to the underlay and opacity RN itself picks", in
+  // `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`, against a real payload.
+  //
+  // They went as a PAIR with the rule rather than being rewritten onto the new witness, because
+  // `underlayShown` cannot tell a crimson underlay from a black one — a bit is the right instrument
+  // for "did the machine flip" and the wrong one for "what colour". Every other case in this file
+  // survived the move, which is the tell that the split was along the real seam.
 
   // `focusable` LEFT ON 2026-09-18 — `foldPressableProps` resolves it off the tag now — AND THIS
   // CASE IS WHY THE MOVE MATTERED, not just where it went.
@@ -317,7 +288,6 @@ describe('touchable-highlight host behavior', () => {
     await settle();
 
     expect(node.listeners?.get('pressIn')).toBeUndefined();
-    expect(committedPropsOf(TEST_ID).backgroundColor).toBeUndefined();
-    expect(committedPropsOf(TEST_ID).focusable).toBeUndefined();
+    expect(isUnderlayShown(node)).toBe(false);
   });
 });

@@ -819,6 +819,64 @@ const std::array<const char *, 6> kTouchableFeedbackKeys = {
 };
 
 /**
+ * RN's own two feedback defaults, `TouchableHighlight.js:258-268`. Constants of the PLATFORM — every
+ * TouchableHighlight in every app gets them unless it says otherwise — which is what makes them the
+ * engine's and not any component's.
+ */
+constexpr double kHighlightChildOpacity = 0.85;
+constexpr const char *kHighlightUnderlayColor = "black";
+
+/**
+ * TouchableHighlight's UNDERLAY, and the last props-shaped rule in the migration.
+ *
+ * ONE NODE, which is the simplification every adapter already shipped rather than one this rule
+ * invents. RN renders a container View carrying the underlay and CLONES an extra opacity style onto
+ * its single child (`TouchableHighlight.js:189, 258-268`); every wrapper here folds BOTH onto the one
+ * node instead, because splitting them needs a child to target and a framework component holding an
+ * opaque children slot cannot reach one safely. The port keeps that, it does not reopen it.
+ *
+ * TWO INPUTS THAT ARE NOT PROPS, both already crossing:
+ *   `underlayShown`      the feedback bit — `kOpSetUnderlayShown`, flipped by the JS hold timer
+ *   `hasAnyPressListener` RN's `_hasPressHandler` (`:296-302`), any of four owned names
+ *
+ * WHY `authored` AND NOT THE BAG. `foldPressableProps` has already run and stripped `underlayColor`
+ * and `activeOpacity` — they are in `kTouchableFeedbackKeys`, because RN forwards neither to the View
+ * it renders. Read from the bag they would both be absent here and every underlay would silently be
+ * black at 0.85 whatever the app asked for. Trap A, in the form that makes it a SILENT wrong answer
+ * rather than a missing key.
+ *
+ * COMPOSES, never replaces: the two styles go OVER the author's, matching the order RN appends them
+ * in. Reversed, a highlight with a background colour of its own would never visibly respond.
+ */
+dynamic foldTouchableHighlightUnderlay(
+    const dynamic &props,
+    const dynamic &authored,
+    const ISelf &self) {
+  if (!self.underlayShown || !self.hasAnyPressListener) return props;
+
+  dynamic underlay = dynamic::object();
+  const dynamic *color = authored.get_ptr("underlayColor");
+  underlay["backgroundColor"] =
+      color != nullptr && !color->isNull() ? *color : dynamic(kHighlightUnderlayColor);
+
+  dynamic child = dynamic::object();
+  const dynamic *opacity = authored.get_ptr("activeOpacity");
+  child["opacity"] = opacity != nullptr && opacity->isNumber()
+      ? *opacity
+      : dynamic(kHighlightChildOpacity);
+
+  dynamic composed = dynamic::array();
+  const dynamic *style = props.get_ptr("style");
+  if (style != nullptr) composed.push_back(*style);
+  composed.push_back(std::move(underlay));
+  composed.push_back(std::move(child));
+
+  dynamic out = props;
+  out["style"] = std::move(composed);
+  return out;
+}
+
+/**
  * The per-axis base style every ScrollView box carries, and the ONE place it is spelled.
  *
  * IT HAD A SECOND COPY IN JS UNTIL 2026-09-18, held by `scroll-view-base-parity.itest.ts` because
@@ -2083,7 +2141,7 @@ dynamic fabricProps(
     const dynamic &props,
     const IPayloadFold &fold,
     const IOwner &owner,
-    bool hasPressListener,
+    const ISelf &self,
     const IAncestorLookup &ancestors,
     const IFirstChild &firstChild) {
   if (component == kRawTextComponent) {
@@ -2128,11 +2186,17 @@ dynamic fabricProps(
         *bag,
         usesTouchableFeedbackRule(tagName),
         usesTouchableFocusableRule(tagName),
-        hasPressListener);
+        self.hasPressListener);
+    // The UNDERLAY, layered over the touchable's own rule and only on the one tag that has one. It
+    // runs AFTER `foldPressableProps` deliberately: that rule strips `underlayColor` and
+    // `activeOpacity`, so this reads them off the AUTHORED bag — Trap A, the same correction every
+    // rule that follows another has needed.
+    if (tagName == "touchable-highlight")
+      tagResolved = foldTouchableHighlightUnderlay(tagResolved, props, self);
     // Button is a touchable PLUS something, exactly as RN builds it (`Button.js:283`), so its own
     // rules layer over the touchable's rather than replacing them.
     if (tagName == "button")
-      tagResolved = foldButtonProps(tagResolved, props, hasPressListener);
+      tagResolved = foldButtonProps(tagResolved, props, self.hasPressListener);
     bag = &tagResolved;
   } else if (tagName == "image" || tagName == "image-background-image") {
     tagResolved = foldImageProps(*bag);

@@ -25,6 +25,7 @@ export {
   setNodeHidden,
   setNodeComponent,
   setNodePressed,
+  setNodeUnderlayShown,
   setText,
   isSymbioteNode,
   isSymbioteEvent,

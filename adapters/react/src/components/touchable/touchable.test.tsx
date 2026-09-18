@@ -172,6 +172,23 @@ function committedViews(): Record<string, unknown>[] {
 function containerProps(): Record<string, unknown> {
   return committedViews()[0];
 }
+
+// TouchableHighlight's underlay is `foldTouchableHighlightUnderlay` in the engine since 2026-09-18,
+// and this host builds payloads through the TypeScript `fabricProps`, which carries no copy of the
+// tag rules — so the painted colour is not readable here. The BIT is (`OP_SET_UNDERLAY_SHOWN`), and
+// it is the right witness for what these cases claim: that REACT's wiring reaches the machine,
+// through a real reconciler and a real commit. What a showing underlay looks like belongs to
+// `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+// Located by TAG, not by view name plus a `pointerEvents` filter the way the payload helpers above
+// are. A `<touchable-highlight>` commits as a plain `RCTView` — that is the whole reason the tag has
+// to cross at all — so the filter those helpers use is a heuristic that happens to work on the
+// shapes in this file, and it picked the wrong node the first time this was written. The tag is
+// exact.
+function isUnderlayShown(): boolean {
+  const node = fabric.find(n => n.tagName === 'touchable-highlight');
+  if (node === undefined) throw new Error('no touchable-highlight was created');
+  return node.underlayShown;
+}
 function childProps(): Record<string, unknown> {
   const views = committedViews();
   return views[views.length - 1];
@@ -435,13 +452,13 @@ describe('React TouchableHighlight underlay feedback', () => {
     );
     const handle = responderHandle();
 
-    expect(containerProps().backgroundColor).toBeUndefined();
+    expect(isUnderlayShown()).toBe(false);
     expect(containerProps().width).toBe(10);
     expect(childProps().opacity).toBeUndefined();
 
     fabric.fireEvent(handle, TOUCH_START);
     await settleUnderlay();
-    expect(containerProps().backgroundColor).toBe('#abc');
+    expect(isUnderlayShown()).toBe(true);
     expect(containerProps().width).toBe(10);
     // BOTH halves land on the ONE node, and the child is untouched — this is the tag's documented
     // divergence from RN, which paints the underlay on a container and clones the lowered opacity
@@ -449,7 +466,8 @@ describe('React TouchableHighlight underlay feedback', () => {
     // (`core/components/src/behaviors/touchable-highlight.ts`, and `component-names/shared.ts` at
     // the tag's own declaration). Every adapter's wrapper except React's had already shipped this
     // simplification; deleting React's wrapper is what made it the only shape.
-    expect(containerProps().opacity).toBe(0.5);
+    expect(containerProps().underlayColor).toBe('#abc');
+    expect(containerProps().activeOpacity).toBe(0.5);
     expect(childProps().opacity).toBeUndefined();
     expect(childProps().height).toBe(4);
   });
@@ -476,14 +494,12 @@ describe('React TouchableHighlight underlay feedback', () => {
     fabric.fireEvent(handle, TOUCH_END);
     await settleUnderlay();
     expect(
-      containerProps().backgroundColor,
+      isUnderlayShown(),
       'release must not clear the underlay before delayPressOut elapses',
-    ).toBe('#abc');
-    expect(containerProps().opacity).toBe(0.5);
+    ).toBe(true);
 
     await new Promise(resolve => setTimeout(resolve, 60));
-    expect(containerProps().backgroundColor).toBeUndefined();
-    expect(containerProps().opacity).toBeUndefined();
+    expect(isUnderlayShown()).toBe(false);
   });
 
   // why: RN's _hasPressHandler gates the whole underlay — a decorative TouchableHighlight with no
@@ -498,12 +514,12 @@ describe('React TouchableHighlight underlay feedback', () => {
     const handle = responderHandle();
 
     fabric.fireEvent(handle, TOUCH_START);
-    expect(containerProps().backgroundColor).toBeUndefined();
+    expect(isUnderlayShown()).toBe(false);
     expect(childProps().opacity).toBeUndefined();
 
     fabric.fireEvent(handle, TOUCH_END);
     await new Promise(resolve => setTimeout(resolve, 20));
-    expect(containerProps().backgroundColor).toBeUndefined();
+    expect(isUnderlayShown()).toBe(false);
   });
 
   // why: RN exposes the underlay transitions as props so a caller can drive sibling visuals off

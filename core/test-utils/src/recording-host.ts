@@ -28,6 +28,7 @@ import {
   OP_SET_COMPONENT,
   OP_SET_OWNED_LISTENER,
   OP_SET_TAG,
+  OP_SET_UNDERLAY_SHOWN,
   OP_SET_PROP,
   OP_SET_TEXT,
   OP_STRIDE,
@@ -55,6 +56,7 @@ type IRecorded = {
   viewName: string;
   tagName: string;
   ownedListeners: Record<string, boolean>;
+  underlayShown: boolean;
   props: Record<string, unknown>;
   parent: IRecorded | undefined;
   children: IRecorded[];
@@ -165,6 +167,8 @@ export type IAuthoredNode = {
    * `tagName` is: so a test can ask what the host was TOLD, separately from what a rule made of it.
    */
   ownedListeners: Record<string, boolean>;
+  /** Whether a behavior's feedback is showing — see `OP_SET_UNDERLAY_SHOWN`. */
+  underlayShown: boolean;
   props: Readonly<Record<string, unknown>>;
 };
 
@@ -292,6 +296,7 @@ export function createRecordingHost(): IRecordingHost {
           viewName,
           tagName: '',
           ownedListeners: {},
+          underlayShown: false,
           props,
           parent: undefined,
           children: [],
@@ -374,6 +379,14 @@ export function createRecordingHost(): IRecordingHost {
           // this records is the fact a test can ASK about.
           case OP_SET_OWNED_LISTENER:
             at(a).ownedListeners[strings[b]] = c !== 0;
+            break;
+          // Same treatment, and for the same reason: the real host paints TouchableHighlight's
+          // underlay from this bit (`foldTouchableHighlightUnderlay`), and this one must not grow a
+          // copy of that rule. Recorded so a test can ask whether the MACHINE flipped it — which is
+          // the half that is still JS — while what the flip LOOKS like is asserted on a committed
+          // payload in `core/engine/cpp/tests/js/touchable-highlight-underlay.itest.ts`.
+          case OP_SET_UNDERLAY_SHOWN:
+            at(a).underlayShown = b !== 0;
             break;
           case OP_COMMIT: {
             host.commits += 1;
