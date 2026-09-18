@@ -33,7 +33,6 @@ import { descriptorFor } from '@symbiote-native/components';
 // A bare intrinsic tag has no wrapper to apply RN's per-primitive prop folds (id -> nativeID,
 // Text's ellipsizeMode / allowFontScaling defaults), so the renderer is the layer that must.
 // Shared with every other adapter, driven by the same HOST_PRIMITIVES spec.
-import { foldHostBag } from '@symbiote-native/components/fold-host-bag';
 // WHICH native view a primitive commits can depend on a prop (TextInput's `multiline`), and that
 // prop can be a runtime value — so the choice is made here, where it is known. Identity for every
 // primitive that declares no alternative.
@@ -170,7 +169,7 @@ const reconciler = createReconciler<
     // solid `renderer.ts`, angular `renderer/index.ts`), and React is the one that did not.
     //
     const node = createElement(descriptor.component, descriptor.isText, tag);
-    applyProps(node, foldHostBag(type, props));
+    applyProps(node, props);
     return node;
   },
   createTextInstance(text, _container, hostContext) {
@@ -206,9 +205,7 @@ const reconciler = createReconciler<
       node,
       descriptorFor(resolveIntrinsicTag(type, newProps)).component,
     );
-    // BOTH sides folded, or the diff compares a raw `id` against a folded `nativeID` and writes
-    // the alias twice while never clearing the raw key.
-    applyUpdate(node, foldHostBag(type, oldProps), foldHostBag(type, newProps));
+    applyUpdate(node, oldProps, newProps);
   },
   commitTextUpdate(node, _oldText, newText) {
     setText(node, newText);

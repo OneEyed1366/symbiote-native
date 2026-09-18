@@ -35,7 +35,6 @@ import {
   COMPONENT_DESCRIPTORS,
   descriptorFor,
 } from '@symbiote-native/components';
-import { foldHostBag } from '@symbiote-native/components/fold-host-bag';
 import type { Renderer2, RendererFactory2, RendererType2 } from '@angular/core';
 import { isAnchorHostComponent } from '../anchor-host-registry';
 import {
@@ -60,40 +59,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-// RN's Text.js applies two defaults on the way to native (core/components/host-primitives.cjs's
-// `Text.defaults`; the authority on what they MEAN is core/components/src/text-props.ts's
-// resolveTextProps, which the composed `Text` @Component already calls). That component's own
-// host paints directly (Text is not anchor-hosted — see the top-level "View/Text's own component
-// doesn't have this split" reasoning elsewhere in this file), so createElement runs for its INNER
-// text node too; seeding here therefore covers both the composed Text and a bare `text` tag,
-// uniformly. Found missing 2026-08-31 (a cross-adapter key-count diff against Vue's real
-// BenchmarkRow.vue) — without this a `text`'s
-// `numberOfLines` clips with no ellipsis, silently, on device only. Vue's renderer already does
-// this (`adapters/vue/src/renderer/index.ts`'s `seedTextDefaults`); Angular's simply never did.
+// RN's TWO TEXT DEFAULTS LEFT THIS RENDERER ENTIRELY ON 2026-09-18, in two steps a fortnight apart.
+// The SEED went first, to the payload builder — writing them as props cost a crossing every time an
+// app authored the same value (6 000 per 1 000-row create, `writesOfUnchanged`). What stayed was a
+// resolver for the clear-back path: a write of `undefined` looked up the default instead of clearing.
 //
-// Sourced from `foldHostBag` (`@symbiote-native/components/fold-host-bag`, driven by
-// `HOST_PRIMITIVES.Text.defaults`) rather than a second hardcoded copy — React and Svelte call the
-// same function directly; this used to be a THIRD, independent restatement of the same two
-// defaults, with nothing to catch it drifting from the spec if a default's value ever changed.
-// `foldHostBag('text', {})` on an EMPTY bag folds every default with no authored value to
-// override it (the alias loop has nothing to fold — `id` is only rewritten when present), which is
-// exactly the seed this function needs.
-// THE SEED IS GONE — the defaults come from the payload builder now (`applyTextDefaults` in
-// `core/engine/src/fabric-props.ts` and its twin in `SymbioteFabricProps.cpp`). Writing them as props
-// cost a crossing every time the app authored the same value: 6 000 per 1 000-row create, measured
-// with `writesOfUnchanged`. The clear-back-to-undefined path below stays — it is off the create path
-// and costs nothing on the common one.
-
-// An explicit `undefined` must NOT clear one of those defaults — RN treats a missing prop and an
-// explicit undefined alike, and only a literal `false` opts allowFontScaling out. Reached only
-// when a later write clears a key back to undefined, so it costs nothing on the common path.
-// `foldHostBag` folds every Text default when called this way (not just `key`), because its
-// contract is "fold a whole bag" — the extra key computed alongside `key` is simply unread here.
-function textDefaultFor(el: IHostElement, key: string): unknown {
-  if (isSurface(el) || !isTextContainer(el)) return undefined;
-  return foldHostBag('text', { [key]: undefined })[key];
-}
-
+// That is gone too, and for the reason the seed was: `applyTextDefaults` (and its C++ twin) runs on
+// EVERY commit of every `RCTText`, so a cleared key is absent for exactly as long as it takes the
+// payload builder to supply the default again. The resolver was answering a question nothing asks.
+//
 // `PROP_ALIASES` (`id` -> `nativeID`) left this renderer on 2026-09-18 — `routeProp` resolves it
 // for every adapter now, so every path that can set a prop still reaches it.
 // Angular's two-way sugar `[(value)]` compiles to a `(valueChange)` binding; the engine knows the
@@ -406,7 +380,7 @@ export class SymbioteRenderer implements Renderer2 {
     if (isSurface(el)) return;
     countAngular('rendererWrites');
     noteAngularWrite(name);
-    routeProp(el, name, textDefaultFor(el, name));
+    routeProp(el, name, undefined);
     this.surface.requestCommit();
   }
 
@@ -473,7 +447,7 @@ export class SymbioteRenderer implements Renderer2 {
     if (isSurface(el)) return;
     countAngular('rendererWrites');
     noteAngularWrite(name);
-    routeProp(el, name, value === undefined ? textDefaultFor(el, name) : value);
+    routeProp(el, name, value);
     this.surface.requestCommit();
   }
 

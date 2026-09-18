@@ -35,9 +35,8 @@
 // (vitest does not typecheck). The reverse is worse and silent: a field in the `.d.cts` and not
 // here typechecks everywhere and arrives `undefined` in all five transforms. Change both, together.
 /**
- * @typedef {{ op: 'nullish', value: unknown } | { op: 'notFalse' }} IFoldOp
  * @typedef {{ prop: string, intrinsic: string }} IIntrinsicWhen
- * @typedef {{ intrinsic: string, defaults: Record<string, IFoldOp>, intrinsicWhen?: IIntrinsicWhen }} IHostPrimitive
+ * @typedef {{ intrinsic: string, intrinsicWhen?: IIntrinsicWhen }} IHostPrimitive
  */
 
 // `aliases` LEFT THIS SPEC ON 2026-09-18, and what it held was one pair — `id` -> `nativeID` —
@@ -49,7 +48,6 @@
 const HOST_PRIMITIVES = {
   View: {
     intrinsic: 'view',
-    defaults: {},
   },
   // The five-way switch, thrown 2026-08-23 once all three transforms carried the refusals
   // (`observesState` below). `pressable` resolves to the SAME `RCTView` a plain view does
@@ -60,7 +58,6 @@ const HOST_PRIMITIVES = {
   // at event time.
   Pressable: {
     intrinsic: 'pressable',
-    defaults: {},
     // Turns on `stateInTemplate` and `renderPropChild`. Without them a render-prop button becomes
     // a tag with no machine — the whole reason this entry landed last.
     observesState: true,
@@ -76,11 +73,9 @@ const HOST_PRIMITIVES = {
   // instead of `_createElementBlock`.
   TouchableOpacity: {
     intrinsic: 'touchable-opacity',
-    defaults: {},
   },
   TouchableHighlight: {
     intrinsic: 'touchable-highlight',
-    defaults: {},
   },
   // The second primitive whose TAG depends on a prop, and the first where the prop is one RN's own
   // API takes (`<ScrollView horizontal>`): the axis is a SEPARATE native ViewManager, not a flag on
@@ -89,7 +84,6 @@ const HOST_PRIMITIVES = {
   // Vue's element set — a tag apps write directly and which would otherwise resolve as a component.
   ScrollView: {
     intrinsic: 'scroll-view',
-    defaults: {},
     intrinsicWhen: {
       prop: 'horizontal',
       intrinsic: 'horizontal-scroll-view',
@@ -104,7 +98,6 @@ const HOST_PRIMITIVES = {
   // only path an app has, so the machine has exactly one owner per node.
   TextInput: {
     intrinsic: 'text-input',
-    defaults: {},
     // `multiline` picks between two SEPARATE native views, not one view with a flag, so the tag is
     // decided at compile time and a runtime selector must refuse — a wrong view here is
     // uncorrectable by any later prop write.
@@ -133,7 +126,6 @@ const HOST_PRIMITIVES = {
   // forced that flag.
   Switch: {
     intrinsic: 'switch',
-    defaults: {},
   },
   // Filed as NOT LOWERABLE for a week under `.claude/rules/host-primitive-tier.md`'s "SECOND
   // disqualifier" — its own node is a single element, but its POSITION is decided by the ScrollView
@@ -157,25 +149,18 @@ const HOST_PRIMITIVES = {
     intrinsic: 'refresh-control',
     // None. RN seeds nothing: `refreshing` is required, and every other prop is per-platform
     // styling the native view defaults itself.
-    defaults: {},
   },
+  // `defaults` LEFT THIS SPEC ON 2026-09-18, and Text was the last entry that had any — RN's
+  // `ellipsizeMode ?? 'tail'` and `allowFontScaling !== false` (`Text.js:289,291`). The other
+  // eighteen entries had declared `{}` for months.
+  //
+  // It was the THIRD copy of that one rule. `applyTextDefaults` (`core/engine/src/fabric-props.ts`)
+  // and its C++ twin apply both to every node committing as `RCTText`, whoever authored it and
+  // whatever tag it carries — strictly WIDER than this table, which reached only a registered
+  // primitive. Proven redundant rather than argued: emptying it turned ZERO itests red, and the
+  // itests are the side that reads a real committed payload.
   Text: {
     intrinsic: 'text',
-    // RN's Text.js applies both unconditionally on the non-virtual path. Each key below cites
-    // the upstream line verbatim, because THIS DATA is now the thing that must not drift from RN.
-    // The
-    // authority on what they MEAN is `src/text-props.ts`'s resolveTextProps, which every wrapper
-    // path already calls; this is the same fold expressed as data so a COMPILE-time transform can
-    // emit it too. `notFalse`, never `nullish` — RN treats an explicit `undefined` like a missing
-    // prop and only a literal `false` opts out. Emit both keys unconditionally: a fold whose two
-    // branches emit different key sets is the hazard `.claude/rules/solid-descriptor-bridge.md` §1
-    // exists for.
-    defaults: {
-      // Text.js:291  processedProps.ellipsizeMode = ellipsizeMode ?? 'tail';
-      ellipsizeMode: { op: 'nullish', value: 'tail' },
-      // Text.js:289  processedProps.allowFontScaling = allowFontScaling !== false;
-      allowFontScaling: { op: 'notFalse' },
-    },
   },
   // FOLD-ONLY: the behavior registered for this tag carries a prop fold and nothing else — no
   // listeners, no commit hook, no per-node runtime (`core/components/src/behaviors/image.ts`).
@@ -194,14 +179,12 @@ const HOST_PRIMITIVES = {
     intrinsic: 'image-background',
     // None. The absolute-fill style, the box-dimension proxy and the Image mapping are all derived
     // from live props at commit, which a compile-time seed cannot express.
-    defaults: {},
   },
   Image: {
     intrinsic: 'image',
     // None. Every default RN's Image applies is already inside the shared mapping (the source
     // array shape, the width/height style fold, `alt` -> accessibilityLabel), which the behavior
     // runs at commit — so there is nothing left for a compile-time seed to do.
-    defaults: {},
   },
   // The ONLY primitive so far whose intrinsic resolves to a different Fabric component per
   // platform — `RCTInputAccessoryView` on iOS, a plain `RCTView` on Android. The fold is
@@ -212,7 +195,6 @@ const HOST_PRIMITIVES = {
     intrinsic: 'input-accessory-view',
     // None. The mapping has no aliasing and no derived value — every consumed name leaves under the
     // same name — so there is nothing for a compile-time seed to do.
-    defaults: {},
   },
   // The emptiest entry here, and deliberately so — the withholding protocol has nothing to protect
   // for this one. Every other primitive was held back until its runtime half existed and was proven
@@ -229,7 +211,6 @@ const HOST_PRIMITIVES = {
   // disqualifier in `.claude/rules/host-primitive-tier.md`.
   SafeAreaView: {
     intrinsic: 'safe-area-view',
-    defaults: {},
   },
   // The one primitive that commits NO NODE: its intrinsic resolves to the engine's anchor, and the
   // behavior (`src/behaviors/touchable-native-feedback.ts`) clones the owner's props onto the single
@@ -242,7 +223,6 @@ const HOST_PRIMITIVES = {
   // listener, which is a fold and not a default.
   TouchableNativeFeedback: {
     intrinsic: 'touchable-native-feedback',
-    defaults: {},
   },
   // The SECOND primitive that commits no node, same anchor shape and same reason
   // (TouchableWithoutFeedback.js:229,286). Its clone list is not TNF's: the passthrough half is
@@ -257,7 +237,6 @@ const HOST_PRIMITIVES = {
   // default.
   TouchableWithoutFeedback: {
     intrinsic: 'touchable-without-feedback',
-    defaults: {},
   },
   // RN's Button is a touchable wrapping a View wrapping a Text and takes NO children — `title` is a
   // string prop (Button.js:363-388) — so the behavior owns the whole subtree and the tag is the
@@ -279,7 +258,6 @@ const HOST_PRIMITIVES = {
   // default.
   Button: {
     intrinsic: 'button',
-    defaults: {},
   },
   // RN wraps the native spinner in a centering `<View>` (ActivityIndicator.js:112), so this tag is
   // that View and the behavior builds `activity-indicator-spinner` under it. Entered in the same
@@ -295,7 +273,6 @@ const HOST_PRIMITIVES = {
   // live in the behavior's spinner fold instead, which is the only layer that can see that node.
   ActivityIndicator: {
     intrinsic: 'activity-indicator',
-    defaults: {},
   },
 };
 module.exports = { HOST_PRIMITIVES };
