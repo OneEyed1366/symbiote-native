@@ -218,15 +218,16 @@ export interface IHostBehavior {
   // hand from `attach` — `animated/event.ts` does — but it then owes its own cancel in `detach`, and
   // forgetting that leaks a waiter pointed at a dead node. This exists to remove that footgun.
   attachAfterCommit?(node: ISymbioteNode): void;
-  // Runs when a `wrap` claim puts a node above the owner, and again with `undefined` when it
-  // leaves. Only the WRAP mode notifies: `beside` changes nothing a behavior has to answer for,
-  // while a wrap moves where the owner's own style belongs.
+  // `onWrapChange` WAS HERE UNTIL 2026-09-18, and what replaced it is worth naming rather than
+  // leaving a dead hook to misdirect the next reader. It fired when a `wrap` claim put a node above
+  // an owner, so a behavior could install a `payloadFold` on a wrapper it had not built — and its
+  // own doc gave the reason: "neither node can work that out alone." That was true of a per-node
+  // JS fold and false of the engine. ScrollView's Android split is `foldScrollViewProps` /
+  // `foldRefreshWrapperProps` now, reached off the two tags, with the wrapper reading the child it
+  // wraps through `IFirstChild` — so both nodes work it out from the tree and nothing needs to be
+  // told when the shape changes. Its only implementor went with it; re-add it when something needs
+  // a wrap EVENT rather than a wrap-derived payload.
   //
-  // The wrapper is the APP's node, so the behavior cannot have given it a `payloadFold` at
-  // creation the way it does for a node its own `buildStructure` built. This is where it can —
-  // RN puts the layout half of the scroll view's style on the refresh layout and the visual half
-  // on the scroll view, and neither node can work that out alone.
-  onWrapChange?(owner: ISymbioteNode, wrapper: ISymbioteNode | undefined): void;
   // Runs when the app WIRES or UNWIRES one of `ownedListeners`, never on a re-render that hands the
   // same name a fresh closure. `wired` is the new state.
   //
@@ -439,15 +440,6 @@ export function notifyChildInserted(
   child: ISymbioteNode,
 ): void {
   attached.get(node)?.onChildInserted?.(node, child);
-}
-
-// Called from the two structural entry points when a wrap claim lands or leaves. See
-// `onWrapChange`.
-export function notifyWrapChange(
-  owner: ISymbioteNode,
-  wrapper: ISymbioteNode | undefined,
-): void {
-  attached.get(owner)?.onWrapChange?.(owner, wrapper);
 }
 
 // What this owner does with a child of that Fabric component, or undefined when it does not claim

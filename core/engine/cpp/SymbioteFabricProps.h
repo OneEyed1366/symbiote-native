@@ -129,6 +129,36 @@ struct IOwner {
   bool hasPressListener = false;
 };
 
+/**
+ * The FIRST CHILD, as the two facts a rule can ask about it — the only seam here that reads DOWN.
+ *
+ * `IOwner`, `IAncestorLookup` and `ownerProps` all read UP, and three iterations of this migration
+ * recorded ScrollView's Android RefreshControl wrap as unportable because it is the one rule that
+ * needs the other direction: `AndroidSwipeRefreshLayout` WRAPS the scroll view, and the app's style
+ * is split across the two boxes with the wrapper taking the LAYOUT half of a style written on the
+ * node BELOW it (`ScrollView.js:1854-1863`).
+ *
+ * IT IS NOT A NEW KIND OF CLAIM, which is what makes it affordable. `ownerProps`' own argument was
+ * that the tree lives in C++, so reading another node costs a pointer hop rather than a closure and
+ * a crossing — and that argument never mentioned a direction. Upstream builds the parent FROM the
+ * child here (`cloneElement(refreshControl, {style: outer}, scrollView)`), so "derived from what it
+ * contains" is RN's shape rather than one invented for this seam; a UA has the same (`:has()`, and
+ * a table frame that has always followed its cells).
+ *
+ * THE DIRTY PATH IS THE HALF THAT IS NOT FREE, and it already existed. A rule runs when ITS node is
+ * dirty, so a wrapper reading its child re-derives only if a write to that child marks the wrapper —
+ * which `routeProp` does for `node.wrapper` under `slotDerived`. Without it the wrapper freezes at
+ * its mount frame while the scroller visibly restyles inside it.
+ *
+ * FIRST child rather than a list, deliberately: the only shape that needs this is a wrapper, and a
+ * wrapper has exactly one. A rule that wanted to survey N children would be reading the tree rather
+ * than deriving from it, which is the line this seam should not cross.
+ */
+struct IFirstChild {
+  const folly::dynamic *props = nullptr;
+  const char *tagName = nullptr;
+};
+
 folly::dynamic fabricProps(
     const std::string &component,
     const std::string &tagName,
@@ -136,6 +166,7 @@ folly::dynamic fabricProps(
     const IPayloadFold &fold = {},
     const IOwner &owner = {},
     bool hasPressListener = false,
-    const IAncestorLookup &ancestors = {});
+    const IAncestorLookup &ancestors = {},
+    const IFirstChild &firstChild = {});
 
 } // namespace symbiote

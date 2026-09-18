@@ -130,80 +130,25 @@ describe('the RefreshControl becomes the scroll view s parent', () => {
   });
 });
 
-describe('the style splits across the two boxes', () => {
-  function boxes(props: Readonly<Record<string, unknown>>): {
-    wrapper: ILiveNode;
-    scroll: ILiveNode;
-  } {
-    const { node, root, refresh, commit } = mount(props);
-    appendChild(node, refresh);
-    appendChild(node, createElement('RCTImageView'));
-    appendChild(root, node);
-    const wrapper = commit();
-    const scroll = wrapper.children[0];
-    if (scroll === undefined)
-      throw new Error('the scroll view never committed');
-    return { wrapper, scroll };
-  }
-
-  it('sends layout to the wrapper and visual to the scroller, base under both', () => {
-    const { wrapper, scroll } = boxes({
-      style: { height: 200, margin: 4, backgroundColor: '#123', padding: 8 },
-    });
-
-    expect(wrapper.payload.height).toBe(200);
-    expect(wrapper.payload.margin).toBe(4);
-    expect('backgroundColor' in wrapper.payload).toBe(false);
-
-    expect(scroll.payload.backgroundColor).toBe('#123');
-    expect(scroll.payload.padding).toBe(8);
-    expect('height' in scroll.payload).toBe(false);
-
-    // RN composes the axis base onto BOTH (`ScrollView.js:1856`), so the wrapper grows too.
-    expect(wrapper.payload.flexGrow).toBe(1);
-    expect(scroll.payload.flexGrow).toBe(1);
-    expect(scroll.payload.overflow).toBe('scroll');
-  });
-
-  // `nestedScrollEnabled` and `decelerationRate` LEFT THIS FILE on 2026-09-18, and the reason they
-  // can leave is the interesting half: both used to be restated in the WRAPPED copy of the owner's
-  // fold, because the wrap swapped that fold out and anything the ordinary one did had to be
-  // repeated. `decelerationRate` once was NOT repeated, and reached Fabric as the string 'fast' on
-  // every Android ScrollView carrying a RefreshControl.
-  //
-  // That whole class of bug is now unrepresentable: the rule is `foldScrollViewProps` in the engine,
-  // it runs off the TAG, and the wrap cannot swap it out — what the wrap swaps is a JS fold that now
-  // does nothing but split the style. Asserted against the committed payload in
-  // `core/engine/cpp/tests/js/scroll-view-payload.itest.ts`; this host carries no copy of the rule.
-
-  // `markPropsDirty` bubbles UP, so a style written on the owner reaches every ancestor and never
-  // the wrapper. `slotDerived` naming `style` is what makes the wrapper rebuild.
-  it('re-splits when the owner style changes after the first commit', () => {
-    const { node, root, refresh, commit } = mount({ style: { height: 200 } });
-    appendChild(node, refresh);
-    appendChild(node, createElement('RCTImageView'));
-    appendChild(root, node);
-    expect(commit().payload.height).toBe(200);
-
-    routeProp(node, 'style', { height: 320 });
-    expect(commit().payload.height).toBe(320);
-  });
-
-  // Unwrapping drops the owner's fold to `undefined` now rather than restoring a plain one, and the
-  // style is the whole question that remains: the split must stop, so the owner's own authored style
-  // reaches it whole again. `decelerationRate` used to be asserted here too — it was what the fold
-  // silently took with it on unwrap — and it is the engine's rule now, which runs off the tag
-  // whatever this field holds. That is why the fold can be dropped at all.
-  it('stops splitting the style when the wrap goes away', () => {
-    const { node, root, refresh, commit } = mount({
-      style: { height: 200 },
-    });
-    appendChild(node, refresh);
-    appendChild(node, createElement('RCTImageView'));
-    appendChild(root, node);
-    commit();
-
-    removeChild(node, refresh);
-    expect(commit().payload.height).toBe(200);
-  });
-});
+// THE WHOLE STYLE-SPLIT DESCRIBE LEFT THIS FILE ON 2026-09-18, three cases, as a GROUP — and the
+// group is the point rather than the count. The split is `splitScrollViewStyle` /
+// `foldRefreshWrapperProps` in `SymbioteFabricProps.cpp` now, and this host builds its payloads
+// through the TypeScript `fabricProps`, which deliberately carries no copy of the tag rules. Two of
+// the three went red on the move, which is honest. The third — "stops splitting the style when the
+// wrap goes away" — went on PASSING, and for the wrong reason: with no rule in this host there is no
+// split to stop, so an unwrapped owner carries its whole style whatever the engine does. A case whose
+// subject is a fold cannot stay behind beside the twins that failed; it would be green forever and
+// mean nothing. Same shape ActivityIndicator's "OMITS colour entirely" case had.
+//
+// Their new home is `core/engine/cpp/tests/js/scroll-view-wrap-payload.itest.ts`, against the payload
+// a commit actually sent, with a `foldsFound === 0` assertion beside them that this host could never
+// have made. `nestedScrollEnabled` and `decelerationRate` had already gone the same way, and their
+// note is worth keeping: both used to be restated in the WRAPPED copy of the owner's fold, because
+// the wrap swapped that fold out and anything the ordinary one did had to be repeated —
+// `decelerationRate` once was NOT repeated, and reached Fabric as the string 'fast' on every Android
+// ScrollView carrying a RefreshControl. A rule that runs off the TAG cannot be swapped out, so that
+// class of bug is unrepresentable now.
+//
+// What stays HERE is what this host is authoritative for and the itest is not: the TOPOLOGY. Who
+// ends up whose parent, that the owner keeps its identity across a wrap, that removing the
+// RefreshControl puts it back. That is `ISymbioteNode.wrapper`'s contract and it is JS's.

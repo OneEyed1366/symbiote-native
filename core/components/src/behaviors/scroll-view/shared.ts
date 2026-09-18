@@ -84,8 +84,6 @@ import type { ISymbioteIntrinsic } from '../../component-names/shared';
 import {
   didContentSizeChange,
   readLayoutDimension,
-  SCROLL_VIEW_BASE_HORIZONTAL,
-  SCROLL_VIEW_BASE_VERTICAL,
   type IContentSize,
 } from '../../view/render-scroll-view';
 import {
@@ -255,20 +253,19 @@ function syncOwnedListener(
   else if (name === 'layout') syncOwnerLayout(owner);
 }
 
-// The platform half. iOS takes the RefreshControl `beside` the content view and needs nothing
-// else; Android takes it as a `wrap` and has to move the scroll view's layout style up to it,
-// which is what `onWrapChange` is for.
+// The platform half, and as of 2026-09-18 it is a CLAIM MODE and a dirty list — nothing else. iOS
+// takes the RefreshControl `beside` the content view; Android takes it as a `wrap`, and the style
+// split that inversion needs is `foldScrollViewProps`/`foldRefreshWrapperProps` in the engine now.
 //
-// The hook is a FACTORY over the axis rather than the hook itself, because the two behaviors
-// registered below carry different bases (vertical and horizontal) and each needs its own.
+// This interface carried an `onWrapChange` factory over the axis until then, purely to hand each
+// behavior's base style to the two folds it installed. Both folds are gone, so the factory had no
+// implementor and `scrollBehavior` no longer needs a `base` at all.
 export interface IScrollPlatform {
   claimMode: IClaimMode;
-  onWrapChange?: (
-    base: IViewStyle,
-    horizontal: boolean,
-  ) => IHostBehavior['onWrapChange'];
   // Owner props this platform's WRAPPER fold reads, added to the slot's own. Android's needs
-  // `style`, because the layout half of the scroll view's style is what the wrapper paints.
+  // `style`, because the layout half of the scroll view's style is what the wrapper paints — and it
+  // is load-bearing for the ENGINE's rule now rather than for a JS fold: `foldRefreshWrapperProps`
+  // derives from a node that is not its own, so it re-reads only on a commit that marks it.
   //
   // It dirties the content node as well as the wrapper — the engine marks both from one list — so a
   // ScrollView style write on Android re-clones a content node whose payload did not change. A
@@ -278,7 +275,6 @@ export interface IScrollPlatform {
 
 function scrollBehavior(
   contentIntrinsic: ISymbioteIntrinsic,
-  base: IViewStyle,
   rowStyle: IViewStyle | undefined,
   platform: IScrollPlatform,
 ): IHostBehavior {
@@ -295,7 +291,6 @@ function scrollBehavior(
     slotProps: SLOT_PROPS,
     slotDerived: [...SLOT_DERIVED, ...(platform.slotDerived ?? [])],
     claimedChildren: { [REFRESH_CONTROL]: platform.claimMode },
-    onWrapChange: platform.onWrapChange?.(base, horizontal),
     buildStructure: buildContent(contentIntrinsic),
     // The scroll dispatcher is installed here and never conditionally: it is what drives the
     // sticky AnimatedValue, and a header can register long after this node was created. It costs a
@@ -325,18 +320,12 @@ function scrollBehavior(
 export function registerScrollViewBehaviors(platform: IScrollPlatform): void {
   registerHostBehavior(
     SCROLL_VIEW_TAG,
-    scrollBehavior(
-      'scroll-content',
-      SCROLL_VIEW_BASE_VERTICAL,
-      undefined,
-      platform,
-    ),
+    scrollBehavior('scroll-content', undefined, platform),
   );
   registerHostBehavior(
     HORIZONTAL_SCROLL_VIEW_TAG,
     scrollBehavior(
       'horizontal-scroll-content',
-      SCROLL_VIEW_BASE_HORIZONTAL,
       { flexDirection: 'row' },
       platform,
     ),

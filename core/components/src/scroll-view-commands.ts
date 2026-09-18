@@ -32,83 +32,17 @@ export interface IScrollViewHandle {
   getScrollNode(): ISymbioteNode | null;
 }
 
-// RN's splitLayoutProps key partition (StyleSheet/splitLayoutProps.js): the LAYOUT keys
-// that belong on the OUTER box when a layout-affecting wrapper sits between the laid-out
-// frame and the visual content. Everything NOT in this set (background*, padding*, border*,
-// opacity, overflow, …) is VISUAL and stays on the inner view. Replicated exactly from RN's
-// switch cases so the Android RefreshControl wrap routes style the way RN does.
-const LAYOUT_KEYS: ReadonlySet<string> = new Set([
-  'margin',
-  'marginHorizontal',
-  'marginVertical',
-  'marginBottom',
-  'marginTop',
-  'marginLeft',
-  'marginRight',
-  'flex',
-  'flexGrow',
-  'flexShrink',
-  'flexBasis',
-  'alignSelf',
-  'height',
-  'minHeight',
-  'maxHeight',
-  'width',
-  'minWidth',
-  'maxWidth',
-  'position',
-  'left',
-  'right',
-  'bottom',
-  'top',
-  'transform',
-  'transformOrigin',
-  'rowGap',
-  'columnGap',
-  'gap',
-]);
-
-// Split a flattened style into the LAYOUT props that drive the outer wrapper's frame and the
-// VISUAL props that paint the inner content, RN's splitLayoutProps. The Android build uses
-// this when a RefreshControl wraps the scroll view: layout (margin/flex/size/position/…) goes
-// on the AndroidSwipeRefreshLayout wrapper, visual (background/padding/border/…) stays on the
-// inner scroll view, instead of dumping the whole style on the wrapper and hardcoding flex:1.
-export function splitLayoutProps(style: IStyleProp<IViewStyle> | undefined): {
-  outer: Record<string, unknown>;
-  inner: Record<string, unknown>;
-} {
-  const outer: Record<string, unknown> = {};
-  const inner: Record<string, unknown> = {};
-  // Reads keys off the style, so flatten the StyleProp (array/nested) to one object first.
-  const flat = flattenStyle(style);
-  for (const key of Object.keys(flat)) {
-    const value = Reflect.get(flat, key);
-    if (LAYOUT_KEYS.has(key)) outer[key] = value;
-    else inner[key] = value;
-  }
-  return { outer, inner };
-}
-
-// The whole Android wrap style decision: the layout/visual split, AND the axis base composed onto
-// BOTH boxes. RN does the second half too (`StyleSheet.compose(baseStyle, outer)` beside
-// `compose(baseStyle, inner)`, ScrollView.js:1856), and every adapter had dropped it from the
-// wrapper — so an AndroidSwipeRefreshLayout with no explicit user layout style lost `flexGrow: 1`
-// and collapsed to its content height inside a flex parent, where RN's grows.
+// THE ANDROID WRAP SPLIT LEFT THIS FILE ON 2026-09-18, and with it the last copy of RN's
+// `splitLayoutProps` key partition. Both halves are `SymbioteFabricProps.cpp` now
+// (`splitScrollViewStyle`, `foldRefreshWrapperProps`), reached off the tag and the tree rather than
+// from a `payloadFold` per node — see `behaviors/scroll-view/index.android.ts` for what made the
+// wrapper's half possible at all.
 //
-// One function rather than five call sites composing `[base, outer]` by hand, because that is what
-// the last one drifted into.
-// `style` is `unknown` rather than `IStyleProp`, because a `payloadFold` reads it off an untyped
-// props bag and `flattenStyle` — the only thing that touches it here — already takes `unknown`.
-// Narrowing it would buy a guard at every fold call site and no safety.
-export function splitScrollViewStyle(
-  base: IStyleProp<IViewStyle> | undefined,
-  style: unknown,
-): { outer: IStyleProp<IViewStyle>; inner: IStyleProp<IViewStyle> } {
-  const { outer, inner } = splitLayoutProps(flattenStyle(style));
-  // Base UNDER the split half on both, so an explicit user value still wins — the same order the
-  // unwrapped scroll view composes.
-  return { outer: [base, outer], inner: [base, inner] };
-}
+// Nothing replaced them here on purpose: a JS copy kept for a caller that no longer exists is the
+// mirror shape this migration keeps deleting, and the twenty-eight layout keys are exactly the kind
+// of list that drifts in silence. `core/engine/cpp/tests/js/scroll-view-wrap-payload.itest.ts`
+// asserts the split on the payload a commit actually sent, which is the only place it can now be
+// wrong.
 
 // Re-exported so the package barrel (index.ts) can still export this guard to
 // '@symbiote-native/components' callers, now that it lives in the engine, next to ISymbioteEvent.

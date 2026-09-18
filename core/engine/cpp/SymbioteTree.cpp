@@ -983,6 +983,23 @@ IOwner ownerOf(const Node &node) {
       node.parent->hasPressListener};
 }
 
+/**
+ * The first child as `IFirstChild` — the mirror of `ownerOf`, and the only read here that goes DOWN.
+ *
+ * SKIPS HOLES RATHER THAN ASSUMING COMPACTION. `Node::children` may hold nulls between a detach and
+ * the next read (`compactChildren`), and both `fabricProps` call sites sit inside a walk that
+ * compacts — but relying on that would make a correct rule depend on the caller's order, which is
+ * the kind of coupling `compactChildren` was introduced to remove. One branch per entry, and the
+ * loop stops at the first live one.
+ */
+IFirstChild firstChildOf(const Node &node) {
+  for (const auto &child : node.children) {
+    if (child == nullptr) continue;
+    return IFirstChild{&child->props, child->tagName.c_str()};
+  }
+  return {};
+}
+
 const folly::dynamic *ancestorPropsOf(const void *context, const char *tag) {
   const auto *node = static_cast<const Node *>(context);
   if (node == nullptr || tag == nullptr) return nullptr;
@@ -1252,7 +1269,8 @@ std::shared_ptr<const react::ShadowNode> materialize(
         fold,
         ownerOf(node),
         node.hasPressListener,
-        IAncestorLookup{&ancestorPropsOf, &node});
+        IAncestorLookup{&ancestorPropsOf, &node},
+        firstChildOf(node));
     walkCost_.propsNs += nanosSince(startedAt);
     // The payload is needed TWICE and only one of those needs a copy. `RawProps` takes its
     // `folly::dynamic` BY VALUE (`RawProps.h:65`) and consumes it, so Fabric's half is a copy no
@@ -1305,7 +1323,8 @@ std::shared_ptr<const react::ShadowNode> materialize(
           fold,
           ownerOf(node),
           node.hasPressListener,
-          IAncestorLookup{&ancestorPropsOf, &node});
+          IAncestorLookup{&ancestorPropsOf, &node},
+          firstChildOf(node));
       walkCost_.propsNs += nanosSince(startedAt);
       startedAt = ISteadyClock::now();
       payload = diffProps(node.committedProps, next);

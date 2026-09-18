@@ -46,7 +46,6 @@ import {
   markDetachCandidate,
   notifyChildInserted,
   notifyOwnedListenerChange,
-  notifyWrapChange,
   noteCommitHookNodeChanged,
   ownsListener,
   reattachHostBehaviors,
@@ -1744,7 +1743,6 @@ function wrapsOwner(owner: ISymbioteNode, child: ISymbioteNode): boolean {
   if (holder !== undefined) recordInsertInto(holder, child, owner);
   owner.wrapper = child;
   recordAppendInto(child, owner);
-  notifyWrapChange(owner, child);
   return true;
 }
 
@@ -1762,7 +1760,6 @@ function unwrapsOwner(owner: ISymbioteNode, child: ISymbioteNode): boolean {
     recordInsertInto(holder, owner, child);
     recordRemoveChild(holder, child);
   }
-  notifyWrapChange(owner, undefined);
   return true;
 }
 

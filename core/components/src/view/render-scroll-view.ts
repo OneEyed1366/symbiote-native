@@ -37,42 +37,20 @@ export function readLayoutDimension(
 // because on iOS both scroll tags resolve to `RCTScrollView` and a component name cannot tell the
 // platforms apart. That puts the Android pair outside headless reach, which is recorded at the rule.
 
-// RN applies a base style to the scroll-view NODE itself, per axis (ScrollView.js
-// styles.baseHorizontal/baseVertical). Two parts carry weight:
-//   - `overflow: 'scroll'`: clips content to the scroll view's frame. On iOS Fabric the
-//     node only clips when this is set; without it a fixed-height ScrollView lets its
-//     content bleed out over siblings (Android's native ViewGroup clips regardless, which
-//     is why the bug showed only on iOS). RN sets it on BOTH axes, so we do too.
-//   - `flexDirection: 'row'` (horizontal only): makes the single content child a MAIN-axis
-//     item, so Yoga sizes it to its content width and the view overflows and scrolls.
-//     Without it the content is a CROSS-axis item, stretched to the viewport, nothing to
-//     scroll. Vertical keeps the default `column`.
-// Both axes match RN's baseHorizontal/baseVertical exactly. Composed UNDER the user style,
-// so an explicit value still wins.
-// THE SECOND COPY, and the first is `foldScrollViewProps` in `SymbioteFabricProps.cpp`. Both are
-// needed: the engine composes the base onto every ordinary scroll view, while Android's
-// RefreshControl path wraps the scroll view and splits the app's style across two boxes with the
-// base on BOTH (`ScrollView.js:1854-1863` — "the ScrollView still needs the baseStyle to be
-// scrollable"). That split reads the OWNER's style from the WRAPPER's fold, one node reading
-// another, which is composition and stays in JS — so these values have to exist here too.
+// THE PER-AXIS BASE STYLE LEFT THIS FILE ON 2026-09-18 and is `scrollViewBaseStyle` in
+// `SymbioteFabricProps.cpp` alone. RN applies it to the scroll-view NODE per axis
+// (`ScrollView.js` `styles.baseHorizontal`/`baseVertical`) and two parts carry weight:
+// `overflow: 'scroll'`, which is what makes an iOS Fabric node clip its content to its own frame at
+// all, and the horizontal `flexDirection: 'row'`, which makes the single content child a MAIN-axis
+// item so Yoga sizes it to its content width and there is something to scroll.
 //
-// A mirror that cannot be removed is made LOUD instead:
-// `core/engine/cpp/tests/js/scroll-view-base-parity.itest.ts` commits a scroll view of each axis and
-// compares the payload against these objects key by key. Edit one side alone and it goes red naming
-// the key; leave it out and the two paths diverge only on an Android device with a RefreshControl
-// attached, which is the narrowest possible place to find out.
-export const SCROLL_VIEW_BASE_HORIZONTAL: IViewStyle = {
-  flexGrow: 1,
-  flexShrink: 1,
-  flexDirection: 'row',
-  overflow: 'scroll',
-};
-export const SCROLL_VIEW_BASE_VERTICAL: IViewStyle = {
-  flexGrow: 1,
-  flexShrink: 1,
-  flexDirection: 'column',
-  overflow: 'scroll',
-};
+// It had a JS copy until then, held by `scroll-view-base-parity.itest.ts` because the Android
+// RefreshControl wrap's style split ran in JS and needed the value. The split moved with it, so the
+// copy had no reader left but the guard asserting it — the orphan shape this migration keeps
+// turning up — and both went together. `IScrollIntrinsics` lost its `scrollViewBaseStyle` field for
+// the same reason: `selectScrollIntrinsics`'s one remaining caller
+// (`adapters/solid/.../virtualized-list`) reads the intrinsic NAMES and the content style, and its
+// own comment already records that the base composition is the behavior's.
 
 // The per-axis selection: the outer scroll-view intrinsic and its content intrinsic (the name
 // table maps each to the right Fabric component per platform: on Android horizontal resolves
@@ -82,7 +60,6 @@ export const SCROLL_VIEW_BASE_VERTICAL: IViewStyle = {
 export type IScrollIntrinsics = {
   scrollViewIntrinsic: ISymbioteIntrinsic;
   contentIntrinsic: ISymbioteIntrinsic;
-  scrollViewBaseStyle: IViewStyle;
   contentStyle: IStyleProp<IViewStyle>;
 };
 
@@ -99,10 +76,6 @@ export function selectScrollIntrinsics(
   const contentIntrinsic: ISymbioteIntrinsic = isHorizontal
     ? 'horizontal-scroll-content'
     : 'scroll-content';
-  const scrollViewBaseStyle = isHorizontal
-    ? SCROLL_VIEW_BASE_HORIZONTAL
-    : SCROLL_VIEW_BASE_VERTICAL;
-
   const contentStyle: IStyleProp<IViewStyle> = isHorizontal
     ? [contentContainerStyle, { flexDirection: 'row' }]
     : contentContainerStyle;
@@ -110,7 +83,6 @@ export function selectScrollIntrinsics(
   return {
     scrollViewIntrinsic,
     contentIntrinsic,
-    scrollViewBaseStyle,
     contentStyle,
   };
 }

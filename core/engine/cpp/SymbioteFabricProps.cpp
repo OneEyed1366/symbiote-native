@@ -819,6 +819,132 @@ const std::array<const char *, 6> kTouchableFeedbackKeys = {
 };
 
 /**
+ * The per-axis base style every ScrollView box carries, and the ONE place it is spelled.
+ *
+ * IT HAD A SECOND COPY IN JS UNTIL 2026-09-18, held by `scroll-view-base-parity.itest.ts` because
+ * the Android wrap's split needed the value on the JS side. The split is here now, so the copy is
+ * gone and the parity test with it — a mirror that becomes unnecessary is deleted rather than
+ * guarded, which is the outcome that test existed to make possible.
+ */
+dynamic scrollViewBaseStyle(bool isHorizontal) {
+  dynamic base = dynamic::object();
+  base["flexGrow"] = 1;
+  base["flexShrink"] = 1;
+  base["flexDirection"] = isHorizontal ? "row" : "column";
+  base["overflow"] = "scroll";
+  return base;
+}
+
+/** `[base, authored]` — base UNDER, so an explicit user value wins. `addStyle` reads in order. */
+dynamic composeUnder(dynamic base, const dynamic *authored) {
+  dynamic composed = dynamic::array(std::move(base));
+  if (authored != nullptr) composed.push_back(*authored);
+  return composed;
+}
+
+/**
+ * RN's `splitLayoutProps` key partition (`StyleSheet/splitLayoutProps.js`): the keys that belong on
+ * the OUTER box when a layout-affecting wrapper sits between the laid-out frame and the visual
+ * content. Everything NOT here (background*, padding*, border*, opacity, overflow, …) is VISUAL and
+ * stays on the inner view.
+ *
+ * Replicated from upstream's switch cases. A key missing from this set does not fail loudly — it
+ * quietly stays on the inner box, where a margin has no effect — so diff it against upstream rather
+ * than reading it for plausibility, the same instruction `kRoleToAccessibilityRole` carries.
+ */
+const std::unordered_set<std::string> kScrollLayoutKeys = {
+    "margin",     "marginHorizontal", "marginVertical", "marginBottom",
+    "marginTop",  "marginLeft",       "marginRight",    "flex",
+    "flexGrow",   "flexShrink",       "flexBasis",      "alignSelf",
+    "height",     "minHeight",        "maxHeight",      "width",
+    "minWidth",   "maxWidth",         "position",       "left",
+    "right",      "bottom",           "top",            "transform",
+    "transformOrigin", "rowGap",      "columnGap",      "gap",
+};
+
+/** Flatten a (possibly nested) style slot to one object, RAW — no `processValue`. */
+void flattenStyleInto(dynamic &out, const dynamic &style) {
+  if (style.isArray()) {
+    for (const auto &entry : style) flattenStyleInto(out, entry);
+    return;
+  }
+  if (!style.isObject()) return;
+  for (const auto &pair : style.items()) {
+    if (!pair.first.isString()) continue;
+    out[pair.first.getString()] = pair.second;
+  }
+}
+
+struct IScrollStyleSplit {
+  dynamic outer;
+  dynamic inner;
+};
+
+/**
+ * The whole Android wrap style decision: the layout/visual split AND the axis base composed onto
+ * BOTH boxes (`ScrollView.js:1856`, `StyleSheet.compose(baseStyle, outer)` beside
+ * `compose(baseStyle, inner)`).
+ *
+ * The second half is the one every adapter had dropped from the wrapper before this became one
+ * function: an `AndroidSwipeRefreshLayout` with no explicit user layout style lost `flexGrow: 1` and
+ * collapsed to its content height inside a flex parent, where RN's grows.
+ *
+ * ONE FUNCTION SERVING TWO NODES is the reason the pair can be a rule at all — the scroller asks for
+ * `.inner` off its own bag and the wrapper asks for `.outer` off its child's, and neither can be
+ * right while the other is wrong.
+ */
+IScrollStyleSplit splitScrollViewStyle(bool isHorizontal, const dynamic *authored) {
+  dynamic flat = dynamic::object();
+  if (authored != nullptr) flattenStyleInto(flat, *authored);
+
+  dynamic outer = dynamic::object();
+  dynamic inner = dynamic::object();
+  for (const auto &pair : flat.items()) {
+    const std::string &key = pair.first.getString();
+    if (kScrollLayoutKeys.count(key) != 0) outer[key] = pair.second;
+    else inner[key] = pair.second;
+  }
+  return IScrollStyleSplit{
+      composeUnder(scrollViewBaseStyle(isHorizontal), &outer),
+      composeUnder(scrollViewBaseStyle(isHorizontal), &inner)};
+}
+
+/** Which tags are a scroll view, for the wrapper rule that has to ask about its child. */
+bool isScrollViewTag(const char *tagName) {
+  if (tagName == nullptr) return false;
+  return std::strcmp(tagName, "scroll-view") == 0 ||
+      std::strcmp(tagName, "horizontal-scroll-view") == 0;
+}
+
+/**
+ * The Android RefreshControl WRAPPER — the first rule in the engine that reads DOWNWARD.
+ *
+ * An Android ScrollView holds exactly one child, so a sibling refresh control is an `addViewAt`
+ * crash rather than a layout mistake. RN inverts the tree and splits the scroller's style across the
+ * two boxes; this node is the outer one and its frame is the LAYOUT half of a style the app wrote on
+ * the node BELOW it. That is the read `IOwner` cannot do and `IFirstChild` exists for.
+ *
+ * REPLACING the app's own `style` is parity rather than a liberty: RN reaches the same place through
+ * `cloneElement(refreshControl, {style: outer}, …)`, which likewise overrides whatever the refresh
+ * control was given.
+ *
+ * A REFRESH CONTROL THAT WRAPS NOTHING IS UNTOUCHED, and the guard is the child's TAG rather than
+ * its presence. On iOS the control is claimed BESIDE the content and an app may mount one alone;
+ * either way inventing a base style for an axis nobody chose would paint a `flexGrow` onto a
+ * standalone control.
+ */
+dynamic foldRefreshWrapperProps(const dynamic &props, const IFirstChild &child) {
+  if (!isScrollViewTag(child.tagName) || child.props == nullptr) return props;
+
+  dynamic out = props;
+  out["style"] = splitScrollViewStyle(
+                     std::strcmp(child.tagName, "horizontal-scroll-view") == 0,
+                     child.props->get_ptr("style"))
+                     .outer;
+  return out;
+}
+
+/**
  * ScrollView's owner, both axes (`ScrollView.js:1753-1761` and the wrapper body).
  *
  * THE TAG IS THE ONLY AXIS INPUT, which is what keeps the three halves of the axis from disagreeing:
@@ -843,24 +969,21 @@ const std::array<const char *, 6> kTouchableFeedbackKeys = {
  * not know throws nothing, logs nothing and paints nothing, so the strip is only ever visible in a
  * payload test.
  */
-dynamic foldScrollViewProps(const dynamic &props, bool isHorizontal) {
+dynamic foldScrollViewProps(const dynamic &props, bool isHorizontal, bool isWrapped) {
   dynamic out = props;
 
-  // THESE FOUR KEYS HAVE A SECOND COPY IN JS and it is not removable: Android's RefreshControl path
-  // wraps the scroll view and splits the app's style across two boxes, composing the base onto BOTH
-  // (`ScrollView.js:1854-1863`), and that split reads one node's style from another node's fold — so
-  // it is composition and stays in `behaviors/scroll-view/index.android.ts`, which needs the value.
-  // `core/engine/cpp/tests/js/scroll-view-base-parity.itest.ts` fails if the two copies drift.
-  dynamic base = dynamic::object();
-  base["flexGrow"] = 1;
-  base["flexShrink"] = 1;
-  base["flexDirection"] = isHorizontal ? "row" : "column";
-  base["overflow"] = "scroll";
-
-  dynamic composed = dynamic::array(std::move(base));
   const dynamic *authored = props.get_ptr("style");
-  if (authored != nullptr) composed.push_back(*authored);
-  out["style"] = std::move(composed);
+  // WRAPPED IS A DIFFERENT COMPOSITION, not an extra one: on Android a RefreshControl becomes this
+  // node's PARENT and takes the LAYOUT half of the app's style with it, so composing `[base,
+  // authored]` here would put every margin on both boxes. See `foldRefreshWrapperProps` for the
+  // other half and `IFirstChild` for why the pair can be one decision at all.
+  //
+  // TOPOLOGY DECIDES, NOT `#ifdef ANDROID`, and that is the same win `Switch`/`AndroidSwitch` gives:
+  // iOS claims the refresh control BESIDE the content, so a scroll view is never one's child there
+  // and this branch cannot fire whatever the host was compiled for.
+  out["style"] = isWrapped
+      ? splitScrollViewStyle(isHorizontal, authored).inner
+      : composeUnder(scrollViewBaseStyle(isHorizontal), authored);
 
   out["nestedScrollEnabled"] = boolAt(props, "nestedScrollEnabled").value_or(true);
 
@@ -1961,7 +2084,8 @@ dynamic fabricProps(
     const IPayloadFold &fold,
     const IOwner &owner,
     bool hasPressListener,
-    const IAncestorLookup &ancestors) {
+    const IAncestorLookup &ancestors,
+    const IFirstChild &firstChild) {
   if (component == kRawTextComponent) {
     dynamic out = dynamic::object();
     const dynamic *text = props.get_ptr("text");
@@ -2024,8 +2148,16 @@ dynamic fabricProps(
     tagResolved = foldButtonLabelStyle(*bag, ancestors);
     bag = &tagResolved;
   } else if (tagName == "scroll-view" || tagName == "horizontal-scroll-view") {
-    tagResolved =
-        foldScrollViewProps(*bag, tagName == "horizontal-scroll-view");
+    // The parent's TAG decides which composition this is — the descendant seam again, read from the
+    // other end. A scroll view whose parent is a refresh control is WRAPPED (Android's claim mode),
+    // and it keeps only the visual half of its own style.
+    tagResolved = foldScrollViewProps(
+        *bag,
+        tagName == "horizontal-scroll-view",
+        owner.tagName != nullptr && std::strcmp(owner.tagName, "refresh-control") == 0);
+    bag = &tagResolved;
+  } else if (tagName == "refresh-control") {
+    tagResolved = foldRefreshWrapperProps(*bag, firstChild);
     bag = &tagResolved;
   } else if (
       tagName == "scroll-content" || tagName == "horizontal-scroll-content") {

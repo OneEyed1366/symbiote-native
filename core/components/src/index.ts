@@ -72,8 +72,6 @@ export {
   readLayoutDimension,
   didContentSizeChange,
   resolveScrollForwarding,
-  SCROLL_VIEW_BASE_HORIZONTAL,
-  SCROLL_VIEW_BASE_VERTICAL,
 } from './view/render-scroll-view';
 export type {
   IScrollIntrinsics,
@@ -85,8 +83,6 @@ export type {
 
 export {
   buildScrollViewHandle,
-  splitLayoutProps,
-  splitScrollViewStyle,
   attachStickyScroll,
   isSymbioteEvent,
   forwardScrollEvent,
