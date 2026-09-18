@@ -125,6 +125,25 @@ the docs claimed:
   `ls -d packages/*/ | wc -l` before trusting any number already in the docs, including the ones
   this pass just wrote.
 
+## Fourth pass — internal contradiction (Solid device status)
+
+README's own M7 milestone row says Solid is "running on device ... ✅ done", while
+`status.mdx`/`roadmap.mdx`/`index.mdx` said "verified only in headless `vitest` so far;
+real-device testing is still pending" — a direct contradiction inside the docs. Resolved by
+checking ground truth: `adapters/solid/README.md` points at `CLAUDE.md`'s device-measured
+benchmark numbers (real, repeated, on iOS simulator) for Solid, so the canary genuinely runs and
+has been measured on-device. What's actually still missing is narrower: `examples/solid` has no
+`e2e/` directory at all (`find examples/solid -iname e2e` → nothing), so it has no Detox
+`canary-journeys` spec, unlike React/Vue-tsx/Vue-sfc/Svelte which all do
+(`find examples/*/e2e -iname '*canary-journeys*'` confirms). Rewrote all three pages to say the
+precise thing: canary is device-benchmarked, Detox e2e coverage is what's pending — not "no
+real-device testing at all."
+
+**Method note for future passes:** when two docs disagree about status, don't just pick one
+wording — find the actual file/command that settles it (`find`, `grep -h version`, etc.) before
+rewriting either side. A milestone table and a "what's verified" prose section are two different
+authors' summaries of the same reality and drift independently.
+
 Not yet checked this pass: whether `apps/docs-site` pages reference specific version numbers
 anywhere (a scan for `0\.[0-9]+\.[0-9x]+` across all `.md`/`.mdx` turned up only RN/Expo SDK
 version mentions and skill-file historical incident logs — nothing else claiming a symbiote-native
