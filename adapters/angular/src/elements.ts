@@ -53,8 +53,10 @@ import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
 import { VALUE_CHANGE_EVENT } from './renderer/value-change';
 import {
   createCallbackWrapper,
+  isWrappableCallback,
   registerViewFlush,
   unregisterViewFlush,
+  type ICallbackWrapper,
 } from './change-detection-flush';
 import type {
   IActivityIndicatorProps,
@@ -100,10 +102,21 @@ export abstract class SymbioteElement implements OnChanges {
   // An `onX` PROP is called by the engine, so Angular is never told it fired. Shared with the
   // component path's `SymbioteHostPropsDirective`, which has the identical deficit — see
   // `createCallbackWrapper`.
-  private readonly wrapCallback = createCallbackWrapper(
-    this.detector,
-    this.host.nativeElement,
-  );
+  //
+  // BUILT ON THE FIRST CALLBACK PROP, not at construction. This directive is instantiated once per
+  // TAG on a screen that imports `SYMBIOTE_ELEMENTS`, and the overwhelming majority of tags carry no
+  // `on*` function prop at all — an eager wrapper is a closure and a `WeakMap` per element for
+  // nothing. Measured on the directive-shaped bench arm: 7 000 per 1 000-row create.
+  private wrapper: ICallbackWrapper | undefined;
+
+  private wrapCallback(key: string, value: unknown): unknown {
+    if (!isWrappableCallback(key, value)) return value;
+    this.wrapper ??= createCallbackWrapper(
+      this.detector,
+      this.host.nativeElement,
+    );
+    return this.wrapper(key, value);
+  }
 
   @Input() testID?: IElementProps['testID'];
   @Input() nativeID?: IElementProps['nativeID'];
