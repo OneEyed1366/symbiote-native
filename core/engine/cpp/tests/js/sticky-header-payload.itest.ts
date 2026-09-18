@@ -28,10 +28,12 @@
 import { registerScrollViewBehavior } from '@symbiote-native/components';
 
 import {
+  appendChild,
   committedPayloadOf,
   createElement,
   createSurface,
   readSurfaceTelemetry,
+  removeChild,
   setProp,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -141,6 +143,49 @@ describe('what a sticky header sends native', () => {
     expect(payload.zIndex).toBe(undefined);
     expect(payload.collapsable).toBe(undefined);
     expect(payload.transform).toBe(undefined);
+  });
+
+  // why: THE PRECONDITION THE PORT INTRODUCED, and nothing else in this file can see it. The fold
+  // was assigned to the NODE in `attach`, so it ran for as long as the node lived; the rule fires
+  // only if `recordSetTag` has delivered this tag to the host. `reattachOne` restores `attach` and
+  // `attachAfterCommit` and does NOT re-emit the tag — its comment assumes "a parked node usually
+  // returns with its tag intact", and that assumption is asserted nowhere.
+  //
+  // A windowed list parks and returns headers continuously, which is exactly the traffic this has
+  // to survive. If the tag does not survive, the header loses `zIndex`, `collapsable: false` and
+  // its transform at once — and a header Yoga is free to flatten has no view left to pin, so the
+  // stickiness dies for that node and stays dead.
+  it('keeps its tag rule after the window parks it and brings it back', () => {
+    const surface = createSurface(ROOT_TAG);
+    const root: ISymbioteNode = createElement('RCTView');
+    const node: ISymbioteNode = createElement(
+      'RCTView',
+      false,
+      'sticky-header',
+    );
+    appendChild(root, node);
+    surface.appendChild(root);
+    surface.commit();
+    mounted();
+    expect(committedPayloadOf(node)?.zIndex).toBe(10);
+
+    removeChild(root, node);
+    surface.commit();
+    mounted();
+
+    // A value the FIRST commit never saw, so the assertions below cannot be satisfied by the
+    // payload left standing from it. Without this the case is green whether or not the rule ran
+    // again — the same one-sided oracle the aria port had to correct.
+    setProp(node, 'stickyTranslateY', 42);
+    appendChild(root, node);
+    surface.commit();
+    mounted();
+
+    const payload = committedPayloadOf(node);
+    expect(payload?.zIndex).toBe(10);
+    expect(payload?.collapsable).toBe(false);
+    expect(firstTransform(payload ?? {})).toEqual({ translateY: 42 });
+    expect(payload?.stickyTranslateY).toBe(undefined);
   });
 
   // why: THE COST, and the reason this port exists at all. A `payloadFold` marshals the whole bag
