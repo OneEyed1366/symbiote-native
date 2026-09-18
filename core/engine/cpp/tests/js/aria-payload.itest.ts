@@ -171,6 +171,19 @@ describe('the aria spelling, resolved by the engine', () => {
     expect(state.busy).toBe(undefined);
   });
 
+  // why: the rule COERCES NOTHING, and that matters because a template produces strings. Every
+  // Svelte/Angular/Vue template spells `aria-checked="true"` as the STRING `'true'`, and what lands
+  // in `accessibilityState.checked` is that string — which is not what RN's native side expects
+  // (`boolean | 'mixed'`). Pinned rather than fixed: the decision to pass it through is the rule's,
+  // and `adapters/svelte/src/aria-fold-parity.test.ts` pins the other half, that the template is
+  // where the string is born. If someone adds coercion, one of the two fails and names the layer.
+  it('coerces nothing, so a template’s string arrives as a string', () => {
+    const state = commit({ 'aria-checked': 'true' }).accessibilityState;
+    if (!isRecord(state)) throw new Error('no accessibilityState committed');
+
+    expect(state.checked).toBe('true');
+  });
+
   // why: the value composite is the same shape as the state one, four fields instead of five. It is
   // asserted separately because a rule can easily have one of the two and not the other.
   it('composes accessibilityValue from its four aliases', () => {
@@ -186,6 +199,34 @@ describe('the aria spelling, resolved by the engine', () => {
     expect(value.max).toBe(10);
     expect(value.now).toBe(4);
     expect(value.text).toBe('four');
+  });
+
+  // why: THE FOLD RUNS TWICE ON DEVICE under React, and this is the only place that can be seen.
+  // React's surviving wrappers call `resolveAccessibilityProps` on the way in (pass 1, JS), and this
+  // rule folds the same bag again on the way to Fabric (pass 2, C++). Pass 2 must be a no-op, or a
+  // composite pass 1 built from an alias would be overwritten by the alias it already consumed.
+  //
+  // It holds by CONSTRUCTION rather than by care, which is the part worth recording: pass 1 blanks
+  // its aliases to `undefined`, and `recordSetProp` erases a key written `undefined` instead of
+  // storing a null — so a folded bag reaches this rule with the aliases genuinely ABSENT, and the
+  // gate reports nothing to do. `coalesce` would survive a null anyway. Asserted because neither of
+  // those two facts is local to this file, and either could change without anyone thinking of aria.
+  //
+  // `adapters/react/src/__tests__/` cannot test this: its harness runs no second pass at all, and
+  // the file that claimed to was mounting a BARE tag, which has no wrapper to be pass 1.
+  it('leaves an already-folded bag alone, which is what makes React’s second pass safe', () => {
+    const payload = commit({
+      accessibilityRole: 'button',
+      accessibilityLabel: 'close',
+      accessibilityState: { checked: true, busy: true },
+    });
+
+    expect(payload.accessibilityRole).toBe('button');
+    expect(payload.accessibilityLabel).toBe('close');
+    const state = payload.accessibilityState;
+    if (!isRecord(state)) throw new Error('no accessibilityState committed');
+    expect(state.checked).toBe(true);
+    expect(state.busy).toBe(true);
   });
 
   // why: THE CONTROL. A node with no aria key must come out with nothing invented — no empty

@@ -108,19 +108,20 @@ describe('Solid InputAccessoryView on the engine', () => {
       );
     });
 
-    // why: native reads only `accessibility*`. This component owns its host element rather than
-    // rendering through a View, so nothing else in the path folds the web aliases — dropping the
-    // fold would send `aria-label` to Fabric as a meaningless prop and leave the toolbar
-    // unlabelled for a screen reader.
-    it('folds aria aliases into the canonical accessibility props', async () => {
+    // why: native reads only `accessibility*`, and the engine folds the web aliases into them off
+    // the authored, HYPHENATED names. This component owns its host element rather than rendering
+    // through a View, so nothing else in the path carries the aliases down for it — losing one
+    // leaves the toolbar unlabelled for a screen reader.
+    // The fold's own cases: `core/engine/cpp/tests/js/aria-payload.itest.ts`.
+    it('forwards the aria aliases under their authored names', async () => {
       mount(ROOT_TAG, () => (
         <input-accessory-view aria-label="toolbar" aria-busy={true} />
       ));
       await tick();
 
       const props = accessory().payload;
-      expect(props.accessibilityLabel).toBe('toolbar');
-      expect(props.accessibilityState).toEqual({ busy: true });
+      expect(props['aria-label']).toBe('toolbar');
+      expect(props['aria-busy']).toBe(true);
     });
 
     // why: Solid runs a component body ONCE. Every prop read sits inside the bag accessor

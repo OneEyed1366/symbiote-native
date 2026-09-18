@@ -207,16 +207,19 @@ describe('button host behavior', () => {
     await settle();
 
     const { host } = subtreeOf(TEST_ID);
-    // The GREY that `aria-disabled` causes is `foldButtonLabelStyle`'s now and is asserted in
-    // `button-derived-payload.itest.ts`; what stays here is the accessibilityState merge, which is
-    // this side's and is the half this case is named for.
-    // MERGES: RN keeps busy/checked/expanded/selected and overrides only `disabled`
-    // (Button.js:333-338). Nothing in `button.ts` does this — the engine's aria fold and the press
-    // fold compose to it, which is the whole reason Button owes no accessibilityState fold.
-    expect(host.payload.accessibilityState).toMatchObject({
-      busy: true,
-      disabled: true,
-    });
+    // BOTH HALVES OF THIS CASE HAVE NOW LEFT, and the second one proves the first's reasoning.
+    //
+    // The GREY that `aria-disabled` causes went first — `foldButtonLabelStyle`, asserted in
+    // `button-derived-payload.itest.ts`. What stayed was the accessibilityState MERGE, on the
+    // grounds that it was "this side's". It was not: the comment beside it said outright that
+    // nothing in `button.ts` does it and that the engine's aria fold and the press fold COMPOSE to
+    // it — two rules, both since ported, neither visible here. It moved to
+    // `button-payload.itest.ts` on 2026-09-18.
+    //
+    // What a behaviour test can still say about this input is that the app's own props arrive on the
+    // node the rules will read, which is the precondition for either of them running at all.
+    expect(host.payload.accessibilityState).toEqual({ busy: true });
+    expect(host.payload['aria-disabled']).toBe(true);
   });
 
   it('re-folds the label when title changes after mount', async () => {

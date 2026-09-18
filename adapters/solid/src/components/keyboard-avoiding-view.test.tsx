@@ -610,9 +610,11 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
   });
 
   describe('Positive — pass-through of the props KAV does not consume', () => {
-    // why: KAV composes View rather than painting its own host tag, so the aria/role fold and the
-    // class+style merge must happen exactly once, in View. Splitting the wrong prop into HANDLED_PROPS
-    // would silently swallow it — nothing else in this file would fail.
+    // why: KAV composes View rather than painting its own host tag, so anything it does not consume
+    // must reach that wrapper host untouched. Splitting the wrong prop into HANDLED_PROPS would
+    // silently swallow it — nothing else in this file would fail. `aria-label` is read under its
+    // AUTHORED name: the fold into `accessibilityLabel` is the engine's rule
+    // (`aria-payload.itest.ts`), and what KAV owes is that the key arrives at all.
     it('forwards accessibility, testID and the caller onLayout onto the wrapper host', async () => {
       let layoutEvents = 0;
       mount(ROOT_TAG, () => (
@@ -629,7 +631,7 @@ describe('Solid KeyboardAvoidingView on the engine', () => {
 
       const wrapper = currentWrapper();
       expect(wrapper.payload.testID).toBe('kav');
-      expect(wrapper.payload.accessibilityLabel).toBe('compose');
+      expect(wrapper.payload['aria-label']).toBe('compose');
 
       measureWrapper();
       expect(layoutEvents, "the caller's onLayout still fires").toBe(1);

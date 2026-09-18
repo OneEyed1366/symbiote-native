@@ -127,10 +127,12 @@ describe('Solid Text on the engine', () => {
       );
     });
 
-    // why: native reads only `accessibility*`; the web aliases must be folded in JS before commit
-    // (RN's own View.js transform). Skipping the fold would leave `aria-label` riding to Fabric as
-    // a meaningless prop and the text unlabelled for a screen reader.
-    it('folds aria aliases into the canonical accessibility props', async () => {
+    // why: native reads only `accessibility*`, and the engine folds the web aliases into them
+    // (`foldAriaProps`, `SymbioteFabricProps.cpp`) — it reads the HYPHENATED name literally, so what
+    // this component owes is the authored spelling arriving intact. A boolean shorthand
+    // (`aria-hidden`) is the half most likely to be lost, since it has no value in the source.
+    // The fold's own eleven cases: `core/engine/cpp/tests/js/aria-payload.itest.ts`.
+    it('forwards the aria aliases under their authored names', async () => {
       mount(ROOT_TAG, () => (
         <text testID="probe" aria-label="greeting" aria-hidden>
           hi
@@ -138,8 +140,8 @@ describe('Solid Text on the engine', () => {
       ));
       await tick();
 
-      expect(probe().payload.accessibilityLabel).toBe('greeting');
-      expect(probe().payload.accessibilityElementsHidden).toBe(true);
+      expect(probe().payload['aria-label']).toBe('greeting');
+      expect(probe().payload['aria-hidden']).toBe(true);
     });
 
     // why: onTextLayout is Text's own direct event (per-glyph frames), distinct from onLayout's

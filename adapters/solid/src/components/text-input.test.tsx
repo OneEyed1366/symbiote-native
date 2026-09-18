@@ -156,16 +156,17 @@ describe('Solid TextInput on the engine', () => {
       expect(payload.testID).toBe('field');
     });
 
-    // why: native reads only `accessibility*`; the web aliases must be folded in JS before commit.
-    // TextInput owns its host element rather than rendering through a View, so the fold is the
-    // tag's own behavior — skipping it leaves the field unlabelled for a screen reader.
-    it('folds aria aliases into the canonical accessibility props', async () => {
+    // why: native reads only `accessibility*`, and the engine folds the web aliases into them off
+    // the authored, HYPHENATED names. TextInput owns its host element rather than rendering through
+    // a View, so nothing else carries the aliases down for it — losing one leaves the field
+    // unlabelled for a screen reader. The fold's own cases: `aria-payload.itest.ts`.
+    it('forwards the aria aliases under their authored names', async () => {
       mount(ROOT_TAG, () => <text-input aria-label="email" aria-disabled />);
       await tick();
 
       const payload = committedInput().payload;
-      expect(payload.accessibilityLabel).toBe('email');
-      expect(payload.accessibilityState).toEqual({ disabled: true });
+      expect(payload['aria-label']).toBe('email');
+      expect(payload['aria-disabled']).toBe(true);
     });
 
     // why: RN's change payload carries the text and the native event counter; the callback hands

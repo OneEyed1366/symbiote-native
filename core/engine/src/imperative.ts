@@ -19,7 +19,6 @@ import type {
   IMeasureOnSuccess,
   IRootTag,
 } from './fabric';
-import { isAriaAliasKey } from './accessibility-props';
 import { clearPublishedStyle, writeProp, type ISymbioteNode } from './node';
 import { flattenStyle } from './style';
 import { flushOps, treeHost, type ICommittedRecord } from './tree-host';
@@ -283,9 +282,9 @@ export function setNativeProps(
       };
     } else {
       merged[key] = value;
-      // Bypasses `setProp`, so it owes the aria gate that normally lives there. An `aria-*` arriving
-      // only through this path would otherwise never be folded.
-      if (!node.hasAriaAlias && isAriaAliasKey(key)) node.hasAriaAlias = true;
+      // This path used to owe the aria gate that `setProp` carried, since it bypasses it. There is
+      // no gate to owe any more: the fold is the device's rule and it recomputes presence from the
+      // bag. See `node.ts`'s note at the old choke point.
     }
   }
   for (const [key, value] of Object.entries(merged)) {

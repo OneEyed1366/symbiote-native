@@ -72,8 +72,12 @@ describe('Vue: the fold-only tags commit what their wrappers used to', () => {
     expect(node.viewName).toBe('SafeAreaView');
     expect(node.payload.nativeID).toBe('pane');
     expect(Object.hasOwn(node.payload, 'id')).toBe(false);
-    // The wrapper called `resolveAccessibilityProps`; the engine's `fabricProps` does it now.
-    expect(node.payload.accessibilityLabel).toBe('the pane');
+    // The aria ALIAS, read under its authored name. The wrapper used to fold it with
+    // `resolveAccessibilityProps`; the fold is the engine's rule now (`foldAriaProps`,
+    // `SymbioteFabricProps.cpp`) and this harness holds no copy of it, so what a fold-only tag owes
+    // is that the hyphenated key survives the wrapper's removal at all. Note this is the OPPOSITE
+    // shape from the `id` line above — that alias is resolved by `routeProp`, in JS, on the way in.
+    expect(node.payload['aria-label']).toBe('the pane');
   });
 
   it('input-accessory-view keeps its nativeID and background', async () => {

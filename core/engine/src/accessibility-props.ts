@@ -85,15 +85,11 @@ function hasAnyAriaKey(props: Readonly<Record<string, unknown>>): boolean {
   return false;
 }
 
-/**
- * Whether one key is an alias this fold consumes. `startsWith` rather than a Set lookup: this runs
- * on `setProp`, the hottest write path in the engine (32 001 writes on one benchmark create), and
- * it is guarded by the node's sticky flag so it is reached at most once per node per key. The
- * `role` comparison comes first because it is the one alias with no prefix.
- */
-export function isAriaAliasKey(key: string): boolean {
-  return key === 'role' || key.startsWith('aria-');
-}
+// `isAriaAliasKey` WAS HERE AND IS GONE (2026-09-18). Its whole reason was to maintain
+// `node.hasAriaAlias` from `setProp` — the hottest write path in the engine, 32 001 writes on one
+// benchmark create — and that flag existed only to gate the aria fold inside the headless payload
+// builder. The fold left for `SymbioteFabricProps.cpp`, which recomputes presence from the bag it
+// holds, so the flag became write-only and this function became its only maintainer. Both went.
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

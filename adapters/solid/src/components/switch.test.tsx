@@ -92,19 +92,20 @@ describe('Solid Switch on the engine', () => {
     // `on` prefix. The engine writes that name into the payload directly now, so `routeProp` never
     // sees it and the hazard cannot occur. The authored name it DOES see is `trackColor`.
 
-    // why: native reads only `accessibility*`; the web aliases must be folded in JS before commit
-    // (RN's own View.js transform). Switch owns its host element rather than rendering through a
-    // View, so the fold is the component's own job — skipping it would leave `aria-label` riding to
-    // Fabric as a meaningless prop and the switch unlabelled for a screen reader.
-    it('folds aria aliases into the canonical accessibility props', async () => {
+    // why: native reads only `accessibility*`, and the engine folds the web aliases into them off
+    // the authored, HYPHENATED names. Switch owns its host element rather than rendering through a
+    // View, so nothing else could carry the aliases down for it — losing one leaves the switch
+    // unlabelled for a screen reader, on device, silently.
+    // The fold's own cases: `core/engine/cpp/tests/js/aria-payload.itest.ts`.
+    it('forwards the aria aliases under their authored names', async () => {
       mount(ROOT_TAG, () => (
         <switch value={false} aria-label="wifi" aria-disabled />
       ));
       await tick();
 
       const payload = committedSwitch().payload;
-      expect(payload.accessibilityLabel).toBe('wifi');
-      expect(payload.accessibilityState).toEqual({ disabled: true });
+      expect(payload['aria-label']).toBe('wifi');
+      expect(payload['aria-disabled']).toBe(true);
     });
 
     // why: onValueChange hands the caller ONE event, with the derived boolean carried as

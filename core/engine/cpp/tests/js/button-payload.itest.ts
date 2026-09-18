@@ -50,6 +50,11 @@ type ICommitted = {
   readonly folds: number;
 };
 
+// A narrowing, not a defensive check: a committed composite arrives as `unknown`.
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 function commit(props: Record<string, unknown>): ICommitted {
   const surface = createSurface(ROOT_TAG);
   const node: ISymbioteNode = createElement('RCTView', false, 'button');
@@ -191,6 +196,25 @@ describe('whether a button is a focus stop', () => {
 
   // why: and the third source, which is what an app writes when it is driving accessibility state
   // directly rather than through the alias.
+  // why: the MERGE, which is the composition of TWO ported rules and therefore visible only here.
+  // RN keeps `busy`/`checked`/`expanded`/`selected` from the app's own composite and overrides only
+  // `disabled` (`Button.js:333-338`) — and nothing in `button.ts` does that: the engine's aria fold
+  // writes `disabled` from `aria-disabled` while preserving the other fields, and the pressable rule
+  // composes onto the result. That is the whole reason Button owes no `accessibilityState` fold of
+  // its own, so it is the claim that would silently break if either rule stopped preserving.
+  //
+  // Travelled from `core/components/src/behaviors/button.test.ts`, which could see neither rule.
+  it('merges aria-disabled into an authored accessibilityState, keeping its other fields', () => {
+    const state = commit({
+      accessibilityState: { busy: true },
+      'aria-disabled': true,
+    }).payload.accessibilityState;
+    if (!isRecord(state)) throw new Error('no accessibilityState committed');
+
+    expect(state.busy).toBe(true);
+    expect(state.disabled).toBe(true);
+  });
+
   it('lets an authored accessibilityState.disabled do the same', () => {
     expect(focusableOf({ accessibilityState: { disabled: true } }, noop)).toBe(
       false,

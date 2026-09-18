@@ -4,8 +4,7 @@
 // CSS-style processors.
 //
 // IT IS CALLED BY THE HOST, and that is what the `props` parameter is for. The NODE still comes in
-// beside it, because two inputs to the fold are JS-side facts about the node rather than entries in
-// the bag — its authored component name and the sticky `hasAriaAlias` flag.
+// beside it for its authored component name and for a behavior's own `payloadFold`.
 //
 // **THIS IS THE HEADLESS BUILDER, and the device one is `SymbioteFabricProps.cpp`.** The header used
 // to say the C++ side "does not have this yet", which was true mid-branch and stopped being true
@@ -17,27 +16,19 @@
 // with everything green — not hypothetical: it is how a disabled `touchable-highlight` shipped
 // `focusable: true`.
 //
-// NO COMPONENT-KEYED RULE IS LEFT, as of 2026-09-18. The two went in that order — RN's Text defaults
-// first, then `value ?? defaultValue -> text` — separately and on purpose, because they had
-// different test topologies and one commit removing both could not be attributed to either. So a
-// text input's payload here carries `value` where the device's carries `text`, and a text node's is
-// missing two keys. That asymmetry is the harness working as designed — do not close it by adding a
-// rule back.
+// **NONE IS LEFT, as of 2026-09-18.** Three went, one per commit, in that order: RN's Text defaults,
+// `value ?? defaultValue -> text`, and the aria fold. Separately on purpose — they had different test
+// topologies, and one commit removing several could not be attributed to any of them.
 //
-// ONE PLATFORM RULE IS STILL CALLED FROM HERE AND IT IS A DIFFERENT CASE: `foldAriaProps`. The
-// FUNCTION is not a mirror to delete — `resolveAccessibilityProps` in `core/components` calls it on
-// the component path, where a body folds its bag before handing it on — so unlike the other two
-// there is real JS that needs it. What is arguably wrong is this CALL, which puts a platform rule
-// back in the headless payload and invites assertions that cannot see the device copy.
+// SO THE HEADLESS PAYLOAD DIVERGES FROM THE DEVICE'S, deliberately and in named places: a text
+// input's carries `value` where the device's carries `text`, a text node's is missing two defaults,
+// and a bare tag's `aria-*` keys arrive unfolded. **That asymmetry is the harness working as
+// designed** — it is what forces a claim about a platform rule to be made where the rule runs. Do
+// not close it by adding a rule back.
 //
-// The device copy is no longer untested either way: `core/engine/cpp/tests/js/aria-payload.itest.ts`
-// pins all eleven of its behaviours, break-tested. Removing the call here costs 27 cases across 16
-// files (measured), so it is its own piece of work with its own argument, not a tail of this one.
-//
-// The rest is the framework-agnostic half: colour processing, the style hoist, and a node's own
+// What is left is the framework-agnostic half: colour processing, the style hoist, and a node's own
 // `payloadFold`.
 
-import { foldAriaProps } from './accessibility-props';
 import type { IFabricProps } from './fabric';
 import { RAW_TEXT_COMPONENT, type ISymbioteNode } from './node';
 import { isProcessableColor, processColor } from './platform-color';
@@ -265,7 +256,15 @@ export function fabricProps(
   // (the `processedStyle` pattern below) would be stale forever. The gate is the node's sticky flag
   // instead: one boolean read for a node with no alias, which is nearly all of them, and the fold's
   // own fast path returns by identity for the rest.
-  const aliasFolded = node.hasAriaAlias ? foldAriaProps(nodeProps) : nodeProps;
+  // THE ARIA FOLD IS NOT CALLED HERE ANY MORE (2026-09-18), and it is the last platform rule to
+  // leave this builder. `foldAriaProps` itself STAYS in JS and is not a mirror: `pickAccessibilityProps`
+  // (`@symbiote-native/components`) folds a bag and then picks fields BY NAME, which it cannot do
+  // from a bag holding only `aria-label`. So the function has a real, load-bearing caller — what was
+  // wrong was this CALL, which put a rule the device runs in C++ back into the headless payload and
+  // invited 27 cases to assert it where the device copy is invisible.
+  //
+  // Where the claims live now: `core/engine/cpp/tests/js/aria-payload.itest.ts`, off a real payload.
+  const aliasFolded = nodeProps;
   // The behavior's own fold, keyed on the TAG — the two folds above are keyed on the resolved
   // component name, which several tags share (`pressable` and a plain `view` are both `RCTView`),
   // so neither could carry a per-primitive fold. See IPayloadFold.

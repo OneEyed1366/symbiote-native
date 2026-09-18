@@ -179,31 +179,31 @@ describe('Solid SafeAreaView on the engine', () => {
     expect(committed(n => n.payload.testID === 'late')).toBeDefined();
   });
 
-  // why: Solid's spread walks only the CURRENT key set and has no removal pass, and
-  // resolveAccessibilityProps emits `accessibilityLabel` only while an aria alias holds a VALUE.
-  // Without the withStableKeys widening the folded key simply vanishes from the bag and a screen
-  // reader keeps announcing a label the app already removed — green in every other test here.
-  it('clears a folded accessibility prop when its aria alias goes undefined', async () => {
+  // why: Solid's spread walks only the CURRENT key set and has no removal pass, so without the
+  // withStableKeys widening a prop that goes undefined simply vanishes from the bag instead of being
+  // cleared — and a screen reader keeps announcing a label the app already removed, green in every
+  // other test here.
+  //
+  // Read on the AUTHORED key: the fold into `accessibilityLabel` is the engine's rule
+  // (`aria-payload.itest.ts`) and this harness holds no copy of it. `aria-label` is the key the
+  // spread actually holds, so the widening is watched where it operates.
+  it('clears an aria alias that goes undefined', async () => {
     const [label, setLabel] = createSignal<string | undefined>('screen');
     mount(ROOT_TAG, () => <safe-area-view aria-label={label()} />);
     await tick();
-    expect(safeArea().payload.accessibilityLabel).toBe('screen');
+    expect(safeArea().payload['aria-label']).toBe('screen');
 
     setLabel(undefined);
     await tick();
 
-    // `null`, not absent: a key the node held last commit and no longer has goes to Fabric as
-    // literal null so the native setter resets to its default (diffProps, symbiote-engine-core
-    // §8). Without the widening this reads back the stale 'screen'.
     // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
     // default", held only inside the diff the stand-in merged. The engine's op stream says the
-    // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
-    expect(Object.hasOwn(safeArea().payload, 'accessibilityLabel')).toBe(false);
+    // same thing with `NO_VALUE`, and a host replaying that op deletes the key. Without the
+    // widening this reads back the stale 'screen'.
+    expect(Object.hasOwn(safeArea().payload, 'aria-label')).toBe(false);
     // …and the half that proves the engine ACTED: the record carried the label after the mount
     // above, so its being gone from the record means a clearing op was sent for it.
     const recorded = fabric.find(node => node.viewName === SAFE_AREA);
-    expect(Object.hasOwn(recorded?.props ?? {}, 'accessibilityLabel')).toBe(
-      false,
-    );
+    expect(Object.hasOwn(recorded?.props ?? {}, 'aria-label')).toBe(false);
   });
 });

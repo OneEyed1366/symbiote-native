@@ -206,27 +206,26 @@ const CASES: readonly IFoldCase[] = [
     expected: [{ nativeID: 'p' }],
   },
   {
-    // The aria/role fold, which the engine now applies in `fabricProps` — the one point that sees
-    // the whole bag on both commit paths. Native reads only the `accessibility*` names, so the
-    // proof is that the aliases are CONSUMED, not merely accompanied: a payload carrying both is
-    // the failure this case exists to catch, and full-payload equality states that without a
-    // separate "not.toHaveProperty" per alias.
-    what: 'role and aria-label fold into accessibility* and leave no alias behind',
+    // The aria/role FOLD is the device's rule (`foldAriaProps`, `SymbioteFabricProps.cpp`) and this
+    // harness holds no copy of it, so what three Vue compilers can still disagree about is the
+    // SPELLING that reaches the engine. That is the load-bearing half: the rule reads `aria-label`
+    // literally, so a compiler that camelised or dropped it ends accessibility in silence.
+    what: 'role and a hyphenated aria key reach the engine identically on every path',
     sfc: '<view role="button" aria-label="x" />',
     jsx: '<view role="button" aria-label="x" />',
     handWritten: () => h('view', { role: 'button', 'aria-label': 'x' }),
-    expected: [{ accessibilityRole: 'button', accessibilityLabel: 'x' }],
+    expected: [{ role: 'button', 'aria-label': 'x' }],
   },
   {
-    // RULE ONE — for a scalar, the explicit prop WINS and the alias only fills a hole.
+    // BOTH KEYS MUST ARRIVE, and this case is the one where the three arms genuinely differ in
+    // spelling: the SFC writes `accessibility-label` (kebab), JSX writes `accessibilityLabel`
+    // (camel), and they must converge — that is `normalizeVueAttrKey`, which is still this
+    // adapter's. The aria key beside it must NOT be normalised the same way, because the engine's
+    // rule reads the hyphenated form literally. One case, two opposite requirements.
     //
-    // This is also the double-fold case. `resolveAccessibilityProps` (the wrapper's fold) now
-    // delegates to the same `foldAriaProps` the engine runs in `fabricProps`, so the component arm
-    // passes through it TWICE. That must be a no-op: pass 1 blanks every alias, so pass 2 finds
-    // nothing and hands the bag back. A second pass that re-derived from the aliases would
-    // overwrite 'explicit' with 'alias' here — and only on the wrapper arm, which is why the arms
-    // are compared to each other and not just to `expected`.
-    what: 'an explicit accessibilityLabel beats aria-label, and survives a second fold',
+    // Which of the two WINS is the rule's business and is asserted in `aria-payload.itest.ts`; it
+    // cannot even be expressed here, and a bag missing either side would make it unanswerable.
+    what: 'a kebab prop and a hyphenated alias both arrive, each spelled its own way',
     sfc: '<view accessibility-label="explicit" aria-label="alias" />',
     jsx: '<view accessibilityLabel="explicit" aria-label="alias" />',
     handWritten: () =>
@@ -234,16 +233,17 @@ const CASES: readonly IFoldCase[] = [
         accessibilityLabel: 'explicit',
         'aria-label': 'alias',
       }),
-    expected: [{ accessibilityLabel: 'explicit' }],
+    expected: [{ accessibilityLabel: 'explicit', 'aria-label': 'alias' }],
   },
   {
-    // RULE TWO — inside a composite the polarity INVERTS: the alias wins PER FIELD, and the
-    // composite is rebuilt as a fresh literal rather than merged. `checked` comes from the alias
-    // even though an explicit `accessibilityState` set it, while `busy` survives from the explicit
-    // object. An adapter that copied rule one "by analogy" collapses the two into one rule and
-    // yields `checked: false` — with every component-level test still green, because the wrapper
-    // path happens to agree.
-    what: 'aria-checked wins per field inside an explicit accessibilityState',
+    // A COMPOSITE has to survive as an object through all three compilers, alongside the alias that
+    // will be folded into it. The SFC spells both as BINDINGS (`:accessibility-state`,
+    // `:aria-checked`) where JSX spells them as expressions, so this is the arm where a compiler
+    // could flatten the object or stringify the boolean.
+    //
+    // Which side wins per field — the alias, inverting the scalar rule above — is the engine's and
+    // is asserted in `aria-payload.itest.ts`.
+    what: 'a composite and its alias survive all three compilers, shapes intact',
     sfc: '<view :accessibility-state="{ checked: false, busy: true }" :aria-checked="true" />',
     // Hyphenated in JSX too, deliberately: RN's public prop IS `aria-checked` and the camelCase
     // spelling is only View.js's own destructuring alias, so `ariaChecked={true}` would be a key
@@ -256,13 +256,8 @@ const CASES: readonly IFoldCase[] = [
       }),
     expected: [
       {
-        accessibilityState: {
-          busy: true,
-          checked: true,
-          disabled: undefined,
-          expanded: undefined,
-          selected: undefined,
-        },
+        accessibilityState: { checked: false, busy: true },
+        'aria-checked': true,
       },
     ],
   },

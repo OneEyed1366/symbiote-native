@@ -84,33 +84,38 @@ describe('Solid RefreshControl on the engine', () => {
       expect(refreshes).toBe(1);
     });
 
-    // why: native reads only `accessibility*`; the web aliases have to be folded in JS before the
-    // commit. RefreshControl owns its host element rather than rendering through a View, so the fold
-    // is its own job — skipping it leaves the control unlabelled for a screen reader.
-    it('folds aria aliases into the canonical accessibility props', async () => {
+    // why: native reads only `accessibility*`, and the engine folds the web aliases into them off
+    // the authored, HYPHENATED names. RefreshControl owns its host element rather than rendering
+    // through a View, so nothing else carries the aliases down for it.
+    // The fold's own cases: `core/engine/cpp/tests/js/aria-payload.itest.ts`.
+    it('forwards the aria aliases under their authored names', async () => {
       mount(ROOT_TAG, () => (
         <refresh-control refreshing={false} aria-label="reload" aria-busy />
       ));
       await tick();
 
       const props = committedControl().payload;
-      expect(props.accessibilityLabel).toBe('reload');
-      expect(props.accessibilityState).toEqual({ busy: true });
+      expect(props['aria-label']).toBe('reload');
+      expect(props['aria-busy']).toBe(true);
     });
 
-    // why: Solid-only, and silent everywhere else. `resolveAccessibilityProps` has two branches with
-    // DIFFERENT key sets, and Solid's `spread` walks only the CURRENT keys with no removal pass — so
-    // an `aria-label` that goes undefined drops the folded `accessibilityLabel` KEY and a screen
-    // reader keeps announcing a label the app already removed. React and Vue never meet this: they
-    // hand their reconciler a whole new prop object and the engine's diffProps sends the vanished
-    // key down as an explicit delete.
-    it('clears a folded accessibility prop when its aria alias goes undefined', async () => {
+    // why: Solid-only, and silent everywhere else. Solid's `spread` walks only the CURRENT keys with
+    // no removal pass, so an `aria-label` that goes undefined can leave its key STANDING at the old
+    // value — and a screen reader keeps announcing a label the app already removed. React and Vue
+    // never meet this: they hand their reconciler a whole new prop object and the engine's diffProps
+    // sends the vanished key down as an explicit delete.
+    //
+    // Read on the AUTHORED key now. The hazard is unchanged and so is the assertion's force — what
+    // moved is only which name carries it, since the fold into `accessibilityLabel` is the engine's
+    // rule and this harness has no copy of it. If anything this is the sharper place to watch,
+    // because it is the key Solid's spread actually holds.
+    it('clears an aria alias that goes undefined', async () => {
       const [label, setLabel] = createSignal<string | undefined>('reload');
       mount(ROOT_TAG, () => (
         <refresh-control refreshing={false} aria-label={label()} />
       ));
       await tick();
-      expect(committedControl().payload.accessibilityLabel).toBe('reload');
+      expect(committedControl().payload['aria-label']).toBe('reload');
 
       setLabel(undefined);
       await tick();
@@ -119,14 +124,12 @@ describe('Solid RefreshControl on the engine', () => {
       // ABSENT, not null: the literal null was the CLONE PROTOCOL's spelling of "reset to the
       // default", held only inside the diff the stand-in merged. The engine's op stream says the
       // same thing with `NO_VALUE`, and a host replaying that op deletes the key.
-      expect(
-        Object.hasOwn(committedControl().payload, 'accessibilityLabel'),
-      ).toBe(false);
-      // …and the half that proves the engine ACTED: the record carried the label after the mount
-      // above, so its being gone from the record means a clearing op was sent for it.
-      expect(Object.hasOwn(createdControl().props, 'accessibilityLabel')).toBe(
+      expect(Object.hasOwn(committedControl().payload, 'aria-label')).toBe(
         false,
       );
+      // …and the half that proves the engine ACTED: the record carried the label after the mount
+      // above, so its being gone from the record means a clearing op was sent for it.
+      expect(Object.hasOwn(createdControl().props, 'aria-label')).toBe(false);
     });
 
     // why: the Android spinner props have no iOS counterpart, so RN forwards them raw and lets each

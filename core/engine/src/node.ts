@@ -13,7 +13,6 @@ import type {
   IMeasureInWindowOnSuccess,
   IMeasureLayoutOnSuccess,
 } from './fabric';
-import { isAriaAliasKey } from './accessibility-props';
 import {
   recordAppendChild,
   recordCreateAnchor,
@@ -146,19 +145,15 @@ export interface ISymbioteNode {
   // carries an ADDRESS: the host holds the props and the structure, and every question about either
   // is a read through `tree-host.ts`. The buffer is what tells the host; nothing here mirrors it.
 
-  // "A `role` or `aria-*` key has been written here at least once." The gate for the aria fold
-  // (`accessibility-props.ts`), which `fabricProps` runs on the way to the payload because a tag
-  // has no component wrapper to run it in.
+  // `hasAriaAlias` WAS HERE AND IS GONE (2026-09-18), with the two writes that maintained it. It
+  // gated the aria fold inside `fabricProps` — worth a field rather than the fold's own 15-property
+  // probe, because the probe is per COMPONENT INSTANCE where this was per NODE PER BUILD.
   //
-  // A FIELD rather than the fold's own 15-property probe, because the probe is per COMPONENT
-  // INSTANCE where this is per NODE PER BUILD: ~9 000 nodes on a create, 135 000 property reads to
-  // discover that almost none of them carry an alias. One boolean read instead, written at most
-  // once per prop write.
-  //
-  // STICKY on purpose - never cleared. Deleting the last alias leaves it true, the fold runs and
-  // returns its input by identity. Monotone, so no invalidation bug is expressible; the cost of a
-  // stale `true` is one identity-returning call on a node that once had an alias.
-  hasAriaAlias: boolean;
+  // The whole argument dissolved when the fold left the headless builder: the device's rule
+  // (`SymbioteFabricProps.cpp`) recomputes presence from the bag it already holds, so nothing read
+  // the flag any more while `isAriaAliasKey(key)` still ran on every prop write to keep it correct.
+  // **A write-only field is worse than a slow one** — it has the cost and none of the benefit, and
+  // it reads as load-bearing to anyone maintaining the path it sits on.
   /**
    * Whether this node's host behavior declared `afterCommit`.
    *
@@ -320,7 +315,6 @@ class SymbioteNode implements ISymbioteNode {
   declare component: string;
   declare readonly isText: boolean;
   declare listeners: Map<string, IListener> | undefined;
-  declare hasAriaAlias: boolean;
   declare hasCommitHook: boolean;
   declare resolvesImageSources: boolean;
   declare styleParts: IClassStyleParts | undefined;
@@ -335,14 +329,11 @@ class SymbioteNode implements ISymbioteNode {
     this.isText = isText;
     this.listeners = undefined;
     // Assigned here, not lazily on first use: every slot present from the constructor keeps one
-    // hidden class for every node. Adding it on demand buys a shape transition per aria-bearing
-    // node, which is the opposite of what this field is for.
+    // hidden class for every node. Adding one on demand buys a shape transition per node that needs
+    // it, which is the opposite of what these fields are for.
     //
-    // Starts false, and that is COMPLETE rather than optimistic: a node is minted with no props at
-    // all — `createRawText`'s text is an OP, not a field — so no aria key can arrive here.
-    this.hasAriaAlias = false;
-    // Same hidden-class reason; `attachHostBehavior` raises it a few lines later for the rare node
-    // whose behavior declares the recurring hook.
+    // `attachHostBehavior` raises this a few lines later for the rare node whose behavior declares
+    // the recurring hook.
     this.hasCommitHook = false;
     // Same again; `attachHostBehavior` raises it for the one behavior that declares it, Image's.
     this.resolvesImageSources = false;
@@ -673,10 +664,12 @@ export function setProp(
   key: string,
   value: unknown,
 ): void {
-  // The single choke point for the aria gate. `routeProp`'s other branches — class, style,
-  // activeStyle, on* — return before reaching here and none of them can carry an alias, so every
-  // `role` / `aria-*` write in the engine passes through this line.
-  if (!node.hasAriaAlias && isAriaAliasKey(key)) node.hasAriaAlias = true;
+  // THE ARIA GATE WAS THIS LINE AND IT IS GONE (2026-09-18). `node.hasAriaAlias` existed to let the
+  // headless payload builder skip `foldAriaProps` on the ~99% of nodes carrying no alias; that
+  // builder no longer folds aria at all — the rule is the device's, in `SymbioteFabricProps.cpp`,
+  // which recomputes the gate from the bag it already holds. So the flag became write-only, and its
+  // write ran `isAriaAliasKey` on EVERY prop write in the engine to maintain something nothing read.
+  //
   // A composed primitive's slot — and its wrapper, where it has one — can carry a value DERIVED
   // from an owner prop, and `markPropsDirty` bubbles up, so neither ever learns. Here rather than
   // in `routeProp` because this is the one choke point every writer passes (a structural adapter's

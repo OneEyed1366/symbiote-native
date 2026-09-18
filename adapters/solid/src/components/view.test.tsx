@@ -177,15 +177,18 @@ describe('Solid View on the engine', () => {
       expect(committed(n => n.payload.testID === 'late')).toBeDefined();
     });
 
-    // why: Solid's spread walks only the CURRENT key set and has no removal pass, and
-    // resolveAccessibilityProps emits `accessibilityLabel` only while an aria alias holds a VALUE.
-    // Without the stable-key widening the folded key simply vanishes from the bag and a screen
-    // reader keeps announcing a label the app already removed — green in every other test here.
-    it('clears a folded accessibility prop when its aria alias goes undefined', async () => {
+    // why: Solid's spread walks only the CURRENT key set and has no removal pass, so a prop that
+    // goes undefined can leave its key STANDING at the old value — and a screen reader keeps
+    // announcing a label the app already removed, green in every other test here.
+    //
+    // Read on the AUTHORED key: the fold into `accessibilityLabel` is the engine's rule
+    // (`aria-payload.itest.ts`) and this harness holds no copy of it. The hazard is unchanged, and
+    // `aria-label` is the key Solid's spread actually holds, so this is the sharper place to watch.
+    it('clears an aria alias that goes undefined', async () => {
       const [label, setLabel] = createSignal<string | undefined>('wifi');
       mount(ROOT_TAG, () => <view testID="probe" aria-label={label()} />);
       await tick();
-      expect(probe().payload.accessibilityLabel).toBe('wifi');
+      expect(probe().payload['aria-label']).toBe('wifi');
 
       setLabel(undefined);
       await tick();
@@ -198,14 +201,12 @@ describe('Solid View on the engine', () => {
       // ever existed in the diff the stand-in merged. The engine's op stream says the same thing
       // with `NO_VALUE`, and the recording, replaying that op, DELETES the key. So "absent" is what
       // the engine actually emits.
-      expect(Object.hasOwn(probe().payload, 'accessibilityLabel')).toBe(false);
+      expect(Object.hasOwn(probe().payload, 'aria-label')).toBe(false);
       // …and this is the half that proves the engine ACTED. Had it simply stopped setting the key,
       // the record would still carry the value from the first commit; the key being gone from the
       // record means a clearing op was sent for it.
       const recorded = fabric.find(node => node.props.testID === 'probe');
-      expect(Object.hasOwn(recorded?.props ?? {}, 'accessibilityLabel')).toBe(
-        false,
-      );
+      expect(Object.hasOwn(recorded?.props ?? {}, 'aria-label')).toBe(false);
     });
 
     // why: `ref` on a COMPONENT is rewritten by Solid's compiler into a callback prop, so the

@@ -399,17 +399,22 @@ describe('host primitives as intrinsic tags', () => {
   // camelized `ariaLabel` is invisible to it: the fold never runs and the key reaches Fabric dead,
   // where no ViewConfig declares it.
   //
-  // The witness used to be the raw `aria-label` surviving into the payload. That stopped being
-  // observable once the fold moved into fabricProps — it now consumes the key and nulls it — and
-  // "the key is gone" is exactly what a wrongly-camelized attr would also produce. So the claim is
-  // pinned from BOTH sides instead: the fold's OUTPUT carries the aria value (only reachable if the
-  // hyphenated key arrived intact), and no camelized key is left behind.
+  // THE WITNESS HAS MOVED TWICE AND IS BACK WHERE IT STARTED, which is worth recording because the
+  // round trip explains the shape. It began as the raw `aria-label` surviving into the payload; that
+  // stopped being observable when the fold moved INTO `fabricProps`, which consumed the key, so the
+  // claim was re-pinned on the fold's OUTPUT (`accessibilityLabel`) plus the absence of a camelized
+  // key. On 2026-09-18 the fold left this builder for `SymbioteFabricProps.cpp`, so the key survives
+  // again and the original witness is the direct one once more.
+  //
+  // Both sides still, and neither is sufficient alone: the hyphenated key must be PRESENT (a
+  // camelizing pass would drop it) and the camelized spelling must be ABSENT (its presence is what
+  // such a pass produces). "The key is gone" alone would be satisfied by a renderer that dropped it.
   it('leaves the aria- family hyphenated for the engine to fold', async () => {
     await mountTemplate(() =>
       h('view', { testID: 'aria', 'aria-label': 'from-aria' }),
     );
     const props = findByTestId('aria')?.payload;
-    expect(props?.accessibilityLabel).toBe('from-aria');
+    expect(props?.['aria-label']).toBe('from-aria');
     expect(props).not.toHaveProperty('ariaLabel');
   });
 
