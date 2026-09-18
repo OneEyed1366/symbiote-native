@@ -5,21 +5,33 @@
 // instance over the seven a row carries. That number is the whole remaining Angular deficit and it
 // has never been taken apart, so the next fix would be aimed by guesswork.
 //
-// WHAT IT ANSWERED, 2026-09-18, twice with a floor of 2-3 ms per run:
+// WHAT IT ANSWERS, at 10 000 elements, and ONLY what survived two runs whose own floors were 1.0 ms
+// and 9.2 ms. The floor moves between runs, so a reading counts here only if it clears the WIDER one:
 //
-//   279 declared inputs   NOTHING — inside the floor both times. Angular's input map is per-TYPE and
-//                         static, so the exhaustive surface `elements.ts` declares for TYPING costs
-//                         no instance anything. "Declare fewer inputs" is closed.
-//   ngOnChanges           ~4 ms of ~12, i.e. about a third of the directive's discretionary cost —
-//                         and the price of collecting it is 279 hand-written setters. Closed.
-//   two of three injects  ~1.9 us/element, barely outside the floor, and both are load-bearing:
-//                         `Renderer2` would have to become a module-level singleton (wrong the
-//                         moment a second surface exists) and `ChangeDetectorRef` is what gives a
-//                         prop callback its `markForCheck` — whose absence was a device-reported bug.
-//   a directive at all    ~3.3 ms, and it is Angular's own bookkeeping. Not ours.
+//   a directive at all    FREE. `inert` reads 12.35-12.97 us/element against a bare tag's
+//                         12.60-12.87 — the two swap places between runs, which is what "no
+//                         difference" looks like. Angular's per-directive bookkeeping is not the cost.
+//   its three injections  +12.4-13.0 us/element, i.e. HALF of what a directive-shaped element costs,
+//                         and far outside either floor. THIS IS THE WHOLE OF IT.
 //
-// So the remaining deficit is NOT adapter-shaped. Read that before proposing the next rewrite of
-// `elements.ts`.
+//   ngOnChanges           SETTERS ARE WORSE, +2.75 and +2.95 us/element across the two runs, both
+//                         outside their own floor. Not a saving in the wrong size — a cost, in the
+//                         opposite direction from the rewrite that was proposed here. Closed.
+//   279 declared inputs   +3.3 and +1.3 us/element, both outside their floor but disagreeing by 2.5x.
+//                         Real, small, and not worth a number tighter than "some".
+//
+// THE 2 000-ELEMENT VERSION OF THIS FILE GOT THREE OF THESE BACKWARDS, and the floor is why: the
+// control pair disagreed by 2.8 ms while the deltas being read were 3.1. It reported "a directive at
+// all ~3.3 ms, and it is Angular's own" and "279 declared inputs: NOTHING", both of which the bigger
+// N reverses. An instrument that cannot beat its own control answers nothing however many rounds it
+// averages — and the fix was SIZE, not more rounds.
+//
+// ONE MORE TRAP, and it is this file's own units: the table prints BOTH ms and us/element, and the
+// floor is in ms. Reading a us/element delta against a ms floor makes a real finding look like noise
+// — which is what happened to the setter row on the first pass through these numbers.
+//
+// So the lever is DEPENDENCY INJECTION and nothing else here is measurable. Read that before
+// proposing the next rewrite of `elements.ts`.
 //
 // The arms, separated by construction rather than by argument:
 //
@@ -44,6 +56,7 @@ import {
   Input,
   Renderer2,
   inject,
+  signal,
   type OnChanges,
   type SimpleChanges,
 } from '@angular/core';
@@ -55,7 +68,11 @@ import { fileURLToPath } from 'node:url';
 import { mount, unmount } from './render';
 import { ViewElement } from './elements';
 
-const ELEMENTS = 2000;
+// TEN THOUSAND, not two. At 2 000 the control pair disagreed by 2.8 ms against deltas of 3.1 — an
+// instrument that cannot separate the thing it was built to separate. Noise here is dominated by
+// scheduling rather than by the work, so it grows far slower than the signal does; the floor is what
+// says whether that worked, and it is printed for exactly that reason.
+const ELEMENTS = 10000;
 const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -153,10 +170,14 @@ class InertElement {
 
 // The same three inputs, written as SETTERS. Angular writes straight through them and never builds a
 // `SimpleChanges` — `usesOnChanges` is absent from the declaration entirely.
+// THE THIRD INJECTION IS HERE ON PURPOSE, matching `minimal` exactly. Without it this arm differs
+// from its comparison in TWO ways and the delta cannot be attributed — the first spelling had two
+// injections and read 2.44 us/element cheaper, which was quietly the injection plus the lifecycle.
 @Directive({ selector: 'setter-tag', standalone: true })
 class SetterElement {
   private readonly renderer = inject(Renderer2);
   private readonly host = inject(ElementRef);
+  protected readonly detector = inject(ChangeDetectorRef);
 
   @Input() set testID(value: string | undefined) {
     this.renderer.setProperty(this.host.nativeElement, 'testID', value);
@@ -169,11 +190,22 @@ class SetterElement {
   }
 }
 
+// `[testID]` is BOUND rather than static, so a change-detection pass has something to check on every
+// element. That is what the update arm below measures, and it is the shape a `select` has: one row
+// changes, and Angular checks all of them.
 const TEMPLATE = (tag: string): string =>
   `<view testID="host">${Array.from(
     { length: ELEMENTS },
-    () => `<${tag} testID="e" ellipsizeMode="tail"></${tag}>`,
+    () => `<${tag} [testID]="label()" ellipsizeMode="tail"></${tag}>`,
   ).join('')}</view>`;
+
+/** Every arm reads the same signal, so a pass has identical work to do above the directive. */
+const label = signal('a');
+
+/** Angular resolves `label()` against the component instance, so every arm needs the field. */
+class ArmBase {
+  readonly label = label;
+}
 
 @Component({
   selector: 'bare-arm',
@@ -181,7 +213,7 @@ const TEMPLATE = (tag: string): string =>
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: TEMPLATE('bare-tag'),
 })
-class BareArm {}
+class BareArm extends ArmBase {}
 
 @Component({
   selector: 'minimal-arm',
@@ -190,7 +222,7 @@ class BareArm {}
   imports: [MinimalElement],
   template: TEMPLATE('minimal-tag'),
 })
-class MinimalArm {}
+class MinimalArm extends ArmBase {}
 
 @Component({
   selector: 'setter-arm',
@@ -199,7 +231,7 @@ class MinimalArm {}
   imports: [SetterElement],
   template: TEMPLATE('setter-tag'),
 })
-class SetterArm {}
+class SetterArm extends ArmBase {}
 
 @Component({
   selector: 'control-arm',
@@ -208,7 +240,7 @@ class SetterArm {}
   imports: [ControlElement],
   template: TEMPLATE('control-tag'),
 })
-class ControlArm {}
+class ControlArm extends ArmBase {}
 
 @Component({
   selector: 'one-inject-arm',
@@ -222,7 +254,7 @@ class ControlArm {}
     ).join('')}</view
   >`,
 })
-class OneInjectArm {}
+class OneInjectArm extends ArmBase {}
 
 @Component({
   selector: 'inert-arm',
@@ -231,7 +263,7 @@ class OneInjectArm {}
   imports: [InertElement],
   template: TEMPLATE('inert-tag'),
 })
-class InertArm {}
+class InertArm extends ArmBase {}
 
 // `<view>` carries the real `ViewElement`, which extends `SymbioteElement` and its 279 inputs.
 @Component({
@@ -241,7 +273,7 @@ class InertArm {}
   imports: [ViewElement],
   template: TEMPLATE('view'),
 })
-class FullArm {}
+class FullArm extends ArmBase {}
 
 /**
  * Best of N per arm, ROUND-ROBIN rather than arm by arm.
@@ -255,22 +287,44 @@ class FullArm {}
 async function race(
   arms: readonly (readonly [string, unknown])[],
   rounds = 7,
-): Promise<Map<string, number>> {
-  const fastest = new Map<string, number>();
+): Promise<{
+  readonly create: Map<string, number>;
+  readonly check: Map<string, number>;
+}> {
+  const create = new Map<string, number>();
+  const check = new Map<string, number>();
   let rootTag = 8100;
   for (let round = 0; round < rounds; round += 1) {
     for (const [name, component] of arms) {
       rootTag += 1;
       fabric.reset();
+      label.set('a');
       const startedAt = performance.now();
       mount(rootTag, component);
       await tick();
-      const took = performance.now() - startedAt;
+      create.set(
+        name,
+        Math.min(create.get(name) ?? Infinity, performance.now() - startedAt),
+      );
+
+      // A PASS THAT CHANGES NOTHING, which is what a `select` does to the 999 rows it did not
+      // touch: the signal moves, Angular re-checks every binding in the template, and every one of
+      // them compares equal. Nothing should reach the engine at all — so whatever this costs is the
+      // price of CHECKING an element, and the directive is the only difference between the arms.
+      const checkedAt = performance.now();
+      label.set('a');
+      label.set('b');
+      label.set('a');
+      await tick();
+      check.set(
+        name,
+        Math.min(check.get(name) ?? Infinity, performance.now() - checkedAt),
+      );
+
       unmount(rootTag);
-      fastest.set(name, Math.min(fastest.get(name) ?? Infinity, took));
     }
   }
-  return fastest;
+  return { create, check };
 }
 
 describe('what a directive costs, taken apart', () => {
@@ -284,7 +338,9 @@ describe('what a directive costs, taken apart', () => {
       ['setters', SetterArm],
       ['full', FullArm],
     ]);
-    const read = (name: string): number => times.get(name) ?? Number.NaN;
+    const read = (name: string): number => times.create.get(name) ?? Number.NaN;
+    const checked = (name: string): number =>
+      times.check.get(name) ?? Number.NaN;
     const bare = read('bare');
     const inert = read('inert');
     const oneInject = read('one-inject');
@@ -316,6 +372,21 @@ describe('what a directive costs, taken apart', () => {
         '',
         `THE FLOOR               ${floor.toFixed(1)} ms   minimal against its own twin`,
         '',
+        'A CHECK THAT CHANGES NOTHING — the shape of a select, per arm',
+        ...[
+          'bare',
+          'inert',
+          'one-inject',
+          'minimal',
+          'control',
+          'setters',
+          'full',
+        ].map(
+          name =>
+            `${name.padStart(10)}${checked(name).toFixed(1).padStart(9)} ms   ${((checked(name) * 1000) / ELEMENTS).toFixed(2)} us/element`,
+        ),
+        `check floor             ${Math.abs(checked('minimal') - checked('control')).toFixed(1)} ms`,
+        '',
         ...(
           [
             ['a directive at all  ', inert - bare],
@@ -334,5 +405,12 @@ describe('what a directive costs, taken apart', () => {
 
     expect(bare).toBeGreaterThan(0);
     expect(full).toBeGreaterThan(0);
-  });
+    // The instrument reports on itself: a floor wider than the deltas means the run answered
+    // nothing, and that has to fail rather than print a table somebody quotes.
+    expect(
+      floor,
+      'the control pair must agree more closely than the smallest delta read against it',
+    ).toBeLessThan(Math.abs(minimal - setters));
+    // Seven arms, seven rounds, ten thousand elements each — well past vitest's default.
+  }, 120_000);
 });
