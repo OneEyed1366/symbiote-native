@@ -76,16 +76,30 @@
 // only if the answer would change a decision; on this evidence it would not, because the residual
 // belongs to a framework this adapter consumes rather than implements.
 //
+// THE PER-ROW COMPONENT IS ~26-40 us AN INSTANCE, NOT 81, and the difference is the same dev switch.
+// `CLAUDE.md` carries 81 us from a device A/B that inlined the row and re-ran; that predates
+// `settleAngularDevMode`. Measured here in one process, both spellings, census identical on every
+// run (nodes=10003, created=10002, setProps=13003): 25.6 / 30.3 / 38.1 / 39.7 us. One run read
+// 108.3 with both arms at three times their usual wall, which is a busy machine rather than a
+// finding — the arms are re-run rather than averaged for exactly that reason.
+//
+// A REGISTERED COMPOSED COMPONENT COSTS ONE ANCHOR PER INSTANCE and that half IS ours:
+// `rendererCreates` reads 11 002 against the inlined arm's 10 002. It does not reach the commit
+// walk, which is the thing worth checking — Svelte's anchors once cost it 56% of a create by taking
+// `renderableChildren` off its fast path. Here the walk reads 28.5 inlined against 27.5 with a
+// thousand anchors, so the anchors are free and the instance cost is Angular's LView and DI.
+//
 // RUN ON `build-release` (`pnpm run bench:itest`).
 
 import { createElement as h } from 'react';
 import '@angular/compiler';
-import { CUSTOM_ELEMENTS_SCHEMA, Component } from '@angular/core';
+import { CUSTOM_ELEMENTS_SCHEMA, Component, Input } from '@angular/core';
 import { h as vh, mount as mountVue } from '@symbiote-native/vue';
 import {
   SYMBIOTE_ELEMENTS,
   mount as mountAngular,
   readAngularProfile,
+  registerComposedComponent,
   unmount as unmountAngular,
 } from '@symbiote-native/angular';
 
@@ -202,6 +216,58 @@ class AngularCreateArm {
   readonly rowStyle = ROW_STYLE;
   readonly cellStyle = CELL_STYLE;
   readonly inputStyle = INPUT_STYLE;
+}
+
+/**
+ * THE SAME ROW AS A PER-ROW COMPONENT, which is how both bench arms and the device screen write it.
+ *
+ * `CLAUDE.md` records this at ~81 us per instance — 81 ms on a thousand rows, measured on device by
+ * inlining the row into the parent's `@for` and re-running. That figure predates Angular's dev mode
+ * being turned off, and every other pre-switch measurement of this adapter has needed re-taking.
+ *
+ * `registerComposedComponent` is not optional: without it Angular's automatic host element falls
+ * through to a raw `createNode` and the row commits ELEVEN nodes instead of ten. On device a Babel
+ * plugin injects the call; this runner does not run it, so it is written out — the same thing
+ * `angular-suite.itest.ts` does and for the same reason.
+ */
+@Component({
+  selector: 'BenchRowArm',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `<view [style]="rowStyle" [testID]="'row-' + id">
+    <text ellipsizeMode="tail" [allowFontScaling]="true">{{ id }}</text>
+    <view [style]="cellStyle"
+      ><text ellipsizeMode="tail" [allowFontScaling]="true"
+        >row {{ id }}</text
+      ></view
+    >
+    <view [style]="cellStyle"
+      ><text ellipsizeMode="tail" [allowFontScaling]="true">x</text></view
+    >
+    <text-input [style]="inputStyle" [text]="'input ' + id"></text-input>
+  </view>`,
+})
+class BenchRowComponent {
+  @Input() id = 0;
+  readonly rowStyle = ROW_STYLE;
+  readonly cellStyle = CELL_STYLE;
+  readonly inputStyle = INPUT_STYLE;
+}
+
+@Component({
+  selector: 'angular-component-row-arm',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  imports: [BenchRowComponent],
+  template: `<view [style]="rootStyle">
+    @for (id of ids; track id) {
+      <BenchRowArm [id]="id" />
+    }
+  </view>`,
+})
+class AngularComponentRowArm {
+  readonly ids = Array.from({ length: ROWS }, (_unused, id) => id);
+  readonly rootStyle = { flex: 1 };
 }
 
 /**
@@ -861,6 +927,52 @@ describe('what a reconciler adds to a create', () => {
         `unchanged=${telemetry?.writesOfUnchanged ?? 0}`,
     );
     expect(committedTags().length).toBe(10_003);
+  });
+
+  // why: `CLAUDE.md` prices a per-row COMPONENT at ~81 us per instance — 81 ms on this row — and
+  // that figure was taken on device with Angular's dev mode on, like every other pre-2026-09-18
+  // measurement of this adapter. Both bench arms and the device screen write the row that way, so
+  // if it is still 81 ms it is the single largest piece of Angular's remaining cost; if it is not,
+  // a number the project plans around has expired. One process, both spellings, same tree.
+  it('prices a per-row component against the same row inlined', () => {
+    registerComposedComponent('BenchRowArm');
+    const arms: readonly (readonly [string, typeof AngularCreateArm])[] = [
+      ['inlined', AngularCreateArm],
+      ['component', AngularComponentRowArm],
+    ];
+    const walls = new Map<string, number>();
+    for (const [name, component] of arms) {
+      unmountAngular(ROOT_TAG);
+      const startedAt = performance.now();
+      const surface = mountAngular(ROOT_TAG, component);
+      flushTimers();
+      surface.commit();
+      walls.set(name, performance.now() - startedAt);
+      mounted();
+      const telemetry = readSurfaceTelemetry(ROOT_TAG);
+      const profile = readAngularProfile();
+      print(
+        `DEBUG row-${name.padEnd(9)} wall=${(walls.get(name) ?? 0).toFixed(1)} ms ` +
+          `nodes=${committedTags().length} created=${telemetry?.nodesCreated ?? 0} ` +
+          `setProps=${telemetry?.setProps ?? 0} ` +
+          // A registered composed component commits NO node — its host is an anchor the walk skips
+          // — so `nodesCreated` above cannot see it while the renderer's own counter can. Svelte's
+          // anchors cost it 56% of a create once (`renderableChildren` losing its fast path), so
+          // the walk is printed beside them rather than assumed harmless.
+          `rendererCreates=${profile.nodesCreated} ` +
+          `walk=${(telemetry?.walkMs ?? 0).toFixed(1)} ` +
+          `apply=${(telemetry?.applyMs ?? 0).toFixed(1)}`,
+      );
+      // THE ORACLE, per arm and absolute. A component host that did not register commits ELEVEN
+      // nodes a row, and the delta would then be an extra thousand nodes rather than the component.
+      expect(committedTags().length).toBe(10_003);
+    }
+    const inlined = walls.get('inlined') ?? 0;
+    const component = walls.get('component') ?? 0;
+    print(
+      `DEBUG angular per-row component: ${(component - inlined).toFixed(1)} ms ` +
+        `(${(((component - inlined) * 1000) / ROWS).toFixed(1)} us/instance)`,
+    );
   });
 
   // why: `class` is the one styling name `SymbioteElement` does NOT declare, so it is the one that
