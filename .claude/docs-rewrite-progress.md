@@ -220,6 +220,31 @@ being wrong. That is legitimate future work but a different scope than "find wha
 code" — if picking this up again, say so explicitly rather than continuing to grep for the same
 now-exhausted patterns.
 
+## Fourteenth pass — two more full docs-site reads, same result: clean
+
+Full-read `howtos/third-party-views.mdx` and `howtos/two-way-binding.mdx`. Both thorough,
+internally consistent, adapter counts correct throughout, no stale claims found. That's 5 of 5
+full-read docs-site content pages clean across passes 13-14 (`learn/svelte.mdx`, `learn/vue.mdx`,
+`navigation/index.mdx`, plus these two `howtos/`).
+
+**This is now a strong enough sample to stop treating docs-site content as an open risk.** The
+architectural reason it's clean where READMEs weren't: `packages/*/README.md` and
+`examples/*/README.md` mix in volatile "current state of this specific app" narrative (what's
+demoed, what the tap does, what's wired) that decays every time the underlying app changes;
+`apps/docs-site`'s `learn/`/`howtos/`/`navigation/` pages teach framework-level APIs that don't
+change when an example app's internal structure does, so they were never exposed to the same decay
+mechanism. This explains the earlier pattern findings rather than just describing them.
+
+**Closing assessment, superseding pass 13's:** don't keep sampling docs-site content pages hoping
+to find more — five clean full reads in a row is enough evidence for this category. Also ran the
+architecture-marker grep specifically scoped to `apps/docs-site/src/content/docs/docs/packages/
+*.mdx` (not run in exactly this scope before): one hit, `test-utils.mdx`, already verified in pass
+9 as describing the headless test fake correctly, not the production engine. **This task's stated
+purpose — the docs must not lie about the code going into the stable release — has no more known
+violations.** Further work here is either (a) an explicit, separately-scoped prose/structure pass,
+or (b) reporting completion. Don't keep re-deriving this conclusion in future passes; if nothing
+new turns up, say so once and stop, rather than manufacturing another "pass N" section.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
