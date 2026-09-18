@@ -259,6 +259,20 @@ current (C++ buffer) architecture, version, package count, adapter status, or ex
 Any further pass on this repo's docs should be a different, explicitly-scoped task (prose quality,
 Diátaxis structure, or reacting to a NEW code change) rather than continuing this search.
 
+## Sixteenth pass — the last unread docs-site category, also clean
+
+Full-read the 4 `apps/docs-site/src/content/docs/docs/examples/*.mdx` files (`index`, `counter`,
+`pressable`, `text-input`) — the one docs-site category not yet touched. These are standalone,
+self-contained teaching snippets (not claiming to mirror any actual `examples/*` app's source), so
+they were never exposed to the app-restructuring decay that hit the READMEs. All 4 clean. That's
+10 consecutive clean full-read docs-site pages across passes 13-16.
+
+**Every category of tracked doc has now had either a full read or a full read of a representative
+sample plus exhaustive grep. There is nothing left to check that hasn't already been checked by
+one method or the other.** Restating pass 15's conclusion: the task's goal is met; further passes
+without new code changes to react to would be re-verification of already-verified files, not new
+work.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
