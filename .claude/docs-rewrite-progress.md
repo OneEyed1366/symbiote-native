@@ -164,6 +164,36 @@ other wasn't — this is a systematic risk shape, not a one-off.** The `examples
 files (6, not yet read this pass) are the obvious next check, especially since several are
 "same app as X" pairs too.
 
+## Twelfth pass — all 6 `examples/expo-*/README.md`, same pattern confirmed at scale
+
+Read all 6 Expo-canary READMEs in full. Confirmed the exact prediction from pass 11: five of them
+described an early state ("currently demos Sensors, will grow to demo others") when the actual
+apps (verified via `ls examples/expo-*/screens | wc -l` → 23 each, 22 wrapper-package screens +
+Menu) demo ALL 22 wrapper packages today. Fixed `expo-react`, `expo-vue-sfc`, `expo-vue-tsx`,
+`expo-angular` the same way (intro paragraph + file listing + run-section language). `expo-solid`
+was already accurate content-wise, just off-by-one in its own title ("+ 20 more" against a listed
+22 — fixed to "+ 21 more").
+
+`expo-vue-sfc`/`expo-vue-tsx` also still carried the vue-sfc/vue-tsx counter-app narrative
+(`onResponderRelease`, `ActivityIndicator is the first component`) copy-pasted from their non-Expo
+siblings before those got restructured — same root cause as pass 11, fixed the same way (deleted
+the stale specifics rather than guessing replacements, since neither app's `App.tsx`/`App.vue` has
+any counter logic at all any more — verified with `grep -n "count\|onPress" App.tsx` → no hits).
+
+**A second, unrelated finding in `expo-svelte`:** its "Local package resolution" section claimed
+every `@symbiote-native/*` dependency is wired via a `file:` tarball because the packages are
+"unpublished" — false on both counts. `package.json` pins them at `"latest"` (`grep -A2
+'"@symbiote-native/sensors"' package.json` → no `file:` anywhere), and per the earlier
+version-check passes every package is genuinely on npm. This also directly contradicts
+`CLAUDE.md`'s own `<examples_vs_dot_examples>` invariant, which documents the `file:` approach as
+**retired** in favor of a local Verdaccio registry as of 2026-09-01. Rewrote the section to point
+at the current mechanism instead of describing a removed one.
+
+**This closes the examples/*.README.md sweep** (13 non-Expo + Expo canaries, all read in full
+across passes 11-12). Combined with the package-README sweep (passes 1-10), the two largest
+categories of tracked docs are now done. What's left, per the priority list from pass 10: the
+docs-site `learn/`/`howtos/`/`navigation/`/`packages/*.mdx` pages — grep-swept, never fully read.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
