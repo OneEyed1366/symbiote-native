@@ -1134,11 +1134,15 @@ dynamic foldScrollContentProps(
       (ownerProps != nullptr &&
        ownerProps->get_ptr("maintainVisibleContentPosition") != nullptr);
 
-  // The identity return the reference fold had: a vertical content view under a scroller that
-  // anchors nothing has nothing to add, which is the common case and the one worth not copying for.
-  if (!isHorizontal && !preserves) return props;
-
   dynamic out = props;
+  // `ScrollView.js:1747` — UNCONDITIONAL on every content view, both axes. Yoga may collapse a view
+  // that only groups children, and a collapsed content node takes the scroll metrics with it.
+  //
+  // It was a `setProp` in `buildStructure` until 2026-09-18, which reached the payload by a route
+  // that had nothing to do with this rule and cost a crossing per scroll view to say a constant.
+  // Writing it here is also what RETIRED the identity return this rule used to open with: there is
+  // no longer a content node with nothing to add, so the fast path had no case left to serve.
+  out["collapsable"] = false;
   if (isHorizontal) {
     dynamic row = dynamic::object();
     row["flexDirection"] = "row";

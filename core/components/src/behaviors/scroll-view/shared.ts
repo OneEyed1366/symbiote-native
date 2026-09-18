@@ -174,10 +174,11 @@ function buildContent(contentIntrinsic: ISymbioteIntrinsic) {
       descriptor.isText,
       contentIntrinsic,
     );
-    // The wrapper sets it on every content node, both axes (react's `contentProps`). Yoga may
-    // collapse a view that only groups children, and a collapsed content node takes the scroll
-    // metrics with it.
-    setProp(content, 'collapsable', false);
+    // `collapsable: false` WAS SEEDED HERE AND IS NOT ANY MORE (2026-09-18). It is unconditional on
+    // every content node in both axes (`ScrollView.js:1747`), which makes it a constant of the TAG
+    // rather than of this builder — `foldScrollContentProps` writes it, and the contract is
+    // `scroll-content-payload.itest.ts` ("from the rule and not a seed", which asserts the authored
+    // prop is ABSENT because that is the only thing distinguishing the two routes).
     // Lands directly on the owner, because `node.childHost` is still undefined here: the engine
     // assigns it from what this returns. That ordering is why `buildStructure` RETURNS the slot
     // instead of setting the field itself — a behavior that set it first would redirect its own

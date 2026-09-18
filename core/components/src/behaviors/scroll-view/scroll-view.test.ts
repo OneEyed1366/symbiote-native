@@ -98,21 +98,24 @@ describe('the structure the behavior builds', () => {
     // the TAG and so is the only half a structure-time build can supply.
     expect(contentStyle).toEqual([undefined, { flexDirection: 'row' }]);
 
-    // Structure time carries only what the wrapper sets unconditionally; the row direction is a
-    // FOLD, so it shows up in the committed payload rather than in `props` (see the payload group).
+    // Structure time carries NOTHING now; the row direction is a rule, and so is the `collapsable`
+    // this used to expect here (see the case below).
     const owner = scrollNode(HORIZONTAL_SCROLL_VIEW_TAG);
-    expect(slotPropsOf(owner)).toEqual({ collapsable: false });
+    expect(slotPropsOf(owner)).toEqual({});
   });
 
-  it('sets collapsable:false on the content node, both axes, as the wrapper does', () => {
-    // Yoga may collapse a view that only groups children, and a collapsed content node takes the
-    // scroll metrics with it. React's `contentProps` sets it unconditionally; so does this.
-    expect(slotPropsOf(scrollNode(SCROLL_VIEW_TAG))).toEqual({
-      collapsable: false,
-    });
-    expect(slotPropsOf(scrollNode(HORIZONTAL_SCROLL_VIEW_TAG))).toEqual({
-      collapsable: false,
-    });
+  // why: the builder seeds NO props onto the content node, on either axis — which is what makes the
+  // tag rule the single source of everything that node sends. It used to seed `collapsable: false`
+  // with a `setProp`; that is `foldScrollContentProps` since 2026-09-18, because it is unconditional
+  // on both axes (`ScrollView.js:1747`) and therefore a constant of the tag rather than of a builder.
+  //
+  // WHAT IT SENDS is asserted where a rule's output is visible at all —
+  // `core/engine/cpp/tests/js/scroll-content-payload.itest.ts`, "from the rule and not a seed". This
+  // harness builds payloads through the TypeScript `fabricProps`, which carries no copy of the tag
+  // rules, so a `collapsable` assertion here could only ever have been about the seed.
+  it('seeds nothing onto the content node, both axes', () => {
+    expect(slotPropsOf(scrollNode(SCROLL_VIEW_TAG))).toEqual({});
+    expect(slotPropsOf(scrollNode(HORIZONTAL_SCROLL_VIEW_TAG))).toEqual({});
   });
 });
 
@@ -221,8 +224,6 @@ describe('style precedence, which is opposite on the two nodes', () => {
     });
 
     expect(slot.payload.padding).toBe(12);
-    // Seeded by `buildStructure` with `setProp`, not by any rule, so it is still visible here.
-    expect(slot.payload.collapsable).toBe(false);
   });
 
   it('vertical: the slot has no constant of its own', () => {

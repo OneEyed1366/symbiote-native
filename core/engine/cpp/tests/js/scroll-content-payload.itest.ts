@@ -18,8 +18,13 @@
 //   the row style         a CONSTANT of the tag — the content node's own tag is
 //                         `horizontal-scroll-content` or `scroll-content`, so this half needs no
 //                         owner at all and would have been portable at any point
-//   collapsableChildren   DERIVED from `maintainVisibleContentPosition` / `snapToAlignment`, which
-//                         stay on the OWNER, and is the half that needed the seam
+//   collapsable           a CONSTANT too, and unconditional on both axes (`ScrollView.js:1747`). It
+//                         was a build-time `setProp` in `buildStructure` until 2026-09-18 and is
+//                         the rule's now — see "from the rule and not a seed" for why that case has
+//                         to assert an ABSENT authored prop to mean anything
+//   collapsableChildren   DERIVED from the OWNER's `maintainVisibleContentPosition`, or its
+//                         `snapToAlignment` on ANDROID ONLY (`:1731-1733`) — the half that needed
+//                         the seam, and the one leg with a platform gate
 //
 // A STUB REGISTRATION HANDS THE TAG OVER, the same way the ActivityIndicator spinner's does: a tag
 // reaches C++ only through `recordSetTag`, which `attachHostBehavior` emits, so a tag nobody
@@ -32,6 +37,7 @@ import {
   committedPayloadOf,
   createElement,
   createSurface,
+  propsOf,
   readSurfaceTelemetry,
   routeProp,
   type ISymbioteNode,
@@ -81,6 +87,26 @@ function commit(tag: string, ownerProps: Record<string, unknown>): ICommitted {
 
 const vertical = (ownerProps: Record<string, unknown>): ICommitted =>
   commit('scroll-view', ownerProps);
+
+// The content NODE itself, for the one case that has to look at its authored props rather than at
+// what the rule made of them.
+function contentOf(ownerProps: Record<string, unknown>): ISymbioteNode {
+  const surface = createSurface(ROOT_TAG);
+  const owner: ISymbioteNode = createElement(
+    'RCTScrollView',
+    false,
+    'scroll-view',
+  );
+  for (const [name, value] of Object.entries(ownerProps))
+    routeProp(owner, name, value);
+  const content = owner.childHost;
+  if (content === undefined) throw new Error('the behavior built no content');
+  appendChild(owner, createElement('RCTView', false, 'view'));
+  surface.appendChild(owner);
+  surface.commit();
+  mounted();
+  return content;
+}
 const horizontal = (ownerProps: Record<string, unknown>): ICommitted =>
   commit('horizontal-scroll-view', ownerProps);
 
@@ -156,10 +182,20 @@ describe('what a scroll content node sends native', () => {
     expect(payload.snapToAlignment).toBe(undefined);
   });
 
-  // why: `collapsable: false` is seeded at BUILD time by `buildStructure`, not by this rule, and it
-  // must survive the rule running. Yoga may collapse a view that only groups children.
-  it('keeps the build-time collapsable seed', () => {
-    expect(vertical({}).payload.collapsable).toBe(false);
+  // why: `collapsable={false}` is UNCONDITIONAL on RN's content view (`ScrollView.js:1747`) — Yoga may
+  // collapse a view that only groups children, and a collapsed content node takes the scroll metrics
+  // with it. A constant of the tag, so the rule writes it.
+  //
+  // THE SECOND ASSERTION IS THE ONE THAT DISCRIMINATES, and without it this case is green either way.
+  // `buildStructure` used to seed the key with a `setProp` at build time, which reaches the payload by
+  // a completely different route and would satisfy the first line forever. A rule's output lives in
+  // the payload and nowhere else, so an absent AUTHORED prop is what says the seed is gone — the same
+  // witness the sticky port used one commit earlier.
+  it('refuses to be flattened away, from the rule and not a seed', () => {
+    const content = contentOf({});
+
+    expect(committedPayloadOf(content)?.collapsable).toBe(false);
+    expect(propsOf(content).collapsable).toBe(undefined);
   });
 
   // why: THE FAILURE MODE THE SEAM INTRODUCES, and the only one. A rule that reads its parent runs

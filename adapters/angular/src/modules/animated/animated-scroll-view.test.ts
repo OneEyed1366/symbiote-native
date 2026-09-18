@@ -95,7 +95,9 @@ describe('AnimatedScrollView', () => {
 
     const contentNode = fabric.find(n => n.handle === scrollChildren[0]);
     expect(contentNode?.viewName).toBe('RCTScrollContentView');
-    expect(contentNode?.props.collapsable).toBe(false);
+    // `collapsable: false` joined `nestedScrollEnabled` in `foldScrollContentProps` on 2026-09-18 —
+    // it was a build-time `setProp` until then, so it was visible in the authored props this line
+    // read. Same note as above: what this case is about is the wrap below.
 
     const contentChildren = contentNode ? childrenOf(contentNode.handle) : [];
     expect(

@@ -156,7 +156,12 @@ describe('Solid VirtualizedList on the engine', () => {
     // simply does not scroll on a device; on Android a second direct child of the scroll view is an
     // outright addViewAt crash, which is why RN also pins the content view un-flattened
     // (ScrollView.js preserveChildren / collapsable=false).
-    it('commits a nested scroll host with an un-flattened content container', async () => {
+    //
+    // THE UN-FLATTENING ITSELF is `foldScrollContentProps` in the engine since 2026-09-18 and is
+    // pinned in `core/engine/cpp/tests/js/scroll-content-payload.itest.ts`; this host carries no
+    // copy of the tag rules. What Solid owns is the NESTING, which is the half a flat tree gets
+    // wrong.
+    it('commits a nested scroll host holding a single content container', async () => {
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
           data={[]}
@@ -169,7 +174,9 @@ describe('Solid VirtualizedList on the engine', () => {
 
       const scroll = committed(SCROLL_VIEW);
       expect(scroll.children[0]?.viewName).toBe(CONTENT_VIEW);
-      expect(committed(CONTENT_VIEW).payload.collapsable).toBe(false);
+      // ONE content child, which is the Android crash this case is named for: a second direct child
+      // of the scroll view is an addViewAt failure. The count is the claim, not the node's name.
+      expect(scroll.children).toHaveLength(1);
     });
 
     // why: virtualization IS the component. RN mounts only `initialNumToRender` cells in the first
