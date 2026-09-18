@@ -969,6 +969,33 @@ its cost carries GC that best-of-N cannot suppress.
 > react 12 000, svelte/angular 13 000 — which by the benchmark screen's own rule is work the ADAPTER
 > generates, not a cost of the platform. That is the cheapest open lead on this page.
 >
+> **HALF OF THAT LEAD IS CLOSED (2026-09-18), and the counter is where it shows.** Re-run after the
+> `foldHostBag` deletion and the Text-defaults collapse, same fixture, same tree:
+>
+> ```
+>            before   after
+>  vue       10 000   10 000     unchanged
+>  solid     10 000   10 000     unchanged
+>  angular   13 000   13 000     unchanged
+>  react     12 000    9 000     -3 000
+>  svelte    13 000   10 000     -3 000
+> ```
+>
+> React and Svelte are exactly the two adapters whose CREATE path ran `foldHostBag` over
+> `HOST_PRIMITIVES[*].defaults` (`react/src/host-config.ts`, `svelte/src/dom-shim/element.ts`), and
+> the other three are unchanged in the way their own removals predict: Angular's `applyTextDefaults`
+> returned early unless one of the two props was authored, and Vue's `textDefaultFor` and Solid's
+> `foldTextValue` sat on the PATCH path, not create. So every column moved, or did not, for a reason
+> named in advance.
+>
+> **It is an inference from a coincidence, not an isolated A/B**, and the honest weight is that the
+> delta lands on exactly the predicted two adapters at exactly 3 000 each. No wall-clock verdict is
+> claimed: this fixture's per-arm spread is far wider than three thousand writes could move.
+>
+> What is LEFT of the lead is Angular's 13 000 against Solid's 10 000 — three per row, still
+> unenumerated, and now the whole of it. And React at 9 000 is BELOW vue/solid for the first time,
+> which is a new question rather than an answer.
+>
 > **What this invalidates, concretely.** Any cross-check of a headless measurement against a device
 > figure taken from this chapter is comparing two different engines. The `Swap` work below does
 > exactly that — it reads a headless 2.42x against "3.68x on device" — and that pairing is void: the
