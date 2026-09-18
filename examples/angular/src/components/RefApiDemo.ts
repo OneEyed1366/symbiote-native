@@ -6,7 +6,7 @@ import {
   inject,
 } from '@angular/core';
 import {
-  ButtonElement,
+  SYMBIOTE_ELEMENTS,
   Text,
   View,
   findNodeHandle,
@@ -22,7 +22,7 @@ import './RefApiDemo.css';
 @Component({
   selector: 'RefApiDemo',
   standalone: true,
-  imports: [View, Text, ButtonElement],
+  imports: [View, Text, SYMBIOTE_ELEMENTS],
   template: `
     <view class="section-nested">
       <text class="section-label"

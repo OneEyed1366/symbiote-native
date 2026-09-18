@@ -15,8 +15,7 @@
 import '@angular/compiler';
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import {
-  PressableElement,
-  TextInputElement,
+  SYMBIOTE_ELEMENTS,
   mount,
   registerComposedComponent,
   unmount,
@@ -111,7 +110,7 @@ const FLAT_ROW_TEMPLATE = `
 @Component({
   selector: 'BenchmarkRow',
   standalone: true,
-  imports: [PressableElement, Text, View],
+  imports: [SYMBIOTE_ELEMENTS, Text, View],
   template: COMPOSED_ROW_TEMPLATE,
 })
 class BenchmarkRow {
@@ -132,7 +131,7 @@ class BenchmarkRow {
 @Component({
   selector: 'BenchmarkRowWithInput',
   standalone: true,
-  imports: [PressableElement, Text, TextInputElement, View],
+  imports: [SYMBIOTE_ELEMENTS, Text, View],
   template: WITH_INPUT_ROW_TEMPLATE,
 })
 class BenchmarkRowWithInput {

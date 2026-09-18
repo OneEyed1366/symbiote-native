@@ -15,7 +15,7 @@ import {
   type ILiveNode,
 } from '@symbiote-native/test-utils';
 
-import { ViewElement } from '../elements';
+import { SYMBIOTE_ELEMENTS } from '../elements';
 import { mount, unmount } from '../render';
 
 const ROOT_TAG = 934;
@@ -28,7 +28,10 @@ const tick = (): Promise<void> =>
   selector: 'style-input-host',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  imports: [ViewElement],
+  // The whole array, not one element class: the tag directives are withheld from runtime matching,
+  // and what claims `[style]` is `SymbioteStyleHost`, which rides this list and is reachable no other
+  // way. See `../style-host.ts` for why an attribute selector on `[style]` cannot do it.
+  imports: [SYMBIOTE_ELEMENTS],
   template: `<view testID="probe" [style]="style"></view>`,
 })
 class StyleInputHost {

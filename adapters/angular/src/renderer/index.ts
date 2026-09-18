@@ -76,7 +76,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // same fold as the function prop `onValueChange`. See `listen()`. The two names live in a leaf
 // module so `elements.ts`'s ControlValueAccessor can name them without importing this cyclic file.
 import { VALUE_CHANGE_EVENT, VALUE_CHANGE_PROP } from './value-change';
-import { flushViewFor } from '../change-detection-flush';
+import {
+  createCallbackWrapper,
+  flushViewFor,
+  isWrappableCallback,
+  type ICallbackWrapper,
+} from '../change-detection-flush';
 
 // The app callbacks an engine behavior READS BACK inside the same microtask turn, as an Angular
 // `(event)` binding — `valueChange` is handled in `listen` on its own, since it also needs the field
@@ -543,6 +548,10 @@ export class SymbioteRenderer implements Renderer2 {
   // than merged into it, because the two are replaced independently — a new `[class]` value
   // replaces this string entirely while leaving every `[class.foo]` token standing.
   private readonly classStrings = new WeakMap<IHostNode, string>();
+  private readonly callbackWrappers = new WeakMap<
+    IHostNode,
+    ICallbackWrapper
+  >();
 
   addClass(el: IHostElement, name: string): void {
     if (isSurface(el)) return;
@@ -618,8 +627,31 @@ export class SymbioteRenderer implements Renderer2 {
       return;
     }
     this.flushStyling();
-    routeProp(el, name, value);
+    routeProp(el, name, this.wrapCallback(el, name, value));
     this.surface.requestCommit();
+  }
+
+  // AN `on*` PROP IS CALLED BY THE ENGINE, so Angular is told nothing and a plain field mutation
+  // inside the app's handler dirties no view — the "pan readout stuck at dx 0" bug
+  // `change-detection-flush.ts` records. It used to be wrapped by `SymbioteElement.ngOnChanges`,
+  // which is the wrong place now that most element directives are withheld from runtime matching
+  // (`../runtime-matching`): a withheld tag's binding reaches the renderer DIRECTLY through
+  // `ɵɵproperty` and never passes through a directive at all.
+  //
+  // Here it is reached by both paths and by every adapter surface — an element binding, a composed
+  // component's flat bag, an imperative write — which is a better home than the one it left.
+  //
+  // The cache is per NODE rather than per caller, because a node is what both paths agree on, and the
+  // wrapper is built on the first callback a node receives: the overwhelming majority of tags carry
+  // no `on*` prop, and an eager one would be a closure and a `WeakMap` per element for nothing.
+  private wrapCallback(node: IHostNode, name: string, value: unknown): unknown {
+    if (!isWrappableCallback(name, value)) return value;
+    let wrapper = this.callbackWrappers.get(node);
+    if (wrapper === undefined) {
+      wrapper = createCallbackWrapper(node);
+      this.callbackWrappers.set(node, wrapper);
+    }
+    return wrapper(name, value);
   }
 
   setValue(node: IHostNode, value: string): void {

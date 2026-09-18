@@ -139,6 +139,7 @@ import {
   SYMBIOTE_ELEMENTS,
   mount,
 } from '@symbiote-native/angular';
+import { withholdFromRuntimeMatching } from '../../../../../adapters/angular/src/runtime-matching';
 import { readSurfaceTelemetry } from '@symbiote-native/engine';
 
 import {
@@ -371,6 +372,46 @@ class NoDetectorElement implements OnChanges {
 // So the saving and the cost are the same order of magnitude and the design cannot be reasoned into
 // — this arm carries the selector WITHOUT matching anything, which is the state every element on the
 // benchmark row would be in. Against `no-detect` it prices the matching alone.
+// THE DIRECTIVE THAT NGTSC SEES AND THE RUNTIME DOES NOT — the mechanism, asked before any of the
+// adapter is changed around it.
+//
+// `findDirectiveDefMatches` walks `tView.directiveRegistry` and asks `isNodeMatchingSelectorList`
+// with `def.selectors` (upstream `instructions/shared.ts:466-501`), so a def whose selector list is
+// EMPTY is registered, iterated, and never matched. Its class, its inputs and its decorator are
+// untouched, which is all ngtsc reads: the template checker runs over the TypeScript source at
+// compile time and has nothing to do with the array the matcher walks at run time.
+//
+// So this is the whole of "keep the type checking, lose the instance", as one mutation per class at
+// module load — no build step, no linker output to rewrite, and it behaves the same under JIT here
+// as under the partial-compiled path a device runs.
+//
+// THE SHIPPED FUNCTION, by its internal path rather than a local copy of eight lines. It is not on
+// the package barrel — a public mutation helper invites an app to withhold a directive whose style
+// claim nothing replaces — and `angular-benchmark-row-shape.itest.ts` already reaches into the
+// adapter's source the same way for the same reason.
+//
+// `minimal` exactly — three injections, one forward — and then told not to match. Against `minimal`
+// it prices what the instance costs when everything else about the class is held still; against
+// `bare` it says whether anything of the directive survives the withholding.
+@Directive({ selector: 'unmatched-tag', standalone: true })
+class UnmatchedElement implements OnChanges {
+  private readonly renderer = inject(Renderer2);
+  private readonly host = inject(ElementRef);
+  protected readonly detector = inject(ChangeDetectorRef);
+  @Input() testID?: string;
+
+  ngOnChanges(changes: SimpleChanges): void {
+    for (const name of Object.keys(changes))
+      this.renderer.setProperty(
+        this.host.nativeElement,
+        name,
+        changes[name]?.currentValue,
+      );
+  }
+}
+
+withholdFromRuntimeMatching([UnmatchedElement]);
+
 // THE SHIPPED STRING, imported rather than copied. A second spelling here would price a selector
 // that is not the one an app carries the day either drifts, which is the mirror this repo deletes on
 // sight — and `callback-host-selector.test.ts` found five names missing from the first hand-written
@@ -554,6 +595,19 @@ class NoDetectorArm {
 }
 
 @Component({
+  selector: 'unmatched-arm',
+  standalone: true,
+  imports: [UnmatchedElement],
+  // The tag is unknown to Angular once nothing matches it, which is what the schema is for — and the
+  // hyphen it needs is the same one every intrinsic tag of ours already carries or tolerates.
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: ladderTemplate('unmatched-tag'),
+})
+class UnmatchedArm {
+  readonly items = ITEMS;
+}
+
+@Component({
   selector: 'callback-probe-arm',
   standalone: true,
   imports: [NoDetectorElement, CallbackProbeElement],
@@ -602,6 +656,7 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
       ['1-inject', OneInjectArm],
       ['no-detect', NoDetectorArm],
       ['cb-probe', CallbackProbeArm],
+      ['unmatched', UnmatchedArm],
       ['minimal', MinimalArm],
       ['setters', SetterArm],
       ['map-look', MapLookupArm],
@@ -700,6 +755,20 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
         `the ElementRef        ${verdict('no-detect', '1-inject')}`,
         `carrying the selector ${verdict('cb-probe', 'no-detect')}`,
         `the CALLBACK HOST     ${verdict('cb-probe', 'minimal')}`,
+        `WITHHOLDING it        ${verdict('minimal', 'unmatched')}`,
+        `what withholding LEFT ${verdict('unmatched', 'bare')}`,
+        // `full` IS NO LONGER A FAT-DIRECTIVE ARM, and this row is the proof rather than a caveat.
+        // It imports `SYMBIOTE_ELEMENTS`, whose tag directives are withheld from runtime matching as
+        // of 2026-09-18 — so what it now measures is the adapter's CURRENT shape: no tag directive
+        // instantiated, one thin `SymbioteStyleHost` matching instead. Read against `bare`, which
+        // instantiates nothing at all, it is what a screen still pays for its element directives.
+        //
+        // Every row above that names `full` expired with that change. `279 inputs, not 1` compares a
+        // withheld class against a matched one and reads NEGATIVE; `THE ESCAPE` compares two arms
+        // that now behave alike. They are left in place because a row that flipped sign is a louder
+        // record of what moved than a deleted one — the same call this file's own header makes about
+        // the three findings it published and withdrew.
+        `the adapter, vs bare  ${verdict('full', 'bare')}`,
         `ngOnChanges, not set  ${verdict('minimal', 'setters')}`,
         `proposal, weakmap     ${verdict('minimal', 'map-look')}`,
         `proposal, node slot   ${verdict('minimal', 'slot')}`,

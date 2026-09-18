@@ -103,35 +103,33 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('a static attribute on a directive-matched tag', () => {
-  // why: [characterization — behavior not confirmed] IT REACHES THE ENGINE TWICE, and this pins that
-  // rather than asserting the once it ought to be. Two writes of one authored value is a crossing and
-  // a conversion spent on a value the node already holds — `unchanged=3000` on the directive bench
-  // arm's create, against 0 on the bare one, i.e. 30% of that arm's prop writes.
+  // why: IT REACHED THE ENGINE TWICE UNTIL 2026-09-18, and this case pinned that as characterization
+  // while saying in its own text that "the second one going away" would change the line. It went
+  // away, so the line changed, and the rest of this comment is kept because it is the record of what
+  // the second path WAS.
   //
-  // WHO WRITES: `setAttribute` then `setProperty`, named by this case's own instrument rather than
-  // inferred. Ivy's `setUpAttributes` writes every static attribute unconditionally, and
-  // `setInputsFromAttrs` separately sets the directive input the same attribute fed — correct in a
-  // browser, where an attribute and a property are two different things, and a double write here,
-  // where they are one prop.
+  // Ivy's `setUpAttributes` writes every static attribute unconditionally, and `setInputsFromAttrs`
+  // separately set the directive input the same attribute fed — correct in a browser, where an
+  // attribute and a property are two different things, and a double write here, where they are one
+  // prop. It read `unchanged=3000` on the directive bench arm's create against 0 on the bare one,
+  // about 30% of that arm's prop writes, and the note concluded that neither write could be dropped
+  // from the outside without a props MIRROR in JS.
   //
-  // QUESTION: neither write can be dropped from the outside. The attribute write cannot know an
-  // input will claim the name, and the input write is the ONLY write when the binding is `[x]="..."`
-  // with no attribute. What would resolve it is a per-node record of the last value written — which
-  // is a props MIRROR in JS, the one thing this codebase deletes on sight (`node.ts:2`). Left as it
-  // is, deliberately: measured at ~0.5 ms of a 290 ms create, which does not buy a mirror.
+  // WHAT ACTUALLY DROPPED IT was not a mirror and was not aimed at this at all: `./runtime-matching`
+  // withholds the tag directives from Angular's matcher, so no input claims the name and the input
+  // path simply does not exist. A second, unpriced consequence of that change, found by this test.
   //
-  // The case is kept GREEN against the current behaviour so the COUNT is watched: a third path
-  // appearing, or the second one going away, both change this line.
-  it('reaches the engine twice, once per path that carries it', async () => {
+  // The COUNT is still what is watched — a path reappearing changes this line as surely as one
+  // leaving did.
+  it('reaches the engine once, by the attribute path alone', async () => {
     const restore = watchCallers();
     mount(ROOT_TAG, WriteOnceHost);
     await tick();
     restore();
 
-    expect(writesOf('ellipsizeMode')).toEqual(['tail', 'tail']);
-    expect(callers, 'the attribute path and the input path').toEqual([
+    expect(writesOf('ellipsizeMode')).toEqual(['tail']);
+    expect(callers, 'the attribute path, and no input path behind it').toEqual([
       'setAttribute',
-      'setProperty',
     ]);
   });
 

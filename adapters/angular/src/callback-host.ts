@@ -38,7 +38,10 @@ import {
   ChangeDetectorRef,
   Directive,
   ElementRef,
+  Renderer2,
+  type OnChanges,
   type OnDestroy,
+  type SimpleChanges,
   inject,
 } from '@angular/core';
 import {
@@ -53,6 +56,63 @@ import {
  * `scrollEventThrottle` to 1, and `markForCheck` walks to the root, so wrapping it cost the canary
  * ~37fps. `isWrappableCallback` excludes it, and the guard test asserts this string does too.
  */
+const CALLBACK_INPUTS = [
+  'onAccessibilityAction',
+  'onAccessibilityEscape',
+  'onAccessibilityTap',
+  'onBlur',
+  'onContentSizeChange',
+  'onEndEditing',
+  'onError',
+  'onFocus',
+  'onHoverIn',
+  'onHoverOut',
+  'onKeyPress',
+  'onLayout',
+  'onLoad',
+  'onLoadEnd',
+  'onLoadStart',
+  'onLongPress',
+  'onMagicTap',
+  'onMomentumScrollBegin',
+  'onMomentumScrollEnd',
+  'onMoveShouldSetResponder',
+  'onMoveShouldSetResponderCapture',
+  'onPartialLoad',
+  'onPress',
+  'onPressIn',
+  'onPressMove',
+  'onPressOut',
+  'onProgress',
+  'onRefresh',
+  'onResponderEnd',
+  'onResponderGrant',
+  'onResponderMove',
+  'onResponderReject',
+  'onResponderRelease',
+  'onResponderStart',
+  'onResponderTerminate',
+  'onResponderTerminationRequest',
+  'onScrollBeginDrag',
+  'onScrollEndDrag',
+  'onScrollToTop',
+  'onSelectionChange',
+  'onStartShouldSetResponder',
+  'onStartShouldSetResponderCapture',
+  'onSubmitEditing',
+  'onValueChange',
+] as const;
+
+/**
+ * THE SAME NAMES AS A LITERAL, and the duplication is forced rather than chosen.
+ *
+ * ngtsc STATICALLY EVALUATES a decorator's metadata, and a selector built with `.map().join()` is not
+ * something it can evaluate — it reports the class as `Component imports must be standalone
+ * components, directives, pipes, or must be NgModules`, which reads as a missing `standalone: true`
+ * and is not that. Thirty-seven of this adapter's compile-time guards went red on it at once.
+ *
+ * So the selector is written out, and `callback-host-selector.test.ts` holds the two in step.
+ */
 export const CALLBACK_ATTRIBUTE_SELECTOR =
   '[onAccessibilityAction],[onAccessibilityEscape],[onAccessibilityTap],[onBlur],' +
   '[onContentSizeChange],[onEndEditing],[onError],[onFocus],[onHoverIn],[onHoverOut],' +
@@ -65,8 +125,82 @@ export const CALLBACK_ATTRIBUTE_SELECTOR =
   '[onSelectionChange],[onStartShouldSetResponder],[onStartShouldSetResponderCapture],' +
   '[onSubmitEditing],[onValueChange]';
 
-@Directive({ selector: CALLBACK_ATTRIBUTE_SELECTOR, standalone: true })
-export class SymbioteCallbackHost implements OnDestroy {
+/** Exported for the guard alone — the decorator below must spell its own list for ngtsc. */
+export const CALLBACK_INPUT_NAMES: readonly string[] = CALLBACK_INPUTS;
+
+@Directive({
+  selector:
+    '[onAccessibilityAction],[onAccessibilityEscape],[onAccessibilityTap],[onBlur],' +
+    '[onContentSizeChange],[onEndEditing],[onError],[onFocus],[onHoverIn],[onHoverOut],' +
+    '[onKeyPress],[onLayout],[onLoad],[onLoadEnd],[onLoadStart],[onLongPress],[onMagicTap],' +
+    '[onMomentumScrollBegin],[onMomentumScrollEnd],[onMoveShouldSetResponder],' +
+    '[onMoveShouldSetResponderCapture],[onPartialLoad],[onPress],[onPressIn],[onPressMove],' +
+    '[onPressOut],[onProgress],[onRefresh],[onResponderEnd],[onResponderGrant],[onResponderMove],' +
+    '[onResponderReject],[onResponderRelease],[onResponderStart],[onResponderTerminate],' +
+    '[onResponderTerminationRequest],[onScrollBeginDrag],[onScrollEndDrag],[onScrollToTop],' +
+    '[onSelectionChange],[onStartShouldSetResponder],[onStartShouldSetResponderCapture],' +
+    '[onSubmitEditing],[onValueChange]',
+  // DECLARED, and this is not an optimisation — it is what makes withholding the tag directives
+  // possible at all. `ɵɵproperty` on an element no directive claimed ends in `setDomProperty`, which
+  // runs `validateAgainstEventProperties` and THROWS NG0306 on any name beginning with `on`
+  // (upstream `sanitization/sanitization.ts:267`). So an `on*` prop is not merely unwrapped without a
+  // claiming input — it is a hard runtime error, and the first attempt at this change hit it on the
+  // first test that binds one.
+  //
+  // The TYPES still come from `SymbioteElement` and its subclasses, which ngtsc goes on matching from
+  // the decorator's selector however empty the runtime array is. Angular requires an expression to
+  // satisfy EVERY directive that claims the input, so a permissive declaration here cannot loosen the
+  // exact one there.
+  inputs: [
+    'onAccessibilityAction',
+    'onAccessibilityEscape',
+    'onAccessibilityTap',
+    'onBlur',
+    'onContentSizeChange',
+    'onEndEditing',
+    'onError',
+    'onFocus',
+    'onHoverIn',
+    'onHoverOut',
+    'onKeyPress',
+    'onLayout',
+    'onLoad',
+    'onLoadEnd',
+    'onLoadStart',
+    'onLongPress',
+    'onMagicTap',
+    'onMomentumScrollBegin',
+    'onMomentumScrollEnd',
+    'onMoveShouldSetResponder',
+    'onMoveShouldSetResponderCapture',
+    'onPartialLoad',
+    'onPress',
+    'onPressIn',
+    'onPressMove',
+    'onPressOut',
+    'onProgress',
+    'onRefresh',
+    'onResponderEnd',
+    'onResponderGrant',
+    'onResponderMove',
+    'onResponderReject',
+    'onResponderRelease',
+    'onResponderStart',
+    'onResponderTerminate',
+    'onResponderTerminationRequest',
+    'onScrollBeginDrag',
+    'onScrollEndDrag',
+    'onScrollToTop',
+    'onSelectionChange',
+    'onStartShouldSetResponder',
+    'onStartShouldSetResponderCapture',
+    'onSubmitEditing',
+    'onValueChange',
+  ],
+  standalone: true,
+})
+export class SymbioteCallbackHost implements OnChanges, OnDestroy {
+  private readonly renderer = inject(Renderer2);
   private readonly host = inject(ElementRef);
   private readonly detector = inject(ChangeDetectorRef);
 
@@ -74,6 +208,17 @@ export class SymbioteCallbackHost implements OnDestroy {
     const node: unknown = this.host.nativeElement;
     if (typeof node === 'object' && node !== null)
       registerViewMarker(node, this.detector);
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // The renderer wraps the value on its way through, so this forwards it raw — same shape as the
+    // tag directives' own forward, and the only place a withheld tag's callback can now come from.
+    for (const name of Object.keys(changes))
+      this.renderer.setProperty(
+        this.host.nativeElement,
+        name,
+        changes[name]?.currentValue,
+      );
   }
 
   ngOnDestroy(): void {

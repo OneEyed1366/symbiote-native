@@ -28,7 +28,7 @@ import {
 } from '@symbiote-native/test-utils';
 import { ANCHOR_COMPONENT, parentOf } from '@symbiote-native/engine';
 import { COMPONENT_DESCRIPTORS } from '@symbiote-native/components';
-import { ViewElement } from './elements';
+import { SYMBIOTE_ELEMENTS } from './elements';
 // SIDE-EFFECT IMPORT. `register.ts` installs the host behaviors, and a behavior's `foldPayload` is
 // the bare path's ONLY source for the folds a wrapper would otherwise apply — without it
 // `text-input`/`switch`/`image` below commit a payload missing every default. An app reaches this
@@ -371,11 +371,16 @@ describe('[style] on a tag', () => {
     expect(node?.payload.opacity).toBe(1);
   });
 
-  it('takes an ARRAY when the element directive matches', async () => {
+  // `SYMBIOTE_ELEMENTS` AND NOT `[ViewElement]`, which is what this arm used to pass. The tag
+  // directives are withheld from runtime matching now (`./runtime-matching`), so what claims
+  // `[style]` is `SymbioteStyleHost` — a separate directive that rides the array and is reachable no
+  // other way. Naming one element class here would type-check and then throw on the device, which is
+  // exactly why the individual exports were removed from the package barrel.
+  it('takes an ARRAY when the element directives are imported', async () => {
     const { node, thrown } = await mountTemplate(
       `<view testID="probe" [style]="[{ opacity: 1 }, { margin: 2 }]"></view>`,
       NO_ERRORS_SCHEMA,
-      [ViewElement],
+      [...SYMBIOTE_ELEMENTS],
     );
     expect(thrown).toBe('');
     expect(node?.payload).toMatchObject({ opacity: 1, margin: 2 });

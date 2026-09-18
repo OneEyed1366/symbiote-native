@@ -52,13 +52,12 @@ import type {
 import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
 import { VALUE_CHANGE_EVENT } from './renderer/value-change';
 import {
-  createCallbackWrapper,
-  isWrappableCallback,
   registerViewFlush,
   unregisterViewFlush,
-  type ICallbackWrapper,
 } from './change-detection-flush';
 import { SymbioteCallbackHost } from './callback-host';
+import { withholdFromRuntimeMatching } from './runtime-matching';
+import { SymbioteStyleHost } from './style-host';
 import type {
   IActivityIndicatorProps,
   IImageProps,
@@ -106,21 +105,11 @@ export abstract class SymbioteElement implements OnChanges {
   // MATCHES on the callback attributes instead, registering it against the node; `markViewFor` is how
   // the wrapper reaches it. The inputs did not move, so nothing about this file's public surface did.
 
-  // An `onX` PROP is called by the engine, so Angular is never told it fired. Shared with the
-  // component path's `SymbioteHostPropsDirective`, which has the identical deficit — see
-  // `createCallbackWrapper`.
-  //
-  // BUILT ON THE FIRST CALLBACK PROP, not at construction. This directive is instantiated once per
-  // TAG on a screen that imports `SYMBIOTE_ELEMENTS`, and the overwhelming majority of tags carry no
-  // `on*` function prop at all — an eager wrapper is a closure and a `WeakMap` per element for
-  // nothing. Measured on the directive-shaped bench arm: 7 000 per 1 000-row create.
-  private wrapper: ICallbackWrapper | undefined;
-
-  private wrapCallback(key: string, value: unknown): unknown {
-    if (!isWrappableCallback(key, value)) return value;
-    this.wrapper ??= createCallbackWrapper(this.host.nativeElement);
-    return this.wrapper(key, value);
-  }
+  // THE `on*` WRAPPER LEFT THIS CLASS on 2026-09-18, for `SymbioteRenderer.setProperty`. Most of
+  // these directives are withheld from runtime matching now (`./runtime-matching`), so a binding
+  // reaches the renderer through `ɵɵproperty` without passing through any directive — a wrapper that
+  // lives here would simply stop running. The renderer is reached by every path, which is the home it
+  // should have had.
 
   @Input() testID?: IElementProps['testID'];
   @Input() nativeID?: IElementProps['nativeID'];
@@ -256,7 +245,9 @@ export abstract class SymbioteElement implements OnChanges {
       this.renderer.setProperty(
         this.host.nativeElement,
         name,
-        this.wrapCallback(name, changes[name]?.currentValue),
+        // Unwrapped on purpose: `SymbioteRenderer.setProperty` is where an `on*` value is wrapped
+        // now, and it is the call this line makes.
+        changes[name]?.currentValue,
       );
     }
   }
@@ -886,7 +877,41 @@ export const SYMBIOTE_ELEMENTS = [
   // bind one and carries the `ChangeDetectorRef` their wrapper needs. It rides this list for the same
   // reason the accessors do, and `elements.test.ts` subtracts it from the tag-coverage check by name.
   SymbioteCallbackHost,
+  // The other attribute-matched one: it claims `[style]` and `[class]` so an RN style ARRAY never
+  // reaches Angular's styling engine, which cannot represent one and throws. See `style-host.ts`.
+  SymbioteStyleHost,
 ] as const;
+
+// THE DIRECTIVES THAT GO ON MATCHING, and the list is the exceptions rather than the rule.
+//
+// A tag directive here is, with four exceptions, nothing but `@Input()` declarations over one
+// inherited `ngOnChanges` that forwards each of them to the renderer — which is the call
+// `ɵɵproperty` makes directly on an element nothing claimed. So the instance buys a compile-time
+// check at ~8.5-9.4 us of run time per element, and `./runtime-matching` keeps the check while
+// dropping the instance.
+//
+// These four cannot go, because they DO something when they are built:
+//
+//   text-input, text-input-multiline, switch   `ValueChangeElement` — listens for the engine's value
+//                                              event and registers a view flush, which is what stops
+//                                              a controlled value being undone inside one microtask
+//   refresh-control                            `ReadBackElement`, the same flush for the same reason
+//
+// The two form accessors and `SymbioteCallbackHost` are absent from both lists deliberately: they
+// match on an ATTRIBUTE rather than a tag, so they already land only where they are needed.
+withholdFromRuntimeMatching(
+  SYMBIOTE_ELEMENTS.filter(
+    directive =>
+      directive !== TextInputElement &&
+      directive !== MultilineTextInputElement &&
+      directive !== SwitchElement &&
+      directive !== RefreshControlElement &&
+      directive !== TextInputValueAccessor &&
+      directive !== SwitchValueAccessor &&
+      directive !== SymbioteCallbackHost &&
+      directive !== SymbioteStyleHost,
+  ),
+);
 
 // A prop this file forgets is not a silent gap — it is `Can't bind to 'x'` in the app that tries
 // it, which is the failure mode a hand-written list produces here. So the lists are checked

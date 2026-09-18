@@ -1,13 +1,12 @@
 import { Component, ViewChild } from '@angular/core';
 import {
   AccessibilityInfo,
-  ButtonElement,
   FlatList,
   Keyboard,
+  SYMBIOTE_ELEMENTS,
   SectionList,
   SymbioteHostPropsDirective,
   Text,
-  TextInputElement,
   View,
   VListItemDirective,
   VSectionHeaderDirective,
@@ -68,8 +67,7 @@ const paritySections: ISection<ISectionEntry>[] = [
   imports: [
     View,
     Text,
-    ButtonElement,
-    TextInputElement,
+    SYMBIOTE_ELEMENTS,
     FlatList,
     SectionList,
     VListItemDirective,

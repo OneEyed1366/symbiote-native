@@ -123,51 +123,28 @@ export type {
 } from './components';
 export { setImageSourceResolver } from './components';
 // The element directives that make a HAND-WRITTEN intrinsic tag (`<view>`, `<text-input>`, ...)
-// compile under ngtsc with no schema, and with a real type on every declared prop. `imports:
-// [SYMBIOTE_ELEMENTS]` is the whole app-facing surface; the individual classes are exported for an
-// app that wants a narrower import. See `elements.ts`'s header for why a directive rather than
-// `CUSTOM_ELEMENTS_SCHEMA`/`NO_ERRORS_SCHEMA`.
-export {
-  SYMBIOTE_ELEMENTS,
-  SymbioteElement,
-  ActivityIndicatorElement,
-  ActivityIndicatorSpinnerElement,
-  ButtonElement,
-  HorizontalScrollContentElement,
-  HorizontalScrollViewElement,
-  ImageBackgroundElement,
-  ImageElement,
-  InputAccessoryViewElement,
-  ModalElement,
-  MultilineTextInputElement,
-  PressableElement,
-  RefreshControlElement,
-  SafeAreaViewElement,
-  ScrollContentElement,
-  ScrollViewElement,
-  StickyHeaderElement,
-  SwitchElement,
-  TextElement,
-  TextInputElement,
-  // The `[(ngModel)]` / `formControl*` accessors for the two controlled tags — where the deleted
-  // wrappers' `NG_VALUE_ACCESSOR` went. Both ride `SYMBIOTE_ELEMENTS`; named separately for an app
-  // that imports narrowly.
-  SwitchValueAccessor,
-  TextInputValueAccessor,
-  // The three the list omitted while their components still existed. These are now the ONLY
-  // replacements for their deleted components in an app's `imports`, so a narrower import has to be
-  // able to name them.
-  TouchableHighlightElement,
-  TouchableNativeFeedbackElement,
-  TouchableOpacityElement,
-  TouchableWithoutFeedbackElement,
-  ViewElement,
-} from './elements';
-// Rides `SYMBIOTE_ELEMENTS` like the accessors do, and is named here for the same reason: an app
-// importing narrowly still needs its `on*` props to mark their view. `CALLBACK_ATTRIBUTE_SELECTOR`
-// is exported so a MEASUREMENT can carry the real string rather than a copy of it — the ladder in
-// `core/engine/cpp/tests/js/angular-directive-cost.itest.ts` prices what this selector costs to
-// match, and a second copy there would price a different one the day either drifts.
+// compile under ngtsc with no schema, and with a real type on every declared prop. See `elements.ts`
+// for why a directive rather than `CUSTOM_ELEMENTS_SCHEMA`/`NO_ERRORS_SCHEMA`.
+//
+// `imports: [SYMBIOTE_ELEMENTS]` IS THE ONLY SUPPORTED SPELLING, and the individual classes stopped
+// being exported on 2026-09-18. They used to be, "for an app that wants a narrower import", and that
+// became unsafe the day the tag directives were withheld from runtime matching
+// (`./runtime-matching`): a withheld class is a compile-time declaration and nothing else, so what
+// makes `<view [style]="[a, b]">` work at RUN time is `SymbioteStyleHost` matching the `[style]`
+// ATTRIBUTE, and what makes `<view [onPress]="fn">` work at all is `SymbioteCallbackHost` claiming
+// the name before `setDomProperty` throws NG0306 on it.
+//
+// Both ride this list. A narrow `imports: [ViewElement]` would type-check, commit most props
+// correctly, and then throw on a device the first time an app wrote an array style — a failure with
+// no compile-time tell whatsoever. Removing the narrow surface is what makes that unreachable rather
+// than documented, and `elements-are-not-individually-exported.test.ts` keeps it removed.
+//
+// `SymbioteElement` stays exported: it is the base an app NAMES in a type, never in an `imports`.
+export { SYMBIOTE_ELEMENTS, SymbioteElement } from './elements';
+// `CALLBACK_ATTRIBUTE_SELECTOR` is exported so a MEASUREMENT can carry the real string rather than a
+// copy of it — the ladder in `core/engine/cpp/tests/js/angular-directive-cost.itest.ts` prices what
+// this selector costs to match, and a second copy there would price a different one the day either
+// drifts. The two host classes are exported for the same reason the array is: they are part of it.
 export {
   CALLBACK_ATTRIBUTE_SELECTOR,
   SymbioteCallbackHost,
