@@ -740,6 +740,15 @@ try {
           ? '"production"'
           : '"development"',
       },
+      // ANGULAR'S OWN DEV SWITCH IS A THIRD ONE — neither `__DEV__` nor `NODE_ENV` reaches it, and
+      // `initNgDevMode` turns itself ON when the global is undefined (`ng_dev_mode.ts:85`). Every
+      // Angular arm this directory has ever timed ran under it.
+      //
+      // IT IS DELIBERATELY NOT A `define` HERE, and that was tried first. A compile-time `false`
+      // also strips the metadata a component definition builds at class-definition time, which is
+      // MORE than a Metro bundle gets — so it would measure a build the device cannot have and
+      // publish the difference as ours. `mount()` calls Angular's own `enableProdMode()` off the
+      // `__DEV__` above instead, which is exactly what ships, so these arms measure that.
       plugins: [
         workspaceSources,
         solidJsx,
