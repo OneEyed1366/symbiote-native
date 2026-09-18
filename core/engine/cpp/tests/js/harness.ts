@@ -270,6 +270,7 @@ export function expect(actual: unknown): {
   toContain: (expected: unknown) => void;
   toBeDefined: () => void;
   toBeGreaterThan: (expected: number) => void;
+  toBeLessThan: (expected: number) => void;
 } {
   const fail = (expected: unknown): never => {
     throw new Error(
@@ -303,6 +304,14 @@ export function expect(actual: unknown): {
     toBeGreaterThan(expected: number): void {
       if (typeof actual !== 'number' || !(actual > expected)) {
         fail(`a number greater than ${expected}`);
+      }
+    },
+    // The twin, added for a guard that has to bound a delta from ABOVE: a gap wider than N means a
+    // directive stopped matching (`angular-directive-cost.itest.ts`). Inverting such a bound through
+    // `toBeGreaterThan` costs the failure message its numbers, which is the whole value of having it.
+    toBeLessThan(expected: number): void {
+      if (typeof actual !== 'number' || !(actual < expected)) {
+        fail(`a number less than ${expected}`);
       }
     },
   };

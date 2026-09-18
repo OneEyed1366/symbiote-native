@@ -265,10 +265,26 @@ abstract class ReadBackElement extends SymbioteElement implements OnDestroy {
   }
 }
 
-@Directive({ selector: 'view', standalone: true })
+// BOTH SPELLINGS ON THE SEVEN DASHLESS TAGS, and it is a correctness fix rather than a convenience.
+//
+// The renderer has always mapped `symbiote-view` onto `view` (`PRIMITIVE_SELECTOR_ALIAS`), because
+// `CUSTOM_ELEMENTS_SCHEMA` admits an unknown element only when the name carries a hyphen — so the
+// hyphenated form is the spelling an app WITHOUT these directives has to use. It is the same tag and
+// commits the same node.
+//
+// It was not the same tag HERE. A selector of `view` alone meant an app that imports
+// `SYMBIOTE_ELEMENTS` and writes `<symbiote-view>` matched nothing: no type check on its props, no
+// declared inputs, none of `SymbioteElement`'s forwarding or callback wrapping — silently, with the
+// tree still looking right. Measured, that shape also ran ~8.6 us per element FASTER, which is what
+// made it look like an optimization instead of a hole (`angular-directive-cost.itest.ts`).
+//
+// Only the seven dashless tags need it: `hyphenatedIntrinsicAliases` skips any tag that already
+// carries a dash, so `symbiote-scroll-view` resolves nowhere on either side and the two halves agree
+// already.
+@Directive({ selector: 'view, symbiote-view', standalone: true })
 export class ViewElement extends SymbioteElement {}
 
-@Directive({ selector: 'pressable', standalone: true })
+@Directive({ selector: 'pressable, symbiote-pressable', standalone: true })
 export class PressableElement extends SymbioteElement {
   @Input() disabled?: IAngularPressableProps['disabled'];
   @Input() cancelable?: IAngularPressableProps['cancelable'];
@@ -341,14 +357,14 @@ export class TouchableWithoutFeedbackElement extends PressableElement {
 // RN's Button IS a TouchableOpacity (Button.js:384), and the behavior builds the view and the
 // label under it — so the tag takes the touchable's surface plus the four props Button owns. There
 // is no `style`: RN's Button has no such prop, and the label/background come from `color`.
-@Directive({ selector: 'button', standalone: true })
+@Directive({ selector: 'button, symbiote-button', standalone: true })
 export class ButtonElement extends TouchableOpacityElement {
   @Input() title?: string;
   @Input() color?: string;
   @Input() touchSoundDisabled?: boolean;
 }
 
-@Directive({ selector: 'text', standalone: true })
+@Directive({ selector: 'text, symbiote-text', standalone: true })
 export class TextElement extends SymbioteElement {
   // Narrows the inherited input to a TEXT style so `fontSize`/`fontWeight` type-check here. The
   // initializer is what TS2612 asks for to accept a redeclaration as deliberate; `declare` would
@@ -365,7 +381,7 @@ export class TextElement extends SymbioteElement {
   @Input() disabled?: ITextElementProps['disabled'];
 }
 
-@Directive({ selector: 'image', standalone: true })
+@Directive({ selector: 'image, symbiote-image', standalone: true })
 export class ImageElement extends SymbioteElement {
   @Input() source?: IImageProps['source'];
   @Input() src?: IImageProps['src'];
@@ -619,7 +635,7 @@ export class TextInputElement extends ValueChangeElement {
 @Directive({ selector: 'text-input-multiline', standalone: true })
 export class MultilineTextInputElement extends TextInputElement {}
 
-@Directive({ selector: 'switch', standalone: true })
+@Directive({ selector: 'switch, symbiote-switch', standalone: true })
 export class SwitchElement extends ValueChangeElement {
   @Input() value?: ISwitchProps['value'];
   @Input() disabled?: ISwitchProps['disabled'];
@@ -755,7 +771,7 @@ export class ActivityIndicatorSpinnerElement extends ActivityIndicatorElement {}
 @Directive({ selector: 'safe-area-view', standalone: true })
 export class SafeAreaViewElement extends SymbioteElement {}
 
-@Directive({ selector: 'modal', standalone: true })
+@Directive({ selector: 'modal, symbiote-modal', standalone: true })
 export class ModalElement extends SymbioteElement {
   @Input() visible?: IModalViewProps['visible'];
   @Input() transparent?: IModalViewProps['transparent'];

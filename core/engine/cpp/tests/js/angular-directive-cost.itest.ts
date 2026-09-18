@@ -60,30 +60,28 @@
 // cannot be collected. The next idea has to remove the directive from the RUNTIME rather than make
 // it cheaper — it exists for ngtsc's template checker, which is a compile-time job.
 //
-// AND THAT WORKS, on a seam this adapter has carried all along. `PRIMITIVE_SELECTOR_ALIAS` maps
-// `symbiote-view` onto `view`, while `ViewElement`'s selector is the bare `view` — so a template
-// that spells the hyphenated name gets the IDENTICAL engine node with no directive matching it. The
-// `aliased` arm is that, with the directives still imported exactly as a real screen has them:
+// ONE ESCAPE LOOKED AVAILABLE AND IT WAS A HOLE, not a lever — recorded because the measurement is
+// what made it look attractive, and the next reader will find the same numbers.
 //
-//   full -> aliased     86.4 / 81.8 ms saved    ~8.2-8.6 us/element, outside the bar both runs
-//   aliased vs bare     -3.5 / +12.0 ms         it lands on the bare cost
+// `PRIMITIVE_SELECTOR_ALIAS` maps `symbiote-view` onto `view`, so both spellings commit the
+// identical node. The directive's selector was the bare `view` ALONE, so the hyphenated form matched
+// nothing — and an element with no directive is ~8.6 us per element cheaper. Measured before the
+// fix: `full` 291.6/296.0 against `aliased` 205.2/214.2, i.e. 86.4/81.8 ms, censuses identical.
 //
-// Census identical on every arm, so the committed tree does not change. The hyphen is also what
-// `CUSTOM_ELEMENTS_SCHEMA` wants, so a rewritten template needs no directive to be a legal one.
+// That is not 30% off Angular. It is an app writing `<symbiote-view>` and silently losing its type
+// check, its declared inputs, its callback wrapping and everything else `SymbioteElement` does —
+// with the committed tree unchanged, so nothing could see it. The two spellings are ONE TAG, and the
+// fix was to say so in the selector (`elements.ts`, `'view, symbiote-view'` on the seven dashless
+// tags). `elements.test.ts`'s `T2` case is the compile-time guard.
 //
-// WHAT MAKES IT SHIPPABLE RATHER THAN A CURIOSITY is that ngtsc has already type-checked the
-// template by the time the partial declaration exists, so a build step could rewrite the tag AFTER
-// the check and keep both. Per ELEMENT, not per component, which matters: the benchmark row carries
-// a `<text-input>`, and any component-wide strip would refuse the whole row over it.
+// The `aliased` arm stays as the RUNTIME guard for that, and its row now reads the other way: it
+// must land ON `full`, inside the bar. A `THE ESCAPE` row that opens back up means the selector
+// regressed and an app can fall through the hole again.
 //
-// WHAT STILL HAS TO BE ANSWERED BEFORE WRITING THAT STEP — each of these keeps a directive, so a
-// rewrite must leave those elements alone:
-//   an `[onX]="fn"` prop   `wrapCallback` wraps it for `markForCheck`; without the directive the
-//                          engine calls it and Angular is never told (`change-detection-flush.ts`).
-//   `[(value)]`            `ReadBackElement`'s output and its same-microtask view flush.
-//   a `[style]` binding    without a directive it goes through Angular's STYLING engine instead of
-//                          arriving whole at `setProperty`. Both work — the bare bench arm is the
-//                          one that does — but it is a different path with a different cost.
+// WHAT WAS ANSWERED ALONG THE WAY AND IS WORTH KEEPING: a `[style]` binding commits the SAME payload
+// whether a directive claims it as an input or Angular's own styling engine handles it — including a
+// numeric value and a `transform` ARRAY. That was the open question about the two paths and it is
+// closed by `commits the same style whether a directive claims the binding or not` below.
 //
 // ONE PROP PER ELEMENT AND NOTHING ELSE, deliberately. `[testID]` is declared by `ViewElement`, so
 // the directive arm CLAIMS it and forwards it out of `ngOnChanges`, while the bare arm lets it reach
@@ -217,6 +215,39 @@ class BehaviorArm {
   // carries `accessible` and no `focusable` at all — which is correct, and made the first spelling
   // of this case fail on the arm that was working.
   noop(): void {}
+}
+
+// THE GATE ON THE WHOLE IDEA, and it is `[style]`.
+//
+// `SymbioteElement` declares `style` as an `@Input()`, so with a directive matched the binding
+// arrives WHOLE at `setProperty('style', obj)`. Drop the directive and the same binding goes through
+// Angular's own STYLING engine instead — `ɵɵstyleMap`, one `setStyle` per key, gathered back into
+// one write by the renderer's styling run. Two different paths for one authored object.
+//
+// It decides whether the rewrite is worth building at all: the benchmark row carries a `[style]` on
+// every one of its ten nodes, so if that binding forces a refusal the saving is zero where it
+// matters most. RN styles are also the awkward case for a CSS-shaped engine — numbers rather than
+// strings, and an ARRAY for `transform`.
+const STYLE_OBJECT = {
+  height: 44,
+  flexDirection: 'row',
+  paddingLeft: 10,
+  opacity: 0.5,
+  transform: [{ translateX: 12 }],
+};
+
+@Component({
+  selector: 'style-path-arm',
+  standalone: true,
+  imports: [SYMBIOTE_ELEMENTS],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `<view>
+    <view testID="claimed" [style]="style"></view>
+    <symbiote-view testID="styled" [style]="style"></symbiote-view>
+  </view>`,
+})
+class StylePathArm {
+  readonly style = STYLE_OBJECT;
 }
 
 // THE LADDER BETWEEN THE TWO, so the 9 us has a breakdown rather than a name. Every rung declares
@@ -566,14 +597,25 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
         `ngOnChanges, not set  ${verdict('minimal', 'setters')}`,
         `proposal, weakmap     ${verdict('minimal', 'map-look')}`,
         `proposal, node slot   ${verdict('minimal', 'slot')}`,
+        // MUST read INSIDE the bar. The hyphenated spelling is the same tag, so it must cost the
+        // same; a gap here is the selector hole reopening, and it reads as a 30% win.
         `THE ESCAPE            ${verdict('full', 'aliased')}`,
-        `escape vs bare        ${verdict('aliased', 'bare')}`,
         `279 inputs, not 1     ${verdict('full', 'minimal')}`,
       ].join('\n'),
     );
 
     // No threshold on any delta — that is what the print is for, and a bound would either be so
     // loose it says nothing or so tight it fails on a busy machine.
+    //
+    // ONE EXCEPTION, and it is a correctness claim rather than a performance one: the hyphenated
+    // spelling must not be CHEAPER than the bare one, because cheaper means no directive matched it
+    // and an app writing it has silently lost every check. The bound is deliberately loose — half
+    // the measured hole (86 ms) — so it cannot fail on a busy machine and cannot miss the hole.
+    const HOLE = 40;
+    expect(
+      read('full').wall - read('aliased').wall,
+      'the hyphenated spelling matched no directive — see the selector in elements.ts',
+    ).toBeLessThan(HOLE);
   });
 
   // why: an aliased tag that lost its host behavior would commit a tree that looks identical and is
@@ -612,6 +654,38 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
     expect(plain?.props.accessible, 'a bare pressable folds').toBe('true');
     expect(aliased?.props.accessible, 'and so does an aliased one').toBe(
       'true',
+    );
+  });
+
+  // why: THE GATE. Every node of the benchmark row carries a `[style]`, so if the two paths disagree
+  // about one authored object the rewrite is worth nothing on the screen it was designed for. And a
+  // disagreement here would be a SILENT one — the tree, the node count and the write count are all
+  // identical either way; only the pixels would differ.
+  it('commits the same style whether a directive claims the binding or not', () => {
+    const surface = mount(ROOT_TAG, StylePathArm);
+    flushTimers();
+    surface.commit();
+    mounted();
+
+    const claimed = findByTestId('claimed');
+    const styled = findByTestId('styled');
+    print(
+      `claimed ${JSON.stringify(claimed?.props)}\nstyled  ${JSON.stringify(styled?.props)}`,
+    );
+
+    const withoutTestID = (view: typeof claimed): string =>
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(view?.props ?? {}).filter(([key]) => key !== 'testID'),
+        ),
+      );
+    expect(withoutTestID(styled), 'the two style paths agree').toBe(
+      withoutTestID(claimed),
+    );
+    // An absolute anchor beside the comparison: two empty payloads compare equal, and `height` is
+    // the one key a flattened view could not have.
+    expect(claimed?.props.height, 'the claimed path styled anything').toBe(
+      '44',
     );
   });
 });
