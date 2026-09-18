@@ -58,6 +58,7 @@ import {
   unregisterViewFlush,
   type ICallbackWrapper,
 } from './change-detection-flush';
+import { SymbioteCallbackHost } from './callback-host';
 import type {
   IActivityIndicatorProps,
   IImageProps,
@@ -97,7 +98,13 @@ import type { IAngularScrollViewProps } from './components/scroll-view-props';
 export abstract class SymbioteElement implements OnChanges {
   private readonly renderer = inject(Renderer2);
   protected readonly host = inject(ElementRef);
-  protected readonly detector = inject(ChangeDetectorRef);
+
+  // NO `ChangeDetectorRef` HERE, and its absence is the point. This class is instantiated once per
+  // ELEMENT, so injecting one cost ~1.0-2.4 us on every tag of a screen to serve the few that carry
+  // an `on*` prop — ten thousand `ViewRef`s on a thousand-row create, read by none of them
+  // (`core/engine/cpp/tests/js/angular-directive-cost.itest.ts`). `SymbioteCallbackHost` owns one and
+  // MATCHES on the callback attributes instead, registering it against the node; `markViewFor` is how
+  // the wrapper reaches it. The inputs did not move, so nothing about this file's public surface did.
 
   // An `onX` PROP is called by the engine, so Angular is never told it fired. Shared with the
   // component path's `SymbioteHostPropsDirective`, which has the identical deficit — see
@@ -111,10 +118,7 @@ export abstract class SymbioteElement implements OnChanges {
 
   private wrapCallback(key: string, value: unknown): unknown {
     if (!isWrappableCallback(key, value)) return value;
-    this.wrapper ??= createCallbackWrapper(
-      this.detector,
-      this.host.nativeElement,
-    );
+    this.wrapper ??= createCallbackWrapper(this.host.nativeElement);
     return this.wrapper(key, value);
   }
 
@@ -270,6 +274,10 @@ export abstract class SymbioteElement implements OnChanges {
  */
 @Directive()
 abstract class ReadBackElement extends SymbioteElement implements OnDestroy {
+  // ITS OWN, now that the base has none. Three tags reach this class, so the injection is paid where
+  // it is read instead of on every element of a screen.
+  private readonly detector = inject(ChangeDetectorRef);
+
   constructor() {
     super();
     const node: unknown = this.host.nativeElement;
@@ -874,6 +882,10 @@ export const SYMBIOTE_ELEMENTS = [
   // provided, and `elements.test.ts` subtracts them from its tag-coverage check by name.
   TextInputValueAccessor,
   SwitchValueAccessor,
+  // Also not a tag: it matches on the callback ATTRIBUTES, so it lands only on the elements that
+  // bind one and carries the `ChangeDetectorRef` their wrapper needs. It rides this list for the same
+  // reason the accessors do, and `elements.test.ts` subtracts it from the tag-coverage check by name.
+  SymbioteCallbackHost,
 ] as const;
 
 // A prop this file forgets is not a silent gap — it is `Can't bind to 'x'` in the app that tries

@@ -98,10 +98,7 @@ export function isWrappableCallback(key: string, value: unknown): boolean {
  * ONE wrapper per original handler, for the caller's lifetime. A fresh closure per push would make
  * the engine store a new listener every time and would defeat every downstream identity check.
  */
-export function createCallbackWrapper(
-  view: IViewMarker,
-  node: unknown,
-): ICallbackWrapper {
+export function createCallbackWrapper(node: unknown): ICallbackWrapper {
   // Allocated on the FIRST wrap, not at construction. The map is per-CALLER, so an eager one is one
   // `WeakMap` per directive instance — 7 000 on a 1 000-row create of the benchmark row, none of
   // which is ever read, because that row carries no `on*` prop.
@@ -120,13 +117,46 @@ export function createCallbackWrapper(
     // `undefined` as the receiver preserves the previous unbound call.
     const wrapper = (...args: unknown[]): unknown => {
       const result: unknown = Reflect.apply(value, undefined, args);
-      view.markForCheck();
+      markViewFor(node);
       flushViewFor(node);
       return result;
     };
     wrappers.set(value, wrapper);
     return wrapper;
   };
+}
+
+/**
+ * The MARKER half, keyed on the node rather than injected.
+ *
+ * `markForCheck` needs the view holding the binding, and until 2026-09-18 the only way to have one
+ * was for `SymbioteElement` to inject a `ChangeDetectorRef` — on EVERY element, so that its lazy
+ * `on*` wrapper could reach one on the few that carry a callback. An injection is ~1-2.4 us per
+ * element on JavaScriptCore (`core/engine/cpp/tests/js/angular-directive-cost.itest.ts`), so a
+ * thousand-row screen paid for ten thousand `ViewRef`s to serve none.
+ *
+ * `SymbioteCallbackHost` registers here instead, and it MATCHES on the callback attributes rather
+ * than being injected — so an element with no `on*` binding neither instantiates it nor pays for it.
+ * Measured as the whole trade, selector included: -3.9 / -9.3 / -25.5 ms over ten thousand elements.
+ *
+ * Separate from `viewFlushes` deliberately. They come from different directives, on overlapping but
+ * different sets of tags, and they are not the same instruction: this one SCHEDULES and reaches every
+ * ancestor, that one re-checks ONE view synchronously. Collapsing them into a single entry would make
+ * whichever directive registered last decide which of the two an element gets.
+ */
+const viewMarkers = new WeakMap<object, IViewMarker>();
+
+export function registerViewMarker(node: object, marker: IViewMarker): void {
+  viewMarkers.set(node, marker);
+}
+
+export function unregisterViewMarker(node: object): void {
+  viewMarkers.delete(node);
+}
+
+export function markViewFor(node: unknown): void {
+  if (typeof node !== 'object' || node === null) return;
+  viewMarkers.get(node)?.markForCheck();
 }
 
 export function registerViewFlush(node: object, flush: () => void): void {

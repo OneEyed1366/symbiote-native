@@ -134,7 +134,11 @@ import {
   type SimpleChanges,
 } from '@angular/core';
 
-import { SYMBIOTE_ELEMENTS, mount } from '@symbiote-native/angular';
+import {
+  CALLBACK_ATTRIBUTE_SELECTOR,
+  SYMBIOTE_ELEMENTS,
+  mount,
+} from '@symbiote-native/angular';
 import { readSurfaceTelemetry } from '@symbiote-native/engine';
 
 import {
@@ -357,6 +361,25 @@ class NoDetectorElement implements OnChanges {
   }
 }
 
+// WHAT A BIG ATTRIBUTE SELECTOR COSTS TO CARRY, asked before the design that needs one is built.
+//
+// The shape that would collect the `ChangeDetectorRef` is a second directive selected on the callback
+// attributes, so only an element binding one instantiates it. That selector is every `on*` input
+// `elements.ts` declares bar the per-frame one, which is dozens of alternatives, and Angular
+// tries a component's whole directive list against every element it creates.
+//
+// So the saving and the cost are the same order of magnitude and the design cannot be reasoned into
+// — this arm carries the selector WITHOUT matching anything, which is the state every element on the
+// benchmark row would be in. Against `no-detect` it prices the matching alone.
+// THE SHIPPED STRING, imported rather than copied. A second spelling here would price a selector
+// that is not the one an app carries the day either drifts, which is the mirror this repo deletes on
+// sight — and `callback-host-selector.test.ts` found five names missing from the first hand-written
+// version of it within a minute of being written.
+@Directive({ selector: CALLBACK_ATTRIBUTE_SELECTOR, standalone: true })
+class CallbackProbeElement {
+  protected readonly detector = inject(ChangeDetectorRef);
+}
+
 // The same three injections and the same one forward, written as a SETTER. Angular writes straight
 // through it and never builds a `SimpleChanges` — `usesOnChanges` is absent from the declaration
 // entirely — so `minimal` against this one prices the lifecycle rather than the forwarding.
@@ -530,6 +553,16 @@ class NoDetectorArm {
   readonly items = ITEMS;
 }
 
+@Component({
+  selector: 'callback-probe-arm',
+  standalone: true,
+  imports: [NoDetectorElement, CallbackProbeElement],
+  template: ladderTemplate('no-detector-tag'),
+})
+class CallbackProbeArm {
+  readonly items = ITEMS;
+}
+
 interface IArmReading {
   wall: number;
   created: number;
@@ -568,6 +601,7 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
       ['bare', BareArm],
       ['1-inject', OneInjectArm],
       ['no-detect', NoDetectorArm],
+      ['cb-probe', CallbackProbeArm],
       ['minimal', MinimalArm],
       ['setters', SetterArm],
       ['map-look', MapLookupArm],
@@ -664,6 +698,8 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
         `two more injections   ${verdict('minimal', '1-inject')}`,
         `the ChangeDetectorRef ${verdict('minimal', 'no-detect')}`,
         `the ElementRef        ${verdict('no-detect', '1-inject')}`,
+        `carrying the selector ${verdict('cb-probe', 'no-detect')}`,
+        `the CALLBACK HOST     ${verdict('cb-probe', 'minimal')}`,
         `ngOnChanges, not set  ${verdict('minimal', 'setters')}`,
         `proposal, weakmap     ${verdict('minimal', 'map-look')}`,
         `proposal, node slot   ${verdict('minimal', 'slot')}`,

@@ -163,6 +163,15 @@ export {
   TouchableWithoutFeedbackElement,
   ViewElement,
 } from './elements';
+// Rides `SYMBIOTE_ELEMENTS` like the accessors do, and is named here for the same reason: an app
+// importing narrowly still needs its `on*` props to mark their view. `CALLBACK_ATTRIBUTE_SELECTOR`
+// is exported so a MEASUREMENT can carry the real string rather than a copy of it — the ladder in
+// `core/engine/cpp/tests/js/angular-directive-cost.itest.ts` prices what this selector costs to
+// match, and a second copy there would price a different one the day either drifts.
+export {
+  CALLBACK_ATTRIBUTE_SELECTOR,
+  SymbioteCallbackHost,
+} from './callback-host';
 export type {
   IElementProps,
   IStickyHeaderElementProps,
