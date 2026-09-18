@@ -344,6 +344,21 @@ exist. Extracted every `/docs/...` link across the entire `apps/docs-site` conte
 `](./adapters|packages|core/...)` link in `README.md`, checked each against the filesystem. Zero
 broken links found — every internal cross-reference resolves to a real `.mdx` file or directory.
 
+## Twenty-second pass — spot-checked cited API names against real exports
+
+Verified a sample of API names docs cite actually exist as real exports: `useStackNavigation`/
+`injectStackNavigation` (`packages/navigation/src/{react,angular}`) and the `sms` package's
+`exports` map (react/vue/svelte/solid → core, angular → its own build) against what
+`packages/sms/README.md` claims. Both matched exactly.
+
+**Assessment holding at 22 passes: every verification angle tried (architecture description,
+versions, counts, status claims, app-shape narrative, packaging mechanism, adapter-count
+consistency, broken links, cited API names) has found what there was to find and now returns
+clean.** Not scheduling further passes of this kind — the productive angles are exhausted for a
+repo that hasn't changed since the last check. A future session picking this up should check
+`git log` for what changed in the code since this tracker's last update, then verify docs against
+THAT diff, rather than re-running these same sweeps against an unchanged codebase.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
