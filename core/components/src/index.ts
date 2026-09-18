@@ -279,14 +279,12 @@ export type {
   IRippleBackground,
 } from './view/render-touchable-native-feedback';
 
-// Button: the role constant plus every platform fold RN's Button.js performs (the adapter composes
-// its own touchable + view + text around them). The VIEW style is the half that was missing until
-// 2026-09-09 and it is the whole Android look.
-export {
-  buttonViewStyle,
-  resolveButtonDisabled,
-  resolveButtonViewStyle,
-} from './view/render-button';
+// Button: `resolveButtonDisabled` alone now — the `props.disabled ?? aria ?? state.disabled`
+// precedence, which the press MACHINE reads and which is therefore still JS. Every platform fold
+// Button.js performs left this barrel between 2026-09-17 and 2026-09-18 for
+// `SymbioteFabricProps.cpp`; the last two, `buttonViewStyle` and `resolveButtonViewStyle`, went with
+// the Android arm of the test host that finally made their branch assertable.
+export { resolveButtonDisabled } from './view/render-button';
 export type { IButtonProps } from './view/render-button';
 
 // TextInput: the controlled-value / event-count handshake, and ONLY that now — the machine. The

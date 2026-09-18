@@ -74,15 +74,9 @@ Object.assign(globalThis, {
 
 const BUTTON_VIEW_NAME = 'RCTView';
 const TEST_ID = 'subject';
-const ANDROID_BLUE = '#2196F3';
-const ANDROID_DISABLED_BACKGROUND = '#dfdfdf';
-// TouchableNativeFeedback.js:343-348 — Button passes no `background`, so TNF resolves
-// `SelectableBackground()` onto the background slot.
-const SELECTABLE_BACKGROUND = {
-  type: 'ThemeAttrAndroid',
-  attribute: 'selectableItemBackground',
-  rippleRadius: undefined,
-};
+// The Material palette and the selectable-background dict went with the cases that read them — they
+// live beside the rule in `SymbioteFabricProps.cpp` and are asserted in `android-rules.android
+// .itest.ts`, not restated here.
 
 function touchAt(x: number, y: number): ISymbioteEvent {
   // `pageX/pageY` drive the retention test, `locationX/locationY` the hotspot — RN reads the
@@ -176,75 +170,14 @@ describe('button host behavior on Android', () => {
     expect(node.childHost).toBeDefined();
   });
 
-  it('paints the Material look on the HOST, which is the cloned button view', async () => {
-    mountButton();
-    await settle();
-
-    const { host } = subtreeOf(TEST_ID);
-    // On iOS this lives one node down and is `{}`; here the host IS `<View style={buttonStyles}>`.
-    expect(host.payload.backgroundColor).toBe(ANDROID_BLUE);
-    expect(host.payload.elevation).toBe(4);
-    expect(host.payload.borderRadius).toBe(2);
-    // The LABEL's white left on 2026-09-18 with the rest of its style — `foldButtonLabelStyle` in
-    // `SymbioteFabricProps.cpp`, whose Android branch is `#ifdef ANDROID` and therefore pinned
-    // nowhere headless. This file mocks `Platform.OS`, which that rule does not read.
-  });
-
-  it('carries the selectable-background ripple and runs no opacity fade', async () => {
-    mountButton();
-    await settle();
-
-    const { host } = subtreeOf(TEST_ID);
-    expect(host.payload.nativeBackgroundAndroid).toEqual(SELECTABLE_BACKGROUND);
-    // `useForeground` is not a Button prop, so the foreground slot is never the one TNF picks.
-    expect(Object.keys(host.payload)).not.toContain('nativeForegroundAndroid');
-    // `collapsable`, not `opacity`, and the difference was measured rather than assumed. Binding an
-    // Animated value is what forces `collapsable: false` (touchable-opacity.ts's `attach`), and
-    // that key survives; the fade's `opacity` does NOT reach the payload here at all, because the
-    // Material fold below overwrites the whole style slot. So an `opacity` assertion would pass
-    // under a composed TouchableOpacity and prove nothing.
-    expect(Object.keys(host.payload)).not.toContain('collapsable');
-  });
-
-  // The Android half of the colour pair. Here `color` tints the BUTTON and leaves the label white;
-  // `button.test.ts` asserts the mirror, where it tints the label and leaves the view at its
-  // constant `{}`. Two platforms, two different nodes, one owner prop.
-  it('re-tints the host when color changes after mount', async () => {
-    const { surface, node } = mountButton();
-    await settle();
-    expect(subtreeOf(TEST_ID).host.payload.backgroundColor).toBe(ANDROID_BLUE);
-
-    routeProp(node, 'color', '#ff0000');
-    surface.commit();
-    await settle();
-
-    const after = subtreeOf(TEST_ID);
-    expect(after.host.payload.backgroundColor).toBe('#ff0000');
-    // The label's half of this pair — that it keeps Android's own white rather than picking up the
-    // tint — was the half a one-hop mark would have lost, and it is `foldButtonLabelStyle`'s now.
-    // Its iOS twin is asserted on the committed payload in
-    // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`; the Android branch is not.
-    // That the raw `color` is absent from the HOST is the engine's strip (`foldButtonProps`), which
-    // this host's TypeScript `fabricProps` does not carry — asserted in
-    // `core/engine/cpp/tests/js/button-payload.itest.ts`. The re-tint above is the question here,
-    // and it is the one that proves the strip reaches the payload without touching the node.
-  });
-
-  it('greys both nodes when disabled changes after mount', async () => {
-    const { surface, node } = mountButton();
-    await settle();
-
-    routeProp(node, 'disabled', true);
-    surface.commit();
-    await settle();
-
-    const after = subtreeOf(TEST_ID);
-    expect(after.host.payload.backgroundColor).toBe(
-      ANDROID_DISABLED_BACKGROUND,
-    );
-    expect(after.host.payload.elevation).toBe(0);
-    // The label's grey is `foldButtonLabelStyle`'s, Android branch, and unreachable here.
-  });
+  // THE MATERIAL LOOK LEFT THIS FILE ON 2026-09-18 AND HAS A BETTER HOME, which is the first time in
+  // this migration that sentence has been true of an Android branch. The style, the selectable
+  // background, the `color` override, the disabled greying and the late re-tint are asserted against
+  // the COMMITTED PAYLOAD in `core/engine/cpp/tests/js/android-rules.android.itest.ts`, run by
+  // `pnpm run test:android` against a build that actually compiles `#ifdef ANDROID`.
+  //
+  // What this file could offer was always weaker: it mocks `Platform.OS`, and what that steers is
+  // the JS half. A rule in `SymbioteFabricProps.cpp` never reads it.
 
   // TouchableNativeFeedback.js:230-252. Without these the drawable is installed and never animates:
   // the JS responder consumes the touch, so Android's own pressed-state handling never fires and

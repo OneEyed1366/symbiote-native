@@ -11,7 +11,7 @@
  */
 
 import babel from '@babel/core';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import {
   existsSync,
   mkdtempSync,
@@ -20,7 +20,7 @@ import {
   rmSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -201,13 +201,21 @@ const PLATFORM_EXTENSIONS_DIRECTIVE = '@symbiote-platform-extensions';
 const RN_IMPORTER = /[/\\]node_modules[/\\](react-native|@react-native[/\\])/;
 const RELATIVE_REQUEST = /^\.\.?[/\\]/;
 
+// `resolveDir` + `request` alone determine the candidate — the `existsSync` check is worth caching
+// since the same RN-internal relative import repeats across every bundle that reaches it.
+const platformExtensionCache = new Map();
+
 const reactNativePlatformExtensions = {
   name: 'react-native-platform-extensions',
   setup(build) {
     build.onResolve({ filter: RELATIVE_REQUEST }, ({ path: request, importer, resolveDir }) => {
       if (!RN_IMPORTER.test(importer)) return undefined;
+      const key = `${resolveDir}\0${request}`;
+      if (platformExtensionCache.has(key)) return platformExtensionCache.get(key);
       const candidate = path.resolve(resolveDir, `${request}.ios.js`);
-      return existsSync(candidate) ? { path: candidate } : undefined;
+      const resolved = existsSync(candidate) ? { path: candidate } : undefined;
+      platformExtensionCache.set(key, resolved);
+      return resolved;
     });
   },
 };
@@ -242,22 +250,34 @@ const stubReactNativeBootstrap = {
   },
 };
 
+// One RN source file is imported by nearly every bundle (`Platform.js`, `StyleSheet.js`, …), and
+// its content can't change mid-run — so the Flow strip is a pure function of `file` for the whole
+// process. Keyed by promise, not by result, so two builds that hit the same uncached file don't
+// both pay for the transform.
+const reactNativeFlowCache = new Map();
+
 const reactNativeFlow = {
   name: 'strip-flow-from-react-native',
   setup(build) {
-    build.onLoad({ filter: RN_SOURCE }, async ({ path: file }) => {
-      const out = await babel.transformAsync(readFileSync(file, 'utf8'), {
-        filename: file,
-        babelrc: false,
-        configFile: false,
-        plugins: [[HERMES_SYNTAX, { parseLangTypes: 'flow' }], FLOW_STRIP],
-      });
-      // `jsx`, not `js`: stripping Flow leaves JSX untouched, and React Native writes JSX in `.js`
-      // files (`VirtualizedList.js`, `AnimatedScrollView.js`, …). Reaching one under the `js` loader
-      // is 75 copies of "The JSX syntax extension is not currently enabled" — which reads as a Flow
-      // problem and is not one. A `.js` file with no JSX parses identically either way, so this is
-      // strictly wider.
-      return { contents: out?.code ?? '', loader: 'jsx' };
+    build.onLoad({ filter: RN_SOURCE }, ({ path: file }) => {
+      let cached = reactNativeFlowCache.get(file);
+      if (cached === undefined) {
+        cached = babel
+          .transformAsync(readFileSync(file, 'utf8'), {
+            filename: file,
+            babelrc: false,
+            configFile: false,
+            plugins: [[HERMES_SYNTAX, { parseLangTypes: 'flow' }], FLOW_STRIP],
+          })
+          // `jsx`, not `js`: stripping Flow leaves JSX untouched, and React Native writes JSX in
+          // `.js` files (`VirtualizedList.js`, `AnimatedScrollView.js`, …). Reaching one under the
+          // `js` loader is 75 copies of "The JSX syntax extension is not currently enabled" — which
+          // reads as a Flow problem and is not one. A `.js` file with no JSX parses identically
+          // either way, so this is strictly wider.
+          .then(out => ({ contents: out?.code ?? '', loader: 'jsx' }));
+        reactNativeFlowCache.set(file, cached);
+      }
+      return cached;
     });
   },
 };
@@ -284,36 +304,48 @@ const solidRequire = createRequire(
   ),
 );
 
+// Same deal as `reactNativeFlow`: a shared `.tsx` under `adapters/solid` is re-entered by every
+// itest bundle that touches Solid, and the two-pass compile is redone identically each time
+// without this cache.
+const solidJsxCache = new Map();
+
 const solidJsx = {
   name: 'compile-solid-jsx',
   setup(build) {
-    build.onLoad({ filter: SOLID_SOURCE }, async ({ path: file }) => {
-      // esbuild strips the TYPES and leaves the JSX alone (`jsx: 'preserve'`), then babel compiles
-      // the JSX. Two passes rather than one because babel cannot parse TypeScript without a preset
-      // this workspace does not install, and because the split is exactly how the real pipelines
-      // are built — tsc preserves, the app's babel compiles.
-      const typescript = await esbuild.transform(readFileSync(file, 'utf8'), {
-        loader: 'tsx',
-        jsx: 'preserve',
-        sourcefile: file,
-      });
-      const out = await babel.transformAsync(typescript.code, {
-        filename: file.replace(/\.tsx$/, '.jsx'),
-        babelrc: false,
-        configFile: false,
-        presets: [
-          [
-            // Resolved from `adapters/solid`, not from here: under pnpm's isolated layout a
-            // package's devDependencies live beside IT and are invisible at the repo root.
-            solidRequire('babel-preset-solid'),
-            {
-              generate: 'universal',
-              moduleName: '@symbiote-native/solid/renderer',
-            },
-          ],
-        ],
-      });
-      return { contents: out?.code ?? '', loader: 'js' };
+    build.onLoad({ filter: SOLID_SOURCE }, ({ path: file }) => {
+      let cached = solidJsxCache.get(file);
+      if (cached === undefined) {
+        cached = (async () => {
+          // esbuild strips the TYPES and leaves the JSX alone (`jsx: 'preserve'`), then babel
+          // compiles the JSX. Two passes rather than one because babel cannot parse TypeScript
+          // without a preset this workspace does not install, and because the split is exactly how
+          // the real pipelines are built — tsc preserves, the app's babel compiles.
+          const typescript = await esbuild.transform(readFileSync(file, 'utf8'), {
+            loader: 'tsx',
+            jsx: 'preserve',
+            sourcefile: file,
+          });
+          const out = await babel.transformAsync(typescript.code, {
+            filename: file.replace(/\.tsx$/, '.jsx'),
+            babelrc: false,
+            configFile: false,
+            presets: [
+              [
+                // Resolved from `adapters/solid`, not from here: under pnpm's isolated layout a
+                // package's devDependencies live beside IT and are invisible at the repo root.
+                solidRequire('babel-preset-solid'),
+                {
+                  generate: 'universal',
+                  moduleName: '@symbiote-native/solid/renderer',
+                },
+              ],
+            ],
+          });
+          return { contents: out?.code ?? '', loader: 'js' };
+        })();
+        solidJsxCache.set(file, cached);
+      }
+      return cached;
     });
   },
 };
@@ -336,23 +368,42 @@ const svelteRequire = createRequire(
   ),
 );
 
+// Loaded once for the whole run, not once per `.svelte` file: the dynamic `import()` was re-run on
+// every load even though it always resolves the same module.
+let svelteCompilePromise;
+function svelteCompile() {
+  if (svelteCompilePromise === undefined) {
+    // `?? .default` because the resolved entry is reached by PATH rather than by specifier, and
+    // that loses the package's own ESM/CJS framing — the namespace can arrive wrapped.
+    svelteCompilePromise = import(
+      `file://${svelteRequire.resolve('svelte/compiler')}`
+    ).then(loaded => loaded.compile ?? loaded.default?.compile);
+  }
+  return svelteCompilePromise;
+}
+
+// A `.svelte` fixture shared across multiple itest bundles was recompiled once per bundle; its
+// output can't change mid-run.
+const svelteComponentsCache = new Map();
+
 const svelteComponents = {
   name: 'compile-svelte-components',
   setup(build) {
-    build.onLoad({ filter: /\.svelte$/ }, async ({ path: file }) => {
-      // `?? .default` because the resolved entry is reached by PATH rather than by specifier, and
-      // that loses the package's own ESM/CJS framing — the namespace can arrive wrapped.
-      const loaded = await import(
-        `file://${svelteRequire.resolve('svelte/compiler')}`
-      );
-      const compile = loaded.compile ?? loaded.default?.compile;
-      const out = compile(readFileSync(file, 'utf8'), {
-        generate: 'client',
-        fragments: 'tree',
-        css: 'external',
-        filename: path.basename(file),
-      });
-      return { contents: out.js.code, loader: 'js' };
+    build.onLoad({ filter: /\.svelte$/ }, ({ path: file }) => {
+      let cached = svelteComponentsCache.get(file);
+      if (cached === undefined) {
+        cached = svelteCompile().then(compile => {
+          const out = compile(readFileSync(file, 'utf8'), {
+            generate: 'client',
+            fragments: 'tree',
+            css: 'external',
+            filename: path.basename(file),
+          });
+          return { contents: out.js.code, loader: 'js' };
+        });
+        svelteComponentsCache.set(file, cached);
+      }
+      return cached;
     });
   },
 };
@@ -369,17 +420,37 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
  */
 const vueTransformerPath = path.join(root, 'adapters/vue/metro-vue-transformer.cjs');
 
+// Same fix as Svelte's compiler load: one dynamic `import()` for the whole run, not one per `.vue`
+// file.
+let vueCompileSfcPromise;
+function vueCompileSfc() {
+  if (vueCompileSfcPromise === undefined) {
+    vueCompileSfcPromise = import(`file://${vueTransformerPath}`).then(
+      loaded => loaded.compileSfc ?? loaded.default?.compileSfc,
+    );
+  }
+  return vueCompileSfcPromise;
+}
+
+// A shared `.vue` fixture compiled once per itest bundle that imports it; cache by file since the
+// SFC's content is fixed for the run.
+const vueSfcCache = new Map();
+
 const vueSfc = {
   name: 'compile-vue-sfc',
   setup(build) {
-    build.onLoad({ filter: /\.vue$/ }, async ({ path: file }) => {
-      const loaded = await import(`file://${vueTransformerPath}`);
-      const compileSfc = loaded.compileSfc ?? loaded.default?.compileSfc;
-      const code = await compileSfc(readFileSync(file, 'utf8'), file);
-      // `compileScript`'s output still carries the `<script setup>` block's TypeScript verbatim —
-      // Metro's SECOND pass (RN's own babel transformer) is what strips it there; `ts` here is that
-      // pass, esbuild's own.
-      return { contents: code, loader: 'ts' };
+    build.onLoad({ filter: /\.vue$/ }, ({ path: file }) => {
+      let cached = vueSfcCache.get(file);
+      if (cached === undefined) {
+        cached = vueCompileSfc()
+          .then(compileSfc => compileSfc(readFileSync(file, 'utf8'), file))
+          // `compileScript`'s output still carries the `<script setup>` block's TypeScript
+          // verbatim — Metro's SECOND pass (RN's own babel transformer) is what strips it there;
+          // `ts` here is that pass, esbuild's own.
+          .then(code => ({ contents: code, loader: 'ts' }));
+        vueSfcCache.set(file, cached);
+      }
+      return cached;
     });
   },
 };
@@ -414,12 +485,21 @@ const workspaceRoots = new Map(
  * `@symbiote-native/components/register`, `@symbiote-native/engine/mutation-buffer` — and an alias
  * matches a specifier exactly. esbuild fills in the extension and the `/index` for us.
  */
+// A specifier like `@symbiote-native/engine` recurs across nearly every bundle in the run, and its
+// resolution never depends on the importer — only on the specifier string — so it's cacheable
+// outright rather than re-walking `existsSync` candidates each time.
+const workspaceResolveCache = new Map();
+
 const workspaceSources = {
   name: 'symbiote-workspace-sources',
   setup(build) {
     build.onResolve(
       { filter: /^@symbiote-native\// },
       ({ path: specifier }) => {
+        if (workspaceResolveCache.has(specifier)) {
+          return workspaceResolveCache.get(specifier);
+        }
+        let resolved;
         for (const [name, source] of workspaceRoots) {
           const subpath =
             specifier === name
@@ -438,10 +518,15 @@ const workspaceSources = {
             path.join(base, 'index.tsx'),
             base,
           ]) {
-            if (existsSync(candidate)) return { path: candidate };
+            if (existsSync(candidate)) {
+              resolved = { path: candidate };
+              break;
+            }
           }
+          if (resolved !== undefined) break;
         }
-        return undefined;
+        workspaceResolveCache.set(specifier, resolved);
+        return resolved;
       },
     );
   },
@@ -492,6 +577,18 @@ const binary = path.join(
 );
 
 /**
+ * `*.android.itest.ts` runs ONLY against `build-android`, and everything else runs only against the
+ * other builds. A hard split rather than a filter in one direction, because each arm's fixtures
+ * assume their own platform: an Android fixture asserts keys the default build never writes, and the
+ * default fixtures assert their absence.
+ *
+ * The suffix is the whole mechanism — the same shape Metro's own `.ios.js` / `.android.js` uses, so
+ * a file's name says which binary it belongs to and nothing has to maintain a list.
+ */
+const ANDROID_SUFFIX = '.android.itest.ts';
+const wantsAndroid = buildDirectory === 'build-android';
+
+/**
  * Recursive, because this directory has to hold hundreds of files eventually and a flat one stops
  * being readable long before that. A subdirectory per subject mirrors how the vitest suites are laid
  * out, which is also where these files come FROM.
@@ -500,6 +597,8 @@ function itestsUnder(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const full = path.join(directory, entry.name);
     if (entry.isDirectory()) return itestsUnder(full);
+    if (entry.name.endsWith(ANDROID_SUFFIX)) return wantsAndroid ? [full] : [];
+    if (wantsAndroid) return [];
     return entry.name.endsWith('.itest.ts') || entry.name.endsWith('.itest.tsx')
       ? [full]
       : [];
@@ -515,11 +614,76 @@ if (found.length === 0) {
   process.exit(1);
 }
 
+// A test file's own directory has no `node_modules`, and under pnpm's isolated layout a package's
+// dependencies live beside IT. `react` is reachable from `adapters/react` and nowhere else, so the
+// search path is every workspace package plus the root. Fixed for the whole run — hoisted out of
+// the loop so the `existsSync` filter doesn't re-run per bundle.
+const nodePaths = [
+  path.join(root, 'node_modules'),
+  ...[...workspaceRoots.values()].map(source =>
+    path.join(path.dirname(source), 'node_modules'),
+  ),
+].filter(existsSync);
+
+// The tester binary is a clean per-process invocation — one bundle in on argv, stdout/stderr out,
+// no shared file or port across runs — so nothing here needs the runs to be sequential. Measured
+// 2026-09-17: of a 76s run over 59 files, 74s was `symbiote_tester` wall time and 2.3s was esbuild;
+// running the binary sequentially was the whole cost, not the bundling this file already caches.
+const testConcurrency = Math.max(1, availableParallelism());
+
+/**
+ * A fixed-size batch (`Promise.all` per chunk of `testConcurrency`) stalls on its own slowest
+ * member — this suite mixes multi-second benchmark suites with sub-second unit tests, so a batch
+ * holding one benchmark file idles every other slot in it until that one finishes. A slot here is
+ * refilled the moment it frees, from the single shared queue, not from a fixed chunk — so a fast
+ * file behind a slow one in submission order still runs as soon as capacity exists.
+ */
+function createLimiter(max) {
+  let active = 0;
+  const queue = [];
+  const pump = () => {
+    if (active >= max || queue.length === 0) return;
+    active += 1;
+    const { fn, resolve, reject } = queue.shift();
+    fn().then(resolve, reject).finally(() => {
+      active -= 1;
+      pump();
+    });
+  };
+  return fn =>
+    new Promise((resolve, reject) => {
+      queue.push({ fn, resolve, reject });
+      pump();
+    });
+}
+
+const limitTestRun = createLimiter(testConcurrency);
+
+function runTester(bundle) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary, [bundle]);
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+    });
+    child.on('error', reject);
+    child.on('close', status => resolve({ status, stdout, stderr }));
+  });
+}
+
 const out = mkdtempSync(path.join(tmpdir(), 'symbiote-itest-'));
 let failed = 0;
+let buildMs = 0;
+let runMs = 0;
 
 try {
+  const bundles = [];
   for (const file of found) {
+    const buildStart = performance.now();
     // Named by the path relative to the tests root, flattened — two files of the same basename in
     // different subdirectories would otherwise write over each other's bundle.
     const bundle = path.join(
@@ -546,15 +710,7 @@ try {
         '.svelte',
         '.vue',
       ],
-      // A test file's own directory has no `node_modules`, and under pnpm's isolated layout a
-      // package's dependencies live beside IT. `react` is reachable from `adapters/react` and
-      // nowhere else, so the search path is every workspace package plus the root.
-      nodePaths: [
-        path.join(root, 'node_modules'),
-        ...[...workspaceRoots.values()].map(source =>
-          path.join(path.dirname(source), 'node_modules'),
-        ),
-      ].filter(existsSync),
+      nodePaths,
       // `browser` is for Svelte and is not cosmetic: its `.` export splits on it, and the
       // `default`/`worker` side is the SSR runtime whose `mount()` throws outright. Vitest's Svelte
       // project sets the same condition for the same reason.
@@ -597,10 +753,17 @@ try {
       ],
       logLevel: 'silent',
     });
+    buildMs += performance.now() - buildStart;
+    bundles.push(bundle);
+  }
 
-    const run = spawnSync(binary, [bundle], { encoding: 'utf8' });
-    if (run.error) throw run.error;
-
+  const runStart = performance.now();
+  // Every bundle is queued at once — the limiter caps how many run concurrently — and printing
+  // still walks them in submission order, so output stays grouped exactly as the sequential run
+  // printed it even though completion order underneath is whatever finishes first.
+  const runPromises = bundles.map(bundle => limitTestRun(() => runTester(bundle)));
+  for (const runPromise of runPromises) {
+    const run = await runPromise;
     for (const line of run.stdout.split('\n').filter(Boolean)) {
       if (line.startsWith('FAIL ')) failed += 1;
       console.log(line);
@@ -610,8 +773,10 @@ try {
       console.error(run.stderr.trim());
     }
   }
+  runMs += performance.now() - runStart;
 } finally {
   rmSync(out, { recursive: true, force: true });
 }
 
+console.error(`PROFILE build=${buildMs.toFixed(0)}ms run=${runMs.toFixed(0)}ms files=${found.length}`);
 process.exit(failed > 0 ? 1 : 0);

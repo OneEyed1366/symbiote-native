@@ -63,35 +63,18 @@ const ANDROID_BORDER_RADIUS = 2;
 // answers "my parent", could not reach it. `IAncestorLookup` asks for the nearest ancestor carrying
 // a tag instead, which is a CSS ancestor selector and makes one rule right on both trees.
 
-// `styles.button` — empty on iOS, the whole Material look on Android.
-export const buttonViewStyle: IViewStyle =
-  Platform.select({
-    ios: {},
-    android: {
-      elevation: ANDROID_ELEVATION,
-      backgroundColor: ANDROID_BUTTON_BLUE,
-      borderRadius: ANDROID_BORDER_RADIUS,
-    },
-    default: {},
-  }) ?? {};
-
-/**
- * The inner view's style with `color` and `disabled` folded in — `{}` on iOS in every combination,
- * which is RN's own answer there and the reason the node looked droppable.
- */
-export function resolveButtonViewStyle(
-  color: string | undefined,
-  disabled: boolean | undefined,
-): IViewStyle {
-  if (Platform.OS !== 'android') return buttonViewStyle;
-  const style: IViewStyle = { ...buttonViewStyle };
-  if (color !== undefined) style.backgroundColor = color;
-  if (disabled === true) {
-    style.elevation = ANDROID_DISABLED_ELEVATION;
-    style.backgroundColor = ANDROID_DISABLED_BACKGROUND;
-  }
-  return style;
-}
+// `buttonViewStyle` AND `resolveButtonViewStyle` ARE GONE (2026-09-18), and with them the last of
+// Button's folds. The Material look is inside `foldButtonProps` in `SymbioteFabricProps.cpp`, behind
+// `#ifdef ANDROID` — where it belongs, since `{}` on iOS was the whole of its other branch.
+//
+// Its five constants went too rather than staying as a copy nothing reads.
+//
+// WHAT MADE THIS ONE DIFFERENT from the four ports before it: the Android branch is no longer
+// untestable. The test host grew an arm that compiles `#ifdef ANDROID`
+// (`core/engine/cpp/tests/CMakeLists.txt`, `SYMBIOTE_PLATFORM_ANDROID`), so the style, the `color`
+// override and the disabled greying are asserted against the COMMITTED PAYLOAD in
+// `core/engine/cpp/tests/js/android-rules.itest.ts` — strictly better than the mocked-`Platform.OS`
+// unit test that went with them, which asserted a JS function rather than what Fabric receives.
 
 // `resolveButtonTitle` IS GONE (2026-09-18) — the uppercase-on-Android rule is `foldButtonLabel` in
 // `SymbioteFabricProps.cpp`, reached off the label's own tag. It had no caller left but its own two

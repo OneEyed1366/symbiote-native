@@ -122,22 +122,13 @@ import {
   registerHostBehavior,
   requestCommitFor,
   type IHostBehavior,
-  type IPayloadFold,
   type ISymbioteNode,
-  propsOf,
   setProp,
 } from '@symbiote-native/engine';
 
 import { descriptorFor } from '../component-names';
 import { resolveTextProps } from '../text-props';
-import {
-  resolveButtonDisabled,
-  resolveButtonViewStyle,
-} from '../view/render-button';
-import {
-  backgroundProps,
-  selectableBackground,
-} from '../view/render-touchable-native-feedback';
+import { resolveButtonDisabled } from '../view/render-button';
 import {
   booleanOr,
   createPressBehavior,
@@ -301,37 +292,16 @@ const touchable: Pick<
 // `foldButtonProps` resolves the expression itself. It reads the AUTHORED bag rather than the folded
 // one, which is the same Trap A correction this fold carried as `projectionOf(propsOf(node))`.
 //
-// So off Android there is nothing left and no fold is bound at all. On Android the view style and
-// the ripple background survive — `resolveButtonViewStyle` is a theme computation and
-// `backgroundProps` builds a native config object, neither of which is a prop rewrite.
+// The ANDROID half went the same day, once the test host grew an arm that compiles `#ifdef ANDROID`
+// (`tests/CMakeLists.txt`, `SYMBIOTE_PLATFORM_ANDROID`). It is inside `foldButtonProps` now: the
+// Material view style and the theme's selectable background, which TNF clones onto this very node
+// (`TouchableNativeFeedback.js:339`) because it renders no view of its own.
 //
-// Contract: the `whether a button is a focus stop` block in
-// `core/engine/cpp/tests/js/button-payload.itest.ts`.
-function ownerFold(node: ISymbioteNode): IPayloadFold {
-  return props => {
-    const next: Record<string, unknown> = { ...props };
-    // `accessibilityRole`, the `importantForAccessibility` promotion, the `touchSoundDisabled`
-    // rename and the `color` strip all USED TO BE HERE and are `foldButtonProps` in
-    // `SymbioteFabricProps.cpp` now — every one of them a function of the tag and of nothing else.
-    // They run BEFORE this fold, which is the order the composition always had.
-    // THE NODE, not the bag this fold was handed. The two agreed while the pressable rule ran
-    // inside this function; they do not now that it runs before it, because the rule folds
-    // `disabled` INTO `accessibilityState` and erases the raw key — so reading the bag would resolve
-    // through `state.disabled` and lose RN's `props.disabled ?? aria ?? state.disabled` precedence
-    // wherever the two disagree. `propsOf(owner)` is already what both derived children read, so
-    // this also makes the three projections one answer instead of two.
-    const { color, disabled } = projectionOf(propsOf(node));
-    // TNF renders no view, it CLONES onto Button's `<View style={buttonStyles}>`
-    // (TouchableNativeFeedback.js:339), so this host IS that view. Overwritten rather than merged
-    // because RN's Button declares no `style` prop at all — there is nothing to compose with.
-    next.style = resolveButtonViewStyle(color, disabled);
-    // Button passes no `background` and no `useForeground`, so TNF resolves the theme's
-    // selectable background onto the background slot (TouchableNativeFeedback.js:343-348,
-    // :402). The dicts are the shared factories', never restated here.
-    Object.assign(next, backgroundProps(selectableBackground(), false));
-    return next;
-  };
-}
+// SO BUTTON BINDS NO FOLD ON EITHER PLATFORM, and it is the first primitive to reach that with a
+// subtree — four nodes, four crossings per commit when this migration started.
+//
+// Contract: `core/engine/cpp/tests/js/button-payload.itest.ts` for the platform-invariant half and
+// `android-rules.itest.ts` for the style, the colour override and the disabled greying.
 
 /**
  * Builds the whole subtree, once, at `attachHostBehavior`.
@@ -383,12 +353,9 @@ function buildStructure(node: ISymbioteNode): ISymbioteNode {
     appendChild(node, view);
   }
   // ANDROID ONLY since 2026-09-18. See the header: the owner's fold needs its own node, and this
-  // runs after `attachHostBehavior` has already written `behavior.foldPayload` into the field.
-  //
-  // Off Android nothing is bound at all, which is the point — a fold with an empty body still costs
-  // a full JSI round trip per commit, so leaving one that returns its input is the worst value
-  // available (`input-accessory-view`, and Button's own `viewFold` a commit ago).
-  if (IS_ANDROID) node.payloadFold = ownerFold(node);
+  // NOTHING IS BOUND HERE ON EITHER PLATFORM as of 2026-09-18, which is the point — a fold with an
+  // empty body still costs a full JSI round trip per commit, so leaving one that returns its input
+  // is the worst value available (`input-accessory-view`, and Button's own `viewFold`).
   return label;
 }
 

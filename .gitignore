@@ -3,6 +3,8 @@ build/
 build-ngc/
 # the optimized twin of `core/engine/cpp/tests/build` — timings only, asserts compiled out
 build-release/
+# and the ANDROID twin — same sources, `#ifdef ANDROID` compiled in (`pnpm run test:android`)
+build-android/
 dist/
 *.tsbuildinfo
 

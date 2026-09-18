@@ -7,31 +7,21 @@
 // inputs that can tell a correct fold from one that ignores the platform: `color` tints the TEXT
 // here and the BUTTON there, the disabled greys differ, and the title is uppercased there only.
 import { describe, expect, it } from 'vitest';
-import { resolveButtonDisabled, resolveButtonViewStyle } from './render-button';
+import { resolveButtonDisabled } from './render-button';
 
-const CUSTOM = '#ff0000';
-
-describe('Button folds on iOS', () => {
-  // THE LABEL'S THREE CASES LEFT ON 2026-09-18 with `resolveButtonTextStyle` itself. The style is
-  // `foldButtonLabelStyle` in `SymbioteFabricProps.cpp` now, keyed off the label text's own tag and
-  // reading the BUTTON through `IAncestorLookup` — the function these asserted no longer exists, so
-  // they could not be pointed at anything here.
-  //
-  // Their iOS half is `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, against the
-  // payload a commit actually sent: the blue-at-18pt base, the `color` tint, and the grey winning
-  // over it. The Android half is `#ifdef ANDROID` and is pinned NOWHERE headless — the same gap
-  // `android_ripple` and `decelerationRate`'s constants have.
-
-  it('leaves the inner view unstyled in every combination', () => {
-    expect(resolveButtonViewStyle(undefined, undefined)).toEqual({});
-    expect(resolveButtonViewStyle(CUSTOM, true)).toEqual({});
-  });
-
-  // The title's own rule left this file on 2026-09-18 — `foldButtonLabel` in
-  // `SymbioteFabricProps.cpp`, off the label's tag. Its iOS half was the identity, so this case was
-  // asserting that a function did nothing; the real one is
-  // `core/engine/cpp/tests/js/button-derived-payload.itest.ts`.
-});
+// EVERY PLATFORM-VARYING CASE LEFT THIS FILE ON 2026-09-18, and the file survives for the one fold
+// that does not vary: `resolveButtonDisabled`, which the press MACHINE reads and which is therefore
+// still JS.
+//
+// What went and where. The label's style and the title's uppercase are `foldButtonLabelStyle` and
+// `foldButtonLabel` in `SymbioteFabricProps.cpp`; the inner view's style is inside
+// `foldButtonProps`. All three asserted a JS function that no longer exists, so none could be
+// pointed at anything here.
+//
+// Their iOS half is `core/engine/cpp/tests/js/button-derived-payload.itest.ts`, against the payload
+// a commit actually sent. Their ANDROID half is `core/engine/cpp/tests/js/android-rules.android
+// .itest.ts` — which is new: `#ifdef ANDROID` used to mean "pinned nowhere headless", and the test
+// host now has an arm that compiles those branches (`pnpm run test:android`).
 
 describe('Button folds that do not vary by platform', () => {
   // Button.js:337 — an explicit `disabled` wins, and only its ABSENCE lets the accessibility side

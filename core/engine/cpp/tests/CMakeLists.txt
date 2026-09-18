@@ -308,6 +308,30 @@ target_include_directories(symbiote_tester PRIVATE
   ${REACT_COMMON_DIR} ${REACT_COMMON_DIR}/jsi ${REACT_COMMON_DIR}/jsc
   ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_compile_options(symbiote_tester PRIVATE -fexceptions -frtti -Wall)
+
+# ── The ANDROID arm ──────────────────────────────────────────────────────────────────────────────
+# `-DSYMBIOTE_PLATFORM_ANDROID=ON` compiles the rule file's Android branches instead of its default
+# ones, into a SECOND build directory the itest runner reaches with `SYMBIOTE_ITEST_BUILD`.
+#
+# WHY IT WAS WORTH BUILDING. Five ported rules carry a platform split that no view NAME can express —
+# `android_ripple`, `underlineColorAndroid`, `decelerationRate`'s constants, Button's uppercase label
+# and its Material style, TouchableNativeFeedback's background — and every one of them landed with
+# the same note: "a compile-time branch is only testable in a build that compiles it". Before this,
+# closing that meant a device. It means a second `cmake --build` now.
+#
+# SCOPED TO ONE TRANSLATION UNIT, deliberately. All twelve `#ifdef ANDROID` sites live in
+# `SymbioteFabricProps.cpp`, which includes nothing but `folly/dynamic.h` and our own headers — so
+# the define reaches our rules and never ReactCommon, whose own Android branches want fbjni and a
+# real NDK. Defining it target-wide is the version of this that does not compile.
+#
+# It is NOT a substitute for a device: `Platform.OS` in JS still reads the host, so an arm that needs
+# the JS half to agree has to say so itself. What this build settles is what the RULE emits.
+option(SYMBIOTE_PLATFORM_ANDROID "Compile the rule file's Android branches" OFF)
+if(SYMBIOTE_PLATFORM_ANDROID)
+  set_source_files_properties(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteFabricProps.cpp
+    PROPERTIES COMPILE_DEFINITIONS ANDROID)
+endif()
 target_link_libraries(symbiote_tester PRIVATE
   folly_runtime
   ${REACT_TARGETS}

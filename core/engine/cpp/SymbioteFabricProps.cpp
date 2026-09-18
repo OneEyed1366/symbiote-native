@@ -1259,6 +1259,48 @@ dynamic foldButtonLabelStyle(
   return out;
 }
 
+#ifdef ANDROID
+// `TouchableNativeFeedback.js` via `Platform.Version >= 23` — foreground ripples need API 23.
+constexpr int kAndroidForegroundMinVersion = 23;
+
+// `Button.js:394-437`, one constant per literal so a value cannot drift silently.
+constexpr int kAndroidButtonElevation = 4;
+constexpr int kAndroidDisabledElevation = 0;
+constexpr int kAndroidButtonBorderRadius = 2;
+constexpr const char *kAndroidButtonBlue = "#2196F3";
+constexpr const char *kAndroidDisabledBackground = "#dfdfdf";
+
+/**
+ * The running device's API level, and the one line of the Android branch a HOST build cannot have.
+ *
+ * `android_get_device_api_level` is the NDK's, so it exists when `__ANDROID__` is defined — which the
+ * real toolchain sets and the test host's `-DANDROID` does not. That split is the point rather than
+ * a workaround: the rule's LOGIC becomes testable in the Android arm of the test host
+ * (`tests/CMakeLists.txt`, `SYMBIOTE_PLATFORM_ANDROID`) while the query itself stays the device's.
+ *
+ * The host answers with the minimum RN supports, so the arm exercises the branch an app on a modern
+ * device takes. The other branch is reachable only on a device old enough to need it, which is where
+ * it always was.
+ */
+int androidApiLevel() {
+#ifdef __ANDROID__
+  return android_get_device_api_level();
+#else
+  return kAndroidForegroundMinVersion;
+#endif
+}
+
+// RN's `TouchableNativeFeedback.SelectableBackground()` with no ripple radius, which is what its
+// body falls back to when the app passes no `background` (`:343-348`), and what Button's own view
+// gets because TNF clones onto it (`:339`).
+dynamic selectableItemBackground() {
+  dynamic background = dynamic::object();
+  background["type"] = "ThemeAttrAndroid";
+  background["attribute"] = "selectableItemBackground";
+  return background;
+}
+#endif
+
 dynamic foldButtonProps(
     const dynamic &props,
     const dynamic &authored,
@@ -1283,6 +1325,32 @@ dynamic foldButtonProps(
     out["android_disableSound"] = *sound;
     out.erase("touchSoundDisabled");
   }
+
+  // `Button.js:394-437`'s `styles.button`, which is `{}` on iOS in every combination — the reason
+  // the wrapping view looked droppable there and the reason this half is the only one that moved.
+  //
+  // OVERWRITTEN rather than composed, because RN's Button declares no `style` prop at all: there is
+  // nothing for it to compose with. `authored`, not `props`, for `color` and `disabled` — by the
+  // time this runs `foldPressableProps` has folded `disabled` into `accessibilityState` and erased
+  // the raw key, so reading it here would resolve through the state and lose RN's
+  // `props.disabled ?? aria ?? state.disabled` precedence. Same correction `focusable` needed above.
+  //
+  // The background is the touchable's: TNF renders no view and CLONES onto Button's
+  // `<View style={buttonStyles}>` (`TouchableNativeFeedback.js:339`), so on this platform THIS node
+  // is that view, and it gets the theme's selectable background with no foreground.
+#ifdef ANDROID
+  dynamic style = dynamic::object();
+  style["elevation"] = kAndroidButtonElevation;
+  style["borderRadius"] = kAndroidButtonBorderRadius;
+  const std::string *color = stringAt(authored, "color");
+  style["backgroundColor"] = color != nullptr ? *color : kAndroidButtonBlue;
+  if (buttonDisabled(authored).value_or(false)) {
+    style["elevation"] = kAndroidDisabledElevation;
+    style["backgroundColor"] = kAndroidDisabledBackground;
+  }
+  out["style"] = std::move(style);
+  out["nativeBackgroundAndroid"] = selectableItemBackground();
+#endif
 
   out.erase("color");
   return out;
@@ -1471,20 +1539,6 @@ const std::array<const char *, 3> kWithoutFeedbackAlwaysKeys = {
     "importantForAccessibility",
 };
 
-#ifdef ANDROID
-// `TouchableNativeFeedback.js` via `Platform.Version >= 23` — foreground ripples need API 23.
-constexpr int kAndroidForegroundMinVersion = 23;
-
-// RN's `TouchableNativeFeedback.SelectableBackground()` with no ripple radius, which is what its
-// body falls back to when the app passes no `background` (`:343-348`).
-dynamic selectableItemBackground() {
-  dynamic background = dynamic::object();
-  background["type"] = "ThemeAttrAndroid";
-  background["attribute"] = "selectableItemBackground";
-  return background;
-}
-#endif
-
 bool usesCloneOntoChildRule(const char *ownerTag) {
   if (ownerTag == nullptr) return false;
   return std::strcmp(ownerTag, "touchable-native-feedback") == 0 ||
@@ -1575,7 +1629,7 @@ dynamic foldCloneOntoChild(
     // `canUseNativeForeground()` — RN's own guard, and `Platform.Version` on Android IS the API
     // level, so the JS check and this one read the same number.
     out[boolAt(source, "useForeground").value_or(false) &&
-                android_get_device_api_level() >= kAndroidForegroundMinVersion
+                androidApiLevel() >= kAndroidForegroundMinVersion
             ? "nativeForegroundAndroid"
             : "nativeBackgroundAndroid"] = std::move(background);
   }
