@@ -42,6 +42,7 @@ import { isAnchorHostComponent } from '../anchor-host-registry';
 import {
   countAngular,
   noteAngularCreate,
+  noteAngularStyleWrite,
   noteAngularWrite,
 } from '../diagnostics';
 // Angular host nodes are all SymbioteNode (elements, raw text, anchors). The mount
@@ -556,7 +557,7 @@ export class SymbioteRenderer implements Renderer2 {
   setStyle(el: IHostElement, style: string, value: unknown): void {
     if (isSurface(el)) return;
     countAngular('rendererWrites');
-    noteAngularWrite(`style.${style}`);
+    noteAngularStyleWrite(style);
     this.openStyleRun(el)[style] = value;
     this.surface.requestCommit();
   }
@@ -568,7 +569,7 @@ export class SymbioteRenderer implements Renderer2 {
     // was there to avoid.
     if (this.pendingStyleNode !== el && !isRecord(getExplicitStyle(el))) return;
     countAngular('rendererWrites');
-    noteAngularWrite(`style.${style}`);
+    noteAngularStyleWrite(style);
     const run = this.openStyleRun(el);
     // The accumulator is this renderer's own object, never the node's — see `openStyleRun`.
 
