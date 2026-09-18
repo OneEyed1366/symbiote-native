@@ -1,5 +1,11 @@
 # @symbiote-native/angular
 
+## 2.0.1
+
+### Patch Changes
+
+- [`710e002`](https://github.com/OneEyed1366/symbiote-native/commit/710e002c8c265f154f2a8bdcb26d48be3f770171) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Fix Metro failing to resolve a bundled asset (`require('./assets/logo.png')`) from an Angular component under the ngc `outDir`: `withSymbioteAngularMetroConfig`'s buildRoot->source redirect only matched style extensions (`.css`/`.scss`/`.sass`/`.less`/`.styl`). Generalized to any relative, non-script (`.ts`/`.tsx`/`.js`/`.jsx`) import with an extension, so images and other bundled assets resolve the same way styles already did.
+
 ## 2.0.0
 
 ### Major Changes

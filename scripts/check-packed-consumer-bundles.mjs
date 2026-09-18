@@ -165,6 +165,18 @@ async function runAsync(command, args, options = {}) {
   }
 }
 
+// Each framework's npm install needs its OWN cache directory — see the ENOTEMPTY comment on
+// installWithCacheRetry, npm's cacache isn't safe for two installs writing the same cache root
+// concurrently. Without a cacheRoot (local dev, or CI runs that don't opt in) the cache lives
+// inside the disposable matrix dir and dies with it every run. CI passes SYMBIOTE_NPM_CACHE_ROOT
+// pointed at an actions/cache-restored path so the registry downloads survive across runs instead
+// of every framework re-fetching the whole RN toolchain from npm on every job (measured 2026-09-14:
+// install dominates each framework's 300s+ wall time).
+export function npmCacheDirFor(exampleRoot, framework, cacheRoot) {
+  if (cacheRoot) return join(cacheRoot, framework);
+  return join(exampleRoot, '.npm-cache');
+}
+
 export function directInternalDependencies(manifest) {
   const names = new Set();
   for (const field of DEPENDENCY_FIELDS) {
@@ -410,7 +422,11 @@ async function processExample(
     // rmdir/mkdir race on a shared bucket directory throws ENOTEMPTY. Every framework already runs
     // its own `npm install` concurrently (see the Promise.all in main()); a shared
     // `npm_config_cache` was the one piece of mutable state that comment didn't account for.
-    const frameworkNpmCache = join(exampleRoot, '.npm-cache');
+    const frameworkNpmCache = npmCacheDirFor(
+      exampleRoot,
+      framework,
+      process.env.SYMBIOTE_NPM_CACHE_ROOT,
+    );
     mkdirSync(frameworkNpmCache, { recursive: true });
     const frameworkNpmEnvironment = {
       ...npmEnvironment,
