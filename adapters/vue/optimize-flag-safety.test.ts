@@ -1,26 +1,27 @@
-// Whether `@vue/babel-plugin-jsx`'s `optimize: true` (PatchFlags/SlotFlags for JSX — see the
-// plugin's own README: "the optimized code may skip certain re-renders... we strongly recommend
-// thorough testing") is safe to turn on by default in `babel-jsx.cjs`.
+// The correctness backing for `babel-jsx.cjs`'s `optimize: true` default (`@vue/babel-plugin-jsx`'s
+// PatchFlags/SlotFlags for JSX — see the plugin's own README: "the optimized code may skip certain
+// re-renders... we strongly recommend thorough testing").
 //
 // WHY THIS MATTERS FOR PERFORMANCE. `vue-row-component-shape-cost.itest.ts` (core/engine/cpp/tests
 // /js/) measured that a stateful Vue component pays for `hasPropsChanged`'s full
 // `Object.keys(nextProps)` walk on every patch, even when nothing changed. PatchFlags let Vue skip
 // straight to the flagged dynamic keys instead — the same lever `.vue` SFCs already get for free
 // from `@vue/compiler-sfc`'s template compiler (unconditional, default ON). TSX apps compiled
-// through `@vue/babel-plugin-jsx` do NOT get it unless `optimize: true` is passed, and this adapter
-// does not pass it (`babel-jsx.cjs`).
+// through `@vue/babel-plugin-jsx` did NOT get it before `babel-jsx.cjs` passed `optimize: true`.
 //
 // WHY THIS IS A CORRECTNESS TEST, NOT A PERF TEST. Flipping this default without verifying it can
 // silently make a real app under-render — the failure mode is a stale screen, not a crash. This
 // reuses `fold-parity.test.ts`'s own harness (compile through the real `symbioteVueJsx()` config,
-// mount through the real renderer, read back the committed payload) with `optimize: true` added,
-// and drives the update patterns the plugin's docs single out as risky: conditional branches and
-// keyed list reordering, neither of which `fold-parity.test.ts` exercises (it only ever writes one
-// changing prop on one static element).
+// mount through the real renderer, read back the committed payload) with `optimize` toggled per
+// case, and drives the update patterns the plugin's docs single out as risky: conditional branches
+// and keyed list reordering, neither of which `fold-parity.test.ts` exercises (it only ever writes
+// one changing prop on one static element) — plus the shape that actually motivated the default, a
+// stateful child COMPONENT whose prop is a nested field of a freshly-allocated object.
 //
-// If every case here holds, `optimize: true` is a candidate for `babel-jsx.cjs`'s default — that
-// change is NOT made by this file. Enabling it for every consuming app is a decision for whoever
-// owns that default, made with this file's result in hand, not a byproduct of writing it.
+// NOT VERIFIED: on-device, under Hermes, or against the SFC's own compiled output (a `.vue` file
+// never goes through this plugin at all). If a real TSX app under-renders after this default
+// landed, that combination is the first thing to add a case for here, and `optimize: false` in the
+// app's own `symbioteVueJsx()` call is the immediate mitigation while it is investigated.
 
 import { describe, expect, it } from 'vitest';
 import { transformAsync } from '@babel/core';
