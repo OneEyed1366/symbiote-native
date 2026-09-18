@@ -386,6 +386,31 @@ export function noteHostSideChange(): void {
   changedSinceCommit = true;
 }
 
+// Nodes whose PLACEMENT this batch has not published yet — created, or named as the child of a
+// structural op.
+//
+// It exists so a read does not have to drain. `parentOf` is unconditional otherwise, and Angular's
+// 1 000-row create measured 1 002 drains for 1 000 reads of which ONE asked about a node the pending
+// batch had touched (`adapters/angular/src/read-fragmentation.probe.test.ts`).
+//
+// THE CLAIM THAT MAKES IT SOUND: a node's parent link changes only through an op that names that
+// node AS THE CHILD. `before` on an insert is a position reference and moves nothing; a parent
+// argument moves the parent's list, not the parent's own link. So a handle absent from here has the
+// same parent in the host as it has here.
+//
+// Creation is in it because the host cannot answer about a node it has never been told exists, which
+// is the other half — and the half a "was it re-parented" set alone would get wrong.
+//
+// NOT A TREE, and that is the line this has to stay on the right side of (`node.ts:2` — no parent,
+// no children, no mirror). It answers about the BUFFER: is this node's placement unpublished. It is
+// emptied by `takeBatch`, so it never outlives one batch and can never disagree with the host.
+let placementPending = new Set<object>();
+
+/** Does the pending batch hold anything that could change what the host says this node's parent is? */
+export function hasPendingPlacement(handle: object): boolean {
+  return placementPending.has(handle);
+}
+
 export function recordCreateElement(
   handle: object,
   viewName: string,
@@ -393,6 +418,7 @@ export function recordCreateElement(
   instanceHandle: unknown,
 ): void {
   instanceHandles.push(instanceHandle);
+  placementPending.add(handle);
   push(
     OP_CREATE_ELEMENT,
     slotOf(handle),
@@ -403,14 +429,17 @@ export function recordCreateElement(
 }
 
 export function recordCreateRawText(handle: object, text: string): void {
+  placementPending.add(handle);
   push(OP_CREATE_RAW_TEXT, slotOf(handle), intern(text));
 }
 
 export function recordCreateAnchor(handle: object): void {
+  placementPending.add(handle);
   push(OP_CREATE_ANCHOR, slotOf(handle));
 }
 
 export function recordAppendChild(parent: object, child: object): void {
+  placementPending.add(child);
   push(OP_APPEND_CHILD, slotOf(parent), slotOf(child));
 }
 
@@ -419,10 +448,12 @@ export function recordInsertBefore(
   child: object,
   before: object,
 ): void {
+  placementPending.add(child);
   push(OP_INSERT_BEFORE, slotOf(parent), slotOf(child), slotOf(before));
 }
 
 export function recordRemoveChild(parent: object, child: object): void {
+  placementPending.add(child);
   push(OP_REMOVE_CHILD, slotOf(parent), slotOf(child));
 }
 
@@ -528,6 +559,9 @@ export function takeBatch(): IMutationBatch {
   values = [];
   instanceHandles = [];
   handles = [];
+  // A fresh Set rather than `.clear()`: the old one is handed to nobody, and clearing a set that
+  // held ten thousand handles on a benchmark create costs more than dropping it.
+  placementPending = new Set();
   stringIds.clear();
   slots.clear();
   valueIds.clear();

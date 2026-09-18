@@ -36,6 +36,7 @@
 // would build three JS trees instead of the one being removed.
 
 import { flushOps, treeHost } from './tree-host';
+import { hasPendingPlacement } from './mutation-buffer';
 import {
   functionPropOf,
   functionPropsOf,
@@ -61,9 +62,15 @@ const NO_CHILDREN: readonly ISymbioteNode[] = [];
  * sentinel that stops the answer there.
  *
  * So `undefined` is not the same question as "is this node attached".
+ *
+ * IT DOES NOT ALWAYS DRAIN, unlike its neighbours. A node's parent link changes only through an op
+ * that names it as the CHILD, so a node the pending batch has not placed already has its final
+ * answer standing in the host — see `hasPendingPlacement`. Angular's 1 000-row create asks this
+ * 1 000 times (its `addLViewToLContainer` calls `renderer.parentNode` once per embedded view) and
+ * exactly ONE of those reads was about a node the batch had touched.
  */
 export function parentOf(node: ISymbioteNode): ISymbioteNode | undefined {
-  flushOps();
+  if (hasPendingPlacement(node)) flushOps();
   const parent = treeHost()?.parentOf(node);
   // A runtime guard, not a cast: the host stores handles as bare objects, and the brand is what says
   // one of them is ours. It also refuses anything a foreign host might hand back.
