@@ -55,6 +55,35 @@
 // two of three inside the bar. Under vitest in dev mode it read reliably WORSE, which is a third
 // runtime giving a third answer to one question.
 //
+// THE TWO INJECTIONS ARE PRICED SEPARATELY NOW, and the result refutes the reason for splitting them.
+// `injectChangeDetectorRef` ends in `new ViewRef(hostComponentView, lView)` (upstream
+// `change_detection/change_detector_ref.ts:139-153`) while finding an `ElementRef` is a lookup, so
+// the prediction was that the allocating one dominates — which would make it the obvious one to
+// remove. Three runs say otherwise:
+//
+//   the ChangeDetectorRef   20.5 ms (bar 9.0)   12.2 ms (bar 2.5)   19.5 ms (bar 32.6, no verdict)
+//   the ElementRef           9.4 ms (bar 9.0)   20.7 ms (bar 3.7)   15.6 ms (bar 32.6, no verdict)
+//
+// Same band, and they SWAP RANK between runs. So an injection on this runtime costs ~1.2-2.1 us
+// whatever it allocates, and reading the allocation in the vendor source predicted a split this
+// instrument cannot see. Their SUM is the stable figure — ~30 ms, the row above — and that is what a
+// change should be sized against.
+//
+// WHAT IT DOES ESTABLISH is the prize for removing ONE injection from the common path: ~12-21 ms on
+// ten thousand elements, i.e. 6-9% of the `ng-elements` bench arm. `ElementRef` cannot go — every
+// `ngOnChanges` names the node. `ChangeDetectorRef` can, and that is a DESIGN question rather than a
+// measurement one: `SymbioteElement` injects one on every element, and the only two readers are the
+// lazy `on*` callback wrapper and `ReadBackElement`'s constructor on three tags. An element carrying
+// no `on*` prop — which is most of a screen, and all ten thousand of the benchmark row — builds a
+// `ViewRef` for nobody.
+//
+// The shape that would collect it is a SECOND directive selected on the callback attributes
+// (`[onPress],[onLayout],…`), holding those inputs and the `ChangeDetectorRef`, so only elements that
+// bind one instantiate it. Not built here, and the hazard to design against is named rather than
+// discovered later: that selector is a hand-written list of names, and a name missing from it makes
+// its callback silently unwrapped — which needs a guard test deriving the list from the directives'
+// own declared inputs, the treatment `ARIA_ALIAS_KEYS` already gets in the engine.
+//
 // SO WHAT IS LEFT IS STRUCTURAL: ~5.5 us to match and instantiate a directive per element and feed
 // its inputs, which is Angular's own and not reachable from here, plus ~3 us of injections that
 // cannot be collected. The next idea has to remove the directive from the RUNTIME rather than make
@@ -300,6 +329,34 @@ class MinimalElement implements OnChanges {
   }
 }
 
+// `minimal` MINUS its `ChangeDetectorRef`, and it is the one injection nobody has ever priced alone.
+//
+// The ladder's "two more injections" row moves `Renderer2` and `ChangeDetectorRef` together, and the
+// two are not alike: `injectChangeDetectorRef` ends in `new ViewRef(hostComponentView, lView)`
+// (upstream `change_detection/change_detector_ref.ts:139-153`), so it ALLOCATES per element, while
+// finding a renderer is a lookup. That is why replacing the renderer injection with a `WeakMap` or a
+// node slot was a wash and this might not be: a lookup traded for a lookup buys nothing, an
+// allocation removed is removed.
+//
+// It is priced because `SymbioteElement` injects one on EVERY element and two places use it — the
+// lazy `on*` callback wrapper, and `ReadBackElement`'s constructor on three tags. The benchmark row
+// carries no `on*` prop at all, so on that screen all ten thousand `ViewRef`s are built for nobody.
+@Directive({ selector: 'no-detector-tag', standalone: true })
+class NoDetectorElement implements OnChanges {
+  private readonly renderer = inject(Renderer2);
+  private readonly host = inject(ElementRef);
+  @Input() testID?: string;
+
+  ngOnChanges(changes: SimpleChanges): void {
+    for (const name of Object.keys(changes))
+      this.renderer.setProperty(
+        this.host.nativeElement,
+        name,
+        changes[name]?.currentValue,
+      );
+  }
+}
+
 // The same three injections and the same one forward, written as a SETTER. Angular writes straight
 // through it and never builds a `SimpleChanges` — `usesOnChanges` is absent from the declaration
 // entirely — so `minimal` against this one prices the lifecycle rather than the forwarding.
@@ -463,6 +520,16 @@ class MinimalArm {
   readonly items = ITEMS;
 }
 
+@Component({
+  selector: 'no-detector-arm',
+  standalone: true,
+  imports: [NoDetectorElement],
+  template: ladderTemplate('no-detector-tag'),
+})
+class NoDetectorArm {
+  readonly items = ITEMS;
+}
+
 interface IArmReading {
   wall: number;
   created: number;
@@ -500,6 +567,7 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
     const arms: readonly (readonly [string, IArm])[] = [
       ['bare', BareArm],
       ['1-inject', OneInjectArm],
+      ['no-detect', NoDetectorArm],
       ['minimal', MinimalArm],
       ['setters', SetterArm],
       ['map-look', MapLookupArm],
@@ -594,6 +662,8 @@ describe('what a matched element directive costs on JavaScriptCore', () => {
         '',
         `a directive at all    ${verdict('1-inject', 'bare')}`,
         `two more injections   ${verdict('minimal', '1-inject')}`,
+        `the ChangeDetectorRef ${verdict('minimal', 'no-detect')}`,
+        `the ElementRef        ${verdict('no-detect', '1-inject')}`,
         `ngOnChanges, not set  ${verdict('minimal', 'setters')}`,
         `proposal, weakmap     ${verdict('minimal', 'map-look')}`,
         `proposal, node slot   ${verdict('minimal', 'slot')}`,
