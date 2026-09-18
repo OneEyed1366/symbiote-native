@@ -330,13 +330,13 @@ export class LocalAuthScreen {
 ```
 
 There's no per-instance service to `inject()` in the Angular case — every function is a plain
-free function off the core package, called straight from the constructor. The React/Vue/Angular
-examples are trimmed from the real canary demo screens
+free function off the core package, called straight from the constructor. The examples above are
+trimmed from the real canary demo screens, which exist for all six Expo canaries
 (`examples/expo-react/screens/LocalAuthScreen.tsx`,
 `examples/expo-vue-sfc/screens/LocalAuthScreen.vue`, `examples/expo-vue-tsx/screens/LocalAuthScreen.tsx`,
+`examples/expo-svelte/screens/LocalAuthScreen.svelte`, `examples/expo-solid/screens/LocalAuthScreen.tsx`,
 `examples/expo-angular/src/screens/LocalAuthScreen.ts`), which also cover
-`getEnrolledLevelAsync`/`supportedAuthenticationTypesAsync` and render a capabilities card. No
-canary demo screen exists yet for Svelte/Solid — the two snippets above follow the same surface.
+`getEnrolledLevelAsync`/`supportedAuthenticationTypesAsync` and render a capabilities card.
 
 ## API
 
