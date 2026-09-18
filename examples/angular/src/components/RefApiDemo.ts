@@ -6,7 +6,11 @@ import {
   ViewChild,
   inject,
 } from '@angular/core';
-import { SYMBIOTE_ELEMENTS, findNodeHandle } from '@symbiote-native/angular';
+import {
+  SYMBIOTE_ELEMENTS,
+  findNodeHandle,
+  type IHostInstance,
+} from '@symbiote-native/angular';
 
 // Static look lives in RefApiDemo.css, compiled at build time by @symbiote-native/css-parser.
 import './RefApiDemo.css';
@@ -57,7 +61,9 @@ import './RefApiDemo.css';
   `,
 })
 export class RefApiDemo implements AfterViewInit {
-  @ViewChild('boxRef') private boxRef?: ElementRef<unknown>;
+  // `ElementRef<IHostInstance>`, not `ElementRef<unknown>`: the imperative surface lives on the
+  // engine's public instance, and an unknown `nativeElement` type-checks here and fails at every use.
+  @ViewChild('boxRef') private boxRef?: ElementRef<IHostInstance>;
 
   private readonly changeDetector = inject(ChangeDetectorRef);
 

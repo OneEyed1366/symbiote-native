@@ -9,6 +9,7 @@ import {
   VListItemDirective,
   VSectionHeaderDirective,
   VSectionItemDirective,
+  type IHostInstance,
   type ISection,
 } from '@symbiote-native/angular';
 // static look compiled at build time by @symbiote-native/css-parser
@@ -170,8 +171,9 @@ const paritySections: ISection<ISectionEntry>[] = [
 })
 export class ParityDemo {
   // An `ElementRef` off the template reference, not a `Text` COMPONENT: `<text>` is a tag that
-  // `SYMBIOTE_ELEMENTS` covers, and `nativeElement` is the same engine node either way.
-  @ViewChild('titleRef') private titleRef?: ElementRef<unknown>;
+  // `SYMBIOTE_ELEMENTS` covers, and `nativeElement` is the same engine node either way — typed as
+  // `IHostInstance`, which is what the imperative calls below are declared against.
+  @ViewChild('titleRef') private titleRef?: ElementRef<IHostInstance>;
   @ViewChild(FlatList) private listRef?: FlatList<IParityRow>;
 
   readonly parityRows = parityRows;
