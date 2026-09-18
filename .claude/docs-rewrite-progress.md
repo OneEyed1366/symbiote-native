@@ -72,6 +72,30 @@ Verified NOT stale (checked, no change needed — don't re-check unless code mov
   "beta"/"alpha" hits were false positives (`rotation.beta` sensor axis, "Alphanumerics"), not
   project-status claims.
 
+## Second pass (commit 6ae1bb23 → next) — swept the whole priority list below
+
+Ran targeted greps (`retained tree|clone-on-write|shadow.tree|nativeFabricUIManager|beta|alpha|
+in progress|mutation-buffer`) across every remaining group in the priority list: `learn/*.mdx`,
+`howtos/*.mdx`, `api/{angular,components,react,solid,svelte,vue,index}.mdx` — all clean, no hits.
+`index.mdx`/`quick-start.mdx`/`testing.mdx`/`project/faq.mdx` had hits but all were accurate at
+their level of abstraction, **except** `index.mdx` said Solid was "still catching up before it
+joins the live switcher" — false, README/status.mdx both say Solid is already on it. Fixed.
+All 8 remaining `.claude/skills/*/SKILL.md` — clean (only `symbiote-devtools-inspector` had the
+`commit.ts` staleness, already handled). `packages/*/README.md` + their `.mdx` mirrors — clean
+(the `nativeFabricUIManager`/`clone-on-write` hits in `navigation/README.md` and
+`packages/test-utils.mdx` are about the headless *test* fake, unrelated to the production C++
+engine — no change needed). `examples/*/README.md` (remaining ones), `navigation/*.mdx`,
+`benchmarks/*/README.md`, `scripts/*/README.md`, `core/css-parser/README.md`,
+`core/test-utils/README.md` — all clean.
+
+**Conclusion: the architecture-honesty sweep is essentially done.** A final whole-repo grep for
+the hard markers (`shadow.tree|shadow tree|JS.side retained|retained tree lives in (Java|Type)
+Script|@symbiote-native/shared\b|mutation-buffer\.ts`) across all 138 tracked files returns hits
+only in the files already fixed (README.md, CLAUDE.md, how-it-works.mdx) plus this progress file
+itself (intentional). If resuming this task later, re-run that grep first — if it's still clean,
+the remaining work (if any) is prose/structure quality per Diátaxis, not architecture accuracy,
+and should be scoped as a separate, explicit ask rather than assumed from the original prompt.
+
 ## Not yet checked (the bulk of the 138 — pick up here)
 
 Priority order for the next iteration:
