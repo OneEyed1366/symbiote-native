@@ -19,6 +19,37 @@ read catches things a keyword pattern can't anticipate.** If continuing with the
 package READMEs by reading them fully" approach, expect roughly this hit rate (1 real finding per
 ~1 full README read so far) and keep doing it rather than trusting exhausted grep patterns.
 
+## Seventh pass — the local-auth finding generalized to a real cluster
+
+Followed up on the "grep-blind-spot" lesson from pass 6 by checking every package README sharing
+the same "mirror the real canary demo screens — <list of files>" sentence
+(`grep -ln "canary demo screens" packages/*/README.md` → 9 files: application, crypto, device,
+sensors, local-auth, tracking-transparency, system-ui, web-browser, store-review). Cross-checked
+each file list against `test -f examples/expo-{svelte,solid}/screens/<Name>Screen.*`:
+
+- **`device/README.md` and `sensors/README.md` omitted Svelte AND Solid from the list even though
+  both screens exist** (`DeviceScreen.svelte`/`.tsx`, `SensorsScreen.svelte`/`.tsx` all present,
+  confirmed with `test -f`). Fixed both to list all six.
+- `local-auth/README.md` already fixed in pass 6 (said the screens didn't exist at all, worse than
+  a missing-from-list omission).
+- `application/README.md` and `crypto/README.md` HAD all six files listed but the prose said
+  "All five examples" — off-by-one against their own list (5 frameworks, 6 files since Vue ships
+  both SFC and TSX). Fixed to "All six".
+- `tracking-transparency`, `system-ui`, `web-browser`, `store-review` — already complete, no
+  change needed.
+
+Also checked the non-matching "demo screen" (singular) mentions in `battery`/`cellular`/
+`clipboard`/`navigation` — different sentence structure (per-snippet inline refs or a glob
+pattern), not the same enumeration-staleness shape; `cellular` and `clipboard` already list all
+six explicitly, `battery` references inline per-framework, `navigation` uses a glob. No changes
+needed there.
+
+**Pattern confirmed:** the missing-Svelte/Solid staleness was NOT a one-off (contra pass 6's
+tentative "looks like it was a one-off") — it's a real cluster from whichever session added the
+Svelte/Solid Expo canary screens and updated most but not all of the wrapper-package READMEs that
+reference them. Docs-site `.mdx` mirrors for these same packages were checked and don't repeat
+this sentence pattern at all (different structure), so no mirror-side fix was needed.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
