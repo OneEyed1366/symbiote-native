@@ -120,9 +120,17 @@ describe('what a scroll content node sends native', () => {
       vertical({ maintainVisibleContentPosition: { minIndexForVisible: 0 } })
         .payload.collapsableChildren,
     ).toBe(false);
+  });
+
+  // why: `snapToAlignment` is HALF a reason, and only on Android — RN's own gate is
+  // `maintainVisibleContentPosition != null || (Platform.OS === 'android' && snapToAlignment !=
+  // null)` (`ScrollView.js:1731-1733`). We honoured it on both platforms, so an iOS ScrollView that
+  // merely snaps stopped Yoga flattening its children for no reason RN has. The Android half is
+  // asserted on the arm that compiles it (`android-rules.android.itest.ts`).
+  it('lets a snapping iOS scroller collapse its children, as RN does', () => {
     expect(
       vertical({ snapToAlignment: 'center' }).payload.collapsableChildren,
-    ).toBe(false);
+    ).toBe(undefined);
   });
 
   // why: PRESENCE decides, not truthiness — `snapToAlignment: 'start'` and an empty
@@ -178,7 +186,12 @@ describe('what a scroll content node sends native', () => {
     mounted();
     expect(committedPayloadOf(content)?.collapsableChildren).toBe(undefined);
 
-    routeProp(owner, 'snapToAlignment', 'center');
+    // `maintainVisibleContentPosition` rather than `snapToAlignment`, because the latter is an
+    // Android-only leg and this claim — that a late write to the OWNER re-derives the CHILD — is
+    // platform-independent. `slotDerived` names both, so either would do on the Android arm.
+    routeProp(owner, 'maintainVisibleContentPosition', {
+      minIndexForVisible: 0,
+    });
     surface.commit();
     mounted();
 

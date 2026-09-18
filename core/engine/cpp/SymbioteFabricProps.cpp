@@ -1119,9 +1119,20 @@ dynamic foldScrollContentProps(
     const dynamic &props,
     bool isHorizontal,
     const dynamic *ownerProps) {
-  const bool preserves = ownerProps != nullptr &&
-      (ownerProps->get_ptr("maintainVisibleContentPosition") != nullptr ||
-       ownerProps->get_ptr("snapToAlignment") != nullptr);
+  // `ScrollView.js:1731-1733`, and the `snapToAlignment` leg is ANDROID-ONLY there. It was written
+  // here without the gate until 2026-09-18, so an iOS scroller that merely snapped stopped Yoga
+  // flattening its children — work RN never asks for. A compile-time branch rather than a component
+  // name, for the reason `android_ripple` already is: a content node commits as
+  // `RCTScrollContentView` on both platforms, so nothing on the wire tells them apart.
+  const bool snaps =
+#ifdef ANDROID
+      ownerProps != nullptr && ownerProps->get_ptr("snapToAlignment") != nullptr;
+#else
+      false;
+#endif
+  const bool preserves = snaps ||
+      (ownerProps != nullptr &&
+       ownerProps->get_ptr("maintainVisibleContentPosition") != nullptr);
 
   // The identity return the reference fold had: a vertical content view under a scroller that
   // anchors nothing has nothing to add, which is the common case and the one worth not copying for.

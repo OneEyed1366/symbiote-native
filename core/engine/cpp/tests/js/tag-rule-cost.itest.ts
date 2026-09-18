@@ -431,9 +431,11 @@ registerHostBehavior('scroll-content-in-js', {
   attach(): void {},
   detach(): void {},
   foldPayload(props: Readonly<Record<string, unknown>>) {
-    const preserves =
-      jsOwnerProps.maintainVisibleContentPosition !== undefined ||
-      jsOwnerProps.snapToAlignment !== undefined;
+    // `snapToAlignment` is deliberately NOT a leg here, and the omission is the arm's, not a
+    // simplification: it is Android-only in the engine's rule (`ScrollView.js:1731-1733`), so a twin
+    // that read it would disagree with the rule on this build and `expectSamePayload` would refuse
+    // to time them. It did exactly that when the gate landed, which is what the guard is for.
+    const preserves = jsOwnerProps.maintainVisibleContentPosition !== undefined;
     if (!preserves) return props;
     return { ...props, collapsableChildren: false };
   },
@@ -815,9 +817,10 @@ describe('what a ported tag rule costs on each side of the wire', () => {
       'RCTScrollContentView',
       'scroll-content',
       SCROLL_CONTENT_PROPS,
-      {
-        snapToAlignment: 'center',
-      },
+      // The platform-INVARIANT anchor prop, so this arm prices the same rule on every build. Its
+      // Android-only sibling `snapToAlignment` would make the two arms disagree here — see the
+      // twin's own note.
+      { maintainVisibleContentPosition: { minIndexForVisible: 0 } },
     );
   });
 

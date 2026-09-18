@@ -30,6 +30,7 @@
 import {
   registerButtonBehavior,
   registerPressableBehavior,
+  registerScrollViewBehavior,
   registerTextInputBehavior,
   registerTouchableNativeFeedbackBehavior,
 } from '@symbiote-native/components';
@@ -52,6 +53,7 @@ registerPressableBehavior();
 registerButtonBehavior();
 registerTouchableNativeFeedbackBehavior();
 registerTextInputBehavior();
+registerScrollViewBehavior();
 
 const SINGLELINE = 'RCTSinglelineTextInputView';
 
@@ -303,6 +305,30 @@ describe('the rules that only an Android build compiles', () => {
     });
 
     expect(payload.keyboardType).toBe('default');
+  });
+
+  // why: `snapToAlignment` stops the content node's children collapsing on ANDROID ONLY — RN's gate
+  // is `maintainVisibleContentPosition != null || (Platform.OS === 'android' && snapToAlignment !=
+  // null)` (`ScrollView.js:1731-1733`). It was honoured on both platforms here until 2026-09-18, so
+  // this is the arm that pins the half a compile-time branch made unreachable from the other one.
+  // The iOS NEGATIVE is `scroll-content-payload.itest.ts`, "lets a snapping iOS scroller collapse
+  // its children" — the two are twins and neither means much alone.
+  it('stops a snapping scroller collapsing its content children', () => {
+    const surface = createSurface(ROOT_TAG);
+    const owner: ISymbioteNode = createElement(
+      'RCTScrollView',
+      false,
+      'scroll-view',
+    );
+    routeProp(owner, 'snapToAlignment', 'center');
+    const content = owner.childHost;
+    if (content === undefined) throw new Error('the behavior built no content');
+    appendChild(owner, createElement('RCTView', false, 'view'));
+    surface.appendChild(owner);
+    surface.commit();
+    mounted();
+
+    expect(committedPayloadOf(content)?.collapsableChildren).toBe(false);
   });
 });
 
