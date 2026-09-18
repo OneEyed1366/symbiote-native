@@ -2364,6 +2364,101 @@ call, Angular's `textDefaultFor`, the `defaults`/`IFoldOp` half of `host-primiti
 package subpaths. **Seven implementations of the alias, then the bag fold itself — the whole
 mechanism, not just its users.**
 
+### RN's two Text defaults had SIX implementations, and the headless builder was the wrong place for the last
+
+`ellipsizeMode ?? 'tail'` and `allowFontScaling !== false` (`Text.js:289,291`) were written out in
+`SymbioteFabricProps.cpp`, in `core/engine/src/fabric-props.ts`, in `core/components/src/text-props.ts`
+(`resolveTextProps`), in Angular's `TextHost`, in Vue's renderer and in Solid's. Every copy had a
+sound-sounding local reason and most had a comment saying the OTHERS were the seed. All five JS ones
+are gone.
+
+**The seam is the payload builder, keyed on the component**, and what makes it the right one is that
+it reads the AUTHORED bag: a null, an explicit `undefined` and an absent prop are alike by the time
+it looks. That is the question every copy existed to answer. Angular declared two real `@Input()`s
+specifically because "a default can only be applied by code that can SEE whether the caller supplied
+a value, and a pass-through host binding is invisible to the component" — true, and answered one
+layer down, so `TextHost` is an ordinary primitive host again. Solid went through THREE shapes for
+the same reason (a create seed, a substitute-on-`undefined`, then a fold per key because `??` has to
+catch a null too); the null that cost it two revisions is `ellipsize->isNull()` in C++, once.
+
+**THE HEADLESS BUILDER'S COPY IS THE ONE WORTH READING TWICE, because it looks like the one that
+should stay.** `core/engine/src/fabric-props.ts` is not dead code — it builds every payload the
+recording host serves, so its copy is what made ~29 vitest cases green. But it is a TEST-ONLY
+builder (the TypeScript reference applier it was also written for no longer exists), and a payload
+rule asserted against a second copy of itself is asserted against nothing. That is already the
+stated policy for the ten tag rules — `fabric-props.ts` deliberately holds none of them — and these
+two were simply on the wrong side of a line the file had already drawn.
+
+**The hazard was live, not theoretical.** `foldTextInputValue`'s `defaultValue` leg appeared in NO
+itest, so the device rule could have broken with every suite green; `text-input-payload.itest.ts` now
+pins the precedence, the erasure, the explicit-`text` case, the component gate and the multiline tag.
+**Break-tested by neutering the C++ rule** — four of the five new cases go red, and the fifth stays
+green because it is the control (a view is untouched either way).
+
+**One test file's header contained its own refutation, and reading it is what turned the deletion
+from a guess into a decision.** `core/engine/src/__tests__/text-payload-defaults.test.ts` said it
+"keeps the copies honest"; being a vitest over one of the two copies, it could only ever keep the one
+honest. The C++ file's comment cited it for the same claim. Two places asserted a guarantee that no
+code provided.
+
+**WHAT THE ADAPTER TESTS BECAME, and the rule generalises to the next port.** Each case split into a
+claim about the PLATFORM (moved to an itest) and a claim about the ADAPTER (kept, re-aimed). The
+adapter half is almost always one of two things: *does this adapter commit the node under the
+component the rule is keyed on*, and *does an authored value reach the engine unchanged* — including
+the `false` that `!== false` exists for, which is the value a renderer is most likely to swallow.
+Vue's and Solid's clear-back cases INVERT: they used to assert the adapter substitutes the default
+for an explicit `undefined`, and now assert it forwards the clear untouched, which is the opposite
+behaviour and the correct one.
+
+**Two cases had to be deleted rather than re-aimed, and the tell is the same both times: after the
+change they passed for a reason unrelated to their subject.** "Does not seed text defaults onto a
+View" is trivially true once nothing seeds anything anywhere. An absence assertion whose harness can
+no longer produce the key passes forever and means nothing — the same shape already recorded for
+ActivityIndicator's colour case.
+
+**`foldTextInputValue` DID NOT GO WITH THEM, and splitting there was the point rather than a
+shortcut.** Removing both at once turned 47 tests red across 25 files; removing the defaults alone,
+29. The remainder are mostly TextInput MACHINE tests — the controlled-value handshake, which stays in
+JS by design — using `payload.text` as their observable, so re-aiming them is a different piece of
+work with a different argument. Two rules deleted in one commit is one commit that cannot be
+attributed, which is the discipline this file already applies to measurements. The twin is marked in
+`fabric-props.ts` as the one rule that breaks its own header, with the reason it waited.
+
+### TWO GUARDS THAT HAVE STOPPED GUARDING — found while porting, recorded rather than quietly fixed
+
+Both were noticed by asking what a passing test can still SEE, which is the question the text-defaults
+port made routine. Neither is fixed: each repair is a decision with its own scope, and folding either
+into a port would be the unattributable-commit mistake the section above exists about.
+
+**`core/engine/src/applier-is-not-forked.test.ts` is trivially green, for the FOURTH time**, in a
+file that documents its own three previous expiries and states the lesson each time ("a guard keyed
+on HOW something is built expires when the build changes"). Its scan looks for `registerCommitHook` /
+`completeSurface` in our native sources after stripping comments; both markers now appear ONLY in
+comments in `SymbioteTree.cpp` and `SymbioteEngineBindings.h`, so `nativeApplierFiles()` returns
+empty and the "whole point" case early-returns before asserting anything. Verified by running the
+file's own `withoutComments` over both sources.
+
+And the obligation itself has no subject any more: the differential it demands,
+`core/test-utils/src/tree-applier.fuzz.test.ts`, does not exist — nor does `tree-applier.ts`, the
+TypeScript reference tree host it was written to hold honest. **There are not two tree hosts over one
+buffer now; there is one.** So the pair this file forbids is, for the fourth time, not a pair. The
+open question is whether anything survives re-aiming, or whether the file should go.
+
+**`adapters/solid/src/bare-tag-payload-parity.test.tsx` compares a payload with itself**, in all its
+cases. It mounts `payloadOf(WRAPPER_ROOT, () => <text …/>)` against
+`payloadOf(TAG_ROOT, () => <text …/>)` — identical JSX, and `adapters/solid/src/components/` holds no
+`text` or `view` component any more, only `*-props.ts`. Its own header predicted exactly this ("once
+`View` is a string, there is no component left to compare against"). The comparison DID its job
+across the switch and the record is in git; what is left is a test that cannot go red for its stated
+reason. The repair is the shape its sibling `tag-folds.test.tsx` already uses — one arm, absolute
+expectations naming the keys the layer now produces — and the Text case has had it done; the other
+seven are noted in the file and left standing.
+
+**The general form, and it is the cheap check both came from: a test that passes tells you nothing
+until you know what would make it fail.** For the first, the scan's own input had drifted out from
+under it; for the second, the two arms converged. Neither is visible in a green run, and both are one
+question away.
+
 ### A derived node's tag never reached C++ — and ActivityIndicator is the first primitive at ZERO folds
 
 `recordSetTag` is emitted by `attachHostBehavior` and by nothing else, so a tag crosses only when JS
