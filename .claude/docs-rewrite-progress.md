@@ -104,6 +104,30 @@ navigation `.mdx`, all `.claude/skills/*.md`, and every `packages/*/README.md` e
 `cellular`/`clipboard`/`secure-store`/`sharing`/`sms`/`standard-web-crypto` (grep-checked, not
 full-read — lower priority, no "canary demo screens" pattern present to be stale in).
 
+## Tenth pass — package README sweep is now COMPLETE
+
+Read the last 4 unread package READMEs in full: `secure-store`, `sharing`, `sms`,
+`standard-web-crypto`. All four clean — no path errors, no framework-count staleness, no version
+drift. Combined with passes 6-9, **every one of the 27 `packages/*/README.md` files has now
+either been fully read or grep-swept for the known staleness patterns.** Package-level doc
+accuracy for this task is done; don't re-read these again unless new evidence surfaces (a new
+package added, a new adapter, etc.).
+
+## What's left, in priority order (for the next iteration)
+
+Package READMEs are done (see above). Not yet full-read, only grep-swept:
+1. `examples/*/README.md` (13 files) — worth a full-read pass the same way packages got one; these
+   describe per-canary setup and could carry the same kind of stale file-path/framework-list claim.
+2. `apps/docs-site/src/content/docs/docs/{learn,howtos}/*.mdx` (19 files) — grep-swept clean for
+   the specific patterns searched, but never fully read end-to-end.
+3. `apps/docs-site/src/content/docs/docs/navigation/*.mdx` (6 files) and
+   `apps/docs-site/src/content/docs/docs/packages/*.mdx` (25 files, docs-site mirrors of the
+   package READMEs just finished) — same idea: full-read a sample rather than trust the grep.
+
+If none of these turn up anything in a full read, that's a real signal to stop mining for smaller
+findings and either do (a) the genuine Diátaxis prose-quality pass, or (b) report the task
+substantially complete rather than continuing to search.
+
 ## State as of the 6th pass — read this first
 
 The high-signal work is done: every place that described the retired JS-only engine as current
