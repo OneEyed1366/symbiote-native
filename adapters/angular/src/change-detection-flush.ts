@@ -61,6 +61,22 @@ interface IViewMarker {
 export type ICallbackWrapper = (key: string, value: unknown) => unknown;
 
 /**
+ * Is this prop write one the wrapper would touch at all?
+ *
+ * Exported so a CALLER can ask before building a wrapper it may never need — an element directive is
+ * constructed per TAG, and a screen's tags overwhelmingly carry no `on*` function prop. Keeping the
+ * question here rather than copying the two tests at the call site is what stops the predicate and
+ * the wrapper drifting apart.
+ */
+export function isWrappableCallback(key: string, value: unknown): boolean {
+  return (
+    ON_PREFIX.test(key) &&
+    typeof value === 'function' &&
+    key !== PER_FRAME_CALLBACK
+  );
+}
+
+/**
  * Makes an app callback handed to the engine as a PROP re-enter Angular's update loop.
  *
  * An `(event)` binding is wrapped by Angular's own `wrapListenerIn_markDirtyAndPreventDefault` and
@@ -82,22 +98,6 @@ export type ICallbackWrapper = (key: string, value: unknown) => unknown;
  * ONE wrapper per original handler, for the caller's lifetime. A fresh closure per push would make
  * the engine store a new listener every time and would defeat every downstream identity check.
  */
-/**
- * Is this prop write one the wrapper would touch at all?
- *
- * Exported so a CALLER can ask before building a wrapper it may never need — an element directive is
- * constructed per TAG, and a screen's tags overwhelmingly carry no `on*` function prop. Keeping the
- * question here rather than copying the two tests at the call site is what stops the predicate and
- * the wrapper drifting apart.
- */
-export function isWrappableCallback(key: string, value: unknown): boolean {
-  return (
-    ON_PREFIX.test(key) &&
-    typeof value === 'function' &&
-    key !== PER_FRAME_CALLBACK
-  );
-}
-
 export function createCallbackWrapper(
   view: IViewMarker,
   node: unknown,
