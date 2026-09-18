@@ -2,27 +2,26 @@ import {
   AfterViewInit,
   ChangeDetectorRef,
   Component,
+  ElementRef,
   ViewChild,
   inject,
 } from '@angular/core';
-import {
-  SYMBIOTE_ELEMENTS,
-  Text,
-  View,
-  findNodeHandle,
-} from '@symbiote-native/angular';
+import { SYMBIOTE_ELEMENTS, findNodeHandle } from '@symbiote-native/angular';
 
 // Static look lives in RefApiDemo.css, compiled at build time by @symbiote-native/css-parser.
 import './RefApiDemo.css';
 
-// @ViewChild gives back the real ViewHost component instance directly (no reactive-proxy
-// wrapping to worry about, unlike Vue's shallowRef requirement) — its `nativeElement`
-// getter (SymbiotePrimitiveHost) is the engine host node measure/setNativeProps run on.
+// @ViewChild on a template reference gives back Angular's own ElementRef, whose `nativeElement` IS
+// the engine host node — the same node measure / setNativeProps / findNodeHandle run on, and no
+// reactive-proxy wrapping to worry about the way Vue's shallowRef requirement forces.
+//
+// It used to name a `View` COMPONENT here. `<view>` is a tag covered by `SYMBIOTE_ELEMENTS` and
+// nothing else is needed for it — the host components were a second mechanism on the same selector.
 
 @Component({
   selector: 'RefApiDemo',
   standalone: true,
-  imports: [View, Text, SYMBIOTE_ELEMENTS],
+  imports: [SYMBIOTE_ELEMENTS],
   template: `
     <view class="section-nested">
       <text class="section-label"
@@ -58,7 +57,7 @@ import './RefApiDemo.css';
   `,
 })
 export class RefApiDemo implements AfterViewInit {
-  @ViewChild('boxRef') private boxRef?: View;
+  @ViewChild('boxRef') private boxRef?: ElementRef<unknown>;
 
   private readonly changeDetector = inject(ChangeDetectorRef);
 

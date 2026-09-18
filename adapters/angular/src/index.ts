@@ -4,6 +4,19 @@
 //
 // SEAM SCAFFOLD: mount/unmount + the renderer seam + host intrinsic selectors. Full RN-like
 // composed components still flow through the shared @symbiote-native/components bridge.
+//
+// `View` AND `Text` LEFT THIS BARREL ON 2026-09-18. They were `@Component`s on the `view` and `text`
+// SELECTORS — a second mechanism on the same tags `SYMBIOTE_ELEMENTS` covers, kept for one stated
+// reason their own header gives: "Declaring `style` as a real Angular input prevents Angular's CSS
+// style engine from decomposing RN `StyleProp` arrays". `SymbioteStyleHost` does exactly that now,
+// for every tag, at a directive's cost rather than a component's.
+//
+// What an app loses is nothing it cannot spell better: `@ViewChild('ref')` on a template reference
+// returns Angular's own `ElementRef`, whose `nativeElement` IS the engine host node — the same
+// property the component exposed, reached without a component instance per element.
+//
+// They are still used INSIDE the adapter, where the composed components render them; that is a
+// separate question from what an app imports.
 
 import './register';
 
@@ -20,9 +33,7 @@ export {
   stableAnchorStyle,
   SymbioteHostPropsDirective,
   SymbioteStyleInputDirective,
-  Text,
   TouchableNativeFeedback,
-  View,
   VirtualizedList,
   VirtualizedSectionList,
   VListEmptyDirective,

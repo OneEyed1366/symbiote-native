@@ -1,4 +1,4 @@
-import { Component, ViewChild } from '@angular/core';
+import { Component, ElementRef, ViewChild } from '@angular/core';
 import {
   AccessibilityInfo,
   FlatList,
@@ -6,8 +6,6 @@ import {
   SYMBIOTE_ELEMENTS,
   SectionList,
   SymbioteHostPropsDirective,
-  Text,
-  View,
   VListItemDirective,
   VSectionHeaderDirective,
   VSectionItemDirective,
@@ -65,8 +63,6 @@ const paritySections: ISection<ISectionEntry>[] = [
   selector: 'ParityDemo',
   standalone: true,
   imports: [
-    View,
-    Text,
     SYMBIOTE_ELEMENTS,
     FlatList,
     SectionList,
@@ -173,7 +169,9 @@ const paritySections: ISection<ISectionEntry>[] = [
   `,
 })
 export class ParityDemo {
-  @ViewChild('titleRef') private titleRef?: Text;
+  // An `ElementRef` off the template reference, not a `Text` COMPONENT: `<text>` is a tag that
+  // `SYMBIOTE_ELEMENTS` covers, and `nativeElement` is the same engine node either way.
+  @ViewChild('titleRef') private titleRef?: ElementRef<unknown>;
   @ViewChild(FlatList) private listRef?: FlatList<IParityRow>;
 
   readonly parityRows = parityRows;
